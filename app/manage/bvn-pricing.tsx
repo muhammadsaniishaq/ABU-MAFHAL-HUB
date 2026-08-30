@@ -72,7 +72,8 @@ export interface BVNServicePrice {
     cost_price: number; // Official AgentHub API Cost Price
     markup_price: number; // Admin Profit Margin (Riba)
     hasBankFees?: boolean;
-    status: 'ACTIVE' | 'INACTIVE';
+    status: 'active' | 'maintenance' | 'hidden';
+    maintenance_msg?: string;
     icon: string;
 }
 
@@ -86,7 +87,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 5000,
         markup_price: 1000,
         hasBankFees: true,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'calendar-outline',
     },
     {
@@ -98,7 +99,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 7000,
         markup_price: 1500,
         hasBankFees: true,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'phone-portrait-outline',
     },
     {
@@ -110,7 +111,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 5000,
         markup_price: 1000,
         hasBankFees: true,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'person-outline',
     },
     {
@@ -122,7 +123,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 7000,
         markup_price: 1500,
         hasBankFees: true,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'create-outline',
     },
     {
@@ -134,7 +135,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 7000,
         markup_price: 1500,
         hasBankFees: true,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'call-outline',
     },
     {
@@ -146,7 +147,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 5000,
         markup_price: 1000,
         hasBankFees: true,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'phone-portrait-outline',
     },
     {
@@ -158,7 +159,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 150,
         markup_price: 100,
         hasBankFees: false,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'document-text-outline',
     },
     {
@@ -170,7 +171,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 900,
         markup_price: 300,
         hasBankFees: false,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'server-outline',
     },
     {
@@ -182,7 +183,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 900,
         markup_price: 300,
         hasBankFees: false,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'search-outline',
     },
     {
@@ -194,7 +195,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 150,
         markup_price: 100,
         hasBankFees: false,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'shield-checkmark-outline',
     },
     {
@@ -206,7 +207,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 500,
         markup_price: 300,
         hasBankFees: false,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'git-compare-outline',
     },
     {
@@ -218,7 +219,7 @@ const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
         cost_price: 1500,
         markup_price: 500,
         hasBankFees: false,
-        status: 'ACTIVE',
+        status: 'active',
         icon: 'person-add-outline',
     },
 ];
@@ -230,6 +231,10 @@ export default function EnterpriseBVNPricingScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Global BVN Gateway Status Switch
+    const [globalBVNStatus, setGlobalBVNStatus] = useState<'active' | 'maintenance' | 'hidden'>('active');
+    const [globalMaintenanceMsg, setGlobalMaintenanceMsg] = useState('BVN verification services are currently undergoing routine core server maintenance. Services will resume shortly.');
 
     // Filters
     const [activeTab, setActiveTab] = useState<'all' | 'modification' | 'retrieval' | 'slip' | 'core'>('all');
@@ -248,7 +253,20 @@ export default function EnterpriseBVNPricingScreen() {
         try {
             setLoading(true);
 
-            // 1. Fetch from service_pricing table
+            // 1. Fetch Global Settings
+            const { data: globalSetting } = await supabase
+                .from('app_settings')
+                .select('key, value')
+                .in('key', ['bvn_global_status', 'bvn_global_maintenance_msg']);
+
+            if (globalSetting) {
+                const statusRow = globalSetting.find(g => g.key === 'bvn_global_status');
+                if (statusRow?.value) setGlobalBVNStatus(statusRow.value as any);
+                const msgRow = globalSetting.find(g => g.key === 'bvn_global_maintenance_msg');
+                if (msgRow?.value) setGlobalMaintenanceMsg(msgRow.value);
+            }
+
+            // 2. Fetch from service_pricing table
             const { data, error } = await supabase
                 .from('service_pricing')
                 .select('*')
@@ -261,6 +279,8 @@ export default function EnterpriseBVNPricingScreen() {
                         ...def,
                         cost_price: row?.cost_price !== undefined ? Number(row.cost_price) : def.cost_price,
                         markup_price: row?.markup_price !== undefined ? Number(row.markup_price) : def.markup_price,
+                        status: (row?.status as any) || def.status || 'active',
+                        maintenance_msg: row?.maintenance_msg || undefined,
                     };
                 });
                 setServices(merged);
@@ -284,6 +304,7 @@ export default function EnterpriseBVNPricingScreen() {
                 name: s.name,
                 cost_price: s.cost_price,
                 markup_price: s.markup_price,
+                status: s.status,
                 updated_at: new Date().toISOString(),
             }));
 
@@ -300,7 +321,7 @@ export default function EnterpriseBVNPricingScreen() {
     }, []);
 
     // Update single field locally
-    const handleUpdateServiceField = (id: string, field: 'cost_price' | 'markup_price', value: number) => {
+    const handleUpdateServiceField = (id: string, field: 'cost_price' | 'markup_price' | 'status', value: any) => {
         setServices(prev =>
             prev.map(s => {
                 if (s.id === id) {
@@ -315,12 +336,20 @@ export default function EnterpriseBVNPricingScreen() {
     const handleSaveAllBVNPrices = async () => {
         setSaving(true);
         try {
+            // 1. Save Global Gateway Settings
+            await supabase.from('app_settings').upsert([
+                { key: 'bvn_global_status', value: globalBVNStatus, updated_at: new Date().toISOString() },
+                { key: 'bvn_global_maintenance_msg', value: globalMaintenanceMsg, updated_at: new Date().toISOString() }
+            ], { onConflict: 'key' });
+
+            // 2. Save Individual Service Statuses & Margins
             const rowsToUpsert = services.map(s => ({
                 id: s.id,
                 service_category: 'bvn',
                 name: s.name,
                 cost_price: s.cost_price,
                 markup_price: s.markup_price,
+                status: s.status,
                 updated_at: new Date().toISOString(),
             }));
 
@@ -338,6 +367,7 @@ export default function EnterpriseBVNPricingScreen() {
                     name: 'BVN Modification Request',
                     cost_price: defaultMod.cost_price,
                     markup_price: defaultMod.markup_price,
+                    status: defaultMod.status,
                     updated_at: new Date().toISOString(),
                 },
                 {
@@ -346,23 +376,26 @@ export default function EnterpriseBVNPricingScreen() {
                     name: 'BVN Phone Retrieval',
                     cost_price: defaultPhone.cost_price,
                     markup_price: defaultPhone.markup_price,
+                    status: defaultPhone.status,
                     updated_at: new Date().toISOString(),
                 }
             ], { onConflict: 'id' });
 
             await supabase.from('audit_logs').insert({
-                action: 'Updated AgentHub BVN Pricing & Markup Margins',
+                action: 'Updated AgentHub BVN Pricing, Maintenance & Visibility Matrix',
                 target_resource: 'BVN Identity Pricing',
                 details: {
+                    globalStatus: globalBVNStatus,
                     totalServices: services.length,
-                    averageMarkup: avgProfitMargin,
-                    servicesList: services.map(s => ({ code: s.code, name: s.name, cost: s.cost_price, markup: s.markup_price, total: s.cost_price + s.markup_price })),
+                    activeCount: services.filter(s => s.status === 'active').length,
+                    maintenanceCount: services.filter(s => s.status === 'maintenance').length,
+                    hiddenCount: services.filter(s => s.status === 'hidden').length,
                 },
             });
 
             Alert.alert(
-                'BVN Pricing Live 🚀',
-                'All AgentHub API cost prices and customer selling prices saved to production. The app will now charge users with your configured profit margins!'
+                'BVN Matrix Saved 🚀',
+                'All service prices, maintenance modes, and hidden statuses are now active in production!'
             );
             fetchBVNPrices();
         } catch (e: any) {
@@ -420,7 +453,7 @@ export default function EnterpriseBVNPricingScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: 'BVN Services Pricing',
+                    title: 'BVN Pricing & Visibility Control',
                     headerStyle: { backgroundColor: T.navyPrimary },
                     headerTintColor: '#FFFFFF',
                     headerShadowVisible: false,
@@ -440,34 +473,82 @@ export default function EnterpriseBVNPricingScreen() {
             {/* Top Telemetry Stat Hero */}
             <LinearGradient colors={[T.navyPrimary, T.navyDeep, T.navyMid]} style={styles.heroSummaryBar}>
                 <View style={styles.liveIndicatorRow}>
-                    <View style={styles.pulseDot} />
-                    <Text style={styles.liveIndicatorText}>AGENTHUB KYC ENGINE • OFFICIAL BVN CATALOGUE</Text>
+                    <View style={[styles.pulseDot, globalBVNStatus === 'maintenance' ? { backgroundColor: T.goldBright } : globalBVNStatus === 'hidden' ? { backgroundColor: T.danger } : { backgroundColor: T.success }]} />
+                    <Text style={styles.liveIndicatorText}>
+                        AGENTHUB BVN CONTROL • GATEWAY {globalBVNStatus.toUpperCase()}
+                    </Text>
                 </View>
 
                 <View style={styles.summaryGrid}>
                     <View style={styles.summaryItem}>
                         <Text style={styles.summaryValue}>{services.length}</Text>
-                        <Text style={styles.summaryLabel}>Active Services</Text>
+                        <Text style={styles.summaryLabel}>Total Items</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.success }]}>
+                            {services.filter(s => s.status === 'active').length}
+                        </Text>
+                        <Text style={styles.summaryLabel}>Active</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
                         <Text style={[styles.summaryValue, { color: T.goldBright }]}>
-                            +₦{avgProfitMargin.toLocaleString()}
+                            {services.filter(s => s.status === 'maintenance').length}
                         </Text>
-                        <Text style={styles.summaryLabel}>Avg Riba / Margin</Text>
+                        <Text style={styles.summaryLabel}>Maint.</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
-                        <Text style={[styles.summaryValue, { color: T.success }]}>ACTIVE</Text>
-                        <Text style={styles.summaryLabel}>API Gateway</Text>
-                    </View>
-                    <View style={styles.summaryDivider} />
-                    <View style={styles.summaryItem}>
-                        <Text style={[styles.summaryValue, { color: T.info }]}>LIVE</Text>
-                        <Text style={styles.summaryLabel}>User Charging</Text>
+                        <Text style={[styles.summaryValue, { color: T.danger }]}>
+                            {services.filter(s => s.status === 'hidden').length}
+                        </Text>
+                        <Text style={styles.summaryLabel}>Hidden</Text>
                     </View>
                 </View>
             </LinearGradient>
+
+            {/* MASTER GLOBAL BVN GATEWAY CONTROL CARD */}
+            <View style={styles.masterControlCard}>
+                <View style={styles.masterControlHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="shield-outline" size={17} color={T.goldBright} />
+                        <Text style={styles.masterControlTitle}>Global BVN Gateway Status</Text>
+                    </View>
+                    <View style={styles.statusToggleGroup}>
+                        {(['active', 'maintenance', 'hidden'] as const).map(st => (
+                            <TouchableOpacity
+                                key={st}
+                                onPress={() => setGlobalBVNStatus(st)}
+                                style={[
+                                    styles.statusTogglePill,
+                                    globalBVNStatus === st && (st === 'active' ? styles.pillActive : st === 'maintenance' ? styles.pillMaint : styles.pillHide)
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.statusTogglePillText,
+                                    globalBVNStatus === st && { color: '#FFFFFF', fontWeight: '900' }
+                                ]}>
+                                    {st.toUpperCase()}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {globalBVNStatus === 'maintenance' && (
+                    <View style={styles.maintMsgBox}>
+                        <Text style={styles.maintMsgLabel}>User Downtime Notice:</Text>
+                        <TextInput
+                            value={globalMaintenanceMsg}
+                            onChangeText={setGlobalMaintenanceMsg}
+                            placeholder="Enter message displayed to users when BVN services are paused..."
+                            placeholderTextColor={T.textMuted}
+                            style={styles.maintMsgInput}
+                        />
+                    </View>
+                )}
+            </View>
 
             {/* Variable Pricing Notice Box (Matching AgentHub) */}
             <View style={styles.noticeContainer}>
@@ -561,7 +642,7 @@ export default function EnterpriseBVNPricingScreen() {
                                                 <Text style={styles.serviceTitle}>{item.name}</Text>
                                                 {item.hasBankFees && (
                                                     <View style={styles.bankFeesBadge}>
-                                                        <Text style={styles.bankFeesText}>BANK FEES APPLY</Text>
+                                                        <Text style={styles.bankFeesText}>BANK FEES</Text>
                                                     </View>
                                                 )}
                                             </View>
@@ -569,9 +650,25 @@ export default function EnterpriseBVNPricingScreen() {
                                         </View>
                                     </View>
 
-                                    <View style={styles.statusWrap}>
-                                        <Text style={styles.statusActiveText}>{item.status}</Text>
-                                        <Text style={styles.codeText}>Code: {item.code}</Text>
+                                    {/* Visibility / Status Pill Switcher */}
+                                    <View style={styles.itemStatusGroup}>
+                                        {(['active', 'maintenance', 'hidden'] as const).map(st => (
+                                            <TouchableOpacity
+                                                key={st}
+                                                onPress={() => handleUpdateServiceField(item.id, 'status', st)}
+                                                style={[
+                                                    styles.itemStatusPill,
+                                                    item.status === st && (st === 'active' ? styles.itemStatusActive : st === 'maintenance' ? styles.itemStatusMaint : styles.itemStatusHide)
+                                                ]}
+                                            >
+                                                <Text style={[
+                                                    styles.itemStatusText,
+                                                    item.status === st && { color: '#FFFFFF', fontWeight: '900' }
+                                                ]}>
+                                                    {st === 'active' ? 'Live' : st === 'maintenance' ? 'Maint' : 'Hide'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
                                     </View>
                                 </View>
 
@@ -589,7 +686,7 @@ export default function EnterpriseBVNPricingScreen() {
                                                 style={styles.priceInput}
                                             />
                                         </View>
-                                        <Text style={styles.costSubText}>Base Gateway Fee</Text>
+                                        <Text style={styles.costSubText}>Code: {item.code}</Text>
                                     </View>
 
                                     {/* 2. ADMIN PROFIT MARGIN (Riba) */}
@@ -619,10 +716,10 @@ export default function EnterpriseBVNPricingScreen() {
 
                                     {/* 3. USER SELLING PRICE */}
                                     <View style={styles.totalBox}>
-                                        <Text style={styles.priceBoxLabelTotal}>USER CHARGE FEE</Text>
+                                        <Text style={styles.priceBoxLabelTotal}>USER CHARGE</Text>
                                         <Text style={styles.totalSellingPrice}>₦{sellingPrice.toLocaleString()}</Text>
                                         <View style={styles.marginTag}>
-                                            <Text style={styles.marginTagText}>+{profitPercent}% Profit</Text>
+                                            <Text style={styles.marginTagText}>+{profitPercent}%</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -645,7 +742,7 @@ export default function EnterpriseBVNPricingScreen() {
                     ) : (
                         <>
                             <Ionicons name="checkmark-circle" size={18} color={T.goldBright} />
-                            <Text style={styles.saveLiveBtnText}>Save BVN Pricing to Production</Text>
+                            <Text style={styles.saveLiveBtnText}>Save BVN Pricing & Visibility</Text>
                         </>
                     )}
                 </TouchableOpacity>
@@ -801,29 +898,96 @@ const styles = StyleSheet.create({
         height: 20,
         backgroundColor: 'rgba(255,255,255,0.1)',
     },
+    masterControlCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 12,
+        marginTop: 8,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+    },
+    masterControlHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    masterControlTitle: {
+        fontSize: 11.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+    },
+    statusToggleGroup: {
+        flexDirection: 'row',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 6,
+        padding: 2,
+        gap: 2,
+    },
+    statusTogglePill: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 5,
+    },
+    pillActive: {
+        backgroundColor: '#059669',
+    },
+    pillMaint: {
+        backgroundColor: '#D97706',
+    },
+    pillHide: {
+        backgroundColor: '#DC2626',
+    },
+    statusTogglePillText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    maintMsgBox: {
+        marginTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        paddingTop: 6,
+    },
+    maintMsgLabel: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: T.goldDark,
+        marginBottom: 2,
+    },
+    maintMsgInput: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        fontSize: 11,
+        color: T.textMain,
+    },
     noticeContainer: {
         paddingHorizontal: 12,
-        paddingTop: 8,
+        paddingTop: 6,
     },
     noticeBox: {
         flexDirection: 'row',
         gap: 8,
         backgroundColor: '#FFFBEB',
         borderRadius: 8,
-        padding: 10,
+        padding: 8,
         borderWidth: 1,
         borderColor: '#FDE68A',
     },
     noticeTitle: {
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '900',
         color: '#B45309',
-        marginBottom: 2,
+        marginBottom: 1,
     },
     noticeBody: {
-        fontSize: 10,
+        fontSize: 9.5,
         color: '#92400E',
-        lineHeight: 14,
+        lineHeight: 13,
     },
     categoryBar: {
         backgroundColor: T.navyPrimary,
@@ -954,24 +1118,31 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         color: '#B45309',
     },
-    statusWrap: {
-        alignItems: 'flex-end',
+    itemStatusGroup: {
+        flexDirection: 'row',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 5,
+        padding: 2,
+        gap: 2,
     },
-    statusActiveText: {
-        fontSize: 8.5,
-        fontWeight: '900',
-        color: '#059669',
-        backgroundColor: '#ECFDF5',
+    itemStatusPill: {
         paddingHorizontal: 6,
-        paddingVertical: 2,
+        paddingVertical: 3,
         borderRadius: 4,
     },
-    codeText: {
-        fontSize: 9,
+    itemStatusActive: {
+        backgroundColor: '#059669',
+    },
+    itemStatusMaint: {
+        backgroundColor: '#D97706',
+    },
+    itemStatusHide: {
+        backgroundColor: '#DC2626',
+    },
+    itemStatusText: {
+        fontSize: 8.5,
         fontWeight: '700',
-        color: T.textMuted,
-        marginTop: 3,
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        color: '#64748B',
     },
     priceBoxesRow: {
         flexDirection: 'row',

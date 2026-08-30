@@ -1,893 +1,1300 @@
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Modal, TextInput, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    ScrollView,
+    TextInput,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    Dimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 
-export default function NinPricingBoard() {
+const { width } = Dimensions.get('window');
+
+// Executive Royal Navy & Imperial Gold Palette
+const T = {
+    bg: '#F8FAFC',
+    card: '#FFFFFF',
+    cardBorder: '#E2E8F0',
+    cardBorderGold: 'rgba(217, 119, 6, 0.28)',
+    navyPrimary: '#070D1E',
+    navyDeep: '#0A1128',
+    navyMid: '#0F172A',
+    navyCard: '#1E293B',
+    navyLight: '#334155',
+    gold: '#D97706',
+    goldBright: '#F59E0B',
+    goldDark: '#B45309',
+    goldLight: '#FEF3C7',
+    goldBg: '#FFFBEB',
+    goldBorder: '#FDE68A',
+    textMain: '#0F172A',
+    textSub: '#475569',
+    textMuted: '#64748B',
+    border: '#CBD5E1',
+    inputBg: '#F8FAFC',
+    success: '#059669',
+    successBg: '#ECFDF5',
+    danger: '#DC2626',
+    dangerBg: '#FEF2F2',
+    warning: '#D97706',
+    warningBg: '#FFFBEB',
+};
+
+export interface NINServicePrice {
+    id: string;
+    code: string;
+    name: string;
+    category: 'slips' | 'validation' | 'modification' | 'ipe' | 'lookup' | 'other';
+    description: string;
+    cost_price: number;
+    markup_price: number;
+    status: 'active' | 'maintenance' | 'hidden';
+    maintenance_msg?: string;
+    icon: string;
+}
+
+const OFFICIAL_NIN_CATALOGUE: NINServicePrice[] = [
+    {
+        id: 'nin_premium',
+        code: '101',
+        name: 'NIN Premium Slip (HD Colour)',
+        category: 'slips',
+        description: 'Official full colour biometric card with high-resolution QR.',
+        cost_price: 140,
+        markup_price: 100,
+        status: 'active',
+        icon: 'card-outline',
+    },
+    {
+        id: 'nin_standard',
+        code: '102',
+        name: 'NIN Standard Slip (NIMC Format)',
+        category: 'slips',
+        description: 'Standard national identity slip with official verification barcode.',
+        cost_price: 140,
+        markup_price: 60,
+        status: 'active',
+        icon: 'document-text-outline',
+    },
+    {
+        id: 'nin_regular',
+        code: '103',
+        name: 'NIN Regular / Compact Slip',
+        category: 'slips',
+        description: 'Pocket format national ID slip with barcode.',
+        cost_price: 140,
+        markup_price: 60,
+        status: 'active',
+        icon: 'receipt-outline',
+    },
+    {
+        id: 'nin_phone',
+        code: '104',
+        name: 'NIN Lookup by Phone Number',
+        category: 'lookup',
+        description: 'Instant demographic NIN retrieval using registered phone number.',
+        cost_price: 150,
+        markup_price: 100,
+        status: 'active',
+        icon: 'call-outline',
+    },
+    {
+        id: 'nin_verify',
+        code: '105',
+        name: 'NIN Direct Verification',
+        category: 'lookup',
+        description: 'Live biometric confirmation and full identity payload lookup.',
+        cost_price: 150,
+        markup_price: 50,
+        status: 'active',
+        icon: 'finger-print-outline',
+    },
+    {
+        id: 'vnin_to_nin',
+        code: '106',
+        name: 'VNIN to Normal NIN Conversion',
+        category: 'lookup',
+        description: 'Instant conversion of 16-digit Virtual NIN to raw 11-digit NIN.',
+        cost_price: 2500,
+        markup_price: 500,
+        status: 'active',
+        icon: 'swap-horizontal-outline',
+    },
+    {
+        id: 'nin_val_norecord',
+        code: '201',
+        name: 'NIN Validation: No Record Found',
+        category: 'validation',
+        description: 'Resolution of unindexed records across central NIMC database.',
+        cost_price: 1000,
+        markup_price: 500,
+        status: 'active',
+        icon: 'alert-circle-outline',
+    },
+    {
+        id: 'nin_val_update',
+        code: '202',
+        name: 'NIN Validation: Record Update',
+        category: 'validation',
+        description: 'Syncing backend NIMC profile with banking NIBSS records.',
+        cost_price: 1500,
+        markup_price: 500,
+        status: 'active',
+        icon: 'sync-outline',
+    },
+    {
+        id: 'vnin_val',
+        code: '203',
+        name: 'Virtual NIN Validation',
+        category: 'validation',
+        description: 'Validation and authentication of enterprise VNIN tokens.',
+        cost_price: 1200,
+        markup_price: 300,
+        status: 'active',
+        icon: 'shield-checkmark-outline',
+    },
+    {
+        id: 'ipe_clearance',
+        code: '301',
+        name: 'IPE Clearance & Approval',
+        category: 'ipe',
+        description: 'Instant pre-employment security vetting & IPE verification clearance.',
+        cost_price: 450,
+        markup_price: 200,
+        status: 'active',
+        icon: 'briefcase-outline',
+    },
+    {
+        id: 'nin_mod_name',
+        code: '401',
+        name: 'NIN Modification: Name',
+        category: 'modification',
+        description: 'Legal update of First, Middle, or Surname on NIMC database.',
+        cost_price: 5500,
+        markup_price: 1500,
+        status: 'active',
+        icon: 'person-outline',
+    },
+    {
+        id: 'nin_mod_phone',
+        code: '402',
+        name: 'NIN Modification: Phone Number',
+        category: 'modification',
+        description: 'Update of registered MSISDN telephone on NIMC portal.',
+        cost_price: 5500,
+        markup_price: 1500,
+        status: 'active',
+        icon: 'phone-portrait-outline',
+    },
+    {
+        id: 'nin_mod_address',
+        code: '403',
+        name: 'NIN Modification: Address / State',
+        category: 'modification',
+        description: 'Residential state, LGA, and home address correction.',
+        cost_price: 5500,
+        markup_price: 1500,
+        status: 'active',
+        icon: 'home-outline',
+    },
+    {
+        id: 'pers_status',
+        code: '501',
+        name: 'NIN Personalization Tracking',
+        category: 'other',
+        description: 'Real-time status check for plastic national ID card issuance.',
+        cost_price: 150,
+        markup_price: 50,
+        status: 'active',
+        icon: 'time-outline',
+    },
+];
+
+export default function EnterpriseNINPricingScreen() {
     const router = useRouter();
-    const insets = useSafeAreaInsets();
-    
-    const [prices, setPrices] = useState<any[]>([]);
-    const [originalPrices, setOriginalPrices] = useState<any[]>([]);
+
+    const [services, setServices] = useState<NINServicePrice[]>(OFFICIAL_NIN_CATALOGUE);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [saving, setSaving] = useState(false);
-    
-    // Tab State: 'nin' | 'ipe'
-    const [activeTab, setActiveTab] = useState<'nin' | 'ipe' | 'validation' | 'personalization' | 'bvn'>('nin');
-    
-    // Input Focus State
-    const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
-    // Custom Smooth Alert State
-    const [customAlert, setCustomAlert] = useState<{
-        visible: boolean;
-        title: string;
-        message: string;
-        type: 'success' | 'error' | 'info';
-    }>({
-        visible: false,
-        title: '',
-        message: '',
-        type: 'info'
-    });
+    // Global NIN Gateway Status Switch
+    const [globalNINStatus, setGlobalNINStatus] = useState<'active' | 'maintenance' | 'hidden'>('active');
+    const [globalMaintenanceMsg, setGlobalMaintenanceMsg] = useState('NIMC portal infrastructure is currently undergoing scheduled optimization. Services will resume shortly.');
 
-    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
-        setCustomAlert({
-            visible: true,
-            title,
-            message,
-            type
-        });
-    };
+    // Filters
+    const [activeTab, setActiveTab] = useState<'all' | 'slips' | 'lookup' | 'validation' | 'ipe' | 'modification'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const [syncing, setSyncing] = useState(false);
-
-    const syncLiveAgentHubPrices = async () => {
-        try {
-            setSyncing(true);
-
-            // Seeded Wholesale Price Matrix from AgentHub (agenthub.ng/pricing)
-            const AGENTHUB_WHOLESALE_RATES: Record<string, number> = {
-                'nin_premium': 140,
-                'nin_standard': 140,
-                'nin_regular': 140,
-                'nin_info': 150,
-                'nin_verify': 150,
-                'nin_phone': 150,
-                'vnin_gen': 170,
-                'vnin_to_nin': 2500,
-                'vnin_val': 1200,
-                'nin_val_norecord': 1000,
-                'nin_val_update': 1500,
-                'nin_mod_address': 5500,
-                'nin_mod_name': 5500,
-                'nin_mod_phone': 5500,
-                'ipe_clearance': 450,
-                'pers_status': 150,
-                'bvn_num_basic': 150,
-                'bvn_num_advanced': 150,
-                'bvn_phone_basic': 150,
-                'bvn_phone_advanced': 150,
-                'bvn_card': 150,
-            };
-
-            // 1. Try server-to-server Edge Function sync
-            const { data: res } = await supabase.functions.invoke('verify-nin', {
-                body: { searchType: 'sync_prices' }
-            });
-
-            let updatedCount = 0;
-            const liveData = res?.data;
-            const liveList = Array.isArray(liveData) ? liveData : (liveData?.data || []);
-
-            if (Array.isArray(liveList) && liveList.length > 0) {
-                for (const liveItem of liveList) {
-                    const costVal = parseFloat(liveItem.price || liveItem.amount || liveItem.cost_price);
-                    const nameStr = (liveItem.name || liveItem.service || '').toLowerCase();
-                    const codeStr = String(liveItem.code || '');
-
-                    if (!isNaN(costVal) && costVal > 0) {
-                        for (const p of prices) {
-                            const pName = p.name.toLowerCase();
-                            if (pName.includes(nameStr) || (codeStr && pName.includes(codeStr))) {
-                                await supabase.from('service_pricing').update({ cost_price: costVal, updated_at: new Date().toISOString() }).eq('id', p.id);
-                                updatedCount++;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Ensure all registry cost_prices are synced with AgentHub wholesale rates
-            for (const [id, cost] of Object.entries(AGENTHUB_WHOLESALE_RATES)) {
-                await supabase.from('service_pricing').update({ cost_price: cost, updated_at: new Date().toISOString() }).eq('id', id);
-            }
-
-            await fetchPrices();
-            showAlert('Live AgentHub Prices Synced! ✓', `All service cost prices have been updated to exact AgentHub wholesale rates in database.`, 'success');
-        } catch (e: any) {
-            console.error("Sync error:", e);
-            await fetchPrices();
-            showAlert('Sync Complete ✓', 'Seeded AgentHub wholesale pricing matrix is active in registry.', 'success');
-        } finally {
-            setSyncing(false);
-        }
-    };
+    // Modal: Batch Margin Tool
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batchTargetCategory, setBatchTargetCategory] = useState<'all' | 'slips' | 'validation' | 'modification'>('all');
+    const [batchProfitDelta, setBatchProfitDelta] = useState('50');
 
     useEffect(() => {
-        fetchPrices();
+        fetchNINPrices();
     }, []);
 
-    const fetchPrices = async () => {
-        setLoading(true);
+    const fetchNINPrices = async () => {
         try {
-            // Auto-seed Personalization pricing entries if missing
-            const persPricingDefaults = [
-                { id: 'pers_status', service_category: 'personalization', name: 'Personalization', cost_price: 150, markup_price: 0 }
-            ];
+            setLoading(true);
 
-            for (const item of persPricingDefaults) {
-                const { data: existing } = await supabase
-                    .from('service_pricing')
-                    .select('id')
-                    .eq('id', item.id)
-                    .maybeSingle();
-                
-                if (!existing) {
-                    await supabase.from('service_pricing').insert(item);
-                }
+            // 1. Fetch Global Settings
+            const { data: globalSetting } = await supabase
+                .from('app_settings')
+                .select('key, value')
+                .in('key', ['nin_global_status', 'nin_global_maintenance_msg']);
+
+            if (globalSetting) {
+                const statusRow = globalSetting.find(g => g.key === 'nin_global_status');
+                if (statusRow?.value) setGlobalNINStatus(statusRow.value as any);
+                const msgRow = globalSetting.find(g => g.key === 'nin_global_maintenance_msg');
+                if (msgRow?.value) setGlobalMaintenanceMsg(msgRow.value);
             }
 
-            // Auto-seed BVN pricing entries if missing
-            const bvnPricingDefaults = [
-                { id: 'bvn_num_advanced', service_category: 'bvn', name: 'BVN Verification', cost_price: 150, markup_price: 50 },
-                { id: 'bvn_premium_slip', service_category: 'bvn', name: 'BVN Premium Slip', cost_price: 150, markup_price: 50 },
-                { id: 'bvn_phone_basic', service_category: 'bvn', name: 'BVN Phone Retrieval', cost_price: 150, markup_price: 100 },
-                { id: 'bvn_card', service_category: 'bvn', name: 'BVN Plastic Card', cost_price: 200, markup_price: 50 },
-                { id: 'bvn_modification', service_category: 'bvn', name: 'BVN Modification', cost_price: 1000, markup_price: 500 },
-                { id: 'bvn_enrollment', service_category: 'bvn', name: 'BVN Enrollment', cost_price: 1500, markup_price: 500 },
-                { id: 'vnin_to_nibss', service_category: 'bvn', name: 'VNIN to NIBSS Integration', cost_price: 500, markup_price: 200 },
-            ];
-
-            for (const item of bvnPricingDefaults) {
-                const { data: existing } = await supabase
-                    .from('service_pricing')
-                    .select('id')
-                    .eq('id', item.id)
-                    .maybeSingle();
-                
-                if (!existing) {
-                    await supabase.from('service_pricing').insert(item);
-                }
-            }
-
+            // 2. Fetch from service_pricing table
             const { data, error } = await supabase
                 .from('service_pricing')
                 .select('*')
-                .in('service_category', ['nin', 'ipe', 'validation', 'personalization', 'bvn'])
-                .order('name', { ascending: true });
+                .eq('service_category', 'nin');
 
-            if (error) throw error;
-            setPrices(data || []);
-            setOriginalPrices(JSON.parse(JSON.stringify(data || []))); // Deep copy
-        } catch (error: any) {
-            showAlert('Database Error', error.message, 'error');
+            if (data && data.length > 0) {
+                const merged: NINServicePrice[] = OFFICIAL_NIN_CATALOGUE.map(def => {
+                    const row = data.find(r => r.id === def.id || (r.name && r.name.toLowerCase() === def.name.toLowerCase()));
+                    return {
+                        ...def,
+                        cost_price: row?.cost_price !== undefined ? Number(row.cost_price) : def.cost_price,
+                        markup_price: row?.markup_price !== undefined ? Number(row.markup_price) : def.markup_price,
+                        status: (row?.status as any) || def.status || 'active',
+                        maintenance_msg: row?.maintenance_msg || undefined,
+                    };
+                });
+                setServices(merged);
+            } else {
+                seedDefaultNINPrices();
+            }
+        } catch (e) {
+            console.error('Error fetching NIN pricing:', e);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    const updateMarkup = (id: string, newMarkup: string) => {
-        const val = parseInt(newMarkup, 10);
-        if (isNaN(val) && newMarkup !== '') return;
-
-        setPrices(prev => prev.map(p => {
-            if (p.id === id) {
-                return { ...p, markup_price: newMarkup === '' ? 0 : val };
-            }
-            return p;
-        }));
-    };
-
-    const updateCost = (id: string, newCost: string) => {
-        const val = parseInt(newCost, 10);
-        if (isNaN(val) && newCost !== '') return;
-
-        setPrices(prev => prev.map(p => {
-            if (p.id === id) {
-                return { ...p, cost_price: newCost === '' ? 0 : val };
-            }
-            return p;
-        }));
-    };
-
-    const applyPresetMarkup = (id: string, addition: number) => {
-        setPrices(prev => prev.map(p => {
-            if (p.id === id) {
-                return { ...p, markup_price: Math.max(0, (Number(p.markup_price) || 0) + addition) };
-            }
-            return p;
-        }));
-    };
-
-    const hasChanges = () => {
-        return JSON.stringify(prices) !== JSON.stringify(originalPrices);
-    };
-
-    const handleSave = async () => {
+    const seedDefaultNINPrices = async () => {
         try {
-            setSaving(true);
-            for (const item of prices) {
-                const { error } = await supabase
-                    .from('service_pricing')
-                    .update({
-                        cost_price: item.cost_price,
-                        markup_price: item.markup_price,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', item.id);
-                if (error) throw error;
-            }
-            setOriginalPrices(JSON.parse(JSON.stringify(prices))); // Reset original state
-            showAlert('Prices Updated', 'All price changes have been saved to the registry.', 'success');
-        } catch (error: any) {
-            showAlert('Save Failed', error.message, 'error');
+            const seedRows = OFFICIAL_NIN_CATALOGUE.map(s => ({
+                id: s.id,
+                service_category: 'nin',
+                name: s.name,
+                cost_price: s.cost_price,
+                markup_price: s.markup_price,
+                status: s.status,
+                updated_at: new Date().toISOString(),
+            }));
+
+            await supabase.from('service_pricing').upsert(seedRows, { onConflict: 'id' });
+            fetchNINPrices();
+        } catch (e) {
+            console.warn('Seed NIN error:', e);
+        }
+    };
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchNINPrices();
+    }, []);
+
+    const handleUpdateServiceField = (id: string, field: 'cost_price' | 'markup_price' | 'status', value: any) => {
+        setServices(prev =>
+            prev.map(s => {
+                if (s.id === id) {
+                    return { ...s, [field]: value };
+                }
+                return s;
+            })
+        );
+    };
+
+    const handleSaveAllNINPrices = async () => {
+        setSaving(true);
+        try {
+            // 1. Save Global Gateway Settings
+            await supabase.from('app_settings').upsert([
+                { key: 'nin_global_status', value: globalNINStatus, updated_at: new Date().toISOString() },
+                { key: 'nin_global_maintenance_msg', value: globalMaintenanceMsg, updated_at: new Date().toISOString() }
+            ], { onConflict: 'key' });
+
+            // 2. Save Individual Service Statuses & Margins
+            const rowsToUpsert = services.map(s => ({
+                id: s.id,
+                service_category: 'nin',
+                name: s.name,
+                cost_price: s.cost_price,
+                markup_price: s.markup_price,
+                status: s.status,
+                updated_at: new Date().toISOString(),
+            }));
+
+            const { error } = await supabase.from('service_pricing').upsert(rowsToUpsert, { onConflict: 'id' });
+            if (error) throw error;
+
+            await supabase.from('audit_logs').insert({
+                action: 'Updated NIMC NIN Pricing, Maintenance & Visibility Matrix',
+                target_resource: 'NIN Identity Pricing',
+                details: {
+                    globalStatus: globalNINStatus,
+                    totalServices: services.length,
+                    activeCount: services.filter(s => s.status === 'active').length,
+                    maintenanceCount: services.filter(s => s.status === 'maintenance').length,
+                    hiddenCount: services.filter(s => s.status === 'hidden').length,
+                },
+            });
+
+            Alert.alert(
+                'NIN Matrix Saved 🚀',
+                'All service prices, maintenance modes, and hidden statuses are now active in production!'
+            );
+            fetchNINPrices();
+        } catch (e: any) {
+            Alert.alert('Save Error', e.message);
         } finally {
             setSaving(false);
         }
     };
 
-    const filteredPrices = prices.filter(p => p.service_category === activeTab);
+    const handleApplyBatchMarkup = () => {
+        const delta = parseFloat(batchProfitDelta) || 0;
+        if (delta === 0) return;
+
+        setServices(prev =>
+            prev.map(s => {
+                if (batchTargetCategory === 'all' || s.category === batchTargetCategory) {
+                    return {
+                        ...s,
+                        markup_price: Math.max(0, s.markup_price + delta),
+                    };
+                }
+                return s;
+            })
+        );
+
+        setShowBatchModal(false);
+        Alert.alert(
+            'Profit Margin Applied ✨',
+            `Added +₦${delta.toLocaleString()} profit margin across ${batchTargetCategory.toUpperCase()} services. Click "Save NIN Pricing" to push live.`
+        );
+    };
+
+    const filteredServices = useMemo(() => {
+        return services.filter(s => {
+            const matchesCat = activeTab === 'all' || s.category === activeTab;
+            const matchesSearch =
+                !searchQuery.trim() ||
+                s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.description.toLowerCase().includes(searchQuery.toLowerCase());
+            return matchesCat && matchesSearch;
+        });
+    }, [services, activeTab, searchQuery]);
 
     return (
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-            style={{ flex: 1, backgroundColor: '#f4f6fb' }}
-        >
-            <Stack.Screen options={{
-                title: 'Price Controller',
-                headerStyle: { backgroundColor: '#060d21' },
-                headerTintColor: '#fff',
-                headerShadowVisible: false,
-                headerLeft: () => (
-                    <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 16 }}>
-                        <Ionicons name="arrow-back" size={24} color="#fff" />
-                    </TouchableOpacity>
-                )
-            }} />
-            <StatusBar style="light" />
-
-            {/* Custom Modern Alert Dialog */}
-            <Modal
-                transparent
-                visible={customAlert.visible}
-                animationType="fade"
-                onRequestClose={() => setCustomAlert(prev => ({ ...prev, visible: false }))}
-            >
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertCard}>
-                        <View style={[
-                            styles.alertIconBg,
-                            customAlert.type === 'success' ? styles.alertSuccessIcon :
-                            customAlert.type === 'error' ? styles.alertErrorIcon : styles.alertInfoIcon
-                        ]}>
-                            <Ionicons 
-                                name={
-                                    customAlert.type === 'success' ? 'checkmark-circle' :
-                                    customAlert.type === 'error' ? 'close-circle' : 'information-circle'
-                                } 
-                                size={36} 
-                                color={
-                                    customAlert.type === 'success' ? '#10b981' :
-                                    customAlert.type === 'error' ? '#ef4444' : '#3b82f6'
-                                } 
-                            />
+        <View style={styles.container}>
+            <Stack.Screen
+                options={{
+                    title: 'NIN Pricing & Visibility Control',
+                    headerStyle: { backgroundColor: T.navyPrimary },
+                    headerTintColor: '#FFFFFF',
+                    headerShadowVisible: false,
+                    headerRight: () => (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                            <TouchableOpacity onPress={() => setShowBatchModal(true)} style={styles.headerGoldBtn}>
+                                <Ionicons name="calculator-outline" size={17} color={T.goldBright} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={onRefresh} style={styles.headerGoldBtn}>
+                                <Ionicons name="refresh" size={17} color={T.goldBright} />
+                            </TouchableOpacity>
                         </View>
-                        <Text style={styles.alertTitle}>{customAlert.title}</Text>
-                        <Text style={styles.alertMessage}>{customAlert.message}</Text>
-                        <TouchableOpacity 
-                            style={styles.alertButton} 
-                            onPress={() => setCustomAlert(prev => ({ ...prev, visible: false }))}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.alertButtonText}>Okay</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+                    ),
+                }}
+            />
 
-            {/* Premium Gradient Header */}
-            <LinearGradient colors={['#060d21', '#0F1E4C']} style={[styles.headerGradient, { paddingTop: 12 }]}>
-                <View style={styles.headerRow}>
-                    <View>
-                        <Text style={styles.headerTitle}>Pricing Console</Text>
-                        <Text style={styles.headerSub}>Manage service costs and markups</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                        <TouchableOpacity 
-                            onPress={syncLiveAgentHubPrices} 
-                            disabled={syncing}
-                            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(37, 99, 235, 0.3)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#3b82f6' }}
-                            activeOpacity={0.8}
-                        >
-                            {syncing ? (
-                                <ActivityIndicator size="small" color="#60a5fa" />
-                            ) : (
-                                <>
-                                    <Ionicons name="sync" size={12} color="#60a5fa" style={{ marginRight: 4 }} />
-                                    <Text style={{ color: '#60a5fa', fontSize: 12, fontWeight: '800' }}>Sync AgentHub API</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-                        <View style={styles.badgeContainer}>
-                            <Ionicons name="shield-checkmark" size={12} color="#f5a623" />
-                            <Text style={styles.badgeText}>Admin Mode</Text>
-                        </View>
-                    </View>
+            {/* Top Telemetry Stat Hero */}
+            <LinearGradient colors={[T.navyPrimary, T.navyDeep, T.navyMid]} style={styles.heroSummaryBar}>
+                <View style={styles.liveIndicatorRow}>
+                    <View style={[styles.pulseDot, globalNINStatus === 'maintenance' ? { backgroundColor: T.goldBright } : globalNINStatus === 'hidden' ? { backgroundColor: T.danger } : { backgroundColor: T.success }]} />
+                    <Text style={styles.liveIndicatorText}>
+                        NIMC IDENTITY CONTROL • GATEWAY {globalNINStatus.toUpperCase()}
+                    </Text>
                 </View>
 
-                {/* Dashboard Stats */}
-                <View style={styles.statsRow}>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statVal}>{prices.filter(p => p.service_category === 'bvn').length}</Text>
-                        <Text style={styles.statLabel}>BVN</Text>
+                <View style={styles.summaryGrid}>
+                    <View style={styles.summaryItem}>
+                        <Text style={styles.summaryValue}>{services.length}</Text>
+                        <Text style={styles.summaryLabel}>Total Items</Text>
                     </View>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statVal}>{prices.filter(p => p.service_category === 'personalization').length}</Text>
-                        <Text style={styles.statLabel}>Personalize</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statVal}>{prices.filter(p => p.service_category === 'validation').length}</Text>
-                        <Text style={styles.statLabel}>Validation</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statVal}>{prices.filter(p => p.service_category === 'nin').length}</Text>
-                        <Text style={styles.statLabel}>NIN Slips</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statVal}>{prices.filter(p => p.service_category === 'ipe').length}</Text>
-                        <Text style={styles.statLabel}>IPE Clearances</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statVal}>
-                            {prices.length > 0 ? `₦${Math.round(prices.reduce((acc, p) => acc + Number(p.markup_price), 0) / prices.length)}` : '₦0'}
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.success }]}>
+                            {services.filter(s => s.status === 'active').length}
                         </Text>
-                        <Text style={styles.statLabel}>Avg Profit</Text>
+                        <Text style={styles.summaryLabel}>Active</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.goldBright }]}>
+                            {services.filter(s => s.status === 'maintenance').length}
+                        </Text>
+                        <Text style={styles.summaryLabel}>Maint.</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.danger }]}>
+                            {services.filter(s => s.status === 'hidden').length}
+                        </Text>
+                        <Text style={styles.summaryLabel}>Hidden</Text>
                     </View>
                 </View>
             </LinearGradient>
 
-            {/* Smooth Tab Selectors */}
-            <View style={styles.tabContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('nin')}
-                        style={[styles.tabButton, activeTab === 'nin' && styles.tabButtonActive, { paddingHorizontal: 12, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="document-text" size={13} color={activeTab === 'nin' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'nin' && styles.tabTextActive, { fontSize: 12 }]}>NIN Slips</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('ipe')}
-                        style={[styles.tabButton, activeTab === 'ipe' && styles.tabButtonActive, { paddingHorizontal: 12, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="shield-checkmark" size={13} color={activeTab === 'ipe' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'ipe' && styles.tabTextActive, { fontSize: 12 }]}>IPE</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('validation')}
-                        style={[styles.tabButton, activeTab === 'validation' && styles.tabButtonActive, { paddingHorizontal: 12, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="checkmark-circle" size={13} color={activeTab === 'validation' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'validation' && styles.tabTextActive, { fontSize: 12 }]}>Validation</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('personalization')}
-                        style={[styles.tabButton, activeTab === 'personalization' && styles.tabButtonActive, { paddingHorizontal: 12, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="sparkles" size={13} color={activeTab === 'personalization' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'personalization' && styles.tabTextActive, { fontSize: 12 }]}>Personalize</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('bvn')}
-                        style={[styles.tabButton, activeTab === 'bvn' && styles.tabButtonActive, { paddingHorizontal: 12 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="finger-print" size={13} color={activeTab === 'bvn' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'bvn' && styles.tabTextActive, { fontSize: 12 }]}>BVN</Text>
-                    </TouchableOpacity>
+            {/* MASTER GLOBAL NIN GATEWAY CONTROL CARD */}
+            <View style={styles.masterControlCard}>
+                <View style={styles.masterControlHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="shield-checkmark-outline" size={17} color={T.goldBright} />
+                        <Text style={styles.masterControlTitle}>Global NIN Gateway Status</Text>
+                    </View>
+                    <View style={styles.statusToggleGroup}>
+                        {(['active', 'maintenance', 'hidden'] as const).map(st => (
+                            <TouchableOpacity
+                                key={st}
+                                onPress={() => setGlobalNINStatus(st)}
+                                style={[
+                                    styles.statusTogglePill,
+                                    globalNINStatus === st && (st === 'active' ? styles.pillActive : st === 'maintenance' ? styles.pillMaint : styles.pillHide)
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.statusTogglePillText,
+                                    globalNINStatus === st && { color: '#FFFFFF', fontWeight: '900' }
+                                ]}>
+                                    {st.toUpperCase()}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {globalNINStatus === 'maintenance' && (
+                    <View style={styles.maintMsgBox}>
+                        <Text style={styles.maintMsgLabel}>User Downtime Notice:</Text>
+                        <TextInput
+                            value={globalMaintenanceMsg}
+                            onChangeText={setGlobalMaintenanceMsg}
+                            placeholder="Enter message displayed to users when NIN services are paused..."
+                            placeholderTextColor={T.textMuted}
+                            style={styles.maintMsgInput}
+                        />
+                    </View>
+                )}
+            </View>
+
+            {/* Sub-Navigation Categories Ribbon */}
+            <View style={styles.categoryBar}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+                    {[
+                        { key: 'all', label: 'All Services' },
+                        { key: 'slips', label: '📄 Slips & Cards' },
+                        { key: 'lookup', label: '🔍 Lookups & VNIN' },
+                        { key: 'validation', label: '⚡ Validations' },
+                        { key: 'ipe', label: '💼 IPE Clearance' },
+                        { key: 'modification', label: '🛠️ Modifications' },
+                    ].map(cat => (
+                        <TouchableOpacity
+                            key={cat.key}
+                            onPress={() => setActiveTab(cat.key as any)}
+                            style={[styles.categoryPill, activeTab === cat.key && styles.categoryPillActive]}
+                        >
+                            <Text style={[styles.categoryPillText, activeTab === cat.key && styles.categoryPillTextActive]}>
+                                {cat.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </ScrollView>
             </View>
 
-            <ScrollView 
-                style={{ flex: 1 }} 
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: hasChanges() ? 100 : 40 }]}
-                showsVerticalScrollIndicator={false}
-            >
-                {loading ? (
-                    <View style={styles.loaderBox}>
-                        <ActivityIndicator size="large" color="#060d21" />
-                        <Text style={styles.loaderText}>Fetching pricing details...</Text>
-                    </View>
-                ) : filteredPrices.length === 0 ? (
-                    <View style={styles.emptyBox}>
-                        <Ionicons name="alert-circle-outline" size={48} color="#94a3b8" />
-                        <Text style={styles.emptyText}>No pricing cards configured for this category.</Text>
-                    </View>
-                ) : (
-                    filteredPrices.map((item) => {
-                        const total = Number(item.cost_price) + Number(item.markup_price);
-                        const marginPercent = item.cost_price > 0 ? ((item.markup_price / item.cost_price) * 100).toFixed(1) : '100';
-                        
+            {/* Search & Action Bar */}
+            <View style={styles.searchActionRow}>
+                <View style={styles.searchBox}>
+                    <Ionicons name="search" size={15} color={T.textMuted} />
+                    <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search service name or code (e.g. 101, Premium, IPE)..."
+                        placeholderTextColor={T.textMuted}
+                        style={styles.searchInput}
+                    />
+                </View>
+                <TouchableOpacity
+                    onPress={() => setShowBatchModal(true)}
+                    style={styles.batchMarginBtn}
+                >
+                    <Ionicons name="sparkles" size={14} color={T.goldDark} />
+                    <Text style={styles.batchMarginBtnText}>Batch Riba</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* NIN Services Pricing List */}
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color={T.gold} />
+                    <Text style={styles.loadingText}>Loading NIMC Pricing Engine...</Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={filteredServices}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />}
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <Ionicons name="pricetags-outline" size={40} color={T.gold} />
+                            <Text style={styles.emptyStateTitle}>Zero Services Found</Text>
+                            <Text style={styles.emptyStateSub}>No NIN services match your current filter.</Text>
+                        </View>
+                    }
+                    renderItem={({ item }) => {
+                        const sellingPrice = item.cost_price + item.markup_price;
+                        const profitPercent = item.cost_price > 0 ? ((item.markup_price / item.cost_price) * 100).toFixed(1) : '0';
+
                         return (
-                            <View key={item.id} style={styles.priceCard}>
-                                {/* Card Header */}
+                            <View style={styles.serviceCard}>
                                 <View style={styles.cardHeader}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.cardTitle}>{item.name}</Text>
-                                        <Text style={styles.cardId}>ID: {item.id}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                        <View style={styles.iconCircle}>
+                                            <Ionicons name={item.icon as any} size={16} color={T.goldBright} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.serviceTitle}>{item.name}</Text>
+                                            <Text style={styles.serviceDesc}>{item.description}</Text>
+                                        </View>
                                     </View>
-                                    <View style={styles.totalBadge}>
-                                        <Text style={styles.totalBadgeLabel}>Customer Pays</Text>
-                                        <Text style={styles.totalBadgeVal}>₦{total.toLocaleString()}</Text>
+
+                                    {/* Visibility / Status Pill Switcher */}
+                                    <View style={styles.itemStatusGroup}>
+                                        {(['active', 'maintenance', 'hidden'] as const).map(st => (
+                                            <TouchableOpacity
+                                                key={st}
+                                                onPress={() => handleUpdateServiceField(item.id, 'status', st)}
+                                                style={[
+                                                    styles.itemStatusPill,
+                                                    item.status === st && (st === 'active' ? styles.itemStatusActive : st === 'maintenance' ? styles.itemStatusMaint : styles.itemStatusHide)
+                                                ]}
+                                            >
+                                                <Text style={[
+                                                    styles.itemStatusText,
+                                                    item.status === st && { color: '#FFFFFF', fontWeight: '900' }
+                                                ]}>
+                                                    {st === 'active' ? 'Live' : st === 'maintenance' ? 'Maint' : 'Hide'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
                                     </View>
                                 </View>
 
-                                {/* Form Fields */}
-                                <View style={styles.formRow}>
-                                    {/* Cost Price */}
-                                    <View style={styles.inputWrapper}>
-                                        <Text style={styles.inputLabel}>Cost Price (Base)</Text>
-                                        <View style={[
-                                            styles.inputFieldContainer,
-                                            focusedInput === `${item.id}_cost` && styles.inputFocused
-                                        ]}>
-                                            <Ionicons name="logo-bitcoin" size={14} color="#64748b" style={{ marginRight: 6 }} />
-                                            <Text style={styles.currencyPrefix}>₦</Text>
+                                {/* Pricing Breakdown Grid */}
+                                <View style={styles.priceBoxesRow}>
+                                    {/* 1. API COST PRICE */}
+                                    <View style={styles.costBox}>
+                                        <Text style={styles.priceBoxLabel}>API COST (NIMC)</Text>
+                                        <View style={styles.inputWrap}>
+                                            <Text style={styles.nairaSign}>₦</Text>
                                             <TextInput
-                                                style={styles.textInputStyle}
                                                 value={String(item.cost_price)}
-                                                onChangeText={(val) => updateCost(item.id, val)}
-                                                keyboardType="number-pad"
-                                                onFocus={() => setFocusedInput(`${item.id}_cost`)}
-                                                onBlur={() => setFocusedInput(null)}
+                                                onChangeText={val => handleUpdateServiceField(item.id, 'cost_price', parseFloat(val) || 0)}
+                                                keyboardType="numeric"
+                                                style={styles.priceInput}
                                             />
                                         </View>
+                                        <Text style={styles.costSubText}>Code: {item.code}</Text>
                                     </View>
 
-                                    {/* Markup Price */}
-                                    <View style={styles.inputWrapper}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Text style={styles.inputLabel}>Profit (Markup)</Text>
-                                            <Text style={styles.marginText}>+{marginPercent}%</Text>
-                                        </View>
-                                        <View style={[
-                                            styles.inputFieldContainer,
-                                            focusedInput === `${item.id}_markup` && styles.inputFocusedMarkup
-                                        ]}>
-                                            <Ionicons name="trending-up" size={14} color="#4f46e5" style={{ marginRight: 6 }} />
-                                            <Text style={styles.currencyPrefixMarkup}>₦</Text>
+                                    {/* 2. ADMIN PROFIT MARGIN (Riba) */}
+                                    <View style={styles.markupBox}>
+                                        <Text style={styles.priceBoxLabelMarkup}>PROFIT MARGIN (RIBA)</Text>
+                                        <View style={styles.inputWrap}>
+                                            <Text style={styles.nairaSignGold}>+₦</Text>
                                             <TextInput
-                                                style={[styles.textInputStyle, styles.markupTextInput]}
                                                 value={String(item.markup_price)}
-                                                onChangeText={(val) => updateMarkup(item.id, val)}
-                                                keyboardType="number-pad"
-                                                onFocus={() => setFocusedInput(`${item.id}_markup`)}
-                                                onBlur={() => setFocusedInput(null)}
+                                                onChangeText={val => handleUpdateServiceField(item.id, 'markup_price', parseFloat(val) || 0)}
+                                                keyboardType="numeric"
+                                                style={styles.priceInputGold}
                                             />
                                         </View>
+                                        <View style={styles.stepperRow}>
+                                            {[-100, -50, 50, 100].map(step => (
+                                                <TouchableOpacity
+                                                    key={step}
+                                                    onPress={() => handleUpdateServiceField(item.id, 'markup_price', Math.max(0, item.markup_price + step))}
+                                                    style={styles.stepperBtn}
+                                                >
+                                                    <Text style={styles.stepperBtnText}>{step > 0 ? `+${step}` : step}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
                                     </View>
-                                </View>
 
-                                {/* Quick Margin Presets */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}>
-                                    <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '600' }}>Add Margin:</Text>
-                                    {[+50, +100, +200, +500].map(addVal => (
-                                        <TouchableOpacity
-                                            key={addVal}
-                                            style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}
-                                            onPress={() => applyPresetMarkup(item.id, addVal)}
-                                        >
-                                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#0f172a' }}>+{addVal}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                    {/* 3. USER SELLING PRICE */}
+                                    <View style={styles.totalBox}>
+                                        <Text style={styles.priceBoxLabelTotal}>USER CHARGE</Text>
+                                        <Text style={styles.totalSellingPrice}>₦{sellingPrice.toLocaleString()}</Text>
+                                        <View style={styles.marginTag}>
+                                            <Text style={styles.marginTagText}>+{profitPercent}%</Text>
+                                        </View>
+                                    </View>
                                 </View>
                             </View>
                         );
-                    })
-                )}
-            </ScrollView>
-
-            {/* Sticky Floating Save Bar */}
-            {hasChanges() && !loading && (
-                <View style={[styles.saveBar, { paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 12 }]}>
-                    <TouchableOpacity
-                        onPress={handleSave}
-                        disabled={saving}
-                        style={styles.saveButton}
-                        activeOpacity={0.8}
-                    >
-                        {saving ? (
-                            <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                            <>
-                                <Ionicons name="cloud-upload" size={18} color="#fff" style={{ marginRight: 8 }} />
-                                <Text style={styles.saveButtonText}>SAVE PRICE CHANGES</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                </View>
+                    }}
+                />
             )}
-        </KeyboardAvoidingView>
+
+            {/* Bottom Save Action Bar */}
+            <View style={styles.bottomBar}>
+                <TouchableOpacity
+                    onPress={handleSaveAllNINPrices}
+                    disabled={saving}
+                    style={styles.saveLiveBtn}
+                    activeOpacity={0.85}
+                >
+                    {saving ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <>
+                            <Ionicons name="checkmark-circle" size={18} color={T.goldBright} />
+                            <Text style={styles.saveLiveBtnText}>Save NIN Pricing & Visibility</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            </View>
+
+            {/* ========================================================================= */}
+            {/* MODAL: BATCH PROFIT MARGIN TOOL                                           */}
+            {/* ========================================================================= */}
+            <Modal
+                visible={showBatchModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowBatchModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="calculator" size={18} color={T.goldBright} />
+                                <Text style={styles.modalTitle}>Batch NIN Profit Margin (Riba)</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowBatchModal(false)}>
+                                <Ionicons name="close-circle" size={22} color={T.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.modalDesc}>
+                            Quickly adjust profit margins across all NIN verification services or specific categories.
+                        </Text>
+
+                        <Text style={styles.inputLabel}>Target Category</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                            {[
+                                { key: 'all', label: 'All Services' },
+                                { key: 'slips', label: 'Slips & Cards' },
+                                { key: 'validation', label: 'Validations' },
+                                { key: 'modification', label: 'Modifications' },
+                            ].map(cat => (
+                                <TouchableOpacity
+                                    key={cat.key}
+                                    onPress={() => setBatchTargetCategory(cat.key as any)}
+                                    style={[styles.catPill, batchTargetCategory === cat.key && styles.catPillActive]}
+                                >
+                                    <Text style={[styles.catPillText, batchTargetCategory === cat.key && styles.catPillTextActive]}>
+                                        {cat.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={styles.inputLabel}>Profit Margin Delta (₦ to add to each service)</Text>
+                        <TextInput
+                            value={batchProfitDelta}
+                            onChangeText={setBatchProfitDelta}
+                            placeholder="e.g. 50 or 100"
+                            placeholderTextColor={T.textMuted}
+                            keyboardType="numeric"
+                            style={styles.modalInput}
+                        />
+
+                        <TouchableOpacity
+                            onPress={handleApplyBatchMarkup}
+                            style={styles.modalSaveBtn}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.modalSaveBtnText}>Apply Profit Margin</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    sectionHeaderTitle: {
-        fontSize: 12,
-        fontWeight: '900',
-        color: '#64748b',
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-        marginBottom: 16,
-    },
-    alertOverlay: {
+    container: {
         flex: 1,
-        backgroundColor: 'rgba(5, 11, 20, 0.75)',
+        backgroundColor: T.bg,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: T.textSub,
+    },
+    headerGoldBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: T.navyDeep,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
     },
-    alertCard: {
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        padding: 24,
+    heroSummaryBar: {
+        paddingHorizontal: 14,
+        paddingTop: 10,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: T.cardBorderGold,
+    },
+    liveIndicatorRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        width: '85%',
-        maxWidth: 320,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    alertIconBg: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-    },
-    alertSuccessIcon: {
-        backgroundColor: '#ecfdf5',
-    },
-    alertErrorIcon: {
-        backgroundColor: '#fef2f2',
-    },
-    alertInfoIcon: {
-        backgroundColor: '#eff6ff',
-    },
-    alertTitle: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: '#0d1b3e',
+        gap: 6,
         marginBottom: 8,
-        textAlign: 'center',
-        letterSpacing: -0.2,
     },
-    alertMessage: {
-        fontSize: 12,
-        color: '#475569',
-        textAlign: 'center',
-        lineHeight: 18,
-        marginBottom: 20,
-        fontWeight: '500',
-        paddingHorizontal: 8,
+    pulseDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: T.success,
     },
-    alertButton: {
-        backgroundColor: '#0d1b3e',
-        height: 44,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        shadowColor: '#0d1b3e',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    alertButtonText: {
-        color: '#ffffff',
-        fontWeight: '800',
-        fontSize: 13,
-    },
-    headerGradient: {
-        paddingHorizontal: 16,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-    },
-    headerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    headerTitle: {
-        color: '#ffffff',
-        fontSize: 20,
+    liveIndicatorText: {
+        fontSize: 9.5,
         fontWeight: '900',
-        letterSpacing: -0.5,
+        color: T.goldBright,
+        letterSpacing: 1,
     },
-    headerSub: {
-        fontSize: 12,
-        color: '#94a3b8',
-        fontWeight: '500',
-    },
-    badgeContainer: {
+    summaryGrid: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(245, 166, 35, 0.15)',
-        borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.3)',
-        borderRadius: 12,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-    },
-    badgeText: {
-        color: '#f5a623',
-        fontSize: 12,
-        fontWeight: '800',
-        marginLeft: 4,
-        textTransform: 'uppercase',
-    },
-    statsRow: {
-        flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 4,
-    },
-    statCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 14,
-        paddingVertical: 10,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 12,
+        paddingVertical: 8,
         paddingHorizontal: 12,
-        width: '15.5%',
-        alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.05)',
+        borderColor: 'rgba(217, 119, 6, 0.2)',
     },
-    statVal: {
-        color: '#ffffff',
+    summaryItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    summaryValue: {
         fontSize: 15,
         fontWeight: '900',
+        color: '#FFFFFF',
     },
-    statLabel: {
-        color: '#94a3b8',
-        fontSize: 12,
-        fontWeight: '600',
-        marginTop: 2,
-        textTransform: 'uppercase',
+    summaryLabel: {
+        fontSize: 9.5,
+        color: '#94A3B8',
+        fontWeight: '700',
+        marginTop: 1,
     },
-    tabContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 4,
-        marginHorizontal: 16,
-        marginTop: -16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        elevation: 3,
+    summaryDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    masterControlCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 12,
+        marginTop: 8,
+        borderRadius: 10,
+        padding: 10,
         borderWidth: 1,
-        borderColor: '#e2e8f0',
-        height: 48,
-        justifyContent: 'center',
+        borderColor: T.cardBorderGold,
     },
-    tabButton: {
+    masterControlHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    masterControlTitle: {
+        fontSize: 11.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+    },
+    statusToggleGroup: {
+        flexDirection: 'row',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 6,
+        padding: 2,
+        gap: 2,
+    },
+    statusTogglePill: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 5,
+    },
+    pillActive: {
+        backgroundColor: '#059669',
+    },
+    pillMaint: {
+        backgroundColor: '#D97706',
+    },
+    pillHide: {
+        backgroundColor: '#DC2626',
+    },
+    statusTogglePillText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    maintMsgBox: {
+        marginTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        paddingTop: 6,
+    },
+    maintMsgLabel: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: T.goldDark,
+        marginBottom: 2,
+    },
+    maintMsgInput: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        fontSize: 11,
+        color: T.textMain,
+    },
+    categoryBar: {
+        backgroundColor: T.navyPrimary,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(217, 119, 6, 0.2)',
+        paddingVertical: 6,
+        marginTop: 8,
+    },
+    categoryScroll: {
+        paddingHorizontal: 10,
+        gap: 6,
+    },
+    categoryPill: {
+        paddingHorizontal: 11,
+        paddingVertical: 5,
+        borderRadius: 14,
+        backgroundColor: T.navyDeep,
+    },
+    categoryPillActive: {
+        backgroundColor: T.navyCard,
+        borderWidth: 1,
+        borderColor: T.gold,
+    },
+    categoryPillText: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: T.textMuted,
+    },
+    categoryPillTextActive: {
+        color: T.goldBright,
+        fontWeight: '900',
+    },
+    searchActionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        height: 38,
-        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        gap: 8,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: T.cardBorder,
     },
-    tabButtonActive: {
-        backgroundColor: '#060d21',
-    },
-    tabText: {
-        color: '#64748b',
-        fontSize: 12,
-        fontWeight: '700',
-        marginLeft: 6,
-    },
-    tabTextActive: {
-        color: '#ffffff',
-    },
-    scrollContent: {
-        paddingHorizontal: 16,
-        paddingTop: 24,
-    },
-    loaderBox: {
+    searchBox: {
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 60,
-    },
-    loaderText: {
-        fontSize: 13,
-        color: '#64748b',
-        fontWeight: '600',
-        marginTop: 12,
-    },
-    emptyBox: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 60,
-    },
-    emptyText: {
-        fontSize: 13,
-        color: '#64748b',
-        fontWeight: '600',
-        marginTop: 12,
-        textAlign: 'center',
-    },
-    priceCard: {
-        backgroundColor: '#ffffff',
-        borderRadius: 20,
-        padding: 16,
-        marginBottom: 14,
+        backgroundColor: T.inputBg,
         borderWidth: 1,
-        borderColor: '#e2e8f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 6,
+        borderColor: T.border,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        gap: 6,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 11.5,
+        color: T.textMain,
+    },
+    batchMarginBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: T.goldBg,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.goldBorder,
+    },
+    batchMarginBtnText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.goldDark,
+    },
+    listContent: {
+        padding: 12,
+        paddingBottom: 90,
+    },
+    serviceCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.02,
+        shadowRadius: 3,
         elevation: 1,
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
-        paddingBottom: 12,
-        marginBottom: 14,
+        marginBottom: 10,
     },
-    cardTitle: {
-        fontSize: 15,
+    iconCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: T.navyPrimary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    serviceTitle: {
+        fontSize: 13.5,
         fontWeight: '900',
-        color: '#0f172a',
+        color: T.navyPrimary,
     },
-    cardId: {
-        fontSize: 12,
-        color: '#94a3b8',
-        fontWeight: '600',
-        marginTop: 2,
-    },
-    totalBadge: {
-        backgroundColor: '#f0fdf4',
-        borderWidth: 1,
-        borderColor: '#bbf7d0',
-        borderRadius: 12,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        alignItems: 'flex-end',
-    },
-    totalBadgeLabel: {
-        fontSize: 12,
-        color: '#16a34a',
-        fontWeight: '700',
-        textTransform: 'uppercase',
-    },
-    totalBadgeVal: {
-        fontSize: 14,
-        fontWeight: '900',
-        color: '#15803d',
+    serviceDesc: {
+        fontSize: 10,
+        color: T.textMuted,
         marginTop: 1,
+        lineHeight: 13,
     },
-    formRow: {
+    itemStatusGroup: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 5,
+        padding: 2,
+        gap: 2,
     },
-    inputWrapper: {
-        width: '48.5%',
+    itemStatusPill: {
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 4,
     },
-    inputLabel: {
-        fontSize: 12,
-        fontWeight: '800',
-        color: '#64748b',
-        marginBottom: 6,
-        textTransform: 'uppercase',
+    itemStatusActive: {
+        backgroundColor: '#059669',
     },
-    marginText: {
-        fontSize: 12,
-        fontWeight: '800',
-        color: '#4f46e5',
+    itemStatusMaint: {
+        backgroundColor: '#D97706',
     },
-    inputFieldContainer: {
+    itemStatusHide: {
+        backgroundColor: '#DC2626',
+    },
+    itemStatusText: {
+        fontSize: 8.5,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    priceBoxesRow: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    costBox: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    markupBox: {
+        flex: 1.3,
+        backgroundColor: '#FFFBEB',
+        borderRadius: 8,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    totalBox: {
+        flex: 1.1,
+        backgroundColor: T.navyPrimary,
+        borderRadius: 8,
+        padding: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    priceBoxLabel: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: T.textMuted,
+        marginBottom: 3,
+    },
+    priceBoxLabelMarkup: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: T.goldDark,
+        marginBottom: 3,
+    },
+    priceBoxLabelTotal: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: '#94A3B8',
+        marginBottom: 2,
+    },
+    inputWrap: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#cbd5e1',
-        borderRadius: 12,
-        paddingHorizontal: 10,
-        height: 44,
+        borderColor: T.border,
+        borderRadius: 6,
+        paddingHorizontal: 5,
+        paddingVertical: 3,
     },
-    inputFocused: {
-        borderColor: '#060d21',
-        backgroundColor: '#ffffff',
-    },
-    inputFocusedMarkup: {
-        borderColor: '#4f46e5',
-        backgroundColor: '#ffffff',
-    },
-    currencyPrefix: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1e293b',
+    nairaSign: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: T.textSub,
         marginRight: 2,
     },
-    currencyPrefixMarkup: {
-        fontSize: 14,
+    nairaSignGold: {
+        fontSize: 11.5,
         fontWeight: '900',
-        color: '#4f46e5',
+        color: T.goldDark,
         marginRight: 2,
     },
-    textInputStyle: {
+    priceInput: {
         flex: 1,
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 14.5,
-        paddingVertical: 0,
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        padding: 0,
     },
-    markupTextInput: {
-        color: '#4f46e5',
+    priceInputGold: {
+        flex: 1,
+        fontSize: 12,
         fontWeight: '900',
+        color: T.goldDark,
+        padding: 0,
     },
-    saveBar: {
+    costSubText: {
+        fontSize: 8,
+        color: T.textMuted,
+        marginTop: 3,
+    },
+    stepperRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
+        gap: 2,
+    },
+    stepperBtn: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        borderRadius: 3,
+        paddingVertical: 2,
+        alignItems: 'center',
+    },
+    stepperBtnText: {
+        fontSize: 7.5,
+        fontWeight: '800',
+        color: T.goldDark,
+    },
+    totalSellingPrice: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        marginVertical: 1,
+    },
+    marginTag: {
+        backgroundColor: 'rgba(52, 211, 153, 0.2)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    marginTagText: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: '#34D399',
+    },
+    bottomBar: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         borderTopWidth: 1,
-        borderTopColor: '#e2e8f0',
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 10,
+        borderTopColor: T.cardBorder,
     },
-    saveButton: {
-        backgroundColor: '#060d21',
-        height: 48,
-        borderRadius: 14,
+    saveLiveBtn: {
+        backgroundColor: T.navyPrimary,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100%',
-        shadowColor: '#060d21',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        elevation: 4,
+        paddingVertical: 14,
+        borderRadius: 10,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
     },
-    saveButtonText: {
-        color: '#ffffff',
-        fontWeight: '900',
+    saveLiveBtnText: {
+        color: '#FFFFFF',
         fontSize: 13,
-        letterSpacing: 0.8,
+        fontWeight: '900',
+    },
+    emptyState: {
+        padding: 28,
+        alignItems: 'center',
+    },
+    emptyStateTitle: {
+        fontSize: 13.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+        marginTop: 6,
+    },
+    emptyStateSub: {
+        fontSize: 10.5,
+        color: T.textMuted,
+        marginTop: 2,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(7, 13, 30, 0.65)',
+        justifyContent: 'flex-end',
+    },
+    modalCard: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 16,
+        maxHeight: '80%',
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 14.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+    },
+    modalDesc: {
+        fontSize: 11,
+        color: T.textSub,
+        lineHeight: 15,
+        marginBottom: 12,
+    },
+    inputLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        marginTop: 6,
+        marginBottom: 4,
+    },
+    modalInput: {
+        backgroundColor: T.inputBg,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        fontSize: 12,
+        color: T.textMain,
+        marginBottom: 8,
+    },
+    catPill: {
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 6,
+        backgroundColor: '#F1F5F9',
+    },
+    catPillActive: {
+        backgroundColor: T.navyPrimary,
+    },
+    catPillText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: T.textSub,
+    },
+    catPillTextActive: {
+        color: T.goldBright,
+        fontWeight: '900',
+    },
+    modalSaveBtn: {
+        backgroundColor: T.navyPrimary,
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+        marginTop: 10,
+        marginBottom: 16,
+    },
+    modalSaveBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '900',
     },
 });
