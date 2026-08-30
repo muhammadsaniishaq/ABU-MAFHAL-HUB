@@ -64,15 +64,19 @@ export default function BVNRetrievalScreen() {
         }
     };
 
-    const fetchServicePrice = async () => {
+    const fetchServicePrice = async (currentTab: 'crm' | 'phone' | 'track' = activeTab) => {
         try {
+            const targetId = currentTab === 'crm' ? 'bvn_retrieval_crm' : 'bvn_retrieval_phone';
             const { data } = await supabase
                 .from('service_pricing')
                 .select('cost_price, markup_price, selling_price')
-                .eq('id', 'bvn_phone_basic')
-                .maybeSingle();
-            if (data) {
-                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                .in('id', [targetId, 'bvn_phone_basic']);
+
+            if (data && data.length > 0) {
+                const specific = data.find(d => d.id === targetId) || data[0];
+                const total = specific.selling_price 
+                    ? Number(specific.selling_price) 
+                    : (Number(specific.cost_price || 0) + Number(specific.markup_price || 0));
                 if (total > 0) setServicePrice(total);
             }
         } catch (e) {
@@ -82,8 +86,8 @@ export default function BVNRetrievalScreen() {
 
     useEffect(() => {
         fetchWalletBalance();
-        fetchServicePrice();
-    }, []);
+        fetchServicePrice(activeTab);
+    }, [activeTab]);
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
         setAlertConfig({

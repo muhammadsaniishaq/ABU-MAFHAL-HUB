@@ -1,499 +1,716 @@
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Modal, TextInput, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    ScrollView,
+    TextInput,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    Dimensions,
+    Share,
+    Switch
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../services/supabase';
 
-// Executive Navy & Gold Design System
-const C = {
+const { width } = Dimensions.get('window');
+
+// Executive Royal Navy & Imperial Gold Palette
+const T = {
     bg: '#F8FAFC',
     card: '#FFFFFF',
-    cardBorder: 'rgba(212, 175, 55, 0.25)',
-    navy: '#0B192C',
-    navyMid: '#1E293B',
-    navyLight: '#F1F5F9',
-    gold: '#D4AF37',
-    goldDk: '#B45309',
-    goldLight: '#FEF9E7',
-    goldBorder: '#FCD34D',
+    cardBorder: '#E2E8F0',
+    cardBorderGold: 'rgba(217, 119, 6, 0.28)',
+    navyPrimary: '#070D1E',
+    navyDeep: '#0A1128',
+    navyMid: '#0F172A',
+    navyCard: '#1E293B',
+    navyLight: '#334155',
+    gold: '#D97706',
+    goldBright: '#F59E0B',
+    goldDark: '#B45309',
+    goldLight: '#FEF3C7',
+    goldBg: '#FFFBEB',
+    goldBorder: '#FDE68A',
     textMain: '#0F172A',
     textSub: '#475569',
-    textMuted: '#94A3B8',
-    border: '#E2E8F0',
-    success: '#10B981',
+    textMuted: '#64748B',
+    border: '#CBD5E1',
+    inputBg: '#F8FAFC',
+    success: '#059669',
     successBg: '#ECFDF5',
-    warning: '#F59E0B',
-    warningBg: '#FFFBEB',
-    danger: '#EF4444',
+    successBorder: '#A7F3D0',
+    danger: '#DC2626',
     dangerBg: '#FEF2F2',
-    blue: '#3B82F6',
-    blueBg: '#EFF6FF',
-    purple: '#8B5CF6',
+    dangerBorder: '#FECACA',
+    warning: '#D97706',
+    warningBg: '#FFFBEB',
+    warningBorder: '#FDE68A',
+    info: '#0284C7',
+    infoBg: '#F0F9FF',
+    infoBorder: '#BAE6FD',
+    purple: '#7C3AED',
     purpleBg: '#F5F3FF',
+    purpleBorder: '#DDD6FE',
 };
 
-const BVN_SERVICES_DEFAULT = [
+export interface BVNServicePrice {
+    id: string;
+    code: string;
+    name: string;
+    category: 'modification' | 'retrieval' | 'slip' | 'core';
+    description: string;
+    cost_price: number; // Official AgentHub API Cost Price
+    markup_price: number; // Admin Profit Margin (Riba)
+    hasBankFees?: boolean;
+    status: 'ACTIVE' | 'INACTIVE';
+    icon: string;
+}
+
+const AGENTHUB_OFFICIAL_BVN_CATALOGUE: BVNServicePrice[] = [
     {
-        id: 'bvn_num_advanced',
-        service_category: 'bvn',
-        name: 'BVN Verification',
-        description: 'Instant full biometric & demographic verification via BVN number',
-        cost_price: 150,
-        markup_price: 50,
-        icon: 'shield-checkmark',
-        color: '#10B981',
-        bg: '#ECFDF5',
-        badge: 'Core'
+        id: 'bvn_mod_dob',
+        code: '621',
+        name: 'BVN Mod: DOB',
+        category: 'modification',
+        description: 'Instant Date of Birth correction via API integration.',
+        cost_price: 5000,
+        markup_price: 1000,
+        hasBankFees: true,
+        status: 'ACTIVE',
+        icon: 'calendar-outline',
+    },
+    {
+        id: 'bvn_mod_dob_phone',
+        code: '624',
+        name: 'BVN Mod: DOB & Phone',
+        category: 'modification',
+        description: 'Instant Date of Birth & Telephone update via API integration.',
+        cost_price: 7000,
+        markup_price: 1500,
+        hasBankFees: true,
+        status: 'ACTIVE',
+        icon: 'phone-portrait-outline',
+    },
+    {
+        id: 'bvn_mod_name',
+        code: '620',
+        name: 'BVN Mod: Name',
+        category: 'modification',
+        description: 'Instant First, Middle, or Surname update via API integration.',
+        cost_price: 5000,
+        markup_price: 1000,
+        hasBankFees: true,
+        status: 'ACTIVE',
+        icon: 'person-outline',
+    },
+    {
+        id: 'bvn_mod_name_dob',
+        code: '626',
+        name: 'BVN Mod: Name & DOB',
+        category: 'modification',
+        description: 'Combined Name and Date of Birth correction via API integration.',
+        cost_price: 7000,
+        markup_price: 1500,
+        hasBankFees: true,
+        status: 'ACTIVE',
+        icon: 'create-outline',
+    },
+    {
+        id: 'bvn_mod_name_phone',
+        code: '623',
+        name: 'BVN Mod: Name & Phone',
+        category: 'modification',
+        description: 'Combined Name and Phone number modification via API integration.',
+        cost_price: 7000,
+        markup_price: 1500,
+        hasBankFees: true,
+        status: 'ACTIVE',
+        icon: 'call-outline',
+    },
+    {
+        id: 'bvn_mod_phone',
+        code: '622',
+        name: 'BVN Mod: Phone',
+        category: 'modification',
+        description: 'Instant Primary Registered Phone modification via API integration.',
+        cost_price: 5000,
+        markup_price: 1000,
+        hasBankFees: true,
+        status: 'ACTIVE',
+        icon: 'phone-portrait-outline',
     },
     {
         id: 'bvn_premium_slip',
-        service_category: 'bvn',
+        code: 'N/A',
         name: 'BVN Premium Slip',
-        description: 'Full official high-resolution printable BVN slip generation',
+        category: 'slip',
+        description: 'Instant official high-resolution printable PDF BVN slip generation.',
         cost_price: 150,
         markup_price: 100,
-        icon: 'star',
-        color: '#D4AF37',
-        bg: '#FEF9E7',
-        badge: 'Popular'
+        hasBankFees: false,
+        status: 'ACTIVE',
+        icon: 'document-text-outline',
     },
     {
-        id: 'bvn_phone_basic',
-        service_category: 'bvn',
-        name: 'BVN Phone Retrieval',
-        description: 'Search and retrieve linked BVN record via registered phone number',
+        id: 'bvn_retrieval_crm',
+        code: '631',
+        name: 'BVN Retrieval: CRM',
+        category: 'retrieval',
+        description: 'Instant CRM ticket & demographic BVN recovery via API integration.',
+        cost_price: 900,
+        markup_price: 300,
+        hasBankFees: false,
+        status: 'ACTIVE',
+        icon: 'server-outline',
+    },
+    {
+        id: 'bvn_retrieval_phone',
+        code: '630',
+        name: 'BVN Retrieval: Phone',
+        category: 'retrieval',
+        description: 'Instant lookup and BVN extraction using registered phone number.',
+        cost_price: 900,
+        markup_price: 300,
+        hasBankFees: false,
+        status: 'ACTIVE',
+        icon: 'search-outline',
+    },
+    {
+        id: 'bvn_num_advanced',
+        code: '601',
+        name: 'BVN Full Verification',
+        category: 'core',
+        description: 'Instant full biometric & demographic verification via BVN number.',
         cost_price: 150,
-        markup_price: 150,
-        icon: 'search',
-        color: '#3B82F6',
-        bg: '#EFF6FF',
-        badge: 'Search'
-    },
-    {
-        id: 'bvn_card',
-        service_category: 'bvn',
-        name: 'BVN Plastic Card',
-        description: 'Digital ID card formatted layout for plastic/PVC printing',
-        cost_price: 200,
         markup_price: 100,
-        icon: 'card',
-        color: '#8B5CF6',
-        bg: '#F5F3FF',
-        badge: 'Card'
-    },
-    {
-        id: 'bvn_modification',
-        service_category: 'bvn',
-        name: 'BVN Modification Request',
-        description: 'Submit BVN field change & demographic correction applications',
-        cost_price: 1000,
-        markup_price: 500,
-        icon: 'create',
-        color: '#B45309',
-        bg: '#FEF9E7',
-        badge: 'Mod'
-    },
-    {
-        id: 'bvn_enrollment',
-        service_category: 'bvn',
-        name: 'BVN Enrollment',
-        description: 'New BVN registration and demographic capture portal processing',
-        cost_price: 1500,
-        markup_price: 500,
-        icon: 'person-add',
-        color: '#0B192C',
-        bg: '#F1F5F9',
-        badge: 'Enroll'
+        hasBankFees: false,
+        status: 'ACTIVE',
+        icon: 'shield-checkmark-outline',
     },
     {
         id: 'vnin_to_nibss',
-        service_category: 'bvn',
+        code: '640',
         name: 'VNIN to NIBSS Integration',
-        description: 'Direct NIBSS linking of Virtual NIN to customer BVN record',
+        category: 'core',
+        description: 'Direct NIBSS linking of Virtual NIN to customer BVN record.',
         cost_price: 500,
-        markup_price: 200,
-        icon: 'git-compare',
-        color: '#6366F1',
-        bg: '#EEF2FF',
-        badge: 'NIBSS'
-    }
+        markup_price: 300,
+        hasBankFees: false,
+        status: 'ACTIVE',
+        icon: 'git-compare-outline',
+    },
+    {
+        id: 'bvn_enrollment',
+        code: '650',
+        name: 'BVN User Enrollment',
+        category: 'core',
+        description: 'New BVN registration and demographic capture portal processing.',
+        cost_price: 1500,
+        markup_price: 500,
+        hasBankFees: false,
+        status: 'ACTIVE',
+        icon: 'person-add-outline',
+    },
 ];
 
-export default function BVNPricingScreen() {
+export default function EnterpriseBVNPricingScreen() {
     const router = useRouter();
-    const insets = useSafeAreaInsets();
 
-    const [prices, setPrices] = useState<any[]>([]);
-    const [originalPrices, setOriginalPrices] = useState<any[]>([]);
+    const [services, setServices] = useState<BVNServicePrice[]>(AGENTHUB_OFFICIAL_BVN_CATALOGUE);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [syncing, setSyncing] = useState(false);
-    const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
-    // Custom Alert State
-    const [customAlert, setCustomAlert] = useState<{
-        visible: boolean;
-        title: string;
-        message: string;
-        type: 'success' | 'error' | 'info';
-    }>({
-        visible: false,
-        title: '',
-        message: '',
-        type: 'info'
-    });
+    // Filters
+    const [activeTab, setActiveTab] = useState<'all' | 'modification' | 'retrieval' | 'slip' | 'core'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
-        setCustomAlert({
-            visible: true,
-            title,
-            message,
-            type
-        });
-    };
+    // Modal: Batch Margin Tool
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batchTargetCategory, setBatchTargetCategory] = useState<'all' | 'modification' | 'retrieval'>('modification');
+    const [batchProfitDelta, setBatchProfitDelta] = useState('500');
 
-    const fetchPrices = async () => {
-        setLoading(true);
+    useEffect(() => {
+        fetchBVNPrices();
+    }, []);
+
+    const fetchBVNPrices = async () => {
         try {
-            // 1. Ensure all default BVN entries exist in service_pricing
-            for (const item of BVN_SERVICES_DEFAULT) {
-                const { data: existing } = await supabase
-                    .from('service_pricing')
-                    .select('id')
-                    .eq('id', item.id)
-                    .maybeSingle();
+            setLoading(true);
 
-                if (!existing) {
-                    await supabase.from('service_pricing').insert({
-                        id: item.id,
-                        service_category: 'bvn',
-                        name: item.name,
-                        cost_price: item.cost_price,
-                        markup_price: item.markup_price,
-                    });
-                }
-            }
-
-            // 2. Query from database
+            // 1. Fetch from service_pricing table
             const { data, error } = await supabase
                 .from('service_pricing')
                 .select('*')
                 .eq('service_category', 'bvn');
 
-            if (error) throw error;
-
-            // Merge with local metadata (icons, descriptions, badges)
-            const merged = BVN_SERVICES_DEFAULT.map(def => {
-                const dbRow = (data || []).find(r => r.id === def.id);
-                return {
-                    ...def,
-                    ...(dbRow || {}),
-                    cost_price: dbRow?.cost_price !== undefined ? Number(dbRow.cost_price) : def.cost_price,
-                    markup_price: dbRow?.markup_price !== undefined ? Number(dbRow.markup_price) : def.markup_price,
-                };
-            });
-
-            setPrices(merged);
-            setOriginalPrices(JSON.parse(JSON.stringify(merged)));
-        } catch (error: any) {
-            showAlert('Database Error', error.message || 'Failed to load BVN pricing.', 'error');
+            if (data && data.length > 0) {
+                const merged: BVNServicePrice[] = AGENTHUB_OFFICIAL_BVN_CATALOGUE.map(def => {
+                    const row = data.find(r => r.id === def.id || (r.name && r.name.toLowerCase() === def.name.toLowerCase()));
+                    return {
+                        ...def,
+                        cost_price: row?.cost_price !== undefined ? Number(row.cost_price) : def.cost_price,
+                        markup_price: row?.markup_price !== undefined ? Number(row.markup_price) : def.markup_price,
+                    };
+                });
+                setServices(merged);
+            } else {
+                // Initialize default prices in DB
+                seedDefaultBVNPrices();
+            }
+        } catch (e) {
+            console.error('Error fetching BVN pricing:', e);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    useEffect(() => {
-        fetchPrices();
+    const seedDefaultBVNPrices = async () => {
+        try {
+            const seedRows = AGENTHUB_OFFICIAL_BVN_CATALOGUE.map(s => ({
+                id: s.id,
+                service_category: 'bvn',
+                name: s.name,
+                cost_price: s.cost_price,
+                markup_price: s.markup_price,
+                updated_at: new Date().toISOString(),
+            }));
+
+            await supabase.from('service_pricing').upsert(seedRows, { onConflict: 'id' });
+            fetchBVNPrices();
+        } catch (e) {
+            console.warn('Seed BVN error:', e);
+        }
+    };
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchBVNPrices();
     }, []);
 
-    const updateMarkup = (id: string, newMarkup: string) => {
-        const val = parseInt(newMarkup, 10);
-        if (isNaN(val) && newMarkup !== '') return;
-
-        setPrices(prev => prev.map(p => {
-            if (p.id === id) {
-                return { ...p, markup_price: newMarkup === '' ? 0 : val };
-            }
-            return p;
-        }));
+    // Update single field locally
+    const handleUpdateServiceField = (id: string, field: 'cost_price' | 'markup_price', value: number) => {
+        setServices(prev =>
+            prev.map(s => {
+                if (s.id === id) {
+                    return { ...s, [field]: value };
+                }
+                return s;
+            })
+        );
     };
 
-    const updateCost = (id: string, newCost: string) => {
-        const val = parseInt(newCost, 10);
-        if (isNaN(val) && newCost !== '') return;
-
-        setPrices(prev => prev.map(p => {
-            if (p.id === id) {
-                return { ...p, cost_price: newCost === '' ? 0 : val };
-            }
-            return p;
-        }));
-    };
-
-    const applyPresetMarkup = (id: string, addition: number) => {
-        setPrices(prev => prev.map(p => {
-            if (p.id === id) {
-                return { ...p, markup_price: Math.max(0, (p.markup_price || 0) + addition) };
-            }
-            return p;
-        }));
-    };
-
-    const hasChanges = () => {
-        return JSON.stringify(prices) !== JSON.stringify(originalPrices);
-    };
-
-    const handleSave = async () => {
+    // PUSH ALL UPDATES ATOMICALLY TO SUPABASE
+    const handleSaveAllBVNPrices = async () => {
+        setSaving(true);
         try {
-            setSaving(true);
-            for (const item of prices) {
-                const { error } = await supabase
-                    .from('service_pricing')
-                    .upsert({
-                        id: item.id,
-                        service_category: 'bvn',
-                        name: item.name,
-                        cost_price: Number(item.cost_price || 0),
-                        markup_price: Number(item.markup_price || 0),
-                        updated_at: new Date().toISOString(),
-                    });
+            const rowsToUpsert = services.map(s => ({
+                id: s.id,
+                service_category: 'bvn',
+                name: s.name,
+                cost_price: s.cost_price,
+                markup_price: s.markup_price,
+                updated_at: new Date().toISOString(),
+            }));
 
-                if (error) throw error;
-            }
+            const { error } = await supabase.from('service_pricing').upsert(rowsToUpsert, { onConflict: 'id' });
+            if (error) throw error;
 
-            setOriginalPrices(JSON.parse(JSON.stringify(prices)));
-            showAlert('Changes Saved Successfully! ✓', 'All BVN service selling prices and markups have been updated live.', 'success');
-        } catch (error: any) {
-            showAlert('Save Failed', error.message || 'Could not save pricing changes.', 'error');
+            // Also mirror alias for generic bvn_modification and bvn_phone_basic
+            const defaultMod = services.find(s => s.id === 'bvn_mod_name') || services[0];
+            const defaultPhone = services.find(s => s.id === 'bvn_retrieval_phone') || services[8];
+
+            await supabase.from('service_pricing').upsert([
+                {
+                    id: 'bvn_modification',
+                    service_category: 'bvn',
+                    name: 'BVN Modification Request',
+                    cost_price: defaultMod.cost_price,
+                    markup_price: defaultMod.markup_price,
+                    updated_at: new Date().toISOString(),
+                },
+                {
+                    id: 'bvn_phone_basic',
+                    service_category: 'bvn',
+                    name: 'BVN Phone Retrieval',
+                    cost_price: defaultPhone.cost_price,
+                    markup_price: defaultPhone.markup_price,
+                    updated_at: new Date().toISOString(),
+                }
+            ], { onConflict: 'id' });
+
+            await supabase.from('audit_logs').insert({
+                action: 'Updated AgentHub BVN Pricing & Markup Margins',
+                target_resource: 'BVN Identity Pricing',
+                details: {
+                    totalServices: services.length,
+                    averageMarkup: avgProfitMargin,
+                    servicesList: services.map(s => ({ code: s.code, name: s.name, cost: s.cost_price, markup: s.markup_price, total: s.cost_price + s.markup_price })),
+                },
+            });
+
+            Alert.alert(
+                'BVN Pricing Live 🚀',
+                'All AgentHub API cost prices and customer selling prices saved to production. The app will now charge users with your configured profit margins!'
+            );
+            fetchBVNPrices();
+        } catch (e: any) {
+            Alert.alert('Save Error', e.message);
         } finally {
             setSaving(false);
         }
     };
 
-    const syncLiveAgentHubPrices = async () => {
-        try {
-            setSyncing(true);
+    // Apply Batch Markup
+    const handleApplyBatchMarkup = () => {
+        const delta = parseFloat(batchProfitDelta) || 0;
+        if (delta === 0) return;
 
-            // AgentHub official wholesale cost benchmark
-            const AGENTHUB_BVN_COSTS: Record<string, number> = {
-                'bvn_num_advanced': 150,
-                'bvn_premium_slip': 150,
-                'bvn_phone_basic': 150,
-                'bvn_card': 200,
-                'bvn_modification': 1000,
-                'bvn_enrollment': 1500,
-                'vnin_to_nibss': 500,
-            };
+        setServices(prev =>
+            prev.map(s => {
+                if (batchTargetCategory === 'all' || s.category === batchTargetCategory) {
+                    return {
+                        ...s,
+                        markup_price: Math.max(0, s.markup_price + delta),
+                    };
+                }
+                return s;
+            })
+        );
 
-            for (const [id, cost] of Object.entries(AGENTHUB_BVN_COSTS)) {
-                await supabase
-                    .from('service_pricing')
-                    .update({ cost_price: cost, updated_at: new Date().toISOString() })
-                    .eq('id', id);
-            }
-
-            await fetchPrices();
-            showAlert('AgentHub Rates Synced ✓', 'BVN cost prices updated to live AgentHub wholesale matrix.', 'success');
-        } catch (e: any) {
-            showAlert('Sync Warning', e.message || 'Failed to sync live prices.', 'error');
-        } finally {
-            setSyncing(false);
-        }
+        setShowBatchModal(false);
+        Alert.alert(
+            'Profit Margin Applied ✨',
+            `Added +₦${delta.toLocaleString()} profit margin across ${batchTargetCategory.toUpperCase()} services. Click "Save BVN Pricing" to push live.`
+        );
     };
+
+    // Filtered Services
+    const filteredServices = useMemo(() => {
+        return services.filter(s => {
+            const matchesCat = activeTab === 'all' || s.category === activeTab;
+            const matchesSearch =
+                !searchQuery.trim() ||
+                s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.description.toLowerCase().includes(searchQuery.toLowerCase());
+            return matchesCat && matchesSearch;
+        });
+    }, [services, activeTab, searchQuery]);
+
+    // Average Profit Margin
+    const avgProfitMargin = useMemo(() => {
+        if (services.length === 0) return 0;
+        const sum = services.reduce((acc, s) => acc + s.markup_price, 0);
+        return Math.round(sum / services.length);
+    }, [services]);
 
     return (
         <View style={styles.container}>
-            <StatusBar style="light" />
             <Stack.Screen
                 options={{
-                    headerShown: true,
                     title: 'BVN Services Pricing',
-                    headerStyle: { backgroundColor: C.navy },
+                    headerStyle: { backgroundColor: T.navyPrimary },
                     headerTintColor: '#FFFFFF',
-                    headerTitleStyle: { fontWeight: '700', fontSize: 16 },
-                    headerLeft: () => (
-                        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-                            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-                        </TouchableOpacity>
-                    ),
+                    headerShadowVisible: false,
                     headerRight: () => (
-                        <TouchableOpacity onPress={syncLiveAgentHubPrices} disabled={syncing} style={{ padding: 4 }}>
-                            {syncing ? (
-                                <ActivityIndicator size="small" color={C.gold} />
-                            ) : (
-                                <Ionicons name="cloud-download-outline" size={20} color={C.gold} />
-                            )}
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                            <TouchableOpacity onPress={() => setShowBatchModal(true)} style={styles.headerGoldBtn}>
+                                <Ionicons name="calculator-outline" size={17} color={T.goldBright} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={onRefresh} style={styles.headerGoldBtn}>
+                                <Ionicons name="refresh" size={17} color={T.goldBright} />
+                            </TouchableOpacity>
+                        </View>
                     ),
                 }}
             />
 
-            {/* Header Hero Section */}
-            <LinearGradient colors={[C.navy, '#1E293B']} style={styles.heroSection}>
-                <View style={styles.heroRow}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.heroTitle}>BVN Service Pricing Matrix</Text>
-                        <Text style={styles.heroSub}>Set cost, profit margin (markup), and live end-user selling fees.</Text>
+            {/* Top Telemetry Stat Hero */}
+            <LinearGradient colors={[T.navyPrimary, T.navyDeep, T.navyMid]} style={styles.heroSummaryBar}>
+                <View style={styles.liveIndicatorRow}>
+                    <View style={styles.pulseDot} />
+                    <Text style={styles.liveIndicatorText}>AGENTHUB KYC ENGINE • OFFICIAL BVN CATALOGUE</Text>
+                </View>
+
+                <View style={styles.summaryGrid}>
+                    <View style={styles.summaryItem}>
+                        <Text style={styles.summaryValue}>{services.length}</Text>
+                        <Text style={styles.summaryLabel}>Active Services</Text>
                     </View>
-                    <TouchableOpacity
-                        style={styles.syncBtn}
-                        onPress={syncLiveAgentHubPrices}
-                        disabled={syncing}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="sync" size={14} color="#0B192C" style={{ marginRight: 4 }} />
-                        <Text style={styles.syncBtnText}>{syncing ? 'Syncing...' : 'Sync Wholesale'}</Text>
-                    </TouchableOpacity>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.goldBright }]}>
+                            +₦{avgProfitMargin.toLocaleString()}
+                        </Text>
+                        <Text style={styles.summaryLabel}>Avg Riba / Margin</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.success }]}>ACTIVE</Text>
+                        <Text style={styles.summaryLabel}>API Gateway</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.info }]}>LIVE</Text>
+                        <Text style={styles.summaryLabel}>User Charging</Text>
+                    </View>
                 </View>
             </LinearGradient>
 
+            {/* Variable Pricing Notice Box (Matching AgentHub) */}
+            <View style={styles.noticeContainer}>
+                <View style={styles.noticeBox}>
+                    <Ionicons name="warning-outline" size={16} color={T.goldDark} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.noticeTitle}>Variable Pricing Notice</Text>
+                        <Text style={styles.noticeBody}>
+                            Prices for BVN Modifications vary by bank. Premium banks (e.g., First Bank, GTB) attract an additional surcharge automatically applied via API.
+                        </Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* Sub-Navigation Categories Ribbon */}
+            <View style={styles.categoryBar}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+                    {[
+                        { key: 'all', label: 'All Services' },
+                        { key: 'modification', label: '🛠️ Modifications (Codes 620-626)' },
+                        { key: 'retrieval', label: '🔍 Retrievals (Codes 630-631)' },
+                        { key: 'slip', label: '📄 Slips' },
+                        { key: 'core', label: '🛡️ Core KYC & NIBSS' },
+                    ].map(cat => (
+                        <TouchableOpacity
+                            key={cat.key}
+                            onPress={() => setActiveTab(cat.key as any)}
+                            style={[styles.categoryPill, activeTab === cat.key && styles.categoryPillActive]}
+                        >
+                            <Text style={[styles.categoryPillText, activeTab === cat.key && styles.categoryPillTextActive]}>
+                                {cat.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+
+            {/* Search & Action Bar */}
+            <View style={styles.searchActionRow}>
+                <View style={styles.searchBox}>
+                    <Ionicons name="search" size={15} color={T.textMuted} />
+                    <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search service name or code (e.g. 621, DOB, Name)..."
+                        placeholderTextColor={T.textMuted}
+                        style={styles.searchInput}
+                    />
+                </View>
+                <TouchableOpacity
+                    onPress={() => setShowBatchModal(true)}
+                    style={styles.batchMarginBtn}
+                >
+                    <Ionicons name="sparkles" size={14} color={T.goldDark} />
+                    <Text style={styles.batchMarginBtnText}>Batch Riba</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* BVN Services Pricing List */}
             {loading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={C.gold} />
-                    <Text style={styles.loadingText}>Loading BVN Pricing Registry...</Text>
+                    <ActivityIndicator size="small" color={T.gold} />
+                    <Text style={styles.loadingText}>Loading AgentHub BVN Pricing Engine...</Text>
                 </View>
             ) : (
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-                    <ScrollView
-                        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {prices.map((item) => {
-                            const cost = Number(item.cost_price || 0);
-                            const markup = Number(item.markup_price || 0);
-                            const sellingPrice = cost + markup;
-                            const isCostFocused = focusedInput === `cost_${item.id}`;
-                            const isMarkupFocused = focusedInput === `markup_${item.id}`;
+                <FlatList
+                    data={filteredServices}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />}
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <Ionicons name="pricetags-outline" size={40} color={T.gold} />
+                            <Text style={styles.emptyStateTitle}>Zero Services Found</Text>
+                            <Text style={styles.emptyStateSub}>No BVN services match your current search.</Text>
+                        </View>
+                    }
+                    renderItem={({ item }) => {
+                        const sellingPrice = item.cost_price + item.markup_price;
+                        const profitPercent = item.cost_price > 0 ? ((item.markup_price / item.cost_price) * 100).toFixed(1) : '0';
 
-                            return (
-                                <View key={item.id} style={styles.pricingCard}>
-                                    {/* Card Header */}
-                                    <View style={styles.cardHeader}>
-                                        <View style={[styles.iconBox, { backgroundColor: item.bg || C.navyLight }]}>
-                                            <Ionicons name={item.icon || 'finger-print'} size={18} color={item.color || C.goldDk} />
+                        return (
+                            <View style={styles.serviceCard}>
+                                <View style={styles.cardHeader}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                        <View style={styles.iconCircle}>
+                                            <Ionicons name={item.icon as any} size={16} color={T.goldBright} />
                                         </View>
-                                        <View style={{ flex: 1, marginLeft: 10 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={styles.serviceName}>{item.name}</Text>
-                                                {item.badge && (
-                                                    <View style={[styles.badge, { backgroundColor: item.bg || C.navyLight }]}>
-                                                        <Text style={[styles.badgeText, { color: item.color || C.navy }]}>{item.badge}</Text>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={styles.serviceTitle}>{item.name}</Text>
+                                                {item.hasBankFees && (
+                                                    <View style={styles.bankFeesBadge}>
+                                                        <Text style={styles.bankFeesText}>BANK FEES APPLY</Text>
                                                     </View>
                                                 )}
                                             </View>
-                                            <Text style={styles.serviceDesc} numberOfLines={2}>{item.description}</Text>
+                                            <Text style={styles.serviceDesc}>{item.description}</Text>
                                         </View>
                                     </View>
 
-                                    {/* Selling Price Display Hero */}
-                                    <View style={styles.sellingPriceBox}>
-                                        <View>
-                                            <Text style={styles.sellingLabel}>CUSTOMER SELLING PRICE</Text>
-                                            <Text style={styles.sellingSub}>Cost (₦{cost.toLocaleString()}) + Profit (₦{markup.toLocaleString()})</Text>
-                                        </View>
-                                        <Text style={styles.sellingAmount}>₦{sellingPrice.toLocaleString()}</Text>
-                                    </View>
-
-                                    {/* Edit Inputs Row */}
-                                    <View style={styles.inputsRow}>
-                                        {/* Cost Price Input */}
-                                        <View style={styles.inputCol}>
-                                            <Text style={styles.fieldLabel}>Cost Price (₦)</Text>
-                                            <TextInput
-                                                style={[styles.inputField, isCostFocused && styles.inputFieldFocused]}
-                                                keyboardType="numeric"
-                                                value={String(cost)}
-                                                onChangeText={(val) => updateCost(item.id, val)}
-                                                onFocus={() => setFocusedInput(`cost_${item.id}`)}
-                                                onBlur={() => setFocusedInput(null)}
-                                            />
-                                        </View>
-
-                                        {/* Profit / Markup Input */}
-                                        <View style={styles.inputCol}>
-                                            <Text style={styles.fieldLabel}>Markup Profit (₦)</Text>
-                                            <TextInput
-                                                style={[styles.inputField, isMarkupFocused && styles.inputFieldFocused, { borderColor: C.goldBorder }]}
-                                                keyboardType="numeric"
-                                                value={String(markup)}
-                                                onChangeText={(val) => updateMarkup(item.id, val)}
-                                                onFocus={() => setFocusedInput(`markup_${item.id}`)}
-                                                onBlur={() => setFocusedInput(null)}
-                                            />
-                                        </View>
-                                    </View>
-
-                                    {/* Quick Preset Buttons */}
-                                    <View style={styles.presetRow}>
-                                        <Text style={styles.presetLabel}>Quick Add Margin:</Text>
-                                        {[+50, +100, +200].map(addVal => (
-                                            <TouchableOpacity
-                                                key={addVal}
-                                                style={styles.presetBtn}
-                                                onPress={() => applyPresetMarkup(item.id, addVal)}
-                                            >
-                                                <Text style={styles.presetBtnText}>+{addVal}</Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                    <View style={styles.statusWrap}>
+                                        <Text style={styles.statusActiveText}>{item.status}</Text>
+                                        <Text style={styles.codeText}>Code: {item.code}</Text>
                                     </View>
                                 </View>
-                            );
-                        })}
-                    </ScrollView>
-                </KeyboardAvoidingView>
+
+                                {/* Pricing Breakdown Grid */}
+                                <View style={styles.priceBoxesRow}>
+                                    {/* 1. API COST PRICE (AgentHub Cost) */}
+                                    <View style={styles.costBox}>
+                                        <Text style={styles.priceBoxLabel}>API COST (AGENTHUB)</Text>
+                                        <View style={styles.inputWrap}>
+                                            <Text style={styles.nairaSign}>₦</Text>
+                                            <TextInput
+                                                value={String(item.cost_price)}
+                                                onChangeText={val => handleUpdateServiceField(item.id, 'cost_price', parseFloat(val) || 0)}
+                                                keyboardType="numeric"
+                                                style={styles.priceInput}
+                                            />
+                                        </View>
+                                        <Text style={styles.costSubText}>Base Gateway Fee</Text>
+                                    </View>
+
+                                    {/* 2. ADMIN PROFIT MARGIN (Riba) */}
+                                    <View style={styles.markupBox}>
+                                        <Text style={styles.priceBoxLabelMarkup}>PROFIT MARGIN (RIBA)</Text>
+                                        <View style={styles.inputWrap}>
+                                            <Text style={styles.nairaSignGold}>+₦</Text>
+                                            <TextInput
+                                                value={String(item.markup_price)}
+                                                onChangeText={val => handleUpdateServiceField(item.id, 'markup_price', parseFloat(val) || 0)}
+                                                keyboardType="numeric"
+                                                style={styles.priceInputGold}
+                                            />
+                                        </View>
+                                        <View style={styles.stepperRow}>
+                                            {[-500, -100, 100, 500].map(step => (
+                                                <TouchableOpacity
+                                                    key={step}
+                                                    onPress={() => handleUpdateServiceField(item.id, 'markup_price', Math.max(0, item.markup_price + step))}
+                                                    style={styles.stepperBtn}
+                                                >
+                                                    <Text style={styles.stepperBtnText}>{step > 0 ? `+${step}` : step}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+
+                                    {/* 3. USER SELLING PRICE */}
+                                    <View style={styles.totalBox}>
+                                        <Text style={styles.priceBoxLabelTotal}>USER CHARGE FEE</Text>
+                                        <Text style={styles.totalSellingPrice}>₦{sellingPrice.toLocaleString()}</Text>
+                                        <View style={styles.marginTag}>
+                                            <Text style={styles.marginTagText}>+{profitPercent}% Profit</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        );
+                    }}
+                />
             )}
 
             {/* Bottom Save Action Bar */}
-            {hasChanges() && (
-                <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                    <TouchableOpacity
-                        style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-                        onPress={handleSave}
-                        disabled={saving}
-                        activeOpacity={0.85}
-                    >
-                        {saving ? (
-                            <ActivityIndicator size="small" color="#0B192C" />
-                        ) : (
-                            <>
-                                <Ionicons name="checkmark-done" size={18} color="#0B192C" style={{ marginRight: 6 }} />
-                                <Text style={styles.saveBtnText}>Save BVN Pricing Changes</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            )}
+            <View style={styles.bottomBar}>
+                <TouchableOpacity
+                    onPress={handleSaveAllBVNPrices}
+                    disabled={saving}
+                    style={styles.saveLiveBtn}
+                    activeOpacity={0.85}
+                >
+                    {saving ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <>
+                            <Ionicons name="checkmark-circle" size={18} color={T.goldBright} />
+                            <Text style={styles.saveLiveBtnText}>Save BVN Pricing to Production</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            </View>
 
-            {/* Custom Alert Modal */}
+            {/* ========================================================================= */}
+            {/* MODAL: BATCH PROFIT MARGIN TOOL                                           */}
+            {/* ========================================================================= */}
             <Modal
-                visible={customAlert.visible}
+                visible={showBatchModal}
                 transparent={true}
-                animationType="fade"
-                onRequestClose={() => setCustomAlert({ ...customAlert, visible: false })}
+                animationType="slide"
+                onRequestClose={() => setShowBatchModal(false)}
             >
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertCard}>
-                        <View style={[
-                            styles.alertIconBox,
-                            customAlert.type === 'success' ? { backgroundColor: C.successBg } :
-                            customAlert.type === 'error' ? { backgroundColor: C.dangerBg } : { backgroundColor: C.blueBg }
-                        ]}>
-                            <Ionicons
-                                name={customAlert.type === 'success' ? 'checkmark-circle' : customAlert.type === 'error' ? 'alert-circle' : 'information-circle'}
-                                size={32}
-                                color={customAlert.type === 'success' ? C.success : customAlert.type === 'error' ? C.danger : C.blue}
-                            />
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="calculator" size={18} color={T.goldBright} />
+                                <Text style={styles.modalTitle}>Batch BVN Profit Margin (Riba)</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowBatchModal(false)}>
+                                <Ionicons name="close-circle" size={22} color={T.textMuted} />
+                            </TouchableOpacity>
                         </View>
-                        <Text style={styles.alertTitle}>{customAlert.title}</Text>
-                        <Text style={styles.alertMsg}>{customAlert.message}</Text>
+
+                        <Text style={styles.modalDesc}>
+                            Quickly increase or decrease your profit margin (riba) across all BVN services or specific categories at once.
+                        </Text>
+
+                        <Text style={styles.inputLabel}>Target Category</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                            {[
+                                { key: 'all', label: 'All Services' },
+                                { key: 'modification', label: 'Modifications (620-626)' },
+                                { key: 'retrieval', label: 'Retrievals (630-631)' },
+                            ].map(cat => (
+                                <TouchableOpacity
+                                    key={cat.key}
+                                    onPress={() => setBatchTargetCategory(cat.key as any)}
+                                    style={[styles.catPill, batchTargetCategory === cat.key && styles.catPillActive]}
+                                >
+                                    <Text style={[styles.catPillText, batchTargetCategory === cat.key && styles.catPillTextActive]}>
+                                        {cat.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={styles.inputLabel}>Profit Margin Delta (₦ to add to each service)</Text>
+                        <TextInput
+                            value={batchProfitDelta}
+                            onChangeText={setBatchProfitDelta}
+                            placeholder="e.g. 500 or 1000"
+                            placeholderTextColor={T.textMuted}
+                            keyboardType="numeric"
+                            style={styles.modalInput}
+                        />
+
                         <TouchableOpacity
-                            style={styles.alertBtn}
-                            onPress={() => setCustomAlert({ ...customAlert, visible: false })}
+                            onPress={handleApplyBatchMarkup}
+                            style={styles.modalSaveBtn}
+                            activeOpacity={0.85}
                         >
-                            <Text style={styles.alertBtnText}>Got it</Text>
+                            <Text style={styles.modalSaveBtnText}>Apply Profit Margin</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -505,40 +722,7 @@ export default function BVNPricingScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: C.bg,
-    },
-    heroSection: {
-        paddingHorizontal: 14,
-        paddingTop: 12,
-        paddingBottom: 14,
-    },
-    heroRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    heroTitle: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#FFFFFF',
-    },
-    heroSub: {
-        fontSize: 11,
-        color: C.textMuted,
-        marginTop: 2,
-    },
-    syncBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: C.gold,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 6,
-    },
-    syncBtnText: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: '#0B192C',
+        backgroundColor: T.bg,
     },
     loadingContainer: {
         flex: 1,
@@ -547,134 +731,371 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 10,
-        fontSize: 13,
-        color: C.textSub,
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: T.textSub,
     },
-    scrollContent: {
+    headerGoldBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: T.navyDeep,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heroSummaryBar: {
+        paddingHorizontal: 14,
+        paddingTop: 10,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: T.cardBorderGold,
+    },
+    liveIndicatorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    pulseDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: T.success,
+    },
+    liveIndicatorText: {
+        fontSize: 9.5,
+        fontWeight: '900',
+        color: T.goldBright,
+        letterSpacing: 1,
+    },
+    summaryGrid: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(217, 119, 6, 0.2)',
+    },
+    summaryItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    summaryValue: {
+        fontSize: 15,
+        fontWeight: '900',
+        color: '#FFFFFF',
+    },
+    summaryLabel: {
+        fontSize: 9.5,
+        color: '#94A3B8',
+        fontWeight: '700',
+        marginTop: 1,
+    },
+    summaryDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    noticeContainer: {
+        paddingHorizontal: 12,
+        paddingTop: 8,
+    },
+    noticeBox: {
+        flexDirection: 'row',
+        gap: 8,
+        backgroundColor: '#FFFBEB',
+        borderRadius: 8,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    noticeTitle: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: '#B45309',
+        marginBottom: 2,
+    },
+    noticeBody: {
+        fontSize: 10,
+        color: '#92400E',
+        lineHeight: 14,
+    },
+    categoryBar: {
+        backgroundColor: T.navyPrimary,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(217, 119, 6, 0.2)',
+        paddingVertical: 6,
+        marginTop: 8,
+    },
+    categoryScroll: {
+        paddingHorizontal: 10,
+        gap: 6,
+    },
+    categoryPill: {
+        paddingHorizontal: 11,
+        paddingVertical: 5,
+        borderRadius: 14,
+        backgroundColor: T.navyDeep,
+    },
+    categoryPillActive: {
+        backgroundColor: T.navyCard,
+        borderWidth: 1,
+        borderColor: T.gold,
+    },
+    categoryPillText: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: T.textMuted,
+    },
+    categoryPillTextActive: {
+        color: T.goldBright,
+        fontWeight: '900',
+    },
+    searchActionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        gap: 8,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: T.cardBorder,
+    },
+    searchBox: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.inputBg,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        gap: 6,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 11.5,
+        color: T.textMain,
+    },
+    batchMarginBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: T.goldBg,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.goldBorder,
+    },
+    batchMarginBtnText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.goldDark,
+    },
+    listContent: {
         padding: 12,
+        paddingBottom: 90,
     },
-    pricingCard: {
+    serviceCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
-        padding: 14,
-        marginBottom: 12,
+        padding: 12,
+        marginBottom: 10,
         borderWidth: 1,
-        borderColor: C.border,
-        shadowColor: '#000',
+        borderColor: T.cardBorder,
+        shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
+        shadowOpacity: 0.02,
+        shadowRadius: 3,
         elevation: 1,
     },
     cardHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 10,
     },
-    iconBox: {
-        width: 38,
-        height: 38,
+    iconCircle: {
+        width: 32,
+        height: 32,
         borderRadius: 8,
-        justifyContent: 'center',
+        backgroundColor: T.navyPrimary,
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    serviceName: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: C.textMain,
+    serviceTitle: {
+        fontSize: 13.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
     },
     serviceDesc: {
-        fontSize: 11,
-        color: C.textMuted,
+        fontSize: 10,
+        color: T.textMuted,
         marginTop: 1,
+        lineHeight: 13,
     },
-    badge: {
-        paddingHorizontal: 6,
+    bankFeesBadge: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 5,
         paddingVertical: 1,
         borderRadius: 4,
-        marginLeft: 6,
+        borderWidth: 1,
+        borderColor: '#FCD34D',
     },
-    badgeText: {
-        fontSize: 10,
-        fontWeight: '700',
-    },
-    sellingPriceBox: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        padding: 10,
-        borderRadius: 8,
-        borderLeftWidth: 3,
-        borderLeftColor: C.gold,
-        marginBottom: 12,
-    },
-    sellingLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: C.navy,
-        letterSpacing: 0.5,
-    },
-    sellingSub: {
-        fontSize: 10,
-        color: C.textMuted,
-        marginTop: 1,
-    },
-    sellingAmount: {
-        fontSize: 18,
+    bankFeesText: {
+        fontSize: 7.5,
         fontWeight: '900',
-        color: C.goldDk,
+        color: '#B45309',
     },
-    inputsRow: {
-        flexDirection: 'row',
-        gap: 10,
-        marginBottom: 8,
+    statusWrap: {
+        alignItems: 'flex-end',
     },
-    inputCol: {
-        flex: 1,
-    },
-    fieldLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: C.textSub,
-        marginBottom: 4,
-    },
-    inputField: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1.5,
-        borderColor: C.border,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 14,
-        fontWeight: '700',
-        color: C.textMain,
-    },
-    inputFieldFocused: {
-        borderColor: C.navy,
-        backgroundColor: '#FCFDFF',
-    },
-    presetRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 2,
-    },
-    presetLabel: {
-        fontSize: 10,
-        color: C.textMuted,
-        fontWeight: '600',
-    },
-    presetBtn: {
-        backgroundColor: C.navyLight,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+    statusActiveText: {
+        fontSize: 8.5,
+        fontWeight: '900',
+        color: '#059669',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
         borderRadius: 4,
     },
-    presetBtnText: {
-        fontSize: 10,
+    codeText: {
+        fontSize: 9,
         fontWeight: '700',
-        color: C.navy,
+        color: T.textMuted,
+        marginTop: 3,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    priceBoxesRow: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    costBox: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    markupBox: {
+        flex: 1.3,
+        backgroundColor: '#FFFBEB',
+        borderRadius: 8,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    totalBox: {
+        flex: 1.1,
+        backgroundColor: T.navyPrimary,
+        borderRadius: 8,
+        padding: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    priceBoxLabel: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: T.textMuted,
+        marginBottom: 3,
+    },
+    priceBoxLabelMarkup: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: T.goldDark,
+        marginBottom: 3,
+    },
+    priceBoxLabelTotal: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: '#94A3B8',
+        marginBottom: 2,
+    },
+    inputWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 6,
+        paddingHorizontal: 5,
+        paddingVertical: 3,
+    },
+    nairaSign: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: T.textSub,
+        marginRight: 2,
+    },
+    nairaSignGold: {
+        fontSize: 11.5,
+        fontWeight: '900',
+        color: T.goldDark,
+        marginRight: 2,
+    },
+    priceInput: {
+        flex: 1,
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        padding: 0,
+    },
+    priceInputGold: {
+        flex: 1,
+        fontSize: 12,
+        fontWeight: '900',
+        color: T.goldDark,
+        padding: 0,
+    },
+    costSubText: {
+        fontSize: 8,
+        color: T.textMuted,
+        marginTop: 3,
+    },
+    stepperRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
+        gap: 2,
+    },
+    stepperBtn: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        borderRadius: 3,
+        paddingVertical: 2,
+        alignItems: 'center',
+    },
+    stepperBtnText: {
+        fontSize: 7.5,
+        fontWeight: '800',
+        color: T.goldDark,
+    },
+    totalSellingPrice: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        marginVertical: 1,
+    },
+    marginTag: {
+        backgroundColor: 'rgba(52, 211, 153, 0.2)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    marginTagText: {
+        fontSize: 7.5,
+        fontWeight: '900',
+        color: '#34D399',
     },
     bottomBar: {
         position: 'absolute',
@@ -682,76 +1103,122 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         borderTopWidth: 1,
-        borderTopColor: C.border,
-        padding: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 6,
+        borderTopColor: T.cardBorder,
     },
-    saveBtn: {
+    saveLiveBtn: {
+        backgroundColor: T.navyPrimary,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: C.gold,
+        paddingVertical: 14,
         borderRadius: 10,
-        paddingVertical: 12,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
     },
-    saveBtnText: {
-        color: '#0B192C',
-        fontSize: 14,
-        fontWeight: '800',
+    saveLiveBtnText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
     },
-    alertOverlay: {
+    emptyState: {
+        padding: 28,
+        alignItems: 'center',
+    },
+    emptyStateTitle: {
+        fontSize: 13.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+        marginTop: 6,
+    },
+    emptyStateSub: {
+        fontSize: 10.5,
+        color: T.textMuted,
+        marginTop: 2,
+    },
+    modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
+        backgroundColor: 'rgba(7, 13, 30, 0.65)',
+        justifyContent: 'flex-end',
     },
-    alertCard: {
+    modalCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 14,
-        padding: 20,
-        alignItems: 'center',
-        width: '100%',
-        maxWidth: 320,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 16,
+        maxHeight: '80%',
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
     },
-    alertIconBox: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 12,
     },
-    alertTitle: {
-        fontSize: 16,
+    modalTitle: {
+        fontSize: 14.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+    },
+    modalDesc: {
+        fontSize: 11,
+        color: T.textSub,
+        lineHeight: 15,
+        marginBottom: 12,
+    },
+    inputLabel: {
+        fontSize: 11,
         fontWeight: '800',
-        color: C.textMain,
-        marginBottom: 6,
-        textAlign: 'center',
+        color: T.navyPrimary,
+        marginTop: 6,
+        marginBottom: 4,
     },
-    alertMsg: {
-        fontSize: 12,
-        color: C.textSub,
-        textAlign: 'center',
-        marginBottom: 16,
-        lineHeight: 18,
-    },
-    alertBtn: {
-        backgroundColor: C.navy,
-        paddingHorizontal: 24,
-        paddingVertical: 10,
+    modalInput: {
+        backgroundColor: T.inputBg,
+        borderWidth: 1,
+        borderColor: T.border,
         borderRadius: 8,
-        width: '100%',
-        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        fontSize: 12,
+        color: T.textMain,
+        marginBottom: 8,
     },
-    alertBtnText: {
-        color: '#FFFFFF',
-        fontSize: 13,
+    catPill: {
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 6,
+        backgroundColor: '#F1F5F9',
+    },
+    catPillActive: {
+        backgroundColor: T.navyPrimary,
+    },
+    catPillText: {
+        fontSize: 10,
         fontWeight: '700',
+        color: T.textSub,
+    },
+    catPillTextActive: {
+        color: T.goldBright,
+        fontWeight: '900',
+    },
+    modalSaveBtn: {
+        backgroundColor: T.navyPrimary,
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+        marginTop: 10,
+        marginBottom: 16,
+    },
+    modalSaveBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '900',
     },
 });

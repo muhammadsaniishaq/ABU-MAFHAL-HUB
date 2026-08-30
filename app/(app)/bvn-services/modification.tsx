@@ -95,15 +95,30 @@ export default function BVNModificationScreen() {
         }
     };
 
-    const fetchServicePrice = async () => {
+    const fetchServicePrice = async (currentCode: string = serviceCode) => {
         try {
+            const codeToPriceIdMap: Record<string, string> = {
+                '620': 'bvn_mod_name',
+                '621': 'bvn_mod_dob',
+                '622': 'bvn_mod_phone',
+                '623': 'bvn_mod_name_phone',
+                '624': 'bvn_mod_dob_phone',
+                '626': 'bvn_mod_name_dob',
+                '625': 'bvn_mod_name_dob',
+            };
+
+            const targetPriceId = codeToPriceIdMap[currentCode] || 'bvn_mod_name';
+
             const { data } = await supabase
                 .from('service_pricing')
                 .select('cost_price, markup_price, selling_price')
-                .eq('id', 'bvn_modification')
-                .maybeSingle();
-            if (data) {
-                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                .in('id', [targetPriceId, 'bvn_modification']);
+
+            if (data && data.length > 0) {
+                const specific = data.find(d => d.id === targetPriceId) || data[0];
+                const total = specific.selling_price 
+                    ? Number(specific.selling_price) 
+                    : (Number(specific.cost_price || 0) + Number(specific.markup_price || 0));
                 if (total > 0) setServicePrice(total);
             }
         } catch (e) {
@@ -113,8 +128,8 @@ export default function BVNModificationScreen() {
 
     useEffect(() => {
         fetchWalletBalance();
-        fetchServicePrice();
-    }, []);
+        fetchServicePrice(serviceCode);
+    }, [serviceCode]);
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
         setAlertConfig({
@@ -193,7 +208,18 @@ export default function BVNModificationScreen() {
                 payload.new_phone_number = newPhone.trim().replace(/\D/g, '');
             }
 
-            const res = await api.identity.requestBVNModification(payload, 'bvn_modification');
+            const codeToPriceIdMap: Record<string, string> = {
+                '620': 'bvn_mod_name',
+                '621': 'bvn_mod_dob',
+                '622': 'bvn_mod_phone',
+                '623': 'bvn_mod_name_phone',
+                '624': 'bvn_mod_dob_phone',
+                '626': 'bvn_mod_name_dob',
+                '625': 'bvn_mod_name_dob',
+            };
+            const currentPriceId = codeToPriceIdMap[serviceCode] || 'bvn_modification';
+
+            const res = await api.identity.requestBVNModification(payload, currentPriceId);
 
             if (res && (res.isValid || res.data)) {
                 const data = res.data?.data || res.data || {};
