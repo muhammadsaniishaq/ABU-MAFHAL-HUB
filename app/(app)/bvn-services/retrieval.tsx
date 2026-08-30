@@ -69,7 +69,7 @@ export default function BVNRetrievalScreen() {
             const targetId = currentTab === 'crm' ? 'bvn_retrieval_crm' : 'bvn_retrieval_phone';
             const { data } = await supabase
                 .from('service_pricing')
-                .select('cost_price, markup_price, selling_price')
+                .select('id, cost_price, markup_price, selling_price')
                 .in('id', [targetId, 'bvn_phone_basic']);
 
             if (data && data.length > 0) {

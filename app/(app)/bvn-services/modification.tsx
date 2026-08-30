@@ -111,7 +111,7 @@ export default function BVNModificationScreen() {
 
             const { data } = await supabase
                 .from('service_pricing')
-                .select('cost_price, markup_price, selling_price')
+                .select('id, cost_price, markup_price, selling_price')
                 .in('id', [targetPriceId, 'bvn_modification']);
 
             if (data && data.length > 0) {
