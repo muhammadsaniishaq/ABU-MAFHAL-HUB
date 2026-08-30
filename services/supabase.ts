@@ -54,3 +54,70 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: isWeb,
   },
 });
+
+/**
+ * Processes OAuth return tokens or authorization codes from the URL on web.
+ * Supports both hash fragment tokens (#access_token=...) and query parameters (?code=...).
+ */
+export async function processOAuthReturn(): Promise<boolean> {
+  if (!isWeb || typeof window === 'undefined') return false;
+
+  try {
+    const url = new URL(window.location.href);
+
+    // 1. Check for authorization code in search params (?code=...)
+    const code = url.searchParams.get('code');
+    if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error && data?.session) {
+        // Clean URL params without reloading
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return true;
+      }
+    }
+
+    // 2. Check for access_token / refresh_token in hash fragment (#access_token=...)
+    if (window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+
+      if (accessToken && refreshToken) {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (!error && data?.session) {
+          // Clean hash from URL without reloading
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return true;
+        }
+      }
+    }
+
+    // 3. Fallback check for existing active session
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session;
+  } catch (e) {
+    console.warn('processOAuthReturn error:', e);
+    return false;
+  }
+}
+
+/**
+ * Force signs out the user and purges all cached authentication tokens.
+ */
+export async function forceSignOut(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem('user_transaction_pin');
+      window.localStorage.removeItem('saved_user_pin');
+    }
+    await AsyncStorage.removeItem('user_transaction_pin');
+    await AsyncStorage.removeItem('saved_user_pin');
+  } catch (e) {
+    console.warn('forceSignOut error:', e);
+  }
+}
