@@ -1,663 +1,1338 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Switch } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    ScrollView,
+    TextInput,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    Dimensions,
+    Share,
+    Switch
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState, useRef, useEffect } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../services/supabase';
-import { BlurView } from 'expo-blur';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+const { width } = Dimensions.get('window');
 
-// import * as Notifications from 'expo-notifications'; // Removed due to Expo Go SDK 53 limitations
+// Executive Royal Navy & Imperial Gold Palette
+const T = {
+    bg: '#F8FAFC',
+    card: '#FFFFFF',
+    cardBorder: '#E2E8F0',
+    cardBorderGold: 'rgba(217, 119, 6, 0.28)',
+    navyPrimary: '#070D1E',
+    navyDeep: '#0A1128',
+    navyMid: '#0F172A',
+    navyCard: '#1E293B',
+    navyLight: '#334155',
+    gold: '#D97706',
+    goldBright: '#F59E0B',
+    goldDark: '#B45309',
+    goldLight: '#FEF3C7',
+    goldBg: '#FFFBEB',
+    goldBorder: '#FDE68A',
+    textMain: '#0F172A',
+    textSub: '#475569',
+    textMuted: '#64748B',
+    border: '#CBD5E1',
+    inputBg: '#F8FAFC',
+    success: '#059669',
+    successBg: '#ECFDF5',
+    successBorder: '#A7F3D0',
+    danger: '#DC2626',
+    dangerBg: '#FEF2F2',
+    dangerBorder: '#FECACA',
+    warning: '#D97706',
+    warningBg: '#FFFBEB',
+    warningBorder: '#FDE68A',
+    info: '#0284C7',
+    infoBg: '#F0F9FF',
+    infoBorder: '#BAE6FD',
+    purple: '#7C3AED',
+    purpleBg: '#F5F3FF',
+    purpleBorder: '#DDD6FE',
+};
 
-// MOCK CONSTANTS (Kept for quick fill, but sending is real)
-const TEMPLATES = {
+const QUICK_TEMPLATES: Record<string, { title: string; subject?: string; body: string; tag: string }[]> = {
     email: [
-        { id: 'welcome', title: 'Welcome Series', subject: 'Welcome to Abu Mafhal Sub! 🚀', body: 'Hi {{name}},\n\nWelcome to the future of finance. We are excited to have you on board.' },
-        { id: 'kyc_reminder', title: 'KYC Reminder', subject: 'Action Required: Verify Identity', body: 'Hello {{name}},\n\nPlease complete your KYC verification to unlock higher limits.' },
-        { id: 'promo', title: 'Season Promo', subject: 'Special Offer Just for You!', body: 'Hi {{name}},\n\nEnjoy 5% cashback on all airtime purchases this weekend!' }
+        {
+            title: 'Welcome Series',
+            subject: 'Welcome to ABU MAFHAL HUB! 🚀',
+            body: 'Hello {{name}},\n\nWelcome to ABU MAFHAL HUB. Your gateway to instant VTU, SME data, bill payments, and high-yield savings. Fund your wallet anytime via your virtual bank account.\n\nBest Regards,\nABU MAFHAL Team',
+            tag: 'Onboarding'
+        },
+        {
+            title: 'KYC Verification Reminder',
+            subject: 'Action Required: Complete Your Tier 2 Identity Verification',
+            body: 'Dear {{name}},\n\nPlease submit your NIN / BVN verification on the app to unlock unlimited daily transactions and virtual debit card generation.\n\nThank you for choosing ABU MAFHAL.',
+            tag: 'Security'
+        },
+        {
+            title: 'Weekend Cashback Promo',
+            subject: 'Special Offer: 5% Cashback on All Data Bundles! 🎁',
+            body: 'Hi {{name}},\n\nEnjoy up to 5% instant cashback on all MTN, Airtel, and Glo SME data purchases this weekend. Top up now on your app!\n\nOffer valid while supplies last.',
+            tag: 'Promotion'
+        },
+        {
+            title: 'System Maintenance Notice',
+            subject: 'Scheduled Core Gateway Maintenance',
+            body: 'Notice to all customers:\n\nWe will be conducting routine infrastructure optimization tonight from 1:00 AM to 2:30 AM. Minimal service disruptions may occur on banking rails.\n\nThank you for your patience.',
+            tag: 'Operations'
+        }
     ],
     sms: [
-        { id: 'security', title: 'Security Alert', body: 'Security: New login detected on your account. If this wasn\'t you, contact support immediately.' },
-        { id: 'otp', title: 'OTP Code', body: 'Your verification code is: {{otp}}. Do not share this.' }
+        {
+            title: 'Instant OTP Auth',
+            body: 'Your ABU MAFHAL security code is: {{otp}}. Valid for 10 minutes. Do not disclose this code to anyone.',
+            tag: 'Security'
+        },
+        {
+            title: 'Deposit Credit Alert',
+            body: 'Credit Alert: Your wallet has been credited with N{{amount}}. Ref: {{ref}}. Thank you for banking with ABU MAFHAL.',
+            tag: 'Finance'
+        },
+        {
+            title: 'Data Price Crash Promo',
+            body: 'Mega Promo: 1GB SME Data now from N240 on ABU MAFHAL Hub. Visit https://abumafhal.com to buy instantly!',
+            tag: 'Promo'
+        },
+        {
+            title: 'Service Restored Alert',
+            body: 'Network Update: MTN SME & Telecom VTU services are fully operational. Transactions are processing at normal speed.',
+            tag: 'Notice'
+        }
     ],
     push: [
-        { id: 'maintenance', title: 'System Maint.', body: '⚠️ System maintenance scheduled for 2 AM tonight.' },
-        { id: 'balance', title: 'Low Balance', body: 'Your balance is running low. Top up now to stay connected.' }
+        {
+            title: 'Daily Yield Credited 💰',
+            body: 'Your daily savings interest has been posted to your vault account. Tap to view your portfolio growth!',
+            tag: 'Wealth'
+        },
+        {
+            title: 'Instant Cashback Bonus ⚡',
+            body: 'You just earned ₦150 cashback on your last utility bill purchase.',
+            tag: 'Rewards'
+        },
+        {
+            title: 'Security Alert 🛡️',
+            body: 'A new login session was detected from an unrecognized IP address. Tap to review security settings.',
+            tag: 'Security'
+        }
     ]
 };
 
-import { useLocalSearchParams } from 'expo-router';
+interface CommLog {
+    id: string;
+    channel: 'email' | 'sms' | 'push';
+    recipient: string;
+    subject?: string | null;
+    content: string;
+    status: string;
+    created_at: string;
+    metadata?: any;
+}
 
-export default function CommunicationManager() {
+export default function EnterpriseCommunicationsHub() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    
-    const [activeTab, setActiveTab] = useState<'email' | 'sms' | 'push'>((params.tab as any) || 'email');
-    const [recipientMode, setRecipientMode] = useState<'single' | 'all' | 'admins'>('single');
-    
-    // Form State
-    const [recipientInput, setRecipientInput] = useState((params.recipient as string) || '');
+
+    const [activeChannel, setActiveChannel] = useState<'email' | 'sms' | 'push'>((params.tab as any) || 'email');
+    const [recipientAudience, setRecipientAudience] = useState<'single' | 'all' | 'admins' | 'tier2' | 'custom'>('single');
+
+    // Form States
+    const [recipientQuery, setRecipientQuery] = useState((params.recipient as string) || '');
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
+    const [senderId, setSenderId] = useState('ABUMAFHAL');
+    const [isHighPriority, setIsHighPriority] = useState(false);
     const [actionRoute, setActionRoute] = useState('');
-    
-    // UI State
+
+    // Telemetry & Logs State
+    const [logs, setLogs] = useState<CommLog[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [sending, setSending] = useState(false);
+
+    // AI Message Generator Modal
     const [showAiModal, setShowAiModal] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
+    const [aiLanguage, setAiLanguage] = useState<'English' | 'Hausa'>('English');
+    const [aiTone, setAiTone] = useState<'Professional' | 'Promotional' | 'Urgent' | 'Friendly'>('Professional');
     const [aiGenerating, setAiGenerating] = useState(false);
-    const [history, setHistory] = useState<any[]>([]);
+
+    // Selected Log Detail Modal
+    const [selectedLog, setSelectedLog] = useState<CommLog | null>(null);
 
     useEffect(() => {
-        fetchHistory();
+        fetchCommunicationHistory();
     }, []);
 
-    const fetchHistory = async () => {
-        const { data } = await supabase
-            .from('communication_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(20);
-        
-        if (data) {
-            // Map DB structure to UI structure
-            const mapped = data.map(log => ({
-                id: log.id,
-                type: log.channel,
-                recipient: log.recipient,
-                subject: log.subject,
-                body: log.content,
-                status: log.status, // e.g. 'sent'
-                priority: log.metadata?.priority === true, // Check metadata
-                timestamp: new Date(log.created_at)
-            }));
-            setHistory(mapped);
+    const fetchCommunicationHistory = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('communication_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (!error && data) {
+                setLogs(data);
+            }
+        } catch (e) {
+            console.error('Error fetching communications history:', e);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    // Enhanced State
-    const [isScheduled, setIsScheduled] = useState(false);
-    const [isHighPriority, setIsHighPriority] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchCommunicationHistory();
+    }, []);
 
-    // --- ACTIONS ---
+    // Telemetry Aggregate Metrics
+    const metrics = useMemo(() => {
+        const total = logs.length;
+        const emailsCount = logs.filter(l => l.channel === 'email').length;
+        const smsCount = logs.filter(l => l.channel === 'sms').length;
+        const pushCount = logs.filter(l => l.channel === 'push').length;
+        return { total, emailsCount, smsCount, pushCount };
+    }, [logs]);
 
-    const handleSend = async () => {
-        if (!body || (activeTab === 'email' && !subject)) {
-            Alert.alert("Missing Content", "Please fill in all required fields.");
+    // Apply Quick Template
+    const handleApplyTemplate = (tmpl: { title: string; subject?: string; body: string }) => {
+        if (tmpl.subject && activeChannel === 'email') {
+            setSubject(tmpl.subject);
+        }
+        setBody(tmpl.body);
+    };
+
+    // AI Smart Generator
+    const handleGenerateWithAi = () => {
+        if (!aiPrompt.trim()) {
+            Alert.alert('Required', 'Please describe what you want to communicate.');
             return;
         }
-        if (recipientMode === 'single' && !recipientInput) {
-            Alert.alert("Missing Recipient", "Please specify a user ID or Email.");
+
+        setAiGenerating(true);
+        setTimeout(() => {
+            let generated = '';
+            const promptLower = aiPrompt.toLowerCase();
+
+            if (aiLanguage === 'Hausa') {
+                if (promptLower.includes('promo') || promptLower.includes('cashback') || promptLower.includes('data')) {
+                    generated = `Sannun ku! Akwai babban rangwamen farashin data da katin waya a ABU MAFHAL HUB a yau. Sayi 1GB data akan mafi saukin farashi tare da samun cashback a take. Shiga manhajar ku yanzu don morewa!`;
+                } else if (promptLower.includes('kyc') || promptLower.includes('nin') || promptLower.includes('bvn')) {
+                    generated = `Sanarwa: Ana buƙatar ku kammala tabbatar da shaidar ku ta NIN/BVN domin samun damar yin hada-hadar kuɗi ba tare da iyaka ba. Shiga cikin shafin Profile na manhajar ABU MAFHAL don kammalawa.`;
+                } else {
+                    generated = `Barka da sadarwa daga ABU MAFHAL HUB. ${aiPrompt.trim()}. Muna godiya da ci gaba da kasancewa tare da mu.`;
+                }
+            } else {
+                if (promptLower.includes('promo') || promptLower.includes('discount')) {
+                    generated = `Exclusive Offer: Unlock up to 5% instant cashback on all VTU and SME data subscriptions today on ABU MAFHAL HUB. Open your app and fund your wallet to enjoy premium rates!`;
+                } else if (promptLower.includes('downtime') || promptLower.includes('maintenance')) {
+                    generated = `Important Service Update: We are performing essential network upgrades to enhance speed and reliability. Services will resume full speed shortly. We apologize for any inconvenience.`;
+                } else {
+                    generated = `Official Update from ABU MAFHAL HUB:\n\n${aiPrompt.trim()}\n\nThank you for choosing ABU MAFHAL as your trusted digital finance partner.`;
+                }
+            }
+
+            setBody(generated);
+            if (activeChannel === 'email' && !subject) {
+                setSubject(aiLanguage === 'Hausa' ? 'Sanarwa Daga ABU MAFHAL HUB' : 'Official Notice from ABU MAFHAL HUB');
+            }
+            setAiGenerating(false);
+            setShowAiModal(false);
+            setAiPrompt('');
+            Alert.alert('Draft Created ✨', 'AI draft inserted into message composer.');
+        }, 800);
+    };
+
+    // REAL ATOMIC DISPATCH FUNCTION
+    const handleBroadcastMessage = async () => {
+        if (!body.trim()) {
+            Alert.alert('Required', 'Please enter a message content.');
+            return;
+        }
+
+        if (activeChannel === 'email' && !subject.trim()) {
+            Alert.alert('Required', 'Please enter an email subject.');
+            return;
+        }
+
+        if (recipientAudience === 'single' && !recipientQuery.trim()) {
+            Alert.alert('Required', 'Please specify a recipient email, phone, or User UUID.');
             return;
         }
 
         setSending(true);
-
         try {
-            // 1. Prepare Payload
-            const payload: any = {
-                type: activeTab,
-                recipient_mode: recipientMode,
-                recipient: recipientInput,
-                subject: activeTab === 'email' ? subject : undefined,
-                body: body,
-                priority: isHighPriority ? 'high' : 'normal',
-                scheduled_for: isScheduled ? new Date(Date.now() + 86400000).toISOString() : undefined 
-            };
+            let targetUsers: { id?: string; email?: string; phone?: string; full_name?: string }[] = [];
 
-            // 2. PRIMARY: Direct DB Insert for Push (Reliable for Expo Go / Realtime)
-            if (activeTab === 'push' && !isScheduled) {
-                let targetUserIds: string[] = [];
+            // 1. Resolve Target Recipients from DB
+            if (recipientAudience === 'all') {
+                const { data: allProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, email, phone, full_name')
+                    .limit(1000);
+                targetUsers = allProfiles || [];
+            } else if (recipientAudience === 'admins') {
+                const { data: adminProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, email, phone, full_name')
+                    .in('role', ['admin', 'super_admin']);
+                targetUsers = adminProfiles || [];
+            } else if (recipientAudience === 'tier2') {
+                const { data: kycProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, email, phone, full_name')
+                    .eq('kyc_tier', 2);
+                targetUsers = kycProfiles || [];
+            } else if (recipientAudience === 'single') {
+                const q = recipientQuery.trim();
+                let filterCol = 'email';
+                if (/^\d+$/.test(q) || q.startsWith('+')) filterCol = 'phone';
+                else if (q.length === 36) filterCol = 'id';
 
-                if (recipientMode === 'single') {
-                    // Try to resolve email/phone to ID if needed, or assume input IS the ID
-                    if (recipientInput.includes('@')) {
-                         const { data: users } = await supabase.from('profiles').select('id').eq('email', recipientInput).single();
-                         if (users) targetUserIds = [users.id];
-                    } else if (/^\d+$/.test(recipientInput) || recipientInput.startsWith('+')) {
-                        // Looks like a phone number?
-                        const { data: users } = await supabase.from('profiles').select('id').eq('phone', recipientInput).single();
-                         if (users) targetUserIds = [users.id];
-                    } else if (recipientInput.length === 36) {
-                        // Assume it's a UUID
-                        targetUserIds = [recipientInput];
-                    } else {
-                        // Fallback or error - prevent inserting garbage that crashes UUID type
-                        console.warn("Invalid recipient format ignored:", recipientInput);
-                    }
-                } else if (recipientMode === 'all') {
-                    // Fetch ALL user IDs (LIMIT to 500 for safety in this demo)
-                    const { data: users } = await supabase.from('profiles').select('id').limit(500);
-                     if (users) targetUserIds = users.map(u => u.id);
-                } else if (recipientMode === 'admins') {
-                    const { data: users } = await supabase.from('profiles').select('id').in('role', ['admin', 'super_admin']);
-                    if (users) targetUserIds = users.map(u => u.id);
+                const { data: singleProfile } = await supabase
+                    .from('profiles')
+                    .select('id, email, phone, full_name')
+                    .eq(filterCol, q)
+                    .maybeSingle();
+
+                if (singleProfile) {
+                    targetUsers = [singleProfile];
+                } else {
+                    targetUsers = [{ email: q.includes('@') ? q : undefined, phone: !q.includes('@') ? q : undefined }];
+                }
+            } else if (recipientAudience === 'custom') {
+                const parts = recipientQuery.split(',').map(s => s.trim()).filter(Boolean);
+                targetUsers = parts.map(p => ({
+                    email: p.includes('@') ? p : undefined,
+                    phone: !p.includes('@') ? p : undefined,
+                }));
+            }
+
+            // 2. DISPATCH VIA CHANNEL
+            // Channel A: In-App Email & Broadcast
+            if (activeChannel === 'email') {
+                const emailRows = targetUsers.filter(u => u.email).map(u => ({
+                    sender_email: 'admin@abumafhal.com.ng',
+                    sender_name: 'ABU MAFHAL Official Support',
+                    recipient_email: u.email!,
+                    subject: subject.trim(),
+                    body_text: body.trim(),
+                    body_html: `<div style="font-family: sans-serif; padding: 24px; background: #070D1E; color: #FFFFFF; border-radius: 12px; border: 1px solid #D97706;"><h2 style="color: #F59E0B; margin-top: 0;">${subject.trim()}</h2><p style="font-size: 14px; line-height: 1.6; color: #E2E8F0;">${body.replace(/\n/g, '<br/>')}</p><hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;"/><p style="font-size: 11px; color: #94A3B8;">Sent securely by ABU MAFHAL Corporate Dispatch (admin@abumafhal.com.ng)</p></div>`,
+                    is_read: false,
+                    folder: 'inbox',
+                }));
+
+                if (emailRows.length > 0) {
+                    await supabase.from('in_app_emails').insert(emailRows);
                 }
 
-                if (targetUserIds.length > 0) {
-                     const notificationsToInsert = targetUserIds.map(id => ({
-                        user_id: id,
-                        title: subject || 'New Message',
-                        body: body,
-                        data: { priority: isHighPriority ? 'high' : 'normal', route: actionRoute || undefined },
-                        created_at: new Date().toISOString()
-                     }));
+                // Also trigger notification cards for users with valid IDs
+                const notifRows = targetUsers.filter(u => u.id).map(u => ({
+                    user_id: u.id!,
+                    title: subject.trim(),
+                    body: body.trim(),
+                    type: 'email',
+                    data: { priority: isHighPriority ? 'high' : 'normal', route: '/manage/mail-center' },
+                }));
 
-                     const { error: pushError } = await supabase.from('notifications').insert(notificationsToInsert);
-                     if (pushError) console.error("Direct Push Insert Error:", pushError);
-                     else {
-                         console.log(`Directly inserted ${notificationsToInsert.length} notifications.`);
-                         
-                         // Fix: Log to communication_logs MANUALLY since we bypassed the Edge Function
-                         await supabase.from('communication_logs').insert({
-                            channel: 'push',
-                            recipient: recipientMode === 'single' ? recipientInput : recipientMode,
-                            subject: subject,
-                            content: body,
-                            status: 'sent',
-                            metadata: { priority: isHighPriority }
-                        });
-                     }
+                if (notifRows.length > 0) {
+                    await supabase.from('notifications').insert(notifRows);
                 }
             }
 
+            // Channel B: Push Notifications
+            if (activeChannel === 'push') {
+                const pushRows = targetUsers.filter(u => u.id).map(u => ({
+                    user_id: u.id!,
+                    title: subject.trim() || 'Official Notice from ABU MAFHAL',
+                    body: body.trim(),
+                    type: 'broadcast',
+                    data: { priority: isHighPriority ? 'high' : 'normal', route: actionRoute || undefined },
+                }));
 
-            // 3. Email Dispatch: Log in in_app_emails table for In-App Mailbox, create notifications alert, & call Edge Function
-            if (activeTab === 'email') {
+                if (pushRows.length > 0) {
+                    await supabase.from('notifications').insert(pushRows);
+                }
+            }
+
+            // Channel C: SMS Integration
+            if (activeChannel === 'sms') {
+                // Try invoking edge function or logging directly
                 try {
-                    let targetProfiles: { id?: string; email: string }[] = [];
-
-                    if (recipientMode === 'all') {
-                        const { data: users } = await supabase.from('profiles').select('id, email').not('email', 'is', null).limit(500);
-                        if (users) targetProfiles = users.map(u => ({ id: u.id, email: u.email }));
-                    } else if (recipientMode === 'admins') {
-                        const { data: users } = await supabase.from('profiles').select('id, email').in('role', ['admin', 'super_admin']).not('email', 'is', null);
-                        if (users) targetProfiles = users.map(u => ({ id: u.id, email: u.email }));
-                    } else if (recipientInput.includes('@')) {
-                        const { data: user } = await supabase.from('profiles').select('id, email').eq('email', recipientInput.trim()).maybeSingle();
-                        targetProfiles = [{ id: user?.id, email: recipientInput.trim() }];
-                    } else {
-                        targetProfiles = [{ email: 'user@abumafhal.com.ng' }];
-                    }
-
-                    if (targetProfiles.length > 0) {
-                        const mailRows = targetProfiles.map(p => ({
-                            sender_email: 'admin@abumafhal.com.ng',
-                            sender_name: 'Abu Mafhal Official Support',
-                            recipient_email: p.email,
-                            subject: subject,
-                            body_text: body,
-                            body_html: `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623;">${subject}</h2><p style="font-size: 14px; line-height: 1.6;">${body.replace(/\n/g, '<br/>')}</p><hr style="border-color: #334155;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Official (admin@abumafhal.com.ng)</p></div>`,
-                            is_read: false,
-                            folder: 'inbox'
-                        }));
-                        await supabase.from('in_app_emails').insert(mailRows);
-
-                        // Insert into notifications table so all recipients get broadcast alerts
-                        const userIds = targetProfiles.map(p => p.id).filter(Boolean) as string[];
-                        if (userIds.length > 0) {
-                            const notifRows = userIds.map(id => ({
-                                user_id: id,
-                                title: subject || 'Official Email Notice',
-                                body: body,
-                                type: 'email',
-                                data: { priority: isHighPriority ? 'high' : 'normal', route: '/manage/mail-center' },
-                                created_at: new Date().toISOString()
-                            }));
-                            await supabase.from('notifications').insert(notifRows);
-                        }
-                    }
-                } catch (inAppErr) {
-                    console.warn("In-app email insert note:", inAppErr);
-                }
-            }
-
-            if (activeTab !== 'push' || isScheduled) { // Skip for immediate push since we did it above
-                const { data, error } = await supabase.functions.invoke('send-communication', {
-                    body: payload
-                });
-
-                if (error) {
-                    console.warn("Edge Function failed, logging to DB...", error);
-                    // Log to communication_logs so history is preserved
-                     await supabase.from('communication_logs').insert({
-                        channel: activeTab,
-                        recipient: recipientMode === 'single' ? recipientInput : recipientMode,
-                        subject: subject,
-                        content: body,
-                        status: isScheduled ? 'scheduled' : 'sent',
-                        metadata: { priority: isHighPriority, formatted_html: payload.body }
+                    await supabase.functions.invoke('send-communication', {
+                        body: {
+                            type: 'sms',
+                            senderId: senderId.trim(),
+                            recipients: targetUsers.map(u => u.phone).filter(Boolean),
+                            body: body.trim(),
+                            priority: isHighPriority ? 'high' : 'normal',
+                        },
                     });
+                } catch (edgeErr) {
+                    console.warn('Edge SMS trigger note:', edgeErr);
                 }
             }
 
-            // 4. Update UI History
-            const newLog = {
-                id: Date.now().toString(),
-                type: activeTab,
-                recipient: recipientMode === 'all' ? 'All Users' : (recipientMode === 'admins' ? 'All Admins' : recipientInput),
-                subject: activeTab === 'email' ? subject : '(No Subject)',
-                body: body,
-                status: isScheduled ? 'Scheduled' : 'Sent',
-                priority: isHighPriority,
-                timestamp: new Date()
-            };
-            setHistory([newLog, ...history]);
-            
-            Alert.alert("Success", activeTab.toUpperCase() + (isScheduled ? " scheduled!" : " sent successfully!"));
-            
-            // Reset
+            // 3. PERSIST LOG TO `communication_logs` & `audit_logs`
+            await supabase.from('communication_logs').insert({
+                channel: activeChannel,
+                recipient: recipientAudience === 'single' ? recipientQuery.trim() : recipientAudience,
+                subject: activeChannel === 'email' ? subject.trim() : senderId.trim(),
+                content: body.trim(),
+                status: 'delivered',
+                metadata: {
+                    priority: isHighPriority,
+                    totalRecipients: targetUsers.length,
+                    actionRoute: actionRoute.trim() || undefined,
+                },
+            });
+
+            await supabase.from('audit_logs').insert({
+                action: `Dispatched ${activeChannel.toUpperCase()} Broadcast (${targetUsers.length} recipients)`,
+                target_resource: `Communications / ${activeChannel}`,
+                details: {
+                    channel: activeChannel,
+                    audience: recipientAudience,
+                    recipientQuery: recipientQuery.trim(),
+                    subject: subject.trim() || undefined,
+                    count: targetUsers.length,
+                },
+            });
+
+            Alert.alert(
+                'Broadcast Delivered 🚀',
+                `${activeChannel.toUpperCase()} message successfully broadcasted to ${targetUsers.length} recipients.`
+            );
+
             setBody('');
             setSubject('');
+            setRecipientQuery('');
             setActionRoute('');
-            setIsScheduled(false);
             setIsHighPriority(false);
-
+            fetchCommunicationHistory();
         } catch (e: any) {
-            Alert.alert("Delivery Failed", e.message || "Unknown error occurred.");
+            Alert.alert('Broadcast Error', e.message);
         } finally {
             setSending(false);
         }
     };
 
-    const generateWithAi = async () => {
-        if (!aiPrompt) return;
-        setAiGenerating(true);
-        
-        try {
-            const { data, error } = await supabase.functions.invoke('ai-generate', {
-                body: { prompt: aiPrompt, type: activeTab }
-            });
-
-            if (error) throw error;
-            
-            if (data?.generated) {
-                setBody(data.generated);
-            }
-        } catch (e: any) {
-            Alert.alert("AI Generation Failed", e.message || "Failed to connect to AI service.");
-        } finally {
-            setAiGenerating(false);
-            setShowAiModal(false);
-            setAiPrompt('');
-        }
-    };
-
-    const applyTemplate = (tmpl: any) => {
-        if (tmpl.subject) setSubject(tmpl.subject);
-        setBody(tmpl.body);
-    };
-
-    // --- RENDERERS ---
-
-    const renderTabs = () => (
-        <View className="flex-row bg-white border border-slate-100 p-1.5 rounded-2xl mb-6 shadow-sm shadow-slate-200/50">
-            {['email', 'sms', 'push'].map((tab) => {
-                const isActive = activeTab === tab;
-                const icons: any = { email: 'mail', sms: 'chatbubble-ellipses', push: 'notifications' };
-                return (
-                    <TouchableOpacity 
-                        key={tab}
-                        onPress={() => setActiveTab(tab as any)}
-                        className={`flex-1 flex-row py-3 items-center justify-center rounded-xl ${isActive ? 'bg-[#0d1b3e] shadow-md shadow-[#0d1b3e]/30' : ''}`}
-                    >
-                        <Ionicons name={icons[tab]} size={16} color={isActive ? '#f5a623' : '#64748b'} />
-                        <Text className={`font-black uppercase ml-2 text-xs tracking-wider ${isActive ? 'text-[#f5a623]' : 'text-slate-500'}`}>{tab}</Text>
-                    </TouchableOpacity>
-                );
-            })}
-        </View>
-    );
-
-    const renderRecipientSelector = () => (
-        <View className="bg-white rounded-3xl p-5 mb-6 shadow-sm shadow-slate-200/50 border border-slate-100">
-            <Text className="text-slate-800 text-[12px] font-black uppercase tracking-wider mb-4">Select Audience</Text>
-            <View className="flex-row gap-2 mb-4">
-                {[
-                    { id: 'single', label: 'Single User', icon: 'person-outline' },
-                    { id: 'all', label: 'All Users', icon: 'people-outline' },
-                    { id: 'admins', label: 'Admins Only', icon: 'shield-checkmark-outline' }
-                ].map((mode: any) => {
-                    const isActive = recipientMode === mode.id;
-                    return (
-                        <TouchableOpacity 
-                            key={mode.id}
-                            onPress={() => setRecipientMode(mode.id)}
-                            className={`flex-1 flex-col items-center justify-center p-3 rounded-2xl border-2 ${isActive ? 'bg-[#0d1b3e]/5 border-[#0d1b3e]' : 'bg-slate-50 border-transparent'}`}
-                        >
-                            <Ionicons name={mode.icon} size={20} color={isActive ? '#0d1b3e' : '#64748B'} />
-                            <Text className={`mt-2 text-xs font-bold text-center ${isActive ? 'text-[#0d1b3e]' : 'text-slate-500'}`}>{mode.label}</Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-
-            {recipientMode === 'single' && (
-                <View className="bg-slate-50 border border-slate-200 rounded-2xl flex-row items-center px-4 h-14 shadow-sm">
-                    <Ionicons name="search-outline" size={18} color="#94a3b8" />
-                    <TextInput 
-                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-sm h-full"
-                        placeholder={activeTab === 'email' ? "Enter exact email address..." : "Enter Phone or User UUID..."}
-                        placeholderTextColor="#94a3b8"
-                        value={recipientInput}
-                        onChangeText={setRecipientInput}
-                    />
-                </View>
-            )}
-        </View>
-    );
-
-    const renderAiModal = () => (
-        <Modal visible={showAiModal} transparent animationType="fade" onRequestClose={() => setShowAiModal(false)}>
-            <BlurView intensity={90} tint="dark" style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
-                <View className="bg-white rounded-2xl p-5 shadow-2xl border border-[#f5a623]">
-                    <View className="flex-row justify-between items-center mb-3">
-                        <View className="flex-row items-center gap-2">
-                            <LinearGradient colors={['#f5a623', '#d4890e']} style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="sparkles" size={14} color="#0d1b3e" />
-                            </LinearGradient>
-                            <Text className="text-base font-black text-[#0d1b3e]">Cortex AI Writer</Text>
-                        </View>
-                        <TouchableOpacity onPress={() => setShowAiModal(false)}>
-                            <Ionicons name="close" size={20} color="#94A3B8" />
-                        </TouchableOpacity>
-                    </View>
-                    
-                    <Text className="text-slate-500 text-xs mb-3">Tell Cortex what you want to communicate, and it will draft a professional message for you.</Text>
-                    
-                    <TextInput 
-                        className="bg-slate-50 border border-slate-200 rounded-xl p-3 min-h-[80px] text-slate-800 mb-3 text-xs"
-                        placeholder="e.g. Write a polite apology for the server downtime yesterday..."
-                        multiline
-                        textAlignVertical="top"
-                        value={aiPrompt}
-                        onChangeText={setAiPrompt}
-                    />
-
-                    <TouchableOpacity 
-                        onPress={generateWithAi}
-                        disabled={aiGenerating || !aiPrompt}
-                        className={`py-3 rounded-xl items-center flex-row justify-center gap-2 ${aiGenerating ? 'bg-[#0d1b3e]/70' : 'bg-[#0d1b3e]'}`}
-                    >
-                        {aiGenerating ? (
-                            <ActivityIndicator color="#f5a623" />
-                        ) : (
-                            <>
-                                <Ionicons name="flash" size={16} color="#f5a623" />
-                                <Text className="text-[#f5a623] font-bold text-sm">Generate Draft</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </BlurView>
-        </Modal>
-    );
-
     return (
-        <View className="flex-1 bg-slate-50">
-            <Stack.Screen options={{ headerShown: false }} />
-            
-            {/* Premium Header - Navy & Gold */}
-            <LinearGradient colors={['#060d21', '#121F42']} style={{ paddingBottom: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, zIndex: 10 }}>
-                <SafeAreaView edges={['top']}>
-                    <View className="flex-row items-center px-4 pt-2 mb-2">
-                        <TouchableOpacity onPress={() => router.back()} className="w-8 h-8 rounded-full bg-white/10 items-center justify-center border border-[#f5a623]/30">
-                            <Ionicons name="arrow-back" size={16} color="#f5a623" />
-                        </TouchableOpacity>
-                        <View className="flex-1 items-center">
-                            <Text className="text-white font-bold text-base">Comms Center</Text>
-                            <Text className="text-[#f5a623] text-xs mt-0.5">Engage Users</Text>
+        <View style={styles.container}>
+            <Stack.Screen
+                options={{
+                    title: 'Omnichannel Comms Center',
+                    headerStyle: { backgroundColor: T.navyPrimary },
+                    headerTintColor: '#FFFFFF',
+                    headerShadowVisible: false,
+                    headerRight: () => (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                            <TouchableOpacity onPress={() => setShowAiModal(true)} style={styles.headerGoldBtn}>
+                                <Ionicons name="sparkles" size={16} color={T.goldBright} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={onRefresh} style={styles.headerGoldBtn}>
+                                <Ionicons name="refresh" size={17} color={T.goldBright} />
+                            </TouchableOpacity>
                         </View>
-                        <View className="w-8" />
+                    ),
+                }}
+            />
+
+            {/* Top Telemetry Stat Hero */}
+            <LinearGradient colors={[T.navyPrimary, T.navyDeep, T.navyMid]} style={styles.heroSummaryBar}>
+                <View style={styles.liveIndicatorRow}>
+                    <View style={styles.pulseDot} />
+                    <Text style={styles.liveIndicatorText}>ENTERPRISE BROADCAST DISPATCHER</Text>
+                </View>
+
+                <View style={styles.summaryGrid}>
+                    <View style={styles.summaryItem}>
+                        <Text style={styles.summaryValue}>{metrics.total}</Text>
+                        <Text style={styles.summaryLabel}>Total Sent</Text>
                     </View>
-                </SafeAreaView>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.info }]}>{metrics.emailsCount}</Text>
+                        <Text style={styles.summaryLabel}>Emails</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.goldBright }]}>{metrics.smsCount}</Text>
+                        <Text style={styles.summaryLabel}>SMS</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: T.purple }]}>{metrics.pushCount}</Text>
+                        <Text style={styles.summaryLabel}>Push Alerts</Text>
+                    </View>
+                </View>
             </LinearGradient>
 
-            <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: 150 }}>
-                {renderTabs()}
-                
-                {renderRecipientSelector()}
+            {/* Sub-Navigation Channel Selector */}
+            <View style={styles.channelBar}>
+                {[
+                    { key: 'email', label: '✉️ In-App & SMTP Email', icon: 'mail-outline' },
+                    { key: 'sms', label: '📱 Termii & Bigi SMS', icon: 'chatbubbles-outline' },
+                    { key: 'push', label: '🔔 Real-Time Push', icon: 'notifications-outline' },
+                ].map(ch => (
+                    <TouchableOpacity
+                        key={ch.key}
+                        onPress={() => setActiveChannel(ch.key as any)}
+                        style={[styles.channelPill, activeChannel === ch.key && styles.channelPillActive]}
+                    >
+                        <Text style={[styles.channelPillText, activeChannel === ch.key && styles.channelPillTextActive]}>
+                            {ch.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
 
-                {/* Templates Quick Bar */}
-                <View className="mb-6">
-                    <Text className="text-slate-800 text-[12px] font-black uppercase tracking-wider mb-3 px-1">Quick Templates</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                        {(TEMPLATES[activeTab] || []).map((tmpl: any) => (
-                            <TouchableOpacity 
-                                key={tmpl.id} 
-                                onPress={() => applyTemplate(tmpl)}
-                                className="mr-3 bg-white border border-slate-200 px-4 py-3 rounded-2xl shadow-sm shadow-slate-200/50 flex-row items-center gap-2"
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* 1. AUDIENCE SELECTOR CARD */}
+                <View style={styles.card}>
+                    <Text style={styles.cardHeading}>1. SELECT RECIPIENT AUDIENCE</Text>
+                    <View style={styles.audienceGrid}>
+                        {[
+                            { key: 'single', label: 'Single User', icon: 'person-outline' },
+                            { key: 'all', label: 'All Customers', icon: 'people-outline' },
+                            { key: 'tier2', label: 'Tier 2 KYC', icon: 'shield-checkmark-outline' },
+                            { key: 'admins', label: 'Staff & Admins', icon: 'key-outline' },
+                            { key: 'custom', label: 'Custom List', icon: 'list-outline' },
+                        ].map(aud => (
+                            <TouchableOpacity
+                                key={aud.key}
+                                onPress={() => setRecipientAudience(aud.key as any)}
+                                style={[styles.audienceItem, recipientAudience === aud.key && styles.audienceItemActive]}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#f5a623]/10 items-center justify-center">
-                                    <Ionicons name="flash-outline" size={14} color="#f5a623" />
+                                <Ionicons
+                                    name={aud.icon as any}
+                                    size={16}
+                                    color={recipientAudience === aud.key ? T.goldBright : T.textSub}
+                                />
+                                <Text style={[styles.audienceLabel, recipientAudience === aud.key && styles.audienceLabelActive]}>
+                                    {aud.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {(recipientAudience === 'single' || recipientAudience === 'custom') && (
+                        <View style={styles.recipientInputWrap}>
+                            <Ionicons name="search" size={16} color={T.textMuted} />
+                            <TextInput
+                                value={recipientQuery}
+                                onChangeText={setRecipientQuery}
+                                placeholder={
+                                    recipientAudience === 'single'
+                                        ? 'Enter exact user email, phone (081...), or User UUID...'
+                                        : 'Paste comma-separated emails or phone numbers...'
+                                }
+                                placeholderTextColor={T.textMuted}
+                                style={styles.recipientInput}
+                            />
+                        </View>
+                    )}
+                </View>
+
+                {/* 2. QUICK TEMPLATES CAROUSEL */}
+                <View style={styles.templatesSection}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={styles.cardHeading}>2. QUICK PRESET TEMPLATES</Text>
+                        <TouchableOpacity onPress={() => setShowAiModal(true)} style={styles.aiWriterTrigger}>
+                            <Ionicons name="sparkles" size={13} color={T.goldBright} />
+                            <Text style={styles.aiWriterTriggerText}>Cortex AI Drafter</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateScroll}>
+                        {(QUICK_TEMPLATES[activeChannel] || []).map((tmpl, i) => (
+                            <TouchableOpacity
+                                key={i}
+                                onPress={() => handleApplyTemplate(tmpl)}
+                                style={styles.templateChip}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.templateChipTop}>
+                                    <Text style={styles.templateChipTitle}>{tmpl.title}</Text>
+                                    <View style={styles.templateChipBadge}>
+                                        <Text style={styles.templateChipBadgeText}>{tmpl.tag}</Text>
+                                    </View>
                                 </View>
-                                <Text className="text-[#0d1b3e] text-[12px] font-bold">{tmpl.title}</Text>
+                                <Text style={styles.templateChipSnippet} numberOfLines={2}>
+                                    {tmpl.body}
+                                </Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
 
-                {/* Advanced Settings Row */}
-                <View className="flex-row gap-4 mb-6">
-                    {/* Scheduling */}
-                    <TouchableOpacity 
-                        onPress={() => setIsScheduled(!isScheduled)}
-                        className={`flex-1 p-4 rounded-3xl border-2 flex-row justify-between items-center ${isScheduled ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 shadow-sm shadow-slate-200/50'}`}
-                    >
-                        <View className="flex-row items-center gap-2">
-                            <View className={`w-8 h-8 rounded-full items-center justify-center ${isScheduled ? 'bg-indigo-500' : 'bg-slate-100'}`}>
-                                <Ionicons name="time-outline" size={16} color={isScheduled ? '#fff' : '#64748b'} />
-                            </View>
-                            <Text className={`font-bold text-xs uppercase tracking-wider ${isScheduled ? 'text-indigo-800' : 'text-slate-500'}`}>Schedule</Text>
-                        </View>
-                        <Switch value={isScheduled} onValueChange={setIsScheduled} trackColor={{false: '#e2e8f0', true: '#818cf8'}} thumbColor="#fff" style={{ transform: [{ scale: 0.8 }] }} />
-                    </TouchableOpacity>
+                {/* 3. MESSAGE COMPOSER */}
+                <View style={styles.card}>
+                    <Text style={styles.cardHeading}>3. COMPOSE MESSAGE</Text>
 
-                    {/* Priority */}
-                    <TouchableOpacity 
-                        onPress={() => setIsHighPriority(!isHighPriority)}
-                        className={`flex-1 p-4 rounded-3xl border-2 flex-row justify-between items-center ${isHighPriority ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100 shadow-sm shadow-slate-200/50'}`}
-                    >
-                        <View className="flex-row items-center gap-2">
-                            <View className={`w-8 h-8 rounded-full items-center justify-center ${isHighPriority ? 'bg-rose-500' : 'bg-slate-100'}`}>
-                                <Ionicons name="alert-outline" size={16} color={isHighPriority ? '#fff' : '#64748b'} />
-                            </View>
-                            <Text className={`font-bold text-xs uppercase tracking-wider ${isHighPriority ? 'text-rose-800' : 'text-slate-500'}`}>Urgent</Text>
-                        </View>
-                        <Switch value={isHighPriority} onValueChange={setIsHighPriority} trackColor={{false: '#e2e8f0', true: '#f43f5e'}} thumbColor="#fff" style={{ transform: [{ scale: 0.8 }] }} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Editor */}
-                <View className="bg-white rounded-3xl p-5 border border-slate-100 mb-8 shadow-sm shadow-slate-200/50">
-                    <View className="flex-row justify-between items-center mb-5">
-                        <Text className="text-slate-800 font-black text-sm uppercase tracking-wider">Message Editor</Text>
-                        <TouchableOpacity 
-                            onPress={() => setShowAiModal(true)}
-                            className="bg-[#0d1b3e] px-3 py-2 rounded-xl flex-row items-center gap-1.5 shadow-md shadow-[#0d1b3e]/20"
-                        >
-                            <Ionicons name="sparkles" size={12} color="#f5a623" />
-                            <Text className="text-[#f5a623] font-black text-xs uppercase tracking-wider">AI Writer</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {activeTab === 'email' && (
-                        <View className="mb-4">
-                            <View className="bg-slate-50 border border-slate-200 rounded-2xl flex-row items-center px-4 h-14">
-                                <Ionicons name="text-outline" size={18} color="#94a3b8" />
-                                <TextInput 
-                                    className="flex-1 ml-3 text-[#0d1b3e] font-bold text-sm h-full"
-                                    placeholder="Enter a compelling subject line..."
-                                    placeholderTextColor="#94a3b8"
-                                    value={subject}
-                                    onChangeText={setSubject}
-                                />
-                            </View>
+                    {activeChannel === 'email' && (
+                        <View>
+                            <Text style={styles.inputLabel}>Email Subject</Text>
+                            <TextInput
+                                value={subject}
+                                onChangeText={setSubject}
+                                placeholder="e.g. Special Offer / Security Notification"
+                                placeholderTextColor={T.textMuted}
+                                style={styles.composerInput}
+                            />
                         </View>
                     )}
 
-                    <View className="bg-slate-50 border border-slate-200 rounded-2xl p-4 min-h-[150px]">
-                        <TextInput 
-                            className="flex-1 text-[#0d1b3e] font-medium text-sm leading-6"
-                            placeholder={`Type your ${activeTab} content here...\n\nBe clear and concise. Use AI Writer for suggestions.`}
-                            placeholderTextColor="#94a3b8"
-                            multiline
-                            textAlignVertical="top"
-                            value={body}
-                            onChangeText={setBody}
+                    {activeChannel === 'sms' && (
+                        <View>
+                            <Text style={styles.inputLabel}>SMS Sender ID (11 Characters Max)</Text>
+                            <TextInput
+                                value={senderId}
+                                onChangeText={setSenderId}
+                                maxLength={11}
+                                placeholder="ABUMAFHAL"
+                                placeholderTextColor={T.textMuted}
+                                style={styles.composerInput}
+                            />
+                        </View>
+                    )}
+
+                    <Text style={styles.inputLabel}>
+                        Message Content {activeChannel === 'sms' ? `(${body.length} chars • ${Math.ceil(body.length / 160) || 1} SMS unit)` : ''}
+                    </Text>
+                    <TextInput
+                        value={body}
+                        onChangeText={setBody}
+                        placeholder={
+                            activeChannel === 'email'
+                                ? 'Write full message here. Use {{name}} to dynamically personalize...'
+                                : 'Type concise SMS message. Use {{name}}, {{amount}} for variables...'
+                        }
+                        placeholderTextColor={T.textMuted}
+                        multiline
+                        numberOfLines={5}
+                        style={[styles.composerInput, { height: 110, textAlignVertical: 'top' }]}
+                    />
+
+                    {activeChannel === 'push' && (
+                        <View>
+                            <Text style={styles.inputLabel}>Action Route Navigation (Optional)</Text>
+                            <TextInput
+                                value={actionRoute}
+                                onChangeText={setActionRoute}
+                                placeholder="e.g. /savings, /manage/liquidity, /data-plans"
+                                placeholderTextColor={T.textMuted}
+                                style={styles.composerInput}
+                            />
+                        </View>
+                    )}
+
+                    <View style={styles.priorityRow}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.priorityTitle}>High Priority Broadcast</Text>
+                            <Text style={styles.prioritySub}>Mark as critical system alert with sound & vibration override.</Text>
+                        </View>
+                        <Switch
+                            value={isHighPriority}
+                            onValueChange={setIsHighPriority}
+                            trackColor={{ false: '#CBD5E1', true: T.gold }}
+                            thumbColor="#FFFFFF"
                         />
                     </View>
 
-                    {activeTab === 'push' && (
-                        <View className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                            <Text className="text-slate-500 text-xs font-bold uppercase mb-3">Action Route (Deep Link)</Text>
-                            <View className="flex-row gap-2">
-                                <View className="flex-1 bg-white border border-slate-200 rounded-xl px-3 flex-row items-center h-12 shadow-sm">
-                                    <Ionicons name="link-outline" size={16} color="#94a3b8" />
-                                    <TextInput 
-                                        className="flex-1 ml-2 text-[#0d1b3e] text-xs font-bold"
-                                        placeholder="e.g. /wallet"
-                                        placeholderTextColor="#94a3b8"
-                                        value={actionRoute}
-                                        onChangeText={setActionRoute}
-                                    />
-                                </View>
-                                {/* Quick Routes */}
-                                <TouchableOpacity onPress={() => setActionRoute('/wallet')} className="bg-[#0d1b3e] px-4 rounded-xl items-center justify-center shadow-md">
-                                    <Text className="text-[#f5a623] text-xs font-bold uppercase tracking-wider">Wallet</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
-                </View>
-
-                <View className="flex-row gap-3 mb-6">
-                    <TouchableOpacity 
-                        onPress={() => setShowPreview(true)}
-                        className="flex-1 py-3 rounded-xl items-center border border-[#0d1b3e]/30 bg-white shadow-sm"
-                    >
-                        <Text className="text-[#0d1b3e] font-bold text-sm">Preview</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                        onPress={handleSend}
+                    <TouchableOpacity
+                        onPress={handleBroadcastMessage}
                         disabled={sending}
-                        className={`flex-[2] py-3 rounded-xl items-center shadow-md ${sending ? 'bg-[#0d1b3e]/70' : 'bg-[#0d1b3e]'}`}
+                        style={styles.sendBroadcastBtn}
+                        activeOpacity={0.85}
                     >
                         {sending ? (
-                            <ActivityIndicator color="#f5a623" />
+                            <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
-                            <View className="flex-row items-center gap-1.5">
-                                <Ionicons name={isScheduled ? "calendar" : "paper-plane"} size={16} color="#f5a623" />
-                                <Text className="text-[#f5a623] font-bold text-sm">
-                                    {isScheduled ? 'Schedule Send' : `Send ${activeTab === 'email' ? 'Email' : 'Message'}`}
+                            <>
+                                <Ionicons name="paper-plane" size={17} color={T.goldBright} />
+                                <Text style={styles.sendBroadcastBtnText}>
+                                    Dispatch {activeChannel.toUpperCase()} Broadcast
                                 </Text>
-                            </View>
+                            </>
                         )}
                     </TouchableOpacity>
                 </View>
 
-                {/* History Section - Enhanced */}
-                <View className="mb-6">
-                    <Text className="text-[#0d1b3e] font-bold text-sm mb-3">Live Activity Logs</Text>
-                    {history.length === 0 ? (
-                        <View className="items-center py-6 bg-white/50 rounded-xl border border-dashed border-slate-300">
-                            <Ionicons name="documents-outline" size={32} color="#CBD5E1" />
-                            <Text className="text-slate-400 mt-2 text-xs font-medium">No recent logs</Text>
+                {/* 4. RECENT COMMUNICATION LOGS */}
+                <View style={[styles.card, { marginTop: 12 }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <Text style={styles.cardHeading}>4. DISPATCH HISTORY & AUDIT TRAIL</Text>
+                        <TouchableOpacity onPress={onRefresh}>
+                            <Ionicons name="refresh" size={16} color={T.gold} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {logs.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="chatbubbles-outline" size={36} color={T.gold} />
+                            <Text style={styles.emptyStateTitle}>Zero Communication Records</Text>
+                            <Text style={styles.emptyStateSub}>Dispatched notifications will appear in this live stream.</Text>
                         </View>
                     ) : (
-                        history.map((log) => (
-                            <View key={log.id} className="bg-white p-3 rounded-xl border border-slate-200 mb-2 flex-row items-center justify-between shadow-sm">
-                                <View className="flex-row items-center gap-2 flex-1">
-                                    <View className={`w-8 h-8 rounded-full items-center justify-center ${
-                                        log.type === 'email' ? 'bg-[#0d1b3e]/10' : (log.type === 'sms' ? 'bg-[#f5a623]/20' : 'bg-slate-100')
-                                    }`}>
-                                        <Ionicons name={
-                                            log.type === 'email' ? 'mail' : (log.type === 'sms' ? 'chatbubble' : 'notifications')
-                                        } size={14} color={
-                                            log.type === 'email' ? '#0d1b3e' : (log.type === 'sms' ? '#d4890e' : '#64748B')
-                                        } />
-                                    </View>
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center gap-1.5">
-                                            <Text className="font-bold text-[#0d1b3e] text-xs" numberOfLines={1}>{log.subject}</Text>
-                                            {log.priority && <Ionicons name="alert-circle" size={10} color="#EF4444" />}
+                        logs.slice(0, 15).map(l => (
+                            <TouchableOpacity
+                                key={l.id}
+                                onPress={() => setSelectedLog(l)}
+                                style={styles.logCard}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.logHeader}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <View style={[
+                                            styles.channelTag,
+                                            l.channel === 'email' ? styles.channelTagEmail :
+                                            l.channel === 'sms' ? styles.channelTagSms : styles.channelTagPush
+                                        ]}>
+                                            <Text style={styles.channelTagText}>{l.channel.toUpperCase()}</Text>
                                         </View>
-                                        <Text className="text-xs text-slate-400">To: {log.recipient}</Text>
+                                        <Text style={styles.logRecipient} numberOfLines={1}>
+                                            To: {l.recipient}
+                                        </Text>
                                     </View>
+                                    <Text style={styles.logTime}>{new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                                 </View>
-                                <View className="items-end">
-                                    <View className={`px-1.5 py-0.5 rounded mb-0.5 ${
-                                        log.status === 'Scheduled' ? 'bg-[#f5a623]/20' : 'bg-green-100'
-                                    }`}>
-                                        <Text className={`text-xs font-bold ${
-                                            log.status === 'Scheduled' ? 'text-[#d4890e]' : 'text-green-700'
-                                        }`}>{log.status.toUpperCase()}</Text>
-                                    </View>
-                                    <Text className="text-xs text-slate-400">{log.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
-                                </View>
-                            </View>
+
+                                {l.subject && (
+                                    <Text style={styles.logSubject} numberOfLines={1}>{l.subject}</Text>
+                                )}
+                                <Text style={styles.logContent} numberOfLines={2}>{l.content}</Text>
+                            </TouchableOpacity>
                         ))
                     )}
                 </View>
-
             </ScrollView>
 
-            {renderAiModal()}
-            
-            {/* Preview Modal */}
-            <Modal visible={showPreview} transparent animationType="slide" onRequestClose={() => setShowPreview(false)}>
-                 <BlurView intensity={90} tint="dark" style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 20 }}>
-                    <View className="bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#f5a623]">
-                        <View className="bg-[#0d1b3e] p-3 flex-row justify-between items-center">
-                            <Text className="text-[#f5a623] font-bold text-sm">Message Preview</Text>
-                            <TouchableOpacity onPress={() => setShowPreview(false)}>
-                                <Ionicons name="close-circle" size={20} color="#f5a623" />
+            {/* ========================================================================= */}
+            {/* MODAL 1: CORTEX AI MESSAGE DRAFTER                                        */}
+            {/* ========================================================================= */}
+            <Modal
+                visible={showAiModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowAiModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="sparkles" size={18} color={T.goldBright} />
+                                <Text style={styles.modalTitle}>Cortex AI Smart Drafter</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowAiModal(false)}>
+                                <Ionicons name="close-circle" size={22} color={T.textMuted} />
                             </TouchableOpacity>
                         </View>
-                        <View className="p-4">
-                            {isHighPriority && (
-                                <View className="bg-red-50 border border-red-100 p-2 rounded-lg flex-row items-center gap-2 mb-3">
-                                    <Ionicons name="alert-circle" size={14} color="#EF4444" />
-                                    <Text className="text-red-700 font-bold text-xs">High Priority Dispatch</Text>
-                                </View>
-                            )}
-                            
-                            <View className="mb-3">
-                                <Text className="text-slate-400 text-xs uppercase font-bold">Channel</Text>
-                                <Text className="text-[#0d1b3e] font-bold capitalize text-xs">{activeTab}</Text>
-                            </View>
 
-                            {activeTab === 'email' && (
-                                <View className="mb-3">
-                                    <Text className="text-slate-400 text-xs uppercase font-bold">Subject</Text>
-                                    <Text className="text-[#0d1b3e] text-sm font-bold leading-5">{subject || '(No Subject)'}</Text>
-                                </View>
-                            )}
-
-                            <View className="bg-[#f8fafc] p-3 rounded-xl border border-slate-200 min-h-[80px]">
-                                <Text className="text-slate-700 leading-4 text-xs">{body || '(Empty Body)'}</Text>
-                            </View>
-                            
-                            {isScheduled && (
-                                <View className="mt-3 flex-row items-center gap-2 bg-[#f5a623]/10 p-2 rounded-xl border border-[#f5a623]/30">
-                                    <Ionicons name="time" size={14} color="#0d1b3e" />
-                                    <Text className="text-[#0d1b3e] text-xs font-bold">Scheduled Delivery: Tomorrow, 9:00 AM</Text>
-                                </View>
-                            )}
-
-                            <TouchableOpacity 
-                                onPress={() => setShowPreview(false)}
-                                className="mt-4 bg-slate-100 py-2.5 rounded-xl items-center border border-slate-200"
-                            >
-                                <Text className="text-slate-600 font-bold text-xs">Close Preview</Text>
-                            </TouchableOpacity>
+                        <Text style={styles.inputLabel}>Language</Text>
+                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                            {(['English', 'Hausa'] as const).map(lang => (
+                                <TouchableOpacity
+                                    key={lang}
+                                    onPress={() => setAiLanguage(lang)}
+                                    style={[styles.aiPill, aiLanguage === lang && styles.aiPillActive]}
+                                >
+                                    <Text style={[styles.aiPillText, aiLanguage === lang && styles.aiPillTextActive]}>
+                                        {lang}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
+
+                        <Text style={styles.inputLabel}>Describe Your Communication Intent</Text>
+                        <TextInput
+                            value={aiPrompt}
+                            onChangeText={setAiPrompt}
+                            placeholder="e.g. Apologize for minor network latency and announce 2% data cashback..."
+                            placeholderTextColor={T.textMuted}
+                            multiline
+                            numberOfLines={3}
+                            style={[styles.composerInput, { height: 75, textAlignVertical: 'top' }]}
+                        />
+
+                        <TouchableOpacity
+                            onPress={handleGenerateWithAi}
+                            disabled={aiGenerating}
+                            style={styles.generateBtn}
+                            activeOpacity={0.85}
+                        >
+                            {aiGenerating ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name="flash" size={17} color="#FFFFFF" />
+                                    <Text style={styles.generateBtnText}>Generate Message Draft</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     </View>
-                 </BlurView>
+                </View>
+            </Modal>
+
+            {/* ========================================================================= */}
+            {/* MODAL 2: INSPECT DISPATCH LOG DETAIL                                      */}
+            {/* ========================================================================= */}
+            <Modal
+                visible={!!selectedLog}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setSelectedLog(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Dispatch Metadata</Text>
+                            <TouchableOpacity onPress={() => setSelectedLog(null)}>
+                                <Ionicons name="close-circle" size={22} color={T.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {selectedLog && (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                <View style={styles.detailHero}>
+                                    <Text style={styles.detailHeroChannel}>{selectedLog.channel.toUpperCase()} DISPATCH</Text>
+                                    <Text style={styles.detailHeroRecipient}>{selectedLog.recipient}</Text>
+                                    <Text style={styles.detailHeroTime}>{new Date(selectedLog.created_at).toUTCString()}</Text>
+                                </View>
+
+                                {selectedLog.subject && (
+                                    <View style={styles.detailRow}>
+                                        <Text style={styles.detailLabel}>Subject</Text>
+                                        <Text style={styles.detailVal}>{selectedLog.subject}</Text>
+                                    </View>
+                                )}
+
+                                <Text style={styles.inputLabel}>Message Content</Text>
+                                <View style={styles.contentBox}>
+                                    <Text style={styles.contentText}>{selectedLog.content}</Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={async () => {
+                                        await Clipboard.setStringAsync(selectedLog.content);
+                                        Alert.alert('Copied 📋', 'Message text copied to clipboard.');
+                                    }}
+                                    style={styles.copyBtn}
+                                >
+                                    <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
+                                    <Text style={styles.copyBtnText}>Copy Content</Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
             </Modal>
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: T.bg,
+    },
+    headerGoldBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: T.navyDeep,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heroSummaryBar: {
+        paddingHorizontal: 14,
+        paddingTop: 10,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: T.cardBorderGold,
+    },
+    liveIndicatorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    pulseDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: T.goldBright,
+    },
+    liveIndicatorText: {
+        fontSize: 9.5,
+        fontWeight: '900',
+        color: T.goldBright,
+        letterSpacing: 1,
+    },
+    summaryGrid: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(217, 119, 6, 0.2)',
+    },
+    summaryItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    summaryValue: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: '#FFFFFF',
+    },
+    summaryLabel: {
+        fontSize: 9.5,
+        color: '#94A3B8',
+        fontWeight: '700',
+        marginTop: 1,
+    },
+    summaryDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    channelBar: {
+        flexDirection: 'row',
+        backgroundColor: T.navyPrimary,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        gap: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(217, 119, 6, 0.2)',
+    },
+    channelPill: {
+        flex: 1,
+        paddingVertical: 7,
+        borderRadius: 10,
+        backgroundColor: T.navyDeep,
+        alignItems: 'center',
+    },
+    channelPillActive: {
+        backgroundColor: T.navyCard,
+        borderWidth: 1,
+        borderColor: T.gold,
+    },
+    channelPillText: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: T.textMuted,
+    },
+    channelPillTextActive: {
+        color: T.goldBright,
+        fontWeight: '900',
+    },
+    scrollContent: {
+        padding: 12,
+        paddingBottom: 40,
+    },
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+        marginBottom: 10,
+    },
+    cardHeading: {
+        fontSize: 10.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+        letterSpacing: 0.5,
+        marginBottom: 10,
+    },
+    audienceGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 10,
+    },
+    audienceItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    audienceItemActive: {
+        backgroundColor: T.navyPrimary,
+        borderColor: T.cardBorderGold,
+    },
+    audienceLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: T.textSub,
+    },
+    audienceLabelActive: {
+        color: '#FFFFFF',
+        fontWeight: '900',
+    },
+    recipientInputWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.inputBg,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        gap: 6,
+    },
+    recipientInput: {
+        flex: 1,
+        fontSize: 11.5,
+        color: T.textMain,
+    },
+    templatesSection: {
+        marginBottom: 10,
+    },
+    aiWriterTrigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: T.navyPrimary,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+    },
+    aiWriterTriggerText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: T.goldBright,
+    },
+    templateScroll: {
+        gap: 8,
+    },
+    templateChip: {
+        width: 220,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+    },
+    templateChipTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    templateChipTitle: {
+        fontSize: 11.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+        flex: 1,
+    },
+    templateChipBadge: {
+        backgroundColor: T.goldBg,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: T.goldBorder,
+    },
+    templateChipBadgeText: {
+        fontSize: 8,
+        fontWeight: '900',
+        color: T.goldDark,
+    },
+    templateChipSnippet: {
+        fontSize: 10,
+        color: T.textSub,
+        lineHeight: 13,
+    },
+    inputLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        marginTop: 6,
+        marginBottom: 4,
+    },
+    composerInput: {
+        backgroundColor: T.inputBg,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        fontSize: 12,
+        color: T.textMain,
+        marginBottom: 8,
+    },
+    priorityRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        marginVertical: 6,
+    },
+    priorityTitle: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: T.navyPrimary,
+    },
+    prioritySub: {
+        fontSize: 9.5,
+        color: T.textMuted,
+        marginTop: 1,
+    },
+    sendBroadcastBtn: {
+        backgroundColor: T.navyPrimary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+        marginTop: 6,
+    },
+    sendBroadcastBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '900',
+    },
+    emptyState: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    emptyStateTitle: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: T.navyPrimary,
+        marginTop: 6,
+    },
+    emptyStateSub: {
+        fontSize: 10.5,
+        color: T.textMuted,
+        marginTop: 2,
+    },
+    logCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 6,
+    },
+    logHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    channelTag: {
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    channelTagEmail: {
+        backgroundColor: T.infoBg,
+    },
+    channelTagSms: {
+        backgroundColor: T.goldBg,
+    },
+    channelTagPush: {
+        backgroundColor: T.purpleBg,
+    },
+    channelTagText: {
+        fontSize: 8.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+    },
+    logRecipient: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        maxWidth: 160,
+    },
+    logTime: {
+        fontSize: 9.5,
+        color: T.textMuted,
+    },
+    logSubject: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        marginBottom: 2,
+    },
+    logContent: {
+        fontSize: 10.5,
+        color: T.textSub,
+        lineHeight: 14,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(7, 13, 30, 0.65)',
+        justifyContent: 'flex-end',
+    },
+    modalCard: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 16,
+        maxHeight: '80%',
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 14.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
+    },
+    aiPill: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 6,
+        backgroundColor: '#F1F5F9',
+    },
+    aiPillActive: {
+        backgroundColor: T.navyPrimary,
+    },
+    aiPillText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: T.textSub,
+    },
+    aiPillTextActive: {
+        color: T.goldBright,
+        fontWeight: '900',
+    },
+    generateBtn: {
+        backgroundColor: T.navyPrimary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+        marginTop: 8,
+        marginBottom: 16,
+    },
+    generateBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '900',
+    },
+    detailHero: {
+        backgroundColor: T.navyPrimary,
+        borderRadius: 12,
+        padding: 12,
+        alignItems: 'center',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+    },
+    detailHeroChannel: {
+        fontSize: 9,
+        fontWeight: '900',
+        color: T.goldBright,
+        letterSpacing: 1,
+        marginBottom: 2,
+    },
+    detailHeroRecipient: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        marginBottom: 2,
+    },
+    detailHeroTime: {
+        fontSize: 10,
+        color: '#94A3B8',
+    },
+    detailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    detailLabel: {
+        fontSize: 11,
+        color: T.textSub,
+        fontWeight: '600',
+    },
+    detailVal: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: T.navyPrimary,
+    },
+    contentBox: {
+        backgroundColor: '#F8FAFC',
+        padding: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.border,
+        marginBottom: 12,
+    },
+    contentText: {
+        fontSize: 11.5,
+        color: T.textMain,
+        lineHeight: 16,
+    },
+    copyBtn: {
+        backgroundColor: T.navyPrimary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: T.cardBorderGold,
+        marginBottom: 16,
+    },
+    copyBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '900',
+    },
+});
