@@ -816,14 +816,13 @@ export default function SignupScreen() {
                             </TouchableOpacity>
 
                             <View style={styles.brandRow}>
-                                {/* Glowing Shield Logo Badge */}
-                                <View style={[styles.logoBadgeContainer, { backgroundColor: isDark ? '#0A1224' : '#FFFFFF', borderColor: '#F59E0B' }]}>
+                                {/* Pure Uncropped Medallion Logo */}
+                                <View style={styles.logoBadgeContainer}>
                                     <Image
                                         source={getLogoSource()}
                                         style={styles.logoImage}
                                         resizeMode="contain"
                                     />
-                                    <View style={styles.logoStatusDot} />
                                 </View>
 
                                 <View style={{ marginLeft: 8 }}>
@@ -1279,8 +1278,8 @@ export default function SignupScreen() {
                                             <ActivityIndicator color="#0F172A" size="small" />
                                         ) : (
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                                <Text style={styles.primaryBtnText}>Create My Account</Text>
-                                                <Ionicons name="checkmark-circle" size={20} color="#0F172A" style={{ marginLeft: 8 }} />
+                                                <Text style={styles.primaryBtnText} numberOfLines={1}>Create Account</Text>
+                                                <Ionicons name="checkmark-circle" size={18} color="#0F172A" style={{ marginLeft: 6 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -1302,10 +1301,10 @@ export default function SignupScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                             <Image 
                                                 source={require('../../assets/images/google-g.png')} 
-                                                style={{ width: 22, height: 22, marginRight: 10 }} 
+                                                style={{ width: 18, height: 18, marginRight: 8 }} 
                                                 resizeMode="contain" 
                                             />
-                                            <Text style={[styles.googleLoginBtnText, { color: theme.textPrimary }]}>Sign Up with Google</Text>
+                                            <Text style={[styles.googleLoginBtnText, { color: theme.textPrimary }]} numberOfLines={1}>Sign Up with Google</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -1477,31 +1476,12 @@ const styles = StyleSheet.create({
     logoBadgeContainer: {
         width: 44,
         height: 44,
-        borderRadius: 13,
-        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.35,
-        shadowRadius: 5,
-        elevation: 4,
-        position: 'relative',
     },
     logoImage: {
-        width: 34,
-        height: 34,
-    },
-    logoStatusDot: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#10B981',
-        borderWidth: 1.5,
-        borderColor: '#FFFFFF',
+        width: 44,
+        height: 44,
     },
     brandTitle: {
         fontWeight: '900',
@@ -1649,44 +1629,46 @@ const styles = StyleSheet.create({
         textDecorationLine: 'underline',
     },
     primaryBtn: {
-        borderRadius: 15,
+        borderRadius: 12,
         overflow: 'hidden',
         shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 3,
         marginBottom: 8,
     },
     primaryBtnGradient: {
-        height: 48,
+        height: 45,
         alignItems: 'center',
         justifyContent: 'center',
+        paddingHorizontal: 12,
     },
     primaryBtnText: {
         color: '#0F172A',
-        fontWeight: '900',
-        fontSize: 15,
-        letterSpacing: 0.3,
+        fontWeight: '800',
+        fontSize: 13.5,
+        letterSpacing: 0.2,
     },
     googleLoginBtn: {
         width: '100%',
-        height: 46,
-        borderRadius: 14,
+        height: 44,
+        borderRadius: 12,
         borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
+        paddingHorizontal: 12,
         marginBottom: 8,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
+        shadowOpacity: 0.06,
         shadowRadius: 2,
         elevation: 1,
     },
     googleLoginBtnText: {
-        fontWeight: '800',
-        fontSize: 13.5,
-        letterSpacing: 0.2,
+        fontWeight: '700',
+        fontSize: 12.5,
+        letterSpacing: 0.1,
     },
     socialGrid: {
         flexDirection: 'row',
