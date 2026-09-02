@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
 
@@ -186,36 +187,52 @@ export default function ModernContentManager() {
         const asset = res.assets[0];
         setUploadingAnnouncement(true);
 
-        const isVideo = asset.type === 'video';
-        const fileExt = (asset.uri.split('.').pop() || (isVideo ? 'mp4' : 'jpg')).split('?')[0];
+        const isVideo = asset.type === 'video' || 
+          asset.uri.toLowerCase().endsWith('.mp4') || 
+          asset.uri.toLowerCase().endsWith('.mov') ||
+          asset.uri.toLowerCase().endsWith('.webm');
+        const fileExt = isVideo ? 'mp4' : (asset.uri.split('.').pop() || 'jpg').split('?')[0];
         const fileName = `announcement_${Date.now()}.${fileExt}`;
         const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
 
-        let publicUrl = asset.base64 ? `data:${mimeType};base64,${asset.base64}` : asset.uri;
+        let publicUrl = asset.uri;
 
-        if (asset.base64) {
-          try {
-            const { error: uploadErr } = await supabase.storage
-              .from('banners')
-              .upload(`announcements/${fileName}`, decode(asset.base64), {
+        try {
+          const response = await fetch(asset.uri);
+          const blob = await response.blob();
+
+          let bucket = 'banners';
+          let { error: uploadErr } = await supabase.storage
+            .from('banners')
+            .upload(`announcements/${fileName}`, blob, {
+              contentType: mimeType,
+              upsert: true
+            });
+
+          if (uploadErr) {
+            bucket = 'avatars';
+            const { error: err2 } = await supabase.storage
+              .from('avatars')
+              .upload(`announcements/${fileName}`, blob, {
                 contentType: mimeType,
                 upsert: true
               });
-
-            if (!uploadErr) {
-              const { data: publicUrlData } = supabase.storage
-                .from('banners')
-                .getPublicUrl(`announcements/${fileName}`);
-              if (publicUrlData?.publicUrl) publicUrl = publicUrlData.publicUrl;
-            }
-          } catch (storageErr) {
-            console.warn("Announcement storage upload fallback:", storageErr);
+            uploadErr = err2;
           }
+
+          if (!uploadErr) {
+            const { data: publicUrlData } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(`announcements/${fileName}`);
+            if (publicUrlData?.publicUrl) publicUrl = publicUrlData.publicUrl;
+          }
+        } catch (storageErr) {
+          console.warn("Announcement storage upload fallback:", storageErr);
         }
 
         setAnnouncementType(isVideo ? 'video' : 'image');
         setAnnouncementUrl(publicUrl);
-        Alert.alert("Media Ready 🎉", "Announcement media attached successfully!");
+        Alert.alert("Media Ready 🎉", isVideo ? "Bidiyo ya haɗu cikin nasara kuma yana aiki!" : "Announcement media attached successfully!");
       }
     } catch (err: any) {
       Alert.alert("Media Error", err.message || "Failed to select media");
@@ -665,7 +682,18 @@ export default function ModernContentManager() {
 
               {announcementUrl ? (
                 <View style={s.announcementPreviewBox}>
-                  <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="cover" />
+                  {announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm') ? (
+                    <Video 
+                      source={{ uri: announcementUrl }} 
+                      style={s.announcementPreviewImg} 
+                      resizeMode={ResizeMode.COVER} 
+                      shouldPlay 
+                      isLooping 
+                      isMuted 
+                    />
+                  ) : (
+                    <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="cover" />
+                  )}
                   <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()}</Text>
                 </View>
               ) : null}

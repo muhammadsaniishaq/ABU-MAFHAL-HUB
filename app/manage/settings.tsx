@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
 
 const ToggleRow = ({ title, subtitle, value, onValueChange, icon, color }: any) => (
     <View style={s.toggleRow}>
@@ -378,31 +379,47 @@ export default function AdminSettings() {
             if (!result.canceled && result.assets[0].uri) {
                 setLoading(true);
                 const asset = result.assets[0];
-                const isVideo = asset.type === 'video' || asset.uri.endsWith('.mp4') || asset.uri.endsWith('.mov');
+                const isVideo = asset.type === 'video' || 
+                    asset.uri.toLowerCase().endsWith('.mp4') || 
+                    asset.uri.toLowerCase().endsWith('.mov') ||
+                    asset.uri.toLowerCase().endsWith('.webm');
                 
-                // For expo web, we might need a different approach, but for native we use fetch
                 const response = await fetch(asset.uri);
                 const blob = await response.blob();
                 
                 const fileExt = isVideo ? 'mp4' : 'jpg';
                 const fileName = `announcement_${Date.now()}.${fileExt}`;
+                const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
                 
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('avatars') 
+                let bucket = 'banners';
+                let { error: uploadError } = await supabase.storage
+                    .from('banners') 
                     .upload(`announcements/${fileName}`, blob, {
-                        contentType: isVideo ? 'video/mp4' : 'image/jpeg'
+                        contentType: mimeType,
+                        upsert: true
                     });
+                    
+                if (uploadError) {
+                    bucket = 'avatars';
+                    const { error: err2 } = await supabase.storage
+                        .from('avatars') 
+                        .upload(`announcements/${fileName}`, blob, {
+                            contentType: mimeType,
+                            upsert: true
+                        });
+                    uploadError = err2;
+                }
                     
                 if (uploadError) {
                     Alert.alert('Upload Error', uploadError.message);
                 } else {
                     const { data: publicUrlData } = supabase.storage
-                        .from('avatars')
+                        .from(bucket)
                         .getPublicUrl(`announcements/${fileName}`);
                         
                     setAnnouncementType(isVideo ? 'video' : 'image');
                     setAnnouncementUrl(publicUrlData.publicUrl);
-                    Alert.alert('Banner Uploaded! 🎉', 'An ɗora cikakken banner ɗin ba tare da an yanke ko da ƙwayar pixel ɗaya ba. Zaka iya zaɓar yadda zai fita a ƙasa sannan ka danna Save.');
+                    Alert.alert('Media Uploaded! 🎉', isVideo ? 'An ɗora bidiyo cikin nasara! Zaka iya duba yadda zai fita da kuma kunna sauti a ƙasa.' : 'An ɗora cikakken banner ɗin ba tare da an yanke shi ba.');
                 }
             }
         } catch (error: any) {
@@ -610,12 +627,24 @@ export default function AdminSettings() {
                             {/* LIVE INTERACTIVE BANNER PREVIEW IN ADMIN SETTINGS */}
                             {announcementUrl ? (
                                 <View style={{ marginTop: 14, backgroundColor: '#070D1E', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
-                                    <View style={{ width: '100%', minHeight: 140, maxHeight: 240, backgroundColor: '#0B132B', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Image 
-                                            source={{ uri: announcementUrl }} 
-                                            style={{ width: '100%', height: 180 }} 
-                                            resizeMode={announcementFitMode === 'cover' ? "cover" : "contain"} 
-                                        />
+                                    <View style={{ width: '100%', minHeight: 140, maxHeight: 240, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+                                        {announcementType === 'video' || (announcementUrl && (announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm'))) ? (
+                                            <Video 
+                                                source={{ uri: announcementUrl }} 
+                                                style={{ width: '100%', height: 200 }} 
+                                                resizeMode={announcementFitMode === 'cover' ? ResizeMode.COVER : ResizeMode.CONTAIN} 
+                                                shouldPlay
+                                                isLooping
+                                                isMuted={true}
+                                                useNativeControls
+                                            />
+                                        ) : (
+                                            <Image 
+                                                source={{ uri: announcementUrl }} 
+                                                style={{ width: '100%', height: 180 }} 
+                                                resizeMode={announcementFitMode === 'cover' ? "cover" : "contain"} 
+                                            />
+                                        )}
                                     </View>
                                     <View style={{ padding: 12, backgroundColor: '#0F172A', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <View style={{ flex: 1, marginRight: 8 }}>

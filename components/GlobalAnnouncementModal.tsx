@@ -9,7 +9,8 @@ import {
     Dimensions, 
     Platform, 
     AppState,
-    ScrollView 
+    ScrollView,
+    ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -31,26 +32,44 @@ export default function GlobalAnnouncementModal() {
     const [visible, setVisible] = useState(false);
     const [config, setConfig] = useState<AnnouncementConfig | null>(null);
     const [mediaRatio, setMediaRatio] = useState<number | null>(null);
+    const [isMuted, setIsMuted] = useState(true);
+    const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+    const [isVideoLoading, setIsVideoLoading] = useState(true);
+    const videoRef = useRef<Video>(null);
     const pathname = usePathname();
 
-    // Auto-measure image dimensions for 100% full uncropped display
+    // Auto-detect video format regardless of whether type flag was set
+    const isVideo = config?.mediaType === 'video' ||
+        (typeof config?.mediaUrl === 'string' && (
+            config.mediaUrl.toLowerCase().includes('.mp4') ||
+            config.mediaUrl.toLowerCase().includes('.mov') ||
+            config.mediaUrl.toLowerCase().includes('.webm') ||
+            config.mediaUrl.toLowerCase().includes('.m4v')
+        ));
+
+    // Auto-measure media dimensions for 100% full uncropped display
     useEffect(() => {
-        if (config?.mediaUrl && config.mediaType === 'image') {
-            Image.getSize(
-                config.mediaUrl,
-                (w, h) => {
-                    if (w > 0 && h > 0) {
-                        setMediaRatio(w / h);
+        if (config?.mediaUrl) {
+            if (!isVideo) {
+                Image.getSize(
+                    config.mediaUrl,
+                    (w, h) => {
+                        if (w > 0 && h > 0) {
+                            setMediaRatio(w / h);
+                        }
+                    },
+                    () => {
+                        setMediaRatio(16 / 9);
                     }
-                },
-                () => {
-                    setMediaRatio(16 / 9);
-                }
-            );
+                );
+            } else {
+                setMediaRatio(16 / 9);
+                setIsVideoLoading(true);
+            }
         } else {
             setMediaRatio(null);
         }
-    }, [config?.mediaUrl, config?.mediaType]);
+    }, [config?.mediaUrl, config?.mediaType, isVideo]);
 
     // Auto-Scroll Up Refs & State for long announcement text
     const scrollViewRef = useRef<ScrollView>(null);
@@ -190,20 +209,67 @@ export default function GlobalAnnouncementModal() {
                     {config.mediaUrl ? (
                         <View style={[
                             styles.mediaContainer,
-                            mediaRatio && config.fitMode !== 'cover' ? {
-                                aspectRatio: Math.max(1.1, Math.min(mediaRatio, 2.8)),
-                                height: undefined,
-                            } : null
+                            isVideo ? {
+                                height: 215,
+                                backgroundColor: '#000000',
+                            } : (
+                                mediaRatio && config.fitMode !== 'cover' ? {
+                                    aspectRatio: Math.max(1.1, Math.min(mediaRatio, 2.8)),
+                                    height: undefined,
+                                } : { height: 180 }
+                            )
                         ]}>
-                            {config.mediaType === 'video' ? (
-                                <Video
-                                    source={{ uri: config.mediaUrl }}
-                                    style={styles.media}
-                                    resizeMode={config.fitMode === 'cover' ? ResizeMode.COVER : ResizeMode.CONTAIN}
-                                    shouldPlay
-                                    isLooping
-                                    isMuted={false}
-                                />
+                            {isVideo ? (
+                                <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                    <Video
+                                        ref={videoRef}
+                                        source={{ uri: config.mediaUrl }}
+                                        style={styles.media}
+                                        resizeMode={config.fitMode === 'cover' ? ResizeMode.COVER : ResizeMode.CONTAIN}
+                                        shouldPlay={isVideoPlaying}
+                                        isLooping
+                                        isMuted={isMuted}
+                                        onLoadStart={() => setIsVideoLoading(true)}
+                                        onReadyForDisplay={(event) => {
+                                            setIsVideoLoading(false);
+                                            if (event.naturalSize && event.naturalSize.width > 0 && event.naturalSize.height > 0) {
+                                                setMediaRatio(event.naturalSize.width / event.naturalSize.height);
+                                            }
+                                        }}
+                                        onError={(e) => {
+                                            console.warn("Announcement video playback notice:", e);
+                                            setIsVideoLoading(false);
+                                        }}
+                                    />
+
+                                    {/* Buffering Indicator */}
+                                    {isVideoLoading && (
+                                        <View style={styles.videoLoadingOverlay}>
+                                            <ActivityIndicator size="small" color="#F59E0B" />
+                                            <Text style={styles.videoLoadingText}>Ana loda bidiyo...</Text>
+                                        </View>
+                                    )}
+
+                                    {/* Play/Pause Button (Bottom-Left) */}
+                                    <TouchableOpacity
+                                        onPress={() => setIsVideoPlaying(prev => !prev)}
+                                        style={styles.videoPlayBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name={isVideoPlaying ? "pause" : "play"} size={13} color="#FFFFFF" />
+                                        <Text style={styles.videoControlTxt}>{isVideoPlaying ? "Dakata" : "Kunna"}</Text>
+                                    </TouchableOpacity>
+
+                                    {/* Sound Toggle Button (Bottom-Right) */}
+                                    <TouchableOpacity
+                                        onPress={() => setIsMuted(prev => !prev)}
+                                        style={styles.videoSoundBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={13} color="#FFFFFF" />
+                                        <Text style={styles.videoControlTxt}>{isMuted ? "Kunna Sauti" : "Kashe Sauti"}</Text>
+                                    </TouchableOpacity>
+                                </View>
                             ) : (
                                 <Image 
                                     source={{ uri: config.mediaUrl }} 
@@ -334,5 +400,53 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '800',
         letterSpacing: 0.5
+    },
+    videoLoadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 5,
+        gap: 6,
+    },
+    videoLoadingText: {
+        color: '#CBD5E1',
+        fontSize: 10.5,
+        fontWeight: '600',
+    },
+    videoPlayBtn: {
+        position: 'absolute',
+        bottom: 10,
+        left: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+        paddingHorizontal: 9,
+        paddingVertical: 4.5,
+        borderRadius: 20,
+        gap: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        zIndex: 10,
+    },
+    videoSoundBtn: {
+        position: 'absolute',
+        bottom: 10,
+        right: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+        paddingHorizontal: 9,
+        paddingVertical: 4.5,
+        borderRadius: 20,
+        gap: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        zIndex: 10,
+    },
+    videoControlTxt: {
+        color: '#FFFFFF',
+        fontSize: 9.5,
+        fontWeight: '700',
     }
 });
