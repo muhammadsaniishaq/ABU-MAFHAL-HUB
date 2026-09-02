@@ -103,6 +103,7 @@ export default function AdminSettings() {
     const [announcementUrl, setAnnouncementUrl] = useState('');
     const [announcementType, setAnnouncementType] = useState('image');
     const [announcementActive, setAnnouncementActive] = useState(false);
+    const [announcementFitMode, setAnnouncementFitMode] = useState<'contain' | 'cover'>('contain');
     
     // UI State
     const [loading, setLoading] = useState(false);
@@ -211,6 +212,7 @@ export default function AdminSettings() {
                             setAnnouncementUrl(parsed.mediaUrl || '');
                             setAnnouncementType(parsed.mediaType || 'image');
                             setAnnouncementActive(parsed.isActive === true);
+                            setAnnouncementFitMode(parsed.fitMode || 'contain');
                         } catch (e) {
                             setAnnouncementText(s.value);
                         }
@@ -331,7 +333,8 @@ export default function AdminSettings() {
                     text: announcementText,
                     mediaUrl: announcementUrl,
                     mediaType: announcementType,
-                    isActive: announcementActive
+                    isActive: announcementActive,
+                    fitMode: announcementFitMode,
                 }) }
             ];
             
@@ -367,8 +370,8 @@ export default function AdminSettings() {
         try {
             let result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.All,
-                allowsEditing: true,
-                quality: 0.8,
+                allowsEditing: false, // Prevents phone gallery from cropping or trimming the banner
+                quality: 0.9,
                 videoMaxDuration: 60,
             });
 
@@ -399,6 +402,7 @@ export default function AdminSettings() {
                         
                     setAnnouncementType(isVideo ? 'video' : 'image');
                     setAnnouncementUrl(publicUrlData.publicUrl);
+                    Alert.alert('Banner Uploaded! 🎉', 'An ɗora cikakken banner ɗin ba tare da an yanke ko da ƙwayar pixel ɗaya ba. Zaka iya zaɓar yadda zai fita a ƙasa sannan ka danna Save.');
                 }
             }
         } catch (error: any) {
@@ -523,6 +527,15 @@ export default function AdminSettings() {
                                     <TouchableOpacity onPress={pickAnnouncementMedia} style={s.uploadBtn} activeOpacity={0.7}>
                                         <Ionicons name="cloud-upload" size={20} color="#fff" />
                                     </TouchableOpacity>
+                                    {announcementUrl ? (
+                                        <TouchableOpacity 
+                                            onPress={() => setAnnouncementUrl('')} 
+                                            style={[s.uploadBtn, { backgroundColor: '#EF4444' }]} 
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="trash-outline" size={18} color="#fff" />
+                                        </TouchableOpacity>
+                                    ) : null}
                                 </View>
                             </View>
                             
@@ -540,36 +553,81 @@ export default function AdminSettings() {
                                 </View>
                             </View>
 
-                            {/* RECOMMENDED BANNER SPECIFICATIONS GUIDE */}
-                            <View style={{ marginTop: 12, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', padding: 12, borderRadius: 14 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                    <Ionicons name="information-circle" size={16} color="#d97706" />
-                                    <Text style={{ color: '#b45309', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Recommended Sleek Banner Dimensions</Text>
+                            {/* BANNER FIT / SIZING MODE SELECTOR */}
+                            <View style={s.inputGroup}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={s.label}>Tsarin Fitar Banner (Banner Fit Mode)</Text>
+                                    <Text style={{ fontSize: 11, color: '#F59E0B', fontWeight: '700' }}>
+                                        {announcementFitMode === 'contain' ? '✓ Cikakke (Ba Crop)' : 'Cover (Fill)'}
+                                    </Text>
                                 </View>
-                                <Text style={{ color: '#78350f', fontSize: 12, lineHeight: 16, fontWeight: '500' }}>
-                                    • <Text style={{ fontWeight: '700' }}>Recommended Resolution:</Text> 1200 x 480 px (or 1080 x 430 px){'\n'}
-                                    • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 2.5 : 1 (Sleek Wide Landscape Banner){'\n'}
-                                    • <Text style={{ fontWeight: '700' }}>File Format:</Text> High-quality JPG, PNG, or WEBP (under 2 MB)
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TouchableOpacity 
+                                        onPress={() => setAnnouncementFitMode('contain')} 
+                                        style={[
+                                            s.typeBtn, 
+                                            announcementFitMode === 'contain' && { backgroundColor: '#10B981', borderColor: '#10B981' }
+                                        ]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="scan-outline" size={16} color={announcementFitMode === 'contain' ? '#fff' : '#64748b'} />
+                                        <Text style={[s.typeText, announcementFitMode === 'contain' && { color: '#fff', fontWeight: '800' }]}>
+                                            100% Cikakke (No Crop) ✨
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        onPress={() => setAnnouncementFitMode('cover')} 
+                                        style={[
+                                            s.typeBtn, 
+                                            announcementFitMode === 'cover' && s.typeBtnActive
+                                        ]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="expand-outline" size={16} color={announcementFitMode === 'cover' ? '#fff' : '#64748b'} />
+                                        <Text style={[s.typeText, announcementFitMode === 'cover' && { color: '#fff', fontWeight: '800' }]}>
+                                            Fill (Cover)
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, fontStyle: 'italic' }}>
+                                    * Idan ka zaɓi "100% Cikakke (No Crop)", hoton zai fita gaba ɗayansa ba tare da an yanke gefe ko rubutu ba.
                                 </Text>
                             </View>
 
-                            {/* LIVE CROP PREVIEW IN ADMIN SETTINGS */}
+                            {/* RECOMMENDED BANNER SPECIFICATIONS GUIDE */}
+                            <View style={{ marginTop: 8, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', padding: 12, borderRadius: 14 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <Ionicons name="information-circle" size={16} color="#d97706" />
+                                    <Text style={{ color: '#b45309', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Shawarar Ma'aunin Banner (Recommended Specs)</Text>
+                                </View>
+                                <Text style={{ color: '#78350f', fontSize: 12, lineHeight: 17, fontWeight: '500' }}>
+                                    • <Text style={{ fontWeight: '700' }}>Ko wane irin size:</Text> Zai fita cif ba tare da an yanke shi ba idan ka bar shi a kan "100% Cikakke (No Crop)".{'\n'}
+                                    • <Text style={{ fontWeight: '700' }}>Mafi kyawun Ma'auni:</Text> 1200 x 480 px ko 1080 x 540 px (Landscape){'\n'}
+                                    • <Text style={{ fontWeight: '700' }}>Nau'in Hoto:</Text> JPG, PNG, ko WEBP mai inganci.
+                                </Text>
+                            </View>
+
+                            {/* LIVE INTERACTIVE BANNER PREVIEW IN ADMIN SETTINGS */}
                             {announcementUrl ? (
-                                <View style={{ marginTop: 12, backgroundColor: '#0f172a', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
-                                    <View style={{ height: 130, backgroundColor: '#1e293b', overflow: 'hidden' }}>
+                                <View style={{ marginTop: 14, backgroundColor: '#070D1E', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
+                                    <View style={{ width: '100%', minHeight: 140, maxHeight: 240, backgroundColor: '#0B132B', alignItems: 'center', justifyContent: 'center' }}>
                                         <Image 
                                             source={{ uri: announcementUrl }} 
-                                            style={{ width: '100%', height: '100%' }} 
-                                            resizeMode="cover" 
+                                            style={{ width: '100%', height: 180 }} 
+                                            resizeMode={announcementFitMode === 'cover' ? "cover" : "contain"} 
                                         />
                                     </View>
-                                    <View style={{ padding: 12, alignItems: 'center' }}>
-                                        <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sleek Cropped Banner Preview (180px Display) ✨</Text>
-                                        {announcementText ? (
-                                            <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center' }} numberOfLines={2}>
-                                                {announcementText}
+                                    <View style={{ padding: 12, backgroundColor: '#0F172A', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <View style={{ flex: 1, marginRight: 8 }}>
+                                            <Text style={{ color: '#F59E0B', fontSize: 11.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                {announcementFitMode === 'contain' ? '✓ 100% Cikakken Banner (Ba Crop) Preview' : 'Cover Fit Mode (Crop / Fill) Preview'}
                                             </Text>
-                                        ) : null}
+                                            {announcementText ? (
+                                                <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '500', marginTop: 2 }} numberOfLines={2}>
+                                                    {announcementText}
+                                                </Text>
+                                            ) : null}
+                                        </View>
                                     </View>
                                 </View>
                             ) : null}

@@ -24,12 +24,33 @@ interface AnnouncementConfig {
     mediaUrl: string;
     mediaType: 'image' | 'video';
     isActive: boolean;
+    fitMode?: 'contain' | 'cover';
 }
 
 export default function GlobalAnnouncementModal() {
     const [visible, setVisible] = useState(false);
     const [config, setConfig] = useState<AnnouncementConfig | null>(null);
+    const [mediaRatio, setMediaRatio] = useState<number | null>(null);
     const pathname = usePathname();
+
+    // Auto-measure image dimensions for 100% full uncropped display
+    useEffect(() => {
+        if (config?.mediaUrl && config.mediaType === 'image') {
+            Image.getSize(
+                config.mediaUrl,
+                (w, h) => {
+                    if (w > 0 && h > 0) {
+                        setMediaRatio(w / h);
+                    }
+                },
+                () => {
+                    setMediaRatio(16 / 9);
+                }
+            );
+        } else {
+            setMediaRatio(null);
+        }
+    }, [config?.mediaUrl, config?.mediaType]);
 
     // Auto-Scroll Up Refs & State for long announcement text
     const scrollViewRef = useRef<ScrollView>(null);
@@ -109,15 +130,18 @@ export default function GlobalAnnouncementModal() {
             if (typeof data.value === 'object' && data.value !== null) {
                 parsed = data.value as AnnouncementConfig;
                 parsed.isActive = !!parsed.isActive;
+                parsed.fitMode = parsed.fitMode || 'contain';
             } else if (typeof data.value === 'string' && data.value.trim().startsWith('{')) {
                 try {
                     parsed = JSON.parse(data.value);
+                    parsed.fitMode = parsed.fitMode || 'contain';
                 } catch (e) {
                     parsed = {
                         text: data.value,
                         mediaUrl: '',
                         mediaType: 'image',
-                        isActive: data.value.trim().length > 0
+                        isActive: data.value.trim().length > 0,
+                        fitMode: 'contain',
                     };
                 }
             } else {
@@ -125,7 +149,8 @@ export default function GlobalAnnouncementModal() {
                     text: typeof data.value === 'string' ? data.value : JSON.stringify(data.value),
                     mediaUrl: '',
                     mediaType: 'image',
-                    isActive: data.value ? true : false
+                    isActive: data.value ? true : false,
+                    fitMode: 'contain',
                 };
             }
             
@@ -161,14 +186,20 @@ export default function GlobalAnnouncementModal() {
                         <Ionicons name="close" size={20} color="#fff" />
                     </TouchableOpacity>
 
-                    {/* Banner Image / Video Container with Crop (resizeMode="cover") */}
+                    {/* Banner Image / Video Container (Auto-Fitting & 100% Uncropped) */}
                     {config.mediaUrl ? (
-                        <View style={styles.mediaContainer}>
+                        <View style={[
+                            styles.mediaContainer,
+                            mediaRatio && config.fitMode !== 'cover' ? {
+                                aspectRatio: Math.max(1.1, Math.min(mediaRatio, 2.8)),
+                                height: undefined,
+                            } : null
+                        ]}>
                             {config.mediaType === 'video' ? (
                                 <Video
                                     source={{ uri: config.mediaUrl }}
                                     style={styles.media}
-                                    resizeMode={ResizeMode.COVER}
+                                    resizeMode={config.fitMode === 'cover' ? ResizeMode.COVER : ResizeMode.CONTAIN}
                                     shouldPlay
                                     isLooping
                                     isMuted={false}
@@ -177,7 +208,7 @@ export default function GlobalAnnouncementModal() {
                                 <Image 
                                     source={{ uri: config.mediaUrl }} 
                                     style={styles.media} 
-                                    resizeMode="cover" 
+                                    resizeMode={config.fitMode === 'cover' ? "cover" : "contain"} 
                                 />
                             )}
                         </View>
@@ -248,9 +279,12 @@ const styles = StyleSheet.create({
     },
     mediaContainer: {
         width: '100%',
-        height: 180,
-        backgroundColor: '#0f172a',
-        overflow: 'hidden'
+        minHeight: 140,
+        maxHeight: 280,
+        backgroundColor: '#070D1E',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     media: {
         width: '100%',
