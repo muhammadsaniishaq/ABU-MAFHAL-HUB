@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 32, 450);
-const BANNER_HEIGHT = 70; // Ultra-slim sleek ribbon banner
+const BANNER_HEIGHT = 80; // Sleek slim ribbon banner with 100% full original image support
 const BANNER_MARGIN = 10;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
@@ -112,11 +112,13 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
             style={styles.bannerCard}
           >
             {item.image_url ? (
-              <Image 
-                source={{ uri: item.image_url }} 
-                style={styles.bannerImage} 
-                resizeMode="cover" 
-              />
+              <View style={styles.imageContainer}>
+                <Image 
+                  source={{ uri: item.image_url }} 
+                  style={styles.bannerImage} 
+                  resizeMode={item.fit_mode === 'cover' ? 'cover' : 'contain'} 
+                />
+              </View>
             ) : (
               <LinearGradient 
                 colors={['#0F172A', '#1E293B', '#0B132B']} 
@@ -185,6 +187,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 4,
     elevation: 3,
+  },
+  imageContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#070D1E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   bannerImage: {
     width: '100%',

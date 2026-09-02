@@ -55,6 +55,8 @@ export default function ModernContentManager() {
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const [uploadMode, setUploadMode] = useState<'original' | 'freeform'>('original');
+  const [bannerFitMode, setBannerFitMode] = useState<'contain' | 'cover'>('contain');
 
   // Partner modal state
   const [showPartnerModal, setShowPartnerModal] = useState(false);
@@ -124,7 +126,7 @@ export default function ModernContentManager() {
     }
   };
 
-  const pickImage = async () => {
+  const pickImage = async (allowCrop = false) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted' && Platform.OS !== 'web') {
@@ -133,9 +135,8 @@ export default function ModernContentManager() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true, // Forces cropping to ultra-slim ribbon banner dimensions
-        aspect: [4, 1], // Ultra-slim 4:1 aspect ratio (e.g. 1200x300 or 1000x250)
-        quality: 0.9,
+        allowsEditing: allowCrop, // If false, uploads 100% full original image without any forced crop!
+        quality: 0.95,
         base64: true,
       });
 
@@ -267,6 +268,21 @@ export default function ModernContentManager() {
             }
           } catch (storageErr) {
             console.warn("Banner storage upload fallback:", storageErr);
+          }
+        } else if (selectedImage.uri) {
+          try {
+            const response = await fetch(selectedImage.uri);
+            const blob = await response.blob();
+            const { error: uploadError } = await supabase.storage
+              .from('banners')
+              .upload(fileName, blob, { contentType: mimeType, upsert: true });
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage.from('banners').getPublicUrl(fileName);
+              if (urlData?.publicUrl) publicUrl = urlData.publicUrl;
+            }
+          } catch (storageErr) {
+            console.warn("Banner storage blob upload fallback:", storageErr);
           }
         }
       }
@@ -755,34 +771,63 @@ export default function ModernContentManager() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* UPLOAD MODE SELECTOR */}
+              <View style={{ marginBottom: 10 }}>
+                <Text style={s.inputLabel}>Yanayin Ɗora Banner (Upload Mode)</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                  <TouchableOpacity
+                    onPress={() => { setUploadMode('original'); pickImage(false); }}
+                    style={[s.modeOptionBtn, uploadMode === 'original' && s.modeOptionBtnActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="image-outline" size={14} color={uploadMode === 'original' ? '#fff' : '#0F172A'} />
+                    <Text style={[s.modeOptionTxt, uploadMode === 'original' && { color: '#fff', fontWeight: '800' }]}>
+                      100% Asalin Size (Ba Crop) ✨
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => { setUploadMode('freeform'); pickImage(true); }}
+                    style={[s.modeOptionBtn, uploadMode === 'freeform' && s.modeOptionBtnActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="crop-outline" size={14} color={uploadMode === 'freeform' ? '#fff' : '#0F172A'} />
+                    <Text style={[s.modeOptionTxt, uploadMode === 'freeform' && { color: '#fff', fontWeight: '800' }]}>
+                      Crop / Resize da Hannu
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               {/* Image Preview & Picker */}
-              <TouchableOpacity onPress={pickImage} style={s.imagePickerBox} activeOpacity={0.8}>
+              <TouchableOpacity onPress={() => pickImage(uploadMode === 'freeform')} style={s.imagePickerBox} activeOpacity={0.8}>
                 {selectedImage ? (
-                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="cover" />
+                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="contain" />
                 ) : existingImageUrl ? (
-                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="cover" />
+                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="contain" />
                 ) : (
                   <View style={s.imagePickerPlaceholder}>
-                    <Ionicons name="image-outline" size={24} color={L.goldDk} />
-                    <Text style={s.imagePickerText}>Danna Nan Don Ɗora Siririyar Banner (Tap to Upload)</Text>
-                    <Text style={{ fontSize: 9, color: L.textMuted }}>Aspect Ratio: 4 : 1 (Ultra-Slim 1200 x 300 px)</Text>
+                    <Ionicons name="image-outline" size={26} color={L.goldDk} />
+                    <Text style={s.imagePickerText}>Danna Nan Don Zaɓar Banner</Text>
+                    <Text style={{ fontSize: 9.5, color: L.textMuted }}>
+                      {uploadMode === 'original' ? '✓ Zai ɗauki asalin girman hotonka ba tare da an yanke ba' : 'Zaka iya crop ɗin hoton da kanka yadda kake so'}
+                    </Text>
                   </View>
                 )}
               </TouchableOpacity>
 
-              {/* RECOMMENDED ULTRA-SLIM BANNER DIMENSIONS SUGGESTION CARD */}
-              <View style={{ marginTop: 2, marginBottom: 12, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 12, padding: 10 }}>
+              {/* INFORMATION CARD: NO FORCED CROP & FULL ORIGINAL SIZE SUPPORT */}
+              <View style={{ marginTop: 2, marginBottom: 12, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#3B82F6', borderRadius: 12, padding: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <Ionicons name="sparkles" size={14} color="#D97706" />
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309', textTransform: 'uppercase' }}>
-                    Shawarar Ma'aunin Banner (Ultra-Slim Ribbon)
+                  <Ionicons name="shield-checkmark" size={15} color="#2563EB" />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4ED8', textTransform: 'uppercase' }}>
+                    An Cire Tilasta Ma'aunin 1200x300 (Full Original Size)
                   </Text>
                 </View>
-                <Text style={{ fontSize: 10.5, color: '#78350F', lineHeight: 15, fontWeight: '500' }}>
-                  • <Text style={{ fontWeight: '700' }}>Standard Size:</Text> 1200 x 300 px (ko 1000 x 250 px){'\n'}
-                  • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 4 : 1 (Siririyar Ribbon Banner){'\n'}
-                  • <Text style={{ fontWeight: '700' }}>Tsayi A App:</Text> 70px kacal (siririya sosai wacce bata cinye wuri a allon waya ba!){'\n'}
-                  • <Text style={{ fontWeight: '700' }}>Tilasta Crop:</Text> Da zaran ka zaɓi hoto, cropper zai saita shi a kan siririn ma'aunin 4:1 ta yadda duk banners za su zama sirara kuma iri ɗaya cif!
+                <Text style={{ fontSize: 10.5, color: '#1E40AF', lineHeight: 15, fontWeight: '500' }}>
+                  • <Text style={{ fontWeight: '700' }}>Asalin Size (Ba Crop):</Text> Yanzu ba a sake takura ma hotonku a kan 1200x300 ba! Hotonku zai shiga a ainihin yadda kuka tsara shi ba tare da an yanke ko da ƙwayar pixel ɗaya ba.{'\n'}
+                  • <Text style={{ fontWeight: '700' }}>Crop da Hannu:</Text> Idan kuka zaɓi "Crop / Resize da Hannu", zaku iya yanke hoton da kanku gwargwadon yadda kuke buƙata.{'\n'}
+                  • <Text style={{ fontWeight: '700' }}>Fitar Banner:</Text> Banner zai fita tsaf (100% cikakke) a koina a manhajar ba tare da an matse shi ko an ɓata asalin sa ba.
                 </Text>
               </View>
 
@@ -1306,9 +1351,31 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imagePickerBox: {
-    height: 95,
+  modeOptionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 8,
     backgroundColor: L.bg,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  modeOptionBtnActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  modeOptionTxt: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: L.textPrimary,
+  },
+  imagePickerBox: {
+    height: 120,
+    backgroundColor: '#070D1E',
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: L.cardBorder,
