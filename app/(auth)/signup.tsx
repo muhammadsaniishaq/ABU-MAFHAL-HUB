@@ -816,13 +816,25 @@ export default function SignupScreen() {
                             </TouchableOpacity>
 
                             <View style={styles.brandRow}>
-                                {/* Pure Uncropped Medallion Logo */}
-                                <View style={styles.logoBadgeContainer}>
-                                    <Image
-                                        source={getLogoSource()}
-                                        style={styles.logoImage}
-                                        resizeMode="contain"
-                                    />
+                                {/* Royal Golden Bezel Decorated Logo */}
+                                <View style={styles.royalLogoBezel}>
+                                    <LinearGradient
+                                        colors={['#F59E0B', '#FDE047', '#D97706']}
+                                        style={styles.logoGradientRing}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                    >
+                                        <View style={[styles.logoInnerDisc, { backgroundColor: isDark ? '#0F172A' : '#FFFFFF' }]}>
+                                            <Image
+                                                source={getLogoSource()}
+                                                style={styles.logoImage}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
+                                    </LinearGradient>
+                                    <View style={[styles.royalStarBadge, { borderColor: isDark ? '#0F172A' : '#FFFFFF' }]}>
+                                        <Ionicons name="shield-checkmark" size={9} color="#0F172A" />
+                                    </View>
                                 </View>
 
                                 <View style={{ marginLeft: 8 }}>
@@ -912,7 +924,7 @@ export default function SignupScreen() {
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
                                                 placeholder="Full name"
-                                                placeholderTextColor={theme.textMuted}
+                                                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                                 value={fullName}
                                                 onChangeText={setFullName}
                                                 onFocus={() => setFocusedInput('fullName')}
@@ -930,7 +942,7 @@ export default function SignupScreen() {
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
                                                 placeholder="Username"
-                                                placeholderTextColor={theme.textMuted}
+                                                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                                 autoCapitalize="none"
                                                 value={username}
                                                 onChangeText={setUsername}
@@ -959,7 +971,7 @@ export default function SignupScreen() {
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
                                         placeholder="name@example.com"
-                                        placeholderTextColor={theme.textMuted}
+                                        placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
                                         value={email}
@@ -1027,7 +1039,7 @@ export default function SignupScreen() {
                                         <TextInput 
                                             style={[styles.textInput, { color: theme.textPrimary }]}
                                             placeholder="8012345678"
-                                            placeholderTextColor={theme.textMuted}
+                                            placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                             keyboardType="phone-pad"
                                             value={phone}
                                             onChangeText={setPhone}
@@ -1041,7 +1053,7 @@ export default function SignupScreen() {
                                     <Text style={{ color: '#EF4444', fontSize: 9.5, fontWeight: '700', marginTop: -2, marginBottom: 4 }}>
                                         ❌ Phone number is already registered
                                     </Text>
-                                )}
+                                 )}
                                 {phoneAvailable === true && (
                                     <Text style={{ color: '#10B981', fontSize: 9.5, fontWeight: '700', marginTop: -2, marginBottom: 4 }}>
                                         ✓ Phone number available
@@ -1071,7 +1083,7 @@ export default function SignupScreen() {
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
                                                 placeholder="Password"
-                                                placeholderTextColor={theme.textMuted}
+                                                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                                 secureTextEntry={!showPassword}
                                                 value={password}
                                                 onChangeText={setPassword}
@@ -1100,7 +1112,7 @@ export default function SignupScreen() {
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
                                                 placeholder="Confirm pass"
-                                                placeholderTextColor={theme.textMuted}
+                                                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                                 secureTextEntry={!showConfirmPassword}
                                                 value={confirmPassword}
                                                 onChangeText={setConfirmPassword}
@@ -1204,7 +1216,7 @@ export default function SignupScreen() {
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
                                         placeholder="Referral code (optional)"
-                                        placeholderTextColor={theme.textMuted}
+                                        placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                         autoCapitalize="characters"
                                         value={referralCode}
                                         onChangeText={setReferralCode}
@@ -1473,15 +1485,49 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
-    logoBadgeContainer: {
+    royalLogoBezel: {
         width: 44,
         height: 44,
+        position: 'relative',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 5,
+        elevation: 4,
+    },
+    logoGradientRing: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        padding: 2,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    logoInnerDisc: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 1,
+    },
     logoImage: {
-        width: 44,
-        height: 44,
+        width: '100%',
+        height: '100%',
+        borderRadius: 19,
+    },
+    royalStarBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 15,
+        height: 15,
+        borderRadius: 7.5,
+        backgroundColor: '#F59E0B',
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     brandTitle: {
         fontWeight: '900',
@@ -1577,8 +1623,8 @@ const styles = StyleSheet.create({
     },
     textInput: {
         flex: 1,
-        fontSize: 12.5,
-        fontWeight: '500',
+        fontSize: 11,
+        fontWeight: '400',
         paddingVertical: 0,
     },
     countryBtn: {

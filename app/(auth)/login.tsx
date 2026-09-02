@@ -564,13 +564,25 @@ export default function LoginScreen() {
                         {/* Top Control Bar with Prestigious Brand, Support & Theme Toggle */}
                         <View style={styles.topControlRow}>
                             <View style={styles.brandRow}>
-                                {/* Pure Uncropped Medallion Logo */}
-                                <View style={styles.logoBadgeContainer}>
-                                    <Image
-                                        source={getLogoSource()}
-                                        style={styles.logoImage}
-                                        resizeMode="contain"
-                                    />
+                                {/* Royal Golden Bezel Decorated Logo */}
+                                <View style={styles.royalLogoBezel}>
+                                    <LinearGradient
+                                        colors={['#F59E0B', '#FDE047', '#D97706']}
+                                        style={styles.logoGradientRing}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                    >
+                                        <View style={[styles.logoInnerDisc, { backgroundColor: isDark ? '#0F172A' : '#FFFFFF' }]}>
+                                            <Image
+                                                source={getLogoSource()}
+                                                style={styles.logoImage}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
+                                    </LinearGradient>
+                                    <View style={[styles.royalStarBadge, { borderColor: isDark ? '#0F172A' : '#FFFFFF' }]}>
+                                        <Ionicons name="shield-checkmark" size={9} color="#0F172A" />
+                                    </View>
                                 </View>
 
                                 <View style={{ marginLeft: 10 }}>
@@ -669,7 +681,7 @@ export default function LoginScreen() {
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
                                         placeholder="Email or phone number"
-                                        placeholderTextColor={theme.textMuted}
+                                        placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
                                         value={identifier}
@@ -696,7 +708,7 @@ export default function LoginScreen() {
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
                                         placeholder="Enter password"
-                                        placeholderTextColor={theme.textMuted}
+                                        placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                                         secureTextEntry={!showPassword}
                                         value={password}
                                         onChangeText={setPassword}
@@ -898,15 +910,49 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
-    logoBadgeContainer: {
+    royalLogoBezel: {
         width: 44,
         height: 44,
+        position: 'relative',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 5,
+        elevation: 4,
+    },
+    logoGradientRing: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        padding: 2,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    logoInnerDisc: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 1,
+    },
     logoImage: {
-        width: 44,
-        height: 44,
+        width: '100%',
+        height: '100%',
+        borderRadius: 19,
+    },
+    royalStarBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 15,
+        height: 15,
+        borderRadius: 7.5,
+        backgroundColor: '#F59E0B',
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     brandTitle: {
         fontWeight: '900',
@@ -1034,8 +1080,8 @@ const styles = StyleSheet.create({
     },
     textInput: {
         flex: 1,
-        fontSize: 12.5,
-        fontWeight: '500',
+        fontSize: 11,
+        fontWeight: '400',
         paddingVertical: 0,
     },
     optionsRow: {
