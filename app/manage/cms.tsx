@@ -132,8 +132,8 @@ export default function ModernContentManager() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true, // Forces cropping / resizing to uniform 2.5:1 banner dimensions
-        aspect: [5, 2], // 2.5:1 aspect ratio (e.g. 1200x480) for 100% uniform banners across all screens
+        allowsEditing: true, // Forces cropping to ultra-slim ribbon banner dimensions
+        aspect: [4, 1], // Ultra-slim 4:1 aspect ratio (e.g. 1200x300 or 1000x250)
         quality: 0.9,
         base64: true,
       });
@@ -735,25 +735,26 @@ export default function ModernContentManager() {
                   <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="cover" />
                 ) : (
                   <View style={s.imagePickerPlaceholder}>
-                    <Ionicons name="image-outline" size={26} color={L.goldDk} />
-                    <Text style={s.imagePickerText}>Danna Nan Don Ɗora Banner (Tap to Upload)</Text>
-                    <Text style={{ fontSize: 9, color: L.textMuted }}>Aspect Ratio: 2.5 : 1 (1200 x 480 px)</Text>
+                    <Ionicons name="image-outline" size={24} color={L.goldDk} />
+                    <Text style={s.imagePickerText}>Danna Nan Don Ɗora Siririyar Banner (Tap to Upload)</Text>
+                    <Text style={{ fontSize: 9, color: L.textMuted }}>Aspect Ratio: 4 : 1 (Ultra-Slim 1200 x 300 px)</Text>
                   </View>
                 )}
               </TouchableOpacity>
 
-              {/* RECOMMENDED UNIFORM BANNER DIMENSIONS SUGGESTION CARD */}
+              {/* RECOMMENDED ULTRA-SLIM BANNER DIMENSIONS SUGGESTION CARD */}
               <View style={{ marginTop: 2, marginBottom: 12, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 12, padding: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                   <Ionicons name="sparkles" size={14} color="#D97706" />
                   <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309', textTransform: 'uppercase' }}>
-                    Shawarar Ma'aunin Banner (Recommended Dimensions)
+                    Shawarar Ma'aunin Banner (Ultra-Slim Ribbon)
                   </Text>
                 </View>
                 <Text style={{ fontSize: 10.5, color: '#78350F', lineHeight: 15, fontWeight: '500' }}>
-                  • <Text style={{ fontWeight: '700' }}>Standard Resolution:</Text> 1200 x 480 px (ko 1080 x 430 px){'\n'}
-                  • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 2.5 : 1 (Uniform Banner Ratio){'\n'}
-                  • <Text style={{ fontWeight: '700' }}>Tilasta Resize/Crop:</Text> Idan ka zaɓi hoto, tsarin zai nuna maka wajen saita (crop) shi a kan daidai ma'aunin 2.5:1 domin kowane banner ya fita daidai cif ba tare da wani ya fi wani tsayi ba!
+                  • <Text style={{ fontWeight: '700' }}>Standard Size:</Text> 1200 x 300 px (ko 1000 x 250 px){'\n'}
+                  • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 4 : 1 (Siririyar Ribbon Banner){'\n'}
+                  • <Text style={{ fontWeight: '700' }}>Tsayi A App:</Text> 70px kacal (siririya sosai wacce bata cinye wuri a allon waya ba!){'\n'}
+                  • <Text style={{ fontWeight: '700' }}>Tilasta Crop:</Text> Da zaran ka zaɓi hoto, cropper zai saita shi a kan siririn ma'aunin 4:1 ta yadda duk banners za su zama sirara kuma iri ɗaya cif!
                 </Text>
               </View>
 
@@ -1278,9 +1279,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   imagePickerBox: {
-    height: 150,
+    height: 95,
     backgroundColor: L.bg,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: L.cardBorder,
     overflow: 'hidden',

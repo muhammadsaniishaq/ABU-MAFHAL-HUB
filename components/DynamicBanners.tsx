@@ -6,8 +6,8 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 32, 450);
-const BANNER_HEIGHT = 126; // Uniform 2.5:1 aspect ratio across all banners
-const BANNER_MARGIN = 12;
+const BANNER_HEIGHT = 70; // Ultra-slim sleek ribbon banner
+const BANNER_MARGIN = 10;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
 export default function DynamicBanners({ placement = 'dashboard' }: { placement?: string }) {
@@ -167,24 +167,24 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 10,
-    marginBottom: 8,
+    marginTop: 6,
+    marginBottom: 4,
     zIndex: 10,
   },
   bannerCard: {
     width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
     marginRight: BANNER_MARGIN,
-    borderRadius: 18,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#0F172A',
-    borderWidth: 1.2,
+    borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.35)',
     shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.22,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
   },
   bannerImage: {
     width: '100%',
@@ -196,49 +196,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   promoPill: {
     backgroundColor: 'rgba(245, 158, 11, 0.2)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: '#F59E0B',
   },
   promoPillText: {
     color: '#F59E0B',
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   brandSubtitle: {
     color: '#94A3B8',
-    fontSize: 9.5,
+    fontSize: 8.5,
     fontWeight: '700',
   },
   bannerTitle: {
     color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 14,
+    fontWeight: '800',
+    fontSize: 11.5,
     letterSpacing: 0.2,
   },
   bannerSubtitle: {
     color: '#CBD5E1',
-    fontSize: 10,
-    marginTop: 3,
-    lineHeight: 14,
+    fontSize: 8.5,
+    marginTop: 1,
   },
   actionBtn: {
     backgroundColor: '#F59E0B',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
   },
   actionBtnText: {
     color: '#0F172A',
-    fontSize: 10,
+    fontSize: 8.5,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
@@ -246,19 +245,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    gap: 5,
+    marginTop: 4,
+    gap: 4,
   },
   dot: {
-    height: 4.5,
-    borderRadius: 2.5,
+    height: 3.5,
+    borderRadius: 2,
   },
   activeDot: {
-    width: 18,
+    width: 14,
     backgroundColor: '#F59E0B',
   },
   inactiveDot: {
-    width: 6,
+    width: 4,
     backgroundColor: 'rgba(148, 163, 184, 0.35)',
   },
 });
