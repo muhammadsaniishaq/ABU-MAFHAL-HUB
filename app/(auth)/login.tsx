@@ -668,7 +668,7 @@ export default function LoginScreen() {
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="Enter Email or Phone Number"
+                                        placeholder="Email or phone number"
                                         placeholderTextColor={theme.textMuted}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
@@ -689,13 +689,13 @@ export default function LoginScreen() {
                                 ]}>
                                     <Ionicons 
                                         name="lock-closed" 
-                                        size={19} 
+                                        size={18} 
                                         color={focusedInput === 'password' ? '#F59E0B' : theme.textMuted} 
                                         style={{ marginRight: 10 }} 
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="••••••••••••"
+                                        placeholder="Enter password"
                                         placeholderTextColor={theme.textMuted}
                                         secureTextEntry={!showPassword}
                                         value={password}
@@ -1021,21 +1021,22 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontWeight: '700',
-        fontSize: 12.5,
-        marginBottom: 4,
+        fontSize: 11.5,
+        marginBottom: 3,
     },
     inputFieldBox: {
-        height: 48,
-        borderRadius: 13,
-        borderWidth: 1.5,
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1.2,
         paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
     },
     textInput: {
         flex: 1,
-        fontSize: 14.5,
-        fontWeight: '600',
+        fontSize: 12.5,
+        fontWeight: '500',
+        paddingVertical: 0,
     },
     optionsRow: {
         flexDirection: 'row',

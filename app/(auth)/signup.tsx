@@ -911,7 +911,7 @@ export default function SignupScreen() {
                                         ]}>
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
-                                                placeholder="Sani Abubakar"
+                                                placeholder="Full name"
                                                 placeholderTextColor={theme.textMuted}
                                                 value={fullName}
                                                 onChangeText={setFullName}
@@ -929,7 +929,7 @@ export default function SignupScreen() {
                                         ]}>
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
-                                                placeholder="abumafhal"
+                                                placeholder="Username"
                                                 placeholderTextColor={theme.textMuted}
                                                 autoCapitalize="none"
                                                 value={username}
@@ -1070,7 +1070,7 @@ export default function SignupScreen() {
                                         ]}>
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
-                                                placeholder="Password (8+ chars)"
+                                                placeholder="Password"
                                                 placeholderTextColor={theme.textMuted}
                                                 secureTextEntry={!showPassword}
                                                 value={password}
@@ -1099,7 +1099,7 @@ export default function SignupScreen() {
                                         ]}>
                                             <TextInput 
                                                 style={[styles.textInput, { color: theme.textPrimary }]}
-                                                placeholder="Confirm Pass"
+                                                placeholder="Confirm pass"
                                                 placeholderTextColor={theme.textMuted}
                                                 secureTextEntry={!showConfirmPassword}
                                                 value={confirmPassword}
@@ -1203,7 +1203,7 @@ export default function SignupScreen() {
                                 ]}>
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="ABUMAF123 or @username"
+                                        placeholder="Referral code (optional)"
                                         placeholderTextColor={theme.textMuted}
                                         autoCapitalize="characters"
                                         value={referralCode}
@@ -1564,26 +1564,27 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontWeight: '700',
-        fontSize: 12.5,
+        fontSize: 11.5,
         marginBottom: 3,
     },
     inputFieldBox: {
-        height: 48,
-        borderRadius: 13,
-        borderWidth: 1.5,
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1.2,
         paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
     },
     textInput: {
         flex: 1,
-        fontSize: 14.5,
-        fontWeight: '600',
+        fontSize: 12.5,
+        fontWeight: '500',
+        paddingVertical: 0,
     },
     countryBtn: {
-        height: 48,
-        borderRadius: 13,
-        borderWidth: 1.5,
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1.2,
         paddingHorizontal: 10,
         flexDirection: 'row',
         alignItems: 'center',
