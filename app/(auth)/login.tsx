@@ -863,11 +863,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        flexGrow: 1,
-        justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingTop: Platform.OS === 'ios' ? 4 : 8,
-        paddingBottom: 12,
+        paddingBottom: 24,
     },
     topControlRow: {
         flexDirection: 'row',
@@ -916,9 +914,7 @@ const styles = StyleSheet.create({
     },
     cardWrapper: {
         width: '100%',
-        flex: 1,
-        justifyContent: 'space-between',
-        marginTop: 4,
+        marginTop: 6,
         paddingHorizontal: 2,
     },
     desktopCardWrapper: {
@@ -933,7 +929,8 @@ const styles = StyleSheet.create({
     },
     headlineBox: {
         alignItems: 'center',
-        marginBottom: 8,
+        marginTop: 2,
+        marginBottom: 10,
     },
     welcomeTitle: {
         fontWeight: '900',
