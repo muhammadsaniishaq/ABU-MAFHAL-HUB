@@ -3,8 +3,58 @@ import { Platform, Alert } from 'react-native';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../services/supabase';
-
 import { useRouter } from 'expo-router';
+
+let NotificationsModule: any = null;
+
+// Safely require expo-notifications
+try {
+  if (Platform.OS !== 'web') {
+    NotificationsModule = require('expo-notifications');
+    if (NotificationsModule && NotificationsModule.setNotificationHandler) {
+      NotificationsModule.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          priority: NotificationsModule.AndroidNotificationPriority?.MAX || 5,
+        }),
+      });
+    }
+  }
+} catch (e) {
+  console.warn('[Push] Error initializing NotificationsModule:', e);
+}
+
+/**
+ * Trigger an instant local push notification with sound and vibration
+ */
+export async function sendInstantNotification(
+  title: string,
+  body: string,
+  data: Record<string, any> = {},
+  channelId: string = 'transactions'
+) {
+  if (!NotificationsModule || Platform.OS === 'web') {
+    console.log(`[Notification Fallback] ${title}: ${body}`);
+    return;
+  }
+
+  try {
+    await NotificationsModule.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+        priority: NotificationsModule.AndroidNotificationPriority?.MAX || 'max',
+        data,
+      },
+      trigger: null, // triggers instantly
+    });
+  } catch (err) {
+    console.warn('[Notification] Failed to dispatch instant notification:', err);
+  }
+}
 
 export function usePushNotifications() {
   const router = useRouter();
@@ -15,162 +65,199 @@ export function usePushNotifications() {
 
   useEffect(() => {
     let isMounted = true;
-    let Notifications: any;
-
     const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
-    // 1. Setup Notifications Module (Conditioned for Expo Go)
-    try {
-        // Expo Go SDK 53 crashes if we even require 'expo-notifications' due to auto-registration side effects
-        if (!isExpoGo) {
-            Notifications = require('expo-notifications');
-            
-            // Configure Handler immediately
-            Notifications.setNotificationHandler({
-                handleNotification: async () => ({
-                    shouldShowAlert: true,
-                    shouldPlaySound: true,
-                    shouldSetBadge: false,
-                }),
-            });
+    const setupChannels = async () => {
+      if (Platform.OS === 'android' && NotificationsModule?.setNotificationChannelAsync) {
+        try {
+          // Channel 1: Transactions & Wallet (High Priority, Sound, Vibration)
+          await NotificationsModule.setNotificationChannelAsync('transactions', {
+            name: 'Transactions & Wallet',
+            importance: NotificationsModule.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#f5a623',
+            sound: 'default',
+            enableLights: true,
+            enableVibrate: true,
+            showBadge: true,
+          });
+
+          // Channel 2: Default System Channel
+          await NotificationsModule.setNotificationChannelAsync('default', {
+            name: 'General Alerts',
+            importance: NotificationsModule.AndroidImportance.HIGH,
+            vibrationPattern: [0, 200, 200],
+            lightColor: '#0056D2',
+            sound: 'default',
+            enableLights: true,
+            enableVibrate: true,
+            showBadge: true,
+          });
+
+          // Channel 3: Security & Auth
+          await NotificationsModule.setNotificationChannelAsync('security', {
+            name: 'Security & Auth',
+            importance: NotificationsModule.AndroidImportance.MAX,
+            vibrationPattern: [0, 300, 150, 300],
+            lightColor: '#dc2626',
+            sound: 'default',
+            enableLights: true,
+            enableVibrate: true,
+            showBadge: true,
+          });
+        } catch (err) {
+          console.warn('[Push] Channel setup note:', err);
         }
-    } catch (e) {
-        console.error("Failed to load expo-notifications module:", e);
-    }
-
-    // 2. Register for Token (SKIP IN EXPO GO)
-    const registerForPushNotificationsAsync = async () => {
-        if (isExpoGo || !Notifications) return null;
-
-        let token;
-        
-        if (Platform.OS === 'android') {
-            await Notifications.setNotificationChannelAsync('default', {
-                name: 'default',
-                importance: Notifications.AndroidImportance.MAX,
-                vibrationPattern: [0, 250, 250, 250],
-                lightColor: '#FF231F7C',
-            });
-        }
-
-        if (Device.isDevice && !isExpoGo) {
-            const { status: existingStatus } = await Notifications.getPermissionsAsync();
-            let finalStatus = existingStatus;
-            if (existingStatus !== 'granted') {
-                const { status } = await Notifications.requestPermissionsAsync();
-                finalStatus = status;
-            }
-            if (finalStatus !== 'granted') {
-                console.log('Failed to get push token for push notification!');
-                return;
-            }
-            
-            try {
-                const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-                token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-                console.log("Push Token:", token);
-            } catch (e: any) {
-                console.log("Remote Push Token Error:", e.message);
-            }
-        } else {
-            console.log("Not a physical device, skipping push registration");
-        }
-
-        return token;
+      }
     };
 
-    // Run Registration
-    registerForPushNotificationsAsync().then(async (token) => {
-        if (isMounted) setExpoPushToken(token);
-        if (token && isMounted) {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                await supabase.from('profiles').update({ expo_push_token: token }).eq('id', user.id);
-            }
+    const registerForPushNotificationsAsync = async () => {
+      if (Platform.OS === 'web' || !NotificationsModule) return null;
+
+      await setupChannels();
+
+      let token: string | undefined;
+
+      try {
+        if (Device.isDevice) {
+          const { status: existingStatus } = await NotificationsModule.getPermissionsAsync();
+          let finalStatus = existingStatus;
+          if (existingStatus !== 'granted') {
+            const { status } = await NotificationsModule.requestPermissionsAsync();
+            finalStatus = status;
+          }
+
+          if (finalStatus !== 'granted') {
+            console.log('[Push] Notification permission not granted');
+            return null;
+          }
+
+          const projectId =
+            Constants?.expoConfig?.extra?.eas?.projectId ??
+            Constants?.easConfig?.projectId ??
+            '1f7dcc60-7e1a-4263-b1d9-47489c243d34';
+
+          const tokenResult = await NotificationsModule.getExpoPushTokenAsync({ projectId });
+          token = tokenResult?.data;
+          console.log('[Push] Registered Token successfully:', token);
         }
+      } catch (e: any) {
+        console.warn('[Push] Push registration note:', e?.message || e);
+      }
+
+      return token;
+    };
+
+    // Save token to Supabase profile
+    const saveTokenToProfile = async (token: string) => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && token) {
+          await supabase
+            .from('profiles')
+            .update({ expo_push_token: token, updated_at: new Date().toISOString() })
+            .eq('id', user.id);
+        }
+      } catch (e) {
+        console.warn('[Push] Error saving token to profile:', e);
+      }
+    };
+
+    registerForPushNotificationsAsync().then((token) => {
+      if (isMounted && token) {
+        setExpoPushToken(token);
+        saveTokenToProfile(token);
+      }
     });
 
-    // 3. Setup Realtime Listener (THE WORKAROUND)
-    let cleanupRealtime: (() => void) | undefined;
-    
+    // Realtime Supabase notifications listener for instant push
+    let channel: any = null;
     const setupRealtime = async () => {
+      try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const channel = supabase
-            .channel('notifications-listener')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${user.id}`,
-                },
-                async (payload) => {
-                    console.log("New Notification received via Realtime:", payload.new);
-                    const { title, body, data } = payload.new;
-                    
-                    if (Notifications) {
-                        try {
-                            await Notifications.scheduleNotificationAsync({
-                                content: {
-                                    title: title,
-                                    body: body,
-                                    sound: 'default',
-                                    data: data || {},
-                                },
-                                trigger: null,
-                            });
-                        } catch (e) {
-                             console.error("Local Notification Schedule Failed:", e);
-                        }
-                    } else {
-                        // Expo Go Fallback: Show an Alert and Navigate if possible
-                        Alert.alert(title || "New Notification", body, [
-                            { text: 'Close', style: 'cancel' },
-                            { text: 'View', onPress: () => {
-                                if (data?.route) {
-                                    router.push(data.route);
-                                }
-                            }}
-                        ]);
-                    }
-                }
-            )
-            .subscribe();
+        channel = supabase
+          .channel(`user-notifications-${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${user.id}`,
+            },
+            async (payload) => {
+              const { title, body, data } = payload.new || {};
+              if (title || body) {
+                await sendInstantNotification(
+                  title || 'Abu Mafhal Sub',
+                  body || 'You have a new update.',
+                  data || {},
+                  'transactions'
+                );
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'transactions',
+              filter: `user_id=eq.${user.id}`,
+            },
+            async (payload) => {
+              const tr = payload.new || {};
+              const type = tr.service_type || tr.type || 'Transaction';
+              const amt = tr.amount ? `₦${Number(tr.amount).toLocaleString()}` : '';
+              const status = tr.status || 'Completed';
+              const title = `⚡ ${type.toUpperCase()} ${status}`;
+              const body = `Your ${type} transaction for ${amt} has been processed (${status}).`;
 
-        return () => {
-             supabase.removeChannel(channel);
-        };
+              await sendInstantNotification(
+                title,
+                body,
+                { route: '/(app)/history', transaction_id: tr.id },
+                'transactions'
+              );
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.warn('[Push] Realtime setup note:', err);
+      }
     };
 
-    setupRealtime().then(cleanup => { 
-        if (isMounted) cleanupRealtime = cleanup; 
-    });
+    setupRealtime();
 
-    // 4. Native Listeners (Only if available)
-    if (Notifications && !isExpoGo) {
-        notificationListener.current = Notifications.addNotificationReceivedListener((notification: any) => {
-            if (isMounted) setNotification(notification);
-        });
+    // Native Notification Listeners
+    if (NotificationsModule && !isExpoGo) {
+      notificationListener.current = NotificationsModule.addNotificationReceivedListener(
+        (notif: any) => {
+          if (isMounted) setNotification(notif);
+        }
+      );
 
-        responseListener.current = Notifications.addNotificationResponseReceivedListener((response: any) => {
-            console.log("Notification Tapped:", response);
-            const route = response.notification.request.content.data?.route;
-            if (route) {
-                router.push(route);
-            }
-        });
+      responseListener.current = NotificationsModule.addNotificationResponseReceivedListener(
+        (response: any) => {
+          const route = response?.notification?.request?.content?.data?.route;
+          if (route) {
+            router.push(route);
+          }
+        }
+      );
     }
 
     return () => {
-        isMounted = false;
-        if (Notifications && !isExpoGo) {
-            notificationListener.current && notificationListener.current.remove();
-            responseListener.current && responseListener.current.remove();
-        }
-        if (cleanupRealtime) cleanupRealtime();
+      isMounted = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+      if (NotificationsModule && !isExpoGo) {
+        if (notificationListener.current?.remove) notificationListener.current.remove();
+        if (responseListener.current?.remove) responseListener.current.remove();
+      }
     };
   }, []);
 

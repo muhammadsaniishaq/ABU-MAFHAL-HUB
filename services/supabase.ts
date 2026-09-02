@@ -3,9 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
-// Fallback to project defaults if env vars are missing
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://xdfukgghsllzttmewfvi.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZnVrZ2doc2xsenR0bWV3ZnZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODU0NDEsImV4cCI6MjA1NTk2MTQ0MX0.m9Vf6QjJ4K5V2Xb8bYv_l_v_F1I-V6K8J3kX9_qL_2g';
+// Fallback to active production project defaults
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uagcxrtdqttayulvgpwg.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ2N4cnRkcXR0YXl1bHZncHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2Mzc3OTIsImV4cCI6MjA4NDIxMzc5Mn0.7AzXKou9G3tHFIduDL5TQ3fkski6P9CBGdlqfi_pMI8';
 
 const isWeb = Platform.OS === 'web';
 

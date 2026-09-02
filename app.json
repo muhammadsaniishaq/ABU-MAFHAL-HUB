@@ -24,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.muhammadsaniishaq.abumafhalsub"
+      "package": "com.muhammmadsaniishaq.abumafhalsub"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -35,7 +35,21 @@
       "expo-router",
       "expo-asset",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
-    ]
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0056D2",
+          "defaultChannel": "transactions"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1f7dcc60-7e1a-4263-b1d9-47489c243d34"
+      }
+    }
   }
 }

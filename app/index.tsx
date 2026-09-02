@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, Image, StyleSheet,
-  Dimensions, Animated, Platform, StatusBar, ActivityIndicator
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Dimensions,
+  Animated,
+  Platform,
+  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,53 +23,78 @@ const { width: W, height: H } = Dimensions.get('window');
 export default function SplashScreen() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
-  const [hasSession, setHasSession] = useState(false);
 
-  // Animations
-  const logoScale = useRef(new Animated.Value(0.85)).current;
+  // Animation values
+  const logoScale = useRef(new Animated.Value(0.75)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const contentFade = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const contentSlide = useRef(new Animated.Value(30)).current;
+  const haloPulse = useRef(new Animated.Value(1)).current;
+  const haloRotate = useRef(new Animated.Value(0)).current;
+  const orbFloat = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Entrance Animation
+    // 1. Entrance choreography
     Animated.parallel([
       Animated.spring(logoScale, {
         toValue: 1,
-        friction: 6,
-        tension: 40,
+        friction: 5,
+        tension: 45,
         useNativeDriver: true,
       }),
       Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 500,
+        duration: 600,
         useNativeDriver: true,
       }),
       Animated.timing(contentFade, {
         toValue: 1,
-        duration: 700,
-        delay: 200,
+        duration: 800,
+        delay: 250,
+        useNativeDriver: true,
+      }),
+      Animated.spring(contentSlide, {
+        toValue: 0,
+        friction: 7,
+        tension: 40,
+        delay: 250,
         useNativeDriver: true,
       }),
     ]).start();
 
-    // Subtle Breathing Pulse
+    // 2. Halo breathing pulse loop
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 1200,
+        Animated.timing(haloPulse, {
+          toValue: 1.08,
+          duration: 1800,
           useNativeDriver: true,
         }),
-        Animated.timing(pulseAnim, {
+        Animated.timing(haloPulse, {
           toValue: 1,
-          duration: 1200,
+          duration: 1800,
           useNativeDriver: true,
         }),
       ])
     ).start();
 
-    // Check Session and Navigate
+    // 3. Ambient float loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbFloat, {
+          toValue: 12,
+          duration: 2400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbFloat, {
+          toValue: 0,
+          duration: 2400,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Check existing session
     checkAuthSession();
   }, []);
 
@@ -73,16 +106,14 @@ export default function SplashScreen() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user || activeFlag === 'true') {
-        setHasSession(true);
         setTimeout(() => {
           if (unlockedFlag === 'true') {
             router.replace('/dashboard' as any);
           } else {
             router.replace('/pin' as any);
           }
-        }, 500);
+        }, 600);
       } else {
-        setHasSession(false);
         setChecking(false);
       }
     } catch (e) {
@@ -92,93 +123,194 @@ export default function SplashScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Deep Royal Mesh Gradient */}
+      {/* Deep Royal Cosmic Gradient Background */}
       <LinearGradient
-        colors={['#020617', '#08122c', '#0a1738', '#020617']}
+        colors={['#010514', '#040d24', '#07153d', '#020617']}
         style={StyleSheet.absoluteFillObject}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
       />
 
-      {/* Ambient Glowing Orbs */}
-      <View style={s.glowOrbTop} />
-      <View style={s.glowOrbBottom} />
+      {/* Radiant Glowing Ambient Orbs */}
+      <Animated.View
+        style={[
+          s.glowOrbTop,
+          { transform: [{ translateY: orbFloat }] },
+        ]}
+      />
+      <Animated.View
+        style={[
+          s.glowOrbBottom,
+          {
+            transform: [
+              {
+                translateY: orbFloat.interpolate({
+                  inputRange: [0, 12],
+                  outputRange: [0, -12],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <View style={s.glowOrbCenter} />
 
       <SafeAreaView style={s.safeArea}>
+        {/* TOP STATUS BAR PILL */}
+        <View style={s.topBar}>
+          <View style={s.liveStatusBadge}>
+            <View style={s.liveStatusDot} />
+            <Text style={s.liveStatusText}>GATEWAY LIVE • 99.98% AUTOMATED</Text>
+          </View>
+        </View>
+
+        {/* HERO CENTER CONTENT */}
         <View style={s.centerBox}>
-          {/* LOGO ICON WITH GLOW */}
-          <Animated.View style={[s.logoContainer, { transform: [{ scale: logoScale }, { scale: pulseAnim }], opacity: logoOpacity }]}>
-            <View style={s.logoGlowRing}>
-              <View style={s.logoCard}>
-                <Image
-                  source={require('../assets/images/logo.png')}
-                  style={s.logoImg}
-                  resizeMode="contain"
-                />
+          {/* LOGO WITH MULTI-TIER LUXURY HALO */}
+          <Animated.View
+            style={[
+              s.logoWrapper,
+              {
+                opacity: logoOpacity,
+                transform: [{ scale: logoScale }],
+              },
+            ]}
+          >
+            {/* Outer Golden Glow Ring */}
+            <Animated.View
+              style={[
+                s.outerHaloRing,
+                { transform: [{ scale: haloPulse }] },
+              ]}
+            />
+
+            {/* Middle Cyber Accent Ring */}
+            <View style={s.middleAccentRing}>
+              {/* Glassmorphic Shield Card */}
+              <View style={s.logoGlassCard}>
+                <LinearGradient
+                  colors={['#0e2254', '#071330']}
+                  style={s.logoGradientInside}
+                >
+                  <Image
+                    source={require('../assets/images/logo.png')}
+                    style={s.logoImage}
+                    resizeMode="contain"
+                  />
+                </LinearGradient>
+              </View>
+            </View>
+
+            {/* Micro Floating Tech Badge */}
+            <View style={s.shieldBadge}>
+              <Ionicons name="flash" size={10} color="#060d21" />
+              <Text style={s.shieldBadgeText}>5G VTU</Text>
+            </View>
+          </Animated.View>
+
+          {/* BRAND HEADLINE & TAGLINE */}
+          <Animated.View
+            style={[
+              s.typographyBox,
+              {
+                opacity: contentFade,
+                transform: [{ translateY: contentSlide }],
+              },
+            ]}
+          >
+            <View style={s.brandRow}>
+              <Text style={s.brandTitle}>ABU MAFHAL</Text>
+              <View style={s.brandTagPill}>
+                <Text style={s.brandTagText}>SUB</Text>
+              </View>
+            </View>
+
+            <Text style={s.brandSubtitle}>
+              Next-Gen Automated Telecom & Smart Utility Payments
+            </Text>
+
+            {/* FEATURE PILLS GRID */}
+            <View style={s.featureGrid}>
+              <View style={s.featurePill}>
+                <Ionicons name="cellular" size={12} color="#38bdf8" />
+                <Text style={s.featurePillText}>Cheap Data</Text>
+              </View>
+
+              <View style={s.featurePill}>
+                <Ionicons name="call" size={12} color="#f5a623" />
+                <Text style={s.featurePillText}>Instant Airtime</Text>
+              </View>
+
+              <View style={s.featurePill}>
+                <MaterialCommunityIcons name="lightning-bolt" size={12} color="#10b981" />
+                <Text style={s.featurePillText}>Electric Bills</Text>
+              </View>
+
+              <View style={s.featurePill}>
+                <Ionicons name="tv" size={12} color="#a855f7" />
+                <Text style={s.featurePillText}>Cable TV</Text>
               </View>
             </View>
           </Animated.View>
 
-          {/* BRAND TITLE & TAGLINE */}
-          <Animated.View style={[s.textBox, { opacity: contentFade }]}>
-            <Text style={s.brandTitle}>ABU MAFHAL SUB</Text>
-            
-            <View style={s.badgePill}>
-              <Ionicons name="sparkles" size={10} color="#f5a623" />
-              <Text style={s.badgePillText}>Fast • Cheap • Automated VTU</Text>
-            </View>
-
-            <Text style={s.brandSub}>
-              Data Bundles, Airtime, Cable TV, Bills Payment & Educational Pins at your fingertips.
-            </Text>
-          </Animated.View>
-
-          {/* LOADING OR BUTTONS */}
-          <Animated.View style={[s.actionArea, { opacity: contentFade }]}>
+          {/* ACTION BUTTONS OR LOADING STATUS */}
+          <Animated.View
+            style={[
+              s.actionArea,
+              {
+                opacity: contentFade,
+                transform: [{ translateY: contentSlide }],
+              },
+            ]}
+          >
             {checking ? (
-              <View style={s.loadingBox}>
+              <View style={s.loadingContainer}>
                 <ActivityIndicator size="small" color="#f5a623" />
-                <Text style={s.loadingText}>Securing session...</Text>
+                <Text style={s.loadingLabel}>Securing encrypted session...</Text>
               </View>
             ) : (
               <View style={s.buttonGroup}>
+                {/* Primary Gold CTA */}
                 <TouchableOpacity
                   onPress={() => router.push('/(auth)/login')}
                   style={s.primaryBtn}
-                  activeOpacity={0.85}
+                  activeOpacity={0.88}
                 >
                   <LinearGradient
-                    colors={['#f5a623', '#d97706']}
-                    style={s.primaryBtnGrad}
+                    colors={['#f5a623', '#e08a00', '#c26e00']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
+                    style={s.primaryBtnGradient}
                   >
                     <Text style={s.primaryBtnText}>Sign In to Account</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#060d21" />
+                    <View style={s.btnArrowCircle}>
+                      <Ionicons name="arrow-forward" size={14} color="#040d24" />
+                    </View>
                   </LinearGradient>
                 </TouchableOpacity>
 
+                {/* Secondary Glass CTA */}
                 <TouchableOpacity
                   onPress={() => router.push('/(auth)/signup')}
                   style={s.secondaryBtn}
-                  activeOpacity={0.75}
+                  activeOpacity={0.8}
                 >
-                  <Text style={s.secondaryBtnText}>Create New Account</Text>
+                  <Text style={s.secondaryBtnText}>Create Free Account</Text>
                 </TouchableOpacity>
               </View>
             )}
           </Animated.View>
         </View>
 
-        {/* BOTTOM SECURITY FOOTER */}
+        {/* BOTTOM SECURITY ASSURANCE */}
         <View style={s.footer}>
-          <View style={s.footerSecurityRow}>
-            <Ionicons name="shield-checkmark" size={12} color="#10b981" />
-            <Text style={s.footerSecurityText}>256-Bit Bank Grade SSL Encryption</Text>
+          <View style={s.footerBadgeRow}>
+            <Ionicons name="shield-checkmark-sharp" size={13} color="#10b981" />
+            <Text style={s.footerBadgeText}>Bank-Grade 256-Bit SSL • NDPA Protected</Text>
           </View>
-          <Text style={s.versionText}>v1.2.0 • Abu Mafhal Hub</Text>
+          <Text style={s.versionText}>Abu Mafhal Sub • Production v1.0.0</Text>
         </View>
       </SafeAreaView>
     </View>
@@ -188,177 +320,290 @@ export default function SplashScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#010514',
   },
   safeArea: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'android' ? 24 : 10,
+    paddingBottom: 16,
+  },
+  topBar: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  liveStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  liveStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+  },
+  liveStatusText: {
+    color: '#10b981',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
   glowOrbTop: {
     position: 'absolute',
-    top: -80,
-    right: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-  },
-  glowOrbBottom: {
-    position: 'absolute',
-    bottom: -100,
-    left: -80,
+    top: -60,
+    right: -50,
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: 'rgba(37, 99, 235, 0.14)',
+    backgroundColor: 'rgba(245, 166, 35, 0.14)',
+  },
+  glowOrbBottom: {
+    position: 'absolute',
+    bottom: -80,
+    left: -60,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(37, 99, 235, 0.16)',
+  },
+  glowOrbCenter: {
+    position: 'absolute',
+    top: H * 0.35,
+    left: W * 0.25,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(14, 165, 233, 0.08)',
   },
   centerBox: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10,
   },
-  logoContainer: {
-    marginBottom: 20,
-  },
-  logoGlowRing: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
+  logoWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#f5a623',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
+    marginBottom: 26,
+    position: 'relative',
   },
-  logoCard: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: '#0d1b3e',
-    alignItems: 'center',
-    justifyContent: 'center',
+  outerHaloRing: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(245, 166, 35, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    overflow: 'hidden',
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  logoImg: {
-    width: 60,
-    height: 60,
-  },
-  textBox: {
+  middleAccentRing: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: 'rgba(7, 21, 61, 0.7)',
     alignItems: 'center',
-    marginBottom: 30,
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.45)',
+  },
+  logoGlassCard: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  logoGradientInside: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: 64,
+    height: 64,
+  },
+  shieldBadge: {
+    position: 'absolute',
+    bottom: -6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#f5a623',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  shieldBadgeText: {
+    color: '#040d24',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  typographyBox: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
   brandTitle: {
     color: '#ffffff',
-    fontSize: 22,
+    fontSize: 27,
     fontWeight: '900',
     letterSpacing: 1.2,
-    marginBottom: 8,
   },
-  badgePill: {
+  brandTagPill: {
+    backgroundColor: '#f5a623',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  brandTagText: {
+    color: '#040d24',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  brandSubtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    maxWidth: 290,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  featureGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    maxWidth: 320,
+  },
+  featurePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.35)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  badgePillText: {
-    color: '#f5a623',
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  brandSub: {
-    color: '#94a3b8',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 280,
+  featurePillText: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '600',
   },
   actionArea: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 340,
   },
-  loadingBox: {
+  loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  loadingText: {
+  loadingLabel: {
     color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
   },
   buttonGroup: {
-    gap: 10,
+    gap: 12,
   },
   primaryBtn: {
-    borderRadius: 14,
+    borderRadius: 15,
     overflow: 'hidden',
     shadowColor: '#f5a623',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  primaryBtnGrad: {
+  primaryBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
   },
   primaryBtnText: {
-    color: '#060d21',
-    fontWeight: '900',
-    fontSize: 13.5,
+    color: '#040d24',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
-  secondaryBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 14,
-    paddingVertical: 12,
+  btnArrowCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(4, 13, 36, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  secondaryBtn: {
+    paddingVertical: 15,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+  },
   secondaryBtnText: {
-    color: '#ffffff',
+    color: '#f8fafc',
+    fontSize: 14,
     fontWeight: '700',
-    fontSize: 13,
+    letterSpacing: 0.3,
   },
   footer: {
     alignItems: 'center',
     gap: 4,
+    marginTop: 10,
   },
-  footerSecurityRow: {
+  footerBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
-  footerSecurityText: {
+  footerBadgeText: {
     color: '#64748b',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
   versionText: {
     color: '#475569',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '500',
   },
 });

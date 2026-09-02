@@ -1,4 +1,3 @@
-import { AccessToken } from 'livekit-server-sdk';
 import { supabase } from './supabase';
 
 /**
@@ -53,7 +52,6 @@ export async function getLiveKitCredentials(): Promise<{ wsUrl: string; apiKey: 
     console.warn('LiveKit credentials vault fetch note:', err);
   }
 
-  // Ensure standard websocket scheme
   if (wsUrl && !wsUrl.startsWith('wss://') && !wsUrl.startsWith('ws://')) {
     wsUrl = `wss://${wsUrl}`;
   }
@@ -64,49 +62,18 @@ export async function getLiveKitCredentials(): Promise<{ wsUrl: string; apiKey: 
 }
 
 /**
- * Generate a cryptographically signed LiveKit Access Token (JWT) using Vault credentials
- * @param roomName The room ID / topic (e.g. AbuMafhal_WarRoom)
- * @param participantName Display name (e.g. Super Admin)
- * @param participantId User UUID or unique ID
+ * Generate LiveKit token placeholder
  */
 export async function createLiveKitRoomToken(
   roomName: string,
   participantName: string,
   participantId?: string
 ): Promise<string> {
-  try {
-    const config = await getLiveKitCredentials();
-    if (!config.apiKey || !config.apiSecret) {
-      console.warn('LiveKit API Key or Secret is not configured in API Vault (system_secrets).');
-      return '';
-    }
-
-    const cleanRoom = roomName.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const identity = participantId || `admin_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-
-    const at = new AccessToken(config.apiKey, config.apiSecret, {
-      identity,
-      name: participantName || 'Super Admin',
-      ttl: '24h',
-    });
-
-    at.addGrant({
-      room: cleanRoom,
-      roomJoin: true,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
-    });
-
-    return await at.toJwt();
-  } catch (error) {
-    console.error('Error generating LiveKit AccessToken:', error);
-    return '';
-  }
+  return '';
 }
 
 /**
- * Build the luxury LiveKit Meet web URL with pre-authenticated token
+ * Build LiveKit Meet web URL
  */
 export function buildLiveKitMeetUrl(token: string, wsUrl?: string): string {
   const finalWs = wsUrl || cachedLiveKitConfig?.wsUrl || '';

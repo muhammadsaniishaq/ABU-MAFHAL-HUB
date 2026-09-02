@@ -60,6 +60,7 @@ if (Platform.OS !== 'web') {
 }
 
 import { useAppSettings } from '../hooks/useAppSettings';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import MaintenanceScreen from '../components/MaintenanceScreen';
 import UpdateScreen from '../components/UpdateScreen';
 
@@ -78,6 +79,7 @@ const isUserAdmin = (role?: string | null, email?: string | null) => {
 };
 
 export default function RootLayout() {
+    usePushNotifications();
     const colorScheme = useColorScheme();
     const [session, setSession] = useState<Session | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);

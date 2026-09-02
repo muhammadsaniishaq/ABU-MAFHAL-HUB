@@ -11,7 +11,8 @@
     "login": "npx supabase login",
     "deploy:functions": "npx supabase functions deploy",
     "build": "npx expo export -p web",
-    "vercel-build": "npx expo export -p web"
+    "vercel-build": "npx expo export -p web",
+    "postinstall": "node scripts/patch-css-interop.js"
   },
   "dependencies": {
     "@expo/metro-config": "~54.0.12",

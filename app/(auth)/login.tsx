@@ -14,6 +14,7 @@ import * as Linking from 'expo-linking';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as Haptics from 'expo-haptics';
 
 import { supabase, processOAuthReturn } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
@@ -557,6 +558,7 @@ export default function LoginScreen() {
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                         bounces={false}
+                        scrollEnabled={height < 620}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* Top Control Bar with Brand, Support & Theme Toggle */}
@@ -613,15 +615,15 @@ export default function LoginScreen() {
                                 </Text>
 
                                 {/* Feature Pills Badge Row */}
-                                <View style={{ flexDirection: 'row', gap: 5, marginTop: 5, justifyContent: 'center' }}>
-                                    <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#F59E0B' }}>
-                                        <Text style={{ color: isDark ? '#FDE047' : '#92400E', fontSize: 8, fontWeight: '900' }}>⚡ Instant VTU</Text>
+                                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, justifyContent: 'center' }}>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#F59E0B' }}>
+                                        <Text style={{ color: isDark ? '#FDE047' : '#92400E', fontSize: 11, fontWeight: '800' }}>⚡ Instant VTU</Text>
                                     </View>
-                                    <View style={{ backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#D1FAE5', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#10B981' }}>
-                                        <Text style={{ color: isDark ? '#6EE7B7' : '#065F46', fontSize: 8, fontWeight: '900' }}>🔒 100% Encrypted</Text>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#10B981' }}>
+                                        <Text style={{ color: isDark ? '#6EE7B7' : '#065F46', fontSize: 11, fontWeight: '800' }}>🔒 100% Encrypted</Text>
                                     </View>
-                                    <View style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#DBEAFE', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#3B82F6' }}>
-                                        <Text style={{ color: isDark ? '#93C5FD' : '#1E40AF', fontSize: 8, fontWeight: '900' }}>💎 Zero Cashout Fee</Text>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#DBEAFE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#3B82F6' }}>
+                                        <Text style={{ color: isDark ? '#93C5FD' : '#1E40AF', fontSize: 11, fontWeight: '800' }}>💎 Zero Fee</Text>
                                     </View>
                                 </View>
                             </View>
@@ -639,9 +641,9 @@ export default function LoginScreen() {
                                 ]}>
                                     <Ionicons 
                                         name="person-circle" 
-                                        size={15} 
+                                        size={20} 
                                         color={focusedInput === 'identifier' ? '#F59E0B' : theme.textMuted} 
-                                        style={{ marginRight: 6 }} 
+                                        style={{ marginRight: 10 }} 
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
@@ -657,29 +659,18 @@ export default function LoginScreen() {
                                 </View>
 
                                 {/* Password Input */}
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 2 }}>
-                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Password</Text>
-                                    <TouchableOpacity 
-                                        onPress={() => setShowPassword(!showPassword)}
-                                        style={[styles.eyeTogglePillBtn, { backgroundColor: showPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9' }]}
-                                        activeOpacity={0.7}
-                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                    >
-                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={13} color={showPassword ? "#F59E0B" : theme.textMuted} />
-                                        <Text style={[styles.eyeTogglePillBtnText, { color: showPassword ? '#F59E0B' : theme.textMuted }]}>
-                                            {showPassword ? "Hide 🙈" : "Show 👁️"}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 10 }]}>
+                                    Password
+                                </Text>
                                 <View style={[
                                     styles.inputFieldBox, 
                                     { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? '#F59E0B' : theme.borderPrimary }
                                 ]}>
                                     <Ionicons 
                                         name="lock-closed" 
-                                        size={15} 
+                                        size={19} 
                                         color={focusedInput === 'password' ? '#F59E0B' : theme.textMuted} 
-                                        style={{ marginRight: 6 }} 
+                                        style={{ marginRight: 10 }} 
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
@@ -692,24 +683,20 @@ export default function LoginScreen() {
                                         onBlur={() => setFocusedInput(null)}
                                     />
                                     <TouchableOpacity 
-                                        onPress={() => setShowPassword(!showPassword)} 
-                                        style={[styles.eyeTogglePillBtn, { backgroundColor: showPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9', marginLeft: 6 }]}
-                                        activeOpacity={0.7}
-                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        onPress={() => {
+                                            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                            setShowPassword(!showPassword);
+                                        }} 
+                                        style={{ padding: 6 }}
+                                        activeOpacity={0.6}
+                                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                                     >
-                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={14} color={showPassword ? "#F59E0B" : theme.textMuted} />
-                                        <Text style={[styles.eyeTogglePillBtnText, { color: showPassword ? '#F59E0B' : theme.textMuted }]}>
-                                            {showPassword ? "Hide 🙈" : "Show 👁️"}
-                                        </Text>
+                                        <Ionicons 
+                                            name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                                            size={22} 
+                                            color={showPassword ? "#F59E0B" : theme.textMuted} 
+                                        />
                                     </TouchableOpacity>
-                                </View>
-
-                                {/* Security Active Micro Banner */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 4 }}>
-                                    <Ionicons name="shield-checkmark" size={10} color="#10B981" />
-                                    <Text style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 8.5, fontWeight: '700' }}>
-                                        Bank-Grade 256-Bit SSL Encrypted Session
-                                    </Text>
                                 </View>
 
                                 {/* Options Row */}
@@ -723,7 +710,7 @@ export default function LoginScreen() {
                                             styles.checkboxBox, 
                                             rememberMe && { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }
                                         ]}>
-                                            {rememberMe && <Ionicons name="checkmark" size={9} color="#0F172A" />}
+                                            {rememberMe && <Ionicons name="checkmark" size={13} color="#0F172A" />}
                                         </View>
                                         <Text style={[styles.checkboxLabel, { color: theme.textSecondary }]}>Remember Me</Text>
                                     </TouchableOpacity>
@@ -739,18 +726,19 @@ export default function LoginScreen() {
                                     disabled={loading}
                                     style={styles.primaryLoginBtn}
                                     activeOpacity={0.85}
-                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <LinearGradient 
                                         colors={['#F59E0B', '#D97706']} 
                                         style={styles.primaryBtnGradient}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
                                     >
                                         {loading ? (
                                             <ActivityIndicator color="#0F172A" size="small" />
                                         ) : (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                                 <Text style={styles.primaryBtnText}>Sign In to Account</Text>
-                                                <Ionicons name="arrow-forward-circle" size={15} color="#0F172A" style={{ marginLeft: 5 }} />
+                                                <Ionicons name="arrow-forward-circle" size={20} color="#0F172A" style={{ marginLeft: 8 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -762,9 +750,8 @@ export default function LoginScreen() {
                                         onPress={handleBiometricAuth}
                                         style={[styles.biometricBtn, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', borderColor: '#F59E0B' }]}
                                         activeOpacity={0.8}
-                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                     >
-                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={14} color="#F59E0B" style={{ marginRight: 5 }} />
+                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={19} color="#F59E0B" style={{ marginRight: 8 }} />
                                         <Text style={[styles.biometricBtnText, { color: isDark ? '#FDE047' : '#92400E' }]}>
                                             Quick Sign In with {biometricType}
                                         </Text>
@@ -787,7 +774,6 @@ export default function LoginScreen() {
                                         { backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#CBD5E1' }
                                     ]} 
                                     activeOpacity={0.85}
-                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     {socialLoading === 'google' ? (
                                         <ActivityIndicator size="small" color="#EA4335" />
@@ -795,7 +781,7 @@ export default function LoginScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                             <Image 
                                                 source={require('../../assets/images/google-g.png')} 
-                                                style={{ width: 18, height: 18, marginRight: 8 }} 
+                                                style={{ width: 22, height: 22, marginRight: 10 }} 
                                                 resizeMode="contain" 
                                             />
                                             <Text style={[styles.googleLoginBtnText, { color: theme.textPrimary }]}>Continue with Google</Text>
@@ -803,13 +789,20 @@ export default function LoginScreen() {
                                     )}
                                 </TouchableOpacity>
 
+                                {/* Security Active Micro Banner */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 5 }}>
+                                    <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+                                    <Text style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: '700' }}>
+                                        Bank-Grade 256-Bit SSL Encrypted Session
+                                    </Text>
+                                </View>
+
                                 {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Don't have an account?</Text>
                                     <TouchableOpacity 
                                         onPress={() => router.push('/signup' as any)} 
                                         activeOpacity={0.8}
-                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
                                         <Text style={[styles.signupLinkText, { color: '#F59E0B' }]}> Create Account</Text>
                                     </TouchableOpacity>
@@ -924,18 +917,19 @@ const styles = StyleSheet.create({
     cardWrapper: {
         width: '100%',
         flex: 1,
-        justifyContent: 'space-evenly',
-        marginTop: 2,
+        justifyContent: 'space-between',
+        marginTop: 4,
+        paddingHorizontal: 2,
     },
     desktopCardWrapper: {
-        maxWidth: 420,
+        maxWidth: 440,
         alignSelf: 'center',
-        marginTop: 6,
+        marginTop: 10,
     },
     mascotContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginVertical: 4,
+        marginVertical: 2,
     },
     headlineBox: {
         alignItems: 'center',
@@ -943,26 +937,27 @@ const styles = StyleSheet.create({
     },
     welcomeTitle: {
         fontWeight: '900',
-        fontSize: 17.5,
+        fontSize: 22,
         textAlign: 'center',
+        letterSpacing: 0.3,
     },
     welcomeSubText: {
-        fontSize: 9.5,
+        fontSize: 12,
         fontWeight: '500',
         textAlign: 'center',
         marginTop: 2,
-        lineHeight: 13,
+        lineHeight: 16,
     },
     loginTypeContainer: {
         flexDirection: 'row',
-        borderRadius: 10,
+        borderRadius: 12,
         padding: 2,
         marginBottom: 8,
     },
     loginTypeTab: {
         flex: 1,
-        height: 30,
-        borderRadius: 8,
+        height: 36,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -975,28 +970,28 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     loginTypeText: {
-        fontSize: 9.5,
-        fontWeight: '600',
+        fontSize: 12.5,
+        fontWeight: '700',
     },
     formContainer: {
         width: '100%',
     },
     inputLabel: {
-        fontWeight: '800',
-        fontSize: 10,
-        marginBottom: 3,
+        fontWeight: '700',
+        fontSize: 12.5,
+        marginBottom: 4,
     },
     inputFieldBox: {
-        height: 38,
-        borderRadius: 10,
-        borderWidth: 1,
-        paddingHorizontal: 10,
+        height: 48,
+        borderRadius: 13,
+        borderWidth: 1.5,
+        paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
     },
     textInput: {
         flex: 1,
-        fontSize: 11.5,
+        fontSize: 14.5,
         fontWeight: '600',
     },
     optionsRow: {
@@ -1004,62 +999,63 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         marginTop: 6,
-        marginBottom: 8,
+        marginBottom: 10,
     },
     checkboxRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     checkboxBox: {
-        width: 14,
-        height: 14,
-        borderRadius: 4,
+        width: 18,
+        height: 18,
+        borderRadius: 5,
         borderWidth: 1.5,
         borderColor: '#94A3B8',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 5,
+        marginRight: 6,
     },
     checkboxLabel: {
-        fontSize: 9.5,
+        fontSize: 12.5,
         fontWeight: '600',
     },
     forgotLink: {
-        fontSize: 9.5,
+        fontSize: 12.5,
         fontWeight: '800',
     },
     primaryLoginBtn: {
-        borderRadius: 19,
+        borderRadius: 15,
         overflow: 'hidden',
         shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 3,
-        marginBottom: 6,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+        marginBottom: 8,
     },
     primaryBtnGradient: {
-        height: 38,
+        height: 48,
         alignItems: 'center',
         justifyContent: 'center',
     },
     primaryBtnText: {
         color: '#0F172A',
         fontWeight: '900',
-        fontSize: 12,
+        fontSize: 15,
+        letterSpacing: 0.3,
     },
     biometricBtn: {
-        height: 36,
-        borderRadius: 18,
-        borderWidth: 1,
+        height: 44,
+        borderRadius: 14,
+        borderWidth: 1.5,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 6,
+        marginBottom: 8,
     },
     biometricBtnText: {
         fontWeight: '800',
-        fontSize: 10,
+        fontSize: 13,
     },
     dividerRow: {
         flexDirection: 'row',
@@ -1071,16 +1067,16 @@ const styles = StyleSheet.create({
         height: 1,
     },
     dividerText: {
-        fontSize: 8,
+        fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.8,
         marginHorizontal: 8,
     },
     googleLoginBtn: {
         width: '100%',
-        height: 36,
-        borderRadius: 18,
-        borderWidth: 1,
+        height: 46,
+        borderRadius: 14,
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8,
@@ -1092,7 +1088,7 @@ const styles = StyleSheet.create({
     },
     googleLoginBtnText: {
         fontWeight: '800',
-        fontSize: 11,
+        fontSize: 13.5,
         letterSpacing: 0.2,
     },
     socialGrid: {
@@ -1103,32 +1099,32 @@ const styles = StyleSheet.create({
     },
     socialTile: {
         flex: 1,
-        height: 34,
-        borderRadius: 17,
-        borderWidth: 1,
+        height: 40,
+        borderRadius: 12,
+        borderWidth: 1.5,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
     },
     socialTileText: {
         fontWeight: '700',
-        fontSize: 9.5,
-        marginLeft: 4,
+        fontSize: 11.5,
+        marginLeft: 5,
     },
     footerLinkRow: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 4,
-        paddingVertical: 2,
+        marginTop: 6,
+        paddingVertical: 4,
     },
     footerText: {
-        fontSize: 10,
+        fontSize: 12.5,
         fontWeight: '500',
     },
     signupLinkText: {
-        fontSize: 10,
-        fontWeight: '800',
+        fontSize: 13,
+        fontWeight: '900',
     },
     modalOverlay: {
         flex: 1,

@@ -65,7 +65,7 @@ const COMMON_EMAIL_TYPOS: Record<string, string> = {
 };
 
 export default function SignupScreen() {
-    const { width } = useWindowDimensions();
+    const { width, height } = useWindowDimensions();
     const isTabletOrDesktop = width >= 768;
     const router = useRouter();
     const params = useLocalSearchParams<{ ref?: string; referral?: string; code?: string }>();
@@ -801,6 +801,7 @@ export default function SignupScreen() {
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                         bounces={false}
+                        scrollEnabled={height < 680}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* Top Control Bar */}
@@ -1032,76 +1033,64 @@ export default function SignupScreen() {
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* 1. Main Password Input with Dedicated Hide/Show Toggle */}
-                                <View style={{ marginBottom: 5 }}>
-                                    <View style={[
-                                        styles.inputFieldBox, 
-                                        { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
-                                    ]}>
-                                        <Ionicons name="lock-closed-outline" size={15} color={focusedInput === 'password' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 6 }} />
-                                        <TextInput 
-                                            style={[styles.textInput, { color: theme.textPrimary }]}
-                                            placeholder="Create a strong password (min 8 chars)"
-                                            placeholderTextColor={theme.textMuted}
-                                            secureTextEntry={!showPassword}
-                                            value={password}
-                                            onChangeText={setPassword}
-                                            onFocus={() => setFocusedInput('password')}
-                                            onBlur={() => setFocusedInput(null)}
-                                        />
-                                        <TouchableOpacity 
-                                            onPress={togglePasswordVisibility} 
-                                            style={[styles.eyeTogglePillBtn, { backgroundColor: showPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9' }]}
-                                            activeOpacity={0.7}
-                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                        >
-                                            <Ionicons 
-                                                name={showPassword ? "eye-off" : "eye"} 
-                                                size={15} 
-                                                color={showPassword ? "#F59E0B" : theme.textMuted} 
+                                {/* Password & Confirm Password Side-by-Side Row */}
+                                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 5 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={[
+                                            styles.inputFieldBox, 
+                                            { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
+                                        ]}>
+                                            <TextInput 
+                                                style={[styles.textInput, { color: theme.textPrimary }]}
+                                                placeholder="Password (8+ chars)"
+                                                placeholderTextColor={theme.textMuted}
+                                                secureTextEntry={!showPassword}
+                                                value={password}
+                                                onChangeText={setPassword}
+                                                onFocus={() => setFocusedInput('password')}
+                                                onBlur={() => setFocusedInput(null)}
                                             />
-                                            <Text style={[styles.eyeTogglePillBtnText, { color: showPassword ? '#F59E0B' : theme.textMuted }]}>
-                                                {showPassword ? "Hide 🙈" : "Show 👁️"}
-                                            </Text>
-                                        </TouchableOpacity>
+                                            <TouchableOpacity 
+                                                onPress={() => {
+                                                    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                                    togglePasswordVisibility();
+                                                }} 
+                                                style={{ padding: 4 }}
+                                                activeOpacity={0.6}
+                                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                            >
+                                                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={showPassword ? "#F59E0B" : theme.textMuted} />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
-                                </View>
 
-                                {/* 2. Confirm Password Input with Dedicated Hide/Show Toggle */}
-                                <View style={{ marginBottom: 5 }}>
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                                        <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Confirm Password</Text>
-                                    </View>
-                                    <View style={[
-                                        styles.inputFieldBox, 
-                                        { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
-                                    ]}>
-                                        <Ionicons name="shield-checkmark-outline" size={15} color={focusedInput === 'confirmPassword' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 6 }} />
-                                        <TextInput 
-                                            style={[styles.textInput, { color: theme.textPrimary }]}
-                                            placeholder="Re-enter your password to confirm"
-                                            placeholderTextColor={theme.textMuted}
-                                            secureTextEntry={!showConfirmPassword}
-                                            value={confirmPassword}
-                                            onChangeText={setConfirmPassword}
-                                            onFocus={() => setFocusedInput('confirmPassword')}
-                                            onBlur={() => setFocusedInput(null)}
-                                        />
-                                        <TouchableOpacity 
-                                            onPress={toggleConfirmPasswordVisibility} 
-                                            style={[styles.eyeTogglePillBtn, { backgroundColor: showConfirmPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9' }]}
-                                            activeOpacity={0.7}
-                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                        >
-                                            <Ionicons 
-                                                name={showConfirmPassword ? "eye-off" : "eye"} 
-                                                size={15} 
-                                                color={showConfirmPassword ? "#F59E0B" : theme.textMuted} 
+                                    <View style={{ flex: 1 }}>
+                                        <View style={[
+                                            styles.inputFieldBox, 
+                                            { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
+                                        ]}>
+                                            <TextInput 
+                                                style={[styles.textInput, { color: theme.textPrimary }]}
+                                                placeholder="Confirm Pass"
+                                                placeholderTextColor={theme.textMuted}
+                                                secureTextEntry={!showConfirmPassword}
+                                                value={confirmPassword}
+                                                onChangeText={setConfirmPassword}
+                                                onFocus={() => setFocusedInput('confirmPassword')}
+                                                onBlur={() => setFocusedInput(null)}
                                             />
-                                            <Text style={[styles.eyeTogglePillBtnText, { color: showConfirmPassword ? '#F59E0B' : theme.textMuted }]}>
-                                                {showConfirmPassword ? "Hide 🙈" : "Show 👁️"}
-                                            </Text>
-                                        </TouchableOpacity>
+                                            <TouchableOpacity 
+                                                onPress={() => {
+                                                    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                                    toggleConfirmPasswordVisibility();
+                                                }} 
+                                                style={{ padding: 4 }}
+                                                activeOpacity={0.6}
+                                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                            >
+                                                <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={20} color={showConfirmPassword ? "#F59E0B" : theme.textMuted} />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
                                 </View>
 
@@ -1221,27 +1210,26 @@ export default function SignupScreen() {
                                         onPress={() => setAcceptTerms(!acceptTerms)}
                                         style={styles.checkboxTouch}
                                         activeOpacity={0.8}
-                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
                                         <View style={[
                                             styles.checkboxBox, 
-                                            acceptTerms && { backgroundColor: theme.accentTeal, borderColor: theme.accentTeal }
+                                            acceptTerms && { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }
                                         ]}>
-                                            {acceptTerms && <Ionicons name="checkmark" size={10} color="#0E1A2E" />}
+                                            {acceptTerms && <Ionicons name="checkmark" size={13} color="#0F172A" />}
                                         </View>
                                         <Text style={[styles.termsText, { color: theme.textSecondary }]}>
                                             I agree to
                                         </Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={() => router.push('/terms')} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                        <Text style={[styles.termsLink, { color: theme.accentTeal }]}> Terms</Text>
+                                    <TouchableOpacity onPress={() => router.push('/terms')} activeOpacity={0.7}>
+                                        <Text style={[styles.termsLink, { color: '#F59E0B' }]}> Terms</Text>
                                     </TouchableOpacity>
 
                                     <Text style={[styles.termsText, { color: theme.textSecondary }]}> & </Text>
 
-                                    <TouchableOpacity onPress={() => router.push('/privacy')} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                        <Text style={[styles.termsLink, { color: theme.accentTeal }]}>Privacy Policy</Text>
+                                    <TouchableOpacity onPress={() => router.push('/privacy')} activeOpacity={0.7}>
+                                        <Text style={[styles.termsLink, { color: '#F59E0B' }]}>Privacy Policy</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -1251,18 +1239,19 @@ export default function SignupScreen() {
                                     disabled={loading}
                                     style={styles.primaryBtn}
                                     activeOpacity={0.85}
-                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <LinearGradient 
                                         colors={['#F59E0B', '#D97706']} 
                                         style={styles.primaryBtnGradient}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
                                     >
                                         {loading ? (
                                             <ActivityIndicator color="#0F172A" size="small" />
                                         ) : (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                                 <Text style={styles.primaryBtnText}>Create My Account</Text>
-                                                <Ionicons name="checkmark-circle" size={18} color="#0F172A" style={{ marginLeft: 6 }} />
+                                                <Ionicons name="checkmark-circle" size={20} color="#0F172A" style={{ marginLeft: 8 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -1277,7 +1266,6 @@ export default function SignupScreen() {
                                         { backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#CBD5E1' }
                                     ]} 
                                     activeOpacity={0.85} 
-                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     {socialLoading === 'google' ? (
                                         <ActivityIndicator size="small" color="#EA4335" />
@@ -1285,7 +1273,7 @@ export default function SignupScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                             <Image 
                                                 source={require('../../assets/images/google-g.png')} 
-                                                style={{ width: 18, height: 18, marginRight: 8 }} 
+                                                style={{ width: 22, height: 22, marginRight: 10 }} 
                                                 resizeMode="contain" 
                                             />
                                             <Text style={[styles.googleLoginBtnText, { color: theme.textPrimary }]}>Sign Up with Google</Text>
@@ -1296,7 +1284,7 @@ export default function SignupScreen() {
                                 {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Already have an account?</Text>
-                                    <TouchableOpacity onPress={() => router.push('/login' as any)} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <TouchableOpacity onPress={() => router.push('/login' as any)} activeOpacity={0.8}>
                                         <Text style={[styles.signupLinkText, { color: '#F59E0B' }]}> Sign In</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -1491,54 +1479,56 @@ const styles = StyleSheet.create({
     cardWrapper: {
         width: '100%',
         flex: 1,
-        justifyContent: 'space-evenly',
-        marginTop: 2,
+        justifyContent: 'space-between',
+        marginTop: 4,
+        paddingHorizontal: 2,
     },
     desktopCardWrapper: {
-        maxWidth: 420,
+        maxWidth: 440,
         alignSelf: 'center',
-        marginTop: 6,
+        marginTop: 10,
     },
     mascotContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginVertical: 4,
+        marginVertical: 2,
     },
     headlineBox: {
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     welcomeTitle: {
         fontWeight: '900',
-        fontSize: 17.5,
+        fontSize: 22,
         textAlign: 'center',
+        letterSpacing: 0.3,
     },
     formContainer: {
         width: '100%',
     },
     inputLabel: {
-        fontWeight: '800',
-        fontSize: 10,
+        fontWeight: '700',
+        fontSize: 12.5,
         marginBottom: 3,
     },
     inputFieldBox: {
-        height: 38,
-        borderRadius: 10,
-        borderWidth: 1,
-        paddingHorizontal: 10,
+        height: 48,
+        borderRadius: 13,
+        borderWidth: 1.5,
+        paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
     },
     textInput: {
         flex: 1,
-        fontSize: 11.5,
+        fontSize: 14.5,
         fontWeight: '600',
     },
     countryBtn: {
-        height: 38,
-        borderRadius: 10,
-        borderWidth: 1,
-        paddingHorizontal: 8,
+        height: 48,
+        borderRadius: 13,
+        borderWidth: 1.5,
+        paddingHorizontal: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1556,8 +1546,7 @@ const styles = StyleSheet.create({
     termsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 6,
-        marginBottom: 8,
+        marginVertical: 6,
         flexWrap: 'wrap',
     },
     checkboxTouch: {
@@ -1565,49 +1554,50 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     checkboxBox: {
-        width: 14,
-        height: 14,
-        borderRadius: 4,
+        width: 18,
+        height: 18,
+        borderRadius: 5,
         borderWidth: 1.5,
         borderColor: '#94A3B8',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 5,
+        marginRight: 6,
     },
     termsText: {
-        fontSize: 9.5,
+        fontSize: 12.5,
         fontWeight: '500',
     },
     termsLink: {
-        fontSize: 9.5,
+        fontSize: 12.5,
         fontWeight: '800',
         textDecorationLine: 'underline',
     },
     primaryBtn: {
-        borderRadius: 19,
+        borderRadius: 15,
         overflow: 'hidden',
         shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 3,
-        marginBottom: 6,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+        marginBottom: 8,
     },
     primaryBtnGradient: {
-        height: 38,
+        height: 48,
         alignItems: 'center',
         justifyContent: 'center',
     },
     primaryBtnText: {
         color: '#0F172A',
         fontWeight: '900',
-        fontSize: 12,
+        fontSize: 15,
+        letterSpacing: 0.3,
     },
     googleLoginBtn: {
         width: '100%',
-        height: 36,
-        borderRadius: 18,
-        borderWidth: 1,
+        height: 46,
+        borderRadius: 14,
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8,
@@ -1619,42 +1609,43 @@ const styles = StyleSheet.create({
     },
     googleLoginBtnText: {
         fontWeight: '800',
-        fontSize: 11,
+        fontSize: 13.5,
         letterSpacing: 0.2,
     },
     socialGrid: {
         flexDirection: 'row',
         gap: 8,
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     socialTile: {
         flex: 1,
-        height: 34,
-        borderRadius: 17,
-        borderWidth: 1,
+        height: 40,
+        borderRadius: 12,
+        borderWidth: 1.5,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
     },
     socialTileText: {
         fontWeight: '700',
-        fontSize: 9.5,
-        marginLeft: 4,
+        fontSize: 11.5,
+        marginLeft: 5,
     },
     footerLinkRow: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 2,
+        marginTop: 6,
+        paddingVertical: 4,
     },
     footerText: {
-        fontSize: 10,
+        fontSize: 12.5,
         fontWeight: '500',
     },
     signupLinkText: {
-        fontSize: 10,
-        fontWeight: '800',
+        fontSize: 13,
+        fontWeight: '900',
     },
     modalOverlay: {
         flex: 1,
