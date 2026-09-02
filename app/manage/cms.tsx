@@ -132,9 +132,9 @@ export default function ModernContentManager() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
+        allowsEditing: true, // Forces cropping / resizing to uniform 2.5:1 banner dimensions
+        aspect: [5, 2], // 2.5:1 aspect ratio (e.g. 1200x480) for 100% uniform banners across all screens
+        quality: 0.9,
         base64: true,
       });
 
@@ -735,11 +735,27 @@ export default function ModernContentManager() {
                   <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="cover" />
                 ) : (
                   <View style={s.imagePickerPlaceholder}>
-                    <Ionicons name="image-outline" size={24} color={L.goldDk} />
-                    <Text style={s.imagePickerText}>Tap to Upload Banner Image (16:9)</Text>
+                    <Ionicons name="image-outline" size={26} color={L.goldDk} />
+                    <Text style={s.imagePickerText}>Danna Nan Don Ɗora Banner (Tap to Upload)</Text>
+                    <Text style={{ fontSize: 9, color: L.textMuted }}>Aspect Ratio: 2.5 : 1 (1200 x 480 px)</Text>
                   </View>
                 )}
               </TouchableOpacity>
+
+              {/* RECOMMENDED UNIFORM BANNER DIMENSIONS SUGGESTION CARD */}
+              <View style={{ marginTop: 2, marginBottom: 12, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 12, padding: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <Ionicons name="sparkles" size={14} color="#D97706" />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309', textTransform: 'uppercase' }}>
+                    Shawarar Ma'aunin Banner (Recommended Dimensions)
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 10.5, color: '#78350F', lineHeight: 15, fontWeight: '500' }}>
+                  • <Text style={{ fontWeight: '700' }}>Standard Resolution:</Text> 1200 x 480 px (ko 1080 x 430 px){'\n'}
+                  • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 2.5 : 1 (Uniform Banner Ratio){'\n'}
+                  • <Text style={{ fontWeight: '700' }}>Tilasta Resize/Crop:</Text> Idan ka zaɓi hoto, tsarin zai nuna maka wajen saita (crop) shi a kan daidai ma'aunin 2.5:1 domin kowane banner ya fita daidai cif ba tare da wani ya fi wani tsayi ba!
+                </Text>
+              </View>
 
               <Text style={s.inputLabel}>Banner Title</Text>
               <TextInput
@@ -1262,13 +1278,13 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   imagePickerBox: {
-    height: 110,
+    height: 150,
     backgroundColor: L.bg,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: L.cardBorder,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   modalImagePreview: {
     width: '100%',

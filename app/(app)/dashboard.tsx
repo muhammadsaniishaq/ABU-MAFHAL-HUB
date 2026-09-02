@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import GlobalAnnouncementModal from '../../components/GlobalAnnouncementModal';
 import CelebrationConfetti, { CelebrationSettings, triggerGlobalConfetti } from '../../components/CelebrationConfetti';
+import DynamicBanners from '../../components/DynamicBanners';
 
 const { width: W } = Dimensions.get('window');
 
@@ -49,8 +50,6 @@ export default function Dashboard() {
   const [activePartners, setActivePartners] = useState<any[]>([]);
   const [serviceCustoms, setServiceCustoms] = useState<Record<string, any>>({});
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
-  const bannerRef = useRef<FlatList>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
   const partnerAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -87,18 +86,6 @@ export default function Dashboard() {
       ).start();
     }
   }, [activePartners.length]);
-
-  useEffect(() => {
-    if (activeBanners.length > 1) {
-      const interval = setInterval(() => {
-        let nextIndex = currentBannerIndex + 1;
-        if (nextIndex >= activeBanners.length) nextIndex = 0;
-        bannerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-        setCurrentBannerIndex(nextIndex);
-      }, 4000);
-      return () => clearInterval(interval);
-    }
-  }, [currentBannerIndex, activeBanners.length]);
   
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
@@ -641,38 +628,8 @@ export default function Dashboard() {
           </View>
         </LinearGradient>
 
-        {/* ─── SLIM DYNAMIC BANNERS ─── */}
-        {activeBanners.length > 0 && (
-          <View style={{ marginTop: 12, marginBottom: 4 }}>
-            <FlatList
-              ref={bannerRef}
-              data={activeBanners}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id}
-              pagingEnabled
-              snapToInterval={W - 32 + 10}
-              decelerationRate="fast"
-              contentContainerStyle={{ paddingHorizontal: 16 }}
-              renderItem={({ item, index }) => (
-                <TouchableOpacity 
-                  onPress={() => handleBannerClick(item)}
-                  activeOpacity={0.9}
-                  style={[s.bannerCard, { marginRight: index < activeBanners.length - 1 ? 10 : 0 }]}
-                >
-                  {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  ) : (
-                    <LinearGradient colors={['#0f172a', '#1e293b']} start={{x:0,y:0}} end={{x:1,y:1}} style={{ width: '100%', height: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 }}>
-                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }} numberOfLines={1}>{item.title}</Text>
-                      <Text style={{ color: '#94a3b8', fontSize: 10 }}>Tap ➔</Text>
-                    </LinearGradient>
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        )}
+        {/* ─── DYNAMIC PROMO BANNERS CAROUSEL ─── */}
+        <DynamicBanners placement="dashboard" />
 
         {/* Database Warning */}
         {dbError && (
