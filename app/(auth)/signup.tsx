@@ -804,38 +804,62 @@ export default function SignupScreen() {
                         scrollEnabled={height < 680}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {/* Top Control Bar */}
+                        {/* Top Control Bar with Prestigious Brand, Support & Theme Toggle */}
                         <View style={styles.topControlRow}>
-                            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                <Ionicons name="arrow-back" size={16} color={theme.textPrimary} />
+                            <TouchableOpacity 
+                                onPress={() => router.back()} 
+                                style={[styles.backBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: isDark ? '#334155' : '#CBD5E1' }]} 
+                                activeOpacity={0.8}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                                <Ionicons name="arrow-back" size={17} color={theme.textPrimary} />
                             </TouchableOpacity>
 
                             <View style={styles.brandRow}>
-                                <Image
-                                    source={getLogoSource()}
-                                    style={styles.logoImage}
-                                    resizeMode="contain"
-                                />
-                                <View style={{ marginLeft: 4 }}>
-                                    <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>ABUMAFHAL</Text>
-                                    <Text style={{ color: '#F59E0B', fontSize: 7, fontWeight: '900', letterSpacing: 0.8 }}>ROYAL FINTECH</Text>
+                                {/* Glowing Shield Logo Badge */}
+                                <View style={[styles.logoBadgeContainer, { backgroundColor: isDark ? '#0A1224' : '#FFFFFF', borderColor: '#F59E0B' }]}>
+                                    <Image
+                                        source={getLogoSource()}
+                                        style={styles.logoImage}
+                                        resizeMode="contain"
+                                    />
+                                    <View style={styles.logoStatusDot} />
+                                </View>
+
+                                <View style={{ marginLeft: 8 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
+                                            ABU<Text style={{ color: '#F59E0B' }}>MAFHAL</Text>
+                                        </Text>
+                                        <View style={[styles.proBadge, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7', borderColor: '#F59E0B' }]}>
+                                            <Text style={styles.proBadgeText}>5G SUB</Text>
+                                        </View>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
+                                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981', marginRight: 5 }} />
+                                        <Text style={[styles.brandTagline, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                                            AUTOMATED VTU & HUB
+                                        </Text>
+                                    </View>
                                 </View>
                             </View>
 
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                                {/* WhatsApp Quick Support Header Action */}
                                 <TouchableOpacity
                                     onPress={() => Linking.openURL('https://wa.me/2348001234567?text=Hello%20ABUMAFHAL%20Support')}
                                     style={[styles.supportHeaderBtn, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#E6F4EA', borderColor: '#10B981' }]}
                                     activeOpacity={0.8}
                                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                 >
-                                    <Ionicons name="logo-whatsapp" size={12} color="#10B981" />
+                                    <Ionicons name="logo-whatsapp" size={13} color="#10B981" />
                                     <Text style={[styles.supportHeaderBtnText, { color: isDark ? '#6EE7B7' : '#047857' }]}>Help</Text>
                                 </TouchableOpacity>
 
+                                {/* Theme Toggle */}
                                 <TouchableOpacity 
                                     onPress={toggleTheme} 
-                                    style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
+                                    style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: isDark ? '#334155' : '#CBD5E1' }]}
                                     activeOpacity={0.8}
                                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                 >
@@ -844,8 +868,13 @@ export default function SignupScreen() {
                             </View>
                         </View>
 
-                        {/* Royal Gold Header Accent Line */}
-                        <View style={{ height: 2, backgroundColor: '#F59E0B', borderRadius: 1, marginVertical: 6, opacity: 0.8 }} />
+                        {/* Multi-Stop Royal Gold Accent Line */}
+                        <LinearGradient
+                            colors={['rgba(245, 158, 11, 0.05)', '#F59E0B', 'rgba(245, 158, 11, 0.05)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.gradientAccentLine}
+                        />
 
                         {/* Centered Form Card Wrapper */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
@@ -1434,9 +1463,10 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
     },
     backBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1444,35 +1474,84 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
+    logoBadgeContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 13,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 5,
+        elevation: 4,
+        position: 'relative',
+    },
     logoImage: {
-        width: 32,
-        height: 32,
-        marginRight: 6,
+        width: 34,
+        height: 34,
+    },
+    logoStatusDot: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#10B981',
+        borderWidth: 1.5,
+        borderColor: '#FFFFFF',
     },
     brandTitle: {
         fontWeight: '900',
-        fontSize: 14,
-        letterSpacing: 0.4,
+        fontSize: 16.5,
+        letterSpacing: 0.5,
+    },
+    proBadge: {
+        marginLeft: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 6,
+        borderWidth: 1,
+    },
+    proBadgeText: {
+        color: '#F59E0B',
+        fontSize: 8.5,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    brandTagline: {
+        fontWeight: '800',
+        fontSize: 8.5,
+        letterSpacing: 0.8,
     },
     supportHeaderBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
+        paddingHorizontal: 9,
+        paddingVertical: 4.5,
+        borderRadius: 14,
         borderWidth: 1,
         gap: 3,
     },
     supportHeaderBtnText: {
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '800',
     },
     themeToggleBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    gradientAccentLine: {
+        height: 2,
+        width: '100%',
+        marginVertical: 6,
+        borderRadius: 1,
     },
     cardWrapper: {
         width: '100%',
