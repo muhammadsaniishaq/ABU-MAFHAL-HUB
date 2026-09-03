@@ -64,7 +64,6 @@ export default function SuperAdminMasterHubScreen() {
     totalUsers: 0,
     totalBalance: 0,
     pendingKYC: 0,
-    pendingLoans: 0,
     totalAdmins: 0,
   });
 
@@ -159,11 +158,10 @@ export default function SuperAdminMasterHubScreen() {
       if (enrichedStaff) setStaffList(enrichedStaff);
 
       // Fetch Vault Metrics
-      const [{ count: uCount }, { data: balData }, { count: kCount }, { count: lCount }] = await Promise.all([
+      const [{ count: uCount }, { data: balData }, { count: kCount }] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('balance'),
         supabase.from('kyc_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('loans').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
 
       const sumBalance = balData ? balData.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0) : 0;
@@ -172,7 +170,6 @@ export default function SuperAdminMasterHubScreen() {
         totalUsers: uCount || 0,
         totalBalance: sumBalance,
         pendingKYC: kCount || 0,
-        pendingLoans: lCount || 0,
         totalAdmins: staffData?.length || 0,
       });
 
@@ -645,14 +642,6 @@ export default function SuperAdminMasterHubScreen() {
                 </View>
                 <Text style={[s.statCardNum, vaultData.pendingKYC > 0 && { color: C.red }]}>{vaultData.pendingKYC}</Text>
                 <Text style={s.statCardLabel}>Pending KYC</Text>
-              </View>
-
-              <View style={s.statCard}>
-                <View style={[s.statIconBox, { backgroundColor: 'rgba(217, 119, 6, 0.1)' }]}>
-                  <Ionicons name="cash-outline" size={18} color={C.gold} />
-                </View>
-                <Text style={s.statCardNum}>{vaultData.pendingLoans}</Text>
-                <Text style={s.statCardLabel}>Pending Loans</Text>
               </View>
             </View>
           </>

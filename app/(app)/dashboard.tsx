@@ -387,9 +387,9 @@ export default function Dashboard() {
   const featureMap: Record<string, string> = {
     '/transfer': 'feature_transfer', '/airtime': 'feature_airtime', '/data': 'feature_data',
     '/education': 'feature_education', '/bills': 'feature_bills', '/virtual-cards': 'feature_cards',
-    '/savings': 'feature_savings', '/loans': 'feature_loans', '/crypto': 'feature_crypto',
+    '/crypto': 'feature_crypto',
     '/analytics': 'feature_analytics', '/rewards': 'feature_rewards', '/qr-pay': 'feature_qr',
-    '/investments': 'feature_invest', '/insurance': 'feature_insurance', '/bvn-services': 'feature_bvn',
+    '/bvn-services': 'feature_bvn',
     '/nin-services': 'feature_nin', '/cac-services': 'feature_cac', '/smile': 'feature_smile',
     '/social-boost': 'feature_social', '/bulk-sms': 'feature_bulk_sms'
   };
@@ -429,14 +429,10 @@ export default function Dashboard() {
     { id: 'social',       icon: 'rocket-outline',         label: 'Social',          color: '#ec4899', route: '/social-boost',   badge: 'BOOST' },
     { id: 'reviews',      icon: 'star-outline',           label: 'Reviews',         color: '#f5a623', route: '/reviews',        badge: null },
     { id: 'cards',        icon: 'card-outline',           label: 'Cards',           color: '#8B5CF6', route: '/virtual-cards',  badge: null },
-    { id: 'savings',      icon: 'wallet-outline',         label: 'Savings',         color: '#107C10', route: '/savings',        badge: null },
-    { id: 'loans',        icon: 'cash-outline',           label: 'Loans',           color: '#EA580C', route: '/loans',          badge: null },
     { id: 'crypto',       icon: 'logo-bitcoin',           label: 'Crypto',          color: '#F7931A', route: '/crypto',         badge: 'WEB3' },
     { id: 'analytics',   icon: 'pie-chart-outline',      label: 'Insights',        color: '#DB2777', route: '/analytics',      badge: null },
     { id: 'rewards',      icon: 'gift-outline',           label: 'Rewards',         color: '#9333EA', route: '/rewards',        badge: null },
     { id: 'qr',           icon: 'qr-code-outline',        label: 'QR Pay',          color: '#10B981', route: '/qr-pay',         badge: null },
-    { id: 'investments',  icon: 'trending-up-outline',    label: 'Invest',          color: '#3B82F6', route: '/investments',    badge: null },
-    { id: 'insurance',    icon: 'shield-checkmark-outline',label: 'Insurance',      color: '#107C10', route: '/insurance',      badge: null },
     { id: 'bvn',          icon: 'finger-print-outline',   label: 'BVN',             color: '#0056D2', route: '/bvn-services',   badge: null },
   ];
 

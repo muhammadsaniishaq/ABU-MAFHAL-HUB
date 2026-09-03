@@ -641,7 +641,7 @@ export default function EnterpriseCommunicationsHub() {
                             <TextInput
                                 value={actionRoute}
                                 onChangeText={setActionRoute}
-                                placeholder="e.g. /savings, /manage/liquidity, /data-plans"
+                                placeholder="e.g. /data, /manage/liquidity, /data-plans"
                                 placeholderTextColor={T.textMuted}
                                 style={styles.composerInput}
                             />

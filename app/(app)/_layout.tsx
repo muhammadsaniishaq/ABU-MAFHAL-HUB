@@ -68,10 +68,6 @@ export default function AppLayout() {
                 <Tabs.Screen name="virtual-cards" options={{ href: null }} />
                 <Tabs.Screen name="transfer" options={{ href: null }} />
                 <Tabs.Screen name="saved-cards" options={{ href: null }} />
-                <Tabs.Screen name="savings" options={{ href: null }} />
-                <Tabs.Screen name="loans" options={{ href: null }} />
-                <Tabs.Screen name="insurance" options={{ href: null }} />
-                <Tabs.Screen name="investments" options={{ href: null }} />
                 <Tabs.Screen name="qr-pay" options={{ href: null }} />
                 <Tabs.Screen name="beneficiaries" options={{ href: null }} />
                 <Tabs.Screen name="support" options={{ href: null }} />

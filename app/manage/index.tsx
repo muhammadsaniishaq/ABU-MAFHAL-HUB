@@ -64,8 +64,6 @@ const MODS = {
   banking: [
     { t:'API Liquidity',   i:'wallet',           r:'/manage/liquidity',      c:G,  b:GL,  tag:'Live' },
     { t:'Cards',           i:'card',             r:'/manage/cards',          c:N,  b:NL },
-    { t:'Lending',         i:'cash',             r:'/manage/lending',        c:G,  b:GL,  badge:0 },
-    { t:'Wealth',          i:'trending-up',      r:'/manage/wealth',         c:N,  b:NL },
     { t:'Rates',           i:'stats-chart',      r:'/manage/rates',          c:G,  b:GL,  tag:'Live' },
   ],
   finance: [
@@ -153,7 +151,7 @@ export default function AdminDashboard() {
   const [tab, setTab]           = useState('all');
   const [hidden, setHidden]     = useState<string[]>([]);
   const [query, setQuery]       = useState('');
-  const [counts, setCounts]     = useState({users:0,kyc:0,tickets:0,loans:0});
+  const [counts, setCounts]     = useState({users:0,kyc:0,tickets:0});
 
   useEffect(() => {
     Animated.loop(Animated.sequence([
@@ -191,24 +189,22 @@ export default function AdminDashboard() {
         setProfile(prof);
         AsyncStorage.setItem('@cached_admin_profile',JSON.stringify(prof));
       }
-      const [lg,hd,uc,kc,tc,lc] = await Promise.all([
+      const [lg,hd,uc,kc,tc] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key','app_logo_icon').single(),
         supabase.from('app_settings').select('value').eq('key','hidden_admin_modules').single(),
         supabase.from('profiles').select('*',{count:'exact',head:true}),
         supabase.from('kyc_requests').select('*',{count:'exact',head:true}).eq('status','pending'),
         supabase.from('tickets').select('*',{count:'exact',head:true}).eq('status','open'),
-        supabase.from('loans').select('*',{count:'exact',head:true}).eq('status','pending'),
       ]);
       if(lg.data?.value?.url) setLogo(lg.data.value.url);
       if(hd.data?.value){const a=typeof hd.data.value==='string'?JSON.parse(hd.data.value):hd.data.value;if(Array.isArray(a))setHidden(a);}
-      setCounts({users:uc.count||0,kyc:kc.count||0,tickets:tc.count||0,loans:lc.count||0});
+      setCounts({users:uc.count||0,kyc:kc.count||0,tickets:tc.count||0});
     } catch(e){console.error(e);}
     finally{setLoading(false);}
   };
 
   MODS.operations[2].badge = counts.kyc;
   MODS.operations[7].badge = counts.tickets;
-  MODS.banking[2].badge    = counts.loans;
 
   const isSuper = profile?.role==='super_admin';
   const isAdmin = isSuper || profile?.role==='admin';

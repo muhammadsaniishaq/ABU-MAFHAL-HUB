@@ -23,8 +23,6 @@ const ALL_ADMIN_MODULES = [
 
     // Banking & Assets
     { key: 'cards', label: 'Virtual Cards Management', icon: 'card-outline', cat: 'Banking' },
-    { key: 'lending', label: 'Loans & Lending', icon: 'cash-outline', cat: 'Banking' },
-    { key: 'wealth', label: 'Wealth & Investments', icon: 'briefcase-outline', cat: 'Banking' },
     { key: 'liquidity', label: 'Liquidity Vault', icon: 'water-outline', cat: 'Banking' },
     { key: 'rates', label: 'Exchange Rates', icon: 'trending-up-outline', cat: 'Banking' },
 

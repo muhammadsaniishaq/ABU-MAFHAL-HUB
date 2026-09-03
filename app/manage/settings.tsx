@@ -113,9 +113,9 @@ export default function AdminSettings() {
 
     const allKnownFeatures = [
       'feature_transfer', 'feature_airtime', 'feature_data', 'feature_education',
-      'feature_bills', 'feature_cards', 'feature_savings', 'feature_loans',
+      'feature_bills', 'feature_cards',
       'feature_crypto', 'feature_analytics', 'feature_rewards', 'feature_qr',
-      'feature_invest', 'feature_insurance', 'feature_bvn', 'feature_nin', 'feature_cac',
+      'feature_bvn', 'feature_nin', 'feature_cac',
       'feature_smile', 'feature_social', 'feature_bulk_sms'
     ];
     
@@ -699,14 +699,6 @@ export default function AdminSettings() {
                         <Text style={s.groupLabel}>Financial & Crypto</Text>
                         <View style={s.card}>
                             <ToggleRow title="Crypto Trading" subtitle="Toggle cryptocurrency exchange" icon="logo-bitcoin" color="#f59e0b" value={features['feature_crypto'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_crypto: val})} />
-                            <View style={s.divider} />
-                            <ToggleRow title="Savings" subtitle="Toggle savings" icon="wallet" color="#10b981" value={features['feature_savings'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_savings: val})} />
-                            <View style={s.divider} />
-                            <ToggleRow title="Investments" subtitle="Toggle investments feature" icon="trending-up" color="#0ea5e9" value={features['feature_invest'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_invest: val})} />
-                            <View style={s.divider} />
-                            <ToggleRow title="Loans" subtitle="Toggle loan services" icon="cash" color="#ef4444" value={features['feature_loans'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_loans: val})} />
-                            <View style={s.divider} />
-                            <ToggleRow title="Insurance" subtitle="Toggle insurance services" icon="shield-checkmark" color="#6366f1" value={features['feature_insurance'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_insurance: val})} />
                         </View>
 
                         <Text style={s.groupLabel}>Extras & Analytics</Text>
