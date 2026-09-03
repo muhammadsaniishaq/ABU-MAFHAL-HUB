@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 24, 460);
-const BANNER_HEIGHT = 62; // Ultra-slim modern fintech ribbon
+const BANNER_HEIGHT = 86; // 4:1 Golden Standard Banner Ratio (1200 x 300 px)
 const BANNER_MARGIN = 8;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
@@ -113,10 +113,20 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
           >
             {item.image_url ? (
               <View style={styles.imageContainer}>
+                {/* Full-bleed ambient blurred backdrop: Fills all side spaces with matching colors */}
+                <Image 
+                  source={{ uri: item.image_url }} 
+                  style={StyleSheet.absoluteFillObject} 
+                  resizeMode="cover" 
+                  blurRadius={14} 
+                />
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
+
+                {/* Crisp foreground banner: 100% complete, zero cropping, nothing cut off */}
                 <Image 
                   source={{ uri: item.image_url }} 
                   style={styles.bannerImage} 
-                  resizeMode={item.fit_mode === 'cover' ? 'cover' : 'contain'} 
+                  resizeMode="contain" 
                 />
               </View>
             ) : (

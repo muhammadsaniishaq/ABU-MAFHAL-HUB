@@ -680,7 +680,11 @@ export default function ModernContentManager() {
               ) : (
                 banners.map(b => (
                   <View key={b.id} style={s.card}>
-                    <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
+                    <View style={s.bannerPreviewContainer}>
+                      <Image source={{ uri: b.image_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" blurRadius={14} />
+                      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
+                      <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
+                    </View>
                     <View style={s.cardBody}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <View style={{ flex: 1, marginRight: 8 }}>
@@ -875,41 +879,54 @@ export default function ModernContentManager() {
                   <Ionicons name="sparkles" size={13} color={L.goldDk} />
                   <Text style={s.sizeGuideTitle}>Recommended Banner Size (No Crop Needed)</Text>
                   <View style={s.sizeRatioBadge}>
-                    <Text style={s.sizeRatioBadgeText}>5 : 1</Text>
+                    <Text style={s.sizeRatioBadgeText}>4 : 1</Text>
                   </View>
                 </View>
 
                 <View style={s.sizePillRow}>
                   <View style={s.sizePillActive}>
-                    <Text style={s.sizePillTextBold}>1200 × 240 px</Text>
+                    <Text style={s.sizePillTextBold}>1200 × 300 px</Text>
                     <Text style={s.sizePillSub}>(Standard • 100% Fit)</Text>
                   </View>
                   <View style={s.sizePill}>
-                    <Text style={s.sizePillText}>1000 × 200 px</Text>
+                    <Text style={s.sizePillText}>1000 × 250 px</Text>
                   </View>
                   <View style={s.sizePill}>
-                    <Text style={s.sizePillText}>1500 × 300 px</Text>
+                    <Text style={s.sizePillText}>1600 × 400 px</Text>
                   </View>
                 </View>
 
                 <Text style={s.sizeGuideNote}>
-                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Tukwici:</Text> Idan ka zana hotonka a girman <Text style={{ fontWeight: '800', color: '#0F172A' }}>1200 × 240 px</Text>, zai cika banner ɗin 100% cif ba tare da ya buƙaci yanka (crop) ba!
+                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Tukwici:</Text> Idan ka zana hotonka a girman <Text style={{ fontWeight: '800', color: '#0F172A' }}>1200 × 300 px</Text>, zai cika dukkan allon cif ba tare da wani gefe ya bar space ba kuma ba tare da an yanke komai ba!
                 </Text>
               </View>
 
               {/* Image Preview & Picker */}
               <TouchableOpacity onPress={pickImage} style={s.imagePickerBox} activeOpacity={0.85}>
-                {selectedImage ? (
-                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="contain" />
-                ) : existingImageUrl ? (
-                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="contain" />
+                {selectedImage || existingImageUrl ? (
+                  <View style={s.modalImageContainer}>
+                    <Image 
+                      source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
+                      style={StyleSheet.absoluteFillObject} 
+                      resizeMode="cover" 
+                      blurRadius={14} 
+                    />
+                    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
+                    <Image 
+                      source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
+                      style={s.modalImagePreview} 
+                      resizeMode="contain" 
+                    />
+                  </View>
                 ) : (
                   <View style={s.imagePickerPlaceholder}>
                     <View style={s.uploadIconCircle}>
                       <Ionicons name="cloud-upload-outline" size={22} color={L.goldDk} />
                     </View>
-                    <Text style={s.imagePickerTitle}>Select Banner Image</Text>
-                    <Text style={s.imagePickerSubtitle}>📐 1200 × 240 px (5:1) • Original Quality • No auto-cut</Text>
+                    <View>
+                      <Text style={s.imagePickerTitle}>Select Banner Image</Text>
+                      <Text style={s.imagePickerSubtitle}>📐 Ideal: 1200 × 300 px (4:1) • Fills Edge-to-Edge</Text>
+                    </View>
                   </View>
                 )}
               </TouchableOpacity>
@@ -1354,10 +1371,16 @@ const s = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  bannerPreviewContainer: {
+    width: '100%',
+    height: 86,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#070D1E',
+  },
   bannerImagePreview: {
     width: '100%',
-    height: 62,
-    backgroundColor: '#070D1E',
+    height: 86,
   },
   cardBody: {
     padding: 10,
@@ -1647,13 +1670,19 @@ const s = StyleSheet.create({
     color: L.textPrimary,
   },
   imagePickerBox: {
-    height: 62,
+    height: 86,
     backgroundColor: '#070D1E',
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     overflow: 'hidden',
     marginBottom: 10,
+  },
+  modalImageContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    backgroundColor: '#070D1E',
   },
   modalImagePreview: {
     width: '100%',
@@ -1891,7 +1920,7 @@ const s = StyleSheet.create({
   },
   cropViewfinderFrame: {
     width: '100%',
-    height: 72,
+    height: 86,
     backgroundColor: '#0F172A',
     borderRadius: 10,
     borderWidth: 2,
