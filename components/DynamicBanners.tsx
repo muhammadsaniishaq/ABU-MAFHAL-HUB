@@ -116,7 +116,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
                 <Image 
                   source={{ uri: item.image_url }} 
                   style={styles.bannerImage} 
-                  resizeMode="cover" 
+                  resizeMode={item.fit_mode === 'cover' ? 'cover' : 'contain'} 
                 />
               </View>
             ) : (

@@ -142,19 +142,16 @@ export default function ModernContentManager() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true, // Native manual crop
-        aspect: [5, 1], // Wide banner proportion
+        allowsEditing: false, // Absolutely NO auto-crop! Keep complete original photo
         quality: 1,
         base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setSelectedImage(result.assets[0]);
-        // Automatically open the interactive in-app manual cropper
         setCropZoom(1.0);
         setCropOffsetX(0);
         setCropOffsetY(0);
-        setShowCropModal(true);
       }
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to pick image");
@@ -683,7 +680,7 @@ export default function ModernContentManager() {
               ) : (
                 banners.map(b => (
                   <View key={b.id} style={s.card}>
-                    <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="cover" />
+                    <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
                     <View style={s.cardBody}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <View style={{ flex: 1, marginRight: 8 }}>
@@ -903,16 +900,16 @@ export default function ModernContentManager() {
               {/* Image Preview & Picker */}
               <TouchableOpacity onPress={pickImage} style={s.imagePickerBox} activeOpacity={0.85}>
                 {selectedImage ? (
-                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="cover" />
+                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="contain" />
                 ) : existingImageUrl ? (
-                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="cover" />
+                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="contain" />
                 ) : (
                   <View style={s.imagePickerPlaceholder}>
                     <View style={s.uploadIconCircle}>
-                      <Ionicons name="cloud-upload-outline" size={26} color={L.goldDk} />
+                      <Ionicons name="cloud-upload-outline" size={22} color={L.goldDk} />
                     </View>
                     <Text style={s.imagePickerTitle}>Select Banner Image</Text>
-                    <Text style={s.imagePickerSubtitle}>📐 Ideal: 1200 × 240 px • Manual Crop Enabled</Text>
+                    <Text style={s.imagePickerSubtitle}>📐 1200 × 240 px (5:1) • Original Quality • No auto-cut</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -1359,8 +1356,8 @@ const s = StyleSheet.create({
   },
   bannerImagePreview: {
     width: '100%',
-    height: 120,
-    backgroundColor: '#E2E8F0',
+    height: 62,
+    backgroundColor: '#070D1E',
   },
   cardBody: {
     padding: 10,
@@ -1650,13 +1647,13 @@ const s = StyleSheet.create({
     color: L.textPrimary,
   },
   imagePickerBox: {
-    height: 140,
+    height: 62,
     backgroundColor: '#070D1E',
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   modalImagePreview: {
     width: '100%',
@@ -1664,27 +1661,28 @@ const s = StyleSheet.create({
   },
   imagePickerPlaceholder: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    padding: 12,
+    gap: 10,
+    paddingHorizontal: 12,
   },
   uploadIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(217, 119, 6, 0.12)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   imagePickerTitle: {
-    color: L.navyHeader,
-    fontSize: 13,
+    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: '800',
   },
   imagePickerSubtitle: {
-    color: L.textMuted,
-    fontSize: 10.5,
+    color: '#94A3B8',
+    fontSize: 9,
     fontWeight: '500',
   },
   imagePickerText: {
