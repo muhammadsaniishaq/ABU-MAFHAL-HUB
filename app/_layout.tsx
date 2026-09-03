@@ -9,6 +9,7 @@ import { View, ActivityIndicator, LogBox, Platform, AppState } from 'react-nativ
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as Linking from 'expo-linking';
 
 // Configure Reanimated Logger
 configureReanimatedLogger({
@@ -164,6 +165,67 @@ export default function RootLayout() {
         return () => {
             subscription.unsubscribe();
         };
+    }, []);
+
+    // Global Deep Link Auth Handler for Native App (OAuth redirects)
+    useEffect(() => {
+        if (Platform.OS === 'web') return;
+
+        const handleAuthDeepLink = async (url: string) => {
+            if (!url) return;
+            try {
+                const normalized = url.replace('#', '?');
+                let code: string | null = null;
+                let accessToken: string | null = null;
+                let refreshToken: string | null = null;
+
+                try {
+                    const u = new URL(normalized);
+                    code = u.searchParams.get('code');
+                    accessToken = u.searchParams.get('access_token');
+                    refreshToken = u.searchParams.get('refresh_token');
+                } catch {
+                    const parsed = Linking.parse(normalized);
+                    const q = parsed.queryParams || {};
+                    code = Array.isArray(q.code) ? q.code[0] : (q.code as string);
+                    accessToken = Array.isArray(q.access_token) ? q.access_token[0] : (q.access_token as string);
+                    refreshToken = Array.isArray(q.refresh_token) ? q.refresh_token[0] : (q.refresh_token as string);
+                }
+
+                if (code) {
+                    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+                    if (!error && data?.session) {
+                        await AsyncStorage.setItem('has_active_session', 'true');
+                        await AsyncStorage.setItem('app_unlocked', 'true');
+                        setSession(data.session);
+                        router.replace('/dashboard' as any);
+                    }
+                } else if (accessToken && refreshToken) {
+                    const { data, error } = await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken,
+                    });
+                    if (!error && data?.session) {
+                        await AsyncStorage.setItem('has_active_session', 'true');
+                        await AsyncStorage.setItem('app_unlocked', 'true');
+                        setSession(data.session);
+                        router.replace('/dashboard' as any);
+                    }
+                }
+            } catch (err) {
+                console.warn('Auth deep link processing error:', err);
+            }
+        };
+
+        const sub = Linking.addEventListener('url', ({ url }) => {
+            handleAuthDeepLink(url);
+        });
+
+        Linking.getInitialURL().then((url) => {
+            if (url) handleAuthDeepLink(url);
+        });
+
+        return () => sub.remove();
     }, []);
 
     // Strict Security PIN Lock on native app exit/minimize

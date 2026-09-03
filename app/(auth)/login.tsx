@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -60,6 +61,21 @@ export default function LoginScreen() {
         // Listen for Google OAuth returns & error responses in web URL query/hash params
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             (async () => {
+                const search = window.location.search || '';
+                const hash = window.location.hash || '';
+                const hasAuthParams = (hash && hash.includes('access_token')) || (search && search.includes('code='));
+
+                if (hasAuthParams) {
+                    const ua = (window.navigator?.userAgent || '').toLowerCase();
+                    const isMobile = /android|iphone|ipad|ipod/.test(ua);
+                    if (isMobile) {
+                        const targetAppUrl = `abumafhalsub://login${search}${hash}`;
+                        window.location.href = targetAppUrl;
+                        router.replace('/auth/callback' as any);
+                        return;
+                    }
+                }
+
                 const isOAuthSessionSet = await processOAuthReturn();
                 if (isOAuthSessionSet) {
                     const { data: { session } } = await supabase.auth.getSession();
@@ -405,8 +421,8 @@ export default function LoginScreen() {
         setSocialLoading(provider);
         try {
             const redirectUrl = Platform.OS === 'web'
-                ? (typeof window !== 'undefined' ? window.location.origin : 'https://abumafhal.com.ng')
-                : Linking.createURL('/login');
+                ? (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'https://abumafhal.com.ng/auth/callback')
+                : makeRedirectUri({ scheme: 'abumafhalsub', path: 'login' });
 
             const options: any = {
                 redirectTo: redirectUrl,
@@ -462,7 +478,26 @@ export default function LoginScreen() {
                             if (setErr) throw setErr;
                         }
 
-                        router.replace('/dashboard' as any);
+                        await AsyncStorage.setItem('has_active_session', 'true');
+                        await AsyncStorage.setItem('app_unlocked', 'true');
+
+                        let localPin = await AsyncStorage.getItem('user_transaction_pin');
+                        if (!localPin) {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (user) {
+                                const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', user.id).maybeSingle();
+                                if (data?.transaction_pin) {
+                                    localPin = data.transaction_pin;
+                                    await AsyncStorage.setItem('user_transaction_pin', localPin as string);
+                                }
+                            }
+                        }
+
+                        if (!localPin) {
+                            router.replace('/pin-setup' as any);
+                        } else {
+                            router.replace('/dashboard' as any);
+                        }
                     }
                 }
             }

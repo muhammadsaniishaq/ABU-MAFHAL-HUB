@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -667,8 +668,8 @@ export default function SignupScreen() {
         setSocialLoading(provider);
         try {
             const redirectUrl = Platform.OS === 'web'
-                ? (typeof window !== 'undefined' ? window.location.origin : 'https://abumafhal.com.ng')
-                : Linking.createURL('/login');
+                ? (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'https://abumafhal.com.ng/auth/callback')
+                : makeRedirectUri({ scheme: 'abumafhalsub', path: 'login' });
 
             const queryParams: Record<string, string> = {
                 access_type: 'offline',
@@ -731,7 +732,26 @@ export default function SignupScreen() {
                             if (setErr) throw setErr;
                         }
 
-                        router.replace('/dashboard' as any);
+                        await AsyncStorage.setItem('has_active_session', 'true');
+                        await AsyncStorage.setItem('app_unlocked', 'true');
+
+                        let localPin = await AsyncStorage.getItem('user_transaction_pin');
+                        if (!localPin) {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (user) {
+                                const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', user.id).maybeSingle();
+                                if (data?.transaction_pin) {
+                                    localPin = data.transaction_pin;
+                                    await AsyncStorage.setItem('user_transaction_pin', localPin as string);
+                                }
+                            }
+                        }
+
+                        if (!localPin) {
+                            router.replace('/pin-setup' as any);
+                        } else {
+                            router.replace('/dashboard' as any);
+                        }
                     }
                 }
             }

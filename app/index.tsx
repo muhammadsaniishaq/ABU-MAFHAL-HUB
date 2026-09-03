@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../services/supabase';
+import { supabase, processOAuthReturn } from '../services/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -100,6 +100,25 @@ export default function SplashScreen() {
 
   const checkAuthSession = async () => {
     try {
+      // On web, check if returning from OAuth (hash token or auth code)
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const search = window.location.search || '';
+        const hash = window.location.hash || '';
+        const hasAuthParams = (hash && hash.includes('access_token')) || (search && search.includes('code='));
+
+        if (hasAuthParams) {
+          const ua = (window.navigator?.userAgent || '').toLowerCase();
+          const isMobile = /android|iphone|ipad|ipod/.test(ua);
+          if (isMobile) {
+            const targetAppUrl = `abumafhalsub://login${search}${hash}`;
+            window.location.href = targetAppUrl;
+            router.replace('/auth/callback' as any);
+            return;
+          }
+          await processOAuthReturn();
+        }
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       const unlockedFlag = await AsyncStorage.getItem('app_unlocked');
 
