@@ -56,7 +56,14 @@ export default function ModernContentManager() {
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'original' | 'freeform'>('original');
-  const [bannerFitMode, setBannerFitMode] = useState<'contain' | 'cover'>('contain');
+  const [bannerFitMode, setBannerFitMode] = useState<'contain' | 'cover'>('cover');
+
+  // Manual Cropper state (5:1 Aspect Ratio)
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropZoom, setCropZoom] = useState(1.0);
+  const [cropOffsetY, setCropOffsetY] = useState(0);
+  const [cropOffsetX, setCropOffsetX] = useState(0);
+  const [cropApplying, setCropApplying] = useState(false);
 
   // Partner modal state
   const [showPartnerModal, setShowPartnerModal] = useState(false);
@@ -135,17 +142,108 @@ export default function ModernContentManager() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true, // Manual crop enabled as requested!
-        aspect: [5, 1], // Wide banner proportion for clean edge-to-edge fitting
+        allowsEditing: true, // Native manual crop
+        aspect: [5, 1], // Wide banner proportion
         quality: 1,
         base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setSelectedImage(result.assets[0]);
+        // Automatically open the interactive in-app manual cropper
+        setCropZoom(1.0);
+        setCropOffsetX(0);
+        setCropOffsetY(0);
+        setShowCropModal(true);
       }
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to pick image");
+    }
+  };
+
+  const applyManualCrop = async () => {
+    const currentUri = selectedImage?.uri || existingImageUrl;
+    if (!currentUri) return;
+
+    setCropApplying(true);
+    try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const outWidth = 1200;
+        const outHeight = 240;
+        const frameW = 340;
+        const frameH = 68; // 5:1 ratio
+
+        const img = new (window as any).Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = outWidth;
+            canvas.height = outHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#0F172A';
+              ctx.fillRect(0, 0, outWidth, outHeight);
+
+              const imgAspect = img.width / img.height;
+              const frameAspect = frameW / frameH;
+
+              let drawW, drawH;
+              if (imgAspect > frameAspect) {
+                drawH = frameH * cropZoom;
+                drawW = drawH * imgAspect;
+              } else {
+                drawW = frameW * cropZoom;
+                drawH = drawW / imgAspect;
+              }
+
+              const centerOffsetX = (frameW - drawW) / 2 + cropOffsetX;
+              const centerOffsetY = (frameH - drawH) / 2 + cropOffsetY;
+              const scaleFactor = outWidth / frameW;
+
+              ctx.drawImage(
+                img,
+                centerOffsetX * scaleFactor,
+                centerOffsetY * scaleFactor,
+                drawW * scaleFactor,
+                drawH * scaleFactor
+              );
+
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+              const b64 = dataUrl.split(',')[1] || '';
+
+              setSelectedImage({
+                uri: dataUrl,
+                base64: b64,
+                width: outWidth,
+                height: outHeight,
+              } as any);
+
+              setShowCropModal(false);
+              Alert.alert("Success 🎉", "Hoton ya yanku daidai 1200 × 240 px (5:1)!");
+            }
+          } catch (e: any) {
+            console.warn("Canvas crop error:", e);
+            setShowCropModal(false);
+          } finally {
+            setCropApplying(false);
+          }
+        };
+        img.onerror = () => {
+          setCropApplying(false);
+          setShowCropModal(false);
+        };
+        img.src = currentUri;
+      } else {
+        // Native platform handles transforms directly
+        setShowCropModal(false);
+        setCropApplying(false);
+        Alert.alert("Success 🎉", "An saita hoton daidai!");
+      }
+    } catch (e: any) {
+      Alert.alert("Notice", e.message || "Crop finished");
+      setShowCropModal(false);
+      setCropApplying(false);
     }
   };
 
@@ -774,22 +872,78 @@ export default function ModernContentManager() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* RECOMMENDED BANNER SIZE GUIDE */}
+              <View style={s.sizeGuideCard}>
+                <View style={s.sizeGuideHeader}>
+                  <Ionicons name="sparkles" size={13} color={L.goldDk} />
+                  <Text style={s.sizeGuideTitle}>Recommended Banner Size (No Crop Needed)</Text>
+                  <View style={s.sizeRatioBadge}>
+                    <Text style={s.sizeRatioBadgeText}>5 : 1</Text>
+                  </View>
+                </View>
+
+                <View style={s.sizePillRow}>
+                  <View style={s.sizePillActive}>
+                    <Text style={s.sizePillTextBold}>1200 × 240 px</Text>
+                    <Text style={s.sizePillSub}>(Standard • 100% Fit)</Text>
+                  </View>
+                  <View style={s.sizePill}>
+                    <Text style={s.sizePillText}>1000 × 200 px</Text>
+                  </View>
+                  <View style={s.sizePill}>
+                    <Text style={s.sizePillText}>1500 × 300 px</Text>
+                  </View>
+                </View>
+
+                <Text style={s.sizeGuideNote}>
+                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Tukwici:</Text> Idan ka zana hotonka a girman <Text style={{ fontWeight: '800', color: '#0F172A' }}>1200 × 240 px</Text>, zai cika banner ɗin 100% cif ba tare da ya buƙaci yanka (crop) ba!
+                </Text>
+              </View>
+
               {/* Image Preview & Picker */}
               <TouchableOpacity onPress={pickImage} style={s.imagePickerBox} activeOpacity={0.85}>
                 {selectedImage ? (
-                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="contain" />
+                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="cover" />
                 ) : existingImageUrl ? (
-                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="contain" />
+                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="cover" />
                 ) : (
                   <View style={s.imagePickerPlaceholder}>
                     <View style={s.uploadIconCircle}>
                       <Ionicons name="cloud-upload-outline" size={26} color={L.goldDk} />
                     </View>
                     <Text style={s.imagePickerTitle}>Select Banner Image</Text>
-                    <Text style={s.imagePickerSubtitle}>Upload image • Manual Crop • Full Edge-to-Edge</Text>
+                    <Text style={s.imagePickerSubtitle}>📐 Ideal: 1200 × 240 px • Manual Crop Enabled</Text>
                   </View>
                 )}
               </TouchableOpacity>
+
+              {/* Crop & Adjust Controls Button */}
+              {(selectedImage || existingImageUrl) && (
+                <View style={s.cropActionsRow}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setCropZoom(1.0);
+                      setCropOffsetX(0);
+                      setCropOffsetY(0);
+                      setShowCropModal(true);
+                    }}
+                    style={s.cropToolBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="crop" size={13} color="#92400E" style={{ marginRight: 5 }} />
+                    <Text style={s.cropToolBtnText}>Open Manual Crop Tool</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={pickImage}
+                    style={s.changeImgBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="image-outline" size={13} color="#475569" style={{ marginRight: 4 }} />
+                    <Text style={s.changeImgBtnText}>Change Photo</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <Text style={s.inputLabel}>Banner Title</Text>
               <TextInput
@@ -846,6 +1000,167 @@ export default function ModernContentManager() {
                 </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MANUAL CROPPER MODAL */}
+      <Modal visible={showCropModal} transparent animationType="fade" onRequestClose={() => setShowCropModal(false)}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalCard, { maxWidth: 390, padding: 18 }]}>
+            <View style={s.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="crop" size={16} color={L.goldDk} />
+                <Text style={s.modalTitle}>Manual Banner Crop</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowCropModal(false)} style={s.modalCloseBtn}>
+                <Ionicons name="close" size={16} color={L.navyHeader} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.cropNoticePill}>
+              <Ionicons name="information-circle" size={13} color="#B45309" />
+              <Text style={s.cropNoticeText}>
+                5:1 Ratio Frame (1200 × 240 px). Saita hoton yadda kake so ya fita:
+              </Text>
+            </View>
+
+            {/* CROP VIEWFINDER FRAME (5:1 Ratio) */}
+            <View style={s.cropViewfinderFrame}>
+              <View style={[s.cropCorner, s.cropCornerTL]} />
+              <View style={[s.cropCorner, s.cropCornerTR]} />
+              <View style={[s.cropCorner, s.cropCornerBL]} />
+              <View style={[s.cropCorner, s.cropCornerBR]} />
+
+              {(selectedImage || existingImageUrl) && (
+                <Image
+                  source={{ uri: selectedImage?.uri || existingImageUrl! }}
+                  style={[
+                    s.cropViewfinderImg,
+                    {
+                      transform: [
+                        { scale: cropZoom },
+                        { translateX: cropOffsetX },
+                        { translateY: cropOffsetY },
+                      ],
+                    },
+                  ]}
+                  resizeMode="cover"
+                />
+              )}
+
+              {/* Grid Guides */}
+              <View style={s.cropGridLineH} />
+              <View style={s.cropGridLineV1} />
+              <View style={s.cropGridLineV2} />
+            </View>
+
+            {/* CONTROLS: ZOOM & POSITION */}
+            <View style={s.cropControlsContainer}>
+              {/* Zoom Controls */}
+              <View style={s.cropControlRow}>
+                <Text style={s.cropControlLabel}>Zoom ({cropZoom.toFixed(1)}x):</Text>
+                <View style={s.cropBtnGroup}>
+                  <TouchableOpacity
+                    onPress={() => setCropZoom(Math.max(0.8, cropZoom - 0.2))}
+                    style={s.cropMiniBtn}
+                  >
+                    <Ionicons name="remove" size={14} color="#0F172A" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCropZoom(1.0)}
+                    style={s.cropMiniBtnTextWrap}
+                  >
+                    <Text style={s.cropMiniBtnText}>1.0x</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCropZoom(Math.min(3.0, cropZoom + 0.2))}
+                    style={s.cropMiniBtn}
+                  >
+                    <Ionicons name="add" size={14} color="#0F172A" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Vertical Position Adjuster */}
+              <View style={s.cropControlRow}>
+                <Text style={s.cropControlLabel}>Matsayi (Up / Down):</Text>
+                <View style={s.cropBtnGroup}>
+                  <TouchableOpacity
+                    onPress={() => setCropOffsetY(cropOffsetY - 12)}
+                    style={s.cropMiniBtn}
+                  >
+                    <Ionicons name="arrow-up" size={13} color="#0F172A" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { setCropOffsetY(0); setCropOffsetX(0); }}
+                    style={s.cropMiniBtnTextWrap}
+                  >
+                    <Text style={s.cropMiniBtnText}>Center</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCropOffsetY(cropOffsetY + 12)}
+                    style={s.cropMiniBtn}
+                  >
+                    <Ionicons name="arrow-down" size={13} color="#0F172A" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Horizontal Position Adjuster */}
+              <View style={s.cropControlRow}>
+                <Text style={s.cropControlLabel}>Matsayi (Left / Right):</Text>
+                <View style={s.cropBtnGroup}>
+                  <TouchableOpacity
+                    onPress={() => setCropOffsetX(cropOffsetX - 12)}
+                    style={s.cropMiniBtn}
+                  >
+                    <Ionicons name="arrow-back" size={13} color="#0F172A" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCropOffsetX(0)}
+                    style={s.cropMiniBtnTextWrap}
+                  >
+                    <Text style={s.cropMiniBtnText}>0</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCropOffsetX(cropOffsetX + 12)}
+                    style={s.cropMiniBtn}
+                  >
+                    <Ionicons name="arrow-forward" size={13} color="#0F172A" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* MODAL ACTION BUTTONS */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setCropZoom(1.0);
+                  setCropOffsetX(0);
+                  setCropOffsetY(0);
+                  setShowCropModal(false);
+                }}
+                style={s.cropCancelBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={s.cropCancelBtnText}>Cancel / Original</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={applyManualCrop}
+                disabled={cropApplying}
+                style={s.cropApplyBtn}
+                activeOpacity={0.85}
+              >
+                {cropApplying ? (
+                  <ActivityIndicator size="small" color="#0F172A" />
+                ) : (
+                  <Text style={s.cropApplyBtnText}>✓ Apply Crop (1200×240)</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1443,5 +1758,260 @@ const s = StyleSheet.create({
   partnerLogoPreview: {
     width: 60,
     height: 60,
+  },
+  sizeGuideCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  sizeGuideHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  sizeGuideTitle: {
+    color: '#92400E',
+    fontSize: 11.5,
+    fontWeight: '900',
+    flex: 1,
+  },
+  sizeRatioBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  sizeRatioBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  sizePillRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  sizePillActive: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  sizePillTextBold: {
+    color: '#B45309',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  sizePillSub: {
+    color: '#D97706',
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
+  sizePill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  sizePillText: {
+    color: '#475569',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  sizeGuideNote: {
+    color: '#78350F',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '500',
+  },
+  cropActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  cropToolBtn: {
+    flex: 1.3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  cropToolBtnText: {
+    color: '#92400E',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  changeImgBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  changeImgBtnText: {
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cropNoticePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  cropNoticeText: {
+    fontSize: 10.5,
+    color: '#92400E',
+    fontWeight: '600',
+    flex: 1,
+  },
+  cropViewfinderFrame: {
+    width: '100%',
+    height: 72,
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  cropViewfinderImg: {
+    width: '100%',
+    height: '100%',
+  },
+  cropCorner: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderColor: '#F59E0B',
+    zIndex: 10,
+  },
+  cropCornerTL: { top: 4, left: 4, borderTopWidth: 2.5, borderLeftWidth: 2.5 },
+  cropCornerTR: { top: 4, right: 4, borderTopWidth: 2.5, borderRightWidth: 2.5 },
+  cropCornerBL: { bottom: 4, left: 4, borderBottomWidth: 2.5, borderLeftWidth: 2.5 },
+  cropCornerBR: { bottom: 4, right: 4, borderBottomWidth: 2.5, borderRightWidth: 2.5 },
+  cropGridLineH: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  cropGridLineV1: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '33.3%',
+    width: 1,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  cropGridLineV2: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '66.6%',
+    width: 1,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  cropControlsContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  cropControlRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cropControlLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  cropBtnGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cropMiniBtn: {
+    width: 32,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cropMiniBtnTextWrap: {
+    paddingHorizontal: 8,
+    height: 28,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cropMiniBtnText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  cropCancelBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 11,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cropCancelBtnText: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cropApplyBtn: {
+    flex: 1.4,
+    backgroundColor: '#F59E0B',
+    paddingVertical: 11,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cropApplyBtnText: {
+    color: '#0F172A',
+    fontSize: 11.5,
+    fontWeight: '900',
   },
 });
