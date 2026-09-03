@@ -126,7 +126,7 @@ export default function ModernContentManager() {
     }
   };
 
-  const pickImage = async (allowCrop = false) => {
+  const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted' && Platform.OS !== 'web') {
@@ -135,8 +135,8 @@ export default function ModernContentManager() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: allowCrop, // If false, uploads 100% full original image without any forced crop!
-        quality: 0.95,
+        allowsEditing: false, // Absolutely NO cropping screen, no crop errors!
+        quality: 1,
         base64: true,
       });
 
@@ -773,65 +773,22 @@ export default function ModernContentManager() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* UPLOAD MODE SELECTOR */}
-              <View style={{ marginBottom: 10 }}>
-                <Text style={s.inputLabel}>Yanayin Ɗora Banner (Upload Mode)</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                  <TouchableOpacity
-                    onPress={() => { setUploadMode('original'); pickImage(false); }}
-                    style={[s.modeOptionBtn, uploadMode === 'original' && s.modeOptionBtnActive]}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="image-outline" size={14} color={uploadMode === 'original' ? '#fff' : '#0F172A'} />
-                    <Text style={[s.modeOptionTxt, uploadMode === 'original' && { color: '#fff', fontWeight: '800' }]}>
-                      100% Asalin Size (Ba Crop) ✨
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => { setUploadMode('freeform'); pickImage(true); }}
-                    style={[s.modeOptionBtn, uploadMode === 'freeform' && s.modeOptionBtnActive]}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="crop-outline" size={14} color={uploadMode === 'freeform' ? '#fff' : '#0F172A'} />
-                    <Text style={[s.modeOptionTxt, uploadMode === 'freeform' && { color: '#fff', fontWeight: '800' }]}>
-                      Crop / Resize da Hannu
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
               {/* Image Preview & Picker */}
-              <TouchableOpacity onPress={() => pickImage(uploadMode === 'freeform')} style={s.imagePickerBox} activeOpacity={0.8}>
+              <TouchableOpacity onPress={pickImage} style={s.imagePickerBox} activeOpacity={0.85}>
                 {selectedImage ? (
                   <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="contain" />
                 ) : existingImageUrl ? (
                   <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="contain" />
                 ) : (
                   <View style={s.imagePickerPlaceholder}>
-                    <Ionicons name="image-outline" size={26} color={L.goldDk} />
-                    <Text style={s.imagePickerText}>Danna Nan Don Zaɓar Banner</Text>
-                    <Text style={{ fontSize: 9.5, color: L.textMuted }}>
-                      {uploadMode === 'original' ? '✓ Zai ɗauki asalin girman hotonka ba tare da an yanke ba' : 'Zaka iya crop ɗin hoton da kanka yadda kake so'}
-                    </Text>
+                    <View style={s.uploadIconCircle}>
+                      <Ionicons name="cloud-upload-outline" size={26} color={L.goldDk} />
+                    </View>
+                    <Text style={s.imagePickerTitle}>Select Banner Image</Text>
+                    <Text style={s.imagePickerSubtitle}>Upload original image • High Quality • No cropping</Text>
                   </View>
                 )}
               </TouchableOpacity>
-
-              {/* INFORMATION CARD: NO FORCED CROP & FULL ORIGINAL SIZE SUPPORT */}
-              <View style={{ marginTop: 2, marginBottom: 12, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#3B82F6', borderRadius: 12, padding: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <Ionicons name="shield-checkmark" size={15} color="#2563EB" />
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4ED8', textTransform: 'uppercase' }}>
-                    An Cire Tilasta Ma'aunin 1200x300 (Full Original Size)
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 10.5, color: '#1E40AF', lineHeight: 15, fontWeight: '500' }}>
-                  • <Text style={{ fontWeight: '700' }}>Asalin Size (Ba Crop):</Text> Yanzu ba a sake takura ma hotonku a kan 1200x300 ba! Hotonku zai shiga a ainihin yadda kuka tsara shi ba tare da an yanke ko da ƙwayar pixel ɗaya ba.{'\n'}
-                  • <Text style={{ fontWeight: '700' }}>Crop da Hannu:</Text> Idan kuka zaɓi "Crop / Resize da Hannu", zaku iya yanke hoton da kanku gwargwadon yadda kuke buƙata.{'\n'}
-                  • <Text style={{ fontWeight: '700' }}>Fitar Banner:</Text> Banner zai fita tsaf (100% cikakke) a koina a manhajar ba tare da an matse shi ko an ɓata asalin sa ba.
-                </Text>
-              </View>
 
               <Text style={s.inputLabel}>Banner Title</Text>
               <TextInput
@@ -1275,21 +1232,22 @@ const s = StyleSheet.create({
     borderRadius: 4,
   },
   saveMainBtn: {
-    borderRadius: 10,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: 6,
   },
   saveMainGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
+    gap: 8,
+    paddingVertical: 13,
   },
   saveMainText: {
     color: L.gold,
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 13.5,
+    letterSpacing: 0.5,
   },
   settingsCard: {
     backgroundColor: L.card,
@@ -1376,13 +1334,13 @@ const s = StyleSheet.create({
     color: L.textPrimary,
   },
   imagePickerBox: {
-    height: 120,
+    height: 140,
     backgroundColor: '#070D1E',
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: L.cardBorder,
+    borderColor: '#CBD5E1',
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   modalImagePreview: {
     width: '100%',
@@ -1392,23 +1350,43 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
+    padding: 12,
+  },
+  uploadIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(217, 119, 6, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePickerTitle: {
+    color: L.navyHeader,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  imagePickerSubtitle: {
+    color: L.textMuted,
+    fontSize: 10.5,
+    fontWeight: '500',
   },
   imagePickerText: {
     color: L.textMuted,
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   modalInput: {
-    backgroundColor: L.bg,
-    borderWidth: 1,
-    borderColor: L.cardBorder,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     color: L.textPrimary,
-    fontSize: 11,
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   selectAllText: {
     color: L.goldAmber,

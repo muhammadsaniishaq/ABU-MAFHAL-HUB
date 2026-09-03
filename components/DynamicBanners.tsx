@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 32, 450);
-const BANNER_HEIGHT = 80; // Sleek slim ribbon banner with 100% full original image support
+const BANNER_HEIGHT = 120; // Complete proportional height: shows full banner graphics without cutting in half
 const BANNER_MARGIN = 10;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
