@@ -19,46 +19,63 @@ const L = {
 };
 
 export default function InstallAppButton() {
+    // PWA Install Button is ONLY for web browsers (Chrome/Safari) - on native Android/iOS return null immediately
+    if (Platform.OS !== 'web') {
+        return null;
+    }
+
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstalled, setIsInstalled] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [isIosDevice, setIsIosDevice] = useState(false);
 
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (Platform.OS !== 'web' || typeof window === 'undefined') return;
 
-        // Detect iOS
-        if (typeof navigator !== 'undefined') {
-            const ua = window.navigator.userAgent.toLowerCase();
-            if (/iphone|ipad|ipod/.test(ua)) {
-                setIsIosDevice(true);
+        try {
+            // Detect iOS
+            if (typeof navigator !== 'undefined' && navigator.userAgent) {
+                const ua = navigator.userAgent.toLowerCase();
+                if (/iphone|ipad|ipod/.test(ua)) {
+                    setIsIosDevice(true);
+                }
             }
+
+            // Check if already running as installed PWA
+            if (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) {
+                setIsInstalled(true);
+                return;
+            }
+            if ((window.navigator as any)?.standalone) {
+                setIsInstalled(true);
+                return;
+            }
+
+            const handleBeforeInstallPrompt = (e: any) => {
+                e.preventDefault();
+                setDeferredPrompt(e);
+            };
+
+            const handleAppInstalled = () => {
+                setIsInstalled(true);
+                setDeferredPrompt(null);
+                setModalVisible(false);
+            };
+
+            if (typeof window.addEventListener === 'function') {
+                window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+                window.addEventListener('appinstalled', handleAppInstalled);
+            }
+
+            return () => {
+                if (typeof window.removeEventListener === 'function') {
+                    window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+                    window.removeEventListener('appinstalled', handleAppInstalled);
+                }
+            };
+        } catch (err) {
+            console.warn("PWA install check error:", err);
         }
-
-        // Check if already running as installed PWA
-        if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
-            setIsInstalled(true);
-            return;
-        }
-
-        const handleBeforeInstallPrompt = (e: any) => {
-            e.preventDefault();
-            setDeferredPrompt(e);
-        };
-
-        const handleAppInstalled = () => {
-            setIsInstalled(true);
-            setDeferredPrompt(null);
-            setModalVisible(false);
-        };
-
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        window.addEventListener('appinstalled', handleAppInstalled);
-
-        return () => {
-            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-            window.removeEventListener('appinstalled', handleAppInstalled);
-        };
     }, []);
 
     const handleButtonClick = () => {

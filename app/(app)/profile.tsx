@@ -142,42 +142,58 @@ export default function UserProfileScreen() {
     }, []);
 
     const fetchProfileData = async (userId: string) => {
-        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        if (data) {
-            setProfile(data);
-            setTwoFactorEnabled(!!data.two_factor_enabled);
-            saveCache({ profile: data });
+        try {
+            const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+            if (data && !error) {
+                setProfile(data);
+                setTwoFactorEnabled(!!data.two_factor_enabled);
+                saveCache({ profile: data });
+            }
+        } catch (e) {
+            console.warn("fetchProfileData error:", e);
         }
     };
 
     const fetchVirtualAccount = async (userId: string) => {
-        const { data } = await supabase.from('virtual_accounts').select('*').eq('user_id', userId).maybeSingle();
-        if (data) {
-            setVirtualAcc(data);
-            saveCache({ virtualAcc: data });
+        try {
+            const { data, error } = await supabase.from('virtual_accounts').select('*').eq('user_id', userId).maybeSingle();
+            if (data && !error) {
+                setVirtualAcc(data);
+                saveCache({ virtualAcc: data });
+            }
+        } catch (e) {
+            console.warn("fetchVirtualAccount error:", e);
         }
     };
 
     const fetchTransactionCount = async (userId: string) => {
-        const { count } = await supabase
-            .from('transactions')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId);
-        if (count !== null) {
-            setTxCount(count);
-            saveCache({ txCount: count });
+        try {
+            const { count, error } = await supabase
+                .from('transactions')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId);
+            if (count !== null && count !== undefined && !error) {
+                setTxCount(count);
+                saveCache({ txCount: count });
+            }
+        } catch (e) {
+            console.warn("fetchTransactionCount error:", e);
         }
     };
 
     const fetchUnreadNotifications = async (userId: string) => {
-        const { count } = await supabase
-            .from('notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .eq('read', false);
-        if (count !== null) {
-            setUnreadCount(count);
-            saveCache({ unreadCount: count });
+        try {
+            const { count, error } = await supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('read', false);
+            if (count !== null && count !== undefined && !error) {
+                setUnreadCount(count);
+                saveCache({ unreadCount: count });
+            }
+        } catch (e) {
+            console.warn("fetchUnreadNotifications error:", e);
         }
     };
 
@@ -356,7 +372,7 @@ export default function UserProfileScreen() {
                             <View style={{ position: 'relative' }}>
                                 <View style={{ width: 56, height: 56, borderRadius: 28, padding: 2, backgroundColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
                                     <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: L.navyHeader }}>
-                                        {profile?.avatar_url ? (
+                                        {profile?.avatar_url && typeof profile.avatar_url === 'string' && profile.avatar_url.trim().length > 5 ? (
                                             <Image source={{ uri: profile.avatar_url }} style={{ width: '100%', height: '100%' }} />
                                         ) : (
                                             <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: L.navyMid }}>
@@ -408,7 +424,7 @@ export default function UserProfileScreen() {
                         <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', elevation: 2 }}>
                             <View style={{ alignItems: 'center', flex: 1 }}>
                                 <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Wallet Balance</Text>
-                                <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 2 }}>₦{(profile?.balance || 0).toLocaleString()}</Text>
+                                <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 2 }}>₦{Number(profile?.balance || 0).toLocaleString()}</Text>
                             </View>
                             <View style={{ width: 1, height: 22, backgroundColor: L.inputBorder }} />
                             <View style={{ alignItems: 'center', flex: 1 }}>
@@ -425,7 +441,7 @@ export default function UserProfileScreen() {
                         {/* Mobile-First Quick Chips Navigation (4 Balanced Touch Chips) */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
                             <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase' }}>Quick Navigation Actions</Text>
-                            <InstallAppButton />
+                            {Platform.OS === 'web' && <InstallAppButton />}
                         </View>
                         <View style={{ flexDirection: 'row', gap: 6 }}>
                             <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
