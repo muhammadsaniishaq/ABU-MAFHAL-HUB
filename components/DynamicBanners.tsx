@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 32, 450);
-const BANNER_HEIGHT = 120; // Complete proportional height: shows full banner graphics without cutting in half
+const BANNER_HEIGHT = 70; // Ultra-slim, elegant fintech banner ribbon
 const BANNER_MARGIN = 10;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
@@ -169,19 +169,19 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 6,
-    marginBottom: 4,
+    marginTop: 4,
+    marginBottom: 2,
     zIndex: 10,
   },
   bannerCard: {
     width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
     marginRight: BANNER_MARGIN,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#0F172A',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: 'rgba(245, 158, 11, 0.25)',
     shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
