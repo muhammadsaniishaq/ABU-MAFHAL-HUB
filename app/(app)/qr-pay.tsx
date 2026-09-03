@@ -118,7 +118,7 @@ export default function QRPayScreen() {
             if (user) {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('id, full_name, email, balance, avatar_url, created_at')
+                    .select('id, full_name, username, phone, email, balance, avatar_url, created_at')
                     .eq('id', user.id)
                     .single();
                 if (profile) {
@@ -162,41 +162,298 @@ export default function QRPayScreen() {
         }
     };
 
+    const downloadCardOnWeb = async (): Promise<boolean> => {
+        if (!currentUser) return false;
+        try {
+            if (typeof document === 'undefined') return false;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 750;
+            canvas.height = 1050;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return false;
+
+            // 1. Dark background gradient
+            const bgGrad = ctx.createLinearGradient(0, 0, 750, 1050);
+            bgGrad.addColorStop(0, '#060C1B');
+            bgGrad.addColorStop(0.5, '#0B1736');
+            bgGrad.addColorStop(1, '#060C1B');
+            ctx.fillStyle = bgGrad;
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(0, 0, 750, 1050, 28);
+            } else {
+                ctx.rect(0, 0, 750, 1050);
+            }
+            ctx.fill();
+
+            // 2. Gold border
+            ctx.strokeStyle = '#F5A623';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 3. Abu Mafhal Hub Header with Logo
+            const logoUrl = settings?.app_logo 
+                ? (typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url)
+                : '';
+            
+            let logoLoaded = false;
+            if (logoUrl) {
+                try {
+                    const logoImg = new window.Image();
+                    logoImg.crossOrigin = 'anonymous';
+                    await new Promise((res) => {
+                        logoImg.onload = res;
+                        logoImg.onerror = res;
+                        logoImg.src = logoUrl;
+                    });
+                    if (logoImg.width > 0) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(80, 80, 30, 0, Math.PI * 2);
+                        ctx.clip();
+                        ctx.drawImage(logoImg, 50, 50, 60, 60);
+                        ctx.restore();
+                        logoLoaded = true;
+                    }
+                } catch (_) {}
+            }
+            if (!logoLoaded) {
+                ctx.beginPath();
+                ctx.arc(80, 80, 30, 0, Math.PI * 2);
+                ctx.fillStyle = '#F5A623';
+                ctx.fill();
+                ctx.fillStyle = '#0D1B3E';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('AM', 80, 88);
+                ctx.textAlign = 'left';
+            }
+
+            // Header brand text
+            ctx.fillStyle = '#F5A623';
+            ctx.font = 'bold 26px sans-serif';
+            ctx.fillText('ABU MAFHAL HUB', 125, 74);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.font = 'bold 15px sans-serif';
+            ctx.fillText('OFFICIAL VIP PAYMENT PASS', 125, 100);
+
+            // Verified badge pill on top right
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(550, 58, 145, 38, 19);
+            else ctx.rect(550, 58, 145, 38);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#10B981';
+            ctx.font = 'bold 15px sans-serif';
+            ctx.fillText('✓ VERIFIED', 575, 83);
+
+            // Divider line
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.beginPath();
+            ctx.moveTo(50, 130);
+            ctx.lineTo(700, 130);
+            ctx.stroke();
+
+            // 4. User Profile Row
+            let avatarLoaded = false;
+            if (currentUser.avatar_url) {
+                try {
+                    const avImg = new window.Image();
+                    avImg.crossOrigin = 'anonymous';
+                    await new Promise((res) => {
+                        avImg.onload = res;
+                        avImg.onerror = res;
+                        avImg.src = currentUser.avatar_url;
+                    });
+                    if (avImg.width > 0) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(95, 185, 34, 0, Math.PI * 2);
+                        ctx.clip();
+                        ctx.drawImage(avImg, 61, 151, 68, 68);
+                        ctx.restore();
+                        avatarLoaded = true;
+                    }
+                } catch (_) {}
+            }
+            if (!avatarLoaded) {
+                ctx.beginPath();
+                ctx.arc(95, 185, 34, 0, Math.PI * 2);
+                ctx.fillStyle = '#F5A623';
+                ctx.fill();
+                ctx.fillStyle = '#0D1B3E';
+                ctx.font = 'bold 26px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText((currentUser.full_name ? currentUser.full_name[0] : 'U').toUpperCase(), 95, 195);
+                ctx.textAlign = 'left';
+            }
+
+            // User Name & Email
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 26px sans-serif';
+            ctx.fillText(currentUser.full_name || 'Mafhal User', 145, 180);
+            ctx.fillStyle = '#94A3B8';
+            ctx.font = '17px sans-serif';
+            ctx.fillText(currentUser.email || '', 145, 210);
+
+            // 5. QR Code Plate
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(175, 255, 400, 400, 20);
+            else ctx.rect(175, 255, 400, 400);
+            ctx.fill();
+
+            // Gold corner accents
+            ctx.strokeStyle = '#F5A623';
+            ctx.lineWidth = 4;
+            // Top Left
+            ctx.beginPath();
+            ctx.moveTo(185, 290);
+            ctx.lineTo(185, 270);
+            ctx.lineTo(205, 270);
+            ctx.stroke();
+            // Top Right
+            ctx.beginPath();
+            ctx.moveTo(545, 270);
+            ctx.lineTo(565, 270);
+            ctx.lineTo(565, 290);
+            ctx.stroke();
+            // Bottom Left
+            ctx.beginPath();
+            ctx.moveTo(185, 620);
+            ctx.lineTo(185, 640);
+            ctx.lineTo(205, 640);
+            ctx.stroke();
+            // Bottom Right
+            ctx.beginPath();
+            ctx.moveTo(545, 640);
+            ctx.lineTo(565, 640);
+            ctx.lineTo(565, 620);
+            ctx.stroke();
+
+            // Load and draw QR code
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(myCodePayload)}&color=0D1B3E&margin=0`;
+            const qrImg = new window.Image();
+            qrImg.crossOrigin = 'anonymous';
+            await new Promise((res) => {
+                qrImg.onload = res;
+                qrImg.onerror = res;
+                qrImg.src = qrUrl;
+            });
+            ctx.drawImage(qrImg, 195, 275, 360, 360);
+
+            // Amount banner or subtitle
+            if (requestedAmount && parseFloat(requestedAmount) > 0) {
+                ctx.fillStyle = '#FDE68A';
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(200, 675, 350, 42, 12);
+                else ctx.rect(200, 675, 350, 42);
+                ctx.fill();
+                ctx.fillStyle = '#78350F';
+                ctx.font = 'bold 19px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`REQUESTED AMOUNT: ₦${parseFloat(requestedAmount).toLocaleString()}`, 375, 703);
+                ctx.textAlign = 'left';
+            } else {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Scan with Abu Mafhal App or Any Banking Camera', 375, 695);
+                ctx.textAlign = 'left';
+            }
+
+            // 6. Bottom Details Card ("a kasa da bayanan sa")
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(60, 735, 630, 200, 18);
+            else ctx.rect(60, 735, 630, 200);
+            ctx.fill();
+            ctx.stroke();
+
+            // Row 1: Wallet ID
+            ctx.fillStyle = '#F5A623';
+            ctx.font = 'bold 20px monospace';
+            ctx.fillText(`WALLET ID:  MAF-${(currentUser.id || '').substring(0, 8).toUpperCase()}`, 90, 780);
+
+            // Row 2: Account Name
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 18px sans-serif';
+            ctx.fillText(`ACCOUNT NAME:  ${currentUser.full_name}`, 90, 820);
+
+            // Row 3: Email
+            ctx.fillStyle = '#94A3B8';
+            ctx.font = '17px sans-serif';
+            ctx.fillText(`EMAIL ADDRESS:  ${currentUser.email}`, 90, 858);
+
+            // Row 4: Phone & Settlement
+            ctx.fillStyle = '#10B981';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText(`PHONE: ${currentUser.phone || 'Verified'}   •   FEE: 0% Free Instant Transfer`, 90, 898);
+
+            // 7. Footer Watermark Seal
+            ctx.fillStyle = 'rgba(245, 166, 35, 0.85)';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('POWERED BY ABU MAFHAL HUB • SECURE 256-BIT ENCRYPTION', 375, 975);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.font = '13px sans-serif';
+            ctx.fillText('www.abumafhal.com.ng', 375, 1000);
+
+            // Trigger download
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `Abu_Mafhal_QR_${(currentUser.full_name || 'Card').replace(/\s+/g, '_')}.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            Alert.alert("Downloaded 🎉", "Your official Abu Mafhal QR Card has been saved successfully!");
+            return true;
+        } catch (canvasErr) {
+            console.error("downloadCardOnWeb error:", canvasErr);
+            return false;
+        }
+    };
+
     const handleSaveToGallery = async () => {
         if (!currentUser) return;
         try {
             if (Platform.OS !== 'web') {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             }
+            if (Platform.OS === 'web') {
+                await downloadCardOnWeb();
+                return;
+            }
             if (flyerRef.current && flyerRef.current.capture) {
                 const uri = await flyerRef.current.capture();
-                if (Platform.OS === 'web') {
-                    const link = document.createElement('a');
-                    link.href = uri;
-                    link.download = `mafhal_pay_qr_${(currentUser.full_name || 'code').replace(/\s+/g, '_')}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    Alert.alert("Downloaded 🎉", "QR flyer image downloaded successfully!");
+                const { status } = await MediaLibrary.requestPermissionsAsync();
+                if (status === 'granted') {
+                    await MediaLibrary.saveToLibraryAsync(uri);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    Alert.alert("Saved to Photos 📸", "Your Abu Mafhal QR Card has been saved to your photo gallery!");
                 } else {
-                    const { status } = await MediaLibrary.requestPermissionsAsync();
-                    if (status === 'granted') {
-                        await MediaLibrary.saveToLibraryAsync(uri);
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        Alert.alert("Saved to Photos 📸", "Your payment QR Code has been saved to your photo gallery!");
-                    } else {
-                        await Sharing.shareAsync(uri, {
-                            mimeType: 'image/png',
-                            dialogTitle: `Mafhal Pay QR - ${currentUser.full_name}`,
-                        });
-                    }
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: `Abu Mafhal Pay QR - ${currentUser.full_name}`,
+                    });
                 }
             } else {
                 handleShareMyCode();
             }
         } catch (error: any) {
             console.error("Save to gallery error:", error);
-            handleShareMyCode();
+            if (Platform.OS === 'web') {
+                await downloadCardOnWeb();
+            } else {
+                handleShareMyCode();
+            }
         }
     };
 
@@ -205,35 +462,25 @@ export default function QRPayScreen() {
         
         setIsSubmitting(true);
         try {
-            // Use ViewShot to capture the beautifully rendered native UI into a high-quality PNG
+            if (Platform.OS === 'web') {
+                await downloadCardOnWeb();
+                return;
+            }
             if (flyerRef.current && flyerRef.current.capture) {
                 const uri = await flyerRef.current.capture();
-                
-                if (Platform.OS === 'web') {
-                    // On Web, trigger a download of the captured PNG image
-                    const link = document.createElement('a');
-                    link.href = uri;
-                    link.download = `mafhal_pay_qr_${currentUser.full_name.replace(/\s+/g, '_')}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                } else {
-                    // On Mobile, share the captured PNG directly
-                    await Sharing.shareAsync(uri, {
-                        mimeType: 'image/png',
-                        dialogTitle: `Pay ${currentUser.full_name} - Mafhal Sub`,
-                    });
-                }
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'image/png',
+                    dialogTitle: `Pay ${currentUser.full_name} - Abu Mafhal Hub`,
+                });
             } else {
                 throw new Error("Unable to capture QR Flyer");
             }
         } catch (error: any) {
             console.error("Flyer share error:", error);
-            // Fallback to text sharing
             try {
                 await Share.share({
                     title: `Pay ${currentUser.full_name}`,
-                    message: `Assalamu alaikum, scan this QR code or use my email to send me money instantly on Mafhal Sub:\n\n👤 Name: ${currentUser.full_name}\n📧 Email: ${currentUser.email}`,
+                    message: `Assalamu alaikum, scan this QR code or use my details to send me money instantly on Abu Mafhal Hub:\n\n👤 Name: ${currentUser.full_name}\n📧 Email: ${currentUser.email}\n💳 Wallet ID: MAF-${currentUser.id.substring(0, 8).toUpperCase()}`,
                 });
             } catch (fallbackError: any) {
                 Alert.alert("Share Error", fallbackError.message);
@@ -247,14 +494,14 @@ export default function QRPayScreen() {
         try {
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permissionResult.granted) {
-                Alert.alert("Permission Denied", "We need access to your gallery to upload QR images.");
+                Alert.alert("Permission Denied", "We need access to your photo gallery to upload QR images.");
                 return;
             }
 
             const pickerResult = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
-                quality: 1,
+                allowsEditing: false,
+                quality: 0.7,
             });
 
             if (pickerResult.canceled || !pickerResult.assets || pickerResult.assets.length === 0) {
@@ -264,9 +511,30 @@ export default function QRPayScreen() {
             const selectedImage = pickerResult.assets[0];
             setIsReadingGallery(true);
 
-            // Create form data to send to the qrserver decoding API
+            // 1. On Web: Try local native BarcodeDetector if available in browser
+            if (Platform.OS === 'web' && typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+                try {
+                    const barcodeDetector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+                    const img = new window.Image();
+                    img.crossOrigin = 'anonymous';
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = selectedImage.uri;
+                    });
+                    const barcodes = await barcodeDetector.detect(img);
+                    if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                        setIsReadingGallery(false);
+                        onBarcodeScanned({ data: barcodes[0].rawValue });
+                        return;
+                    }
+                } catch (detectorErr) {
+                    console.log("Local BarcodeDetector attempt skipped, proceeding to API decoder:", detectorErr);
+                }
+            }
+
+            // 2. Decode QR via remote decoding API
             const formData = new FormData();
-            
             if (Platform.OS === 'web') {
                 const response = await fetch(selectedImage.uri);
                 const blob = await response.blob();
@@ -274,8 +542,8 @@ export default function QRPayScreen() {
             } else {
                 formData.append('file', {
                     uri: selectedImage.uri,
-                    name: 'qr.png',
-                    type: 'image/png',
+                    name: 'qr.jpg',
+                    type: 'image/jpeg',
                 } as any);
             }
 
@@ -287,16 +555,16 @@ export default function QRPayScreen() {
             const result = await response.json();
             setIsReadingGallery(false);
 
-            const qrText = result[0]?.symbol[0]?.data;
+            const qrText = result?.[0]?.symbol?.[0]?.data;
             if (qrText) {
                 onBarcodeScanned({ data: qrText });
             } else {
-                Alert.alert("Scan Failed", "No valid QR code was detected in the selected image. Please make sure it is clear.");
+                Alert.alert("No QR Code Detected", "We could not find a clear QR code in the selected picture. Please choose a sharper image.");
             }
         } catch (e: any) {
             setIsReadingGallery(false);
             console.error("Gallery scan error:", e);
-            Alert.alert("Scan Error", "Failed to scan QR code from gallery. Check your network connection.");
+            Alert.alert("Scan Error", "Failed to scan QR code from gallery. Please check your network connection and try again.");
         }
     };
 
@@ -1211,7 +1479,8 @@ export default function QRPayScreen() {
                                         >
                                             <Ionicons name="close" size={24} color="white" />
                                         </TouchableOpacity>
-                                        <Text style={s.cameraTitleText}>QR Scanner</Text>
+                                        <Text style={s.cameraTitleText}>Live QR Scanner</Text>
+                                        <View style={{ width: 40 }} />
                                     </View>
                                     <View style={s.overlayMiddle}>
                                         <View style={s.overlaySide} />
@@ -1280,7 +1549,26 @@ export default function QRPayScreen() {
                                     {/* Ambient Glow */}
                                     <View style={s.ambientOrb} />
 
-                                    {/* Top Row: User Avatar & Info + VIP Badge */}
+                                    {/* 1. Official Branding: Logo + VIP Header */}
+                                    <View style={s.cardBrandRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                                            <Image 
+                                                source={settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png')}
+                                                style={s.cardBrandLogo}
+                                                resizeMode="contain"
+                                            />
+                                            <View>
+                                                <Text style={s.cardBrandTitle}>ABU MAFHAL HUB</Text>
+                                                <Text style={s.cardBrandSubText}>OFFICIAL VIP QR PASS</Text>
+                                            </View>
+                                        </View>
+                                        <View style={s.cardVerifiedPill}>
+                                            <Ionicons name="shield-checkmark" size={10} color="#10B981" />
+                                            <Text style={s.cardVerifiedText}>VERIFIED</Text>
+                                        </View>
+                                    </View>
+
+                                    {/* 2. User Profile: Avatar + Full Name + Email */}
                                     <View style={s.cardTopRow}>
                                         <View style={s.cardTopUser}>
                                             <LinearGradient
@@ -1291,16 +1579,16 @@ export default function QRPayScreen() {
                                                     {currentUser.avatar_url ? (
                                                         <Image 
                                                             source={{ uri: currentUser.avatar_url }} 
-                                                            style={{ width: '100%', height: '100%', borderRadius: 18 }}
+                                                            style={{ width: '100%', height: '100%', borderRadius: 17.5 }}
                                                         />
                                                     ) : (
-                                                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>
+                                                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#F5A623' }}>
                                                             {currentUser.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
                                                         </Text>
                                                     )}
                                                 </View>
                                             </LinearGradient>
-                                            <View style={{ marginLeft: 10, flex: 1 }}>
+                                            <View style={{ marginLeft: 9, flex: 1 }}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                                     <Text style={s.myCodeName} numberOfLines={1}>{currentUser.full_name}</Text>
                                                     <Ionicons name="checkmark-circle" size={13} color="#10B981" />
@@ -1316,14 +1604,14 @@ export default function QRPayScreen() {
                                             </View>
                                         </View>
 
-                                        {/* VIP Badge */}
-                                        <View style={s.cardBrandBadge}>
+                                        {/* Status badge */}
+                                        <View style={s.instantBadge}>
                                             <Ionicons name="flash" size={9} color="#F5A623" />
-                                            <Text style={s.cardBrandTitle}>MAFHAL PAY</Text>
+                                            <Text style={s.instantBadgeText}>0% FEE</Text>
                                         </View>
                                     </View>
 
-                                    {/* Center: High-Definition QR Code with Precision Gold Reticle */}
+                                    {/* 3. Center: High-Definition QR Code with Precision Gold Reticle */}
                                     <View style={s.qrWrapperContainer}>
                                         <View style={s.qrWrapper}>
                                             <View style={[s.qrCorner, s.qrCornerTL]} />
@@ -1361,12 +1649,12 @@ export default function QRPayScreen() {
                                         ) : (
                                             <View style={s.qrSecurityNote}>
                                                 <Ionicons name="shield-checkmark" size={9} color="#F5A623" />
-                                                <Text style={s.qrSecurityNoteText}>Scan with Mafhal App to Pay</Text>
+                                                <Text style={s.qrSecurityNoteText}>Scan with Mafhal App or any Camera to Pay</Text>
                                             </View>
                                         )}
                                     </View>
 
-                                    {/* Bottom: Wallet ID Bar with 1-Tap Copy */}
+                                    {/* 4. Bottom: Wallet ID Bar with 1-Tap Copy & User Details */}
                                     <View style={s.cardFooter}>
                                         <TouchableOpacity 
                                             onPress={() => handleCopy(`MAF-${currentUser.id.substring(0, 8).toUpperCase()}`, 'Wallet ID')}
@@ -1382,6 +1670,13 @@ export default function QRPayScreen() {
                                                 <Ionicons name="copy-outline" size={11} color="#F5A623" />
                                             </View>
                                         </TouchableOpacity>
+
+                                        {/* User Details Footer */}
+                                        <View style={s.cardDetailsSubBar}>
+                                            <Text style={s.cardDetailsSubText} numberOfLines={1}>
+                                                👤 {currentUser.full_name}   •   📱 {currentUser.phone || 'Abu Mafhal Pay'}
+                                            </Text>
+                                        </View>
                                     </View>
                                 </LinearGradient>
                             </ViewShot>
@@ -2131,6 +2426,21 @@ const s = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '600',
   },
+  cardBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  cardBrandLogo: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
   cardBrandBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2144,9 +2454,64 @@ const s = StyleSheet.create({
   },
   cardBrandTitle: {
     color: '#F5A623',
-    fontSize: 9,
+    fontSize: 10.5,
     fontWeight: '900',
     letterSpacing: 0.6,
+  },
+  cardBrandSubText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  cardVerifiedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    gap: 3,
+  },
+  cardVerifiedText: {
+    color: '#10B981',
+    fontSize: 8.5,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  instantBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    gap: 3,
+  },
+  instantBadgeText: {
+    color: '#F5A623',
+    fontSize: 8.5,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  cardDetailsSubBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: 6,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 8,
+  },
+  cardDetailsSubText: {
+    fontSize: 9,
+    color: '#94A3B8',
+    fontWeight: '700',
   },
   qrWrapperContainer: {
     alignItems: 'center',
@@ -2607,126 +2972,137 @@ const s = StyleSheet.create({
     fontWeight: '800',
     color: 'white',
   },
-  // Scanner styles
+  // Full-Screen Live Camera Scanner Overlay Styles
   overlayContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
     zIndex: 10,
   },
   overlayTop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    position: 'relative',
+    paddingTop: Platform.OS === 'ios' ? 50 : 25,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingBottom: 15,
   },
   floatingBackBtn: {
-    position: 'absolute',
-    top: 24,
-    left: 20,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 100,
+  },
+  cameraTitleText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
   overlayMiddle: {
     flexDirection: 'row',
-    height: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 270,
   },
   overlaySide: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   scanWindow: {
-    width: 240,
-    height: 240,
-    backgroundColor: 'transparent',
-    position: 'relative',
-  },
-  overlayBottom: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    alignItems: 'center',
-    paddingTop: 20,
-  },
-  overlayText: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    width: '100%',
-  },
-  torchBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    width: 260,
+    height: 260,
     borderRadius: 20,
+    position: 'relative',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'rgba(245, 166, 35, 0.3)',
+    backgroundColor: 'transparent',
   },
-  torchBtnText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '800',
-    marginLeft: 4,
-  },
-  // Corners
   corner: {
     position: 'absolute',
-    width: 24,
-    height: 24,
-    borderColor: '#f5a623',
-    borderWidth: 0,
+    width: 26,
+    height: 26,
+    borderColor: '#F5A623',
   },
   topLeft: {
     top: 0,
     left: 0,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderTopLeftRadius: 12,
+    borderTopLeftRadius: 16,
   },
   topRight: {
     top: 0,
     right: 0,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderTopRightRadius: 12,
+    borderTopRightRadius: 16,
   },
   bottomLeft: {
     bottom: 0,
     left: 0,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderBottomLeftRadius: 12,
+    borderBottomLeftRadius: 16,
   },
   bottomRight: {
     bottom: 0,
     right: 0,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderBottomRightRadius: 12,
+    borderBottomRightRadius: 16,
   },
   laserLine: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    height: 2,
-    backgroundColor: '#f5a623',
-    shadowColor: '#f5a623',
+    width: '100%',
+    height: 3,
+    backgroundColor: '#F5A623',
+    shadowColor: '#F5A623',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  overlayBottom: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    justifyContent: 'space-between',
+  },
+  overlayText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  torchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    gap: 6,
+  },
+  torchBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   scanDashboardContainer: {
     paddingHorizontal: 16,
@@ -2903,14 +3279,6 @@ const s = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: '500',
     marginTop: 1,
-  },
-  cameraTitleText: {
-    position: 'absolute',
-    top: 32,
-    left: 80,
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '900',
   },
   decoratedModalCard: {
     width: '90%',
