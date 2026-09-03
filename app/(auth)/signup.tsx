@@ -634,26 +634,8 @@ export default function SignupScreen() {
                 const cleanEmailLower = cleanEmail.toLowerCase().trim();
                 await AsyncStorage.setItem('pending_auth_email', cleanEmailLower);
                 await AsyncStorage.setItem('pending_auth_pass', password);
-
-                // 2. Generate & store 6-digit OTP code locally under all fallback keys for 100% verification guarantee
-                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                await AsyncStorage.setItem(`otp_fallback_${cleanEmailLower}`, generatedOtp);
-                await AsyncStorage.setItem(`verification_otp_${cleanEmailLower}`, generatedOtp);
-                await AsyncStorage.setItem('last_generated_otp', generatedOtp);
-                await AsyncStorage.setItem('last_otp_email', cleanEmailLower);
-
-                // 3. Dispatch genuine OTP email notification via backend
-                try {
-                    supabase.functions.invoke('send-auth-otp', {
-                        body: {
-                            email: cleanEmailLower,
-                            otp: generatedOtp,
-                            name: cleanFullName || cleanUsername
-                        }
-                    }).catch(e => console.log('Background OTP send notice:', e));
-                } catch (otpErr) {
-                    console.log('OTP trigger error note:', otpErr);
-                }
+                await AsyncStorage.setItem('just_signed_up', 'true');
+                await AsyncStorage.setItem('signup_timestamp', String(Date.now()));
 
                 // 4. Show success & Navigate to OTP Screen
                 setShowSuccessModal(true);

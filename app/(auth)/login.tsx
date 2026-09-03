@@ -222,47 +222,21 @@ export default function LoginScreen() {
                             await AsyncStorage.setItem('pending_auth_pass', userPass);
                         }
 
-                        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-
-                        await AsyncStorage.setItem(`recovery_otp_${cleanEmail}`, generatedOtp);
-                        await AsyncStorage.setItem(`recovery_otp_${emailToUse}`, generatedOtp);
-                        await AsyncStorage.setItem('latest_generated_otp', generatedOtp);
-
-                        await AsyncStorage.setItem(`recovery_otp_time_${cleanEmail}`, String(Date.now()));
-                        await AsyncStorage.setItem(`recovery_otp_time_${emailToUse}`, String(Date.now()));
-                        await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
-
-                        try {
-                            await supabase.functions.invoke('send-communication', {
-                                body: {
-                                    type: 'email',
-                                    recipient_mode: 'single',
-                                    recipient: cleanEmail,
-                                    subject: 'Your 6-Digit Verification Code 🔒 - ABU MAFHAL SUB',
-                                    body: `
-                                        <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
-                                            <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
-                                            <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Account Email Verification</p>
-                                            <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit verification code is:</p>
-                                            <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
-                                                ${generatedOtp}
-                                            </div>
-                                            <p style="color:#64748B; font-size:11px; margin-top:16px;">This code is valid for 10 minutes. Do not share this code with anyone.</p>
-                                        </div>
-                                    `,
-                                },
-                            });
-                        } catch (e) {
-                            console.log('Login OTP email dispatch notice:', e);
-                        }
-
+                        // Send ONE official verification code from Supabase Auth
                         try {
                             await supabase.auth.resend({ type: 'signup', email: cleanEmail });
-                        } catch (e) {}
+                        } catch (e) {
+                            console.log('Supabase resend notice:', e);
+                        }
 
                         router.push({
                             pathname: '/otp' as any,
-                            params: { email: cleanEmail, mode: 'signup', forceResend: 'true' }
+                            params: { 
+                                email: cleanEmail, 
+                                type: 'signup',
+                                mode: 'signup',
+                                source: 'login_unconfirmed'
+                            }
                         });
                         setLoading(false);
                         return;

@@ -196,12 +196,33 @@ export default function PinSetupScreen() {
                             }
                         }
 
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (user?.id) {
+                        // Ensure active session is verified before routing to dashboard
+                        let finalUser = null;
+                        const { data: { session: existingSession } } = await supabase.auth.getSession();
+                        if (existingSession?.user) {
+                            finalUser = existingSession.user;
+                        } else {
+                            const pEmail = await AsyncStorage.getItem('pending_auth_email');
+                            const pPass = await AsyncStorage.getItem('pending_auth_pass');
+                            if (pEmail && pPass) {
+                                try {
+                                    const { data: resData } = await supabase.auth.signInWithPassword({
+                                        email: pEmail,
+                                        password: pPass,
+                                    });
+                                    if (resData?.session) {
+                                        await supabase.auth.setSession(resData.session);
+                                        finalUser = resData.user;
+                                    }
+                                } catch (sErr) {}
+                            }
+                        }
+
+                        if (finalUser?.id) {
                             await supabase
                                 .from('profiles')
                                 .update({ transaction_pin: pin, status: 'active' })
-                                .eq('id', user.id);
+                                .eq('id', finalUser.id);
                         }
                     } catch (e) {
                         console.log('Profile transaction_pin sync notice:', e);
@@ -209,19 +230,28 @@ export default function PinSetupScreen() {
 
                     if (Platform.OS !== 'web') Vibration.vibrate(50);
 
-                    // 3. Mark app as unlocked & navigate straight to Dashboard
+                    // 3. Mark app as unlocked & navigate
                     await AsyncStorage.setItem('app_unlocked', 'true');
                     await AsyncStorage.setItem('has_active_session', 'true');
                     await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
 
-                    const successMsg = 'Success! 🎉 Your account & 4-digit Transaction PIN have been created successfully.';
-                    if (Platform.OS === 'web') {
-                        alert(successMsg);
-                        router.replace('/dashboard' as any);
+                    const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+
+                    if (verifiedSession?.user) {
+                        const successMsg = 'Success! 🎉 Your account & 4-digit Transaction PIN have been created successfully.';
+                        if (Platform.OS === 'web') {
+                            alert(successMsg);
+                            router.replace('/dashboard' as any);
+                        } else {
+                            Alert.alert('Setup Complete! 🎉', successMsg, [
+                                { text: 'Go to Dashboard', onPress: () => router.replace('/dashboard' as any) },
+                            ]);
+                        }
                     } else {
-                        Alert.alert('Setup Complete! 🎉', successMsg, [
-                            { text: 'Go to Dashboard', onPress: () => router.replace('/dashboard' as any) },
-                        ]);
+                        const loginNotice = 'PIN set successfully! Please log in with your password to continue to dashboard.';
+                        if (Platform.OS === 'web') alert(loginNotice);
+                        else Alert.alert('Account Ready', loginNotice);
+                        router.replace('/(auth)/login' as any);
                     }
                 } catch (error: any) {
                     const errMsg = error.message || 'Failed to save PIN';

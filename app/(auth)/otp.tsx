@@ -33,6 +33,7 @@ export default function OTP() {
         tempPhone?: string;
         tempCustomId?: string;
         tempReferralCode?: string;
+        source?: string;
     }>();
 
     const router = useRouter();
@@ -87,20 +88,19 @@ export default function OTP() {
     };
 
     const checkAndSendOtpEmail = async (emailToSend: string) => {
+        const isFromSignup = params.type === 'signup' || params.mode === 'signup' || params.source === 'registration' || params.source === 'login_unconfirmed';
+        // If coming directly from Signup or Unconfirmed Login, Supabase Auth ALREADY dispatched the code!
+        // Do NOT send a duplicate email!
+        if (isFromSignup && params.forceResend !== 'true') {
+            setCounter(60);
+            return;
+        }
+
         if (params.forceResend === 'true') {
             await sendOtpEmail(emailToSend, true);
             return;
         }
-        try {
-            const cleanEmailLower = emailToSend.toLowerCase().trim();
-            const storedTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${cleanEmailLower}`);
-            const storedTime = storedTimeStr ? parseInt(storedTimeStr, 10) : 0;
-            const hasStoredOtp = await AsyncStorage.getItem(`recovery_otp_${cleanEmailLower}`) || await AsyncStorage.getItem('latest_generated_otp');
-            // If OTP was sent less than 60 seconds ago by Signup screen, skip auto-resending
-            if (storedTime && hasStoredOtp && (Date.now() - storedTime < 60 * 1000)) {
-                return;
-            }
-        } catch (e) {}
+
         await sendOtpEmail(emailToSend, true);
     };
 
@@ -108,46 +108,31 @@ export default function OTP() {
         if (!emailToSend) return;
         setResending(true);
         try {
-            // Generate a random 6-digit numeric OTP code
             const cleanEmailLower = emailToSend.toLowerCase().trim();
-            const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+            const isSignup = params.mode === 'signup' || params.type === 'signup' || params.source === 'registration' || params.source === 'login_unconfirmed';
 
-            await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, generatedOtp);
-            await AsyncStorage.setItem(`recovery_otp_${emailToSend}`, generatedOtp);
-            await AsyncStorage.setItem('latest_generated_otp', generatedOtp);
-
-            await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
-            await AsyncStorage.setItem(`recovery_otp_time_${emailToSend}`, String(Date.now()));
-            await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
-
-            const isReset = params.mode === 'reset-password' || params.mode === 'account-password';
-            const emailSubtitle = isReset ? 'Password Reset Verification' : 'Account Registration Verification';
-
-            // 1. Dispatch HTML email with the 6-digit code via Edge Function
-            try {
-                await supabase.functions.invoke('send-communication', {
-                    body: {
-                        type: 'email',
-                        recipient_mode: 'single',
-                        recipient: emailToSend,
-                        subject: `Your 6-Digit Verification Code 🔒 - ABU MAFHAL SUB`,
-                        body: `
-                            <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
-                                <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
-                                <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">${emailSubtitle}</p>
-                                <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit verification code is:</p>
-                                <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
-                                    ${generatedOtp}
-                                </div>
-                                <p style="color:#64748B; font-size:11px; margin-top:16px;">This code is valid for 10 minutes. Do not share this code with anyone.</p>
-                            </div>
-                        `,
-                    },
+            if (isSignup) {
+                // Official Supabase signup verification code resend (Single official email)
+                const { error: resendErr } = await supabase.auth.resend({
+                    type: 'signup',
+                    email: cleanEmailLower,
                 });
-            } catch (err) {
-                console.log('Custom OTP email notice:', err);
+                if (resendErr) {
+                    console.log('Supabase signup resend note:', resendErr);
+                }
+            } else {
+                // Password reset or recovery
+                try {
+                    await supabase.auth.resetPasswordForEmail(cleanEmailLower);
+                } catch (rErr) {
+                    console.log('Reset password email note:', rErr);
+                }
             }
+
             setCounter(60);
+            const successNotice = 'A fresh 6-digit verification code has been sent to your email!';
+            if (Platform.OS === 'web') alert(successNotice);
+            else Alert.alert('Code Sent ✉️', successNotice);
         } catch (error: any) {
             Alert.alert('Resend Failed', error.message || 'Could not send verification code email.');
         } finally {
@@ -240,7 +225,11 @@ export default function OTP() {
             let nativeVerifySuccess = false;
             let activeAuthSession = null;
 
-            const otpTypesToTry: Array<'signup' | 'email' | 'recovery'> = ['signup', 'email', 'recovery'];
+            const isResetPassword = params.mode === 'reset-password' || params.mode === 'account-password';
+            const otpTypesToTry: Array<'signup' | 'email' | 'recovery'> = isResetPassword 
+                ? ['recovery', 'email'] 
+                : ['signup', 'email'];
+
             for (const otpType of otpTypesToTry) {
                 try {
                     const { data: authData, error: authErr } = await supabase.auth.verifyOtp({
@@ -263,36 +252,37 @@ export default function OTP() {
                 }
             }
 
-            if (!isCodeValid) {
+            if (!isCodeValid && !nativeVerifySuccess) {
                 throw new Error('Invalid or expired 6-digit code. Please check your email and try again.');
             }
 
-            // Mark email as verified locally & call RPC to confirm email on Supabase Auth DB
+            // Mark email as verified locally
             await AsyncStorage.setItem(`verified_user_${normalizedEmail}`, 'true');
             await AsyncStorage.setItem(`verified_user_${targetEmail}`, 'true');
-            try {
-                await supabase.rpc('confirm_user_email', { target_email: normalizedEmail });
-            } catch (rpcErr) {
-                console.log('RPC confirm_user_email notice:', rpcErr);
-            }
 
             // Establish active Supabase session if pending password exists
-            try {
-                const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
-                const emailToLogin = (await AsyncStorage.getItem('pending_auth_email')) || normalizedEmail;
-                if (pendingPass && emailToLogin) {
-                    const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
-                        email: emailToLogin,
-                        password: pendingPass,
-                    });
-                    if (!signInErr && authData?.session) {
-                        await supabase.auth.setSession(authData.session);
-                        await AsyncStorage.setItem('has_active_session', 'true');
-                        await AsyncStorage.setItem('app_unlocked', 'true');
+            if (!activeAuthSession && !isResetPassword) {
+                try {
+                    const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
+                    const emailToLogin = (await AsyncStorage.getItem('pending_auth_email')) || normalizedEmail;
+                    if (pendingPass && emailToLogin) {
+                        const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
+                            email: emailToLogin,
+                            password: pendingPass,
+                        });
+                        if (!signInErr && authData?.session) {
+                            await supabase.auth.setSession(authData.session);
+                            activeAuthSession = authData.session;
+                            await AsyncStorage.setItem('has_active_session', 'true');
+                            await AsyncStorage.setItem('app_unlocked', 'true');
+                        }
                     }
+                } catch (authSessionErr) {
+                    console.log('Auto sign-in session notice:', authSessionErr);
                 }
-            } catch (authSessionErr) {
-                console.log('Auto sign-in session notice:', authSessionErr);
+            } else if (activeAuthSession) {
+                await AsyncStorage.setItem('has_active_session', 'true');
+                await AsyncStorage.setItem('app_unlocked', 'true');
             }
 
             // Clear used OTP
@@ -330,9 +320,9 @@ export default function OTP() {
                 });
             }
 
-            const isResetPassword = params.mode === 'reset-password' || params.mode === 'account-password';
-            const targetPath = isResetPassword ? '/(auth)/reset-password' : '/(auth)/pin-setup';
-            const successMsg = isResetPassword 
+            const isResetFlow = params.mode === 'reset-password' || params.mode === 'account-password';
+            const targetPath = isResetFlow ? '/(auth)/reset-password' : '/(auth)/pin-setup';
+            const successMsg = isResetFlow 
                 ? 'Success! 6-digit code verified successfully. Now set your new account password.'
                 : 'Success! 6-digit code verified successfully.';
 
@@ -342,7 +332,7 @@ export default function OTP() {
             } else {
                 Alert.alert('Success', successMsg, [
                     { 
-                        text: isResetPassword ? 'Set New Password' : 'Set New PIN', 
+                        text: isResetFlow ? 'Set New Password' : 'Set New PIN', 
                         onPress: () => router.replace({ pathname: targetPath as any, params: { email: targetEmail } }) 
                     },
                 ]);

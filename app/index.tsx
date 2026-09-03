@@ -100,23 +100,27 @@ export default function SplashScreen() {
 
   const checkAuthSession = async () => {
     try {
-      const activeFlag = await AsyncStorage.getItem('has_active_session');
+      const { data: { session } } = await supabase.auth.getSession();
       const unlockedFlag = await AsyncStorage.getItem('app_unlocked');
 
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (session?.user || activeFlag === 'true') {
+      if (session?.user) {
+        // Genuine verified Supabase session exists
         setTimeout(() => {
           if (unlockedFlag === 'true') {
             router.replace('/dashboard' as any);
           } else {
             router.replace('/pin' as any);
           }
-        }, 600);
+        }, 500);
       } else {
+        // No valid session: purge stale flags to prevent redirect loops
+        await AsyncStorage.removeItem('has_active_session');
+        await AsyncStorage.removeItem('app_unlocked');
         setChecking(false);
       }
     } catch (e) {
+      await AsyncStorage.removeItem('has_active_session');
+      await AsyncStorage.removeItem('app_unlocked');
       setChecking(false);
     }
   };
