@@ -134,13 +134,13 @@ export default function QRPayScreen() {
 
     const loadRecentTransfers = async (userId: string) => {
         try {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('transactions')
                 .select('id, amount, type, status, description, created_at')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false })
-                .limit(4);
-            if (data && data.length > 0) {
+                .limit(5);
+            if (!error && data) {
                 setRecentTransfers(data);
             }
         } catch (err) {
@@ -1086,14 +1086,19 @@ export default function QRPayScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Frequent Recipients for Fast Re-transfer */}
-                            {recentTransfers.length > 0 && (
-                                <View style={s.recentTransfersContainer}>
-                                    <View style={s.recentTransfersHeader}>
-                                        <Ionicons name="repeat" size={14} color="#64748B" />
+                            {/* Frequent Recipients for Fast Re-transfer - ALWAYS VISIBLE */}
+                            <View style={s.recentTransfersContainer}>
+                                <View style={s.recentTransfersHeader}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="repeat" size={13} color="#F5A623" />
                                         <Text style={s.recentTransfersTitle}>Frequent Recipients</Text>
                                     </View>
-                                    {recentTransfers.slice(0, 3).map((tx, idx) => (
+                                    <Text style={s.recentTransfersBadge}>
+                                        {recentTransfers.length > 0 ? `${recentTransfers.length} Saved` : 'Instant'}
+                                    </Text>
+                                </View>
+                                {recentTransfers.length > 0 ? (
+                                    recentTransfers.slice(0, 3).map((tx, idx) => (
                                         <TouchableOpacity 
                                             key={tx.id || idx} 
                                             style={s.recentTxRow}
@@ -1106,9 +1111,9 @@ export default function QRPayScreen() {
                                             }}
                                         >
                                             <View style={s.recentTxIcon}>
-                                                <Ionicons name="arrow-up" size={13} color="#0056D2" />
+                                                <Ionicons name="arrow-up" size={12} color="#F5A623" />
                                             </View>
-                                            <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                            <View style={{ flex: 1, marginHorizontal: 8 }}>
                                                 <Text style={s.recentTxDesc} numberOfLines={1}>
                                                     {tx.description || 'Wallet Transfer'}
                                                 </Text>
@@ -1120,9 +1125,19 @@ export default function QRPayScreen() {
                                                 ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </Text>
                                         </TouchableOpacity>
-                                    ))}
-                                </View>
-                            )}
+                                    ))
+                                ) : (
+                                    <View style={s.recentEmptyBox}>
+                                        <View style={s.recentEmptyIconCircle}>
+                                            <Ionicons name="people-outline" size={18} color="#94A3B8" />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 10 }}>
+                                            <Text style={s.recentEmptyTitle}>No Frequent Recipients</Text>
+                                            <Text style={s.recentEmptySub}>People you pay via QR or email will be remembered here for 1-tap transfers.</Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
 
                             {/* Bank-Grade Security Pill */}
                             <View style={s.securityShieldPill}>
@@ -1426,24 +1441,25 @@ export default function QRPayScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Dynamic Banner in Footer */}
-                            <View style={{ width: '100%', maxWidth: 350, marginTop: 12 }}>
-                                <DynamicBanners placement="qr_pay" />
-                            </View>
-
-                            {/* RECENT TRANSFERS ACTIVITY */}
-                            {recentTransfers.length > 0 ? (
-                                <View style={s.recentTransfersContainer}>
-                                    <View style={s.recentTransfersHeader}>
-                                        <Ionicons name="time-outline" size={13} color="#F5A623" />
-                                        <Text style={s.recentTransfersTitle}>Recent Transfers</Text>
+                            {/* RECENT TRANSFERS ACTIVITY - ALWAYS VISIBLE */}
+                            <View style={s.recentTransfersContainer}>
+                                <View style={s.recentTransfersHeader}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="time" size={13} color="#F5A623" />
+                                        <Text style={s.recentTransfersTitle}>Recent Activity</Text>
                                     </View>
-                                    {recentTransfers.map((tx, idx) => (
+                                    <Text style={s.recentTransfersBadge}>
+                                        {recentTransfers.length > 0 ? `${recentTransfers.length} Transfers` : 'Live History'}
+                                    </Text>
+                                </View>
+
+                                {recentTransfers.length > 0 ? (
+                                    recentTransfers.map((tx, idx) => (
                                         <View key={tx.id || idx} style={s.recentTxRow}>
                                             <View style={s.recentTxIcon}>
                                                 <Ionicons 
                                                     name={tx.type === 'transfer' ? "swap-horizontal" : "arrow-up"} 
-                                                    size={13} 
+                                                    size={12} 
                                                     color="#F5A623" 
                                                 />
                                             </View>
@@ -1459,9 +1475,26 @@ export default function QRPayScreen() {
                                                 ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </Text>
                                         </View>
-                                    ))}
-                                </View>
-                            ) : null}
+                                    ))
+                                ) : (
+                                    <View style={s.recentEmptyBox}>
+                                        <View style={s.recentEmptyIconCircle}>
+                                            <Ionicons name="receipt-outline" size={18} color="#94A3B8" />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 10 }}>
+                                            <Text style={s.recentEmptyTitle}>No Recent Transfers Yet</Text>
+                                            <Text style={s.recentEmptySub}>
+                                                Your peer-to-peer QR payments and wallet transfers will appear here automatically.
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Dynamic Banner in Footer */}
+                            <View style={{ width: '100%', maxWidth: 350, marginTop: 10 }}>
+                                <DynamicBanners placement="qr_pay" />
+                            </View>
                         </>
                     ) : (
                         <ActivityIndicator size="large" color="#0056D2" />
@@ -2351,6 +2384,47 @@ const s = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '900',
     color: '#10B981',
+  },
+  recentTransfersBadge: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#F5A623',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    letterSpacing: 0.3,
+  },
+  recentEmptyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginTop: 2,
+  },
+  recentEmptyIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recentEmptyTitle: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  recentEmptySub: {
+    fontSize: 9.5,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+    lineHeight: 13,
   },
   modalSubTitle: {
     color: 'rgba(255, 255, 255, 0.55)',
