@@ -481,6 +481,21 @@ export default function LoginScreen() {
                         await AsyncStorage.setItem('has_active_session', 'true');
                         await AsyncStorage.setItem('app_unlocked', 'true');
 
+                        // Record referral if pending
+                        try {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            const pendingRef = await AsyncStorage.getItem('pending_referral_code');
+                            if (user?.id && pendingRef && pendingRef.trim()) {
+                                await supabase.rpc('record_referral', {
+                                    referee_user_id: user.id,
+                                    referral_input: pendingRef.trim()
+                                });
+                                await AsyncStorage.removeItem('pending_referral_code');
+                            }
+                        } catch (refErr) {
+                            console.log('Login referral record notice:', refErr);
+                        }
+
                         let localPin = await AsyncStorage.getItem('user_transaction_pin');
                         if (!localPin) {
                             const { data: { user } } = await supabase.auth.getUser();

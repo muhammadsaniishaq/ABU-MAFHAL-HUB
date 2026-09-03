@@ -111,7 +111,16 @@ export default function SignupScreen() {
             } catch (e) {}
         }
         if (codeFromUrl) {
-            setReferralCode(String(codeFromUrl).trim());
+            const clean = String(codeFromUrl).trim();
+            setReferralCode(clean);
+            AsyncStorage.setItem('pending_referral_code', clean).catch(() => {});
+            if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+                try { window.localStorage.setItem('pending_referral_code', clean); } catch (_) {}
+            }
+        } else {
+            AsyncStorage.getItem('pending_referral_code').then((saved) => {
+                if (saved && saved.trim()) setReferralCode(saved.trim());
+            }).catch(() => {});
         }
     }, [params.ref, params.referral, params.code]);
 
@@ -637,6 +646,9 @@ export default function SignupScreen() {
                 await AsyncStorage.setItem('pending_auth_pass', password);
                 await AsyncStorage.setItem('just_signed_up', 'true');
                 await AsyncStorage.setItem('signup_timestamp', String(Date.now()));
+                if (referralCode && referralCode.trim()) {
+                    await AsyncStorage.setItem('pending_referral_code', referralCode.trim());
+                }
 
                 // 4. Show success & Navigate to OTP Screen
                 setShowSuccessModal(true);
@@ -649,7 +661,8 @@ export default function SignupScreen() {
                             phone: cleanPhone,
                             type: 'signup',
                             source: 'registration',
-                            name: cleanFullName
+                            name: cleanFullName,
+                            tempReferralCode: referralCode.trim() || undefined
                         }
                     });
                 }, 1200);
@@ -667,6 +680,13 @@ export default function SignupScreen() {
         if (socialLoading) return;
         setSocialLoading(provider);
         try {
+            if (referralCode && referralCode.trim()) {
+                await AsyncStorage.setItem('pending_referral_code', referralCode.trim());
+                if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+                    try { window.localStorage.setItem('pending_referral_code', referralCode.trim()); } catch (_) {}
+                }
+            }
+
             const redirectUrl = Platform.OS === 'web'
                 ? (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'https://abumafhal.com.ng/auth/callback')
                 : makeRedirectUri({ scheme: 'abumafhalsub', path: 'login' });
@@ -734,6 +754,21 @@ export default function SignupScreen() {
 
                         await AsyncStorage.setItem('has_active_session', 'true');
                         await AsyncStorage.setItem('app_unlocked', 'true');
+
+                        // Record referral if pending
+                        try {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            const pendingRef = referralCode.trim() || (await AsyncStorage.getItem('pending_referral_code'));
+                            if (user?.id && pendingRef && pendingRef.trim()) {
+                                await supabase.rpc('record_referral', {
+                                    referee_user_id: user.id,
+                                    referral_input: pendingRef.trim()
+                                });
+                                await AsyncStorage.removeItem('pending_referral_code');
+                            }
+                        } catch (refErr) {
+                            console.log('Social signup referral notice:', refErr);
+                        }
 
                         let localPin = await AsyncStorage.getItem('user_transaction_pin');
                         if (!localPin) {

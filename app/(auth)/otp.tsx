@@ -305,6 +305,20 @@ export default function OTP() {
                 } catch (vaErr) {
                     console.log('Background VA dispatch in OTP notice:', vaErr);
                 }
+
+                // Trigger Automatic Referral Recording
+                try {
+                    const pendingRef = params.tempReferralCode || (await AsyncStorage.getItem('pending_referral_code'));
+                    if (pendingRef && pendingRef.trim()) {
+                        await supabase.rpc('record_referral', {
+                            referee_user_id: user.id,
+                            referral_input: pendingRef.trim()
+                        });
+                        await AsyncStorage.removeItem('pending_referral_code');
+                    }
+                } catch (refErr) {
+                    console.log('Referral RPC record notice in OTP:', refErr);
+                }
             }
             if (user && params.tempFullName) {
                 await supabase.from('profiles').insert({

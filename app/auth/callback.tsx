@@ -51,6 +51,22 @@ export default function AuthCallbackScreen() {
                     if (session?.user) {
                         await AsyncStorage.setItem('has_active_session', 'true');
                         await AsyncStorage.setItem('app_unlocked', 'true');
+
+                        // Check and record referral for Google signup if pending
+                        try {
+                            const pendingRef = (await AsyncStorage.getItem('pending_referral_code')) ||
+                                (window.localStorage ? window.localStorage.getItem('pending_referral_code') : null);
+                            if (pendingRef && pendingRef.trim()) {
+                                await supabase.rpc('record_referral', {
+                                    referee_user_id: session.user.id,
+                                    referral_input: pendingRef.trim()
+                                });
+                                await AsyncStorage.removeItem('pending_referral_code');
+                                if (window.localStorage) window.localStorage.removeItem('pending_referral_code');
+                            }
+                        } catch (refErr) {
+                            console.log('Callback referral record notice:', refErr);
+                        }
                     }
                 }
 
