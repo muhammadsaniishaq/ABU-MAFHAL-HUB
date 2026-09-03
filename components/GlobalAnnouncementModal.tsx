@@ -216,21 +216,16 @@ export default function GlobalAnnouncementModal() {
                         <Ionicons name="close" size={20} color="#fff" />
                     </TouchableOpacity>
 
-                    {/* Banner Image / Video Container (YouTube 16:9 Standard Size & Zero Zoom) */}
+                    {/* Banner Image / Video Container (100% Original Size & Zero Zoom/Crop) */}
                     {config.mediaUrl ? (
                         <View style={[
                             styles.mediaContainer,
-                            isVideo ? {
+                            {
                                 width: '100%',
-                                aspectRatio: 16 / 9, // Exact standard YouTube HD widescreen aspect ratio!
+                                aspectRatio: mediaRatio ? Math.max(0.65, Math.min(mediaRatio, 2.4)) : (16 / 9),
                                 backgroundColor: '#000000',
                                 overflow: 'hidden',
-                            } : (
-                                mediaRatio && config.fitMode !== 'cover' ? {
-                                    aspectRatio: Math.max(1.1, Math.min(mediaRatio, 2.8)),
-                                    height: undefined,
-                                } : { height: 180 }
-                            )
+                            }
                         ]}>
                             {isVideo ? (
                                 <View style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#000000' }}>
@@ -238,23 +233,28 @@ export default function GlobalAnnouncementModal() {
                                         ref={videoRef}
                                         source={{ uri: config.mediaUrl }}
                                         style={styles.media}
-                                        resizeMode={ResizeMode.CONTAIN} // ZERO ZOOM: 100% full uncropped video frame!
+                                        resizeMode={ResizeMode.CONTAIN} // STRICTLY CONTAIN: Zero zoom, 100% original full frame!
                                         shouldPlay={isVideoPlaying}
                                         isLooping
                                         isMuted={isMuted}
                                         onPlaybackStatusUpdate={(status) => setPlaybackStatus(status)}
                                         onLoadStart={() => setIsVideoLoading(true)}
-                                        onReadyForDisplay={() => setIsVideoLoading(false)}
+                                        onReadyForDisplay={(event) => {
+                                            setIsVideoLoading(false);
+                                            if (event.naturalSize && event.naturalSize.width > 0 && event.naturalSize.height > 0) {
+                                                setMediaRatio(event.naturalSize.width / event.naturalSize.height);
+                                            }
+                                        }}
                                         onError={(e) => {
                                             console.warn("Announcement video playback notice:", e);
                                             setIsVideoLoading(false);
                                         }}
                                     />
 
-                                    {/* YouTube 16:9 HD Badge (Top-Left) */}
+                                    {/* HD Video Badge (Top-Left) */}
                                     <View style={styles.youtubeBadge}>
-                                        <Ionicons name="logo-youtube" size={12} color="#EF4444" />
-                                        <Text style={styles.youtubeBadgeText}>16:9 HD</Text>
+                                        <Ionicons name="play-circle" size={12} color="#EF4444" />
+                                        <Text style={styles.youtubeBadgeText}>HD Video</Text>
                                     </View>
 
                                     {/* Fullscreen Player Button (Top-Right) */}
@@ -267,7 +267,7 @@ export default function GlobalAnnouncementModal() {
                                         <Ionicons name="scan-outline" size={14} color="#FFFFFF" />
                                     </TouchableOpacity>
 
-                                    {/* YouTube Red Progress Bar (Bottom) */}
+                                    {/* Progress Bar (Bottom) */}
                                     {playbackStatus?.isLoaded && playbackStatus?.durationMillis ? (
                                         <View style={styles.youtubeProgressBarContainer}>
                                             <View 
@@ -283,7 +283,7 @@ export default function GlobalAnnouncementModal() {
                                     {isVideoLoading && (
                                         <View style={styles.videoLoadingOverlay}>
                                             <ActivityIndicator size="small" color="#F59E0B" />
-                                            <Text style={styles.videoLoadingText}>Ana loda bidiyo...</Text>
+                                            <Text style={styles.videoLoadingText}>Loading video...</Text>
                                         </View>
                                     )}
 
@@ -294,7 +294,7 @@ export default function GlobalAnnouncementModal() {
                                         activeOpacity={0.8}
                                     >
                                         <Ionicons name={isVideoPlaying ? "pause" : "play"} size={13} color="#FFFFFF" />
-                                        <Text style={styles.videoControlTxt}>{isVideoPlaying ? "Dakata" : "Kunna"}</Text>
+                                        <Text style={styles.videoControlTxt}>{isVideoPlaying ? "Pause" : "Play"}</Text>
                                     </TouchableOpacity>
 
                                     {/* Sound Toggle Button (Bottom-Right) */}
@@ -304,14 +304,14 @@ export default function GlobalAnnouncementModal() {
                                         activeOpacity={0.8}
                                     >
                                         <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={13} color="#FFFFFF" />
-                                        <Text style={styles.videoControlTxt}>{isMuted ? "Kunna Sauti" : "Kashe Sauti"}</Text>
+                                        <Text style={styles.videoControlTxt}>{isMuted ? "Unmute" : "Mute"}</Text>
                                     </TouchableOpacity>
                                 </View>
                             ) : (
                                 <Image 
                                     source={{ uri: config.mediaUrl }} 
                                     style={styles.media} 
-                                    resizeMode={config.fitMode === 'cover' ? "cover" : "contain"} 
+                                    resizeMode="contain" 
                                 />
                             )}
                         </View>

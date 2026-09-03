@@ -420,7 +420,7 @@ export default function AdminSettings() {
                         
                     setAnnouncementType(isVideo ? 'video' : 'image');
                     setAnnouncementUrl(publicUrlData.publicUrl);
-                    Alert.alert('Media Uploaded! 🎉', isVideo ? 'An ɗora bidiyo cikin nasara! Zaka iya duba yadda zai fita da kuma kunna sauti a ƙasa.' : 'An ɗora cikakken banner ɗin ba tare da an yanke shi ba.');
+                    Alert.alert('Media Uploaded! 🎉', isVideo ? 'Video uploaded successfully in original quality.' : 'Media uploaded successfully.');
                 }
             }
         } catch (error: any) {
@@ -590,7 +590,7 @@ export default function AdminSettings() {
                                     >
                                         <Ionicons name="scan-outline" size={16} color={announcementFitMode === 'contain' ? '#fff' : '#64748b'} />
                                         <Text style={[s.typeText, announcementFitMode === 'contain' && { color: '#fff', fontWeight: '800' }]}>
-                                            100% Cikakke (No Crop) ✨
+                                            100% Full (No Crop) ✨
                                         </Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity 
@@ -608,32 +608,32 @@ export default function AdminSettings() {
                                     </TouchableOpacity>
                                 </View>
                                 <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, fontStyle: 'italic' }}>
-                                    * Idan ka zaɓi "100% Cikakke (No Crop)", hoton zai fita gaba ɗayansa ba tare da an yanke gefe ko rubutu ba.
+                                    * With "100% Full (No Crop)", media is displayed in full without cropping or zooming.
                                 </Text>
                             </View>
 
-                            {/* RECOMMENDED BANNER SPECIFICATIONS GUIDE */}
+                            {/* RECOMMENDED MEDIA SPECIFICATIONS GUIDE */}
                             <View style={{ marginTop: 8, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', padding: 12, borderRadius: 14 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                     <Ionicons name="information-circle" size={16} color="#d97706" />
-                                    <Text style={{ color: '#b45309', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Shawarar Ma'aunin Banner (Recommended Specs)</Text>
+                                    <Text style={{ color: '#b45309', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Media Specifications & Quality</Text>
                                 </View>
                                 <Text style={{ color: '#78350f', fontSize: 12, lineHeight: 17, fontWeight: '500' }}>
-                                    • <Text style={{ fontWeight: '700' }}>Ko wane irin size:</Text> Zai fita cif ba tare da an yanke shi ba idan ka bar shi a kan "100% Cikakke (No Crop)".{'\n'}
-                                    • <Text style={{ fontWeight: '700' }}>Mafi kyawun Ma'auni:</Text> 1200 x 480 px ko 1080 x 540 px (Landscape){'\n'}
-                                    • <Text style={{ fontWeight: '700' }}>Nau'in Hoto:</Text> JPG, PNG, ko WEBP mai inganci.
+                                    • <Text style={{ fontWeight: '700' }}>Supported Formats:</Text> MP4, MOV, WEBM videos and high-resolution images.{'\n'}
+                                    • <Text style={{ fontWeight: '700' }}>Natural Ratio:</Text> Videos and banners display in their original proportions without cropping.{'\n'}
+                                    • <Text style={{ fontWeight: '700' }}>Master Quality:</Text> Video files are uploaded in original HD resolution.
                                 </Text>
                             </View>
 
                             {/* LIVE INTERACTIVE BANNER PREVIEW IN ADMIN SETTINGS */}
                             {announcementUrl ? (
                                 <View style={{ marginTop: 14, backgroundColor: '#070D1E', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
-                                    <View style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                    <View style={{ width: '100%', minHeight: 180, maxHeight: 280, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                                         {announcementType === 'video' || (announcementUrl && (announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm'))) ? (
                                             <Video 
                                                 source={{ uri: announcementUrl }} 
                                                 style={{ width: '100%', height: '100%' }} 
-                                                resizeMode={ResizeMode.CONTAIN} // Zero zoom, YouTube 16:9 HD standard
+                                                resizeMode={ResizeMode.CONTAIN} // Zero zoom, original full frame
                                                 shouldPlay
                                                 isLooping
                                                 isMuted={true}
@@ -650,7 +650,7 @@ export default function AdminSettings() {
                                     <View style={{ padding: 12, backgroundColor: '#0F172A', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <View style={{ flex: 1, marginRight: 8 }}>
                                             <Text style={{ color: '#F59E0B', fontSize: 11.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                {announcementFitMode === 'contain' ? '✓ 100% Cikakken Banner (Ba Crop) Preview' : 'Cover Fit Mode (Crop / Fill) Preview'}
+                                                {announcementFitMode === 'contain' ? '✓ 100% Full Media (No Crop) Preview' : 'Cover Fit Mode Preview'}
                                             </Text>
                                             {announcementText ? (
                                                 <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '500', marginTop: 2 }} numberOfLines={2}>

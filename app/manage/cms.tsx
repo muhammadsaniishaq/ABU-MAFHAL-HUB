@@ -235,7 +235,7 @@ export default function ModernContentManager() {
 
         setAnnouncementType(isVideo ? 'video' : 'image');
         setAnnouncementUrl(publicUrl);
-        Alert.alert("Media Ready 🎉", isVideo ? "Bidiyo ya haɗu cikin nasara kuma yana aiki!" : "Announcement media attached successfully!");
+        Alert.alert("Media Ready 🎉", isVideo ? "Video attached successfully in original quality!" : "Announcement media attached successfully!");
       }
     } catch (err: any) {
       Alert.alert("Media Error", err.message || "Failed to select media");
