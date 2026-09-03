@@ -80,8 +80,10 @@ export default function QRPayScreen() {
     // Copy Toast State
     const [copiedToast, setCopiedToast] = useState<string | null>(null);
 
-    // Recent Transfers State
+    // Recent Transfers State & Collapsible View Toggles
     const [recentTransfers, setRecentTransfers] = useState<any[]>([]);
+    const [showFrequentRecipients, setShowFrequentRecipients] = useState<boolean>(false);
+    const [showRecentActivity, setShowRecentActivity] = useState<boolean>(false);
 
     // Notice / Alert Modal State (Cross-Platform)
     const [noticeModal, setNoticeModal] = useState<{ visible: boolean; title: string; message: string }>({
@@ -1540,55 +1542,96 @@ export default function QRPayScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Frequent Recipients for Fast Re-transfer - ALWAYS VISIBLE */}
+                            {/* Frequent Recipients for Fast Re-transfer with Top Toggle Icon */}
                             <View style={s.recentTransfersContainer}>
-                                <View style={s.recentTransfersHeader}>
+                                <TouchableOpacity 
+                                    style={s.recentTransfersHeader}
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                        setShowFrequentRecipients(!showFrequentRecipients);
+                                    }}
+                                >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Ionicons name="repeat" size={13} color="#F5A623" />
                                         <Text style={s.recentTransfersTitle}>Frequent Recipients</Text>
-                                    </View>
-                                    <Text style={s.recentTransfersBadge}>
-                                        {recentTransfers.length > 0 ? `${recentTransfers.length} Saved` : 'Instant'}
-                                    </Text>
-                                </View>
-                                {recentTransfers.length > 0 ? (
-                                    recentTransfers.slice(0, 3).map((tx, idx) => (
-                                        <TouchableOpacity 
-                                            key={tx.id || idx} 
-                                            style={s.recentTxRow}
-                                            activeOpacity={0.7}
-                                            onPress={() => {
-                                                if (tx.recipient_email) {
-                                                    setManualInput(tx.recipient_email);
-                                                    setManualInputVisible(true);
-                                                }
-                                            }}
-                                        >
-                                            <View style={s.recentTxIcon}>
-                                                <Ionicons name="arrow-up" size={12} color="#F5A623" />
-                                            </View>
-                                            <View style={{ flex: 1, marginHorizontal: 8 }}>
-                                                <Text style={s.recentTxDesc} numberOfLines={1}>
-                                                    {tx.description || 'Wallet Transfer'}
-                                                </Text>
-                                                <Text style={s.recentTxDate}>
-                                                    {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                </Text>
-                                            </View>
-                                            <Text style={s.recentTxAmount}>
-                                                ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        <View style={s.recentCountBadge}>
+                                            <Text style={s.recentCountBadgeText}>
+                                                {recentTransfers.length > 0 ? `${recentTransfers.length}` : '0'}
                                             </Text>
-                                        </TouchableOpacity>
-                                    ))
-                                ) : (
-                                    <View style={s.recentEmptyBox}>
-                                        <View style={s.recentEmptyIconCircle}>
-                                            <Ionicons name="people-outline" size={18} color="#94A3B8" />
                                         </View>
-                                        <View style={{ flex: 1, marginLeft: 10 }}>
-                                            <Text style={s.recentEmptyTitle}>No Frequent Recipients</Text>
-                                            <Text style={s.recentEmptySub}>People you pay via QR or email will be remembered here for 1-tap transfers.</Text>
-                                        </View>
+                                    </View>
+
+                                    {/* Icon a sama - idan an danna kawai zai nuna su */}
+                                    <View style={s.recentHeaderToggleBtn}>
+                                        <Ionicons 
+                                            name={showFrequentRecipients ? "eye-off" : "eye"} 
+                                            size={14} 
+                                            color="#D4890E" 
+                                        />
+                                        <Text style={s.recentHeaderToggleText}>
+                                            {showFrequentRecipients ? "Hide" : "Show"}
+                                        </Text>
+                                        <Ionicons 
+                                            name={showFrequentRecipients ? "chevron-up" : "chevron-down"} 
+                                            size={13} 
+                                            color="#D4890E" 
+                                        />
+                                    </View>
+                                </TouchableOpacity>
+
+                                {showFrequentRecipients && (
+                                    <View style={{ marginTop: 4 }}>
+                                        {recentTransfers.length > 0 ? (
+                                            recentTransfers.map((tx, idx) => {
+                                                const emailMatch = tx.description?.match(/[\w.-]+@[\w.-]+\.\w+/);
+                                                const targetEmail = tx.recipient_email || (emailMatch ? emailMatch[0] : null);
+                                                return (
+                                                    <TouchableOpacity 
+                                                        key={tx.id || idx} 
+                                                        style={s.recentTxRow}
+                                                        activeOpacity={0.7}
+                                                        onPress={() => {
+                                                            if (targetEmail) {
+                                                                setManualInput(targetEmail);
+                                                                setManualInputVisible(true);
+                                                            } else if (tx.description) {
+                                                                setManualInput(tx.description);
+                                                                setManualInputVisible(true);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <View style={s.recentTxIcon}>
+                                                            <Ionicons name="arrow-up" size={12} color="#F5A623" />
+                                                        </View>
+                                                        <View style={{ flex: 1, marginHorizontal: 8 }}>
+                                                            <Text style={s.recentTxDesc} numberOfLines={1}>
+                                                                {tx.description || 'Wallet Transfer'}
+                                                            </Text>
+                                                            <Text style={s.recentTxDate}>
+                                                                {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                            </Text>
+                                                        </View>
+                                                        <View style={{ alignItems: 'flex-end' }}>
+                                                            <Text style={s.recentTxAmount}>
+                                                                ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                            </Text>
+                                                            <Text style={{ fontSize: 8.5, color: '#10B981', fontWeight: '800' }}>Tap to Pay</Text>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                );
+                                            })
+                                        ) : (
+                                            <View style={s.recentEmptyBox}>
+                                                <View style={s.recentEmptyIconCircle}>
+                                                    <Ionicons name="people-outline" size={18} color="#94A3B8" />
+                                                </View>
+                                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                                    <Text style={s.recentEmptyTitle}>No Frequent Recipients</Text>
+                                                    <Text style={s.recentEmptySub}>People you pay via QR or email will be remembered here for 1-tap transfers.</Text>
+                                                </View>
+                                            </View>
+                                        )}
                                     </View>
                                 )}
                             </View>
@@ -1813,52 +1856,82 @@ export default function QRPayScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* RECENT TRANSFERS ACTIVITY - ALWAYS VISIBLE */}
+                            {/* RECENT TRANSFERS ACTIVITY with Top Toggle Icon */}
                             <View style={s.recentTransfersContainer}>
-                                <View style={s.recentTransfersHeader}>
+                                <TouchableOpacity 
+                                    style={s.recentTransfersHeader}
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                        setShowRecentActivity(!showRecentActivity);
+                                    }}
+                                >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Ionicons name="time" size={13} color="#F5A623" />
                                         <Text style={s.recentTransfersTitle}>Recent Activity</Text>
+                                        <View style={s.recentCountBadge}>
+                                            <Text style={s.recentCountBadgeText}>
+                                                {recentTransfers.length > 0 ? `${recentTransfers.length}` : '0'}
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <Text style={s.recentTransfersBadge}>
-                                        {recentTransfers.length > 0 ? `${recentTransfers.length} Transfers` : 'Live History'}
-                                    </Text>
-                                </View>
 
-                                {recentTransfers.length > 0 ? (
-                                    recentTransfers.map((tx, idx) => (
-                                        <View key={tx.id || idx} style={s.recentTxRow}>
-                                            <View style={s.recentTxIcon}>
-                                                <Ionicons 
-                                                    name={tx.type === 'transfer' ? "swap-horizontal" : "arrow-up"} 
-                                                    size={12} 
-                                                    color="#F5A623" 
-                                                />
+                                    {/* Icon a sama - idan an danna zai nuna su */}
+                                    <View style={s.recentHeaderToggleBtn}>
+                                        <Ionicons 
+                                            name={showRecentActivity ? "eye-off" : "eye"} 
+                                            size={14} 
+                                            color="#D4890E" 
+                                        />
+                                        <Text style={s.recentHeaderToggleText}>
+                                            {showRecentActivity ? "Hide" : "Show"}
+                                        </Text>
+                                        <Ionicons 
+                                            name={showRecentActivity ? "chevron-up" : "chevron-down"} 
+                                            size={13} 
+                                            color="#D4890E" 
+                                        />
+                                    </View>
+                                </TouchableOpacity>
+
+                                {showRecentActivity && (
+                                    <View style={{ marginTop: 4 }}>
+                                        {recentTransfers.length > 0 ? (
+                                            recentTransfers.map((tx, idx) => (
+                                                <View key={tx.id || idx} style={s.recentTxRow}>
+                                                    <View style={s.recentTxIcon}>
+                                                        <Ionicons 
+                                                            name={tx.type === 'transfer' ? "swap-horizontal" : "arrow-up"} 
+                                                            size={12} 
+                                                            color="#F5A623" 
+                                                        />
+                                                    </View>
+                                                    <View style={{ flex: 1, marginHorizontal: 8 }}>
+                                                        <Text style={s.recentTxDesc} numberOfLines={1}>
+                                                            {tx.description || 'Wallet Transfer'}
+                                                        </Text>
+                                                        <Text style={s.recentTxDate}>
+                                                            {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={s.recentTxAmount}>
+                                                        ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </Text>
+                                                </View>
+                                            ))
+                                        ) : (
+                                            <View style={s.recentEmptyBox}>
+                                                <View style={s.recentEmptyIconCircle}>
+                                                    <Ionicons name="receipt-outline" size={18} color="#94A3B8" />
+                                                </View>
+                                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                                    <Text style={s.recentEmptyTitle}>No Recent Transfers Yet</Text>
+                                                    <Text style={s.recentEmptySub}>
+                                                        Your peer-to-peer QR payments and wallet transfers will appear here automatically.
+                                                    </Text>
+                                                </View>
                                             </View>
-                                            <View style={{ flex: 1, marginHorizontal: 8 }}>
-                                                <Text style={s.recentTxDesc} numberOfLines={1}>
-                                                    {tx.description || 'Wallet Transfer'}
-                                                </Text>
-                                                <Text style={s.recentTxDate}>
-                                                    {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                </Text>
-                                            </View>
-                                            <Text style={s.recentTxAmount}>
-                                                ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </Text>
-                                        </View>
-                                    ))
-                                ) : (
-                                    <View style={s.recentEmptyBox}>
-                                        <View style={s.recentEmptyIconCircle}>
-                                            <Ionicons name="receipt-outline" size={18} color="#94A3B8" />
-                                        </View>
-                                        <View style={{ flex: 1, marginLeft: 10 }}>
-                                            <Text style={s.recentEmptyTitle}>No Recent Transfers Yet</Text>
-                                            <Text style={s.recentEmptySub}>
-                                                Your peer-to-peer QR payments and wallet transfers will appear here automatically.
-                                            </Text>
-                                        </View>
+                                        )}
                                     </View>
                                 )}
                             </View>
@@ -2910,8 +2983,7 @@ const s = StyleSheet.create({
   recentTransfersHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    justifyContent: 'space-between',
     paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
@@ -2922,6 +2994,36 @@ const s = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  recentCountBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: '#E2E8F0',
+  },
+  recentCountBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#64748B',
+  },
+  recentHeaderToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+    gap: 4,
+  },
+  recentHeaderToggleText: {
+    color: '#D4890E',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   recentTxRow: {
     flexDirection: 'row',
@@ -2955,14 +3057,15 @@ const s = StyleSheet.create({
     color: '#10B981',
   },
   recentTransfersBadge: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#F5A623',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    paddingHorizontal: 8,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
-    letterSpacing: 0.3,
+  },
+  recentTransfersBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#64748B',
   },
   recentEmptyBox: {
     flexDirection: 'row',
