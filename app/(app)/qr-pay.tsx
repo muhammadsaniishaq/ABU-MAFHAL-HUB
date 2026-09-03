@@ -20,6 +20,8 @@ import DynamicBanners from '../../components/DynamicBanners';
 import * as Print from 'expo-print';
 import { Asset } from 'expo-asset';
 import ViewShot from 'react-native-view-shot';
+import jsQR from 'jsqr';
+import { ABU_MAFHAL_LOGO_B64 } from '../../assets/images/logoB64';
 
 const T = {
   navy:    '#0d1b3e',
@@ -84,13 +86,82 @@ export default function QRPayScreen() {
     // Scanner animation & Flyer Ref
     const scanLineAnim = useRef(new Animated.Value(0)).current;
     const flyerRef = useRef<ViewShot>(null);
+    const webVideoRef = useRef<any>(null);
+
+    // Real-Time Web Camera Scanner using jsQR
+    useEffect(() => {
+        if (Platform.OS !== 'web' || !cameraActive) return;
+
+        let activeStream: any = null;
+        let animationFrameId: number;
+
+        const startWebcam = async () => {
+            try {
+                if (!navigator?.mediaDevices?.getUserMedia) {
+                    Alert.alert("Camera Notice", "Webcam access is not supported on this browser. You can upload a QR image from Gallery instead.");
+                    setCameraActive(false);
+                    return;
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                activeStream = stream;
+                if (webVideoRef.current) {
+                    webVideoRef.current.srcObject = stream;
+                    webVideoRef.current.play().catch(() => {});
+                }
+
+                const scanCanvas = document.createElement('canvas');
+                const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+
+                const scanFrame = () => {
+                    if (!cameraActive) return;
+                    const video = webVideoRef.current;
+                    if (video && video.readyState >= 2 && scanCtx) {
+                        scanCanvas.width = video.videoWidth || 640;
+                        scanCanvas.height = video.videoHeight || 480;
+                        scanCtx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+                        const imgData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+                        const code = jsQR(imgData.data, imgData.width, imgData.height, {
+                            inversionAttempts: 'attemptBoth'
+                        });
+                        if (code && code.data) {
+                            setScanned(true);
+                            setCameraActive(false);
+                            onBarcodeScanned({ data: code.data });
+                            return;
+                        }
+                    }
+                    animationFrameId = requestAnimationFrame(scanFrame);
+                };
+
+                animationFrameId = requestAnimationFrame(scanFrame);
+            } catch (err: any) {
+                console.warn("Web camera error:", err);
+                Alert.alert("Camera Notice", "Could not access webcam. You can upload a QR picture from Gallery instead.");
+                setCameraActive(false);
+            }
+        };
+
+        startWebcam();
+
+        return () => {
+            if (activeStream && activeStream.getTracks) {
+                activeStream.getTracks().forEach((t: any) => t.stop());
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        };
+    }, [cameraActive]);
 
     useEffect(() => {
         loadUserProfile();
     }, []);
 
     useEffect(() => {
-        if (activeTab === 'scan' && permission?.granted && isFocused && !scanned) {
+        if ((activeTab === 'scan' || cameraActive) && !scanned) {
             // Laser line looping animation
             scanLineAnim.setValue(0);
             Animated.loop(
@@ -110,7 +181,7 @@ export default function QRPayScreen() {
         } else {
             scanLineAnim.stopAnimation();
         }
-    }, [activeTab, permission, isFocused, scanned]);
+    }, [activeTab, cameraActive, scanned]);
 
     const loadUserProfile = async () => {
         try {
@@ -192,43 +263,31 @@ export default function QRPayScreen() {
             ctx.lineWidth = 3;
             ctx.stroke();
 
-            // 3. Abu Mafhal Hub Header with Logo
-            const logoUrl = settings?.app_logo 
-                ? (typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url)
-                : '';
+            // 3. Abu Mafhal Hub Header with Official Logo
+            const logoSrc = (settings?.app_logo && typeof settings.app_logo === 'string' && settings.app_logo.startsWith('data:'))
+                ? settings.app_logo
+                : ABU_MAFHAL_LOGO_B64;
             
-            let logoLoaded = false;
-            if (logoUrl) {
-                try {
-                    const logoImg = new window.Image();
-                    logoImg.crossOrigin = 'anonymous';
-                    await new Promise((res) => {
-                        logoImg.onload = res;
-                        logoImg.onerror = res;
-                        logoImg.src = logoUrl;
-                    });
-                    if (logoImg.width > 0) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(80, 80, 30, 0, Math.PI * 2);
-                        ctx.clip();
-                        ctx.drawImage(logoImg, 50, 50, 60, 60);
-                        ctx.restore();
-                        logoLoaded = true;
+            try {
+                const logoImg = new window.Image();
+                logoImg.src = logoSrc;
+                await new Promise((res) => {
+                    if (logoImg.complete) {
+                        res(null);
+                    } else {
+                        logoImg.onload = () => res(null);
+                        logoImg.onerror = () => res(null);
                     }
-                } catch (_) {}
-            }
-            if (!logoLoaded) {
-                ctx.beginPath();
-                ctx.arc(80, 80, 30, 0, Math.PI * 2);
-                ctx.fillStyle = '#F5A623';
-                ctx.fill();
-                ctx.fillStyle = '#0D1B3E';
-                ctx.font = 'bold 22px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('AM', 80, 88);
-                ctx.textAlign = 'left';
-            }
+                });
+                if (logoImg.width > 0) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(80, 80, 30, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(logoImg, 50, 50, 60, 60);
+                    ctx.restore();
+                }
+            } catch (_) {}
 
             // Header brand text
             ctx.fillStyle = '#F5A623';
@@ -500,8 +559,8 @@ export default function QRPayScreen() {
 
             const pickerResult = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: false,
-                quality: 0.7,
+                allowsEditing: true,
+                quality: 1,
             });
 
             if (pickerResult.canceled || !pickerResult.assets || pickerResult.assets.length === 0) {
@@ -510,11 +569,11 @@ export default function QRPayScreen() {
 
             const selectedImage = pickerResult.assets[0];
             setIsReadingGallery(true);
+            setScanned(false);
 
-            // 1. On Web: Try local native BarcodeDetector if available in browser
-            if (Platform.OS === 'web' && typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+            // 1. Instant local scan with jsQR on Web Canvas
+            if (Platform.OS === 'web' && typeof document !== 'undefined') {
                 try {
-                    const barcodeDetector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
                     const img = new window.Image();
                     img.crossOrigin = 'anonymous';
                     await new Promise((resolve, reject) => {
@@ -522,18 +581,40 @@ export default function QRPayScreen() {
                         img.onerror = reject;
                         img.src = selectedImage.uri;
                     });
-                    const barcodes = await barcodeDetector.detect(img);
-                    if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-                        setIsReadingGallery(false);
-                        onBarcodeScanned({ data: barcodes[0].rawValue });
-                        return;
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth || img.width;
+                    canvas.height = img.naturalHeight || img.height;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        
+                        // Full scan
+                        let code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+                        
+                        // Center crop scan (e.g. for card flyers)
+                        if (!code) {
+                            const cw = Math.floor(canvas.width * 0.7);
+                            const ch = Math.floor(canvas.height * 0.7);
+                            const cx = Math.floor(canvas.width * 0.15);
+                            const cy = Math.floor(canvas.height * 0.15);
+                            const centerData = ctx.getImageData(cx, cy, cw, ch);
+                            code = jsQR(centerData.data, cw, ch, { inversionAttempts: 'attemptBoth' });
+                        }
+
+                        if (code && code.data) {
+                            setIsReadingGallery(false);
+                            onBarcodeScanned({ data: code.data });
+                            return;
+                        }
                     }
-                } catch (detectorErr) {
-                    console.log("Local BarcodeDetector attempt skipped, proceeding to API decoder:", detectorErr);
+                } catch (localQrErr) {
+                    console.warn("Local jsQR attempt error:", localQrErr);
                 }
             }
 
-            // 2. Decode QR via remote decoding API
+            // 2. Secondary scan via remote API
             const formData = new FormData();
             if (Platform.OS === 'web') {
                 const response = await fetch(selectedImage.uri);
@@ -559,20 +640,25 @@ export default function QRPayScreen() {
             if (qrText) {
                 onBarcodeScanned({ data: qrText });
             } else {
-                Alert.alert("No QR Code Detected", "We could not find a clear QR code in the selected picture. Please choose a sharper image.");
+                Alert.alert(
+                    "QR Code Not Found",
+                    "Could not detect a clear QR code in this image. Please crop tightly to the square QR code and try again, or enter email manually."
+                );
             }
         } catch (e: any) {
             setIsReadingGallery(false);
             console.error("Gallery scan error:", e);
-            Alert.alert("Scan Error", "Failed to scan QR code from gallery. Please check your network connection and try again.");
+            Alert.alert("Scan Error", "Failed to scan QR code from gallery. Please try another image or enter email manually.");
         }
     };
 
     const onBarcodeScanned = async ({ data }: { data: string }) => {
-        if (scanned || confirmModalVisible || successModalVisible) return;
+        if (confirmModalVisible || successModalVisible) return;
         setScanned(true);
         setCameraActive(false);
-        Vibration.vibrate(100);
+        if (Platform.OS !== 'web') {
+            Vibration.vibrate(100);
+        }
         
         try {
             let userId = '';
@@ -589,22 +675,43 @@ export default function QRPayScreen() {
                 }
             } catch (jsonErr) {
                 const trimmedData = data.trim();
-                if (trimmedData.includes('@')) {
-                    email = trimmedData.toLowerCase();
-                } else if (trimmedData.length === 36) {
-                    userId = trimmedData;
-                } else {
-                    email = trimmedData.toLowerCase();
+                // 1. Check if it's Wallet ID format: MAF-XXXXXXXX
+                if (trimmedData.toUpperCase().startsWith('MAF-')) {
+                    const cleanPrefix = trimmedData.replace(/^MAF-/i, '').trim();
+                    userId = cleanPrefix;
+                } 
+                // 2. Check for URL with query params
+                else if (trimmedData.includes('http://') || trimmedData.includes('https://')) {
+                    try {
+                        const urlObj = new URL(trimmedData);
+                        userId = urlObj.searchParams.get('userId') || '';
+                        email = urlObj.searchParams.get('email') || '';
+                    } catch (_) {}
+                }
+                // 3. Check for email anywhere in text
+                const emailMatch = trimmedData.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+                if (emailMatch && !userId) {
+                    email = emailMatch[0].toLowerCase();
+                } else if (!userId && !email) {
+                    if (trimmedData.length === 36) {
+                        userId = trimmedData;
+                    } else {
+                        email = trimmedData.toLowerCase();
+                    }
                 }
             }
 
             let query = supabase.from('profiles').select('id, full_name, email, avatar_url');
             if (userId) {
-                query = query.eq('id', userId);
+                if (userId.length === 36) {
+                    query = query.eq('id', userId);
+                } else {
+                    query = query.ilike('id', `${userId}%`);
+                }
             } else if (email) {
                 query = query.eq('email', email);
             } else {
-                Alert.alert("Invalid QR", "This QR code does not contain a valid user ID or email.", [
+                Alert.alert("Invalid QR", "This QR code does not contain a valid Abu Mafhal user ID, Wallet ID, or email.", [
                     { text: "OK", onPress: () => setScanned(false) }
                 ]);
                 return;
@@ -613,14 +720,14 @@ export default function QRPayScreen() {
             const { data: recipient, error } = await query.maybeSingle();
             
             if (error || !recipient) {
-                Alert.alert("User Not Found", "No registered user was found matching this QR code.", [
+                Alert.alert("User Not Found", "No registered Abu Mafhal user was found matching this QR code.", [
                     { text: "OK", onPress: () => setScanned(false) }
                 ]);
                 return;
             }
 
             if (currentUser && recipient.id === currentUser.id) {
-                Alert.alert("Scan Error", "You cannot transfer money to yourself!", [
+                Alert.alert("Self Scan Notice", `You scanned your own QR code (${currentUser.full_name || 'My Account'}). To make a transfer, please scan another user's QR code.`, [
                     { text: "OK", onPress: () => setScanned(false) }
                 ]);
                 return;
@@ -1268,7 +1375,10 @@ export default function QRPayScreen() {
                                 <TouchableOpacity 
                                     onPress={async () => {
                                         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        if (!permission?.granted) {
+                                        setScanned(false);
+                                        if (Platform.OS === 'web') {
+                                            setCameraActive(true);
+                                        } else if (!permission?.granted) {
                                             const res = await requestPermission();
                                             if (res.granted) setCameraActive(true);
                                         } else {
@@ -1301,7 +1411,10 @@ export default function QRPayScreen() {
                                 <TouchableOpacity 
                                     onPress={async () => {
                                         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        if (!permission?.granted) {
+                                        setScanned(false);
+                                        if (Platform.OS === 'web') {
+                                            setCameraActive(true);
+                                        } else if (!permission?.granted) {
                                             const res = await requestPermission();
                                             if (res.granted) setCameraActive(true);
                                         } else {
@@ -1421,7 +1534,7 @@ export default function QRPayScreen() {
                                 <DynamicBanners placement="qr_pay" />
                             </View>
                         </ScrollView>
-                    ) : !permission?.granted ? (
+                    ) : (Platform.OS !== 'web' && !permission?.granted) ? (
                         <View style={s.permissionCard}>
                             <TouchableOpacity 
                                 onPress={() => setCameraActive(false)}
@@ -1449,8 +1562,23 @@ export default function QRPayScreen() {
                         </View>
                     ) : (
                         <View className="flex-1 bg-black relative">
-                            {/* Render Camera ONLY when screen is focused to release GPU/camera hardware and prevent lag */}
-                            {isFocused && !scanned ? (
+                            {Platform.OS === 'web' ? (
+                                <video
+                                    ref={webVideoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        backgroundColor: '#000',
+                                    }}
+                                />
+                            ) : !scanned ? (
                                 <CameraView
                                     style={StyleSheet.absoluteFillObject}
                                     facing="back"
@@ -1460,10 +1588,12 @@ export default function QRPayScreen() {
                                         barcodeTypes: ["qr"],
                                     }}
                                 />
-                            ) : (
+                            ) : null}
+
+                            {scanned && (
                                 <View className="flex-1 items-center justify-center bg-black/95">
                                     <ActivityIndicator size="large" color="#f5a623" />
-                                    <Text className="text-white font-bold mt-4">Processing scan...</Text>
+                                    <Text className="text-white font-bold mt-4">Processing recipient details...</Text>
                                 </View>
                             )}
 
@@ -1553,7 +1683,7 @@ export default function QRPayScreen() {
                                     <View style={s.cardBrandRow}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                                             <Image 
-                                                source={settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png')}
+                                                source={{ uri: (settings?.app_logo && typeof settings.app_logo === 'string' && settings.app_logo.startsWith('http')) ? settings.app_logo : ABU_MAFHAL_LOGO_B64 }}
                                                 style={s.cardBrandLogo}
                                                 resizeMode="contain"
                                             />
