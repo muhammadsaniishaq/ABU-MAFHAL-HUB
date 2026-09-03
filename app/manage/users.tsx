@@ -229,7 +229,7 @@ export default function UserManagement() {
         const usersToProcess = targetUsers.length > 0 ? targetUsers : users;
 
         if (usersToProcess.length === 0) {
-            Alert.alert("All Set! 🏦", "There are no users to process.");
+            Alert.alert("All Set! 🏦", "All users already have active virtual accounts.");
             return;
         }
 
@@ -244,6 +244,7 @@ export default function UserManagement() {
 
         let successCount = 0;
         let failCount = 0;
+        const failedErrors: string[] = [];
 
         for (let i = 0; i < usersToProcess.length; i++) {
             const user = usersToProcess[i];
@@ -258,14 +259,29 @@ export default function UserManagement() {
             });
 
             try {
-                const res = await supabase.functions.invoke('create-virtual-account', {
-                    body: { userId: user.id, bvn: user.bvn }
+                const { data, error } = await supabase.functions.invoke('create-virtual-account', {
+                    body: { userId: user.id, bvn: user.bvn, nin: user.nin, forceSecondAccount: false }
                 });
-                if (res.error) throw new Error(res.error.message);
+
+                if (error) {
+                    throw new Error(error.message || 'Function invocation failed');
+                }
+
+                if (data?.error && (!data?.accounts || data.accounts.length === 0)) {
+                    throw new Error(data.error);
+                }
+
+                if (!data?.accounts || data.accounts.length === 0) {
+                    throw new Error(data?.message || 'No account returned');
+                }
+
                 successCount++;
-            } catch (err) {
+            } catch (err: any) {
                 console.warn(`Batch account generate error for ${user.email}:`, err);
                 failCount++;
+                if (failedErrors.length < 3) {
+                    failedErrors.push(`${userName}: ${err.message || 'Error'}`);
+                }
             }
 
             setBatchProgress(prev => ({
@@ -277,9 +293,15 @@ export default function UserManagement() {
 
         setBatchProcessing(false);
         await fetchUsers();
+        
+        let reportMsg = `Processed ${usersToProcess.length} users:\n• ${successCount} accounts generated/confirmed\n• ${failCount} failed`;
+        if (failedErrors.length > 0) {
+            reportMsg += `\n\nIssues encountered:\n${failedErrors.join('\n')}`;
+        }
+
         Alert.alert(
-            "Batch Account Generation Completed 🎉",
-            `Successfully processed ${usersToProcess.length} users!\n• ${successCount} accounts generated/confirmed\n• ${failCount} failed`
+            successCount > 0 ? "Batch Engine Finished 🎉" : "Batch Engine Report ⚠️",
+            reportMsg
         );
     };
 
@@ -406,18 +428,40 @@ export default function UserManagement() {
 
             if (error) throw error;
 
+            // Direct fetch of virtual_accounts as a robust fallback
+            const { data: allVas } = await supabase
+                .from('virtual_accounts')
+                .select('user_id, account_number, bank_name')
+                .order('created_at', { ascending: true });
+
+            const vaMap = new Map<string, { account_number: string; bank_name: string }>();
+            if (allVas) {
+                allVas.forEach((va: any) => {
+                    if (va.user_id && va.account_number && !vaMap.has(va.user_id)) {
+                        vaMap.set(va.user_id, { account_number: va.account_number, bank_name: va.bank_name });
+                    }
+                });
+            }
+
             const { data: corpEmails } = await supabase
                 .from('corporate_admin_emails')
                 .select('user_id, email, username');
 
             const corpMap = new Map((corpEmails || []).map(c => [c.user_id, c.email]));
             
-            const enrichedData = (data || []).map((u: any) => ({
-                ...u,
-                account_number: u.virtual_accounts?.[0]?.account_number || u.virtual_accounts?.account_number || null,
-                bank_name: u.virtual_accounts?.[0]?.bank_name || u.virtual_accounts?.bank_name || 'Wema Bank',
-                corporate_email: corpMap.get(u.id) || (u.email?.endsWith('@abumafhal.com.ng') ? u.email : null)
-            }));
+            const enrichedData = (data || []).map((u: any) => {
+                const directVa = vaMap.get(u.id);
+                const joinVa = Array.isArray(u.virtual_accounts) ? u.virtual_accounts[0] : u.virtual_accounts;
+                const accNum = joinVa?.account_number || directVa?.account_number || u.account_number || null;
+                const bName = joinVa?.bank_name || directVa?.bank_name || u.bank_name || 'PalmPay / 9PSB';
+
+                return {
+                    ...u,
+                    account_number: accNum,
+                    bank_name: bName,
+                    corporate_email: corpMap.get(u.id) || (u.email?.endsWith('@abumafhal.com.ng') ? u.email : null)
+                };
+            });
             setUsers(enrichedData);
         } catch (error: any) {
             Alert.alert('Error Fetching Users', error.message);

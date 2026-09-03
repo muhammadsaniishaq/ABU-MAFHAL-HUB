@@ -81,8 +81,8 @@ Deno.serve(async (req) => {
         }
 
         // 3. BVN and NIN Retrieval & Profile sync
-        let userBVN = profile.bvn;
-        let userNIN = null;
+        let userBVN = profile.bvn ? String(profile.bvn).trim() : null;
+        let userNIN = profile.nin ? String(profile.nin).trim() : null;
 
         // If BVN is provided explicitly in request, use it and update profile
         if (safeBvn && safeBvn.length >= 10) {
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
             userBVN = safeBvn;
         }
 
-        if (!userBVN) {
+        if (!userBVN || !userNIN) {
              // Check if they have a 'bvn' or 'nin' record in kyc_requests
              const { data: kycs } = await supabaseAdmin
                 .from('kyc_requests')
@@ -108,21 +108,23 @@ Deno.serve(async (req) => {
                 .order('created_at', { ascending: false });
 
              if (kycs && kycs.length > 0) {
-                 const bvnKyc = kycs.find(k => k.document_type === 'bvn');
-                 if (bvnKyc) {
-                     if (bvnKyc.document_number && bvnKyc.document_number.length >= 10) {
-                         userBVN = bvnKyc.document_number;
-                         await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
-                     } else {
-                         const match = bvnKyc.admin_note?.match(/ID:\s*(\d{11})/);
-                         if (match && match[1]) {
-                             userBVN = match[1];
+                 if (!userBVN) {
+                     const bvnKyc = kycs.find(k => k.document_type === 'bvn');
+                     if (bvnKyc) {
+                         if (bvnKyc.document_number && bvnKyc.document_number.length >= 10) {
+                             userBVN = bvnKyc.document_number;
                              await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
+                         } else {
+                             const match = bvnKyc.admin_note?.match(/ID:\s*(\d{11})/);
+                             if (match && match[1]) {
+                                 userBVN = match[1];
+                                 await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
+                             }
                          }
                      }
                  }
 
-                 if (!userBVN) {
+                 if (!userNIN) {
                      const ninKyc = kycs.find(k => k.document_type === 'nin');
                      if (ninKyc) {
                          if (ninKyc.document_number && ninKyc.document_number.length >= 10) {
@@ -138,27 +140,54 @@ Deno.serve(async (req) => {
              }
         }
 
-        // 4. Fetch Payvessel Credentials from DB
+        // 4. Fetch Credentials from DB (system_secrets & app_settings)
         const { data: secrets } = await supabaseAdmin
             .from('system_secrets')
-            .select('key, value')
-            .in('key', ['PAYVESSEL_API_KEY', 'PAYVESSEL_API_SECRET', 'PAYVESSEL_BUSINESS_ID']);
+            .select('key, value');
 
-        const getSecret = (keyName: string) => secrets?.find(s => s.key === keyName)?.value || Deno.env.get(keyName) || '';
+        const { data: appSettings } = await supabaseAdmin
+            .from('app_settings')
+            .select('key, value');
+
+        const allSecretsMap: Record<string, string> = {};
+        if (appSettings) {
+            appSettings.forEach(s => { if (s.key && s.value) allSecretsMap[s.key.toUpperCase()] = s.value; });
+        }
+        if (secrets) {
+            secrets.forEach(s => { if (s.key && s.value) allSecretsMap[s.key.toUpperCase()] = s.value; });
+        }
+
+        const findSecret = (...keys: string[]): string => {
+            for (const k of keys) {
+                const upper = k.toUpperCase();
+                if (allSecretsMap[upper] && allSecretsMap[upper].trim()) {
+                    return allSecretsMap[upper].trim();
+                }
+                const env = Deno.env.get(k) || Deno.env.get(upper);
+                if (env && env.trim()) return env.trim();
+            }
+            return '';
+        };
 
         const pvConfig = {
-            apiKey: getSecret('PAYVESSEL_API_KEY'),
-            apiSecret: getSecret('PAYVESSEL_API_SECRET'),
-            businessId: getSecret('PAYVESSEL_BUSINESS_ID'),
+            apiKey: findSecret('PAYVESSEL_API_KEY', 'PAYVESSEL_KEY', 'PAYBESSEL_API_KEY'),
+            apiSecret: findSecret('PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET_KEY', 'PAYVESSEL_SECRET'),
+            businessId: findSecret('PAYVESSEL_BUSINESS_ID', 'PAYVESSEL_BUSINESS', 'PAYVESSEL_BIZ_ID'),
         };
+
+        // Fallback default BVN/NIN if configured by platform
+        if (!userBVN && !userNIN) {
+            userBVN = findSecret('BUSINESS_BVN', 'DEFAULT_BVN', 'PLATFORM_BVN') || null;
+            userNIN = findSecret('BUSINESS_NIN', 'DEFAULT_NIN', 'PLATFORM_NIN') || null;
+        }
 
         // 5. Create Payvessel DVA (Requests both 9PSB 120001 & PalmPay 999991)
         const userEmail = profile.email;
         const userName = profile.full_name || 'Valued Customer';
         const userPhone = profile.phone || '08000000000';
 
-        console.log(`Creating Payvessel DVA for ${userEmail} (BVN: ${userBVN ? 'present' : 'none'})`);
-        const payvesselRes = await createPayvesselDVA({
+        console.log(`Creating Payvessel DVA for ${userEmail} (BVN: ${userBVN ? 'present' : 'none'}, NIN: ${userNIN ? 'present' : 'none'})`);
+        let payvesselRes = await createPayvesselDVA({
             email: userEmail,
             name: userName,
             phone: userPhone,
@@ -183,7 +212,7 @@ Deno.serve(async (req) => {
                     status: 200,
                 });
             }
-            throw new Error(payvesselRes.message || "Payvessel account creation failed");
+            throw new Error(payvesselRes.message || "Payvessel account creation failed. Verify Payvessel API keys and user BVN/NIN.");
         }
 
         // 6. Save/Update All Returned Banks to DB
@@ -274,11 +303,12 @@ Deno.serve(async (req) => {
         console.error("Create DVA Error:", error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown Error';
         return new Response(JSON.stringify({ 
+            status: "error",
             error: errorMessage,
             details: error instanceof Error ? error.stack : undefined
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200, 
+            status: 400, 
         });
     }
 });
