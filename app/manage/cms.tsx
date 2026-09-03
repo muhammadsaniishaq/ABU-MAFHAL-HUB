@@ -180,8 +180,10 @@ export default function ModernContentManager() {
 
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
-        quality: 0.85,
-        base64: true,
+        allowsEditing: false,
+        quality: 1,
+        videoExportPreset: ImagePicker.VideoExportPreset.Passthrough,
+        videoMaxDuration: 180,
       });
 
       if (!res.canceled && res.assets && res.assets.length > 0) {
@@ -697,20 +699,20 @@ export default function ModernContentManager() {
               </View>
 
               {announcementUrl ? (
-                <View style={s.announcementPreviewBox}>
+                <View style={[s.announcementPreviewBox, (announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4')) && { aspectRatio: 16 / 9, height: undefined, backgroundColor: '#000000' }]}>
                   {announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm') ? (
                     <Video 
                       source={{ uri: announcementUrl }} 
                       style={s.announcementPreviewImg} 
-                      resizeMode={ResizeMode.COVER} 
+                      resizeMode={ResizeMode.CONTAIN} 
                       shouldPlay 
                       isLooping 
                       isMuted 
                     />
                   ) : (
-                    <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="cover" />
+                    <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="contain" />
                   )}
-                  <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()}</Text>
+                  <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()} (16:9 HD)</Text>
                 </View>
               ) : null}
 

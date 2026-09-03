@@ -372,8 +372,9 @@ export default function AdminSettings() {
             let result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.All,
                 allowsEditing: false, // Prevents phone gallery from cropping or trimming the banner
-                quality: 0.9,
-                videoMaxDuration: 60,
+                quality: 1, // 100% Maximum High Quality
+                videoExportPreset: ImagePicker.VideoExportPreset.Passthrough, // Uncompressed HD master quality
+                videoMaxDuration: 180,
             });
 
             if (!result.canceled && result.assets[0].uri) {
@@ -627,12 +628,12 @@ export default function AdminSettings() {
                             {/* LIVE INTERACTIVE BANNER PREVIEW IN ADMIN SETTINGS */}
                             {announcementUrl ? (
                                 <View style={{ marginTop: 14, backgroundColor: '#070D1E', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
-                                    <View style={{ width: '100%', minHeight: 140, maxHeight: 240, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+                                    <View style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                                         {announcementType === 'video' || (announcementUrl && (announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm'))) ? (
                                             <Video 
                                                 source={{ uri: announcementUrl }} 
-                                                style={{ width: '100%', height: 200 }} 
-                                                resizeMode={announcementFitMode === 'cover' ? ResizeMode.COVER : ResizeMode.CONTAIN} 
+                                                style={{ width: '100%', height: '100%' }} 
+                                                resizeMode={ResizeMode.CONTAIN} // Zero zoom, YouTube 16:9 HD standard
                                                 shouldPlay
                                                 isLooping
                                                 isMuted={true}
@@ -641,7 +642,7 @@ export default function AdminSettings() {
                                         ) : (
                                             <Image 
                                                 source={{ uri: announcementUrl }} 
-                                                style={{ width: '100%', height: 180 }} 
+                                                style={{ width: '100%', height: '100%' }} 
                                                 resizeMode={announcementFitMode === 'cover' ? "cover" : "contain"} 
                                             />
                                         )}

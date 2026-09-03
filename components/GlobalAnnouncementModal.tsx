@@ -35,8 +35,19 @@ export default function GlobalAnnouncementModal() {
     const [isMuted, setIsMuted] = useState(true);
     const [isVideoPlaying, setIsVideoPlaying] = useState(true);
     const [isVideoLoading, setIsVideoLoading] = useState(true);
+    const [playbackStatus, setPlaybackStatus] = useState<any>(null);
     const videoRef = useRef<Video>(null);
     const pathname = usePathname();
+
+    const handleFullscreen = async () => {
+        try {
+            if (videoRef.current) {
+                await videoRef.current.presentFullscreenPlayer();
+            }
+        } catch (err) {
+            console.warn("Fullscreen error:", err);
+        }
+    };
 
     // Auto-detect video format regardless of whether type flag was set
     const isVideo = config?.mediaType === 'video' ||
@@ -205,13 +216,15 @@ export default function GlobalAnnouncementModal() {
                         <Ionicons name="close" size={20} color="#fff" />
                     </TouchableOpacity>
 
-                    {/* Banner Image / Video Container (Auto-Fitting & 100% Uncropped) */}
+                    {/* Banner Image / Video Container (YouTube 16:9 Standard Size & Zero Zoom) */}
                     {config.mediaUrl ? (
                         <View style={[
                             styles.mediaContainer,
                             isVideo ? {
-                                height: 215,
+                                width: '100%',
+                                aspectRatio: 16 / 9, // Exact standard YouTube HD widescreen aspect ratio!
                                 backgroundColor: '#000000',
+                                overflow: 'hidden',
                             } : (
                                 mediaRatio && config.fitMode !== 'cover' ? {
                                     aspectRatio: Math.max(1.1, Math.min(mediaRatio, 2.8)),
@@ -220,27 +233,51 @@ export default function GlobalAnnouncementModal() {
                             )
                         ]}>
                             {isVideo ? (
-                                <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                <View style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#000000' }}>
                                     <Video
                                         ref={videoRef}
                                         source={{ uri: config.mediaUrl }}
                                         style={styles.media}
-                                        resizeMode={config.fitMode === 'cover' ? ResizeMode.COVER : ResizeMode.CONTAIN}
+                                        resizeMode={ResizeMode.CONTAIN} // ZERO ZOOM: 100% full uncropped video frame!
                                         shouldPlay={isVideoPlaying}
                                         isLooping
                                         isMuted={isMuted}
+                                        onPlaybackStatusUpdate={(status) => setPlaybackStatus(status)}
                                         onLoadStart={() => setIsVideoLoading(true)}
-                                        onReadyForDisplay={(event) => {
-                                            setIsVideoLoading(false);
-                                            if (event.naturalSize && event.naturalSize.width > 0 && event.naturalSize.height > 0) {
-                                                setMediaRatio(event.naturalSize.width / event.naturalSize.height);
-                                            }
-                                        }}
+                                        onReadyForDisplay={() => setIsVideoLoading(false)}
                                         onError={(e) => {
                                             console.warn("Announcement video playback notice:", e);
                                             setIsVideoLoading(false);
                                         }}
                                     />
+
+                                    {/* YouTube 16:9 HD Badge (Top-Left) */}
+                                    <View style={styles.youtubeBadge}>
+                                        <Ionicons name="logo-youtube" size={12} color="#EF4444" />
+                                        <Text style={styles.youtubeBadgeText}>16:9 HD</Text>
+                                    </View>
+
+                                    {/* Fullscreen Player Button (Top-Right) */}
+                                    <TouchableOpacity
+                                        onPress={handleFullscreen}
+                                        style={styles.fullscreenBtn}
+                                        activeOpacity={0.8}
+                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                    >
+                                        <Ionicons name="scan-outline" size={14} color="#FFFFFF" />
+                                    </TouchableOpacity>
+
+                                    {/* YouTube Red Progress Bar (Bottom) */}
+                                    {playbackStatus?.isLoaded && playbackStatus?.durationMillis ? (
+                                        <View style={styles.youtubeProgressBarContainer}>
+                                            <View 
+                                                style={[
+                                                    styles.youtubeProgressBarFill, 
+                                                    { width: `${Math.min(100, ((playbackStatus.positionMillis || 0) / playbackStatus.durationMillis) * 100)}%` }
+                                                ]} 
+                                            />
+                                        </View>
+                                    ) : null}
 
                                     {/* Buffering Indicator */}
                                     {isVideoLoading && (
@@ -448,5 +485,52 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 9.5,
         fontWeight: '700',
+    },
+    youtubeBadge: {
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        paddingHorizontal: 8,
+        paddingVertical: 3.5,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.5)',
+        zIndex: 10,
+    },
+    youtubeBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    fullscreenBtn: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        padding: 6,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    youtubeProgressBarContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        zIndex: 8,
+    },
+    youtubeProgressBarFill: {
+        height: '100%',
+        backgroundColor: '#EF4444',
     }
 });
