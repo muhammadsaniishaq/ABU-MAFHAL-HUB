@@ -29,6 +29,17 @@ const T = {
 
 const CACHE_KEY = '@dashboard_data_v2';
 
+let inMemoryServiceCustoms: Record<string, any> = {};
+let inMemoryHiddenFeatures: string[] = [];
+
+// Preload immediately from storage
+AsyncStorage.getItem('@app_service_customs_cache').then(s => {
+  if (s) try { inMemoryServiceCustoms = JSON.parse(s); } catch (_) {}
+}).catch(() => {});
+AsyncStorage.getItem('@app_hidden_features_cache').then(s => {
+  if (s) try { inMemoryHiddenFeatures = JSON.parse(s); } catch (_) {}
+}).catch(() => {});
+
 export default function Dashboard() {
   const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string; avatar_url?: string; kyc_tier?: number; bvn?: string | null } | null>(null);
   const { settings, loading: settingsLoading } = useAppSettings();
@@ -48,7 +59,8 @@ export default function Dashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeBanners, setActiveBanners] = useState<any[]>([]);
   const [activePartners, setActivePartners] = useState<any[]>([]);
-  const [serviceCustoms, setServiceCustoms] = useState<Record<string, any>>({});
+  const [serviceCustoms, setServiceCustoms] = useState<Record<string, any>>(inMemoryServiceCustoms);
+  const [hiddenFeatures, setHiddenFeatures] = useState<string[]>(inMemoryHiddenFeatures);
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
 
   const partnerAnim = useRef(new Animated.Value(0)).current;
@@ -158,31 +170,65 @@ export default function Dashboard() {
 
   const loadCachedData = async () => {
     try {
-      const cachedStr = await AsyncStorage.getItem(CACHE_KEY);
+      const [storedCustoms, storedHidden, cachedStr] = await Promise.all([
+        AsyncStorage.getItem('@app_service_customs_cache'),
+        AsyncStorage.getItem('@app_hidden_features_cache'),
+        AsyncStorage.getItem(CACHE_KEY),
+      ]);
+
+      if (storedCustoms) {
+        try {
+          const parsedCustoms = JSON.parse(storedCustoms);
+          if (parsedCustoms && typeof parsedCustoms === 'object') {
+            inMemoryServiceCustoms = parsedCustoms;
+            setServiceCustoms(parsedCustoms);
+          }
+        } catch (_) {}
+      }
+
+      if (storedHidden) {
+        try {
+          const parsedHidden = JSON.parse(storedHidden);
+          if (Array.isArray(parsedHidden)) {
+            inMemoryHiddenFeatures = parsedHidden;
+            setHiddenFeatures(parsedHidden);
+          }
+        } catch (_) {}
+      }
+
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
-        const cacheAgeMs = Date.now() - (cached.updatedAt || 0);
-        const IS_CACHE_STALE = cacheAgeMs > 60 * 60 * 1000;
         if (cached.userData) setUserData(cached.userData);
         if (cached.transactions) setTransactions(cached.transactions);
-        if (!IS_CACHE_STALE) {
-          if (cached.featureFlags) setFeatureFlags(cached.featureFlags);
-          if (cached.logoUrl) setLogoUrl(cached.logoUrl);
-          if (cached.unreadCount !== undefined) setUnreadCount(cached.unreadCount);
-          if (cached.activePartners) setActivePartners(cached.activePartners);
-          if (cached.celebrationSettings) setCelebrationSettings(cached.celebrationSettings);
-        } else {
-          console.log("Cached feature flags are stale (older than 1 hour). Skipping cache load for flags.");
+        if (cached.featureFlags) setFeatureFlags(cached.featureFlags);
+        if (cached.serviceCustoms && Object.keys(inMemoryServiceCustoms).length === 0) {
+          setServiceCustoms(cached.serviceCustoms);
         }
-        setLoading(false);
+        if (cached.hiddenFeatures && inMemoryHiddenFeatures.length === 0) {
+          setHiddenFeatures(cached.hiddenFeatures);
+        }
+        if (cached.logoUrl) setLogoUrl(cached.logoUrl);
+        if (cached.unreadCount !== undefined) setUnreadCount(cached.unreadCount);
+        if (cached.activePartners) setActivePartners(cached.activePartners);
+        if (cached.celebrationSettings) setCelebrationSettings(cached.celebrationSettings);
       }
     } catch (e) {
       console.warn("Cache read error:", e);
+    } finally {
+      setLoading(false);
     }
   };
 
   const saveCache = async (data: any) => {
     try {
+      if (data.serviceCustoms) {
+        inMemoryServiceCustoms = data.serviceCustoms;
+        AsyncStorage.setItem('@app_service_customs_cache', JSON.stringify(data.serviceCustoms)).catch(() => {});
+      }
+      if (data.hiddenFeatures) {
+        inMemoryHiddenFeatures = data.hiddenFeatures;
+        AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(data.hiddenFeatures)).catch(() => {});
+      }
       const currentCacheStr = await AsyncStorage.getItem(CACHE_KEY);
       const currentCache = currentCacheStr ? JSON.parse(currentCacheStr) : {};
       const newCache = { ...currentCache, ...data, updatedAt: Date.now() };
@@ -214,7 +260,6 @@ export default function Dashboard() {
   };
 
   const onRefresh = useCallback(() => { setRefreshing(true); loadAllData(); }, []);
-  const [hiddenFeatures, setHiddenFeatures] = useState<string[]>([]);
 
   const fetchUnreadCount = async (userId: string) => {
     try {
@@ -260,7 +305,13 @@ export default function Dashboard() {
             setLogoUrl(url); saveCache({ logoUrl: url });
           }
           if (setting.key === 'hidden_features') {
-            try { const parsed = JSON.parse(setting.value); setHiddenFeatures(parsed); saveCache({ hiddenFeatures: parsed }); } catch (e) {}
+            try { 
+              const parsed = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value; 
+              if (Array.isArray(parsed)) {
+                setHiddenFeatures(parsed); 
+                saveCache({ hiddenFeatures: parsed }); 
+              }
+            } catch (e) {}
           }
           if (setting.key === 'dashboard_service_customizations') {
             try {

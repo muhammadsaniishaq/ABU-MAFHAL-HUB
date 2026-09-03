@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -241,6 +242,9 @@ export default function ManageFeaturesScreen() {
 
   const saveServiceCustoms = async (updated: Record<string, ServiceCustom>) => {
     setServiceCustoms(updated);
+    try {
+      await AsyncStorage.setItem('@app_service_customs_cache', JSON.stringify(updated));
+    } catch (_) {}
     await supabase.from('app_settings').upsert(
       { key: 'dashboard_service_customizations', value: JSON.stringify(updated) },
       { onConflict: 'key' }

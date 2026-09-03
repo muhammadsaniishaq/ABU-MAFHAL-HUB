@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 
 export interface AppSettings {
@@ -53,7 +54,6 @@ const DEFAULT_SETTINGS: AppSettings = {
     crypto_earn_enabled: true,
     crypto_cards_enabled: true,
     crypto_stake_enabled: true,
-    crypto_loan_enabled: true,
     crypto_gift_enabled: true,
     crypto_gas_enabled: true,
     crypto_qrpay_enabled: true,
@@ -70,9 +70,22 @@ const DEFAULT_SETTINGS: AppSettings = {
     crypto_rate_eth_sell: '4300000'
 };
 
+const SETTINGS_CACHE_KEY = '@cached_app_settings_v2';
 let globalSettings: AppSettings = DEFAULT_SETTINGS;
 let isFetching = false;
 let fetchPromise: Promise<void> | null = null;
+
+// Immediately try to restore from memory or AsyncStorage
+AsyncStorage.getItem(SETTINGS_CACHE_KEY).then((cached) => {
+    if (cached) {
+        try {
+            const parsed = JSON.parse(cached);
+            if (parsed && typeof parsed === 'object') {
+                globalSettings = { ...DEFAULT_SETTINGS, ...parsed };
+            }
+        } catch (_) {}
+    }
+}).catch(() => {});
 
 export function useAppSettings() {
     const [settings, setSettings] = useState<AppSettings>(globalSettings);
@@ -80,6 +93,18 @@ export function useAppSettings() {
 
     useEffect(() => {
         let mounted = true;
+
+        // Restore immediately from local storage if state is default
+        AsyncStorage.getItem(SETTINGS_CACHE_KEY).then((cached) => {
+            if (cached && mounted) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed && typeof parsed === 'object') {
+                        setSettings(prev => ({ ...prev, ...parsed }));
+                    }
+                } catch (_) {}
+            }
+        }).catch(() => {});
 
         const safetyTimer = setTimeout(() => {
             if (mounted) setLoading(false);
@@ -103,9 +128,11 @@ export function useAppSettings() {
                                 }
                             });
                             globalSettings = newSettings;
+                            // Persist to offline storage
+                            AsyncStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(newSettings)).catch(() => {});
                         }
                     } catch (error: any) {
-                        console.warn('Could not fetch app settings from Supabase:', error?.message || error);
+                        console.warn('Could not fetch app settings from Supabase (offline/slow):', error?.message || error);
                     } finally {
                         isFetching = false;
                     }

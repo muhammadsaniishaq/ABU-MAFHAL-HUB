@@ -1,6 +1,7 @@
 import { View, Text, Switch, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Platform, KeyboardAvoidingView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../services/supabase';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -341,6 +342,10 @@ export default function AdminSettings() {
             
             const { error } = await supabase.from('app_settings').upsert(settingsToSave, { onConflict: 'key' });
             if (error) throw error;
+            
+            try {
+                await AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(hiddenFeaturesList));
+            } catch (_) {}
             
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert('Success', 'System preferences saved and synced across all devices.');
