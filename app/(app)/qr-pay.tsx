@@ -905,14 +905,14 @@ export default function QRPayScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Premium Curved Header */}
+            {/* Ultra-Sleek Executive Curved Header */}
             <LinearGradient 
-              colors={['#060d21', '#0d1b3e']} 
+              colors={['#060B18', '#0D1B3E']} 
               style={s.headerContainer}
             >
               <View style={s.headerTop}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-                  <Ionicons name="arrow-back" size={20} color="white" />
+                <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
+                  <Ionicons name="arrow-back" size={18} color="white" />
                 </TouchableOpacity>
                 <View style={{ alignItems: 'center' }}>
                   <Text style={s.headerTitle}>QR Pay & Transfer</Text>
@@ -924,16 +924,26 @@ export default function QRPayScreen() {
                     style={s.headerBalancePill}
                     activeOpacity={0.7}
                   >
+                    <Ionicons name="wallet-outline" size={11} color="#F5A623" style={{ marginRight: 4 }} />
                     <Text style={s.headerBalance}>
                       {showBalance ? `₦${userBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '₦ • • • • • •'}
                     </Text>
-                    <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={12} color="#f5a623" style={{ marginLeft: 4 }} />
+                    <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={11} color="#F5A623" style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
                 </View>
-                <View style={{ width: 32 }} />
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (Platform.OS !== 'web') Haptics.selectionAsync();
+                    setActiveTab(activeTab === 'mycode' ? 'scan' : 'mycode');
+                  }} 
+                  style={s.headerToggleBtn}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name={activeTab === 'mycode' ? 'scan-outline' : 'qr-code-outline'} size={16} color="#F5A623" />
+                </TouchableOpacity>
               </View>
 
-              {/* Tab Switcher */}
+              {/* Ultra-Compact Segmented Tab Switcher */}
               <View style={s.tabContainer}>
                 <TouchableOpacity
                     onPress={() => { 
@@ -944,7 +954,7 @@ export default function QRPayScreen() {
                     style={[s.tabItem, activeTab === 'mycode' && s.tabItemActive]}
                     activeOpacity={0.8}
                 >
-                    <Ionicons name="qr-code-outline" size={13} color={activeTab === 'mycode' ? '#F5A623' : 'rgba(255,255,255,0.5)'} style={{ marginRight: 4 }} />
+                    <Ionicons name="qr-code" size={13} color={activeTab === 'mycode' ? '#F5A623' : 'rgba(255,255,255,0.45)'} style={{ marginRight: 5 }} />
                     <Text style={[s.tabText, activeTab === 'mycode' && s.tabTextActive]}>My QR Code</Text>
                 </TouchableOpacity>
 
@@ -957,14 +967,11 @@ export default function QRPayScreen() {
                     style={[s.tabItem, activeTab === 'scan' && s.tabItemActive]}
                     activeOpacity={0.8}
                 >
-                    <Ionicons name="scan-outline" size={13} color={activeTab === 'scan' ? '#F5A623' : 'rgba(255,255,255,0.5)'} style={{ marginRight: 4 }} />
-                    <Text style={[s.tabText, activeTab === 'scan' && s.tabTextActive]}>Scan to Pay</Text>
+                    <Ionicons name="scan" size={13} color={activeTab === 'scan' ? '#10B981' : 'rgba(255,255,255,0.45)'} style={{ marginRight: 5 }} />
+                    <Text style={[s.tabText, activeTab === 'scan' && s.tabTextActiveScan]}>Scan to Pay</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-
-            {/* Dynamic Banners */}
-            <DynamicBanners placement="qr_pay" />
 
             {activeTab === 'scan' ? (
                 <View style={{ flex: 1 }}>
@@ -984,13 +991,9 @@ export default function QRPayScreen() {
                                 <View style={s.ambientOrb} />
 
                                 {/* Header badge */}
-                                <View style={s.cardBrandBadge}>
-                                    <View style={[s.cardBrandIconRing, { backgroundColor: '#10B981' }]}>
-                                        <Ionicons name="scan" size={9} color="#0D1B3E" />
-                                    </View>
-                                    <Text style={[s.cardBrandTitle, { color: '#10B981' }]}>FAST SCAN</Text>
-                                    <View style={s.cardBrandDot} />
-                                    <Text style={s.cardBrandSub}>INSTANT WALLET TRANSFER</Text>
+                                <View style={[s.cardBrandBadge, { borderColor: 'rgba(16, 185, 129, 0.35)', backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+                                    <Ionicons name="scan" size={10} color="#10B981" />
+                                    <Text style={[s.cardBrandTitle, { color: '#10B981' }]}>FAST SCAN & PAY</Text>
                                 </View>
 
                                 {/* High-tech Viewfinder Preview Window */}
@@ -1129,6 +1132,11 @@ export default function QRPayScreen() {
                                     <Text style={s.securityShieldSub}>Instant wallet settlement with zero transaction fees.</Text>
                                 </View>
                             </View>
+
+                            {/* Banner in scan footer */}
+                            <View style={{ width: '100%', maxWidth: 350, marginTop: 12 }}>
+                                <DynamicBanners placement="qr_pay" />
+                            </View>
                         </ScrollView>
                     ) : !permission?.granted ? (
                         <View style={s.permissionCard}>
@@ -1241,7 +1249,7 @@ export default function QRPayScreen() {
                 </View>
             ) : (
                 <ScrollView 
-                    contentContainerStyle={{ flexGrow: 1, alignItems: 'center', paddingHorizontal: 16, paddingBottom: 100, paddingTop: 16 }}
+                    contentContainerStyle={s.myCodeDashboardContainer}
                     showsVerticalScrollIndicator={false}
                 >
                     {currentUser ? (
@@ -1249,7 +1257,7 @@ export default function QRPayScreen() {
                             {/* LUXURY COMPACT VIP QR CARD */}
                             <ViewShot ref={flyerRef} options={{ format: 'png', quality: 1 }}>
                                 <LinearGradient 
-                                    colors={['#070D1E', '#0D1B3E', '#081128']} 
+                                    colors={['#060B18', '#0D1B3E', '#081126']} 
                                     style={s.myCodeCard}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 1 }}
@@ -1257,78 +1265,52 @@ export default function QRPayScreen() {
                                     {/* Ambient Glow */}
                                     <View style={s.ambientOrb} />
 
-                                    {/* Top Brand Emblem */}
-                                    <View style={s.cardBrandBadge}>
-                                        <View style={s.cardBrandIconRing}>
-                                            <Ionicons name="flash" size={10} color="#0D1B3E" />
-                                        </View>
-                                        <Text style={s.cardBrandTitle}>MAFHAL PAY</Text>
-                                        <View style={s.cardBrandDot} />
-                                        <Text style={s.cardBrandSub}>INSTANT WALLET TRANSFER</Text>
-                                    </View>
-
-                                    {/* User Profile Header */}
-                                    <View style={s.myCodeHeader}>
-                                        <LinearGradient
-                                            colors={['#F5A623', '#D97706']}
-                                            style={s.avatarGradientRing}
-                                        >
-                                            <View style={s.avatarInnerWrapper}>
-                                                {currentUser.avatar_url ? (
-                                                    <Image 
-                                                        source={{ uri: currentUser.avatar_url }} 
-                                                        style={{ width: '100%', height: '100%', borderRadius: 20 }}
-                                                    />
-                                                ) : (
-                                                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
-                                                        {currentUser.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        </LinearGradient>
-                                        
-                                        <View style={{ alignItems: 'center', marginTop: 6 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                                <Text style={s.myCodeName} numberOfLines={1}>{currentUser.full_name}</Text>
-                                                <Ionicons name="checkmark-circle" size={15} color="#10B981" />
-                                            </View>
-                                            <TouchableOpacity 
-                                                onPress={() => handleCopy(currentUser.email, 'Email')}
-                                                style={s.emailCopyBtn}
-                                                activeOpacity={0.7}
+                                    {/* Top Row: User Avatar & Info + VIP Badge */}
+                                    <View style={s.cardTopRow}>
+                                        <View style={s.cardTopUser}>
+                                            <LinearGradient
+                                                colors={['#F5A623', '#D97706']}
+                                                style={s.avatarGradientRing}
                                             >
-                                                <Text style={s.myCodeEmail} numberOfLines={1}>{currentUser.email}</Text>
-                                                <Ionicons name="copy-outline" size={10} color="#94A3B8" />
-                                            </TouchableOpacity>
+                                                <View style={s.avatarInnerWrapper}>
+                                                    {currentUser.avatar_url ? (
+                                                        <Image 
+                                                            source={{ uri: currentUser.avatar_url }} 
+                                                            style={{ width: '100%', height: '100%', borderRadius: 18 }}
+                                                        />
+                                                    ) : (
+                                                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>
+                                                            {currentUser.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            </LinearGradient>
+                                            <View style={{ marginLeft: 10, flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                    <Text style={s.myCodeName} numberOfLines={1}>{currentUser.full_name}</Text>
+                                                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                                                </View>
+                                                <TouchableOpacity 
+                                                    onPress={() => handleCopy(currentUser.email, 'Email')}
+                                                    style={s.emailCopyBtn}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={s.myCodeEmail} numberOfLines={1}>{currentUser.email}</Text>
+                                                    <Ionicons name="copy-outline" size={9} color="#94A3B8" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+
+                                        {/* VIP Badge */}
+                                        <View style={s.cardBrandBadge}>
+                                            <Ionicons name="flash" size={9} color="#F5A623" />
+                                            <Text style={s.cardBrandTitle}>MAFHAL PAY</Text>
                                         </View>
                                     </View>
 
-                                    {/* Dynamic Requested Amount Ribbon */}
-                                    {requestedAmount && parseFloat(requestedAmount) > 0 ? (
-                                        <View style={s.requestedAmountBanner}>
-                                            <View style={s.requestedAmountIcon}>
-                                                <Ionicons name="pricetag" size={10} color="#0D1B3E" />
-                                            </View>
-                                            <Text style={s.requestedAmountTxt}>
-                                                Requesting: <Text style={{ fontWeight: '900', color: '#0D1B3E' }}>₦{parseFloat(requestedAmount).toLocaleString()}</Text>
-                                            </Text>
-                                            <TouchableOpacity 
-                                                onPress={() => {
-                                                    if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                                    setRequestedAmount('');
-                                                }}
-                                                style={s.requestedAmountClearBtn}
-                                                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                                            >
-                                                <Ionicons name="close" size={12} color="#0D1B3E" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    ) : null}
-
-                                    {/* Clean QR Code Container with 4 Luxury Gold Brackets */}
+                                    {/* Center: High-Definition QR Code with Precision Gold Reticle */}
                                     <View style={s.qrWrapperContainer}>
                                         <View style={s.qrWrapper}>
-                                            {/* 4 Gold Corner Crosshairs */}
                                             <View style={[s.qrCorner, s.qrCornerTL]} />
                                             <View style={[s.qrCorner, s.qrCornerTR]} />
                                             <View style={[s.qrCorner, s.qrCornerBL]} />
@@ -1336,37 +1318,62 @@ export default function QRPayScreen() {
 
                                             <Image
                                                 source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(myCodePayload)}&color=0D1B3E&margin=0` }}
-                                                style={{ width: 132, height: 132 }}
+                                                style={{ width: 126, height: 126 }}
                                                 resizeMode="contain"
                                             />
                                         </View>
-                                        <View style={s.qrSecurityNote}>
-                                            <Ionicons name="shield-checkmark" size={10} color="#F5A623" />
-                                            <Text style={s.qrSecurityNoteText}>Scan with Mafhal App to Pay</Text>
-                                        </View>
+
+                                        {/* Dynamic Requested Amount Ribbon */}
+                                        {requestedAmount && parseFloat(requestedAmount) > 0 ? (
+                                            <View style={s.requestedAmountBanner}>
+                                                <View style={s.requestedAmountIcon}>
+                                                    <Ionicons name="pricetag" size={9} color="#0D1B3E" />
+                                                </View>
+                                                <Text style={s.requestedAmountTxt}>
+                                                    Amount: <Text style={{ fontWeight: '900', color: '#0D1B3E' }}>₦{parseFloat(requestedAmount).toLocaleString()}</Text>
+                                                </Text>
+                                                <TouchableOpacity 
+                                                    onPress={() => {
+                                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                                        setRequestedAmount('');
+                                                    }}
+                                                    style={s.requestedAmountClearBtn}
+                                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                                >
+                                                    <Ionicons name="close" size={11} color="#0D1B3E" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : (
+                                            <View style={s.qrSecurityNote}>
+                                                <Ionicons name="shield-checkmark" size={9} color="#F5A623" />
+                                                <Text style={s.qrSecurityNoteText}>Scan with Mafhal App to Pay</Text>
+                                            </View>
+                                        )}
                                     </View>
 
-                                    {/* Wallet ID Pill with Direct Copy */}
+                                    {/* Bottom: Wallet ID Bar with 1-Tap Copy */}
                                     <View style={s.cardFooter}>
                                         <TouchableOpacity 
                                             onPress={() => handleCopy(`MAF-${currentUser.id.substring(0, 8).toUpperCase()}`, 'Wallet ID')}
                                             style={s.walletIdPill}
                                             activeOpacity={0.8}
                                         >
-                                            <View>
-                                                <Text style={s.cardInfoLabel}>WALLET ID</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Ionicons name="wallet-outline" size={13} color="#F5A623" />
+                                                <Text style={s.cardInfoLabel}>WALLET ID:</Text>
                                                 <Text style={s.cardInfoValue}>MAF-{currentUser.id.substring(0, 8).toUpperCase()}</Text>
                                             </View>
                                             <View style={s.copyIconBadge}>
-                                                <Ionicons name="copy-outline" size={12} color="#F5A623" />
+                                                <Ionicons name="copy-outline" size={11} color="#F5A623" />
                                             </View>
                                         </TouchableOpacity>
                                     </View>
                                 </LinearGradient>
                             </ViewShot>
 
-                            {/* MODERN 3-BUTTON FEATURE ACTIONS */}
+                            {/* 3 LUXURY DECORATED ACTION BUTTONS */}
                             <View style={s.featureActionGrid}>
+                                {/* 1. Set Amount (Warm Amber) */}
                                 <TouchableOpacity 
                                     onPress={() => {
                                         setTempAmountInput(requestedAmount);
@@ -1375,65 +1382,72 @@ export default function QRPayScreen() {
                                     style={s.featureActionBtn}
                                     activeOpacity={0.8}
                                 >
-                                    <LinearGradient colors={['#1E293B', '#0F172A']} style={s.featureActionGrad}>
-                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
-                                            <Ionicons name="calculator-outline" size={16} color="#F5A623" />
+                                    <LinearGradient colors={['#2B1B04', '#150D02']} style={[s.featureActionGrad, { borderColor: 'rgba(245, 166, 35, 0.35)' }]}>
+                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(245, 166, 35, 0.18)' }]}>
+                                            <Ionicons name="pricetag" size={14} color="#F5A623" />
                                         </View>
                                         <Text style={s.featureActionTitle}>
                                             {requestedAmount ? 'Edit Amount' : 'Set Amount'}
                                         </Text>
-                                        <Text style={s.featureActionSub}>
-                                            {requestedAmount ? `₦${parseFloat(requestedAmount).toLocaleString()}` : 'Fix Price'}
+                                        <Text style={[s.featureActionSub, { color: '#FBBF24' }]}>
+                                            {requestedAmount ? `₦${parseFloat(requestedAmount).toLocaleString()}` : 'Custom'}
                                         </Text>
                                     </LinearGradient>
                                 </TouchableOpacity>
 
+                                {/* 2. Save Image (Emerald Green) */}
                                 <TouchableOpacity 
                                     onPress={handleSaveToGallery}
                                     style={s.featureActionBtn}
                                     activeOpacity={0.8}
                                 >
-                                    <LinearGradient colors={['#1E293B', '#0F172A']} style={s.featureActionGrad}>
-                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-                                            <Ionicons name="download-outline" size={16} color="#10B981" />
+                                    <LinearGradient colors={['#04261A', '#02130D']} style={[s.featureActionGrad, { borderColor: 'rgba(16, 185, 129, 0.35)' }]}>
+                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.18)' }]}>
+                                            <Ionicons name="arrow-down-circle" size={14} color="#10B981" />
                                         </View>
                                         <Text style={s.featureActionTitle}>Save Photo</Text>
-                                        <Text style={s.featureActionSub}>Gallery Image</Text>
+                                        <Text style={[s.featureActionSub, { color: '#34D399' }]}>To Photos</Text>
                                     </LinearGradient>
                                 </TouchableOpacity>
 
+                                {/* 3. Share Flyer (Sapphire Royal Blue) */}
                                 <TouchableOpacity 
                                     onPress={handleShareMyCode}
                                     style={s.featureActionBtn}
                                     activeOpacity={0.8}
                                 >
-                                    <LinearGradient colors={['#1E293B', '#0F172A']} style={s.featureActionGrad}>
-                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-                                            <Ionicons name="share-social-outline" size={16} color="#3B82F6" />
+                                    <LinearGradient colors={['#0C1938', '#060D1E']} style={[s.featureActionGrad, { borderColor: 'rgba(59, 130, 246, 0.35)' }]}>
+                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(59, 130, 246, 0.18)' }]}>
+                                            <Ionicons name="share-social" size={14} color="#3B82F6" />
                                         </View>
-                                        <Text style={s.featureActionTitle}>Share Code</Text>
-                                        <Text style={s.featureActionSub}>Send Flyer</Text>
+                                        <Text style={s.featureActionTitle}>Share Flyer</Text>
+                                        <Text style={[s.featureActionSub, { color: '#60A5FA' }]}>To Chat</Text>
                                     </LinearGradient>
                                 </TouchableOpacity>
+                            </View>
+
+                            {/* Dynamic Banner in Footer */}
+                            <View style={{ width: '100%', maxWidth: 350, marginTop: 12 }}>
+                                <DynamicBanners placement="qr_pay" />
                             </View>
 
                             {/* RECENT TRANSFERS ACTIVITY */}
                             {recentTransfers.length > 0 ? (
                                 <View style={s.recentTransfersContainer}>
                                     <View style={s.recentTransfersHeader}>
-                                        <Ionicons name="time-outline" size={14} color="#64748B" />
-                                        <Text style={s.recentTransfersTitle}>Recent Transfer History</Text>
+                                        <Ionicons name="time-outline" size={13} color="#F5A623" />
+                                        <Text style={s.recentTransfersTitle}>Recent Transfers</Text>
                                     </View>
                                     {recentTransfers.map((tx, idx) => (
                                         <View key={tx.id || idx} style={s.recentTxRow}>
                                             <View style={s.recentTxIcon}>
                                                 <Ionicons 
                                                     name={tx.type === 'transfer' ? "swap-horizontal" : "arrow-up"} 
-                                                    size={14} 
-                                                    color="#0056D2" 
+                                                    size={13} 
+                                                    color="#F5A623" 
                                                 />
                                             </View>
-                                            <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                            <View style={{ flex: 1, marginHorizontal: 8 }}>
                                                 <Text style={s.recentTxDesc} numberOfLines={1}>
                                                     {tx.description || 'Wallet Transfer'}
                                                 </Text>
@@ -1840,72 +1854,105 @@ export default function QRPayScreen() {
 }
 
 const s = StyleSheet.create({
-  // Curved header
+  // Ultra-Compact Curved Header
   headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 46,
-    paddingBottom: 22,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 44 : 14,
+    paddingBottom: 10,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     zIndex: 20,
-  },
-  headerBalancePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.14)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
-    marginTop: 4,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 8,
   },
   backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '900',
     color: 'white',
     letterSpacing: -0.2,
   },
+  headerBalancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+    marginTop: 2,
+  },
+  headerBalance: {
+    color: '#F5A623',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  headerToggleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(245, 166, 35, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Tab bar
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
     padding: 2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    height: 36,
   },
   tabItem: {
     flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    justifyContent: 'center',
+    borderRadius: 10,
   },
   tabItemActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.3)',
   },
   tabText: {
     fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   tabTextActive: {
-    color: 'white',
+    color: '#F5A623',
     fontWeight: '900',
+  },
+  tabTextActiveScan: {
+    color: '#10B981',
+    fontWeight: '900',
+  },
+  // Dashboard Scroll Container
+  myCodeDashboardContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 90,
   },
   // Permission Card
   permissionCard: {
@@ -1975,20 +2022,20 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
-  // Executive Luxury VIP QR Card (Compact & Perfectly Proportioned)
+  // Executive Luxury VIP QR Card (Compact, Horizontal Balanced & Perfectly Arranged)
   myCodeCard: {
     width: '100%',
-    maxWidth: 320,
-    borderRadius: 28,
-    padding: 18,
+    maxWidth: 350,
+    borderRadius: 22,
+    padding: 14,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.35)',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
+    borderWidth: 1.2,
+    borderColor: 'rgba(245, 166, 35, 0.3)',
     overflow: 'hidden',
     backgroundColor: '#070D1E',
   },
@@ -1996,140 +2043,92 @@ const s = StyleSheet.create({
     position: 'absolute',
     top: -40,
     right: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: '#F5A623',
-    opacity: 0.12,
+    opacity: 0.1,
   },
-  cardBrandBadge: {
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.25)',
-    marginBottom: 14,
-    gap: 5,
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
   },
-  cardBrandIconRing: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#F5A623',
+  cardTopUser: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardBrandTitle: {
-    color: '#F5A623',
-    fontSize: 9.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  cardBrandDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(245, 166, 35, 0.5)',
-  },
-  cardBrandSub: {
-    color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 8.5,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  myCodeHeader: {
-    alignItems: 'center',
-    marginBottom: 12,
-    zIndex: 1,
+    flex: 1,
   },
   avatarGradientRing: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    padding: 2,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    padding: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#F5A623',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
   },
   avatarInnerWrapper: {
     width: '100%',
     height: '100%',
-    borderRadius: 21,
+    borderRadius: 17.5,
     backgroundColor: '#070D1E',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   myCodeName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: -0.3,
-    textAlign: 'center',
+    letterSpacing: -0.2,
   },
   emailCopyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 8,
+    gap: 3,
+    marginTop: 1,
   },
   myCodeEmail: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#94A3B8',
     fontWeight: '600',
   },
-  requestedAmountBanner: {
+  cardBrandBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FDE68A',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    marginBottom: 10,
-    gap: 6,
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+    gap: 4,
   },
-  requestedAmountIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#F5A623',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  requestedAmountTxt: {
-    color: '#78350F',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  requestedAmountClearBtn: {
-    marginLeft: 4,
-    padding: 2,
+  cardBrandTitle: {
+    color: '#F5A623',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
   qrWrapperContainer: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginVertical: 4,
     width: '100%',
   },
   qrWrapper: {
-    padding: 12,
+    padding: 10,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 6,
+    borderRadius: 16,
+    shadowColor: '#F5A623',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 5,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2141,48 +2140,76 @@ const s = StyleSheet.create({
     borderColor: '#F5A623',
   },
   qrCornerTL: {
-    top: 4,
-    left: 4,
+    top: 3,
+    left: 3,
     borderTopWidth: 2.5,
     borderLeftWidth: 2.5,
-    borderTopLeftRadius: 6,
+    borderTopLeftRadius: 5,
   },
   qrCornerTR: {
-    top: 4,
-    right: 4,
+    top: 3,
+    right: 3,
     borderTopWidth: 2.5,
     borderRightWidth: 2.5,
-    borderTopRightRadius: 6,
+    borderTopRightRadius: 5,
   },
   qrCornerBL: {
-    bottom: 4,
-    left: 4,
+    bottom: 3,
+    left: 3,
     borderBottomWidth: 2.5,
     borderLeftWidth: 2.5,
-    borderBottomLeftRadius: 6,
+    borderBottomLeftRadius: 5,
   },
   qrCornerBR: {
-    bottom: 4,
-    right: 4,
+    bottom: 3,
+    right: 3,
     borderBottomWidth: 2.5,
     borderRightWidth: 2.5,
-    borderBottomRightRadius: 6,
+    borderBottomRightRadius: 5,
+  },
+  requestedAmountBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDE68A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+    gap: 5,
+  },
+  requestedAmountIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#F5A623',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestedAmountTxt: {
+    color: '#78350F',
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  requestedAmountClearBtn: {
+    marginLeft: 3,
+    padding: 2,
   },
   qrSecurityNote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 8,
+    marginTop: 6,
   },
   qrSecurityNoteText: {
     color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   cardFooter: {
     alignItems: 'center',
     width: '100%',
+    marginTop: 6,
   },
   walletIdPill: {
     flexDirection: 'row',
@@ -2191,37 +2218,38 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     width: '100%',
   },
   cardInfoLabel: {
-    fontSize: 8.5,
+    fontSize: 9,
     fontWeight: '800',
-    color: 'rgba(245, 166, 35, 0.8)',
-    letterSpacing: 1,
+    color: 'rgba(245, 166, 35, 0.9)',
+    letterSpacing: 0.5,
   },
   cardInfoValue: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: '#FFFFFF',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
   copyIconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: 'rgba(245, 166, 35, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // 3 Decorated Action Buttons
   featureActionGrid: {
     flexDirection: 'row',
     width: '100%',
-    maxWidth: 320,
-    marginTop: 14,
+    maxWidth: 350,
+    marginTop: 10,
     gap: 8,
   },
   featureActionBtn: {
@@ -2230,47 +2258,45 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 3,
   },
   featureActionGrad: {
-    paddingVertical: 12,
-    paddingHorizontal: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 16,
   },
   featureActionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   featureActionTitle: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 10.5,
+    fontWeight: '900',
     textAlign: 'center',
   },
   featureActionSub: {
-    color: '#94A3B8',
-    fontSize: 9,
-    fontWeight: '600',
-    marginTop: 2,
+    fontSize: 8.5,
+    fontWeight: '700',
+    marginTop: 1,
     textAlign: 'center',
   },
   recentTransfersContainer: {
     width: '100%',
-    maxWidth: 320,
-    marginTop: 18,
+    maxWidth: 350,
+    marginTop: 12,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 18,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: 'rgba(13, 27, 62, 0.04)',
@@ -2283,14 +2309,14 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
-    paddingBottom: 8,
+    marginBottom: 8,
+    paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   recentTransfersTitle: {
     color: '#334155',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -2298,31 +2324,31 @@ const s = StyleSheet.create({
   recentTxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderBottomWidth: 0.5,
     borderBottomColor: '#F1F5F9',
   },
   recentTxIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 86, 210, 0.08)',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(245, 166, 35, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   recentTxDesc: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#0F172A',
   },
   recentTxDate: {
-    fontSize: 9.5,
+    fontSize: 9,
     color: '#94A3B8',
     fontWeight: '500',
     marginTop: 1,
   },
   recentTxAmount: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '900',
     color: '#10B981',
   },
@@ -2811,13 +2837,6 @@ const s = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '900',
-  },
-  headerBalance: {
-    color: '#f5a623',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 2,
-    letterSpacing: 0.5,
   },
   decoratedModalCard: {
     width: '90%',
