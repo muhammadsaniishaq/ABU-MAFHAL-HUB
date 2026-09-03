@@ -213,6 +213,13 @@ export default function UserManagement() {
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentName: '', success: 0, failed: 0 });
     const [generatingSingleAcc, setGeneratingSingleAcc] = useState(false);
 
+    // Manual Virtual Account Assignment State
+    const [showManualVaModal, setShowManualVaModal] = useState(false);
+    const [manualBankName, setManualBankName] = useState('Palmpay');
+    const [manualAccNumber, setManualAccNumber] = useState('');
+    const [manualAccName, setManualAccName] = useState('');
+    const [assigningManualVa, setAssigningManualVa] = useState(false);
+
     // Dynamic Executive KPIs
     const stats = {
         totalUsers: users.length,
@@ -260,7 +267,7 @@ export default function UserManagement() {
 
             try {
                 const { data, error } = await supabase.functions.invoke('create-virtual-account', {
-                    body: { userId: user.id, bvn: user.bvn, nin: user.nin, forceSecondAccount: false }
+                    body: { userId: user.id, bvn: user.bvn, nin: user.nin, forceUpdate: false }
                 });
 
                 if (error) {
@@ -271,11 +278,16 @@ export default function UserManagement() {
                     throw new Error(data.error);
                 }
 
-                if (!data?.accounts || data.accounts.length === 0) {
+                const genAcc = data?.accounts?.[0]?.account_number || data?.account_number;
+                const genBank = data?.accounts?.[0]?.bank_name || data?.bank_name;
+
+                if (!genAcc) {
                     throw new Error(data?.message || 'No account returned');
                 }
 
                 successCount++;
+                // Update live state immediately
+                setUsers(prev => prev.map(u => u.id === user.id ? { ...u, account_number: genAcc, bank_name: genBank } : u));
             } catch (err: any) {
                 console.warn(`Batch account generate error for ${user.email}:`, err);
                 failCount++;
@@ -310,27 +322,85 @@ export default function UserManagement() {
         setGeneratingSingleAcc(true);
         try {
             const { data, error } = await supabase.functions.invoke('create-virtual-account', {
-                body: { userId: targetUser.id, bvn: targetUser.bvn, forceSecondAccount: true }
+                body: { 
+                    userId: targetUser.id, 
+                    bvn: targetUser.bvn, 
+                    nin: targetUser.nin,
+                    forceUpdate: true,
+                    forceSecondAccount: true 
+                }
             });
             if (error) throw error;
-            if (data?.error && !data.accounts) throw new Error(data.error);
+            if (data?.error && (!data?.accounts || data.accounts.length === 0)) throw new Error(data.error);
 
             const newAcc = data?.accounts?.[0]?.account_number || data?.account_number;
             const newBank = data?.accounts?.[0]?.bank_name || data?.bank_name;
 
+            if (!newAcc) {
+                throw new Error(data?.message || "No virtual account returned");
+            }
+
+            // Immediately reflect in state and users list
+            setSelectedUser(prev => prev ? { ...prev, account_number: newAcc, bank_name: newBank } : null);
+            setUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, account_number: newAcc, bank_name: newBank } : u));
+
             Alert.alert(
                 "Account Generated Successfully 🏦",
-                `Virtual account generated!\nBank: ${newBank || '9Payment Service Bank / PalmPay'}\nAccount: ${newAcc || 'Active'}`
+                `Virtual account generated!\nBank: ${newBank || '9Payment Service Bank / PalmPay'}\nAccount: ${newAcc}`
             );
 
-            await fetchUsers();
-            if (selectedUser?.id === targetUser.id) {
-                setSelectedUser(prev => prev ? { ...prev, account_number: newAcc, bank_name: newBank } : null);
-            }
+            fetchUsers();
         } catch (e: any) {
             Alert.alert("Generation Failed", e.message || "Failed to generate virtual account.");
         } finally {
             setGeneratingSingleAcc(false);
+        }
+    };
+
+    const handleManualAssignVA = async () => {
+        if (!selectedUser) return;
+        const cleanAcc = manualAccNumber.trim();
+        const cleanBank = manualBankName.trim();
+        if (!cleanAcc || cleanAcc.length < 8) {
+            Alert.alert("Invalid Account", "Please enter a valid account number (at least 8 digits).");
+            return;
+        }
+        if (!cleanBank) {
+            Alert.alert("Invalid Bank", "Please specify a bank name.");
+            return;
+        }
+
+        setAssigningManualVa(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('create-virtual-account', {
+                body: {
+                    action: 'assign_manual',
+                    userId: selectedUser.id,
+                    bankName: cleanBank,
+                    accountNumber: cleanAcc,
+                    accountName: manualAccName.trim() || selectedUser.full_name || 'Valued User'
+                }
+            });
+
+            if (error) throw error;
+            if (data?.error && !data?.account) throw new Error(data.error);
+
+            const savedAcc = data?.account?.account_number || cleanAcc;
+            const savedBank = data?.account?.bank_name || cleanBank;
+
+            setSelectedUser(prev => prev ? { ...prev, account_number: savedAcc, bank_name: savedBank } : null);
+            setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, account_number: savedAcc, bank_name: savedBank } : u));
+
+            Alert.alert(
+                "Virtual Account Assigned 🏦",
+                `Successfully assigned dedicated bank account!\nBank: ${savedBank}\nAccount: ${savedAcc}`
+            );
+            setShowManualVaModal(false);
+            fetchUsers();
+        } catch (err: any) {
+            Alert.alert("Assignment Failed", err.message || "Failed to assign virtual account.");
+        } finally {
+            setAssigningManualVa(false);
         }
     };
 
@@ -428,11 +498,27 @@ export default function UserManagement() {
 
             if (error) throw error;
 
-            // Direct fetch of virtual_accounts as a robust fallback
-            const { data: allVas } = await supabase
-                .from('virtual_accounts')
-                .select('user_id, account_number, bank_name')
-                .order('created_at', { ascending: true });
+            // Authoritative fetch of all virtual accounts via edge function (bypasses RLS with service role)
+            let allVas: any[] = [];
+            try {
+                const { data: vaRes } = await supabase.functions.invoke('create-virtual-account', {
+                    body: { action: 'list_all' }
+                });
+                if (vaRes?.accounts && Array.isArray(vaRes.accounts)) {
+                    allVas = vaRes.accounts;
+                }
+            } catch (vaErr) {
+                console.warn("Edge function list_all notice, falling back to direct table fetch:", vaErr);
+            }
+
+            // Fallback to direct fetch if edge function didn't return accounts
+            if (allVas.length === 0) {
+                const { data: directVas } = await supabase
+                    .from('virtual_accounts')
+                    .select('user_id, account_number, bank_name')
+                    .order('created_at', { ascending: true });
+                if (directVas) allVas = directVas;
+            }
 
             const vaMap = new Map<string, { account_number: string; bank_name: string }>();
             if (allVas) {
@@ -452,8 +538,8 @@ export default function UserManagement() {
             const enrichedData = (data || []).map((u: any) => {
                 const directVa = vaMap.get(u.id);
                 const joinVa = Array.isArray(u.virtual_accounts) ? u.virtual_accounts[0] : u.virtual_accounts;
-                const accNum = joinVa?.account_number || directVa?.account_number || u.account_number || null;
-                const bName = joinVa?.bank_name || directVa?.bank_name || u.bank_name || 'PalmPay / 9PSB';
+                const accNum = directVa?.account_number || joinVa?.account_number || u.account_number || null;
+                const bName = directVa?.bank_name || joinVa?.bank_name || u.bank_name || 'PalmPay / 9PSB';
 
                 return {
                     ...u,
@@ -1135,33 +1221,61 @@ Metadata:
                                             <Text style={s.accountChipText}>{selectedUser?.account_number || 'No Virtual Account'}</Text>
                                         </View>
 
-                                        <TouchableOpacity
-                                            onPress={() => handleGenerateSingleUserAccount(selectedUser)}
-                                            disabled={generatingSingleAcc}
-                                            style={{
-                                                backgroundColor: T.goldBg,
-                                                borderColor: T.goldDark,
-                                                borderWidth: 1,
-                                                paddingHorizontal: 8,
-                                                paddingVertical: 4,
-                                                borderRadius: 8,
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                gap: 4,
-                                            }}
-                                            activeOpacity={0.8}
-                                        >
-                                            {generatingSingleAcc ? (
-                                                <ActivityIndicator size="small" color={T.goldDark} />
-                                            ) : (
-                                                <>
-                                                    <Ionicons name="flash" size={11} color={T.goldDark} />
-                                                    <Text style={{ color: T.goldDark, fontSize: 10, fontWeight: '900' }}>
-                                                        {selectedUser?.account_number ? 'Refresh/Add 2nd' : '⚡ Generate Account'}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </TouchableOpacity>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <TouchableOpacity
+                                                onPress={() => handleGenerateSingleUserAccount(selectedUser)}
+                                                disabled={generatingSingleAcc}
+                                                style={{
+                                                    backgroundColor: T.goldBg,
+                                                    borderColor: T.goldDark,
+                                                    borderWidth: 1,
+                                                    paddingHorizontal: 8,
+                                                    paddingVertical: 5,
+                                                    borderRadius: 8,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 4,
+                                                }}
+                                                activeOpacity={0.8}
+                                            >
+                                                {generatingSingleAcc ? (
+                                                    <ActivityIndicator size="small" color={T.goldDark} />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons name="flash" size={11} color={T.goldDark} />
+                                                        <Text style={{ color: T.goldDark, fontSize: 10, fontWeight: '900' }}>
+                                                            {selectedUser?.account_number ? '⚡ Auto-Refresh' : '⚡ Generate Account'}
+                                                        </Text>
+                                                    </>
+                                                )}
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    setManualBankName(selectedUser?.bank_name || 'Palmpay');
+                                                    setManualAccNumber(selectedUser?.account_number || '');
+                                                    setManualAccName(selectedUser?.full_name || 'ABU MAFHAL LTD');
+                                                    setShowManualVaModal(true);
+                                                }}
+                                                style={{
+                                                    backgroundColor: T.infoBg,
+                                                    borderColor: T.info,
+                                                    borderWidth: 1,
+                                                    paddingHorizontal: 8,
+                                                    paddingVertical: 5,
+                                                    borderRadius: 8,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 4,
+                                                }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="create-outline" size={11} color={T.info} />
+                                                <Text style={{ color: T.info, fontSize: 10, fontWeight: '900' }}>
+                                                    ✏️ Manual Assign
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
                                     <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Bank: {selectedUser?.bank_name || '9Payment Service Bank / PalmPay'}</Text>
                                 </View>
@@ -1802,6 +1916,115 @@ Metadata:
         </Modal>
     );
 
+    // Manual Virtual Account Assignment Modal
+    const renderManualVaModal = () => (
+        <Modal 
+            visible={showManualVaModal} 
+            transparent 
+            animationType="slide" 
+            onRequestClose={() => !assigningManualVa && setShowManualVaModal(false)}
+        >
+            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
+                <View style={s.createUserCard}>
+                    <View style={s.createUserHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="card" size={20} color={T.gold} />
+                            <Text style={s.createUserTitle}>Assign Dedicated Bank Account</Text>
+                        </View>
+                        <TouchableOpacity 
+                            onPress={() => setShowManualVaModal(false)} 
+                            disabled={assigningManualVa}
+                            style={s.iconCircleBtn}
+                        >
+                            <Ionicons name="close" size={20} color={T.navyDark} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                        <View style={{ gap: 12 }}>
+                            <Text style={{ fontSize: 12, color: T.textSub }}>
+                                Manually allocate or override the dedicated virtual account for <Text style={{ fontWeight: '800', color: T.navyDark }}>{selectedUser?.full_name || selectedUser?.email}</Text>.
+                            </Text>
+
+                            {/* Quick Bank Selector Chips */}
+                            <View>
+                                <Text style={s.fieldLabel}>Preset Partner Banks</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginVertical: 4 }}>
+                                    {[
+                                        'Palmpay',
+                                        '9Payment Service Bank',
+                                        'Moniepoint',
+                                        'Wema Bank',
+                                        'Sterling Bank',
+                                        'Kuda Bank'
+                                    ].map(b => (
+                                        <TouchableOpacity
+                                            key={b}
+                                            onPress={() => setManualBankName(b)}
+                                            style={[
+                                                s.presetChip,
+                                                manualBankName === b ? { backgroundColor: T.navyDark, borderColor: T.navyDark } : null
+                                            ]}
+                                        >
+                                            <Text style={[s.presetChipText, manualBankName === b ? { color: '#FFFFFF' } : null]}>{b}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+
+                            <View>
+                                <Text style={s.fieldLabel}>Bank Name</Text>
+                                <TextInput 
+                                    style={s.createInput}
+                                    placeholder="e.g. Palmpay or 9Payment Service Bank"
+                                    placeholderTextColor={T.textSub}
+                                    value={manualBankName}
+                                    onChangeText={setManualBankName}
+                                />
+                            </View>
+
+                            <View>
+                                <Text style={s.fieldLabel}>10-Digit Account Number</Text>
+                                <TextInput 
+                                    style={s.createInput}
+                                    placeholder="e.g. 6654763126"
+                                    placeholderTextColor={T.textSub}
+                                    keyboardType="numeric"
+                                    maxLength={12}
+                                    value={manualAccNumber}
+                                    onChangeText={setManualAccNumber}
+                                />
+                            </View>
+
+                            <View>
+                                <Text style={s.fieldLabel}>Account Name</Text>
+                                <TextInput 
+                                    style={s.createInput}
+                                    placeholder="e.g. ABU MAFHAL LTD"
+                                    placeholderTextColor={T.textSub}
+                                    value={manualAccName}
+                                    onChangeText={setManualAccName}
+                                />
+                            </View>
+
+                            <TouchableOpacity 
+                                onPress={handleManualAssignVA}
+                                disabled={assigningManualVa}
+                                style={[s.createUserBtn, { backgroundColor: T.goldDark }]}
+                            >
+                                {assigningManualVa ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <Text style={s.createUserBtnText}>💾 Save Dedicated Account</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
+                </View>
+            </BlurView>
+        </Modal>
+    );
+
     return (
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} /> 
@@ -2062,6 +2285,7 @@ Metadata:
             {renderBatchModal()}
             {renderUserModal()}
             {renderCreateUserModal()}
+            {renderManualVaModal()}
 
             {/* Admin Verification Modal */}
             <SecurityModal 
