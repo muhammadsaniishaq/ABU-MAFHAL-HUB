@@ -5,9 +5,9 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
-const BANNER_WIDTH = Math.min(W - 32, 450);
-const BANNER_HEIGHT = 70; // Ultra-slim, elegant fintech banner ribbon
-const BANNER_MARGIN = 10;
+const BANNER_WIDTH = Math.min(W - 24, 460);
+const BANNER_HEIGHT = 62; // Ultra-slim modern fintech ribbon
+const BANNER_MARGIN = 8;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
 export default function DynamicBanners({ placement = 'dashboard' }: { placement?: string }) {
@@ -96,7 +96,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
         decelerationRate="fast"
         snapToInterval={ITEM_STRIDE}
         snapToAlignment="start"
-        contentContainerStyle={{ paddingHorizontal: 16 }}
+        contentContainerStyle={{ paddingHorizontal: 12 }}
         getItemLayout={(_, index) => ({
           length: ITEM_STRIDE,
           offset: ITEM_STRIDE * index,
@@ -116,7 +116,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
                 <Image 
                   source={{ uri: item.image_url }} 
                   style={styles.bannerImage} 
-                  resizeMode={item.fit_mode === 'cover' ? 'cover' : 'contain'} 
+                  resizeMode="cover" 
                 />
               </View>
             ) : (

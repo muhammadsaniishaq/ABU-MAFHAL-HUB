@@ -135,7 +135,8 @@ export default function ModernContentManager() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: false, // Absolutely NO cropping screen, no crop errors!
+        allowsEditing: true, // Manual crop enabled as requested!
+        aspect: [5, 1], // Wide banner proportion for clean edge-to-edge fitting
         quality: 1,
         base64: true,
       });
@@ -785,7 +786,7 @@ export default function ModernContentManager() {
                       <Ionicons name="cloud-upload-outline" size={26} color={L.goldDk} />
                     </View>
                     <Text style={s.imagePickerTitle}>Select Banner Image</Text>
-                    <Text style={s.imagePickerSubtitle}>Upload original image • High Quality • No cropping</Text>
+                    <Text style={s.imagePickerSubtitle}>Upload image • Manual Crop • Full Edge-to-Edge</Text>
                   </View>
                 )}
               </TouchableOpacity>
