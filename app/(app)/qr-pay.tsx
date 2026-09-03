@@ -83,12 +83,24 @@ export default function QRPayScreen() {
     // Recent Transfers State
     const [recentTransfers, setRecentTransfers] = useState<any[]>([]);
 
+    // Notice / Alert Modal State (Cross-Platform)
+    const [noticeModal, setNoticeModal] = useState<{ visible: boolean; title: string; message: string }>({
+        visible: false,
+        title: '',
+        message: '',
+    });
+
+    const showScanNotice = (title: string, message: string) => {
+        setScanned(false);
+        setNoticeModal({ visible: true, title, message });
+    };
+
     // Scanner animation & Flyer Ref
     const scanLineAnim = useRef(new Animated.Value(0)).current;
     const flyerRef = useRef<ViewShot>(null);
     const webVideoRef = useRef<any>(null);
 
-    // Real-Time Web Camera Scanner using jsQR
+    // Real-Time Web Camera Scanner using jsQR with cross-device constraints
     useEffect(() => {
         if (Platform.OS !== 'web' || !cameraActive) return;
 
@@ -98,14 +110,24 @@ export default function QRPayScreen() {
         const startWebcam = async () => {
             try {
                 if (!navigator?.mediaDevices?.getUserMedia) {
-                    Alert.alert("Camera Notice", "Webcam access is not supported on this browser. You can upload a QR image from Gallery instead.");
+                    showScanNotice("Camera Notice", "Webcam access is not supported on this browser. You can upload a QR image from Gallery instead.");
                     setCameraActive(false);
                     return;
                 }
 
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-                });
+                let stream: any = null;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+                    });
+                } catch (_) {
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    } catch (e2) {
+                        throw e2;
+                    }
+                }
+
                 activeStream = stream;
                 if (webVideoRef.current) {
                     webVideoRef.current.srcObject = stream;
@@ -139,7 +161,7 @@ export default function QRPayScreen() {
                 animationFrameId = requestAnimationFrame(scanFrame);
             } catch (err: any) {
                 console.warn("Web camera error:", err);
-                Alert.alert("Camera Notice", "Could not access webcam. You can upload a QR picture from Gallery instead.");
+                showScanNotice("Camera Notice", "Could not access webcam. Please allow camera permissions in your browser or upload a QR picture from Gallery instead.");
                 setCameraActive(false);
             }
         };
@@ -549,11 +571,148 @@ export default function QRPayScreen() {
         }
     };
 
+    const decodeQrFromDataUrl = async (dataUrl: string): Promise<string | null> => {
+        return new Promise((resolve) => {
+            try {
+                const img = new window.Image();
+                img.onload = () => {
+                    try {
+                        const maxDim = 1200;
+                        let w = img.naturalWidth || img.width;
+                        let h = img.naturalHeight || img.height;
+                        if (w > maxDim || h > maxDim) {
+                            const scale = maxDim / Math.max(w, h);
+                            w = Math.round(w * scale);
+                            h = Math.round(h * scale);
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                        if (!ctx) {
+                            resolve(null);
+                            return;
+                        }
+
+                        ctx.drawImage(img, 0, 0, w, h);
+                        
+                        // 1. Full Image Scan
+                        const fullData = ctx.getImageData(0, 0, w, h);
+                        let code = jsQR(fullData.data, w, h, { inversionAttempts: 'attemptBoth' });
+                        if (code && code.data) {
+                            resolve(code.data);
+                            return;
+                        }
+
+                        // 2. Center 70% Box (Flyer / Card format)
+                        const c70w = Math.floor(w * 0.7);
+                        const c70h = Math.floor(h * 0.7);
+                        const c70x = Math.floor(w * 0.15);
+                        const c70y = Math.floor(h * 0.15);
+                        const c70Data = ctx.getImageData(c70x, c70y, c70w, c70h);
+                        code = jsQR(c70Data.data, c70w, c70h, { inversionAttempts: 'attemptBoth' });
+                        if (code && code.data) {
+                            resolve(code.data);
+                            return;
+                        }
+
+                        // 3. Center 50% Box (Focused QR)
+                        const c50w = Math.floor(w * 0.5);
+                        const c50h = Math.floor(h * 0.5);
+                        const c50x = Math.floor(w * 0.25);
+                        const c50y = Math.floor(h * 0.25);
+                        const c50Data = ctx.getImageData(c50x, c50y, c50w, c50h);
+                        code = jsQR(c50Data.data, c50w, c50h, { inversionAttempts: 'attemptBoth' });
+                        if (code && code.data) {
+                            resolve(code.data);
+                            return;
+                        }
+
+                        // 4. Downscale 50% for high-resolution images
+                        const downCanvas = document.createElement('canvas');
+                        downCanvas.width = Math.floor(w / 2);
+                        downCanvas.height = Math.floor(h / 2);
+                        const downCtx = downCanvas.getContext('2d', { willReadFrequently: true });
+                        if (downCtx) {
+                            downCtx.drawImage(img, 0, 0, downCanvas.width, downCanvas.height);
+                            const downData = downCtx.getImageData(0, 0, downCanvas.width, downCanvas.height);
+                            code = jsQR(downData.data, downCanvas.width, downCanvas.height, { inversionAttempts: 'attemptBoth' });
+                            if (code && code.data) {
+                                resolve(code.data);
+                                return;
+                            }
+                        }
+
+                        resolve(null);
+                    } catch (e) {
+                        console.warn("Canvas decode error:", e);
+                        resolve(null);
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = dataUrl;
+            } catch (err) {
+                console.warn("Image load error:", err);
+                resolve(null);
+            }
+        });
+    };
+
     const handleUploadFromGallery = async () => {
         try {
+            if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.style.display = 'none';
+
+                input.onchange = async (e: any) => {
+                    const file = e.target?.files?.[0];
+                    if (!file) return;
+                    setIsReadingGallery(true);
+                    setScanned(false);
+
+                    const reader = new FileReader();
+                    reader.onload = async (re) => {
+                        const dataUrl = re.target?.result as string;
+                        if (!dataUrl) {
+                            setIsReadingGallery(false);
+                            showScanNotice("File Error", "Could not read this picture file. Please try another image.");
+                            return;
+                        }
+
+                        const decodedText = await decodeQrFromDataUrl(dataUrl);
+                        setIsReadingGallery(false);
+
+                        if (decodedText) {
+                            onBarcodeScanned({ data: decodedText });
+                        } else {
+                            showScanNotice(
+                                "No QR Code Detected",
+                                "Could not find a recognizable QR code in this image. Please crop tightly to the square QR code and try again, or enter the recipient's email manually."
+                            );
+                        }
+                    };
+                    reader.onerror = () => {
+                        setIsReadingGallery(false);
+                        showScanNotice("File Error", "Failed to read image file. Please try again.");
+                    };
+                    reader.readAsDataURL(file);
+                };
+
+                document.body.appendChild(input);
+                input.click();
+                setTimeout(() => {
+                    try { document.body.removeChild(input); } catch (_) {}
+                }, 1000);
+                return;
+            }
+
+            // Native Mobile (iOS & Android)
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permissionResult.granted) {
-                Alert.alert("Permission Denied", "We need access to your photo gallery to upload QR images.");
+                showScanNotice("Permission Denied", "We need access to your photo gallery to upload QR images.");
                 return;
             }
 
@@ -571,62 +730,12 @@ export default function QRPayScreen() {
             setIsReadingGallery(true);
             setScanned(false);
 
-            // 1. Instant local scan with jsQR on Web Canvas
-            if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                try {
-                    const img = new window.Image();
-                    img.crossOrigin = 'anonymous';
-                    await new Promise((resolve, reject) => {
-                        img.onload = resolve;
-                        img.onerror = reject;
-                        img.src = selectedImage.uri;
-                    });
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.naturalWidth || img.width;
-                    canvas.height = img.naturalHeight || img.height;
-                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                    if (ctx) {
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        
-                        // Full scan
-                        let code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
-                        
-                        // Center crop scan (e.g. for card flyers)
-                        if (!code) {
-                            const cw = Math.floor(canvas.width * 0.7);
-                            const ch = Math.floor(canvas.height * 0.7);
-                            const cx = Math.floor(canvas.width * 0.15);
-                            const cy = Math.floor(canvas.height * 0.15);
-                            const centerData = ctx.getImageData(cx, cy, cw, ch);
-                            code = jsQR(centerData.data, cw, ch, { inversionAttempts: 'attemptBoth' });
-                        }
-
-                        if (code && code.data) {
-                            setIsReadingGallery(false);
-                            onBarcodeScanned({ data: code.data });
-                            return;
-                        }
-                    }
-                } catch (localQrErr) {
-                    console.warn("Local jsQR attempt error:", localQrErr);
-                }
-            }
-
-            // 2. Secondary scan via remote API
             const formData = new FormData();
-            if (Platform.OS === 'web') {
-                const response = await fetch(selectedImage.uri);
-                const blob = await response.blob();
-                formData.append('file', blob, 'qr.png');
-            } else {
-                formData.append('file', {
-                    uri: selectedImage.uri,
-                    name: 'qr.jpg',
-                    type: 'image/jpeg',
-                } as any);
-            }
+            formData.append('file', {
+                uri: selectedImage.uri,
+                name: 'qr.jpg',
+                type: 'image/jpeg',
+            } as any);
 
             const response = await fetch('https://api.qrserver.com/v1/read-qr-code/', {
                 method: 'POST',
@@ -640,15 +749,15 @@ export default function QRPayScreen() {
             if (qrText) {
                 onBarcodeScanned({ data: qrText });
             } else {
-                Alert.alert(
-                    "QR Code Not Found",
-                    "Could not detect a clear QR code in this image. Please crop tightly to the square QR code and try again, or enter email manually."
+                showScanNotice(
+                    "No QR Code Detected",
+                    "Could not find a clear QR code in this picture. Please crop closer to the square QR code."
                 );
             }
         } catch (e: any) {
             setIsReadingGallery(false);
             console.error("Gallery scan error:", e);
-            Alert.alert("Scan Error", "Failed to scan QR code from gallery. Please try another image or enter email manually.");
+            showScanNotice("Scan Error", "Failed to scan QR code from gallery. Please try another image or enter email manually.");
         }
     };
 
@@ -711,25 +820,19 @@ export default function QRPayScreen() {
             } else if (email) {
                 query = query.eq('email', email);
             } else {
-                Alert.alert("Invalid QR", "This QR code does not contain a valid Abu Mafhal user ID, Wallet ID, or email.", [
-                    { text: "OK", onPress: () => setScanned(false) }
-                ]);
+                showScanNotice("Invalid QR", "This QR code does not contain a valid Abu Mafhal user ID, Wallet ID, or email.");
                 return;
             }
 
             const { data: recipient, error } = await query.maybeSingle();
             
             if (error || !recipient) {
-                Alert.alert("User Not Found", "No registered Abu Mafhal user was found matching this QR code.", [
-                    { text: "OK", onPress: () => setScanned(false) }
-                ]);
+                showScanNotice("User Not Found", "No registered Abu Mafhal user was found matching this QR code.");
                 return;
             }
 
             if (currentUser && recipient.id === currentUser.id) {
-                Alert.alert("Self Scan Notice", `You scanned your own QR code (${currentUser.full_name || 'My Account'}). To make a transfer, please scan another user's QR code.`, [
-                    { text: "OK", onPress: () => setScanned(false) }
-                ]);
+                showScanNotice("Self Scan Notice", `You scanned your own QR code (${currentUser.full_name || 'My Account'}). To make a transfer, please scan another user's QR code.`);
                 return;
             }
 
@@ -741,9 +844,7 @@ export default function QRPayScreen() {
             });
             setConfirmModalVisible(true);
         } catch (err: any) {
-            Alert.alert("Scan Error", "Failed to process QR code details.", [
-                { text: "OK", onPress: () => setScanned(false) }
-            ]);
+            showScanNotice("Scan Error", "Failed to process QR code details. Please try again.");
         }
     };
 
@@ -1350,11 +1451,10 @@ export default function QRPayScreen() {
 
             {activeTab === 'scan' ? (
                 <View style={{ flex: 1 }}>
-                    {!cameraActive ? (
-                        <ScrollView 
-                            contentContainerStyle={s.scanDashboardContainer} 
-                            showsVerticalScrollIndicator={false}
-                        >
+                    <ScrollView 
+                        contentContainerStyle={s.scanDashboardContainer} 
+                        showsVerticalScrollIndicator={false}
+                    >
                             {/* Modern Interactive Scanner Hub Card */}
                             <LinearGradient
                                 colors={['#070D1E', '#0D1B3E', '#081128']}
@@ -1371,7 +1471,7 @@ export default function QRPayScreen() {
                                     <Text style={[s.cardBrandTitle, { color: '#10B981' }]}>FAST SCAN & PAY</Text>
                                 </View>
 
-                                {/* High-tech Viewfinder Preview Window */}
+                                {/* Compact Interactive Scanner Launch Box */}
                                 <TouchableOpacity 
                                     onPress={async () => {
                                         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1381,12 +1481,13 @@ export default function QRPayScreen() {
                                         } else if (!permission?.granted) {
                                             const res = await requestPermission();
                                             if (res.granted) setCameraActive(true);
+                                            else showScanNotice("Camera Access Required", "Please allow camera access to scan QR codes.");
                                         } else {
                                             setCameraActive(true);
                                         }
                                     }}
                                     activeOpacity={0.88}
-                                    style={s.scannerPreviewBox}
+                                    style={s.scannerInteractiveBox}
                                 >
                                     {/* 4 Gold Targeting Brackets */}
                                     <View style={[s.qrCorner, s.qrCornerTL]} />
@@ -1397,42 +1498,14 @@ export default function QRPayScreen() {
                                     {/* Laser Line Animation */}
                                     <Animated.View style={[s.previewLaserLine, { transform: [{ translateY: scanLineAnim }] }]} />
 
-                                    {/* Center Icon & Launch Button */}
+                                    {/* Center Content */}
                                     <View style={s.previewCenterContent}>
                                         <View style={s.previewCameraIconRing}>
-                                            <Ionicons name="camera" size={24} color="#F5A623" />
+                                            <Ionicons name="camera" size={22} color="#F5A623" />
                                         </View>
-                                        <Text style={s.previewTapTitle}>Tap to Open Camera</Text>
-                                        <Text style={s.previewTapSub}>Align any recipient QR code to pay</Text>
+                                        <Text style={s.previewTapTitle}>Launch Live Camera</Text>
+                                        <Text style={s.previewTapSub}>Tap to scan any recipient QR code</Text>
                                     </View>
-                                </TouchableOpacity>
-
-                                {/* Launch Camera Full Button */}
-                                <TouchableOpacity 
-                                    onPress={async () => {
-                                        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        setScanned(false);
-                                        if (Platform.OS === 'web') {
-                                            setCameraActive(true);
-                                        } else if (!permission?.granted) {
-                                            const res = await requestPermission();
-                                            if (res.granted) setCameraActive(true);
-                                        } else {
-                                            setCameraActive(true);
-                                        }
-                                    }}
-                                    style={s.launchCameraBtn}
-                                    activeOpacity={0.9}
-                                >
-                                    <LinearGradient
-                                        colors={['#F5A623', '#D4890E']}
-                                        style={s.launchCameraGrad}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                    >
-                                        <Ionicons name="camera" size={15} color="#0D1B3E" style={{ marginRight: 6 }} />
-                                        <Text style={s.launchCameraText}>Launch Live Camera</Text>
-                                    </LinearGradient>
                                 </TouchableOpacity>
                             </LinearGradient>
 
@@ -1534,134 +1607,8 @@ export default function QRPayScreen() {
                                 <DynamicBanners placement="qr_pay" />
                             </View>
                         </ScrollView>
-                    ) : (Platform.OS !== 'web' && !permission?.granted) ? (
-                        <View style={s.permissionCard}>
-                            <TouchableOpacity 
-                                onPress={() => setCameraActive(false)}
-                                style={{ position: 'absolute', top: 20, right: 20 }}
-                            >
-                                <Ionicons name="close" size={24} color="#0d1b3e" />
-                            </TouchableOpacity>
-                            <View style={s.permissionIconWrapper}>
-                                <Ionicons name="camera-outline" size={48} color="#0056D2" />
-                            </View>
-                            <Text style={s.permissionTitle}>Camera Access Required</Text>
-                            <Text style={s.permissionDesc}>
-                                We need access to your camera to scan QR codes for instant wallet payments.
-                            </Text>
-                            
-                            <TouchableOpacity 
-                                onPress={requestPermission}
-                                style={s.grantBtn}
-                                activeOpacity={0.9}
-                            >
-                                <LinearGradient colors={['#0056D2', '#1e40af']} style={s.gradientBtn} start={{x:0, y:0}} end={{x:1, y:0}}>
-                                    <Text style={s.grantBtnText}>Grant Permission</Text>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        <View className="flex-1 bg-black relative">
-                            {Platform.OS === 'web' ? (
-                                <video
-                                    ref={webVideoRef}
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: 'cover',
-                                        backgroundColor: '#000',
-                                    }}
-                                />
-                            ) : !scanned ? (
-                                <CameraView
-                                    style={StyleSheet.absoluteFillObject}
-                                    facing="back"
-                                    enableTorch={torchEnabled}
-                                    onBarcodeScanned={onBarcodeScanned}
-                                    barcodeScannerSettings={{
-                                        barcodeTypes: ["qr"],
-                                    }}
-                                />
-                            ) : null}
-
-                            {scanned && (
-                                <View className="flex-1 items-center justify-center bg-black/95">
-                                    <ActivityIndicator size="large" color="#f5a623" />
-                                    <Text className="text-white font-bold mt-4">Processing recipient details...</Text>
-                                </View>
-                            )}
-
-                            {/* Viewfinder overlay */}
-                            {!scanned && (
-                                <View style={s.overlayContainer}>
-                                    {/* Top Overlay Section with back button inside camera */}
-                                    <View style={s.overlayTop}>
-                                        <TouchableOpacity 
-                                            onPress={() => setCameraActive(false)}
-                                            style={s.floatingBackBtn}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Ionicons name="close" size={24} color="white" />
-                                        </TouchableOpacity>
-                                        <Text style={s.cameraTitleText}>Live QR Scanner</Text>
-                                        <View style={{ width: 40 }} />
-                                    </View>
-                                    <View style={s.overlayMiddle}>
-                                        <View style={s.overlaySide} />
-                                        <View style={s.scanWindow}>
-                                            <View style={[s.corner, s.topLeft]} />
-                                            <View style={[s.corner, s.topRight]} />
-                                            <View style={[s.corner, s.bottomLeft]} />
-                                            <View style={[s.corner, s.bottomRight]} />
-                                            
-                                            <Animated.View style={[s.laserLine, { transform: [{ translateY: scanLineAnim }] }]} />
-                                        </View>
-                                        <View style={s.overlaySide} />
-                                    </View>
-                                    <View style={s.overlayBottom}>
-                                        <Text style={s.overlayText}>Align the QR code within the frame to pay</Text>
-                                        
-                                        <View style={s.buttonRow}>
-                                            <TouchableOpacity 
-                                                onPress={() => setTorchEnabled(!torchEnabled)}
-                                                style={s.torchBtn}
-                                                activeOpacity={0.8}
-                                            >
-                                                <Ionicons name={torchEnabled ? "flash" : "flash-off"} size={14} color="white" />
-                                                <Text style={s.torchBtnText}>{torchEnabled ? "Flash" : "Flash"}</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity 
-                                                onPress={handleUploadFromGallery}
-                                                style={s.torchBtn}
-                                                activeOpacity={0.8}
-                                            >
-                                                <Ionicons name="image-outline" size={14} color="white" />
-                                                <Text style={s.torchBtnText}>Gallery</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity 
-                                                onPress={() => setManualInputVisible(true)}
-                                                style={s.torchBtn}
-                                                activeOpacity={0.8}
-                                            >
-                                                <Ionicons name="create-outline" size={14} color="white" />
-                                                <Text style={s.torchBtnText}>Email</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                        </View>
-                    )}
-                </View>
-            ) : (
+                    </View>
+                ) : (
                 <ScrollView 
                     contentContainerStyle={s.myCodeDashboardContainer}
                     showsVerticalScrollIndicator={false}
@@ -2296,13 +2243,140 @@ export default function QRPayScreen() {
                 </View>
             )}
 
+            {/* FULL-SCREEN LIVE CAMERA SCANNER MODAL */}
+            <Modal
+                visible={cameraActive}
+                animationType="fade"
+                transparent={false}
+                onRequestClose={() => setCameraActive(false)}
+                statusBarTranslucent
+            >
+                <View style={{ flex: 1, backgroundColor: '#050B17', position: 'relative' }}>
+                    {Platform.OS === 'web' ? (
+                        <video
+                            ref={webVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                backgroundColor: '#050B17',
+                            }}
+                        />
+                    ) : !scanned ? (
+                        <CameraView
+                            style={StyleSheet.absoluteFillObject}
+                            facing="back"
+                            enableTorch={torchEnabled}
+                            onBarcodeScanned={onBarcodeScanned}
+                            barcodeScannerSettings={{
+                                barcodeTypes: ["qr"],
+                            }}
+                        />
+                    ) : null}
+
+                    {scanned && (
+                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(5,11,23,0.95)', alignItems: 'center', justifyContent: 'center', zIndex: 50 }]}>
+                            <ActivityIndicator size="large" color="#F5A623" />
+                            <Text style={{ color: '#FFFFFF', fontWeight: '800', marginTop: 14, fontSize: 15 }}>Processing recipient details...</Text>
+                        </View>
+                    )}
+
+                    {/* Viewfinder overlay */}
+                    {!scanned && (
+                        <View style={s.overlayContainer}>
+                            {/* Top Overlay Section with back button inside camera */}
+                            <View style={s.overlayTop}>
+                                <TouchableOpacity 
+                                    onPress={() => setCameraActive(false)}
+                                    style={s.floatingBackBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="close" size={24} color="white" />
+                                </TouchableOpacity>
+                                <Text style={s.cameraTitleText}>Live QR Scanner</Text>
+                                <TouchableOpacity 
+                                    onPress={() => setTorchEnabled(!torchEnabled)}
+                                    style={s.floatingBackBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name={torchEnabled ? "flash" : "flash-off"} size={18} color={torchEnabled ? "#F5A623" : "white"} />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={s.overlayMiddle}>
+                                <View style={s.overlaySide} />
+                                <View style={s.scanWindow}>
+                                    <View style={[s.corner, s.topLeft]} />
+                                    <View style={[s.corner, s.topRight]} />
+                                    <View style={[s.corner, s.bottomLeft]} />
+                                    <View style={[s.corner, s.bottomRight]} />
+                                    
+                                    <Animated.View style={[s.laserLine, { transform: [{ translateY: scanLineAnim }] }]} />
+                                </View>
+                                <View style={s.overlaySide} />
+                            </View>
+                            <View style={s.overlayBottom}>
+                                <Text style={s.overlayText}>Align recipient QR code inside the frame</Text>
+                                
+                                <View style={s.buttonRow}>
+                                    <TouchableOpacity 
+                                        onPress={handleUploadFromGallery}
+                                        style={s.torchBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="image-outline" size={15} color="white" />
+                                        <Text style={s.torchBtnText}>Upload Photo</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity 
+                                        onPress={() => { setCameraActive(false); setManualInputVisible(true); }}
+                                        style={s.torchBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="mail-outline" size={15} color="white" />
+                                        <Text style={s.torchBtnText}>Pay via Email</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+                </View>
+            </Modal>
+
+            {/* CROSS-PLATFORM THEMED NOTICE / ALERT MODAL */}
+            <Modal visible={noticeModal.visible} transparent animationType="fade" onRequestClose={() => setNoticeModal({ visible: false, title: '', message: '' })}>
+                <View style={s.modalOverlay}>
+                    <View style={s.noticeCard}>
+                        <View style={s.noticeIconRing}>
+                            <Ionicons name="information-circle" size={32} color="#F5A623" />
+                        </View>
+                        <Text style={s.noticeTitle}>{noticeModal.title}</Text>
+                        <Text style={s.noticeMessage}>{noticeModal.message}</Text>
+                        <TouchableOpacity
+                            onPress={() => setNoticeModal({ visible: false, title: '', message: '' })}
+                            style={s.noticeDismissBtn}
+                            activeOpacity={0.85}
+                        >
+                            <LinearGradient colors={['#F5A623', '#D4890E']} style={s.noticeDismissGrad}>
+                                <Text style={s.noticeDismissText}>Understood</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Global Loader overlay for submissions, loading states, and gallery scanning */}
             {(isSubmitting || isReadingGallery) && (
-                <View className="absolute inset-0 bg-black/60 items-center justify-center z-50">
-                    <View className="bg-white p-6 rounded-2xl flex-row items-center gap-4 border border-gray-100 shadow-xl">
-                        <ActivityIndicator size="small" color="#0056D2" />
-                        <Text className="text-slate-800 font-bold">
-                            {isReadingGallery ? "Scanning gallery image..." : "Executing transaction..."}
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(5,11,23,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }]}>
+                    <View style={s.readingGalleryBox}>
+                        <ActivityIndicator size="large" color="#F5A623" />
+                        <Text style={s.readingGalleryText}>
+                            {isReadingGallery ? "Scanning gallery image..." : "Processing transaction..."}
                         </Text>
                     </View>
                 </View>
@@ -3243,31 +3317,43 @@ const s = StyleSheet.create({
   modernScanHubCard: {
     width: '100%',
     maxWidth: 340,
-    borderRadius: 26,
-    padding: 18,
+    borderRadius: 22,
+    padding: 14,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 10,
-    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
+    borderWidth: 1.2,
     borderColor: 'rgba(245, 166, 35, 0.35)',
     overflow: 'hidden',
     backgroundColor: '#070D1E',
   },
-  scannerPreviewBox: {
+  scannerInteractiveBox: {
     width: '100%',
-    height: 180,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    borderRadius: 20,
+    height: 120,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(245, 166, 35, 0.25)',
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: 16,
+    marginTop: 10,
+  },
+  scannerPreviewBox: {
+    width: '100%',
+    height: 120,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   previewLaserLine: {
     position: 'absolute',
@@ -3288,25 +3374,25 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
   },
   previewCameraIconRing: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: 'rgba(245, 166, 35, 0.15)',
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
+    borderColor: 'rgba(245, 166, 35, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   previewTapTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
   previewTapSub: {
-    color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: 10.5,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 10,
     fontWeight: '600',
     marginTop: 2,
     textAlign: 'center',
@@ -3315,17 +3401,12 @@ const s = StyleSheet.create({
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#F5A623',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
   },
   launchCameraGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 13,
+    paddingVertical: 12,
     paddingHorizontal: 16,
   },
   launchCameraText: {
@@ -3333,6 +3414,85 @@ const s = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.2,
+  },
+  readingGalleryBox: {
+    backgroundColor: '#0D1B3E',
+    borderRadius: 22,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+    minWidth: 260,
+  },
+  readingGalleryText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '700',
+    marginTop: 14,
+    textAlign: 'center',
+  },
+  noticeCard: {
+    backgroundColor: '#0D1B3E',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 12,
+    width: '88%',
+    maxWidth: 340,
+  },
+  noticeIconRing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.45)',
+    marginBottom: 12,
+  },
+  noticeTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  noticeMessage: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  noticeDismissBtn: {
+    width: '100%',
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  noticeDismissGrad: {
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noticeDismissText: {
+    color: '#0D1B3E',
+    fontSize: 13.5,
+    fontWeight: '900',
   },
   scanQuickActionsGrid: {
     flexDirection: 'row',
