@@ -68,6 +68,7 @@ const MODS = {
   ],
   finance: [
     { t:'Risk Control',    i:'alert-circle',     r:'/manage/risk',           c:N,  b:NL },
+    { t:'Audit Trail',     i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
     { t:'Analytics',       i:'bar-chart',        r:'/manage/reports',        c:G,  b:GL },
     { t:'Comms Center',    i:'megaphone',        r:'/manage/communications', c:N,  b:NL },
     { t:'Cortex AI',       i:'sparkles',         r:'/manage/ai',             c:G,  b:GL,  tag:'AI' },
@@ -97,7 +98,8 @@ const MODS = {
     { t:'Security Hub',    i:'shield-checkmark', r:'/manage/security',       c:N,  b:NL },
     { t:'Forensics',       i:'finger-print',     r:'/manage/forensics',      c:G,  b:GL },
     { t:'API Keys',        i:'key',              r:'/manage/api',            c:N,  b:NL },
-    { t:'System Logs',     i:'list',             r:'/manage/logs',           c:G,  b:GL },
+    { t:'Audit Logs',      i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
+    { t:'System Logs',     i:'list',             r:'/manage/logs',           c:N,  b:NL },
     { t:'Geo Map',         i:'earth',            r:'/manage/map',            c:N,  b:NL },
     { t:'Settings',        i:'settings',         r:'/manage/settings',       c:G,  b:GL },
     { t:'PANIC ROOM',      i:'warning',          r:'/manage/panic',          c:C.red, b:C.redL },
@@ -105,14 +107,15 @@ const MODS = {
 };
 
 const QUICK = [
-  { l:'Master Hub',  i:'ribbon',        r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
-  { l:'Users',       i:'people',        r:'/manage/users',          c:G,  b:GL },
-  { l:'Liquidity',   i:'wallet',        r:'/manage/liquidity',      c:N,  b:NL },
-  { l:'Data Plans',  i:'wifi',          r:'/manage/data-plans',     c:G,  b:GL },
-  { l:'Help Desk',   i:'chatbubbles',   r:'/manage/tickets',        c:N,  b:NL },
-  { l:'Broadcast',   i:'megaphone',     r:'/manage/communications', c:G,  b:GL },
-  { l:'KYC Queue',   i:'scan',          r:'/manage/kyc',            c:N,  b:NL },
-  { l:'Panic Room',  i:'warning',       r:'/manage/panic',          c:C.red, b:C.redL, sup:true },
+  { l:'Master Hub',  i:'ribbon',           r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
+  { l:'Audit Logs',  i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
+  { l:'Users',       i:'people',           r:'/manage/users',          c:G,  b:GL },
+  { l:'Liquidity',   i:'wallet',           r:'/manage/liquidity',      c:N,  b:NL },
+  { l:'Data Plans',  i:'wifi',             r:'/manage/data-plans',     c:G,  b:GL },
+  { l:'Help Desk',   i:'chatbubbles',      r:'/manage/tickets',        c:N,  b:NL },
+  { l:'Broadcast',   i:'megaphone',        r:'/manage/communications', c:G,  b:GL },
+  { l:'KYC Queue',   i:'scan',             r:'/manage/kyc',            c:N,  b:NL },
+  { l:'Panic Room',  i:'warning',          r:'/manage/panic',          c:C.red, b:C.redL, sup:true },
 ];
 
 const DOCK = [

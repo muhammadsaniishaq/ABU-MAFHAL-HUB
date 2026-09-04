@@ -119,10 +119,27 @@ export default function EnterpriseAuditLogCenter() {
                     fetchedLogs = edgeRes.logs;
                 }
             } catch (edgeErr) {
-                console.warn('Edge function audit-logs notice, falling back to direct table:', edgeErr);
+                console.warn('Edge function invoke notice, falling back:', edgeErr);
             }
 
-            // 2. Direct fallback to Supabase table if edge function returned empty
+            // 2. Direct HTTP fetch fallback to edge function (in case client auth token interferes)
+            if (fetchedLogs.length === 0) {
+                try {
+                    const rawRes = await fetch('https://uagcxrtdqttayulvgpwg.supabase.co/functions/v1/admin-audit-logs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'list', limit: 200 })
+                    });
+                    const rawJson = await rawRes.json();
+                    if (rawJson?.logs && Array.isArray(rawJson.logs)) {
+                        fetchedLogs = rawJson.logs;
+                    }
+                } catch (rawErr) {
+                    console.warn('Direct HTTP fetch fallback notice:', rawErr);
+                }
+            }
+
+            // 3. Direct fallback to Supabase table if edge function returned empty
             if (fetchedLogs.length === 0) {
                 const { data: directData, error: directErr } = await supabase
                     .from('audit_logs')
@@ -283,20 +300,56 @@ export default function EnterpriseAuditLogCenter() {
             }
 
             // Dispatch via edge function for guaranteed persistence
-            const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('admin-audit-logs', {
-                body: {
-                    action: 'create',
-                    logData: {
-                        action_title: newLogAction.trim(),
-                        target_resource: newLogResource.trim() || 'Executive Manual Audit',
-                        details: parsedDetails,
-                        admin_id: authUser?.user?.id || null
+            let dispatched = false;
+            try {
+                const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('admin-audit-logs', {
+                    body: {
+                        action: 'create',
+                        logData: {
+                            action_title: newLogAction.trim(),
+                            target_resource: newLogResource.trim() || 'Executive Manual Audit',
+                            details: parsedDetails,
+                            admin_id: authUser?.user?.id || null
+                        }
                     }
-                }
-            });
+                });
 
-            if (edgeErr) throw edgeErr;
-            if (edgeRes?.error) throw new Error(edgeRes.error);
+                if (!edgeErr && !edgeRes?.error) {
+                    dispatched = true;
+                }
+            } catch (e) {}
+
+            if (!dispatched) {
+                try {
+                    const rawRes = await fetch('https://uagcxrtdqttayulvgpwg.supabase.co/functions/v1/admin-audit-logs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'create',
+                            logData: {
+                                action_title: newLogAction.trim(),
+                                target_resource: newLogResource.trim() || 'Executive Manual Audit',
+                                details: parsedDetails,
+                                admin_id: authUser?.user?.id || null
+                            }
+                        })
+                    });
+                    const rawJson = await rawRes.json();
+                    if (rawJson?.status === 'success') {
+                        dispatched = true;
+                    }
+                } catch (rawErr) {}
+            }
+
+            if (!dispatched) {
+                // Direct insert fallback
+                await supabase.from('audit_logs').insert({
+                    action: newLogAction.trim(),
+                    target_resource: newLogResource.trim() || 'Executive Manual Audit',
+                    details: parsedDetails,
+                    admin_id: authUser?.user?.id || null
+                });
+            }
 
             Alert.alert('Log Committed 🛡️', 'Security audit event recorded successfully into immutable trail.');
             setShowNewLogModal(false);

@@ -285,6 +285,7 @@ export default function EnterpriseRiskDefenseCenter() {
                 fetchTransactionsQueue(),
                 fetchBlacklist(),
                 fetchCustomRules(),
+                fetchAuditLogs(),
             ]);
         } catch (error) {
             console.error('Error loading risk data:', error);
@@ -523,6 +524,88 @@ export default function EnterpriseRiskDefenseCenter() {
             }
         } catch (e) {
             console.error('Fetch blacklist error:', e);
+        }
+    };
+
+    // 6. Fetch Real-Time Live Audit Logs
+    const fetchAuditLogs = async () => {
+        try {
+            let fetchedLogs: any[] = [];
+            try {
+                const { data: edgeRes } = await supabase.functions.invoke('admin-audit-logs', {
+                    body: { action: 'list', limit: 50 }
+                });
+                if (edgeRes?.logs && Array.isArray(edgeRes.logs)) {
+                    fetchedLogs = edgeRes.logs;
+                }
+            } catch (e) {}
+
+            if (fetchedLogs.length === 0) {
+                try {
+                    const rawRes = await fetch('https://uagcxrtdqttayulvgpwg.supabase.co/functions/v1/admin-audit-logs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'list', limit: 50 })
+                    });
+                    const rawJson = await rawRes.json();
+                    if (rawJson?.logs && Array.isArray(rawJson.logs)) {
+                        fetchedLogs = rawJson.logs;
+                    }
+                } catch (e) {}
+            }
+
+            if (fetchedLogs.length === 0) {
+                const { data: directData } = await supabase
+                    .from('audit_logs')
+                    .select('*, profiles:admin_id(full_name, email)')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+                if (directData && directData.length > 0) {
+                    fetchedLogs = directData;
+                }
+            }
+
+            if (fetchedLogs.length > 0) {
+                const mapped: AuditIncident[] = fetchedLogs.map((l: any) => {
+                    const date = new Date(l.created_at);
+                    const now = Date.now();
+                    const diffMins = Math.floor((now - date.getTime()) / 60000);
+                    let timeFormatted = 'Just now';
+                    if (diffMins >= 60 * 24) timeFormatted = `${Math.floor(diffMins / (60 * 24))}d ago`;
+                    else if (diffMins >= 60) timeFormatted = `${Math.floor(diffMins / 60)}h ago`;
+                    else if (diffMins > 0) timeFormatted = `${diffMins}m ago`;
+
+                    const actLower = (l.action || '').toLowerCase();
+                    let type: 'warning' | 'security' | 'action' | 'system' = 'system';
+                    if (actLower.includes('quarantine') || actLower.includes('freeze') || actLower.includes('danger') || actLower.includes('alert') || actLower.includes('critical')) {
+                        type = 'warning';
+                    } else if (actLower.includes('auth') || actLower.includes('pin') || actLower.includes('kyc') || actLower.includes('security')) {
+                        type = 'security';
+                    } else if (actLower.includes('transfer') || actLower.includes('fund') || actLower.includes('debit') || actLower.includes('rate') || actLower.includes('broadcast')) {
+                        type = 'action';
+                    }
+
+                    let descStr = '';
+                    if (typeof l.details === 'string') {
+                        descStr = l.details;
+                    } else if (l.details && typeof l.details === 'object') {
+                        descStr = Object.entries(l.details).map(([k, v]) => `${k}: ${v}`).join(' • ');
+                    } else {
+                        descStr = l.target_resource || 'System governance event logged';
+                    }
+
+                    return {
+                        id: l.id || Math.random().toString(),
+                        title: l.action || 'System Audit Event',
+                        time: timeFormatted,
+                        type,
+                        desc: descStr,
+                    };
+                });
+                setAuditLog(mapped);
+            }
+        } catch (err) {
+            console.warn('Error in fetchAuditLogs risk.tsx:', err);
         }
     };
 
@@ -1744,19 +1827,65 @@ Integrated Platform Channels:
                     {/* ========================================================================= */}
                     {activeTab === 'audit' && (
                         <View>
-                            <Text style={styles.sectionHeading}>Real-Time Security Timeline</Text>
-                            {auditLog.map(item => (
-                                <View key={item.id} style={styles.auditCard}>
-                                    <View style={styles.auditCardHeader}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                            <Ionicons name="time" size={14} color={T.gold} />
-                                            <Text style={styles.auditTitle}>{item.title}</Text>
-                                        </View>
-                                        <Text style={styles.auditTime}>{item.time}</Text>
+                            {/* Executive Audit Hub Banner */}
+                            <LinearGradient
+                                colors={['#040817', '#0A1128', '#111D42']}
+                                style={styles.auditHubHeader}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="shield-checkmark" size={16} color={T.goldBright} />
+                                        <Text style={styles.auditHubTitle}>Live Enterprise Audit Stream</Text>
                                     </View>
-                                    <Text style={styles.auditDesc}>{item.desc}</Text>
+                                    <Text style={styles.auditHubSub}>
+                                        Authoritative telemetry & governance logs ({auditLog.length} incidents tracked)
+                                    </Text>
                                 </View>
-                            ))}
+
+                                <TouchableOpacity
+                                    onPress={() => router.push('/manage/logs')}
+                                    style={styles.auditHubBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.auditHubBtnText}>Open Audit Center ↗</Text>
+                                </TouchableOpacity>
+                            </LinearGradient>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
+                                <Text style={styles.sectionHeading}>Real-Time Security Timeline</Text>
+                                <TouchableOpacity 
+                                    onPress={() => fetchAuditLogs()}
+                                    style={styles.auditRefreshSmallBtn}
+                                >
+                                    <Ionicons name="refresh" size={12} color="#FFFFFF" />
+                                    <Text style={styles.auditRefreshSmallText}>Refresh Live</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {auditLog.map(item => {
+                                const isWarning = item.type === 'warning';
+                                const isSecurity = item.type === 'security';
+                                const isAction = item.type === 'action';
+                                const badgeBg = isWarning ? 'rgba(239, 68, 68, 0.2)' : isSecurity ? 'rgba(16, 185, 129, 0.2)' : isAction ? 'rgba(245, 158, 11, 0.2)' : 'rgba(56, 189, 248, 0.2)';
+                                const badgeColor = isWarning ? '#EF4444' : isSecurity ? '#10B981' : isAction ? '#F59E0B' : '#38BDF8';
+                                const badgeIcon = isWarning ? 'alert-circle' : isSecurity ? 'shield-checkmark' : isAction ? 'flash' : 'information-circle';
+
+                                return (
+                                    <View key={item.id} style={styles.auditCard}>
+                                        <View style={styles.auditCardHeader}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                <View style={[styles.auditBadge, { backgroundColor: badgeBg }]}>
+                                                    <Ionicons name={badgeIcon as any} size={11} color={badgeColor} />
+                                                    <Text style={[styles.auditBadgeText, { color: badgeColor }]}>{item.type.toUpperCase()}</Text>
+                                                </View>
+                                                <Text style={styles.auditTitle} numberOfLines={1}>{item.title}</Text>
+                                            </View>
+                                            <Text style={styles.auditTime}>{item.time}</Text>
+                                        </View>
+                                        <Text style={styles.auditDesc}>{item.desc}</Text>
+                                    </View>
+                                );
+                            })}
                         </View>
                     )}
 
@@ -2721,33 +2850,93 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: T.textSub,
     },
-    auditCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 10,
+    auditHubHeader: {
+        borderRadius: 14,
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: T.cardBorder,
-        marginBottom: 6,
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+        marginBottom: 10,
+        gap: 10,
+    },
+    auditHubTitle: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    auditHubSub: {
+        color: '#94A3B8',
+        fontSize: 11,
+        marginTop: 2,
+    },
+    auditHubBtn: {
+        backgroundColor: '#F59E0B',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    auditHubBtnText: {
+        color: '#070D1E',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    auditRefreshSmallBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#1E293B',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    auditRefreshSmallText: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    auditCard: {
+        backgroundColor: '#0A1128',
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#1C2C5B',
+        marginBottom: 8,
     },
     auditCardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 2,
+        marginBottom: 4,
+    },
+    auditBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    auditBadgeText: {
+        fontSize: 9,
+        fontWeight: '800',
     },
     auditTitle: {
-        fontSize: 11.5,
+        fontSize: 12,
         fontWeight: '800',
-        color: T.navyPrimary,
+        color: '#FFFFFF',
     },
     auditTime: {
-        fontSize: 9.5,
-        color: T.textMuted,
+        fontSize: 10,
+        color: '#94A3B8',
+        fontWeight: '600',
     },
     auditDesc: {
-        fontSize: 10.5,
-        color: T.textSub,
-        marginTop: 2,
+        fontSize: 11,
+        color: '#CBD5E1',
+        marginTop: 4,
+        lineHeight: 15,
     },
     stressCard: {
         backgroundColor: '#FFFFFF',

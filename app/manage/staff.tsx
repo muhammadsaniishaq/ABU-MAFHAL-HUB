@@ -238,14 +238,27 @@ export default function StaffManager() {
             }
         } catch (e) {}
 
-        const { data, error } = await supabase
-            .from('audit_logs')
-            .select('*')
-            .eq('admin_id', admin.id)
-            .order('created_at', { ascending: false })
-            .limit(20);
+        let staffLogs: any[] = [];
+        try {
+            const { data: edgeRes } = await supabase.functions.invoke('admin-audit-logs', {
+                body: { action: 'list', limit: 100 }
+            });
+            if (edgeRes?.logs && Array.isArray(edgeRes.logs)) {
+                staffLogs = edgeRes.logs.filter((l: any) => l.admin_id === admin.id);
+            }
+        } catch (e) {}
+
+        if (staffLogs.length === 0) {
+            const { data } = await supabase
+                .from('audit_logs')
+                .select('*')
+                .eq('admin_id', admin.id)
+                .order('created_at', { ascending: false })
+                .limit(20);
+            if (data) staffLogs = data;
+        }
             
-        if (!error) setAdminLogs(data || []);
+        setAdminLogs(staffLogs);
         setLoadingLogs(false);
     };
 
