@@ -14,13 +14,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
-import { AIService } from '../../services/ai';
+import { AIService, cleanTextFormatting } from '../../services/ai';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import * as Haptics from 'expo-haptics';
 
-// Executive Color Palette
+// Modern Executive Color Palette
 const T = {
     bg: '#040817',
     bgCard: '#0b132b',
@@ -59,46 +59,46 @@ interface Message {
 const AI_MODES: { key: AIMode; label: string; icon: any; color: string; desc: string }[] = [
     { key: 'general', label: 'Cortex Hub', icon: 'sparkles', color: T.gold, desc: 'General Operations & Diagnostics' },
     { key: 'finance', label: 'Financial Auditor', icon: 'cash-outline', color: T.emerald, desc: 'Reconciliation, Gateways & Margins' },
-    { key: 'risk', label: 'Risk & Fraud', icon: 'shield-checkmark-outline', color: T.rose, desc: 'KYC, Limits & Anomaly Sentinel' },
-    { key: 'sql', label: 'SQL Copilot', icon: 'code-slash-outline', color: T.cyan, desc: 'Schema Analysis & PostgreSQL' },
-    { key: 'copywriter', label: 'Broadcast Copy', icon: 'megaphone-outline', color: T.purple, desc: 'Hausa & English Broadcasts' },
+    { key: 'risk', label: 'Risk & Fraud Sentinel', icon: 'shield-checkmark-outline', color: T.rose, desc: 'KYC, Limits & Anomaly Detection' },
+    { key: 'sql', label: 'SQL & DB Copilot', icon: 'code-slash-outline', color: T.cyan, desc: 'PostgreSQL Schema & Query Generator' },
+    { key: 'copywriter', label: 'Broadcast Studio', icon: 'megaphone-outline', color: T.purple, desc: 'Executive Announcements & Campaigns' },
 ];
 
 const QUICK_PROMPTS: Record<AIMode, string[]> = {
     general: [
-        "📊 Complete Platform Health Check",
-        "👥 User Registration & Growth Overview",
-        "🏦 Virtual Account Routing (9PSB & PalmPay)",
-        "📋 Generate Evening Shift Handover",
-        "⚡ Daily Priority Operational Checklist"
+        "Platform Health Diagnostics",
+        "User Registration & Growth Overview",
+        "Virtual Account Routing (9PSB & PalmPay)",
+        "Executive Shift Handover Report",
+        "Daily Priority Operational Checklist"
     ],
     finance: [
-        "💰 24h Deposit & Gateway Reconciliation",
-        "💳 Payvessel DVA vs Monnify Settlement",
-        "📈 Telecom Vendor Wallet Balances Check",
-        "📉 Profit Margins on MTN & Airtel SME Data",
-        "⚠️ Detect Pending Vault Confirmations"
+        "24h Inbound Deposits & Revenue Audit",
+        "Payvessel DVA vs Monnify Settlements",
+        "Telecom Vendor Working Capital Check",
+        "MTN and Airtel SME Net Profit Margins",
+        "Detect Pending or Unallocated Deposits"
     ],
     risk: [
-        "🛡️ Run Real-time Fraud & Risk Audit",
-        "🔍 Scan High-Velocity Wallet Transfers",
-        "⚠️ List Suspended or Negative Accounts",
-        "📜 Pending Tier-2 KYC Verifications",
-        "🚨 Verify Admin 2FA & Session Security"
+        "Run Real-time Platform Threat Assessment",
+        "Scan High-Velocity Wallet Transfers",
+        "Review Suspended & Negative Accounts",
+        "Check Tier-2 KYC Verification Backlog",
+        "Audit Admin Session Security & 2FA"
     ],
     sql: [
-        "🗄️ SQL: Top 15 Users by Wallet Balance",
-        "🗄️ SQL: Users Without Virtual Accounts",
-        "🗄️ SQL: 24-Hour Transaction Summary",
-        "🗄️ SQL: Unverified KYC Users with Balance",
-        "🗄️ SQL: Daily Revenue by Network Provider"
+        "SQL: Top 15 Users by Vault Balance",
+        "SQL: Users Without Dedicated Bank Accounts",
+        "SQL: 24-Hour Settlement Ledger Summary",
+        "SQL: Unverified Tier-1 Users with High Balance",
+        "SQL: Telecom Order Volumes by Network"
     ],
     copywriter: [
-        "📢 Hausa & English: New Data Prices Drop",
-        "📢 Hausa Sanarwa: System Update Complete",
-        "📢 SMS: Fund Wallet via 9PSB / PalmPay",
-        "📢 Email: Complete KYC Level 2 Verification",
-        "📢 Push: Instant 24/7 Virtual Card Launch"
+        "SMS: Weekend Data Bundle Promotion",
+        "Email: Scheduled Maintenance Completed",
+        "Push: Instant Dedicated 9PSB & PalmPay Accounts",
+        "Compliance: Upgrade to Tier-2 KYC Verification",
+        "VIP Notice: Automated Wallet Funding & Zero Fees"
     ]
 };
 
@@ -112,7 +112,13 @@ export default function AIInsights() {
         {
             id: 'init-1',
             role: 'system',
-            text: `⚡ **CORTEX NEURAL CORE v5.2 ACTIVE**\n\nWelcome, Administrator. I am connected with live administrative context to your platform database, payment gateways (Payvessel, Monnify, Paystack), and ledger systems.\n\nSelect an **AI Specialization Mode** above or choose a quick diagnostic command below to begin.`,
+            text: [
+                "CORTEX NEURAL CORE v6.0 READY",
+                "",
+                "Welcome, Administrator. Live administrative telemetry connected to database records, payment gateways (Payvessel, Monnify, Paystack), and telecom routing.",
+                "",
+                "Select a specialized AI mode above or tap any quick diagnostic command below to begin."
+            ].join('\n'),
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             mode: 'general'
         }
@@ -155,11 +161,12 @@ export default function AIInsights() {
         }, 100);
 
         try {
-            const responseText = await AIService.askCortex(userMsg.text, selectedMode);
+            const rawResponse = await AIService.askCortex(userMsg.text, selectedMode);
+            const cleanResponse = cleanTextFormatting(rawResponse);
             const aiMsg: Message = {
                 id: `sys-${Date.now()}`,
                 role: 'system',
-                text: responseText,
+                text: cleanResponse,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 mode: selectedMode
             };
@@ -168,7 +175,7 @@ export default function AIInsights() {
             const errMsg: Message = {
                 id: `err-${Date.now()}`,
                 role: 'system',
-                text: `⚠️ **Cortex Analysis Error**: ${error?.message || 'Could not communicate with Neural Core. Using local diagnostic protocol.'}`,
+                text: `Cortex Analysis Notice: ${error?.message || 'Using local diagnostic engine to fulfill request.'}`,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 mode: selectedMode
             };
@@ -183,8 +190,8 @@ export default function AIInsights() {
 
     const handleCopy = async (text: string) => {
         triggerHaptic();
-        await Clipboard.setStringAsync(text);
-        Alert.alert("Copied 📋", "Response copied to clipboard!");
+        await Clipboard.setStringAsync(cleanTextFormatting(text));
+        Alert.alert("Copied", "Response copied to clipboard.");
     };
 
     const handleSpeak = (id: string, text: string) => {
@@ -194,10 +201,8 @@ export default function AIInsights() {
             setSpeakingId(null);
         } else {
             Speech.stop();
-            // Clean markdown syntax for speech
-            const cleanSpeech = text
+            const cleanSpeech = cleanTextFormatting(text)
                 .replace(/[*#_`>]/g, '')
-                .replace(/━+/g, '')
                 .replace(/\[ \]/g, '');
             Speech.speak(cleanSpeech, {
                 rate: 1.0,
@@ -211,11 +216,11 @@ export default function AIInsights() {
 
     const handleShareConversation = async () => {
         triggerHaptic();
-        const fullReport = messages.map(m => `[${m.timestamp}] ${m.role === 'user' ? 'ADMIN' : 'CORTEX AI'}:\n${m.text}\n`).join('\n---\n\n');
+        const fullReport = messages.map(m => `[${m.timestamp}] ${m.role === 'user' ? 'ADMIN' : 'CORTEX AI'}:\n${cleanTextFormatting(m.text)}\n`).join('\n---\n\n');
         try {
             await Share.share({
                 title: 'Cortex AI Executive Briefing',
-                message: `Abu Mafhal Sub - Cortex AI Executive Briefing\nDate: ${new Date().toLocaleDateString()}\n\n${fullReport}`
+                message: `Abu Mafhal Sub - Executive Intelligence Report\nDate: ${new Date().toLocaleDateString()}\n\n${fullReport}`
             });
         } catch (e) {
             console.log('Share dismissed');
@@ -225,12 +230,12 @@ export default function AIInsights() {
     const handleClearChat = () => {
         triggerHaptic();
         Alert.alert(
-            "Reset Session 🗑️",
-            "Are you sure you want to clear this Cortex AI session?",
+            "Clear Session",
+            "Reset this Cortex AI session and clear chat history?",
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Clear Session",
+                    text: "Clear",
                     style: "destructive",
                     onPress: () => {
                         Speech.stop();
@@ -238,7 +243,7 @@ export default function AIInsights() {
                         setMessages([{
                             id: `init-${Date.now()}`,
                             role: 'system',
-                            text: `⚡ **Cortex AI Core Reset.**\nSession cleared. Neural engine re-initialized and standing by for administrative commands.`,
+                            text: "Cortex AI Session Reset.\n\nNeural core standing by for new administrative instructions.",
                             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             mode: selectedMode
                         }]);
@@ -248,23 +253,24 @@ export default function AIInsights() {
         );
     };
 
-    // Render formatted markdown-like blocks
+    // Modern Text Formatter: Guarantees ZERO Asterisks ("**") Ever Appear on Screen
     const renderFormattedContent = (content: string) => {
+        const sanitized = cleanTextFormatting(content);
         const codeBlockRegex = /```(sql|json|bash)?\n([\s\S]*?)```/g;
         const parts: any[] = [];
         let lastIndex = 0;
         let match;
 
-        while ((match = codeBlockRegex.exec(content)) !== null) {
+        while ((match = codeBlockRegex.exec(sanitized)) !== null) {
             if (match.index > lastIndex) {
-                parts.push({ type: 'text', text: content.substring(lastIndex, match.index) });
+                parts.push({ type: 'text', text: sanitized.substring(lastIndex, match.index) });
             }
-            parts.push({ type: 'code', lang: match[1] || 'code', code: match[2].trim() });
+            parts.push({ type: 'code', lang: match[1] || 'SQL', code: match[2].trim() });
             lastIndex = match.index + match[0].length;
         }
 
-        if (lastIndex < content.length) {
-            parts.push({ type: 'text', text: content.substring(lastIndex) });
+        if (lastIndex < sanitized.length) {
+            parts.push({ type: 'text', text: sanitized.substring(lastIndex) });
         }
 
         return (
@@ -284,7 +290,7 @@ export default function AIInsights() {
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons name="copy-outline" size={12} color={T.gold} />
-                                        <Text style={s.codeCopyText}>Copy</Text>
+                                        <Text style={s.codeCopyText}>Copy SQL</Text>
                                     </TouchableOpacity>
                                 </View>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -294,10 +300,75 @@ export default function AIInsights() {
                         );
                     }
 
+                    // Process lines: Handle headings, numbered points, and bullet points
+                    const lines = part.text.split('\n');
                     return (
-                        <Text key={idx} style={s.systemText}>
-                            {part.text}
-                        </Text>
+                        <View key={idx} style={{ gap: 6 }}>
+                            {lines.map((rawLine: string, lIdx: number) => {
+                                const line = rawLine.trim();
+                                if (!line) return <View key={lIdx} style={{ height: 4 }} />;
+
+                                // Check if line is a major title (starts with number or uppercase heading)
+                                const isMajorHeading = /^[A-Z\s&:-]{6,}$/.test(line) && !line.includes('•');
+                                if (isMajorHeading) {
+                                    return (
+                                        <View key={lIdx} style={s.sectionHeaderBox}>
+                                            <View style={s.sectionHeaderPill} />
+                                            <Text style={s.sectionHeaderText}>{line}</Text>
+                                        </View>
+                                    );
+                                }
+
+                                // Numbered list item: e.g. "1. Item name"
+                                const numberedMatch = line.match(/^(\d+)\.\s+(.*)/);
+                                if (numberedMatch) {
+                                    const num = numberedMatch[1];
+                                    const itemText = numberedMatch[2];
+                                    return (
+                                        <View key={lIdx} style={s.numberedRow}>
+                                            <View style={s.numberBadge}>
+                                                <Text style={s.numberBadgeText}>{num}</Text>
+                                            </View>
+                                            <Text style={s.numberedText}>{itemText}</Text>
+                                        </View>
+                                    );
+                                }
+
+                                // Bullet point item: e.g. "• Item details"
+                                if (line.startsWith('•') || line.startsWith('-')) {
+                                    const bulletText = line.replace(/^[•\-]\s*/, '');
+                                    // Check if it has a label format: "Label: Details"
+                                    const colonIndex = bulletText.indexOf(':');
+                                    if (colonIndex > 0 && colonIndex < 35) {
+                                        const label = bulletText.substring(0, colonIndex + 1);
+                                        const details = bulletText.substring(colonIndex + 1);
+                                        return (
+                                            <View key={lIdx} style={s.bulletRow}>
+                                                <View style={s.bulletDot} />
+                                                <Text style={s.bulletContent}>
+                                                    <Text style={s.bulletLabel}>{label} </Text>
+                                                    {details.trim()}
+                                                </Text>
+                                            </View>
+                                        );
+                                    }
+
+                                    return (
+                                        <View key={lIdx} style={s.bulletRow}>
+                                            <View style={s.bulletDot} />
+                                            <Text style={s.bulletContent}>{bulletText}</Text>
+                                        </View>
+                                    );
+                                }
+
+                                // Regular paragraph text
+                                return (
+                                    <Text key={lIdx} style={s.systemText}>
+                                        {line}
+                                    </Text>
+                                );
+                            })}
+                        </View>
                     );
                 })}
             </View>
@@ -328,7 +399,7 @@ export default function AIInsights() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Text style={s.headerTitle}>Cortex AI Core</Text>
                                 <View style={s.versionBadge}>
-                                    <Text style={s.versionBadgeText}>v5.2 PRO</Text>
+                                    <Text style={s.versionBadgeText}>v6.0 PRO</Text>
                                 </View>
                             </View>
                             <Text style={s.headerSubTitle}>Executive Governance Intelligence</Text>
@@ -371,13 +442,13 @@ export default function AIInsights() {
                     </View>
                     <View style={s.telemetryChip}>
                         <Ionicons name="card" size={11} color={T.cyan} />
-                        <Text style={s.telemetryLabel}>Payvessel:</Text>
+                        <Text style={s.telemetryLabel}>Gateways:</Text>
                         <Text style={[s.telemetryVal, { color: T.cyan }]}>9PSB / PalmPay Active</Text>
                     </View>
                     <View style={s.telemetryChip}>
                         <Ionicons name="shield-checkmark" size={11} color={T.purple} />
-                        <Text style={s.telemetryLabel}>Auth:</Text>
-                        <Text style={s.telemetryVal}>Admin 2FA</Text>
+                        <Text style={s.telemetryLabel}>Security:</Text>
+                        <Text style={s.telemetryVal}>2FA Enforced</Text>
                     </View>
                 </ScrollView>
 
@@ -492,6 +563,15 @@ export default function AIInsights() {
                                         </TouchableOpacity>
 
                                         <TouchableOpacity 
+                                            onPress={() => handleAskAI(messages.find(m => m.role === 'user')?.text || 'Platform Health Diagnostics')}
+                                            style={s.toolBtn}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="refresh-outline" size={13} color={T.textMuted} />
+                                            <Text style={s.toolBtnText}>Regenerate</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity 
                                             onPress={handleShareConversation}
                                             style={s.toolBtn}
                                             activeOpacity={0.7}
@@ -516,13 +596,13 @@ export default function AIInsights() {
                         <ActivityIndicator color={T.gold} size="small" />
                         <View>
                             <Text style={s.loadingTitle}>Cortex Neural Engine Analyzing...</Text>
-                            <Text style={s.loadingSubTitle}>Correlating database ledger & executing inference</Text>
+                            <Text style={s.loadingSubTitle}>Correlating database records and executing analysis</Text>
                         </View>
                     </View>
                 )}
             </ScrollView>
 
-            {/* QUICK ACTIONS & PRESETS DRAWER */}
+            {/* QUICK PROMPTS DRAWER */}
             {!loading && (
                 <View style={s.quickActionsArea}>
                     <ScrollView 
@@ -791,13 +871,84 @@ const s = StyleSheet.create({
         lineHeight: 21,
         fontWeight: '400',
     },
+    sectionHeaderBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 6,
+        marginBottom: 2,
+    },
+    sectionHeaderPill: {
+        width: 3,
+        height: 12,
+        backgroundColor: T.gold,
+        borderRadius: 2,
+    },
+    sectionHeaderText: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: T.gold,
+        letterSpacing: 0.5,
+    },
+    numberedRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        marginVertical: 2,
+    },
+    numberBadge: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: T.navyMid,
+        borderWidth: 1,
+        borderColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    numberBadgeText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: T.gold,
+    },
+    numberedText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#e2e8f0',
+        lineHeight: 19,
+    },
+    bulletRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        marginVertical: 2,
+        paddingLeft: 4,
+    },
+    bulletDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: T.cyan,
+        marginTop: 8,
+    },
+    bulletContent: {
+        flex: 1,
+        fontSize: 13,
+        color: '#e2e8f0',
+        lineHeight: 19,
+    },
+    bulletLabel: {
+        fontWeight: '800',
+        color: '#ffffff',
+    },
     codeBox: {
         backgroundColor: '#020510',
         borderWidth: 1,
         borderColor: T.border,
         borderRadius: 10,
         overflow: 'hidden',
-        marginVertical: 4,
+        marginVertical: 6,
     },
     codeHeader: {
         flexDirection: 'row',
