@@ -799,11 +799,12 @@ export default function ModernContentManager() {
               </View>
 
               {announcementUrl ? (
-                <View style={[s.announcementPreviewBox, (announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4')) && { aspectRatio: 16 / 9, height: undefined, backgroundColor: '#000000' }]}>
+                <View style={[s.announcementPreviewBox, (announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4')) && { minHeight: 160, maxHeight: 280, height: undefined, backgroundColor: '#000000' }]}>
                   {announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm') ? (
                     <Video 
                       source={{ uri: announcementUrl }} 
-                      style={s.announcementPreviewImg} 
+                      style={[s.announcementPreviewImg, Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : null]} 
+                      videoStyle={Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : undefined}
                       resizeMode={ResizeMode.CONTAIN} 
                       shouldPlay 
                       isLooping 
@@ -812,7 +813,7 @@ export default function ModernContentManager() {
                   ) : (
                     <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="contain" />
                   )}
-                  <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()} (16:9 HD)</Text>
+                  <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()} • ORIGINAL HD (NO ZOOM)</Text>
                 </View>
               ) : null}
 

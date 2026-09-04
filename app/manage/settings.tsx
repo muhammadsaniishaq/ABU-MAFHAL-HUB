@@ -637,7 +637,8 @@ export default function AdminSettings() {
                                         {announcementType === 'video' || (announcementUrl && (announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm'))) ? (
                                             <Video 
                                                 source={{ uri: announcementUrl }} 
-                                                style={{ width: '100%', height: '100%' }} 
+                                                style={[{ width: '100%', height: '100%' }, Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : null]} 
+                                                videoStyle={Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : undefined}
                                                 resizeMode={ResizeMode.CONTAIN} // Zero zoom, original full frame
                                                 shouldPlay
                                                 isLooping

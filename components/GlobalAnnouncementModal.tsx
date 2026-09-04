@@ -74,13 +74,45 @@ export default function GlobalAnnouncementModal() {
                     }
                 );
             } else {
-                setMediaRatio(16 / 9);
                 setIsVideoLoading(true);
+                // On Web: probe video dimensions directly via HTML5 video element for zero zoom
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    try {
+                        const tempVideo = document.createElement('video');
+                        tempVideo.src = config.mediaUrl;
+                        tempVideo.onloadedmetadata = () => {
+                            if (tempVideo.videoWidth > 0 && tempVideo.videoHeight > 0) {
+                                setMediaRatio(tempVideo.videoWidth / tempVideo.videoHeight);
+                            }
+                        };
+                    } catch (e) {}
+                }
             }
         } else {
             setMediaRatio(null);
         }
     }, [config?.mediaUrl, config?.mediaType, isVideo]);
+
+    // Helper to safely extract natural aspect ratio from video events on all platforms
+    const updateDimensionsFromEvent = (event: any) => {
+        setIsVideoLoading(false);
+        const natural = event?.naturalSize || event?.nativeEvent?.naturalSize;
+        if (natural && natural.width > 0 && natural.height > 0) {
+            setMediaRatio(natural.width / natural.height);
+            return;
+        }
+        const target = event?.target as any;
+        if (target && target.videoWidth > 0 && target.videoHeight > 0) {
+            setMediaRatio(target.videoWidth / target.videoHeight);
+            return;
+        }
+        if (Platform.OS === 'web' && videoRef.current) {
+            const el = (videoRef.current as any)?.getVideoElement?.() || (videoRef.current as any)?._video;
+            if (el && el.videoWidth > 0 && el.videoHeight > 0) {
+                setMediaRatio(el.videoWidth / el.videoHeight);
+            }
+        }
+    };
 
     // Auto-Scroll Up Refs & State for long announcement text
     const scrollViewRef = useRef<ScrollView>(null);
@@ -216,35 +248,54 @@ export default function GlobalAnnouncementModal() {
                         <Ionicons name="close" size={20} color="#fff" />
                     </TouchableOpacity>
 
-                    {/* Banner Image / Video Container (100% Original Size & Zero Zoom/Crop) */}
+                    {/* Banner Image / Video Container (100% Original Natural Size & Zero Zoom/Crop) */}
                     {config.mediaUrl ? (
-                        <View style={[
-                            styles.mediaContainer,
-                            {
-                                width: '100%',
-                                aspectRatio: mediaRatio ? Math.max(0.65, Math.min(mediaRatio, 2.4)) : (16 / 9),
-                                backgroundColor: '#000000',
-                                overflow: 'hidden',
-                            }
-                        ]}>
+                        <View style={styles.mediaStage}>
                             {isVideo ? (
-                                <View style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#000000' }}>
+                                <View 
+                                    style={[
+                                        styles.videoBox, 
+                                        mediaRatio ? { aspectRatio: mediaRatio } : { aspectRatio: 16 / 9 },
+                                        { maxHeight: Math.min(Math.round(height * 0.48), 420) }
+                                    ]}
+                                >
                                     <Video
                                         ref={videoRef}
                                         source={{ uri: config.mediaUrl }}
-                                        style={styles.media}
+                                        style={[
+                                            styles.media,
+                                            Platform.OS === 'web' ? ({ objectFit: 'contain', width: '100%', height: '100%' } as any) : null
+                                        ]}
+                                        videoStyle={Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : undefined}
                                         resizeMode={ResizeMode.CONTAIN} // STRICTLY CONTAIN: Zero zoom, 100% original full frame!
                                         shouldPlay={isVideoPlaying}
                                         isLooping
                                         isMuted={isMuted}
-                                        onPlaybackStatusUpdate={(status) => setPlaybackStatus(status)}
-                                        onLoadStart={() => setIsVideoLoading(true)}
-                                        onReadyForDisplay={(event) => {
-                                            setIsVideoLoading(false);
-                                            if (event.naturalSize && event.naturalSize.width > 0 && event.naturalSize.height > 0) {
-                                                setMediaRatio(event.naturalSize.width / event.naturalSize.height);
+                                        onPlaybackStatusUpdate={(status: any) => {
+                                            setPlaybackStatus(status);
+                                            if (status?.isLoaded && !mediaRatio) {
+                                                const nat = status.naturalSize;
+                                                if (nat?.width > 0 && nat?.height > 0) {
+                                                    setMediaRatio(nat.width / nat.height);
+                                                } else if (Platform.OS === 'web' && videoRef.current) {
+                                                    const el = (videoRef.current as any)?.getVideoElement?.() || (videoRef.current as any)?._video;
+                                                    if (el?.videoWidth > 0 && el?.videoHeight > 0) {
+                                                        setMediaRatio(el.videoWidth / el.videoHeight);
+                                                    }
+                                                }
                                             }
                                         }}
+                                        onLoadStart={() => setIsVideoLoading(true)}
+                                        onLoad={(status: any) => {
+                                            setIsVideoLoading(false);
+                                            const nat = status?.naturalSize;
+                                            if (nat?.width > 0 && nat?.height > 0) {
+                                                setMediaRatio(nat.width / nat.height);
+                                            } else {
+                                                updateDimensionsFromEvent(status);
+                                            }
+                                        }}
+                                        onReadyForDisplay={updateDimensionsFromEvent}
                                         onError={(e) => {
                                             console.warn("Announcement video playback notice:", e);
                                             setIsVideoLoading(false);
@@ -308,11 +359,19 @@ export default function GlobalAnnouncementModal() {
                                     </TouchableOpacity>
                                 </View>
                             ) : (
-                                <Image 
-                                    source={{ uri: config.mediaUrl }} 
-                                    style={styles.media} 
-                                    resizeMode="contain" 
-                                />
+                                <View 
+                                    style={[
+                                        styles.videoBox, 
+                                        mediaRatio ? { aspectRatio: mediaRatio } : { aspectRatio: 16 / 9 },
+                                        { maxHeight: Math.min(Math.round(height * 0.48), 420) }
+                                    ]}
+                                >
+                                    <Image 
+                                        source={{ uri: config.mediaUrl }} 
+                                        style={styles.media} 
+                                        resizeMode="contain" 
+                                    />
+                                </View>
                             )}
                         </View>
                     ) : null}
@@ -380,14 +439,21 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center'
     },
-    mediaContainer: {
+    mediaStage: {
         width: '100%',
-        minHeight: 140,
-        maxHeight: 280,
-        backgroundColor: '#070D1E',
-        overflow: 'hidden',
+        backgroundColor: '#000000',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    videoBox: {
+        width: '100%',
+        alignSelf: 'center',
+        position: 'relative',
+        backgroundColor: '#000000',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
     },
     media: {
         width: '100%',
