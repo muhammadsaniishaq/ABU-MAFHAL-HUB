@@ -162,7 +162,6 @@ export default function AdminLayout() {
             <Stack.Screen name="forensics" options={{ title: 'Forensics Unit' }} />
             <Stack.Screen name="panic" options={{ title: 'PANIC ROOM' }} />
             <Stack.Screen name="academy" options={{ title: 'Admin Academy' }} />
-            <Stack.Screen name="cinema" options={{ title: 'Session Replay' }} />
             <Stack.Screen name="legal" options={{ title: 'Legal Vault' }} />
             <Stack.Screen name="voice" options={{ title: 'Voice OS' }} />
             <Stack.Screen name="cards" options={{ title: 'Card Issuer' }} />

@@ -117,7 +117,6 @@ const ADMIN_LOCKABLE_MODULES = [
   { key: 'infrastructure', label: 'Server Infrastructure',       icon: 'server-outline',          cat: 'Technical' },
   { key: 'db',             label: 'Database Console',            icon: 'server',                  cat: 'Technical' },
   { key: 'api',            label: 'API Integrations & Keys',     icon: 'code-working-outline',    cat: 'Technical' },
-  { key: 'cinema',         label: 'Media & Cinema Stream',       icon: 'videocam-outline',        cat: 'Technical' },
   { key: 'terminal',       label: 'CLI System Terminal',         icon: 'terminal-outline',        cat: 'Technical' },
   { key: 'features',       label: 'System Feature Flags',        icon: 'toggle-outline',          cat: 'Technical' },
   { key: 'stores',         label: 'App Store Deployments',       icon: 'logo-apple',              cat: 'Technical' },

@@ -146,19 +146,11 @@ interface ChannelStatus {
     icon: string;
 }
 
-interface AuditIncident {
-    id: string;
-    title: string;
-    time: string;
-    type: 'warning' | 'security' | 'action' | 'system';
-    desc: string;
-}
-
 export default function EnterpriseRiskDefenseCenter() {
     const router = useRouter();
 
     // Active Navigation Tab
-    const [activeTab, setActiveTab] = useState<'overview' | 'policies' | 'rules' | 'queue' | 'channels' | 'blacklist' | 'audit' | 'stress_test'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'policies' | 'rules' | 'queue' | 'channels' | 'blacklist' | 'stress_test'>('overview');
 
     // Loading & Refreshing States
     const [loading, setLoading] = useState(true);
@@ -242,15 +234,6 @@ export default function EnterpriseRiskDefenseCenter() {
     const [newBlacklistReason, setNewBlacklistReason] = useState('');
     const [showBlacklistModal, setShowBlacklistModal] = useState(false);
 
-    // Audit Log Incidents
-    const [auditLog, setAuditLog] = useState<AuditIncident[]>([
-        { id: '1', title: 'Payvessel Webhook Verified', time: 'Just now', type: 'system', desc: 'Reserved account virtual funding latency optimal at 115ms.' },
-        { id: '2', title: 'AgentHub KYC Engine Sync', time: '5m ago', type: 'security', desc: 'Tier-2 NIN/BVN biometric queries active with 0 failed lookups.' },
-        { id: '3', title: 'Bigi Sub & BilalSadaSub Telemetry', time: '14m ago', type: 'action', desc: 'Automated data bundle routing re-calibrated for MTN SME.' },
-        { id: '4', title: 'NOWPayments Web3 Liquidity Guard', time: '1h ago', type: 'system', desc: 'USDT/BTC automated deposit wallet listening on mainnet.' },
-        { id: '5', title: 'NineBoost Social Orders API Ping', time: '2h ago', type: 'system', desc: 'SMM provider token validated successfully with 100% SLA.' }
-    ]);
-
     // Exact Platform Channels State
     const [channels, setChannels] = useState<ChannelStatus[]>([
         { id: 'payvessel', name: 'Payvessel Accounts & Cards', provider: 'Payvessel Rail', service: 'Virtual Accounts & Dollar Cards', category: 'VIRTUAL_ACCOUNTS', status: 'operational', latencyMs: 115, lastPing: 'Live (99.9%)', killswitchKey: 'risk_payvessel_killswitch', icon: 'card' },
@@ -285,7 +268,6 @@ export default function EnterpriseRiskDefenseCenter() {
                 fetchTransactionsQueue(),
                 fetchBlacklist(),
                 fetchCustomRules(),
-                fetchAuditLogs(),
             ]);
         } catch (error) {
             console.error('Error loading risk data:', error);
@@ -524,88 +506,6 @@ export default function EnterpriseRiskDefenseCenter() {
             }
         } catch (e) {
             console.error('Fetch blacklist error:', e);
-        }
-    };
-
-    // 6. Fetch Real-Time Live Audit Logs
-    const fetchAuditLogs = async () => {
-        try {
-            let fetchedLogs: any[] = [];
-            try {
-                const { data: edgeRes } = await supabase.functions.invoke('admin-audit-logs', {
-                    body: { action: 'list', limit: 50 }
-                });
-                if (edgeRes?.logs && Array.isArray(edgeRes.logs)) {
-                    fetchedLogs = edgeRes.logs;
-                }
-            } catch (e) {}
-
-            if (fetchedLogs.length === 0) {
-                try {
-                    const rawRes = await fetch('https://uagcxrtdqttayulvgpwg.supabase.co/functions/v1/admin-audit-logs', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'list', limit: 50 })
-                    });
-                    const rawJson = await rawRes.json();
-                    if (rawJson?.logs && Array.isArray(rawJson.logs)) {
-                        fetchedLogs = rawJson.logs;
-                    }
-                } catch (e) {}
-            }
-
-            if (fetchedLogs.length === 0) {
-                const { data: directData } = await supabase
-                    .from('audit_logs')
-                    .select('*, profiles:admin_id(full_name, email)')
-                    .order('created_at', { ascending: false })
-                    .limit(50);
-                if (directData && directData.length > 0) {
-                    fetchedLogs = directData;
-                }
-            }
-
-            if (fetchedLogs.length > 0) {
-                const mapped: AuditIncident[] = fetchedLogs.map((l: any) => {
-                    const date = new Date(l.created_at);
-                    const now = Date.now();
-                    const diffMins = Math.floor((now - date.getTime()) / 60000);
-                    let timeFormatted = 'Just now';
-                    if (diffMins >= 60 * 24) timeFormatted = `${Math.floor(diffMins / (60 * 24))}d ago`;
-                    else if (diffMins >= 60) timeFormatted = `${Math.floor(diffMins / 60)}h ago`;
-                    else if (diffMins > 0) timeFormatted = `${diffMins}m ago`;
-
-                    const actLower = (l.action || '').toLowerCase();
-                    let type: 'warning' | 'security' | 'action' | 'system' = 'system';
-                    if (actLower.includes('quarantine') || actLower.includes('freeze') || actLower.includes('danger') || actLower.includes('alert') || actLower.includes('critical')) {
-                        type = 'warning';
-                    } else if (actLower.includes('auth') || actLower.includes('pin') || actLower.includes('kyc') || actLower.includes('security')) {
-                        type = 'security';
-                    } else if (actLower.includes('transfer') || actLower.includes('fund') || actLower.includes('debit') || actLower.includes('rate') || actLower.includes('broadcast')) {
-                        type = 'action';
-                    }
-
-                    let descStr = '';
-                    if (typeof l.details === 'string') {
-                        descStr = l.details;
-                    } else if (l.details && typeof l.details === 'object') {
-                        descStr = Object.entries(l.details).map(([k, v]) => `${k}: ${v}`).join(' • ');
-                    } else {
-                        descStr = l.target_resource || 'System governance event logged';
-                    }
-
-                    return {
-                        id: l.id || Math.random().toString(),
-                        title: l.action || 'System Audit Event',
-                        time: timeFormatted,
-                        type,
-                        desc: descStr,
-                    };
-                });
-                setAuditLog(mapped);
-            }
-        } catch (err) {
-            console.warn('Error in fetchAuditLogs risk.tsx:', err);
         }
     };
 
@@ -1095,16 +995,6 @@ Integrated Platform Channels:
                         <Ionicons name="ban" size={14} color={activeTab === 'blacklist' ? T.goldBright : T.textMuted} />
                         <Text style={[styles.tabText, activeTab === 'blacklist' && styles.tabTextActive]}>
                             Blacklist ({blacklist.length})
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('audit')}
-                        style={[styles.tabItem, activeTab === 'audit' && styles.tabItemActive]}
-                    >
-                        <Ionicons name="time" size={14} color={activeTab === 'audit' ? T.goldBright : T.textMuted} />
-                        <Text style={[styles.tabText, activeTab === 'audit' && styles.tabTextActive]}>
-                            Audit Log
                         </Text>
                     </TouchableOpacity>
 
@@ -1823,74 +1713,7 @@ Integrated Platform Channels:
                     )}
 
                     {/* ========================================================================= */}
-                    {/* TAB 7: AUDIT INCIDENT LOG                                                 */}
-                    {/* ========================================================================= */}
-                    {activeTab === 'audit' && (
-                        <View>
-                            {/* Executive Audit Hub Banner */}
-                            <LinearGradient
-                                colors={['#040817', '#0A1128', '#111D42']}
-                                style={styles.auditHubHeader}
-                            >
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Ionicons name="shield-checkmark" size={16} color={T.goldBright} />
-                                        <Text style={styles.auditHubTitle}>Live Enterprise Audit Stream</Text>
-                                    </View>
-                                    <Text style={styles.auditHubSub}>
-                                        Authoritative telemetry & governance logs ({auditLog.length} incidents tracked)
-                                    </Text>
-                                </View>
-
-                                <TouchableOpacity
-                                    onPress={() => router.push('/manage/logs')}
-                                    style={styles.auditHubBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.auditHubBtnText}>Open Audit Center ↗</Text>
-                                </TouchableOpacity>
-                            </LinearGradient>
-
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
-                                <Text style={styles.sectionHeading}>Real-Time Security Timeline</Text>
-                                <TouchableOpacity 
-                                    onPress={() => fetchAuditLogs()}
-                                    style={styles.auditRefreshSmallBtn}
-                                >
-                                    <Ionicons name="refresh" size={12} color="#FFFFFF" />
-                                    <Text style={styles.auditRefreshSmallText}>Refresh Live</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {auditLog.map(item => {
-                                const isWarning = item.type === 'warning';
-                                const isSecurity = item.type === 'security';
-                                const isAction = item.type === 'action';
-                                const badgeBg = isWarning ? 'rgba(239, 68, 68, 0.2)' : isSecurity ? 'rgba(16, 185, 129, 0.2)' : isAction ? 'rgba(245, 158, 11, 0.2)' : 'rgba(56, 189, 248, 0.2)';
-                                const badgeColor = isWarning ? '#EF4444' : isSecurity ? '#10B981' : isAction ? '#F59E0B' : '#38BDF8';
-                                const badgeIcon = isWarning ? 'alert-circle' : isSecurity ? 'shield-checkmark' : isAction ? 'flash' : 'information-circle';
-
-                                return (
-                                    <View key={item.id} style={styles.auditCard}>
-                                        <View style={styles.auditCardHeader}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                                                <View style={[styles.auditBadge, { backgroundColor: badgeBg }]}>
-                                                    <Ionicons name={badgeIcon as any} size={11} color={badgeColor} />
-                                                    <Text style={[styles.auditBadgeText, { color: badgeColor }]}>{item.type.toUpperCase()}</Text>
-                                                </View>
-                                                <Text style={styles.auditTitle} numberOfLines={1}>{item.title}</Text>
-                                            </View>
-                                            <Text style={styles.auditTime}>{item.time}</Text>
-                                        </View>
-                                        <Text style={styles.auditDesc}>{item.desc}</Text>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    )}
-
-                    {/* ========================================================================= */}
-                    {/* TAB 8: LIQUIDITY STRESS TEST SIMULATOR                                    */}
+                    {/* TAB 7: LIQUIDITY STRESS TEST SIMULATOR                                    */}
                     {/* ========================================================================= */}
                     {activeTab === 'stress_test' && (
                         <View>

@@ -1,103 +1,104 @@
-import { View, Text, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { supabase } from '../../services/supabase';
-import { useEffect, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 
-type AuditLog = {
-    id: string;
-    admin_id: string;
-    action: string;
-    target_resource: string;
-    details: any;
-    created_at: string;
-};
-
-export default function AuditLogs() {
-    const [logs, setLogs] = useState<AuditLog[]>([]);
-    const [loading, setLoading] = useState(true);
+export default function CinemaAuditRedirect() {
+    const router = useRouter();
 
     useEffect(() => {
-        fetchLogs();
+        const timer = setTimeout(() => {
+            router.replace('/manage/logs');
+        }, 600);
+        return () => clearTimeout(timer);
     }, []);
 
-    const fetchLogs = async () => {
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('audit_logs')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (data) setLogs(data);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <View className="flex-1 items-center justify-center bg-slate-950">
-                <ActivityIndicator size="large" color="#3B82F6" />
-            </View>
-        );
-    }
-
     return (
-        <View className="flex-1 bg-slate-950">
-            <Stack.Screen options={{
-                title: 'Audit Logs',
-                headerStyle: { backgroundColor: '#020617' },
-                headerTintColor: '#fff'
-            }} />
-
-            <View className="p-6">
-                <View className="flex-row items-center justify-between mb-6">
-                    <View>
-                        <Text className="text-white text-2xl font-black">System Audit</Text>
-                        <Text className="text-slate-400">Real-time administrator actions</Text>
-                    </View>
-                    <TouchableOpacity onPress={fetchLogs} className="p-2 bg-slate-900 rounded-full">
-                        <Ionicons name="refresh" size={20} color="#3B82F6" />
-                    </TouchableOpacity>
+        <View style={s.container}>
+            <Stack.Screen
+                options={{
+                    title: 'Audit & Telemetry Center',
+                    headerStyle: { backgroundColor: '#040817' },
+                    headerTintColor: '#FFFFFF',
+                }}
+            />
+            <LinearGradient colors={['#070D1E', '#0B132B']} style={s.card}>
+                <View style={s.iconCircle}>
+                    <Ionicons name="shield-checkmark" size={38} color="#F5A623" />
                 </View>
-
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    {logs.length > 0 ? (
-                        logs.map((log) => (
-                            <View key={log.id} className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 mb-4">
-                                <View className="flex-row justify-between mb-3">
-                                    <View className="flex-row items-center gap-2">
-                                        <View className={`w-2 h-2 rounded-full ${log.action.toLowerCase().includes('delete') ? 'bg-red-500' : 'bg-green-500'}`} />
-                                        <Text className="text-white font-bold">{log.action}</Text>
-                                    </View>
-                                    <Text className="text-slate-500 text-xs font-mono">
-                                        {new Date(log.created_at).toLocaleString()}
-                                    </Text>
-                                </View>
-
-                                <View className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/50">
-                                    <Text className="text-slate-400 text-xs mb-1">Target Resource</Text>
-                                    <Text className="text-blue-400 font-mono text-xs">{log.target_resource}</Text>
-                                </View>
-
-                                {log.details && (
-                                    <View className="mt-3">
-                                        <Text className="text-slate-500 text-xs uppercase font-bold tracking-tighter mb-2">Payload Details</Text>
-                                        <Text className="text-slate-400 text-xs italic">
-                                            {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                        ))
-                    ) : (
-                        <View className="items-center justify-center pt-20">
-                            <Ionicons name="list" size={48} color="#1E293B" />
-                            <Text className="text-slate-500 mt-4 text-center">No audit logs found in the system</Text>
-                        </View>
-                    )}
-                </ScrollView>
-            </View>
+                <Text style={s.title}>Audit Logs Centralized</Text>
+                <Text style={s.sub}>
+                    Audit logs, incident tracking, and governance telemetry have been unified into the Enterprise Audit Center.
+                </Text>
+                <ActivityIndicator size="small" color="#F5A623" style={{ marginVertical: 14 }} />
+                <TouchableOpacity
+                    onPress={() => router.replace('/manage/logs')}
+                    style={s.btn}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="arrow-forward-circle" size={16} color="#070D1E" />
+                    <Text style={s.btnText}>Open Audit Center ↗</Text>
+                </TouchableOpacity>
+            </LinearGradient>
         </View>
     );
 }
+
+const s = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#040817',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    card: {
+        width: '100%',
+        maxWidth: 440,
+        borderRadius: 20,
+        padding: 28,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#1C2C5B',
+    },
+    iconCircle: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: 'rgba(245, 166, 35, 0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
+    },
+    title: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '900',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    sub: {
+        color: '#94A3B8',
+        fontSize: 13,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 8,
+    },
+    btn: {
+        backgroundColor: '#F5A623',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    btnText: {
+        color: '#070D1E',
+        fontSize: 13,
+        fontWeight: '800',
+    },
+});
