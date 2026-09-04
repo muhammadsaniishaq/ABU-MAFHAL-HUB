@@ -322,7 +322,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
 
     // A. Try finding by Explicit ID first
     if (explicitUserId) {
-        const { data, error } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name').eq('id', explicitUserId).single();
+        const { data, error } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name, expo_push_token').eq('id', explicitUserId).single();
         if (data && !error) {
             profile = data;
             method = 'specific_id_from_ref';
@@ -346,7 +346,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
         }
 
         if (va) {
-            const { data } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name').eq('id', va.user_id).single();
+            const { data } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name, expo_push_token').eq('id', va.user_id).single();
             if (data) {
                 profile = data;
                 method = 'virtual_account_number';
@@ -371,7 +371,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     }
 
     if (!profile && email) {
-        const { data } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name').eq('email', email).single();
+        const { data } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name, expo_push_token').eq('email', email).single();
         if (data) {
             profile = data;
             method = 'email_fallback';
@@ -522,12 +522,61 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
         console.log(`[FundWallet] Payment Event Saved`);
     }
 
+    const formattedAmount = creditedAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 });
+    const formattedBalance = finalBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
+    // 4.5 Insert Notification & Dispatch Expo Push Notification with Sound
+    try {
+        const notifTitle = `💰 Wallet Funded: ₦${formattedAmount}`;
+        const notifBody = `Your wallet has been credited with ₦${formattedAmount}. Ref: ${reference}`;
+
+        await supabaseAdmin.from('notifications').insert({
+            user_id: profile.id,
+            title: notifTitle,
+            body: notifBody,
+            type: 'funding',
+            priority: 'high',
+            is_read: false,
+            data: { route: '/(app)/history', reference: reference }
+        });
+
+        if (profile.expo_push_token) {
+            console.log(`[FundWallet] Dispatching push notification to token: ${profile.expo_push_token}`);
+            fetch('https://exp.host/--/api/v2/push/send', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Accept-encoding': 'gzip, deflate',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    to: profile.expo_push_token,
+                    sound: 'default',
+                    title: notifTitle,
+                    body: notifBody,
+                    channelId: 'transactions',
+                    priority: 'high',
+                    data: { route: '/(app)/history', reference: reference }
+                }),
+            }).then(async res => {
+                if (!res.ok) {
+                    console.warn('[FundWallet] Push failed:', await res.text());
+                } else {
+                    console.log('[FundWallet] Push delivered successfully');
+                }
+            }).catch(pushErr => {
+                console.warn('[FundWallet] Push error:', pushErr);
+            });
+        }
+    } catch (notifErr) {
+        console.warn('[FundWallet] Notification dispatch error:', notifErr);
+    }
+
     // 5. Send Email Receipt Notification to User
     try {
         const userEmail = email || profile.email;
         if (userEmail && userEmail.includes('@')) {
-            const formattedAmount = creditedAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 });
-            const formattedBalance = finalBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
             const customerName = profile.full_name || 'Valued Customer';
             
             const subject = `Wallet Funding Notification - ₦${formattedAmount}`;

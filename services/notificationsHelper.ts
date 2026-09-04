@@ -1,7 +1,9 @@
 import { supabase } from './supabase';
+import { sendInstantNotification } from '../hooks/usePushNotifications';
 
 /**
- * Creates an in-app notification for the user.
+ * Creates an in-app notification for the user and immediately triggers 
+ * the phone's native notification bar alert with sound and vibration.
  * 
  * @param userId - The ID of the user receiving the notification
  * @param title - The title of the notification (e.g., "Data Purchase Successful")
@@ -21,6 +23,13 @@ export const createAppNotification = async (
     try {
         if (!userId) return { success: false, error: "No userId provided" };
 
+        // 1. Trigger instant status-bar alert with sound & vibration on current device
+        const targetChannel = (category === 'security' || priority === 'high') ? 'security' : 'transactions';
+        sendInstantNotification(title, body, data, targetChannel).catch(e => {
+            console.warn('[createAppNotification] Sound trigger warning:', e);
+        });
+
+        // 2. Persist in database for in-app history & realtime broadcasts
         const { error } = await supabase.from('notifications').insert({
             user_id: userId,
             title,
@@ -32,7 +41,7 @@ export const createAppNotification = async (
         });
 
         if (error) {
-            console.error("Error creating notification:", error);
+            console.error("Error creating notification in DB:", error);
             return { success: false, error };
         }
 
@@ -42,3 +51,4 @@ export const createAppNotification = async (
         return { success: false, error: err };
     }
 };
+

@@ -29,8 +29,87 @@ const NETWORKS_DATA = [
     { id: 'vitel', name: 'VITEL', color: '#6366F1', cashback: '2% Off', discountRate: 0.02, prefixes: ['070', '091'] },
 ];
 
+const getNetworkStyles = (netId: string, isSelected: boolean) => {
+    if (!isSelected) {
+        return {
+            bg: '#ffffff',
+            border: '#e2e8f0',
+            text: '#334155',
+            badgeBg: '#f1f5f9',
+            badgeText: '#64748b',
+            accent: '#64748b',
+        };
+    }
+    switch (netId) {
+        case 'mtn':
+            return {
+                bg: '#fffbeb',
+                border: '#eab308',
+                text: '#854d0e',
+                badgeBg: '#fef3c7',
+                badgeText: '#b45309',
+                accent: '#eab308',
+            };
+        case 'airtel':
+            return {
+                bg: '#fef2f2',
+                border: '#ef4444',
+                text: '#991b1b',
+                badgeBg: '#fee2e2',
+                badgeText: '#b91c1c',
+                accent: '#ef4444',
+            };
+        case 'glo':
+            return {
+                bg: '#f0fdf4',
+                border: '#16a34a',
+                text: '#166534',
+                badgeBg: '#dcfce7',
+                badgeText: '#15803d',
+                accent: '#16a34a',
+            };
+        case '9mobile':
+            return {
+                bg: '#ecfdf5',
+                border: '#059669',
+                text: '#065f46',
+                badgeBg: '#d1fae5',
+                badgeText: '#047857',
+                accent: '#059669',
+            };
+        case 'vitel':
+            return {
+                bg: '#eef2ff',
+                border: '#6366f1',
+                text: '#3730a3',
+                badgeBg: '#e0e7ff',
+                badgeText: '#4338ca',
+                accent: '#6366f1',
+            };
+        default:
+            return {
+                bg: '#f1f5f9',
+                border: '#475569',
+                text: '#1e293b',
+                badgeBg: '#e2e8f0',
+                badgeText: '#334155',
+                accent: '#475569',
+            };
+    }
+};
+
+const safeLayoutAnimation = () => {
+    try {
+        if (Platform.OS !== 'web') {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        }
+    } catch {
+        // Safe animation fallback
+    }
+};
+
 export default function AirtimeScreen() {
-    const [network, setNetwork] = useState('');
+    const [network, setNetwork] = useState('mtn');
     const [amount, setAmount] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [loading, setLoading] = useState(false);
@@ -54,6 +133,7 @@ export default function AirtimeScreen() {
     const [beneficiarySearch, setBeneficiarySearch] = useState('');
     const [phoneFocused, setPhoneFocused] = useState(false);
     const [amountFocused, setAmountFocused] = useState(false);
+    const [benSearchFocused, setBenSearchFocused] = useState(false);
     
     const router = useRouter();
 
@@ -125,8 +205,8 @@ export default function AirtimeScreen() {
     const handlePurchase = async () => {
         if (!network || !amount || phoneNumber.length < 10) return;
 
-        if (balance !== null && Number(amount) > balance) {
-            Alert.alert("Insufficient Funds", `Your wallet balance (₦${balance.toLocaleString()}) is insufficient for this transaction.`);
+        if (balance !== null && Number(amount || 0) > Number(balance || 0)) {
+            Alert.alert("Insufficient Funds", `Your wallet balance (₦${Number(balance || 0).toLocaleString()}) is insufficient for this transaction.`);
             return;
         }
 
@@ -140,6 +220,8 @@ export default function AirtimeScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
             
+            const activeNetwork = network || 'mtn';
+
             // Save Beneficiary if selected
             if (saveBeneficiary) {
                 // Check if already exists to avoid dupes? (Primitive check)
@@ -147,17 +229,17 @@ export default function AirtimeScreen() {
                 if (!exists) {
                     await supabase.from('beneficiaries').insert({
                         user_id: user.id,
-                        name: `My ${network.toUpperCase()} Line`, // Default Name
-                        bank_name: network.toUpperCase(), // Treat Network as Bank Name
+                        name: `My ${activeNetwork.toUpperCase()} Line`, // Default Name
+                        bank_name: activeNetwork.toUpperCase(), // Treat Network as Bank Name
                         account_number: phoneNumber
                     });
                 }
             }
 
             const result = await api.airtime.purchase(user.id, {
-                network,
+                network: activeNetwork,
                 phone: phoneNumber,
-                amount: Number(amount)
+                amount: Number(amount || 0)
             });
 
             if (result.success) {
@@ -165,7 +247,7 @@ export default function AirtimeScreen() {
                 await createAppNotification(
                     user.id,
                     "Airtime Purchase Successful",
-                    `You have successfully purchased ₦${amount} airtime for ${phoneNumber} (${network.toUpperCase()}).`,
+                    `You have successfully purchased ₦${amount} airtime for ${phoneNumber} (${activeNetwork.toUpperCase()}).`,
                     "airtime",
                     "normal",
                     { route: "/(app)/history" }
@@ -174,7 +256,7 @@ export default function AirtimeScreen() {
                 router.replace({
                     pathname: '/success',
                     params: {
-                        amount: `₦${Number(amount).toLocaleString()}`,
+                        amount: `₦${Number(amount || 0).toLocaleString()}`,
                         type: 'Airtime Purchase',
                         reference: result.reference
                     }
@@ -190,6 +272,88 @@ export default function AirtimeScreen() {
     };
 
     const isWeb = Platform.OS === 'web';
+
+    const renderBeneficiaryModal = () => {
+        const filteredBens = beneficiaries.filter(b => 
+            (b.name || '').toLowerCase().includes(beneficiarySearch.toLowerCase()) ||
+            (b.account_number || '').includes(beneficiarySearch)
+        );
+
+        return (
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={showBeneficiaryModal}
+                onRequestClose={() => {
+                    setBeneficiarySearch('');
+                    setShowBeneficiaryModal(false);
+                }}
+            >
+                <View style={s.modalOverlay}>
+                    <View 
+                        style={[
+                            s.modalContentContainer,
+                            isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450 }
+                        ]}
+                    >
+                        <View style={s.modalHeader}>
+                            <Text style={s.modalTitle}>Select Beneficiary</Text>
+                            <TouchableOpacity onPress={() => {
+                                setBeneficiarySearch('');
+                                setShowBeneficiaryModal(false);
+                            }}>
+                                <Ionicons name="close-circle" size={26} color="#9ca3af" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <TextInput
+                            style={[
+                                s.modalSearchInput,
+                                benSearchFocused && { borderColor: '#0d1b3e' }
+                            ]}
+                            placeholder="Search beneficiary..."
+                            placeholderTextColor="#94a3b8"
+                            value={beneficiarySearch}
+                            onChangeText={setBeneficiarySearch}
+                            onFocus={() => setBenSearchFocused(true)}
+                            onBlur={() => setBenSearchFocused(false)}
+                        />
+                        
+                        <FlatList
+                            data={filteredBens}
+                            keyExtractor={item => item.id}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={s.beneficiaryItem}
+                                    onPress={() => {
+                                        setPhoneNumber(item.account_number); // Using account_number as phone
+                                        detectNetwork(item.account_number);
+                                        setBeneficiarySearch('');
+                                        setShowBeneficiaryModal(false);
+                                    }}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={s.beneficiaryAvatar}>
+                                        <Text style={s.beneficiaryAvatarText}>{item.name ? item.name[0].toUpperCase() : 'B'}</Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.beneficiaryName}>{item.name}</Text>
+                                        <Text style={s.beneficiarySubtext}>{item.bank_name} - {item.account_number}</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
+                                </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                                <View style={s.modalEmptyState}>
+                                    <Text style={s.modalEmptyStateText}>No beneficiaries found</Text>
+                                </View>
+                            }
+                        />
+                    </View>
+                </View>
+            </Modal>
+        );
+    };
 
     return (
         <KeyboardAvoidingView 
@@ -218,7 +382,7 @@ export default function AirtimeScreen() {
                     >
                         <View style={{ flex: 1 }}>
                             <Text style={s.balanceLabel}>Total Balance</Text>
-                            <Text style={s.balanceAmount}>₦{balance.toLocaleString()}</Text>
+                            <Text style={s.balanceAmount}>₦{Number(balance || 0).toLocaleString()}</Text>
                             
                             {/* Cashback Savings Badge Decoration */}
                             <View style={s.savingsBadge}>
@@ -287,6 +451,7 @@ export default function AirtimeScreen() {
                 <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', gap: 4, marginBottom: 16 }}>
                     {NETWORKS_DATA.map((net) => {
                         const isSelected = network === net.id;
+                        const nStyles = getNetworkStyles(net.id, isSelected);
                         return (
                             <TouchableOpacity
                                 key={net.id}
@@ -295,9 +460,9 @@ export default function AirtimeScreen() {
                                     paddingVertical: 10,
                                     paddingHorizontal: 2,
                                     borderRadius: 14,
-                                    backgroundColor: isSelected ? net.color + '15' : '#ffffff',
+                                    backgroundColor: nStyles.bg,
                                     borderWidth: 1.5,
-                                    borderColor: isSelected ? net.color : '#e2e8f0',
+                                    borderColor: nStyles.border,
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     shadowColor: '#000',
@@ -308,26 +473,26 @@ export default function AirtimeScreen() {
                                     position: 'relative'
                                 }}
                                 onPress={() => {
-                                    if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                    safeLayoutAnimation();
                                     setNetwork(net.id);
                                 }}
                                 activeOpacity={0.8}
                             >
                                 <View style={{ width: 28, height: 28, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', marginBottom: 4 }}>
                                     <Image 
-                                        source={NETWORK_LOGOS[net.id]} 
+                                        source={NETWORK_LOGOS[net.id] || NETWORK_LOGOS.mtn} 
                                         style={{ width: '100%', height: '100%' }} 
                                         resizeMode="contain" 
                                     />
                                 </View>
-                                <Text style={{ fontSize: 10, fontWeight: isSelected ? '800' : '600', color: isSelected ? net.color : '#334155', textAlign: 'center' }} numberOfLines={1}>
+                                <Text style={{ fontSize: 10, fontWeight: isSelected ? '800' : '600', color: nStyles.text, textAlign: 'center' }} numberOfLines={1}>
                                     {net.name}
                                 </Text>
-                                <View style={{ backgroundColor: net.color + '20', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, marginTop: 3 }}>
-                                    <Text style={{ fontSize: 7.5, fontWeight: '800', color: net.color }}>{net.cashback}</Text>
+                                <View style={{ backgroundColor: nStyles.badgeBg, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, marginTop: 3 }}>
+                                    <Text style={{ fontSize: 7.5, fontWeight: '800', color: nStyles.badgeText }}>{net.cashback}</Text>
                                 </View>
                                 {isSelected && (
-                                    <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: net.color, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
+                                    <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: nStyles.accent, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
                                         <Ionicons name="checkmark" size={8} color="white" />
                                     </View>
                                 )}
@@ -341,7 +506,7 @@ export default function AirtimeScreen() {
                     <TouchableOpacity 
                         style={[s.modeButton, topupMode === 'direct' && s.modeButtonActive]}
                         onPress={() => {
-                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            safeLayoutAnimation();
                             setTopupMode('direct');
                         }}
                         activeOpacity={0.7}
@@ -352,7 +517,7 @@ export default function AirtimeScreen() {
                     <TouchableOpacity 
                         style={[s.modeButton, topupMode === 'pin' && s.modeButtonActive]}
                         onPress={() => {
-                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            safeLayoutAnimation();
                             setTopupMode('pin');
                         }}
                         activeOpacity={0.7}
@@ -370,8 +535,8 @@ export default function AirtimeScreen() {
                     phoneNumber.length >= 10 && s.inputContainerSuccess
                 ]}>
                     <View style={s.inputIconWrapper}>
-                        {network ? (
-                            <Image source={NETWORK_LOGOS[network]} style={s.inputNetworkLogo as any} resizeMode="cover" />
+                        {network && NETWORK_LOGOS[network] ? (
+                            <Image source={NETWORK_LOGOS[network]} style={s.inputNetworkLogo as any} resizeMode="contain" />
                         ) : (
                              <Ionicons name="call" size={18} color="#64748b" />
                         )}
@@ -482,18 +647,18 @@ export default function AirtimeScreen() {
                         <View style={s.estimatorDivider} />
                         <View style={s.estimatorRow}>
                             <Text style={s.estimatorLabel}>Original Price:</Text>
-                            <Text style={s.estimatorValue}>₦{Number(amount).toLocaleString()}</Text>
+                            <Text style={s.estimatorValue}>₦{Number(amount || 0).toLocaleString()}</Text>
                         </View>
                         <View style={s.estimatorRow}>
-                            <Text style={s.estimatorLabel}>Cashback Discount ({NETWORKS_DATA.find(n => n.id === network)?.cashback}):</Text>
-                            <Text style={[s.estimatorValue, { color: '#16a34a' }]}>-₦{(Number(amount) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}</Text>
+                            <Text style={s.estimatorLabel}>Cashback Discount ({NETWORKS_DATA.find(n => n.id === network)?.cashback || '2% Off'}):</Text>
+                            <Text style={[s.estimatorValue, { color: '#16a34a' }]}>-₦{(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}</Text>
                         </View>
                         <View style={s.estimatorRow}>
                             <Text style={s.estimatorLabelTotal}>You Pay:</Text>
-                            <Text style={s.estimatorValueTotal}>₦{(Number(amount) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}</Text>
+                            <Text style={s.estimatorValueTotal}>₦{(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}</Text>
                         </View>
                         <View style={[s.estimatorBadge, { backgroundColor: '#fef3c7' }]}>
-                            <Text style={s.estimatorBadgeText}>🎉 Saved ₦{(Number(amount) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()} with {NETWORKS_DATA.find(n => n.id === network)?.name} Smart Top-up!</Text>
+                            <Text style={s.estimatorBadgeText}>🎉 Saved ₦{(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()} with {NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase()} Smart Top-up!</Text>
                         </View>
                     </View>
                 )}
@@ -502,7 +667,7 @@ export default function AirtimeScreen() {
                 <View style={s.scheduleContainer}>
                     <TouchableOpacity 
                         onPress={() => {
-                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            safeLayoutAnimation();
                             setScheduleEnabled(!scheduleEnabled);
                         }}
                         style={s.scheduleHeader}
@@ -519,7 +684,7 @@ export default function AirtimeScreen() {
                             trackColor={{ false: "#E2E8F0", true: "#bfdbfe" }}
                             thumbColor={scheduleEnabled ? "#2563eb" : "#f4f3f4"}
                             onValueChange={(val) => {
-                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                safeLayoutAnimation();
                                 setScheduleEnabled(val);
                             }}
                             value={scheduleEnabled}
@@ -556,7 +721,7 @@ export default function AirtimeScreen() {
                 <View style={s.ussdContainer}>
                     <TouchableOpacity 
                         onPress={() => {
-                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            safeLayoutAnimation();
                             setShowUssdGuide(!showUssdGuide);
                         }}
                         style={s.ussdHeader}
@@ -646,7 +811,7 @@ export default function AirtimeScreen() {
 
             </ScrollView>
 
-            <BeneficiaryModal />
+            {renderBeneficiaryModal()}
             
             <TransactionConfirmationModal
                 visible={showConfirmation}
@@ -656,15 +821,15 @@ export default function AirtimeScreen() {
                     setTimeout(() => setShowSecurityModal(true), 500);
                 }}
                 title="Confirm Airtime Purchase"
-                network={network}
+                network={network || 'mtn'}
                 details={[
                     { label: 'Transaction Type', value: 'Airtime Top-up' },
                     { label: 'Recharge Type', value: topupMode === 'direct' ? 'Direct Recharge (Pinless)' : 'PIN Voucher (Recharge Code)' },
-                    { label: 'Network', value: NETWORKS_DATA.find(n => n.id === network)?.name || network },
+                    { label: 'Network', value: NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase() },
                     { label: 'Phone Number', value: phoneNumber },
-                    { label: 'Original Amount', value: `₦${Number(amount).toLocaleString()}`, isAmount: true },
-                    { label: `Discount (${((NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02) * 100).toFixed(0)}%)`, value: `-₦${(Number(amount) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}`, isDiscount: true },
-                    { label: 'Total To Pay', value: `₦${(Number(amount) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}`, isTotal: true },
+                    { label: 'Original Amount', value: `₦${Number(amount || 0).toLocaleString()}`, isAmount: true },
+                    { label: `Discount (${((NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02) * 100).toFixed(0)}%)`, value: `-₦${(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}`, isDiscount: true },
+                    { label: 'Total To Pay', value: `₦${(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}`, isTotal: true },
                 ]}
             />
             
@@ -675,94 +840,11 @@ export default function AirtimeScreen() {
                    processTransaction();
                 }}
                 title="Authorize Purchase"
-                description={`Confirm ${network.toUpperCase()} Airtime\nTop-up of ₦${Number(amount).toLocaleString()}`}
+                description={`Confirm ${(network || 'MTN').toUpperCase()} Airtime\nTop-up of ₦${Number(amount || 0).toLocaleString()}`}
                 requiredFor="purchase"
             />
         </KeyboardAvoidingView>
     );
-
-    function BeneficiaryModal() {
-        const filteredBens = beneficiaries.filter(b => 
-            (b.name || '').toLowerCase().includes(beneficiarySearch.toLowerCase()) ||
-            (b.account_number || '').includes(beneficiarySearch)
-        );
-        const [searchFocused, setSearchFocused] = useState(false);
-
-        return (
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={showBeneficiaryModal}
-                onRequestClose={() => {
-                    setBeneficiarySearch('');
-                    setShowBeneficiaryModal(false);
-                }}
-            >
-                <View style={s.modalOverlay}>
-                    <View 
-                        style={[
-                            s.modalContentContainer,
-                            isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450 }
-                        ]}
-                    >
-                        <View style={s.modalHeader}>
-                            <Text style={s.modalTitle}>Select Beneficiary</Text>
-                            <TouchableOpacity onPress={() => {
-                                setBeneficiarySearch('');
-                                setShowBeneficiaryModal(false);
-                            }}>
-                                <Ionicons name="close-circle" size={26} color="#9ca3af" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <TextInput
-                            style={[
-                                s.modalSearchInput,
-                                searchFocused && { borderColor: '#0d1b3e' }
-                            ]}
-                            placeholder="Search beneficiary..."
-                            placeholderTextColor="#94a3b8"
-                            value={beneficiarySearch}
-                            onChangeText={setBeneficiarySearch}
-                            onFocus={() => setSearchFocused(true)}
-                            onBlur={() => setSearchFocused(false)}
-                        />
-                        
-                        <FlatList
-                            data={filteredBens}
-                            keyExtractor={item => item.id}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={s.beneficiaryItem}
-                                    onPress={() => {
-                                        setPhoneNumber(item.account_number); // Using account_number as phone
-                                        detectNetwork(item.account_number);
-                                        setBeneficiarySearch('');
-                                        setShowBeneficiaryModal(false);
-                                    }}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={s.beneficiaryAvatar}>
-                                        <Text style={s.beneficiaryAvatarText}>{item.name ? item.name[0].toUpperCase() : 'B'}</Text>
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={s.beneficiaryName}>{item.name}</Text>
-                                        <Text style={s.beneficiarySubtext}>{item.bank_name} - {item.account_number}</Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
-                                </TouchableOpacity>
-                            )}
-                            ListEmptyComponent={
-                                <View style={s.modalEmptyState}>
-                                    <Text style={s.modalEmptyStateText}>No beneficiaries found</Text>
-                                </View>
-                            }
-                        />
-                    </View>
-                </View>
-            </Modal>
-        );
-    }
 }
 
 const s = StyleSheet.create({

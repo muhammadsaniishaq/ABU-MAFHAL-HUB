@@ -21,6 +21,7 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../services/supabase';
+import { sendInstantNotification } from '../../hooks/usePushNotifications';
 
 const { width } = Dimensions.get('window');
 
@@ -359,18 +360,48 @@ export default function EnterpriseCommunicationsHub() {
 
             // Channel B: Push Notifications
             if (activeChannel === 'push') {
+                const pushTitle = subject.trim() || 'Official Notice from ABU MAFHAL';
+                const pushBody = body.trim();
+                const pushData = { priority: isHighPriority ? 'high' : 'normal', route: actionRoute || undefined };
+
                 const pushRows = targetUsers.filter(u => u.id).map(u => ({
                     user_id: u.id!,
-                    title: subject.trim() || 'Official Notice from ABU MAFHAL',
-                    body: body.trim(),
+                    title: pushTitle,
+                    body: pushBody,
                     type: 'broadcast',
-                    data: { priority: isHighPriority ? 'high' : 'normal', route: actionRoute || undefined },
+                    data: pushData,
                 }));
 
                 if (pushRows.length > 0) {
                     await supabase.from('notifications').insert(pushRows);
                 }
+
+                // Immediately trigger native notification on current device
+                await sendInstantNotification(
+                    pushTitle,
+                    pushBody,
+                    pushData,
+                    isHighPriority ? 'security' : 'transactions'
+                );
+
+                // Also invoke edge function to dispatch remote Expo Push to all recipient devices
+                try {
+                    await supabase.functions.invoke('send-communication', {
+                        body: {
+                            type: 'push',
+                            recipient_mode: recipientAudience === 'all' ? 'all' : recipientAudience === 'admins' ? 'admins' : 'single',
+                            recipient: recipientAudience === 'single' ? targetUsers[0]?.id : undefined,
+                            subject: pushTitle,
+                            body: pushBody,
+                            actionRoute: actionRoute.trim() || undefined,
+                            priority: isHighPriority ? 'high' : 'normal',
+                        },
+                    });
+                } catch (edgePushErr) {
+                    console.warn('[Communications] Edge push invoke note:', edgePushErr);
+                }
             }
+
 
             // Channel C: SMS Integration
             if (activeChannel === 'sms') {

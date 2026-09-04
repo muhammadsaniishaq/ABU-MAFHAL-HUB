@@ -15,7 +15,7 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { type, recipient, recipient_mode, subject, body } = payload;
+    const { type, recipient, recipient_mode, subject, body, actionRoute, priority } = payload;
     const mode = recipient_mode || 'single';
 
     if (type !== 'email' && type !== 'sms' && type !== 'push') {
@@ -208,13 +208,26 @@ serve(async (req) => {
                 if (dbError) console.error(`DB Insert failed for ${user.id}:`, dbError);
 
                 // 2. Send Remote Push (if token exists)
-                if (user.token && user.token.startsWith('ExponentPushToken[')) {
+                const hasValidToken = typeof user.token === 'string' && (
+                    user.token.startsWith('ExponentPushToken[') ||
+                    user.token.startsWith('ExpoPushToken[') ||
+                    user.token.includes('ExponentPushToken') ||
+                    user.token.includes('ExpoPushToken') ||
+                    user.token.length > 20
+                );
+
+                if (user.token && hasValidToken) {
                     const message = {
                         to: user.token,
                         sound: 'default',
                         title: subject || 'Abu Mafhal Sub',
                         body: body,
-                        data: { someData: 'goes here' },
+                        channelId: priority === 'high' ? 'security' : 'transactions',
+                        priority: 'high',
+                        data: {
+                            route: actionRoute || '/(app)/history',
+                            priority: priority || 'normal'
+                        },
                     };
 
                     const expoRes = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -227,10 +240,16 @@ serve(async (req) => {
                         body: JSON.stringify(message),
                     });
                     
-                    if (!expoRes.ok) console.warn("Expo Push Failed for token", user.token);
+                    if (!expoRes.ok) {
+                        const errTxt = await expoRes.text();
+                        console.warn("Expo Push Failed for token", user.token, errTxt);
+                    } else {
+                        console.log("Expo Push Sent Successfully to token:", user.token);
+                    }
                 }
 
                 results.push({ contact: user.id, status: 'sent' });
+
 
             } catch (e) {
                  console.error(`Failed to push to ${user.id}:`, e);
