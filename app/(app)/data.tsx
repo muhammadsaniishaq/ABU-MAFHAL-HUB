@@ -14,6 +14,7 @@ import { createAppNotification } from '../../services/notificationsHelper';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface ExtractedPlanInfo {
     volumeVal: string;
@@ -267,6 +268,8 @@ export default function DataScreen() {
     
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
+    const insets = useSafeAreaInsets();
+    const headerTopPadding = Math.max(insets.top, Platform.OS === 'android' ? 32 : 20) + 12;
 
     // Initial Data Load (Parallel Execution)
     useEffect(() => {
@@ -544,7 +547,11 @@ export default function DataScreen() {
                 {/* Premium Curved Header */}
                 <LinearGradient 
                     colors={['#060d21', '#0d1b3e']} 
-                    style={[s.headerContainer, isWeb && s.webPageContainer]}
+                    style={[
+                        s.headerContainer, 
+                        { paddingTop: headerTopPadding },
+                        isWeb && s.webPageContainer
+                    ]}
                 >
                     <View style={s.headerTop}>
                         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
@@ -1652,8 +1659,7 @@ const s = StyleSheet.create({
     maxWidth: 450,
   },
   headerContainer: {
-    paddingTop: Platform.OS === 'ios' ? 44 : 26,
-    paddingBottom: 10,
+    paddingBottom: 16,
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,
     paddingHorizontal: 16,
