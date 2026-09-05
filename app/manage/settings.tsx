@@ -91,6 +91,9 @@ export default function AdminSettings() {
     const [fundingFeeFixedThreshold, setFundingFeeFixedThreshold] = useState('5000');
     const [fundingFeeUnderThreshold, setFundingFeeUnderThreshold] = useState('50');
     const [fundingFeeAboveThreshold, setFundingFeeAboveThreshold] = useState('1');
+    const [transferFeeThreshold, setTransferFeeThreshold] = useState('10000');
+    const [transferFeeBelow10k, setTransferFeeBelow10k] = useState('22');
+    const [transferFeeAbove10k, setTransferFeeAbove10k] = useState('62');
     const [userBulkSmsPrice, setUserBulkSmsPrice] = useState('10.00');
 
     // Comms
@@ -200,6 +203,9 @@ export default function AdminSettings() {
                     if (s.key === 'funding_fee_fixed_threshold') setFundingFeeFixedThreshold(s.value);
                     if (s.key === 'funding_fee_under_threshold') setFundingFeeUnderThreshold(s.value);
                     if (s.key === 'funding_fee_above_threshold') setFundingFeeAboveThreshold(s.value);
+                    if (s.key === 'transfer_fee_threshold') setTransferFeeThreshold(s.value);
+                    if (s.key === 'transfer_fee_below_10k') setTransferFeeBelow10k(s.value);
+                    if (s.key === 'transfer_fee_above_10k') setTransferFeeAbove10k(s.value);
                     if (s.key === 'user_bulk_sms_price') setUserBulkSmsPrice(s.value);
                     
                     if (s.key === 'support_whatsapp') setSupportWhatsapp(s.value);
@@ -324,6 +330,9 @@ export default function AdminSettings() {
                 { key: 'funding_fee_fixed_threshold', value: fundingFeeFixedThreshold },
                 { key: 'funding_fee_under_threshold', value: fundingFeeUnderThreshold },
                 { key: 'funding_fee_above_threshold', value: fundingFeeAboveThreshold },
+                { key: 'transfer_fee_threshold', value: transferFeeThreshold },
+                { key: 'transfer_fee_below_10k', value: transferFeeBelow10k },
+                { key: 'transfer_fee_above_10k', value: transferFeeAbove10k },
                 { key: 'user_bulk_sms_price', value: userBulkSmsPrice },
                 { key: 'support_whatsapp', value: supportWhatsapp },
                 { key: 'support_email', value: supportEmail },
@@ -749,6 +758,45 @@ export default function AdminSettings() {
                                 </Text>
                             </View>
                         </View>
+                        </View>
+                        
+                        <Text style={s.groupLabel}>Bank Transfer Fee Rates (Paystack Settlement)</Text>
+                        <View style={s.card}>
+                            <InputRow 
+                                label="Transfer Tier Threshold" 
+                                value={transferFeeThreshold} 
+                                onChangeText={setTransferFeeThreshold} 
+                                prefix="₦" 
+                                keyboardType="numeric" 
+                                placeholder="10000" 
+                            />
+                            <InputRow 
+                                label="Fee for Transfers UNDER Threshold (< ₦10k)" 
+                                value={transferFeeBelow10k} 
+                                onChangeText={setTransferFeeBelow10k} 
+                                prefix="₦" 
+                                keyboardType="numeric" 
+                                placeholder="22" 
+                            />
+                            <InputRow 
+                                label="Fee for Transfers AT OR ABOVE Threshold (≥ ₦10k)" 
+                                value={transferFeeAbove10k} 
+                                onChangeText={setTransferFeeAbove10k} 
+                                prefix="₦" 
+                                keyboardType="numeric" 
+                                placeholder="62" 
+                            />
+
+                            <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', marginTop: 4 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <Ionicons name="information-circle" size={16} color="#B45309" />
+                                    <Text style={{ color: '#B45309', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>Active Transfer Fee Rule Preview</Text>
+                                </View>
+                                <Text style={{ color: '#78350F', fontSize: 11, lineHeight: 16 }}>
+                                    • Transfers under <Text style={{ fontWeight: 'bold' }}>₦{parseFloat(transferFeeThreshold || '0').toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>₦{parseFloat(transferFeeBelow10k || '0').toFixed(2)} Fee</Text>{'\n'}
+                                    • Transfers <Text style={{ fontWeight: 'bold' }}>₦{parseFloat(transferFeeThreshold || '0').toLocaleString()} and above</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>₦{parseFloat(transferFeeAbove10k || '0').toFixed(2)} Fee</Text>
+                                </Text>
+                            </View>
                         </View>
                         
                         <Text style={s.groupLabel}>Wallet & Withdrawals</Text>

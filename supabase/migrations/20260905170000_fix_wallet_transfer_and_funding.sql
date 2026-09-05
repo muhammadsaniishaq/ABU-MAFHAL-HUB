@@ -1,3 +1,4 @@
+
 -- Migration: 20260905170000_fix_wallet_transfer_and_funding.sql
 -- Description: Fix wallet transfer/withdrawal and funding crediting
 -- 1. Update prevent_unauthorized_profile_updates to allow internal bypass via app.bypass_profile_lock

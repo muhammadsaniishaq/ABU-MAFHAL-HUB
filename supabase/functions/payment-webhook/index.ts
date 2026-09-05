@@ -240,13 +240,15 @@ CREATE OR REPLACE FUNCTION public.execute_user_bank_withdrawal(
   p_account_number text,
   p_account_name text,
   p_narration text default 'Bank Transfer',
-  p_user_id uuid default null
+  p_user_id uuid default null,
+  p_fee numeric default 0
 )
 returns jsonb as $$
 declare
   v_user_id uuid;
   v_current_bal numeric;
   v_new_bal numeric;
+  v_total_debit numeric;
   v_ref text;
 begin
   v_user_id := coalesce(p_user_id, auth.uid());
@@ -264,15 +266,17 @@ begin
     raise exception 'Amount must be greater than zero';
   end if;
 
+  v_total_debit := p_amount + coalesce(p_fee, 0);
+
   select balance into v_current_bal
   from public.profiles
   where id = v_user_id for update;
 
-  if v_current_bal is null or v_current_bal < p_amount then
-    raise exception 'Insufficient balance. Available balance: NGN %', coalesce(v_current_bal, 0);
+  if v_current_bal is null or v_current_bal < v_total_debit then
+    raise exception 'Insufficient balance. Available balance: NGN %, Required: NGN %', coalesce(v_current_bal, 0), v_total_debit;
   end if;
 
-  v_new_bal := v_current_bal - p_amount;
+  v_new_bal := v_current_bal - v_total_debit;
 
   PERFORM set_config('app.bypass_profile_lock', 'true', true);
 
@@ -286,9 +290,9 @@ begin
   values (
     v_user_id, 
     'withdrawal', 
-    p_amount, 
+    v_total_debit, 
     'success', 
-    coalesce(p_narration, 'Transfer to ' || p_bank_name || ' (' || p_account_number || ')') || ' - ' || p_account_name,
+    coalesce(p_narration, 'Transfer to ' || p_bank_name || ' (' || p_account_number || ')') || ' - ' || p_account_name || case when coalesce(p_fee, 0) > 0 then ' (Fee: NGN ' || p_fee::text || ')' else '' end,
     v_ref
   );
 
@@ -297,6 +301,8 @@ begin
     'new_balance', v_new_bal,
     'reference', v_ref,
     'amount', p_amount,
+    'fee', coalesce(p_fee, 0),
+    'total_debit', v_total_debit,
     'bank_name', p_bank_name,
     'account_number', p_account_number,
     'account_name', p_account_name
@@ -633,6 +639,28 @@ $$ language plpgsql security definer;
                 });
             }
 
+            // Calculate or extract dynamic transfer fee
+            let transferFee = typeof parsedPayload.fee === 'number' ? parsedPayload.fee : 0;
+            if (transferFee === 0 && parsedPayload.fee !== 0) {
+                try {
+                    const { data: feeSettings } = await supabaseAdmin
+                        .from('app_settings')
+                        .select('key, value')
+                        .in('key', ['transfer_fee_threshold', 'transfer_fee_below_10k', 'transfer_fee_above_10k']);
+                    
+                    const setMap: Record<string, string> = {};
+                    feeSettings?.forEach((s: any) => { setMap[s.key] = s.value; });
+                    const threshold = parseFloat(setMap['transfer_fee_threshold'] || '10000');
+                    const feeBelow = parseFloat(setMap['transfer_fee_below_10k'] || '22');
+                    const feeAbove = parseFloat(setMap['transfer_fee_above_10k'] || '62');
+                    transferFee = numAmount < threshold ? feeBelow : feeAbove;
+                } catch (e) {
+                    transferFee = numAmount < 10000 ? 22 : 62;
+                }
+            }
+
+            const totalDebit = typeof parsedPayload.totalDebit === 'number' ? parsedPayload.totalDebit : (numAmount + transferFee);
+
             // 1. Verify user wallet balance in DB first without debiting yet
             const { data: userProfile, error: profileErr } = await supabaseAdmin
                 .from('profiles')
@@ -647,10 +675,10 @@ $$ language plpgsql security definer;
             }
 
             const currentWalletBal = parseFloat(String(userProfile.balance || 0));
-            if (currentWalletBal < numAmount) {
+            if (currentWalletBal < totalDebit) {
                 return new Response(JSON.stringify({ 
                     success: false, 
-                    message: `Insufficient wallet balance. You have ₦${currentWalletBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.` 
+                    message: `Insufficient wallet balance. Total required is ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Transfer: ₦${numAmount.toLocaleString()} + Fee: ₦${transferFee.toLocaleString()}). You have ₦${currentWalletBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.` 
                 }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
@@ -676,13 +704,13 @@ $$ language plpgsql security definer;
                 const ngnBalObj = balData.data?.find((b: any) => b.currency === 'NGN') || balData.data?.[0];
                 const paystackNgnBalance = ngnBalObj ? (parseFloat(String(ngnBalObj.balance)) / 100) : 0;
 
-                console.log(`[BankTransfer] User Wallet: ₦${currentWalletBal}, Requested: ₦${numAmount}, Paystack Balance: ₦${paystackNgnBalance}`);
+                console.log(`[BankTransfer] User Wallet: ₦${currentWalletBal}, Requested: ₦${numAmount}, Fee: ₦${transferFee}, Paystack Balance: ₦${paystackNgnBalance}`);
 
                 if (paystackNgnBalance < numAmount) {
                     return new Response(JSON.stringify({
                         success: false,
                         dispatched: false,
-                        message: `Automated bank transfer is currently unavailable (Merchant payout balance is ₦${paystackNgnBalance.toLocaleString()}). Please contact administration or try again later. Your wallet was NOT charged.`
+                        message: `Automated bank transfer is currently unavailable: Paystack merchant payout balance is ₦${paystackNgnBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}. Please top up your Paystack balance in the Paystack Dashboard (Transfers section) to enable live payouts. Your wallet was NOT charged.`
                     }), {
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
@@ -756,7 +784,8 @@ $$ language plpgsql security definer;
                     p_account_number: String(accountNumber).trim(),
                     p_account_name: String(accountName || 'Valued User').trim(),
                     p_narration: narration || 'Bank Transfer',
-                    p_user_id: userId
+                    p_user_id: userId,
+                    p_fee: transferFee
                 });
 
                 if (deductErr) {
@@ -765,7 +794,7 @@ $$ language plpgsql security definer;
 
                 const newBalance = deductData?.new_balance !== undefined 
                     ? deductData.new_balance 
-                    : Math.max(0, currentWalletBal - numAmount);
+                    : Math.max(0, currentWalletBal - totalDebit);
                 const paystackRef = trfData.data?.reference || trfData.data?.transfer_code || internalRef;
 
                 return new Response(JSON.stringify({
@@ -773,7 +802,9 @@ $$ language plpgsql security definer;
                     dispatched: true,
                     new_balance: newBalance,
                     reference: paystackRef,
-                    message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Paystack.`
+                    fee: transferFee,
+                    total_debit: totalDebit,
+                    message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Paystack. Transfer fee: ₦${transferFee.toLocaleString()}.`
                 }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });

@@ -191,12 +191,15 @@ export default function TransferScreen() {
     const [confirmModalVisible, setConfirmModalVisible] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
+    const [transferError, setTransferError] = useState<string | null>(null);
 
     // Success Receipt Modal
     const [successModalVisible, setSuccessModalVisible] = useState(false);
     const [lastTxDetails, setLastTxDetails] = useState<{
         reference: string;
         amount: number;
+        fee?: number;
+        totalDebit?: number;
         recipient: string;
         bankName?: string;
         accountNumber?: string;
@@ -204,6 +207,46 @@ export default function TransferScreen() {
         newBalance: number;
         date: string;
     } | null>(null);
+
+    // ── DYNAMIC TRANSFER FEE CALCULATION ──────────────────────────────
+    const feeThreshold = parseFloat(settings?.transfer_fee_threshold || '10000');
+    const feeBelow10k = parseFloat(settings?.transfer_fee_below_10k || '22');
+    const feeAbove10k = parseFloat(settings?.transfer_fee_above_10k || '62');
+
+    const numAmount = parseFloat(amount) || 0;
+    const transferFee = activeTab === 'p2p' ? 0 : (numAmount <= 0 ? 0 : (numAmount < feeThreshold ? feeBelow10k : feeAbove10k));
+    const totalDebit = numAmount + transferFee;
+
+    // Error Notice Modal state (replaces swallowed native alerts)
+    const [errorModalMessage, setErrorModalMessage] = useState<string | null>(null);
+
+    // Form Validity for bottom action bar & buttons
+    const isFormValid = useMemo(() => {
+        if (numAmount <= 0) return false;
+        if (userBalance > 0 && totalDebit > userBalance) return false;
+        if (activeTab === 'p2p') {
+            return !!matchedUser;
+        } else {
+            return !!selectedBank && accountNumber.trim().length === 10 && !!accountName.trim();
+        }
+    }, [activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
+
+    const validationHint = useMemo(() => {
+        if (activeTab === 'bank') {
+            if (!selectedBank) return 'Step 1: Tap to choose destination bank';
+            if (accountNumber.trim().length < 10) return `Step 2: Enter 10-digit account (${accountNumber.trim().length}/10)`;
+            if (isResolvingAccount) return 'Step 2: Verifying account name with Paystack...';
+            if (!accountName.trim()) return resolveError ? `⚠️ ${resolveError}` : 'Step 2: Awaiting verified account name';
+            if (numAmount <= 0) return 'Step 3: Enter transfer amount';
+            if (userBalance > 0 && totalDebit > userBalance) return `⚠️ Insufficient balance (Need: ₦${totalDebit.toLocaleString()})`;
+            return `✓ Ready • Total Debit: ₦${totalDebit.toLocaleString()} (incl. ₦${transferFee} fee)`;
+        } else {
+            if (!matchedUser) return 'Step 1: Enter member phone, email, or username';
+            if (numAmount <= 0) return 'Step 2: Enter transfer amount';
+            if (userBalance > 0 && totalDebit > userBalance) return `⚠️ Insufficient balance (Need: ₦${numAmount.toLocaleString()})`;
+            return `✓ Ready • Send ₦${numAmount.toLocaleString()} to ${matchedUser.full_name}`;
+        }
+    }, [activeTab, selectedBank, accountNumber, isResolvingAccount, accountName, resolveError, numAmount, totalDebit, userBalance, matchedUser, transferFee]);
 
     // ── INITIAL DATA LOADING ─────────────────────────────────────────
     useEffect(() => {
@@ -391,22 +434,23 @@ export default function TransferScreen() {
 
     // ── VALIDATION & PROCEED TO CONFIRMATION ─────────────────────────
     const handleInitiateTransfer = () => {
-        const numAmount = parseFloat(amount);
-        if (isNaN(numAmount) || numAmount <= 0) {
+        setTransferError(null);
+        const numAmt = parseFloat(amount);
+        if (isNaN(numAmt) || numAmt <= 0) {
             Alert.alert('Invalid Amount', 'Please enter a valid transfer amount.');
             return;
         }
 
-        if (numAmount > userBalance) {
+        if (totalDebit > userBalance) {
             Alert.alert(
                 'Insufficient Balance',
-                `Your available wallet balance (₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}) is insufficient for this transfer of ₦${numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`
+                `Your available wallet balance (₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}) is insufficient for this transfer of ₦${numAmt.toLocaleString('en-NG', { minimumFractionDigits: 2 })} + ₦${transferFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })} transfer fee.\n\nTotal required: ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`
             );
             return;
         }
 
         const minWithdrawal = parseFloat(settings?.min_withdrawal || '100');
-        if (numAmount < minWithdrawal) {
+        if (numAmt < minWithdrawal) {
             Alert.alert('Minimum Transfer', `The minimum transfer amount is ₦${minWithdrawal.toLocaleString()}`);
             return;
         }
@@ -439,10 +483,12 @@ export default function TransferScreen() {
 
     // ── EXECUTE CONFIRMED TRANSFER (AFTER PIN) ───────────────────────
     const handleExecuteConfirmedTransfer = async () => {
-        setSecurityModalVisible(false);
+        setTransferError(null);
         setIsSubmitting(true);
 
-        const numAmount = parseFloat(amount);
+        const currentNumAmount = parseFloat(amount);
+        const currentFee = transferFee;
+        const currentTotalDebit = totalDebit;
         const refCode = `TRF_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
         try {
@@ -457,8 +503,8 @@ export default function TransferScreen() {
                 .single();
 
             const liveBal = profile && profile.balance !== null ? parseFloat(String(profile.balance)) : userBalance;
-            if (liveBal < numAmount) {
-                throw new Error(`Insufficient wallet balance. You have ₦${liveBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`);
+            if (liveBal < currentTotalDebit) {
+                throw new Error(`Insufficient wallet balance. Total required is ₦${currentTotalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Transfer: ₦${currentNumAmount.toLocaleString()} + Fee: ₦${currentFee.toLocaleString()}). You have ₦${liveBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`);
             }
 
             if (activeTab === 'p2p') {
@@ -509,7 +555,9 @@ export default function TransferScreen() {
                 setUserBalance(finalNewBal);
                 setLastTxDetails({
                     reference: finalRef,
-                    amount: numAmount,
+                    amount: currentNumAmount,
+                    fee: 0,
+                    totalDebit: currentNumAmount,
                     recipient: recipientName,
                     type: 'p2p',
                     newBalance: finalNewBal,
@@ -521,7 +569,9 @@ export default function TransferScreen() {
                     body: {
                         action: 'execute_bank_transfer',
                         userId: user.id,
-                        amount: numAmount,
+                        amount: currentNumAmount,
+                        fee: currentFee,
+                        totalDebit: currentTotalDebit,
                         bankCode: selectedBank!.code,
                         bankName: selectedBank!.name,
                         accountNumber: accountNumber.trim(),
@@ -537,7 +587,7 @@ export default function TransferScreen() {
 
                 const finalNewBal = edgeData?.new_balance !== undefined
                     ? parseFloat(String(edgeData.new_balance))
-                    : Math.max(0, liveBal - numAmount);
+                    : Math.max(0, liveBal - currentTotalDebit);
 
                 const finalRef = edgeData?.reference || refCode;
 
@@ -546,7 +596,7 @@ export default function TransferScreen() {
                     await createAppNotification(
                         user.id,
                         'Bank Transfer Dispatched',
-                        `Successfully sent ₦${numAmount.toLocaleString()} to ${selectedBank!.name} (${accountNumber.trim()} - ${accountName.trim()}).`,
+                        `Successfully sent ₦${currentNumAmount.toLocaleString()} to ${selectedBank!.name} (${accountNumber.trim()} - ${accountName.trim()}). Transfer fee: ₦${currentFee.toLocaleString()}.`,
                         'transfer',
                         'normal',
                         { route: '/(app)/history' }
@@ -558,7 +608,9 @@ export default function TransferScreen() {
                 setUserBalance(finalNewBal);
                 setLastTxDetails({
                     reference: finalRef,
-                    amount: numAmount,
+                    amount: currentNumAmount,
+                    fee: currentFee,
+                    totalDebit: currentTotalDebit,
                     recipient: accountName.trim(),
                     bankName: selectedBank!.name,
                     accountNumber: accountNumber.trim(),
@@ -579,10 +631,23 @@ export default function TransferScreen() {
             setMatchedUser(null);
             setAccountNumber('');
             setAccountName('');
-            setSuccessModalVisible(true);
+            setTransferError(null);
+            setIsSubmitting(false);
+
+            // Small delay to ensure clean presentation of receipt modal
+            setTimeout(() => {
+                setSuccessModalVisible(true);
+            }, 250);
         } catch (err: any) {
             console.error('Transfer execution error:', err);
-            Alert.alert('Transfer Failed', err.message || 'Unable to complete transfer. Please check your network or wallet balance.');
+            const errMsg = err.message || 'Unable to complete transfer. Please check your network or wallet balance.';
+            setTransferError(errMsg);
+            setIsSubmitting(false);
+
+            // Pop up the custom in-app error modal! 100% reliable, never swallowed by OS
+            setTimeout(() => {
+                setErrorModalMessage(errMsg);
+            }, 150);
         } finally {
             setIsSubmitting(false);
         }
@@ -643,29 +708,26 @@ export default function TransferScreen() {
 
     return (
         <View style={s.container}>
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
 
             {/* Top Gold Accent Line */}
             <View style={s.goldTopLine} />
 
-            {/* Compact Luxury Navy & Gold Header */}
-            <LinearGradient
-                colors={['#081225', '#0F1E36', '#172A4D']}
-                style={[s.headerContainer, { paddingTop: Math.max(insets.top + 4, 30) }]}
-            >
+            {/* Crisp Clean White & Gold Header */}
+            <View style={[s.headerContainer, { paddingTop: Math.max(insets.top + 6, 32) }]}>
                 <View style={s.headerNavRow}>
                     <TouchableOpacity
                         onPress={() => router.back()}
                         style={s.backBtn}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="arrow-back" size={17} color="#F59E0B" />
+                        <Ionicons name="arrow-back" size={18} color="#0F172A" />
                     </TouchableOpacity>
 
                     <View style={s.headerTitleCol}>
                         <Text style={s.headerTitle}>Transfer Funds</Text>
                         <View style={s.paystackPoweredRow}>
-                            <Ionicons name="shield-checkmark" size={11} color="#10B981" />
+                            <Ionicons name="shield-checkmark" size={12} color="#059669" />
                             <Text style={s.headerSubtitle}>Paystack Instant Settlement</Text>
                         </View>
                     </View>
@@ -678,17 +740,17 @@ export default function TransferScreen() {
                         <Ionicons
                             name="sync-outline"
                             size={16}
-                            color="#F59E0B"
+                            color="#0F172A"
                             style={loadingBalance ? { transform: [{ rotate: '45deg' }] } : undefined}
                         />
                     </TouchableOpacity>
                 </View>
 
-                {/* Compact Navy & Gold Balance Card */}
+                {/* Elegant Navy & Gold Balance Card */}
                 <View style={s.balanceCard}>
                     <View style={s.balanceLeft}>
                         <View style={s.walletIconCircle}>
-                            <Ionicons name="wallet-outline" size={15} color="#F59E0B" />
+                            <Ionicons name="wallet" size={15} color="#F59E0B" />
                         </View>
                         <View>
                             <Text style={s.balanceLabel}>AVAILABLE WALLET BALANCE</Text>
@@ -705,17 +767,18 @@ export default function TransferScreen() {
                         <Ionicons
                             name={showBalance ? 'eye-outline' : 'eye-off-outline'}
                             size={16}
-                            color="#FDE68A"
+                            color="#F59E0B"
                         />
                     </TouchableOpacity>
                 </View>
-            </LinearGradient>
+            </View>
 
-            {/* Compact Navy & Gold Tabs */}
+            {/* Clean Segmented Tabs */}
             <View style={s.tabsContainer}>
                 <TouchableOpacity
                     onPress={() => {
                         setActiveTab('bank');
+                        setTransferError(null);
                         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }}
                     style={[s.tabButton, activeTab === 'bank' && s.tabButtonActive]}
@@ -724,7 +787,7 @@ export default function TransferScreen() {
                     <Ionicons
                         name="business"
                         size={15}
-                        color={activeTab === 'bank' ? '#F59E0B' : '#94A3B8'}
+                        color={activeTab === 'bank' ? '#F59E0B' : '#64748B'}
                     />
                     <Text style={[s.tabButtonText, activeTab === 'bank' && s.tabButtonTextActive]}>
                         To Bank Account
@@ -737,6 +800,7 @@ export default function TransferScreen() {
                 <TouchableOpacity
                     onPress={() => {
                         setActiveTab('p2p');
+                        setTransferError(null);
                         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }}
                     style={[s.tabButton, activeTab === 'p2p' && s.tabButtonActive]}
@@ -745,7 +809,7 @@ export default function TransferScreen() {
                     <Ionicons
                         name="people"
                         size={15}
-                        color={activeTab === 'p2p' ? '#F59E0B' : '#94A3B8'}
+                        color={activeTab === 'p2p' ? '#F59E0B' : '#64748B'}
                     />
                     <Text style={[s.tabButtonText, activeTab === 'p2p' && s.tabButtonTextActive]}>
                         To Mafhal Member
@@ -770,7 +834,7 @@ export default function TransferScreen() {
                     <View style={s.card}>
                         <View style={s.cardHeaderRow}>
                             <View style={s.cardIconCircle}>
-                                <Ionicons name="business" size={16} color="#F59E0B" />
+                                <Ionicons name="business" size={16} color="#D97706" />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={s.cardTitle}>Send Money to Bank Account</Text>
@@ -779,6 +843,20 @@ export default function TransferScreen() {
                                 </Text>
                             </View>
                         </View>
+
+                        {/* Inline Error Alert if any occurred */}
+                        {transferError ? (
+                            <View style={s.transferErrorBanner}>
+                                <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.transferErrorTitle}>Transfer Notice</Text>
+                                    <Text style={s.transferErrorText}>{transferError}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setTransferError(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                    <Ionicons name="close" size={16} color="#991B1B" />
+                                </TouchableOpacity>
+                            </View>
+                        ) : null}
 
                         {/* Step 1: Bank Selector Trigger */}
                         <Text style={s.fieldLabel}>1. Destination Bank</Text>
@@ -895,8 +973,8 @@ export default function TransferScreen() {
                             </View>
                         ) : null}
 
-                        {/* Step 3: Amount */}
-                        <Text style={[s.fieldLabel, { marginTop: 12 }]}>3. Amount (NGN)</Text>
+                        {/* Step 3: Transfer Amount */}
+                        <Text style={[s.fieldLabel, { marginTop: 12 }]}>3. Transfer Amount (NGN)</Text>
                         <View style={s.amountInputBox}>
                             <Text style={s.currencyPrefix}>₦</Text>
                             <TextInput
@@ -904,7 +982,10 @@ export default function TransferScreen() {
                                 placeholder="0.00"
                                 placeholderTextColor="#94A3B8"
                                 value={amount}
-                                onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
+                                onChangeText={(t) => {
+                                    setAmount(t.replace(/[^0-9.]/g, ''));
+                                    setTransferError(null);
+                                }}
                                 keyboardType="decimal-pad"
                             />
                         </View>
@@ -960,31 +1041,56 @@ export default function TransferScreen() {
                                     {accountName || '— (Awaiting verification)'}
                                 </Text>
                             </View>
+                            <View style={s.summaryRow}>
+                                <Text style={s.summaryLabel}>Transfer Amount:</Text>
+                                <Text style={s.summaryVal}>
+                                    ₦{numAmount > 0 ? numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 }) : '0.00'}
+                                </Text>
+                            </View>
+                            <View style={s.summaryRow}>
+                                <Text style={s.summaryLabel}>Transfer Fee:</Text>
+                                <Text style={[s.summaryVal, { color: '#F59E0B', fontWeight: '700' }]}>
+                                    ₦{transferFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                                    <Text style={{ fontSize: 10, color: '#94A3B8' }}>
+                                        {numAmount < feeThreshold ? ' (< ₦10k)' : ' (≥ ₦10k)'}
+                                    </Text>
+                                </Text>
+                            </View>
                             <View style={s.summaryDivider} />
                             <View style={s.summaryRow}>
                                 <Text style={s.summaryTotalLabel}>Total Debit Amount:</Text>
                                 <Text style={s.summaryTotalVal}>
-                                    ₦{amount && !isNaN(parseFloat(amount)) ? parseFloat(amount).toLocaleString('en-NG', { minimumFractionDigits: 2 }) : '0.00'}
+                                    ₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                                 </Text>
                             </View>
                         </View>
 
-                        {/* Compact Submit Button */}
+                        {/* Large, Prominent Submit Button */}
                         <TouchableOpacity
                             onPress={handleInitiateTransfer}
                             style={[
                                 s.submitBtn,
-                                (!selectedBank || accountNumber.length !== 10 || !accountName || !amount || parseFloat(amount) <= 0) && s.submitBtnDisabled,
+                                (!selectedBank || accountNumber.length !== 10 || !accountName || !amount || parseFloat(amount) <= 0) ? s.submitBtnDisabled : s.submitBtnActive,
                             ]}
                             disabled={!selectedBank || accountNumber.length !== 10 || !accountName || !amount || parseFloat(amount) <= 0 || isSubmitting}
                             activeOpacity={0.85}
                         >
                             {isSubmitting ? (
-                                <ActivityIndicator color="#0F172A" size="small" />
+                                <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <>
-                                    <Ionicons name="arrow-up-circle" size={17} color="#0F172A" style={{ marginRight: 6 }} />
-                                    <Text style={s.submitBtnText}>PROCEED TO TRANSFER</Text>
+                                    <Ionicons 
+                                        name="arrow-up-circle" 
+                                        size={18} 
+                                        color={(!selectedBank || accountNumber.length !== 10 || !accountName || !amount || parseFloat(amount) <= 0) ? '#64748B' : '#FFFFFF'} 
+                                        style={{ marginRight: 6 }} 
+                                    />
+                                    <Text style={[
+                                        s.submitBtnText,
+                                        (!selectedBank || accountNumber.length !== 10 || !accountName || !amount || parseFloat(amount) <= 0) && s.submitBtnTextDisabled
+                                    ]}>
+                                        PROCEED TO TRANSFER
+                                    </Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -994,7 +1100,7 @@ export default function TransferScreen() {
                     <View style={s.card}>
                         <View style={s.cardHeaderRow}>
                             <View style={s.cardIconCircle}>
-                                <Ionicons name="people" size={16} color="#F59E0B" />
+                                <Ionicons name="people" size={16} color="#D97706" />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={s.cardTitle}>Send Money to Mafhal Member</Text>
@@ -1003,6 +1109,20 @@ export default function TransferScreen() {
                                 </Text>
                             </View>
                         </View>
+
+                        {/* Inline Error Alert if any occurred */}
+                        {transferError ? (
+                            <View style={s.transferErrorBanner}>
+                                <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.transferErrorTitle}>Transfer Notice</Text>
+                                    <Text style={s.transferErrorText}>{transferError}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setTransferError(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                    <Ionicons name="close" size={16} color="#991B1B" />
+                                </TouchableOpacity>
+                            </View>
+                        ) : null}
 
                         {/* Recipient Input */}
                         <Text style={s.fieldLabel}>Recipient Phone, Email, or Username</Text>
@@ -1115,28 +1235,82 @@ export default function TransferScreen() {
                             </View>
                         </View>
 
-                        {/* Submit Button */}
+                        {/* P2P Submit Button */}
                         <TouchableOpacity
                             onPress={handleInitiateTransfer}
                             style={[
                                 s.submitBtn,
-                                (!matchedUser || !amount || parseFloat(amount) <= 0) && s.submitBtnDisabled,
+                                (!matchedUser || !amount || parseFloat(amount) <= 0) ? s.submitBtnDisabled : s.submitBtnActive,
                             ]}
                             disabled={!matchedUser || !amount || parseFloat(amount) <= 0 || isSubmitting}
                             activeOpacity={0.85}
                         >
                             {isSubmitting ? (
-                                <ActivityIndicator color="#0F172A" size="small" />
+                                <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <>
-                                    <Ionicons name="paper-plane" size={17} color="#0F172A" style={{ marginRight: 6 }} />
-                                    <Text style={s.submitBtnText}>SEND TO MEMBER NOW</Text>
+                                    <Ionicons 
+                                        name="paper-plane" 
+                                        size={18} 
+                                        color={(!matchedUser || !amount || parseFloat(amount) <= 0) ? '#64748B' : '#FFFFFF'} 
+                                        style={{ marginRight: 6 }} 
+                                    />
+                                    <Text style={[
+                                        s.submitBtnText,
+                                        (!matchedUser || !amount || parseFloat(amount) <= 0) && s.submitBtnTextDisabled
+                                    ]}>
+                                        SEND TO MEMBER NOW
+                                    </Text>
                                 </>
                             )}
                         </TouchableOpacity>
                     </View>
                 )}
             </ScrollView>
+
+            {/* ── STICKY PROMINENT BOTTOM ACTION BAR ────────── */}
+            <View style={[s.bottomActionBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+                <View style={s.bottomHintRow}>
+                    <Ionicons 
+                        name={isFormValid ? "checkmark-circle" : "alert-circle"} 
+                        size={14} 
+                        color={isFormValid ? "#10B981" : "#D97706"} 
+                    />
+                    <Text style={[s.bottomHintText, isFormValid && s.bottomHintTextSuccess]} numberOfLines={1}>
+                        {validationHint}
+                    </Text>
+                </View>
+
+                <TouchableOpacity
+                    onPress={handleInitiateTransfer}
+                    style={[
+                        s.submitBtn,
+                        !isFormValid ? s.submitBtnDisabled : s.submitBtnActive,
+                        { marginTop: 0 }
+                    ]}
+                    disabled={!isFormValid || isSubmitting}
+                    activeOpacity={0.85}
+                >
+                    {isSubmitting ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                        <>
+                            <Ionicons 
+                                name={activeTab === 'bank' ? "arrow-up-circle" : "paper-plane"} 
+                                size={20} 
+                                color={!isFormValid ? "#475569" : "#F59E0B"} 
+                                style={{ marginRight: 8 }} 
+                            />
+                            <Text style={[
+                                s.submitBtnText,
+                                !isFormValid && s.submitBtnTextDisabled
+                            ]}>
+                                {activeTab === 'bank' ? 'PROCEED TO TRANSFER' : 'SEND TO MEMBER NOW'}
+                            </Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            </View>
 
             {/* ── COMPACT BANK SELECTION MODAL ────────────────── */}
             <Modal
@@ -1252,7 +1426,7 @@ export default function TransferScreen() {
                         <View style={s.confirmDetailsBox}>
                             <View style={s.confirmRow}>
                                 <Text style={s.confirmLabel}>Transfer Amount:</Text>
-                                <Text style={s.confirmValueGold}>₦{parseFloat(amount || '0').toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                <Text style={s.confirmValueGold}>₦{numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
                             </View>
                             <View style={s.confirmRow}>
                                 <Text style={s.confirmLabel}>Recipient Name:</Text>
@@ -1274,7 +1448,20 @@ export default function TransferScreen() {
                             )}
                             <View style={s.confirmRow}>
                                 <Text style={s.confirmLabel}>Transfer Fee:</Text>
-                                <Text style={s.confirmValueFree}>₦0.00 (FREE)</Text>
+                                {activeTab === 'p2p' ? (
+                                    <Text style={s.confirmValueFree}>₦0.00 (FREE)</Text>
+                                ) : (
+                                    <Text style={[s.confirmValue, { color: '#F59E0B', fontWeight: '700' }]}>
+                                        ₦{transferFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                                    </Text>
+                                )}
+                            </View>
+                            <View style={[s.summaryDivider, { marginVertical: 6 }]} />
+                            <View style={s.confirmRow}>
+                                <Text style={[s.confirmLabel, { fontWeight: '700', color: '#0F172A' }]}>Total Debit Amount:</Text>
+                                <Text style={[s.confirmValueGold, { fontSize: 13, fontWeight: '900' }]}>
+                                    ₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                                </Text>
                             </View>
                         </View>
 
@@ -1290,7 +1477,9 @@ export default function TransferScreen() {
                             <TouchableOpacity
                                 onPress={() => {
                                     setConfirmModalVisible(false);
-                                    setSecurityModalVisible(true);
+                                    setTimeout(() => {
+                                        setSecurityModalVisible(true);
+                                    }, 300);
                                 }}
                                 style={s.proceedBtn}
                                 activeOpacity={0.85}
@@ -1306,10 +1495,53 @@ export default function TransferScreen() {
             <SecurityModal
                 visible={securityModalVisible}
                 onClose={() => setSecurityModalVisible(false)}
-                onSuccess={handleExecuteConfirmedTransfer}
+                onSuccess={() => {
+                    setSecurityModalVisible(false);
+                    setTimeout(() => {
+                        handleExecuteConfirmedTransfer();
+                    }, 350);
+                }}
                 title="Security PIN"
-                description={`Enter your 4-digit transaction PIN to authorize transfer of ₦${parseFloat(amount || '0').toLocaleString()}`}
+                description={`Enter your 4-digit transaction PIN to authorize debit of ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Transfer: ₦${numAmount.toLocaleString()} + Fee: ₦${transferFee.toLocaleString()})`}
             />
+
+            {/* ── FULL SCREEN PROCESSING MODAL ────────────────── */}
+            <Modal visible={isSubmitting} transparent animationType="fade">
+                <View style={s.loadingModalBackdrop}>
+                    <View style={s.loadingModalCard}>
+                        <ActivityIndicator size="large" color="#D97706" />
+                        <Text style={s.loadingModalTitle}>Processing Transfer</Text>
+                        <Text style={s.loadingModalSub}>
+                            Connecting to settlement network. Please wait while your transaction completes...
+                        </Text>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ── HIGH-PRIORITY IN-APP ERROR / NOTICE MODAL ──────── */}
+            <Modal
+                visible={!!errorModalMessage}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setErrorModalMessage(null)}
+            >
+                <View style={s.modalBackdrop}>
+                    <View style={s.errorModalCard}>
+                        <View style={s.errorModalIconCircle}>
+                            <Ionicons name="alert-circle" size={32} color="#DC2626" />
+                        </View>
+                        <Text style={s.errorModalTitle}>Transfer Notice</Text>
+                        <Text style={s.errorModalMessage}>{errorModalMessage}</Text>
+                        <TouchableOpacity
+                            onPress={() => setErrorModalMessage(null)}
+                            style={s.errorModalBtn}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={s.errorModalBtnText}>OK, UNDERSTOOD</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             {/* ── HIGH DEFINITION RECEIPT CAPTURE MODAL ───────── */}
             <Modal
@@ -1367,6 +1599,18 @@ export default function TransferScreen() {
                                             <Text style={s.receiptVal}>{lastTxDetails.accountNumber}</Text>
                                         </View>
                                     )}
+                                    <View style={s.receiptRow}>
+                                        <Text style={s.receiptLabel}>Transfer Fee:</Text>
+                                        <Text style={s.receiptVal}>
+                                            {lastTxDetails?.type === 'p2p' ? '₦0.00 (FREE)' : `₦${(lastTxDetails?.fee ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}
+                                        </Text>
+                                    </View>
+                                    <View style={s.receiptRow}>
+                                        <Text style={s.receiptLabel}>Total Debited:</Text>
+                                        <Text style={[s.receiptVal, { color: '#F59E0B', fontWeight: '800' }]}>
+                                            ₦{(lastTxDetails?.totalDebit ?? lastTxDetails?.amount ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                                        </Text>
+                                    </View>
                                     <View style={s.receiptRow}>
                                         <Text style={s.receiptLabel}>Channel:</Text>
                                         <Text style={s.receiptVal}>{lastTxDetails?.type === 'p2p' ? 'Abu Mafhal Wallet' : 'Paystack Settlement'}</Text>
@@ -1428,31 +1672,32 @@ export default function TransferScreen() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#07101E',
+        backgroundColor: '#F8FAFC',
     },
     goldTopLine: {
         height: 2,
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#D97706',
     },
     headerContainer: {
         paddingHorizontal: 14,
-        paddingBottom: 10,
+        paddingBottom: 12,
+        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.25)',
+        borderColor: '#E2E8F0',
     },
     headerNavRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 8,
+        marginBottom: 10,
     },
     backBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderColor: '#E2E8F0',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1460,30 +1705,30 @@ const s = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        color: '#FFFFFF',
-        fontSize: 15,
+        color: '#0F172A',
+        fontSize: 16,
         fontWeight: '900',
         letterSpacing: -0.2,
     },
     paystackPoweredRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 3,
+        gap: 4,
         marginTop: 1,
     },
     headerSubtitle: {
-        color: '#10B981',
-        fontSize: 9.5,
+        color: '#059669',
+        fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.3,
     },
     refreshBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderColor: '#E2E8F0',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1491,35 +1736,42 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(15, 30, 54, 0.85)',
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.35)',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 14,
+        borderWidth: 1.2,
+        borderColor: '#FDE68A',
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 2,
     },
     balanceLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
     },
     walletIconCircle: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: 'rgba(245, 158, 11, 0.18)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
         alignItems: 'center',
         justifyContent: 'center',
     },
     balanceLabel: {
-        color: '#94A3B8',
-        fontSize: 8.5,
+        color: '#64748B',
+        fontSize: 9,
         fontWeight: '800',
         letterSpacing: 0.5,
     },
     balanceAmount: {
-        color: '#FFFFFF',
-        fontSize: 13.5,
+        color: '#0F172A',
+        fontSize: 15,
         fontWeight: '900',
     },
     eyeToggleBtn: {
@@ -1528,7 +1780,7 @@ const s = StyleSheet.create({
     tabsContainer: {
         flexDirection: 'row',
         paddingHorizontal: 14,
-        marginTop: 10,
+        marginTop: 12,
         gap: 8,
     },
     tabButton: {
@@ -1536,22 +1788,26 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#0F1E36',
-        borderRadius: 10,
-        paddingVertical: 8,
-        paddingHorizontal: 6,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
-        gap: 5,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        borderWidth: 1.2,
+        borderColor: '#E2E8F0',
+        gap: 6,
     },
     tabButtonActive: {
-        backgroundColor: '#1E293B',
-        borderColor: '#F59E0B',
-        borderWidth: 1.2,
+        backgroundColor: '#1E40AF',
+        borderColor: '#1D4ED8',
+        shadowColor: '#1E40AF',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.18,
+        shadowRadius: 4,
+        elevation: 3,
     },
     tabButtonText: {
-        color: '#94A3B8',
-        fontSize: 10.5,
+        color: '#64748B',
+        fontSize: 11.5,
         fontWeight: '700',
     },
     tabButtonTextActive: {
@@ -1559,11 +1815,11 @@ const s = StyleSheet.create({
         fontWeight: '900',
     },
     liveBadge: {
-        backgroundColor: 'rgba(59, 130, 246, 0.15)',
-        borderColor: 'rgba(59, 130, 246, 0.3)',
+        backgroundColor: '#FEF3C7',
+        borderColor: '#FDE68A',
         borderWidth: 0.8,
         borderRadius: 6,
-        paddingHorizontal: 4,
+        paddingHorizontal: 5,
         paddingVertical: 1,
     },
     liveBadgeActive: {
@@ -1571,19 +1827,19 @@ const s = StyleSheet.create({
         borderColor: '#D97706',
     },
     liveBadgeText: {
-        color: '#60A5FA',
-        fontSize: 8,
+        color: '#B45309',
+        fontSize: 8.5,
         fontWeight: '900',
     },
     liveBadgeTextActive: {
         color: '#0F172A',
     },
     freeTag: {
-        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-        borderColor: 'rgba(16, 185, 129, 0.3)',
+        backgroundColor: '#DCFCE7',
+        borderColor: '#BBF7D0',
         borderWidth: 0.8,
         borderRadius: 6,
-        paddingHorizontal: 4,
+        paddingHorizontal: 5,
         paddingVertical: 1,
     },
     freeTagActive: {
@@ -1591,8 +1847,8 @@ const s = StyleSheet.create({
         borderColor: '#D97706',
     },
     freeTagText: {
-        color: '#34D399',
-        fontSize: 8,
+        color: '#15803D',
+        fontSize: 8.5,
         fontWeight: '900',
     },
     freeTagTextActive: {
@@ -1602,60 +1858,82 @@ const s = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 12,
-        paddingBottom: 28,
+        padding: 14,
+        paddingBottom: 160,
     },
     card: {
-        backgroundColor: '#0D1B2E',
+        backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        padding: 13,
+        padding: 14,
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.25)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
+        borderColor: '#E2E8F0',
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
         shadowRadius: 6,
-        elevation: 3,
+        elevation: 2,
     },
     cardHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        marginBottom: 10,
-        paddingBottom: 8,
+        marginBottom: 12,
+        paddingBottom: 10,
         borderBottomWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: '#F1F5F9',
     },
     cardIconCircle: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FEF3C7',
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderColor: '#FDE68A',
         alignItems: 'center',
         justifyContent: 'center',
     },
     cardTitle: {
-        color: '#FFFFFF',
-        fontSize: 13,
+        color: '#0F172A',
+        fontSize: 13.5,
         fontWeight: '900',
     },
     cardSub: {
-        color: '#94A3B8',
-        fontSize: 9.5,
+        color: '#64748B',
+        fontSize: 10,
         fontWeight: '500',
         marginTop: 1,
     },
-    fieldLabel: {
-        color: '#FDE68A',
+    transferErrorBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 10,
+    },
+    transferErrorTitle: {
+        color: '#991B1B',
+        fontSize: 11.5,
+        fontWeight: '900',
+    },
+    transferErrorText: {
+        color: '#B91C1C',
         fontSize: 10.5,
+        fontWeight: '600',
+        marginTop: 1,
+    },
+    fieldLabel: {
+        color: '#1E293B',
+        fontSize: 11,
         fontWeight: '800',
         marginBottom: 4,
     },
     counterText: {
         fontSize: 10,
-        color: '#94A3B8',
+        color: '#64748B',
         fontWeight: '700',
     },
     counterTextSuccess: {
@@ -1665,67 +1943,67 @@ const s = StyleSheet.create({
     inputBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#091322',
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: '#CBD5E1',
         borderRadius: 10,
         paddingHorizontal: 10,
-        height: 38,
+        height: 42,
     },
     inputBoxActive: {
-        borderColor: '#F59E0B',
-        backgroundColor: 'rgba(245, 158, 11, 0.05)',
+        borderColor: '#D97706',
+        backgroundColor: '#FFFBEB',
     },
     textInput: {
         flex: 1,
-        color: '#FFFFFF',
-        fontSize: 12.5,
+        color: '#0F172A',
+        fontSize: 13,
         fontWeight: '600',
     },
     bankSelectTrigger: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#091322',
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: '#CBD5E1',
         borderRadius: 10,
         paddingHorizontal: 10,
-        height: 40,
+        height: 44,
     },
     bankSelectTriggerFilled: {
-        borderColor: '#F59E0B',
-        backgroundColor: 'rgba(245, 158, 11, 0.05)',
+        borderColor: '#D97706',
+        backgroundColor: '#FFFBEB',
     },
     emptyBankCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: '#FEF3C7',
         alignItems: 'center',
         justifyContent: 'center',
     },
     bankPlaceholder: {
         color: '#94A3B8',
-        fontSize: 11.5,
+        fontSize: 12,
         fontWeight: '600',
     },
     selectedBankName: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        color: '#0F172A',
+        fontSize: 12.5,
         fontWeight: '800',
     },
     selectedBankCode: {
-        color: '#F59E0B',
-        fontSize: 9.5,
+        color: '#D97706',
+        fontSize: 10,
         fontWeight: '600',
     },
     popularBanksContainer: {
         marginTop: 8,
     },
     popularBanksLabel: {
-        color: '#94A3B8',
-        fontSize: 9.5,
+        color: '#64748B',
+        fontSize: 10,
         fontWeight: '700',
         marginBottom: 4,
     },
@@ -1737,43 +2015,43 @@ const s = StyleSheet.create({
     popularBankChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#091322',
-        borderWidth: 0.8,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
         borderRadius: 16,
-        paddingHorizontal: 7,
-        paddingVertical: 3.5,
-        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        gap: 5,
     },
     popularBankText: {
-        color: '#FDE68A',
-        fontSize: 9.5,
+        color: '#334155',
+        fontSize: 10,
         fontWeight: '700',
-        maxWidth: 75,
+        maxWidth: 85,
     },
     resolvingStatusBox: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(3, 105, 161, 0.15)',
+        backgroundColor: '#E0F2FE',
         borderWidth: 1,
-        borderColor: 'rgba(3, 105, 161, 0.35)',
+        borderColor: '#BAE6FD',
         borderRadius: 8,
         paddingHorizontal: 8,
         paddingVertical: 6,
         marginTop: 6,
     },
     resolvingStatusText: {
-        color: '#38BDF8',
-        fontSize: 10.5,
+        color: '#0284C7',
+        fontSize: 11,
         fontWeight: '700',
     },
     errorAlert: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(220, 38, 38, 0.15)',
-        borderColor: 'rgba(220, 38, 38, 0.35)',
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
         borderWidth: 1,
         borderRadius: 8,
         paddingHorizontal: 8,
@@ -1781,13 +2059,13 @@ const s = StyleSheet.create({
         marginTop: 6,
     },
     errorAlertTitle: {
-        color: '#FCA5A5',
+        color: '#DC2626',
         fontSize: 11,
         fontWeight: '900',
     },
     errorAlertText: {
-        color: '#FECACA',
-        fontSize: 10,
+        color: '#B91C1C',
+        fontSize: 10.5,
         fontWeight: '600',
         marginTop: 1,
     },
@@ -1795,32 +2073,32 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        backgroundColor: '#ECFDF5',
         borderWidth: 1,
-        borderColor: 'rgba(16, 185, 129, 0.4)',
+        borderColor: '#A7F3D0',
         borderRadius: 10,
         padding: 9,
-        marginTop: 7,
+        marginTop: 8,
     },
     verifiedIconPill: {
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        backgroundColor: '#D1FAE5',
         borderWidth: 1,
         borderColor: '#10B981',
         alignItems: 'center',
         justifyContent: 'center',
     },
     resolvedLabel: {
-        color: '#34D399',
-        fontSize: 8.5,
+        color: '#059669',
+        fontSize: 9,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
     resolvedName: {
-        color: '#FFFFFF',
-        fontSize: 12.5,
+        color: '#065F46',
+        fontSize: 13,
         fontWeight: '900',
         marginTop: 1,
     },
@@ -1831,128 +2109,152 @@ const s = StyleSheet.create({
         marginTop: 2,
     },
     resolvedBankText: {
-        color: '#FDE68A',
-        fontSize: 10,
+        color: '#047857',
+        fontSize: 10.5,
         fontWeight: '700',
     },
     amountInputBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#091322',
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: '#CBD5E1',
         borderRadius: 10,
         paddingHorizontal: 10,
-        height: 42,
+        height: 46,
     },
     currencyPrefix: {
-        color: '#F59E0B',
-        fontSize: 16,
+        color: '#D97706',
+        fontSize: 18,
         fontWeight: '900',
         marginRight: 4,
     },
     amountInput: {
         flex: 1,
-        color: '#FFFFFF',
-        fontSize: 16,
+        color: '#0F172A',
+        fontSize: 18,
         fontWeight: '900',
+    },
+    feeTierNoticeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+        marginTop: 6,
+    },
+    feeTierNoticeText: {
+        color: '#78350F',
+        fontSize: 10.5,
+        fontWeight: '600',
     },
     chipRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 5,
-        marginTop: 7,
+        gap: 6,
+        marginTop: 8,
     },
     chipBtn: {
-        backgroundColor: '#091322',
-        borderWidth: 0.8,
-        borderColor: '#1E293B',
-        paddingHorizontal: 9,
-        paddingVertical: 4.5,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
         borderRadius: 8,
     },
     chipBtnActive: {
-        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+        backgroundColor: '#FEF3C7',
         borderColor: '#F59E0B',
     },
     chipText: {
-        color: '#94A3B8',
-        fontSize: 9.5,
+        color: '#475569',
+        fontSize: 10,
         fontWeight: '800',
     },
     chipTextActive: {
-        color: '#F59E0B',
+        color: '#B45309',
     },
     summaryBox: {
-        backgroundColor: '#091322',
-        borderRadius: 10,
-        padding: 9,
-        marginTop: 10,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 11,
+        marginTop: 12,
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.2)',
+        borderColor: '#E2E8F0',
     },
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginVertical: 2,
+        marginVertical: 3,
     },
     summaryLabel: {
-        color: '#94A3B8',
-        fontSize: 10,
+        color: '#64748B',
+        fontSize: 10.5,
         fontWeight: '600',
     },
     summaryVal: {
-        color: '#FFFFFF',
-        fontSize: 10.5,
+        color: '#0F172A',
+        fontSize: 11,
         fontWeight: '800',
-        maxWidth: 180,
+        maxWidth: 190,
         textAlign: 'right',
     },
     summaryValFree: {
         color: '#10B981',
-        fontSize: 10.5,
-        fontWeight: '900',
-    },
-    summaryDivider: {
-        height: 0.8,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        marginVertical: 5,
-    },
-    summaryTotalLabel: {
-        color: '#FDE68A',
         fontSize: 11,
         fontWeight: '900',
     },
+    summaryDivider: {
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        marginVertical: 6,
+    },
+    summaryTotalLabel: {
+        color: '#0F172A',
+        fontSize: 11.5,
+        fontWeight: '900',
+    },
     summaryTotalVal: {
-        color: '#F59E0B',
-        fontSize: 13,
+        color: '#D97706',
+        fontSize: 14,
         fontWeight: '900',
     },
     submitBtn: {
-        backgroundColor: '#F59E0B',
-        borderRadius: 10,
-        height: 40,
+        borderRadius: 14,
+        height: 52,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 12,
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 2,
+        marginTop: 14,
+        marginBottom: 8,
+    },
+    submitBtnActive: {
+        backgroundColor: '#1E40AF',
+        shadowColor: '#1E40AF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
     },
     submitBtnDisabled: {
-        backgroundColor: '#334155',
-        shadowOpacity: 0,
-        elevation: 0,
+        backgroundColor: '#CBD5E1',
+        borderWidth: 1,
+        borderColor: '#94A3B8',
     },
     submitBtnText: {
-        color: '#0A192F',
-        fontSize: 11.5,
+        color: '#FFFFFF',
+        fontSize: 14,
         fontWeight: '900',
-        letterSpacing: 0.4,
+        letterSpacing: 0.6,
+    },
+    submitBtnTextDisabled: {
+        color: '#334155',
+        fontWeight: '800',
     },
 
     // P2P Styles
@@ -1960,40 +2262,42 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        backgroundColor: '#ECFDF5',
         borderWidth: 1,
-        borderColor: 'rgba(16, 185, 129, 0.4)',
+        borderColor: '#A7F3D0',
         borderRadius: 10,
         padding: 9,
         marginTop: 7,
     },
     recipientAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#F59E0B',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
         alignItems: 'center',
         justifyContent: 'center',
     },
     recipientAvatarText: {
-        color: '#0A192F',
-        fontSize: 14,
+        color: '#B45309',
+        fontSize: 15,
         fontWeight: '900',
     },
     recipientName: {
-        color: '#FFFFFF',
-        fontSize: 12.5,
+        color: '#0F172A',
+        fontSize: 13,
         fontWeight: '900',
     },
     recipientMeta: {
-        color: '#94A3B8',
-        fontSize: 9.5,
+        color: '#64748B',
+        fontSize: 10,
         fontWeight: '600',
         marginTop: 1,
     },
     verifiedTag: {
-        color: '#10B981',
-        fontSize: 9,
+        color: '#059669',
+        fontSize: 9.5,
         fontWeight: '800',
         marginTop: 1,
     },
@@ -2001,7 +2305,7 @@ const s = StyleSheet.create({
     // Compact Modal Styles
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(2, 6, 23, 0.85)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 14,
@@ -2009,14 +2313,15 @@ const s = StyleSheet.create({
     bankModalCard: {
         width: '100%',
         maxWidth: 360,
-        backgroundColor: '#0D1B2E',
+        maxHeight: '82%',
+        backgroundColor: '#FFFFFF',
         borderRadius: 18,
-        padding: 14,
+        padding: 16,
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.35)',
+        borderColor: '#E2E8F0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.25,
         shadowRadius: 15,
         elevation: 8,
     },
@@ -2027,67 +2332,65 @@ const s = StyleSheet.create({
         marginBottom: 10,
     },
     modalTitle: {
-        color: '#FFFFFF',
-        fontSize: 14,
+        color: '#0F172A',
+        fontSize: 15,
         fontWeight: '900',
     },
     modalSubtitle: {
-        color: '#F59E0B',
-        fontSize: 10,
-        fontWeight: '600',
+        color: '#D97706',
+        fontSize: 10.5,
+        fontWeight: '700',
         marginTop: 1,
     },
     modalCloseBtn: {
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
     },
     bankSearchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#091322',
+        backgroundColor: '#F8FAFC',
         borderRadius: 10,
-        paddingHorizontal: 8,
-        height: 36,
+        paddingHorizontal: 10,
+        height: 38,
         marginBottom: 8,
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: '#CBD5E1',
     },
     bankSearchInput: {
         flex: 1,
-        color: '#FFFFFF',
-        fontSize: 11.5,
+        color: '#0F172A',
+        fontSize: 12,
         fontWeight: '600',
     },
     bankRowItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
         borderBottomWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.05)',
+        borderColor: '#F1F5F9',
         borderRadius: 8,
     },
     bankRowItemActive: {
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        backgroundColor: '#FEF3C7',
     },
     bankItemName: {
-        color: '#FFFFFF',
-        fontSize: 11.5,
+        color: '#0F172A',
+        fontSize: 12,
         fontWeight: '700',
     },
     bankItemNameActive: {
-        color: '#F59E0B',
+        color: '#B45309',
         fontWeight: '900',
     },
     bankItemCode: {
-        color: '#94A3B8',
-        fontSize: 9.5,
+        color: '#64748B',
+        fontSize: 10,
         fontWeight: '600',
     },
     emptyBankState: {
@@ -2096,14 +2399,14 @@ const s = StyleSheet.create({
         justifyContent: 'center',
     },
     emptyBankTitle: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        color: '#0F172A',
+        fontSize: 13,
         fontWeight: '800',
         marginTop: 6,
     },
     emptyBankSub: {
-        color: '#94A3B8',
-        fontSize: 10,
+        color: '#64748B',
+        fontSize: 10.5,
         fontWeight: '500',
         textAlign: 'center',
         marginTop: 2,
@@ -2112,117 +2415,162 @@ const s = StyleSheet.create({
     // Confirm Card
     confirmCard: {
         width: '100%',
-        maxWidth: 320,
-        backgroundColor: '#0D1B2E',
+        maxWidth: 330,
+        backgroundColor: '#FFFFFF',
         borderRadius: 18,
-        padding: 16,
+        padding: 18,
         alignItems: 'center',
-        borderWidth: 1.2,
-        borderColor: 'rgba(245, 158, 11, 0.4)',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 6,
     },
     confirmIconCircle: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
-        borderWidth: 1.2,
-        borderColor: 'rgba(245, 158, 11, 0.4)',
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
+        marginBottom: 10,
     },
     confirmTitle: {
-        color: '#FFFFFF',
-        fontSize: 15,
+        color: '#0F172A',
+        fontSize: 16,
         fontWeight: '900',
         marginBottom: 3,
         textAlign: 'center',
     },
     confirmSub: {
-        color: '#94A3B8',
-        fontSize: 10,
+        color: '#64748B',
+        fontSize: 11,
         textAlign: 'center',
-        marginBottom: 12,
+        marginBottom: 14,
     },
     confirmDetailsBox: {
         width: '100%',
-        backgroundColor: '#091322',
+        backgroundColor: '#F8FAFC',
         borderRadius: 12,
-        padding: 10,
-        marginBottom: 14,
+        padding: 12,
+        marginBottom: 16,
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.2)',
+        borderColor: '#E2E8F0',
     },
     confirmRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginVertical: 3,
+        marginVertical: 3.5,
     },
     confirmLabel: {
-        color: '#94A3B8',
-        fontSize: 10,
+        color: '#64748B',
+        fontSize: 10.5,
         fontWeight: '600',
     },
     confirmValue: {
-        color: '#FFFFFF',
-        fontSize: 10.5,
+        color: '#0F172A',
+        fontSize: 11,
         fontWeight: '800',
         maxWidth: 160,
         textAlign: 'right',
     },
     confirmValueGold: {
-        color: '#F59E0B',
-        fontSize: 13.5,
+        color: '#D97706',
+        fontSize: 14,
         fontWeight: '900',
     },
     confirmValueFree: {
         color: '#10B981',
-        fontSize: 10.5,
+        fontSize: 11,
         fontWeight: '900',
     },
     confirmActionRow: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 10,
         width: '100%',
     },
     cancelBtn: {
         flex: 1,
-        height: 38,
+        height: 42,
         borderRadius: 10,
-        backgroundColor: '#1E293B',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
     },
     cancelBtnText: {
-        color: '#94A3B8',
-        fontSize: 11,
+        color: '#475569',
+        fontSize: 12,
         fontWeight: '800',
     },
     proceedBtn: {
         flex: 1.4,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: '#F59E0B',
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#1E40AF',
         alignItems: 'center',
         justifyContent: 'center',
     },
     proceedBtnText: {
-        color: '#0A192F',
-        fontSize: 11,
+        color: '#FFFFFF',
+        fontSize: 12.5,
         fontWeight: '900',
+    },
+
+    // Loading Modal
+    loadingModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.7)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    loadingModalCard: {
+        width: '100%',
+        maxWidth: 300,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    loadingModalTitle: {
+        color: '#0F172A',
+        fontSize: 15,
+        fontWeight: '900',
+        marginTop: 14,
+        marginBottom: 4,
+    },
+    loadingModalSub: {
+        color: '#64748B',
+        fontSize: 11,
+        textAlign: 'center',
+        lineHeight: 16,
     },
 
     // Success & Receipt Card
     successCard: {
         width: '100%',
         maxWidth: 340,
-        backgroundColor: '#0D1B2E',
+        backgroundColor: '#FFFFFF',
         borderRadius: 18,
         padding: 14,
         alignItems: 'center',
-        borderWidth: 1.2,
-        borderColor: 'rgba(245, 158, 11, 0.4)',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 6,
     },
     viewShotWrapper: {
         width: '100%',
@@ -2325,31 +2673,122 @@ const s = StyleSheet.create({
     },
     shareReceiptBtn: {
         flex: 1,
-        height: 38,
+        height: 40,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#F59E0B',
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        borderColor: '#D97706',
+        backgroundColor: '#FEF3C7',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
     },
     shareReceiptText: {
-        color: '#F59E0B',
-        fontSize: 11,
+        color: '#B45309',
+        fontSize: 11.5,
         fontWeight: '800',
     },
     doneBtn: {
         flex: 1,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: '#F59E0B',
+        height: 42,
+        borderRadius: 12,
+        backgroundColor: '#1E40AF',
         alignItems: 'center',
         justifyContent: 'center',
     },
     doneBtnText: {
-        color: '#0A192F',
-        fontSize: 11,
+        color: '#FFFFFF',
+        fontSize: 12,
         fontWeight: '900',
+    },
+
+    // Sticky Bottom Action Bar
+    bottomActionBar: {
+        backgroundColor: '#FFFFFF',
+        borderTopWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 10,
+    },
+    bottomHintRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginBottom: 6,
+    },
+    bottomHintText: {
+        fontSize: 11,
+        color: '#B45309',
+        fontWeight: '700',
+    },
+    bottomHintTextSuccess: {
+        color: '#059669',
+        fontWeight: '800',
+    },
+
+    // In-App Error Modal
+    errorModalCard: {
+        width: '100%',
+        maxWidth: 320,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 20,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+    errorModalIconCircle: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        backgroundColor: '#FEE2E2',
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    errorModalTitle: {
+        color: '#991B1B',
+        fontSize: 16,
+        fontWeight: '900',
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    errorModalMessage: {
+        color: '#475569',
+        fontSize: 12,
+        textAlign: 'center',
+        lineHeight: 18,
+        marginBottom: 16,
+    },
+    errorModalBtn: {
+        width: '100%',
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#DC2626',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#DC2626',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    errorModalBtnText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.5,
     },
 });

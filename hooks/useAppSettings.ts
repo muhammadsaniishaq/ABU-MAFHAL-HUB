@@ -19,6 +19,9 @@ export interface AppSettings {
     support_office_address: string;
     funding_fee_type: string;
     funding_fee_value: string;
+    transfer_fee_threshold?: string;
+    transfer_fee_below_10k?: string;
+    transfer_fee_above_10k?: string;
     [key: string]: any;
 }
 
@@ -39,6 +42,9 @@ const DEFAULT_SETTINGS: AppSettings = {
     support_office_address: 'No 1. Abu Mafhal Hub Plaza, Kano State, Nigeria.',
     funding_fee_type: 'fixed',
     funding_fee_value: '0',
+    transfer_fee_threshold: '10000',
+    transfer_fee_below_10k: '22',
+    transfer_fee_above_10k: '62',
     company_name: 'MAFHAL SUB',
     app_logo: '',
     // Crypto Defaults
