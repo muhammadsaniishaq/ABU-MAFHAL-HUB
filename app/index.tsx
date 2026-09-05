@@ -62,6 +62,7 @@ const COPY = {
     ssl: 'Bank-Grade 256-Bit SSL · NDPA Protected',
     notifTitle: 'Purchase Successful!',
     notifBody: '₦1,000 MTN Airtime — delivered instantly',
+    partnersTitle: 'OFFICIAL TELECOM & BANKING PARTNERS',
   },
   ha: {
     lang: '🇬🇧 EN',
@@ -93,45 +94,126 @@ const COPY = {
     ssl: 'Tsaro na Banki · An Kare Bayananku',
     notifTitle: 'An Yi Cinikin!',
     notifBody: 'Katin MTN ₦1,000 — an tura nan take',
+    partnersTitle: 'ABOKAN HULDARMU NA GASKIYA',
   },
 };
 
-const FEATURES = [
+const AVATAR_FEATURES = [
   {
     id: 'data',
-    icon: 'wifi' as const,
+    avatar: require('../assets/images/avatar_data.jpg'),
     color: '#38bdf8',
-    en: { title: '5G High-Speed Data', badge: 'FROM ₦215/GB', stat: '₦215/GB', sub: 'SME, Corporate & Gifting for MTN, Airtel, Glo & 9mobile.' },
-    ha: { title: 'Ingantacciyar Data', badge: 'DAGA ₦215/GB', stat: '₦215/GB', sub: 'Data na SME, Gifting da Corporate MTN, Airtel, Glo, 9mobile.' },
+    glowColor: 'rgba(56, 189, 248, 0.4)',
+    icon: 'wifi' as const,
+    en: {
+      name: 'Zack · 5G Specialist',
+      shortLabel: '5G Data',
+      title: '5G High-Speed Data',
+      badge: 'TOP SELLER',
+      speech: '“Hey! I deliver blazing 5G SME & Corporate Data from ₦215/GB in 2 seconds flat! ⚡”',
+      stat: 'From ₦215/GB',
+      speed: '2-Second Delivery',
+    },
+    ha: {
+      name: 'Zack · Kwararre kan Data',
+      shortLabel: 'Data 5G',
+      title: 'Ingantacciyar Data 5G',
+      badge: 'MAFI SHAHARA',
+      speech: '“Sannu! Ina tura maka Data 5G ta SME da Gifting a kan ₦215/GB cikin sakan 2 kacal! ⚡”',
+      stat: 'Daga ₦215/GB',
+      speed: 'Tsayawa Nan Take',
+    },
   },
   {
     id: 'airtime',
-    icon: 'flash' as const,
+    avatar: require('../assets/images/avatar_airtime.jpg'),
     color: '#f5a623',
-    en: { title: 'Instant Airtime VTU', badge: 'UP TO 3% BACK', stat: '3% Back', sub: 'Automated VTU for all networks with real-time cashback.' },
-    ha: { title: 'Sayen Katin Waya', badge: 'RAGIN 3%', stat: '3% Ragi', sub: 'Katin waya nan take zuwa kowane layi tare da cashback.' },
+    glowColor: 'rgba(245, 166, 35, 0.4)',
+    icon: 'flash' as const,
+    en: {
+      name: 'Amara · Speed Pro',
+      shortLabel: 'Airtime',
+      title: 'Instant Airtime VTU',
+      badge: '3% CASHBACK',
+      speech: '“Recharge MTN, Airtel, Glo or 9mobile instantly with up to 3% cash rebate to your pocket! 💰”',
+      stat: 'Up to 3% Back',
+      speed: 'Zero-Wait VTU',
+    },
+    ha: {
+      name: 'Amara · Kwararriyar Airtime',
+      shortLabel: 'Airtime',
+      title: 'Katin Waya Nan Take',
+      badge: 'RAGIN 3%',
+      speech: '“Sayi katin waya nan take zuwa kowane layi tare da samun ragi na 3% a kan kowane ciniki! 💰”',
+      stat: 'Ragin 3%',
+      speed: 'Cika Nan Take',
+    },
   },
   {
     id: 'bills',
-    icon: 'bulb' as const,
+    avatar: require('../assets/images/avatar_bills.jpg'),
     color: '#10b981',
-    en: { title: 'Electricity & Cable TV', badge: 'INSTANT TOKEN', stat: '< 5 Secs', sub: 'Prepaid tokens IKEDC/AEDC & DStv, GOtv, Startimes.' },
-    ha: { title: 'Biyan Wutar Lantarki', badge: 'TOKEN NAN TAKE', stat: '< 5 Sak.', sub: 'Samo lambar wuta da biyan DStv, GOtv da Startimes cikin sakan 5.' },
+    glowColor: 'rgba(16, 185, 129, 0.4)',
+    icon: 'bulb' as const,
+    en: {
+      name: 'Tariq · Utilities Hero',
+      shortLabel: 'Power & TV',
+      title: 'Electricity & Cable TV',
+      badge: 'INSTANT TOKEN',
+      speech: '“Never get left in the dark! Get prepaid tokens & renew DStv/GOtv in 5 seconds with receipts! 💡”',
+      stat: '< 5s Token',
+      speed: '24/7 Available',
+    },
+    ha: {
+      name: 'Tariq · Kwararren NEPA & TV',
+      shortLabel: 'Wuta & TV',
+      title: 'Wutar Lantarki & TV',
+      badge: 'TOKEN NAN TAKE',
+      speech: '“Kada a bar ka a duhu! Samo lambar wuta da biyan DStv & GOtv cikin sakan 5 tare da shaidar biya! 💡”',
+      stat: '< 5s Token',
+      speed: 'Aiki Dare da Rana',
+    },
   },
   {
     id: 'wallet',
-    icon: 'card' as const,
+    avatar: require('../assets/images/avatar_wallet.jpg'),
     color: '#a855f7',
-    en: { title: 'Virtual Bank Accounts', badge: 'AUTO-CREDIT', stat: '0-Second', sub: 'Dedicated accounts Moniepoint, Wema & Sterling.' },
-    ha: { title: 'Asusun Banki na Musamman', badge: 'KUDI NAN TAKE', stat: '0-Sakan', sub: 'Asusun banki daga Moniepoint, Wema da Sterling auto-credit.' },
+    glowColor: 'rgba(168, 85, 247, 0.4)',
+    icon: 'card' as const,
+    en: {
+      name: 'Khadijah · Banking Lead',
+      shortLabel: 'Accounts',
+      title: 'Dedicated Bank Accounts',
+      badge: 'AUTO-CREDIT',
+      speech: '“Get automated Moniepoint, Wema & Sterling accounts that credit your wallet in 0 seconds! 🏦”',
+      stat: '0-Sec Credit',
+      speed: 'Bank-Grade SSL',
+    },
+    ha: {
+      name: 'Khadijah · Kwararriyar Asusu',
+      shortLabel: 'Asusun Banki',
+      title: 'Asusun Banki na Musamman',
+      badge: 'KUDI NAN TAKE',
+      speech: '“Samu asusun banki na Moniepoint, Wema da Sterling wanda ke shiga wallet a take 0-sakan! 🏦”',
+      stat: '0-Sakan Kudi',
+      speed: 'Tsaro na Banki',
+    },
   },
-  {
-    id: 'cashback',
-    icon: 'gift' as const,
-    color: '#f43f5e',
-    en: { title: 'Earn & Refer Profits', badge: 'DAILY INCOME', stat: 'Daily ₦₦', sub: 'Cashback on every purchase plus referral commissions.' },
-    ha: { title: 'Samun Riba da Garabasa', badge: 'KARIN KUDI', stat: 'Riba Kullum', sub: 'Cashback a kowane ciniki tare da alawus na gayyato abokai.' },
-  },
+];
+
+const PARTNER_ITEMS = [
+  { id: 'mtn', name: 'MTN 5G', img: require('../assets/images/mtn.png'), color: '#f5a623' },
+  { id: 'airtel', name: 'Airtel', img: require('../assets/images/airtel.png'), color: '#ef4444' },
+  { id: 'glo', name: 'Glo', img: require('../assets/images/glo.png'), color: '#22c55e' },
+  { id: '9mobile', name: '9mobile', img: require('../assets/images/9mobile.png'), color: '#84cc16' },
+  { id: 'moniepoint', name: 'Moniepoint', icon: 'business' as const, color: '#38bdf8' },
+  { id: 'wema', name: 'Wema Bank', icon: 'card' as const, color: '#f43f5e' },
+  { id: 'sterling', name: 'Sterling', icon: 'shield-checkmark' as const, color: '#fb923c' },
+  { id: 'dstv', name: 'DStv', img: require('../assets/images/dstv.png'), color: '#38bdf8' },
+  { id: 'gotv', name: 'GOtv', img: require('../assets/images/gotv.png'), color: '#fb923c' },
+  { id: 'startimes', name: 'StarTimes', img: require('../assets/images/startimes.png'), color: '#f59e0b' },
+  { id: 'aedc', name: 'AEDC Power', img: require('../assets/images/aedc.png'), color: '#10b981' },
+  { id: 'ekedc', name: 'EKEDC Power', img: require('../assets/images/ekedc.png'), color: '#06b6d4' },
 ];
 
 const NETWORKS = [
@@ -433,10 +515,268 @@ function PageWelcome({
   );
 }
 
+// ─── PARTNER LOGOS MARQUEE (Moving tape) ────────────────────────────────────
+function PartnerMarquee({ title }: { title: string }) {
+  const scrollX = useSharedValue(0);
+  const CHIP_WIDTH = 104;
+  const TOTAL_WIDTH = PARTNER_ITEMS.length * (CHIP_WIDTH + 8);
+
+  useEffect(() => {
+    scrollX.value = 0;
+    scrollX.value = withRepeat(
+      withTiming(-TOTAL_WIDTH, {
+        duration: 20000,
+        easing: Easing.linear,
+      }),
+      -1,
+      false
+    );
+  }, []);
+
+  const marqueeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: scrollX.value }],
+  }));
+
+  const doubled = [...PARTNER_ITEMS, ...PARTNER_ITEMS];
+
+  return (
+    <View style={marq.wrap}>
+      <View style={marq.headerRow}>
+        <View style={marq.dot} />
+        <Text style={marq.title}>{title}</Text>
+        <View style={marq.dot} />
+      </View>
+
+      <View style={marq.marqueeContainer}>
+        {/* Left & Right gradient edge masks */}
+        <LinearGradient
+          colors={['#08173d', 'transparent']}
+          style={marq.maskLeft}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          pointerEvents="none"
+        />
+
+        <Animated.View style={[marq.tape, marqueeStyle]}>
+          {doubled.map((p, idx) => (
+            <View key={idx} style={[marq.chip, { borderColor: p.color + '40' }]}>
+              {p.img ? (
+                <Image source={p.img} style={marq.chipImg} resizeMode="contain" />
+              ) : (
+                <Ionicons name={p.icon as any} size={13} color={p.color} style={{ marginRight: 5 }} />
+              )}
+              <Text style={[marq.chipText, { color: p.color }]} numberOfLines={1}>{p.name}</Text>
+            </View>
+          ))}
+        </Animated.View>
+
+        <LinearGradient
+          colors={['transparent', '#08173d']}
+          style={marq.maskRight}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          pointerEvents="none"
+        />
+      </View>
+    </View>
+  );
+}
+
+// ─── SPEAKING AVATAR CARD ───────────────────────────────────────────────────
+function SpeakingAvatarCard({
+  lang,
+  haptic,
+}: {
+  lang: LangKey;
+  haptic: () => void;
+}) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const slideAnim = useSharedValue(0);
+  const opacityAnim = useSharedValue(1);
+  const bobAnim = useSharedValue(0);
+
+  useEffect(() => {
+    bobAnim.value = withRepeat(
+      withSequence(
+        withTiming(-5, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNextAvatar();
+    }, 4800);
+    return () => clearInterval(timer);
+  }, [activeIdx]);
+
+  const changeTo = (idx: number, dir: 'next' | 'prev') => {
+    haptic();
+    slideAnim.value = dir === 'next' ? 28 : -28;
+    opacityAnim.value = 0.3;
+    setActiveIdx(idx);
+    slideAnim.value = withSpring(0, { damping: 15, stiffness: 120 });
+    opacityAnim.value = withTiming(1, { duration: 250 });
+  };
+
+  const setNextAvatar = () => {
+    const next = (activeIdx + 1) % AVATAR_FEATURES.length;
+    changeTo(next, 'next');
+  };
+
+  const setPrevAvatar = () => {
+    const prev = (activeIdx - 1 + AVATAR_FEATURES.length) % AVATAR_FEATURES.length;
+    changeTo(prev, 'prev');
+  };
+
+  const current = AVATAR_FEATURES[activeIdx];
+  const info = current[lang];
+
+  const avatarAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: bobAnim.value }],
+  }));
+
+  const cardAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideAnim.value }],
+    opacity: opacityAnim.value,
+  }));
+
+  return (
+    <View style={avc.container}>
+      {/* 4 Avatar Selector Tabs */}
+      <View style={avc.pillsRow}>
+        {AVATAR_FEATURES.map((item, i) => {
+          const isSelected = i === activeIdx;
+          return (
+            <TouchableOpacity
+              key={item.id}
+              onPress={() => changeTo(i, i > activeIdx ? 'next' : 'prev')}
+              activeOpacity={0.8}
+              style={[
+                avc.tabPill,
+                isSelected && {
+                  backgroundColor: item.color + '22',
+                  borderColor: item.color,
+                },
+              ]}
+            >
+              <Ionicons
+                name={item.icon}
+                size={11}
+                color={isSelected ? item.color : '#94a3b8'}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  avc.tabPillTxt,
+                  isSelected && { color: '#ffffff', fontWeight: '900' },
+                ]}
+              >
+                {item[lang].shortLabel}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Main Interactive Stage */}
+      <Animated.View style={[avc.stageCard, cardAnimStyle]}>
+        {/* Glow halo behind active avatar */}
+        <View style={[avc.glowOrb, { backgroundColor: current.glowColor }]} />
+
+        {/* Top: Character Speaking Header */}
+        <View style={avc.speakerHeader}>
+          <View style={[avc.speakerBadge, { backgroundColor: current.color + '22', borderColor: current.color + '55' }]}>
+            <View style={[avc.speakingDot, { backgroundColor: current.color }]} />
+            <Text style={[avc.speakerName, { color: current.color }]}>
+              {info.name}
+            </Text>
+          </View>
+          <View style={avc.roleBadge}>
+            <Ionicons name="sparkles" size={10} color="#f5a623" style={{ marginRight: 3 }} />
+            <Text style={avc.roleText}>{info.badge}</Text>
+          </View>
+        </View>
+
+        {/* Mid: Avatar & Connected Speech Bubble */}
+        <View style={avc.avatarBodyRow}>
+          {/* 3D Animated Cartoon Avatar */}
+          <Animated.View style={[avc.avatarFrame, { borderColor: current.color }, avatarAnimStyle]}>
+            <Image source={current.avatar} style={avc.avatarImg} resizeMode="cover" />
+            <View style={[avc.avatarStatusDot, { backgroundColor: '#10b981' }]} />
+          </Animated.View>
+
+          {/* Talking Speech Bubble */}
+          <View style={[avc.speechBubble, { borderColor: current.color + '45' }]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
+              style={[StyleSheet.absoluteFillObject, { borderRadius: 14 }]}
+            />
+            {/* Speech Tail */}
+            <View style={[avc.speechTail, { borderRightColor: current.color + '45' }]} />
+
+            <Text style={avc.speechText} numberOfLines={3}>
+              {info.speech}
+            </Text>
+
+            <View style={avc.statChipRow}>
+              <View style={[avc.statChip, { backgroundColor: current.color + '25', borderColor: current.color + '50' }]}>
+                <Text style={[avc.statChipText, { color: current.color }]}>{info.stat}</Text>
+              </View>
+              <View style={avc.speedChip}>
+                <Ionicons name="flash" size={9} color="#f5a623" style={{ marginRight: 2 }} />
+                <Text style={avc.speedChipText}>{info.speed}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Bottom Slide Controller (Prev < Dots > Next) */}
+        <View style={avc.navControls}>
+          <TouchableOpacity onPress={setPrevAvatar} style={avc.arrowBtn} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={15} color="#ffffff" />
+          </TouchableOpacity>
+
+          {/* Slide dots */}
+          <View style={avc.dotsRow}>
+            {AVATAR_FEATURES.map((_, i) => (
+              <TouchableOpacity key={i} onPress={() => changeTo(i, i > activeIdx ? 'next' : 'prev')}>
+                <View
+                  style={[
+                    avc.slideDot,
+                    i === activeIdx
+                      ? { width: 18, backgroundColor: current.color }
+                      : { width: 6, backgroundColor: 'rgba(255,255,255,0.2)' },
+                  ]}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity onPress={setNextAvatar} style={avc.arrowBtn} activeOpacity={0.7}>
+            <Ionicons name="chevron-forward" size={15} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// PAGE 2 — FEATURES
+// PAGE 2 — FEATURES (Everything You Need)
 // ─────────────────────────────────────────────────────────────────────────────
-function PageFeatures({ lang, c }: { lang: LangKey; c: typeof COPY.en }) {
+function PageFeatures({
+  lang,
+  c,
+  haptic,
+}: {
+  lang: LangKey;
+  c: typeof COPY.en;
+  haptic: () => void;
+}) {
   return (
     <View style={p2.root}>
       <View style={p2.blobA} />
@@ -445,56 +785,18 @@ function PageFeatures({ lang, c }: { lang: LangKey; c: typeof COPY.en }) {
       {/* Header */}
       <View style={p2.header}>
         <View style={p2.badge}>
-          <Ionicons name="grid" size={11} color="#f5a623" style={{ marginRight: 5 }} />
-          <Text style={p2.badgeTxt}>OUR SERVICES</Text>
+          <Ionicons name="sparkles" size={11} color="#f5a623" style={{ marginRight: 5 }} />
+          <Text style={p2.badgeTxt}>OUR AI AVATARS</Text>
         </View>
         <Text style={p2.title}>{c.p2Title}</Text>
         <Text style={p2.sub}>{c.p2Sub}</Text>
       </View>
 
-      {/* Feature rows */}
-      <View style={p2.list}>
-        {FEATURES.map(f => {
-          const info = f[lang];
-          return (
-            <LinearGradient
-              key={f.id}
-              colors={[f.color + '18', 'rgba(255,255,255,0.03)']}
-              style={[p2.row, { borderColor: f.color + '38' }]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              {/* Icon */}
-              <LinearGradient
-                colors={[f.color + '32', f.color + '15']}
-                style={p2.icon}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Ionicons name={f.icon} size={18} color={f.color} />
-              </LinearGradient>
+      {/* Interactive Talking Cartoon Avatar Slide */}
+      <SpeakingAvatarCard lang={lang} haptic={haptic} />
 
-              {/* Text */}
-              <View style={p2.textCol}>
-                <Text style={p2.rowTitle} numberOfLines={1}>
-                  {info.title}
-                </Text>
-                <Text style={p2.rowSub} numberOfLines={1}>
-                  {info.sub}
-                </Text>
-              </View>
-
-              {/* Right side */}
-              <View style={p2.rightCol}>
-                <View style={[p2.rowBadge, { backgroundColor: f.color + '1e', borderColor: f.color + '45' }]}>
-                  <Text style={[p2.rowBadgeTxt, { color: f.color }]}>{info.badge}</Text>
-                </View>
-                <Text style={[p2.rowStat, { color: f.color }]}>{info.stat}</Text>
-              </View>
-            </LinearGradient>
-          );
-        })}
-      </View>
+      {/* Moving Partner Logos Tape */}
+      <PartnerMarquee title={c.partnersTitle} />
     </View>
   );
 }
@@ -765,14 +1067,19 @@ export default function SplashScreen() {
     <View style={root.outerScreen}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Deep luxury cosmic background gradient */}
+      {/* Modern Royal Cyber-Navy Gradient (Luminous & Rich, never pitch black) */}
       <LinearGradient
-        colors={['#010812', '#050f28', '#091a48', '#050f28', '#010812']}
-        locations={[0, 0.22, 0.5, 0.78, 1]}
+        colors={['#071434', '#0d2561', '#14388e', '#0d2561', '#071434']}
+        locations={[0, 0.2, 0.5, 0.8, 1]}
         style={StyleSheet.absoluteFillObject}
         start={{ x: 0.15, y: 0 }}
         end={{ x: 0.85, y: 1 }}
       />
+
+      {/* Floating ambient glow lights */}
+      <View style={root.ambientOrbCyan} pointerEvents="none" />
+      <View style={root.ambientOrbGold} pointerEvents="none" />
+      <View style={root.ambientOrbIndigo} pointerEvents="none" />
 
       {/* Main app frame */}
       <View
@@ -786,7 +1093,7 @@ export default function SplashScreen() {
             {pageIdx === 0 && (
               <PageWelcome c={c} lang={lang} setLang={setLang} haptic={haptic} />
             )}
-            {pageIdx === 1 && <PageFeatures lang={lang} c={c} />}
+            {pageIdx === 1 && <PageFeatures lang={lang} c={c} haptic={haptic} />}
             {pageIdx === 2 && (
               <PageGetStarted
                 c={c}
@@ -855,7 +1162,7 @@ const root = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-    backgroundColor: '#010812',
+    backgroundColor: '#071434',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -864,8 +1171,38 @@ const root = StyleSheet.create({
     width: '100%',
     maxWidth: 460,
     height: '100%',
-    backgroundColor: '#010812',
+    backgroundColor: 'transparent',
     overflow: 'hidden',
+  },
+  ambientOrbCyan: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: '#0284c7',
+    opacity: 0.18,
+  },
+  ambientOrbGold: {
+    position: 'absolute',
+    top: '35%',
+    left: -60,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: '#d97706',
+    opacity: 0.14,
+  },
+  ambientOrbIndigo: {
+    position: 'absolute',
+    bottom: 30,
+    right: -40,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: '#4338ca',
+    opacity: 0.18,
   },
   safeArea: {
     flex: 1,
@@ -879,9 +1216,9 @@ const root = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: Platform.OS === 'ios' ? 20 : 12,
     paddingTop: 8,
-    backgroundColor: 'rgba(1,8,18,0.96)',
+    backgroundColor: 'rgba(7, 20, 52, 0.95)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.07)',
+    borderTopColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
@@ -1224,9 +1561,9 @@ const p2 = StyleSheet.create({
   root: {
     flex: 1,
     width: '100%',
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 2,
     justifyContent: 'space-between',
   },
   blobA: {
@@ -1236,7 +1573,7 @@ const p2 = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(56,189,248,0.08)',
+    backgroundColor: 'rgba(56,189,248,0.1)',
   },
   blobB: {
     position: 'absolute',
@@ -1245,11 +1582,10 @@ const p2 = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: 'rgba(168,85,247,0.07)',
+    backgroundColor: 'rgba(168,85,247,0.09)',
   },
-
   header: {
-    marginBottom: 6,
+    marginBottom: 4,
   },
   badge: {
     flexDirection: 'row',
@@ -1261,7 +1597,7 @@ const p2 = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(245,166,35,0.28)',
     backgroundColor: 'rgba(245,166,35,0.1)',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   badgeTxt: {
     color: '#f5a623',
@@ -1271,71 +1607,309 @@ const p2 = StyleSheet.create({
   },
   title: {
     color: '#ffffff',
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '900',
     letterSpacing: 0.3,
     marginBottom: 2,
   },
   sub: {
-    color: '#8ea4c4',
-    fontSize: 11,
+    color: '#94a3b8',
+    fontSize: 10.5,
     fontWeight: '500',
   },
+});
 
-  list: {
-    flex: 1,
-    justifyContent: 'space-evenly',
-    gap: 7,
+// ─── Talking Avatar Card Styles ─────────────────────────────────────────────
+const avc = StyleSheet.create({
+  container: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 4,
   },
-  row: {
+  pillsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 13,
-    borderWidth: 1.1,
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 8,
+    gap: 5,
   },
-  icon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  tabPill: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  textCol: {
-    flex: 1,
+  tabPillTxt: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94a3b8',
   },
-  rowTitle: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 1,
+  stageCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 12,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  rowSub: {
-    color: '#8ea4c4',
-    fontSize: 9.5,
+  glowOrb: {
+    position: 'absolute',
+    top: -20,
+    left: -20,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    opacity: 0.35,
   },
-  rightCol: {
-    alignItems: 'flex-end',
-    gap: 3,
-    flexShrink: 0,
+  speakerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  rowBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 5,
+  speakerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 12,
     borderWidth: 1,
   },
-  rowBadgeTxt: {
-    fontSize: 7.5,
+  speakingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  speakerName: {
+    fontSize: 10.5,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
-  rowStat: {
-    fontSize: 10,
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245,166,35,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245,166,35,0.25)',
+  },
+  roleText: {
+    color: '#f5a623',
+    fontSize: 9,
     fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  avatarBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  avatarFrame: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 2.5,
+    padding: 2,
+    position: 'relative',
+    backgroundColor: '#0c1a3d',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 42,
+  },
+  avatarStatusDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#061333',
+  },
+  speechBubble: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    padding: 10,
+    position: 'relative',
+    backgroundColor: 'rgba(10, 22, 54, 0.75)',
+    justifyContent: 'space-between',
+    minHeight: 88,
+  },
+  speechTail: {
+    position: 'absolute',
+    left: -8,
+    top: 32,
+    width: 0,
+    height: 0,
+    borderTopWidth: 6,
+    borderBottomWidth: 6,
+    borderRightWidth: 8,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  speechText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  statChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  statChipText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  speedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  speedChipText: {
+    color: '#e2e8f0',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  navControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  arrowBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  slideDot: {
+    height: 5,
+    borderRadius: 3,
+  },
+});
+
+// ─── Partner Marquee Styles ─────────────────────────────────────────────────
+const marq = StyleSheet.create({
+  wrap: {
+    width: '100%',
+    marginTop: 4,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#f5a623',
+    opacity: 0.7,
+  },
+  title: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  marqueeContainer: {
+    width: '100%',
+    height: 38,
+    position: 'relative',
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  maskLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    zIndex: 10,
+  },
+  maskRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    zIndex: 10,
+  },
+  tape: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    minWidth: 88,
+    justifyContent: 'center',
+  },
+  chipImg: {
+    width: 18,
+    height: 18,
+    marginRight: 6,
+  },
+  chipText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
 });
 
