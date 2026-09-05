@@ -1,4 +1,4 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, Platform, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Animated, Linking } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
@@ -14,10 +14,13 @@ const LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 
 export default function AppLayout() {
     const router = useRouter();
+    const pathname = usePathname();
     const { settings } = useAppSettings();
     const [isFabOpen, setIsFabOpen] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     usePushNotifications(); // Register for push notifications
+
+    const hideFab = pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/');
 
     useEffect(() => {
         // AI Button Pulse Animation
@@ -66,7 +69,7 @@ export default function AppLayout() {
                 <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
                 <Tabs.Screen name="kyc" options={{ href: null }} />
                 <Tabs.Screen name="virtual-cards" options={{ href: null }} />
-                <Tabs.Screen name="transfer" options={{ href: null }} />
+                <Tabs.Screen name="transfer" options={{ href: null, tabBarStyle: { display: 'none' } }} />
                 <Tabs.Screen name="saved-cards" options={{ href: null }} />
                 <Tabs.Screen name="qr-pay" options={{ href: null }} />
                 <Tabs.Screen name="beneficiaries" options={{ href: null }} />
@@ -78,7 +81,7 @@ export default function AppLayout() {
             </Tabs>
 
             {/* FLOATING ACTION BUTTON (FAB) */}
-            {isFabOpen && (
+            {!hideFab && isFabOpen && (
                 <TouchableOpacity 
                     activeOpacity={1} 
                     onPress={() => setIsFabOpen(false)}
@@ -86,41 +89,43 @@ export default function AppLayout() {
                 />
             )}
             
-            <View pointerEvents="box-none" style={{ position: 'absolute', bottom: 72, right: 20, zIndex: 50, alignItems: 'center' }}>
-                {isFabOpen && (
-                    <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                        <TouchableOpacity 
-                            onPress={() => { setIsFabOpen(false); Linking.openURL(`whatsapp://send?phone=${settings?.support_whatsapp || '2348145853539'}`).catch(() => alert('WhatsApp not installed')); }}
-                            style={{ backgroundColor: '#25D366', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
-                        >
-                            <Ionicons name="logo-whatsapp" size={20} color="#fff" />
-                        </TouchableOpacity>
+            {!hideFab && (
+                <View pointerEvents="box-none" style={{ position: 'absolute', bottom: 72, right: 20, zIndex: 50, alignItems: 'center' }}>
+                    {isFabOpen && (
+                        <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                            <TouchableOpacity 
+                                onPress={() => { setIsFabOpen(false); Linking.openURL(`whatsapp://send?phone=${settings?.support_whatsapp || '2348145853539'}`).catch(() => alert('WhatsApp not installed')); }}
+                                style={{ backgroundColor: '#25D366', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
+                            >
+                                <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                            </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            onPress={() => { setIsFabOpen(false); router.push('/(app)/tickets'); }}
-                            style={{ backgroundColor: '#e11d48', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
-                        >
-                            <Ionicons name="headset" size={20} color="#fff" />
-                        </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => { setIsFabOpen(false); router.push('/(app)/tickets'); }}
+                                style={{ backgroundColor: '#e11d48', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
+                            >
+                                <Ionicons name="headset" size={20} color="#fff" />
+                            </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            onPress={() => { setIsFabOpen(false); router.push('/ai-chat'); }}
-                            style={{ backgroundColor: '#4f46e5', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
-                        >
-                            <Ionicons name="sparkles" size={20} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                )}
+                            <TouchableOpacity 
+                                onPress={() => { setIsFabOpen(false); router.push('/ai-chat'); }}
+                                style={{ backgroundColor: '#4f46e5', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
+                            >
+                                <Ionicons name="sparkles" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
-                <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <TouchableOpacity 
-                        onPress={() => setIsFabOpen(!isFabOpen)}
-                        style={{ backgroundColor: '#0d1b3e', width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' }}
-                    >
-                        <Ionicons name={isFabOpen ? "close" : "add"} size={26} color="#fff" />
-                    </TouchableOpacity>
-                </Animated.View>
-            </View>
+                    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                        <TouchableOpacity 
+                            onPress={() => setIsFabOpen(!isFabOpen)}
+                            style={{ backgroundColor: '#0d1b3e', width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' }}
+                        >
+                            <Ionicons name={isFabOpen ? "close" : "add"} size={26} color="#fff" />
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            )}
         </View>
     );
 }
