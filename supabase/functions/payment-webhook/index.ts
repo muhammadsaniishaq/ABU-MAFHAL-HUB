@@ -477,13 +477,44 @@ $$ language plpgsql security definer;
                         '082': 20,    // Keystone
                     };
 
-                    const banks = bData.data.map((b: any) => ({
-                        id: String(b.id),
-                        name: b.name,
-                        code: b.code,
-                        slug: b.slug,
-                        logo: `https://cdn.jsdelivr.net/gh/steveoni/nigeria-banks-logo@master/${b.slug}.png`
-                    }));
+                    const logoMap: Record<string, string> = {
+                        '999992': 'paycom.png',
+                        '999991': 'palmpay.png',
+                        '50515': 'moniepoint-mfb-ng.png',
+                        '50211': 'kuda-bank.png',
+                        '058': 'guaranty-trust-bank.png',
+                        '057': 'zenith-bank.png',
+                        '044': 'access-bank.png',
+                        '063': 'access-bank-diamond.png',
+                        '011': 'first-bank-of-nigeria.png',
+                        '033': 'united-bank-for-africa.png',
+                        '232': 'sterling-bank.png',
+                        '035': 'wema-bank.png',
+                        '035A': 'alat-by-wema.png',
+                        '070': 'fidelity-bank.png',
+                        '214': 'first-city-monument-bank.png',
+                        '032': 'union-bank-of-nigeria.png',
+                        '221': 'stanbic-ibtc-bank.png',
+                        '076': 'polaris-bank.png',
+                        '302': 'taj-bank.png',
+                        '050': 'ecobank-nigeria.png',
+                        '082': 'keystone-bank.png',
+                        '303': 'lotus-bank.png',
+                        '00103': 'globus-bank.png',
+                        '327': 'paga.png',
+                        '401': 'asosavings.png',
+                    };
+
+                    const banks = bData.data.map((b: any) => {
+                        const logoFile = logoMap[b.code] || (b.slug ? `${b.slug}.png` : 'default-image.png');
+                        return {
+                            id: String(b.id),
+                            name: b.name,
+                            code: b.code,
+                            slug: b.slug,
+                            logo: `https://raw.githubusercontent.com/ichtrojan/nigerian-banks/master/logos/${logoFile}`
+                        };
+                    });
 
                     banks.sort((a: any, b: any) => {
                         const aRank = priorityMap[a.code] || 999;
@@ -497,6 +528,29 @@ $$ language plpgsql security definer;
                     });
                 }
                 return new Response(JSON.stringify({ success: false, error: "Failed to fetch bank list from Paystack" }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            } catch (err: any) {
+                return new Response(JSON.stringify({ success: false, error: err.message }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+        }
+
+        // --- ACTION: CHECK PAYSTACK BALANCE & CAPABILITIES ---
+        if (parsedPayload && parsedPayload.action === 'check_paystack_balance') {
+            try {
+                const paystackSecret = await getPaystackSecret(supabaseAdmin);
+                if (!paystackSecret) {
+                    return new Response(JSON.stringify({ success: false, error: "No Paystack secret key found" }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+                const balRes = await fetch('https://api.paystack.co/balance', {
+                    headers: { Authorization: `Bearer ${paystackSecret}` }
+                });
+                const balData = await balRes.json();
+                return new Response(JSON.stringify({ success: true, is_live: paystackSecret.startsWith('sk_live_'), paystack: balData }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             } catch (err: any) {
@@ -579,95 +633,161 @@ $$ language plpgsql security definer;
                 });
             }
 
-            // 1. Atomic Wallet Debit in Database
-            const { data: deductData, error: deductErr } = await supabaseAdmin.rpc('execute_user_bank_withdrawal', {
-                p_amount: numAmount,
-                p_bank_name: bankName || 'Nigerian Bank',
-                p_account_number: String(accountNumber).trim(),
-                p_account_name: String(accountName || 'Valued User').trim(),
-                p_narration: narration || 'Bank Transfer',
-                p_user_id: userId
-            });
+            // 1. Verify user wallet balance in DB first without debiting yet
+            const { data: userProfile, error: profileErr } = await supabaseAdmin
+                .from('profiles')
+                .select('balance')
+                .eq('id', userId)
+                .maybeSingle();
 
-            if (deductErr) {
-                console.error("[BankTransfer] Debit error:", deductErr);
-                return new Response(JSON.stringify({ success: false, message: deductErr.message || "Insufficient wallet balance." }), {
+            if (profileErr || !userProfile) {
+                return new Response(JSON.stringify({ success: false, message: "User account not found." }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
 
-            const newBalance = deductData?.new_balance;
-            const internalRef = deductData?.reference || `WTH_${Date.now()}`;
+            const currentWalletBal = parseFloat(String(userProfile.balance || 0));
+            if (currentWalletBal < numAmount) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: `Insufficient wallet balance. You have ₦${currentWalletBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.` 
+                }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
 
             // 2. Paystack Real Payout Dispatch
             const paystackSecret = await getPaystackSecret(supabaseAdmin);
-            let paystackDispatched = false;
-            let paystackRef = '';
-
-            if (paystackSecret && paystackSecret.startsWith('sk_')) {
-                try {
-                    // Step A: Create Transfer Recipient
-                    const recRes = await fetch('https://api.paystack.co/transferrecipient', {
-                        method: 'POST',
-                        headers: {
-                            Authorization: `Bearer ${paystackSecret}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            type: 'nuban',
-                            name: accountName || 'Valued User',
-                            account_number: String(accountNumber).trim(),
-                            bank_code: String(bankCode).trim(),
-                            currency: 'NGN'
-                        })
-                    });
-
-                    const recData = await recRes.json();
-                    console.log("[BankTransfer] Recipient response:", recData);
-
-                    if (recData.status && recData.data?.recipient_code) {
-                        const recipientCode = recData.data.recipient_code;
-
-                        // Step B: Initiate Transfer from Paystack Balance
-                        const trfRes = await fetch('https://api.paystack.co/transfer', {
-                            method: 'POST',
-                            headers: {
-                                Authorization: `Bearer ${paystackSecret}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                source: 'balance',
-                                amount: Math.round(numAmount * 100), // Naira to Kobo
-                                recipient: recipientCode,
-                                reason: narration || `Transfer to ${accountName} (${bankName})`,
-                                reference: internalRef
-                            })
-                        });
-
-                        const trfData = await trfRes.json();
-                        console.log("[BankTransfer] Transfer response:", trfData);
-
-                        if (trfData.status) {
-                            paystackDispatched = true;
-                            paystackRef = trfData.data?.reference || trfData.data?.transfer_code || '';
-                        }
-                    }
-                } catch (payoutErr) {
-                    console.warn("[BankTransfer] Paystack payout attempt notice:", payoutErr);
-                }
+            if (!paystackSecret || !paystackSecret.startsWith('sk_')) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: "Paystack live secret key is not configured on the server." 
+                }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
             }
 
-            return new Response(JSON.stringify({
-                success: true,
-                new_balance: newBalance,
-                reference: paystackRef || internalRef,
-                dispatched: paystackDispatched,
-                message: paystackDispatched 
-                    ? `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Paystack.`
-                    : `Successfully processed transfer of ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}).`
-            }), {
-                headers: { "Content-Type": "application/json", ...corsHeaders }
-            });
+            try {
+                // Step A: Check Paystack Merchant Balance
+                const balRes = await fetch('https://api.paystack.co/balance', {
+                    headers: { Authorization: `Bearer ${paystackSecret}` }
+                });
+                const balData = await balRes.json();
+                const ngnBalObj = balData.data?.find((b: any) => b.currency === 'NGN') || balData.data?.[0];
+                const paystackNgnBalance = ngnBalObj ? (parseFloat(String(ngnBalObj.balance)) / 100) : 0;
+
+                console.log(`[BankTransfer] User Wallet: ₦${currentWalletBal}, Requested: ₦${numAmount}, Paystack Balance: ₦${paystackNgnBalance}`);
+
+                if (paystackNgnBalance < numAmount) {
+                    return new Response(JSON.stringify({
+                        success: false,
+                        dispatched: false,
+                        message: `Automated bank transfer is currently unavailable (Merchant payout balance is ₦${paystackNgnBalance.toLocaleString()}). Please contact administration or try again later. Your wallet was NOT charged.`
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+
+                // Step B: Create Transfer Recipient on Paystack
+                const recRes = await fetch('https://api.paystack.co/transferrecipient', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${paystackSecret}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: 'nuban',
+                        name: accountName || 'Valued User',
+                        account_number: String(accountNumber).trim(),
+                        bank_code: String(bankCode).trim(),
+                        currency: 'NGN'
+                    })
+                });
+
+                const recData = await recRes.json();
+                console.log("[BankTransfer] Recipient response:", recData);
+
+                if (!recData.status || !recData.data?.recipient_code) {
+                    return new Response(JSON.stringify({
+                        success: false,
+                        dispatched: false,
+                        message: recData.message || "Failed to register recipient bank with Paystack. Your wallet was NOT charged."
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+
+                const recipientCode = recData.data.recipient_code;
+                const internalRef = `WTH_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+                // Step C: Initiate Transfer on Paystack
+                const trfRes = await fetch('https://api.paystack.co/transfer', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${paystackSecret}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        source: 'balance',
+                        amount: Math.round(numAmount * 100), // Kobo
+                        recipient: recipientCode,
+                        reason: narration || `Transfer to ${accountName} (${bankName})`,
+                        reference: internalRef
+                    })
+                });
+
+                const trfData = await trfRes.json();
+                console.log("[BankTransfer] Transfer response:", trfData);
+
+                if (!trfData.status) {
+                    return new Response(JSON.stringify({
+                        success: false,
+                        dispatched: false,
+                        message: trfData.message || "Bank payout rejected by Paystack. Your wallet was NOT charged."
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+
+                // Step D: Only debit user wallet after Paystack confirms transfer dispatch
+                const { data: deductData, error: deductErr } = await supabaseAdmin.rpc('execute_user_bank_withdrawal', {
+                    p_amount: numAmount,
+                    p_bank_name: bankName || 'Nigerian Bank',
+                    p_account_number: String(accountNumber).trim(),
+                    p_account_name: String(accountName || 'Valued User').trim(),
+                    p_narration: narration || 'Bank Transfer',
+                    p_user_id: userId
+                });
+
+                if (deductErr) {
+                    console.error("[BankTransfer] Post-dispatch DB debit error:", deductErr);
+                }
+
+                const newBalance = deductData?.new_balance !== undefined 
+                    ? deductData.new_balance 
+                    : Math.max(0, currentWalletBal - numAmount);
+                const paystackRef = trfData.data?.reference || trfData.data?.transfer_code || internalRef;
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    dispatched: true,
+                    new_balance: newBalance,
+                    reference: paystackRef,
+                    message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Paystack.`
+                }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+
+            } catch (payoutErr: any) {
+                console.error("[BankTransfer] Payout Exception:", payoutErr);
+                return new Response(JSON.stringify({
+                    success: false,
+                    dispatched: false,
+                    message: "Unexpected error connecting to Paystack payout service. Your wallet was NOT charged."
+                }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
         }
 
         // --- DEBUG LOGGING ---
