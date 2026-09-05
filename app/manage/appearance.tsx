@@ -12,6 +12,8 @@ import { supabase } from '../../services/supabase';
 import CelebrationConfetti, {
   CelebrationConfettiRef, CelebrationSettings, EVENT_PRESETS, triggerGlobalConfetti
 } from '../../components/CelebrationConfetti';
+import { safeLaunchPicker } from '../../services/systemPickerTracker';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 const { width: W } = Dimensions.get('window');
 
@@ -202,14 +204,14 @@ export default function AppDesigner() {
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.8,
         base64: true,
-      });
+      }));
 
-      if (!result.canceled && result.assets[0].base64) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         await uploadToSupabase(result.assets[0], type);
       }
     } catch (error: any) {
@@ -223,25 +225,23 @@ export default function AppDesigner() {
     else setUploadingLogo(true);
 
     try {
-      if (!image.base64) throw new Error('No image data found.');
-
-      const fileExt = 'jpg';
+      const fileExt = (image.uri.split('.').pop() || 'jpg').split('?')[0];
       const fileName = `brand/${type}_${Date.now()}.${fileExt}`;
 
-      const { error } = await supabase
-        .storage
-        .from('banners')
-        .upload(fileName, decode(image.base64), {
-          contentType: 'image/jpeg',
-          upsert: true
-        });
+      const uploadRes = await uploadMediaFile({
+        uri: image.uri,
+        bucket: 'banners',
+        fileName,
+        mimeType: 'image/jpeg',
+        base64: image.base64,
+        isVideo: false,
+      });
 
-      if (error) throw error;
+      if (!uploadRes.success || !uploadRes.publicUrl) {
+        throw new Error(uploadRes.error || 'Failed to upload image to storage');
+      }
 
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from('banners')
-        .getPublicUrl(fileName);
+      const publicUrl = uploadRes.publicUrl;
 
       const { error: dbError } = await supabase
         .from('app_settings')
@@ -255,10 +255,10 @@ export default function AppDesigner() {
 
       if (isIcon) {
         setLogoIconUrl(publicUrl);
-        Alert.alert("Success", "Logo Icon uploaded and published successfully!");
+        Alert.alert("Success 🎉", "Logo Icon uploaded and published successfully!");
       } else {
         setLogoUrl(publicUrl);
-        Alert.alert("Success", "Logo Banner uploaded and published successfully!");
+        Alert.alert("Success 🎉", "Logo Banner uploaded and published successfully!");
       }
     } catch (error: any) {
       Alert.alert("Upload Failed", error.message);

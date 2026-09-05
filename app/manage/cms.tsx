@@ -10,6 +10,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
+import { safeLaunchPicker } from '../../services/systemPickerTracker';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 // Platinum Light Executive Theme Tokens
 const L = {
@@ -140,12 +142,12 @@ export default function ModernContentManager() {
         Alert.alert("Permission Required", "Please grant photo library access.");
         return;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false, // Absolutely NO auto-crop! Keep complete original photo
         quality: 1,
         base64: true,
-      });
+      }));
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setSelectedImage(result.assets[0]);
@@ -251,13 +253,13 @@ export default function ModernContentManager() {
         Alert.alert("Permission Required", "Please grant photo library access.");
         return;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
         base64: true,
-      });
+      }));
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setNewPartnerLogo(result.assets[0]);
@@ -274,13 +276,13 @@ export default function ModernContentManager() {
         return Alert.alert("Permission Required", "Please allow gallery access.");
       }
 
-      const res = await ImagePicker.launchImageLibraryAsync({
+      const res = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
         allowsEditing: false,
         quality: 1,
         videoExportPreset: ImagePicker.VideoExportPreset.Passthrough,
         videoMaxDuration: 180,
-      });
+      }));
 
       if (!res.canceled && res.assets && res.assets.length > 0) {
         const asset = res.assets[0];
@@ -291,47 +293,26 @@ export default function ModernContentManager() {
           asset.uri.toLowerCase().endsWith('.mov') ||
           asset.uri.toLowerCase().endsWith('.webm');
         const fileExt = isVideo ? 'mp4' : (asset.uri.split('.').pop() || 'jpg').split('?')[0];
-        const fileName = `announcement_${Date.now()}.${fileExt}`;
+        const fileName = `announcements/announcement_${Date.now()}.${fileExt}`;
         const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
 
-        let publicUrl = asset.uri;
+        const uploadRes = await uploadMediaFile({
+          uri: asset.uri,
+          bucket: 'banners',
+          folder: 'announcements',
+          fileName,
+          mimeType,
+          base64: asset.base64,
+          isVideo,
+        });
 
-        try {
-          const response = await fetch(asset.uri);
-          const blob = await response.blob();
-
-          let bucket = 'banners';
-          let { error: uploadErr } = await supabase.storage
-            .from('banners')
-            .upload(`announcements/${fileName}`, blob, {
-              contentType: mimeType,
-              upsert: true
-            });
-
-          if (uploadErr) {
-            bucket = 'avatars';
-            const { error: err2 } = await supabase.storage
-              .from('avatars')
-              .upload(`announcements/${fileName}`, blob, {
-                contentType: mimeType,
-                upsert: true
-              });
-            uploadErr = err2;
-          }
-
-          if (!uploadErr) {
-            const { data: publicUrlData } = supabase.storage
-              .from(bucket)
-              .getPublicUrl(`announcements/${fileName}`);
-            if (publicUrlData?.publicUrl) publicUrl = publicUrlData.publicUrl;
-          }
-        } catch (storageErr) {
-          console.warn("Announcement storage upload fallback:", storageErr);
+        if (uploadRes.success && uploadRes.publicUrl) {
+          setAnnouncementType(isVideo ? 'video' : 'image');
+          setAnnouncementUrl(uploadRes.publicUrl);
+          Alert.alert("Media Ready 🎉", isVideo ? "Video attached successfully in original quality!" : "Announcement media attached successfully!");
+        } else {
+          Alert.alert("Upload Notice", uploadRes.error || "Could not upload media. Please try again.");
         }
-
-        setAnnouncementType(isVideo ? 'video' : 'image');
-        setAnnouncementUrl(publicUrl);
-        Alert.alert("Media Ready 🎉", isVideo ? "Video attached successfully in original quality!" : "Announcement media attached successfully!");
       }
     } catch (err: any) {
       Alert.alert("Media Error", err.message || "Failed to select media");
@@ -349,39 +330,23 @@ export default function ModernContentManager() {
 
       if (selectedImage) {
         const fileExt = (selectedImage.uri.split('.').pop() || 'jpg').split('?')[0];
-        const fileName = `banner_${Date.now()}.${fileExt}`;
+        const fileName = `banners/banner_${Date.now()}.${fileExt}`;
         const mimeType = fileExt.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
 
-        publicUrl = selectedImage.base64 ? `data:${mimeType};base64,${selectedImage.base64}` : selectedImage.uri;
+        const uploadRes = await uploadMediaFile({
+          uri: selectedImage.uri,
+          bucket: 'banners',
+          folder: 'banners',
+          fileName,
+          mimeType,
+          base64: selectedImage.base64,
+          isVideo: false,
+        });
 
-        if (selectedImage.base64) {
-          try {
-            const { error: uploadError } = await supabase.storage
-              .from('banners')
-              .upload(fileName, decode(selectedImage.base64), { contentType: mimeType, upsert: true });
-
-            if (!uploadError) {
-              const { data: urlData } = supabase.storage.from('banners').getPublicUrl(fileName);
-              if (urlData?.publicUrl) publicUrl = urlData.publicUrl;
-            }
-          } catch (storageErr) {
-            console.warn("Banner storage upload fallback:", storageErr);
-          }
-        } else if (selectedImage.uri) {
-          try {
-            const response = await fetch(selectedImage.uri);
-            const blob = await response.blob();
-            const { error: uploadError } = await supabase.storage
-              .from('banners')
-              .upload(fileName, blob, { contentType: mimeType, upsert: true });
-
-            if (!uploadError) {
-              const { data: urlData } = supabase.storage.from('banners').getPublicUrl(fileName);
-              if (urlData?.publicUrl) publicUrl = urlData.publicUrl;
-            }
-          } catch (storageErr) {
-            console.warn("Banner storage blob upload fallback:", storageErr);
-          }
+        if (uploadRes.success && uploadRes.publicUrl) {
+          publicUrl = uploadRes.publicUrl;
+        } else if (selectedImage.base64) {
+          publicUrl = `data:${mimeType};base64,${selectedImage.base64}`;
         }
       }
 
@@ -429,24 +394,23 @@ export default function ModernContentManager() {
 
       if (newPartnerLogo) {
         const fileExt = (newPartnerLogo.uri.split('.').pop() || 'png').split('?')[0];
-        const fileName = `partner_${Date.now()}.${fileExt}`;
+        const fileName = `partners/partner_${Date.now()}.${fileExt}`;
         const mimeType = fileExt.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
 
-        logoUrl = newPartnerLogo.base64 ? `data:${mimeType};base64,${newPartnerLogo.base64}` : newPartnerLogo.uri;
+        const uploadRes = await uploadMediaFile({
+          uri: newPartnerLogo.uri,
+          bucket: 'partners',
+          folder: 'partners',
+          fileName,
+          mimeType,
+          base64: newPartnerLogo.base64,
+          isVideo: false,
+        });
 
-        if (newPartnerLogo.base64) {
-          try {
-            const { error: uploadError } = await supabase.storage
-              .from('partners')
-              .upload(fileName, decode(newPartnerLogo.base64), { contentType: mimeType, upsert: true });
-
-            if (!uploadError) {
-              const { data: publicUrlData } = supabase.storage.from('partners').getPublicUrl(fileName);
-              if (publicUrlData?.publicUrl) logoUrl = publicUrlData.publicUrl;
-            }
-          } catch (storageErr) {
-            console.warn("Partner logo storage upload fallback:", storageErr);
-          }
+        if (uploadRes.success && uploadRes.publicUrl) {
+          logoUrl = uploadRes.publicUrl;
+        } else if (newPartnerLogo.base64) {
+          logoUrl = `data:${mimeType};base64,${newPartnerLogo.base64}`;
         }
       }
 

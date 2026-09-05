@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
+import { safeLaunchPicker } from '../../services/systemPickerTracker';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 const ToggleRow = ({ title, subtitle, value, onValueChange, icon, color }: any) => (
     <View style={s.toggleRow}>
@@ -374,15 +376,15 @@ export default function AdminSettings() {
 
     const pickAnnouncementMedia = async () => {
         try {
-            let result = await ImagePicker.launchImageLibraryAsync({
+            let result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.All,
                 allowsEditing: false, // Prevents phone gallery from cropping or trimming the banner
                 quality: 1, // 100% Maximum High Quality
                 videoExportPreset: ImagePicker.VideoExportPreset.Passthrough, // Uncompressed HD master quality
                 videoMaxDuration: 180,
-            });
+            }));
 
-            if (!result.canceled && result.assets[0].uri) {
+            if (!result.canceled && result.assets && result.assets[0]?.uri) {
                 setLoading(true);
                 const asset = result.assets[0];
                 const isVideo = asset.type === 'video' || 
@@ -390,42 +392,26 @@ export default function AdminSettings() {
                     asset.uri.toLowerCase().endsWith('.mov') ||
                     asset.uri.toLowerCase().endsWith('.webm');
                 
-                const response = await fetch(asset.uri);
-                const blob = await response.blob();
-                
                 const fileExt = isVideo ? 'mp4' : 'jpg';
-                const fileName = `announcement_${Date.now()}.${fileExt}`;
+                const fileName = `announcements/announcement_${Date.now()}.${fileExt}`;
                 const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
                 
-                let bucket = 'banners';
-                let { error: uploadError } = await supabase.storage
-                    .from('banners') 
-                    .upload(`announcements/${fileName}`, blob, {
-                        contentType: mimeType,
-                        upsert: true
-                    });
-                    
-                if (uploadError) {
-                    bucket = 'avatars';
-                    const { error: err2 } = await supabase.storage
-                        .from('avatars') 
-                        .upload(`announcements/${fileName}`, blob, {
-                            contentType: mimeType,
-                            upsert: true
-                        });
-                    uploadError = err2;
-                }
-                    
-                if (uploadError) {
-                    Alert.alert('Upload Error', uploadError.message);
-                } else {
-                    const { data: publicUrlData } = supabase.storage
-                        .from(bucket)
-                        .getPublicUrl(`announcements/${fileName}`);
-                        
+                const uploadRes = await uploadMediaFile({
+                    uri: asset.uri,
+                    bucket: 'banners',
+                    folder: 'announcements',
+                    fileName,
+                    mimeType,
+                    base64: asset.base64,
+                    isVideo,
+                });
+
+                if (uploadRes.success && uploadRes.publicUrl) {
                     setAnnouncementType(isVideo ? 'video' : 'image');
-                    setAnnouncementUrl(publicUrlData.publicUrl);
+                    setAnnouncementUrl(uploadRes.publicUrl);
                     Alert.alert('Media Uploaded! 🎉', isVideo ? 'Video uploaded successfully in original quality.' : 'Media uploaded successfully.');
+                } else {
+                    Alert.alert('Upload Notice', uploadRes.error || 'Could not upload media. Please try again.');
                 }
             }
         } catch (error: any) {

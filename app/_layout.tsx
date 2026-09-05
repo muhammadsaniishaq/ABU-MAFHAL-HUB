@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as Linking from 'expo-linking';
+import { isSystemPickerActive } from '../services/systemPickerTracker';
 
 // Configure Reanimated Logger
 configureReanimatedLogger({
@@ -232,21 +233,43 @@ export default function RootLayout() {
     useEffect(() => {
         if (Platform.OS === 'web') return;
 
+        let backgroundTimestamp = 0;
+
         const subscription = AppState.addEventListener('change', (nextAppState) => {
-            if (nextAppState === 'background' || nextAppState === 'inactive') {
-                AsyncStorage.removeItem('app_unlocked').catch(() => {});
+            // NEVER lock on 'inactive'! (Happens on permission prompts, notifications, Face ID, system pickers)
+            if (nextAppState === 'background') {
+                if (isSystemPickerActive()) {
+                    // User is actively choosing an image, video, or document - do not set background lock
+                    return;
+                }
+                backgroundTimestamp = Date.now();
             } else if (nextAppState === 'active') {
-                AsyncStorage.getItem('has_active_session').then(async (hasActive) => {
-                    if (hasActive === 'true') {
-                        const unlocked = await AsyncStorage.getItem('app_unlocked');
-                        if (unlocked !== 'true') {
-                            const currentScreen = segments[segments.length - 1] || 'index';
-                            if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'login' && currentScreen !== 'signup') {
-                                router.replace('/pin' as any);
+                if (isSystemPickerActive()) {
+                    // Returned from system media/file picker - maintain session without prompt
+                    return;
+                }
+
+                // If minimized to background for more than 60 seconds, prompt PIN unlock
+                const elapsedSeconds = backgroundTimestamp > 0 ? (Date.now() - backgroundTimestamp) / 1000 : 0;
+                backgroundTimestamp = 0;
+
+                if (elapsedSeconds > 60) {
+                    AsyncStorage.removeItem('app_unlocked').catch(() => {});
+                    AsyncStorage.getItem('has_active_session').then(async (hasActive) => {
+                        if (hasActive === 'true') {
+                            const unlocked = await AsyncStorage.getItem('app_unlocked');
+                            if (unlocked !== 'true') {
+                                const currentScreen = segments[segments.length - 1] || 'index';
+                                if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'login' && currentScreen !== 'signup') {
+                                    // Save the active route path so PIN unlock returns here
+                                    const fullPath = segments.length > 0 ? '/' + segments.join('/') : '/dashboard';
+                                    await AsyncStorage.setItem('pin_return_path', fullPath).catch(() => {});
+                                    router.replace('/pin' as any);
+                                }
                             }
                         }
-                    }
-                }).catch(() => {});
+                    }).catch(() => {});
+                }
             }
         });
         return () => subscription.remove();

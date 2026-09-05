@@ -192,6 +192,14 @@ export default function PinUnlockScreen() {
         }
         await AsyncStorage.setItem('app_unlocked', 'true');
         await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
+        try {
+            const returnPath = await AsyncStorage.getItem('pin_return_path');
+            if (returnPath) {
+                await AsyncStorage.removeItem('pin_return_path');
+                router.replace(returnPath as any);
+                return;
+            }
+        } catch (_) {}
         router.replace('/dashboard' as any);
     };
 
