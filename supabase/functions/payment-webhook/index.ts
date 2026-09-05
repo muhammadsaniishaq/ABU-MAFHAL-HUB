@@ -512,20 +512,20 @@ $$ language plpgsql security definer;
             const bankCode = String(parsedPayload.bank_code || parsedPayload.bankCode || '').trim();
 
             if (accNum.length !== 10) {
-                return new Response(JSON.stringify({ success: false, message: "Lambar asusun banki dole ne ta kasance lamba 10." }), {
+                return new Response(JSON.stringify({ success: false, message: "Bank account number must be exactly 10 digits." }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
 
             if (!bankCode) {
-                return new Response(JSON.stringify({ success: false, message: "Da fatan za a zaɓi banki." }), {
+                return new Response(JSON.stringify({ success: false, message: "Please select a bank." }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
 
             const paystackSecret = await getPaystackSecret(supabaseAdmin);
             if (!paystackSecret) {
-                return new Response(JSON.stringify({ success: false, message: "Babu tsarin Paystack (PAYSTACK_SECRET_KEY missing)." }), {
+                return new Response(JSON.stringify({ success: false, message: "Paystack secret key is not configured." }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
@@ -552,7 +552,7 @@ $$ language plpgsql security definer;
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
                 } else {
-                    const failMsg = rData.message || "Ba a sami wannan asusun banki ba. Duba lambar asusun da bankin.";
+                    const failMsg = rData.message || "Account not found. Please verify the account number and selected bank.";
                     return new Response(JSON.stringify({
                         success: false,
                         message: failMsg
@@ -562,7 +562,7 @@ $$ language plpgsql security definer;
                 }
             } catch (rErr: any) {
                 console.error("[ResolveAccount] Fetch Exception:", rErr);
-                return new Response(JSON.stringify({ success: false, message: "Kuskure wajen duba asusun banki. Duba intanet." }), {
+                return new Response(JSON.stringify({ success: false, message: "Error resolving bank account. Please check your network connection." }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
@@ -574,7 +574,7 @@ $$ language plpgsql security definer;
             const numAmount = parseFloat(String(amount));
 
             if (!userId || !numAmount || numAmount <= 0 || !accountNumber || !bankCode) {
-                return new Response(JSON.stringify({ success: false, message: "Bayanai ba su cika ba don tura kudi." }), {
+                return new Response(JSON.stringify({ success: false, message: "Incomplete transfer details provided." }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
@@ -591,7 +591,7 @@ $$ language plpgsql security definer;
 
             if (deductErr) {
                 console.error("[BankTransfer] Debit error:", deductErr);
-                return new Response(JSON.stringify({ success: false, message: deductErr.message || "Kuɗin ka bai isa ba." }), {
+                return new Response(JSON.stringify({ success: false, message: deductErr.message || "Insufficient wallet balance." }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
@@ -663,8 +663,8 @@ $$ language plpgsql security definer;
                 reference: paystackRef || internalRef,
                 dispatched: paystackDispatched,
                 message: paystackDispatched 
-                    ? `An tura ₦${numAmount.toLocaleString()} zuwa ${accountName} (${bankName}) nan take ta Paystack.`
-                    : `An yi nasarar aiwatar da tura ₦${numAmount.toLocaleString()} zuwa ${accountName} (${bankName}).`
+                    ? `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Paystack.`
+                    : `Successfully processed transfer of ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}).`
             }), {
                 headers: { "Content-Type": "application/json", ...corsHeaders }
             });
