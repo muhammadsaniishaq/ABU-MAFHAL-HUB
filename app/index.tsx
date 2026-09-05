@@ -5,13 +5,10 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  useWindowDimensions,
   Platform,
   StatusBar,
   ActivityIndicator,
   Linking,
-  FlatList,
-  ViewToken,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -59,6 +56,7 @@ const COPY = {
     signup: 'Create Free Account',
     skip: 'Skip',
     next: 'Next',
+    back: 'Back to start',
     networks: 'SUPPORTED NETWORKS',
     verify: 'Verifying session...',
     ssl: 'Bank-Grade 256-Bit SSL · NDPA Protected',
@@ -89,6 +87,7 @@ const COPY = {
     signup: 'Bude Sabon Asusu Kyauta',
     skip: 'Tsallake',
     next: 'Gaba',
+    back: 'Komawa farko',
     networks: 'LAYUKAN DA MUKE GOYAN BAYA',
     verify: 'Ana duba asusu...',
     ssl: 'Tsaro na Banki · An Kare Bayananku',
@@ -142,21 +141,21 @@ const NETWORKS = [
   { name: '9mobile', color: '#a3e635', bg: 'rgba(163,230,53,0.15)' },
 ];
 
-const LOGO_WRAP_SIZE = 240;
+const LOGO_WRAP_SIZE = 220;
 
 // ─── ANIMATED DOT ─────────────────────────────────────────────────────────────
 function Dot({ active, color }: { active: boolean; color: string }) {
   const w = useSharedValue(active ? 22 : 7);
   const op = useSharedValue(active ? 1 : 0.35);
   useEffect(() => {
-    w.value = withSpring(active ? 22 : 7, { damping: 13, stiffness: 110 });
+    w.value = withSpring(active ? 22 : 7, { damping: 14, stiffness: 110 });
     op.value = withTiming(active ? 1 : 0.35, { duration: 250 });
   }, [active]);
   const a = useAnimatedStyle(() => ({ width: w.value, opacity: op.value }));
   return <Animated.View style={[{ height: 7, borderRadius: 4, backgroundColor: color }, a]} />;
 }
 
-// ─── SPINNING RING (Pixel-perfect centered without percentage quirks) ────────
+// ─── SPINNING RING (Pixel-perfect centered) ──────────────────────────────────
 function SpinRing({
   size,
   delay,
@@ -208,12 +207,12 @@ function SpinRing({
 
 // ─── SHIMMER BEAM ─────────────────────────────────────────────────────────────
 function ShimmerBeam() {
-  const tx = useSharedValue(-160);
+  const tx = useSharedValue(-150);
   useEffect(() => {
     tx.value = withRepeat(
       withSequence(
-        withTiming(160, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
-        withDelay(2600, withTiming(-160, { duration: 0 }))
+        withTiming(150, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
+        withDelay(2600, withTiming(-150, { duration: 0 }))
       ),
       -1,
       false
@@ -228,62 +227,10 @@ function ShimmerBeam() {
         {
           position: 'absolute',
           zIndex: 2,
-          width: 50,
-          height: 190,
+          width: 48,
+          height: 180,
           backgroundColor: 'rgba(255,255,255,0.18)',
-          borderRadius: 30,
-        },
-        a,
-      ]}
-    />
-  );
-}
-
-// ─── FLOATING PARTICLE ────────────────────────────────────────────────────────
-function Particle({
-  x,
-  y,
-  delay,
-  size,
-  color,
-}: {
-  x: number;
-  y: number;
-  delay: number;
-  size: number;
-  color: string;
-}) {
-  const op = useSharedValue(0);
-  const ty = useSharedValue(0);
-  useEffect(() => {
-    op.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(withTiming(0.85, { duration: 1400 }), withTiming(0, { duration: 1400 })),
-        -1,
-        false
-      )
-    );
-    ty.value = withDelay(
-      delay,
-      withRepeat(withTiming(-36, { duration: 2800, easing: Easing.inOut(Easing.ease) }), -1, true)
-    );
-  }, []);
-  const a = useAnimatedStyle(() => ({
-    opacity: op.value,
-    transform: [{ translateY: ty.value }],
-  }));
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          left: x,
-          top: y,
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
+          borderRadius: 28,
         },
         a,
       ]}
@@ -299,29 +246,27 @@ function PageWelcome({
   lang,
   setLang,
   haptic,
-  pageWidth,
 }: {
   c: typeof COPY.en;
   lang: LangKey;
   setLang: (fn: (l: LangKey) => LangKey) => void;
   haptic: () => void;
-  pageWidth: number;
 }) {
   const logoSc = useSharedValue(0);
   const logoOp = useSharedValue(0);
   const haloSc = useSharedValue(1);
   const titleOp = useSharedValue(0);
-  const titleY = useSharedValue(24);
+  const titleY = useSharedValue(20);
   const statsOp = useSharedValue(0);
-  const statsY = useSharedValue(20);
+  const statsY = useSharedValue(16);
 
   useEffect(() => {
-    logoOp.value = withDelay(120, withTiming(1, { duration: 450 }));
-    logoSc.value = withDelay(120, withSpring(1, { damping: 9, stiffness: 72 }));
-    titleOp.value = withDelay(380, withTiming(1, { duration: 500 }));
-    titleY.value = withDelay(380, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
-    statsOp.value = withDelay(600, withTiming(1, { duration: 450 }));
-    statsY.value = withDelay(600, withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) }));
+    logoOp.value = withDelay(100, withTiming(1, { duration: 400 }));
+    logoSc.value = withDelay(100, withSpring(1, { damping: 9, stiffness: 72 }));
+    titleOp.value = withDelay(300, withTiming(1, { duration: 450 }));
+    titleY.value = withDelay(300, withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) }));
+    statsOp.value = withDelay(500, withTiming(1, { duration: 450 }));
+    statsY.value = withDelay(500, withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) }));
     haloSc.value = withRepeat(
       withSequence(
         withTiming(1.15, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
@@ -346,25 +291,13 @@ function PageWelcome({
     transform: [{ translateY: statsY.value }],
   }));
 
-  const haloPos = (LOGO_WRAP_SIZE - 190) / 2;
-
-  const PARTS = [
-    { x: pageWidth * 0.08, y: 70, delay: 0, size: 4.5, color: '#f5a623' },
-    { x: pageWidth * 0.85, y: 80, delay: 350, size: 3.5, color: '#38bdf8' },
-    { x: pageWidth * 0.88, y: 260, delay: 700, size: 5, color: '#a855f7' },
-    { x: pageWidth * 0.06, y: 320, delay: 250, size: 4, color: '#10b981' },
-    { x: pageWidth * 0.80, y: 430, delay: 550, size: 3, color: '#f5a623' },
-    { x: pageWidth * 0.12, y: 470, delay: 900, size: 4, color: '#f43f5e' },
-  ];
+  const haloPos = (LOGO_WRAP_SIZE - 180) / 2;
 
   return (
     <View style={pg.root}>
       {/* Ambient background glows */}
       <View style={pg.blobA} />
       <View style={pg.blobB} />
-      {PARTS.map((p, i) => (
-        <Particle key={i} {...p} />
-      ))}
 
       {/* ─── Top bar ─── */}
       <View style={pg.topBar}>
@@ -402,16 +335,16 @@ function PageWelcome({
         <Animated.View
           style={[
             pg.haloGlow,
-            { top: haloPos, left: haloPos, width: 190, height: 190, borderRadius: 95 },
+            { top: haloPos, left: haloPos, width: 180, height: 180, borderRadius: 90 },
             aHalo,
           ]}
         />
 
         {/* 4 Concentric spinning rings */}
-        <SpinRing size={230} delay={900} color="rgba(168,85,247,0.12)" speed={22000} reverse />
-        <SpinRing size={206} delay={600} color="rgba(56,189,248,0.16)" speed={17000} />
-        <SpinRing size={182} delay={300} color="rgba(255,255,255,0.10)" speed={13000} reverse />
-        <SpinRing size={158} delay={0} color="rgba(245,166,35,0.38)" speed={9000} />
+        <SpinRing size={214} delay={800} color="rgba(168,85,247,0.12)" speed={22000} reverse />
+        <SpinRing size={192} delay={500} color="rgba(56,189,248,0.16)" speed={17000} />
+        <SpinRing size={170} delay={250} color="rgba(255,255,255,0.10)" speed={13000} reverse />
+        <SpinRing size={148} delay={0} color="rgba(245,166,35,0.38)" speed={9000} />
 
         {/* Gold medallion container */}
         <View style={pg.medallion}>
@@ -521,72 +454,48 @@ function PageFeatures({ lang, c }: { lang: LangKey; c: typeof COPY.en }) {
 
       {/* Feature rows */}
       <View style={p2.list}>
-        {FEATURES.map((f, idx) => {
+        {FEATURES.map(f => {
           const info = f[lang];
-          return <FeatureRow key={f.id} f={f} info={info} idx={idx} />;
+          return (
+            <LinearGradient
+              key={f.id}
+              colors={[f.color + '18', 'rgba(255,255,255,0.03)']}
+              style={[p2.row, { borderColor: f.color + '38' }]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {/* Icon */}
+              <LinearGradient
+                colors={[f.color + '32', f.color + '15']}
+                style={p2.icon}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Ionicons name={f.icon} size={18} color={f.color} />
+              </LinearGradient>
+
+              {/* Text */}
+              <View style={p2.textCol}>
+                <Text style={p2.rowTitle} numberOfLines={1}>
+                  {info.title}
+                </Text>
+                <Text style={p2.rowSub} numberOfLines={1}>
+                  {info.sub}
+                </Text>
+              </View>
+
+              {/* Right side */}
+              <View style={p2.rightCol}>
+                <View style={[p2.rowBadge, { backgroundColor: f.color + '1e', borderColor: f.color + '45' }]}>
+                  <Text style={[p2.rowBadgeTxt, { color: f.color }]}>{info.badge}</Text>
+                </View>
+                <Text style={[p2.rowStat, { color: f.color }]}>{info.stat}</Text>
+              </View>
+            </LinearGradient>
+          );
         })}
       </View>
     </View>
-  );
-}
-
-function FeatureRow({
-  f,
-  info,
-  idx,
-}: {
-  f: typeof FEATURES[0];
-  info: any;
-  idx: number;
-}) {
-  const op = useSharedValue(0);
-  const tx = useSharedValue(-20);
-  useEffect(() => {
-    const d = idx * 80 + 150;
-    op.value = withDelay(d, withTiming(1, { duration: 400 }));
-    tx.value = withDelay(d, withTiming(0, { duration: 400, easing: Easing.out(Easing.cubic) }));
-  }, []);
-  const a = useAnimatedStyle(() => ({
-    opacity: op.value,
-    transform: [{ translateX: tx.value }],
-  }));
-  return (
-    <Animated.View style={a}>
-      <LinearGradient
-        colors={[f.color + '18', 'rgba(255,255,255,0.03)']}
-        style={[p2.row, { borderColor: f.color + '38' }]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
-        {/* Icon */}
-        <LinearGradient
-          colors={[f.color + '32', f.color + '15']}
-          style={p2.icon}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Ionicons name={f.icon} size={18} color={f.color} />
-        </LinearGradient>
-
-        {/* Text */}
-        <View style={p2.textCol}>
-          <Text style={p2.rowTitle} numberOfLines={1}>
-            {info.title}
-          </Text>
-          <Text style={p2.rowSub} numberOfLines={1}>
-            {info.sub}
-          </Text>
-        </View>
-
-        {/* Right side */}
-        <View style={p2.rightCol}>
-          <View style={[p2.rowBadge, { backgroundColor: f.color + '1e', borderColor: f.color + '45' }]}>
-            <Text style={[p2.rowBadgeTxt, { color: f.color }]}>{info.badge}</Text>
-          </View>
-          <Text style={[p2.rowStat, { color: f.color }]}>{info.stat}</Text>
-        </View>
-      </LinearGradient>
-    </Animated.View>
   );
 }
 
@@ -604,25 +513,6 @@ function PageGetStarted({
   router: any;
   haptic: () => void;
 }) {
-  const secOp = useSharedValue(0);
-  const secY = useSharedValue(16);
-  const btnOp = useSharedValue(0);
-  const btnY = useSharedValue(14);
-  useEffect(() => {
-    secOp.value = withDelay(120, withTiming(1, { duration: 450 }));
-    secY.value = withDelay(120, withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) }));
-    btnOp.value = withDelay(350, withTiming(1, { duration: 450 }));
-    btnY.value = withDelay(350, withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) }));
-  }, []);
-  const aSec = useAnimatedStyle(() => ({
-    opacity: secOp.value,
-    transform: [{ translateY: secY.value }],
-  }));
-  const aBtn = useAnimatedStyle(() => ({
-    opacity: btnOp.value,
-    transform: [{ translateY: btnY.value }],
-  }));
-
   return (
     <View style={p3.root}>
       <View style={p3.blobA} />
@@ -639,7 +529,7 @@ function PageGetStarted({
       </View>
 
       {/* How it works */}
-      <Animated.View style={[p3.stepsRow, aSec]}>
+      <View style={p3.stepsRow}>
         {c.steps.map((label, i) => (
           <React.Fragment key={i}>
             <View style={p3.stepItem}>
@@ -663,10 +553,10 @@ function PageGetStarted({
             )}
           </React.Fragment>
         ))}
-      </Animated.View>
+      </View>
 
       {/* Network badges */}
-      <Animated.View style={[p3.netsBlock, aSec]}>
+      <View style={p3.netsBlock}>
         <Text style={p3.netsTitle}>{c.networks}</Text>
         <View style={p3.netsRow}>
           {NETWORKS.map(n => (
@@ -679,39 +569,37 @@ function PageGetStarted({
             </View>
           ))}
         </View>
-      </Animated.View>
+      </View>
 
       {/* Notification preview card */}
-      <Animated.View style={aSec}>
-        <LinearGradient
-          colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
-          style={p3.notifCard}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={p3.notifIcon}>
-            <LinearGradient
-              colors={['#10b981', '#059669']}
-              style={{ flex: 1, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
-            </LinearGradient>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={p3.notifTitle}>{c.notifTitle}</Text>
-            <Text style={p3.notifBody}>{c.notifBody}</Text>
-          </View>
-          <View style={{ alignItems: 'center', gap: 3 }}>
-            <View style={p3.notifDot} />
-            <Text style={p3.notifNow}>now</Text>
-          </View>
-        </LinearGradient>
-      </Animated.View>
+      <LinearGradient
+        colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
+        style={p3.notifCard}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={p3.notifIcon}>
+          <LinearGradient
+            colors={['#10b981', '#059669']}
+            style={{ flex: 1, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
+          </LinearGradient>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={p3.notifTitle}>{c.notifTitle}</Text>
+          <Text style={p3.notifBody}>{c.notifBody}</Text>
+        </View>
+        <View style={{ alignItems: 'center', gap: 3 }}>
+          <View style={p3.notifDot} />
+          <Text style={p3.notifNow}>now</Text>
+        </View>
+      </LinearGradient>
 
       {/* CTA Buttons */}
-      <Animated.View style={[p3.btnBlock, aBtn]}>
+      <View style={p3.btnBlock}>
         {checking ? (
           <View style={p3.loadCard}>
             <ActivityIndicator size="small" color="#f5a623" />
@@ -755,7 +643,7 @@ function PageGetStarted({
             </TouchableOpacity>
           </View>
         )}
-      </Animated.View>
+      </View>
 
       {/* SSL Footnote */}
       <View style={p3.sslRow}>
@@ -771,16 +659,14 @@ function PageGetStarted({
 // ─────────────────────────────────────────────────────────────────────────────
 export default function SplashScreen() {
   const router = useRouter();
-  const { width: winWidth, height: winHeight } = useWindowDimensions();
   const [checking, setChecking] = useState(true);
   const [lang, setLang] = useState<LangKey>('en');
   const [pageIdx, setPageIdx] = useState(0);
-  const flatRef = useRef<FlatList>(null);
   const PAGE_COLORS = ['#f5a623', '#38bdf8', '#10b981'];
 
-  // Responsive page width: phone uses 100%, desktop web caps at 440px
-  const PAGE_W = winWidth > 480 ? 440 : winWidth;
-  const NAV_H = Platform.OS === 'ios' ? 84 : 74;
+  // Swipe gesture tracking
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   useEffect(() => {
     checkAuthSession();
@@ -834,44 +720,52 @@ export default function SplashScreen() {
 
   const goToPage = (idx: number) => {
     haptic();
-    flatRef.current?.scrollToIndex({ index: idx, animated: true });
     setPageIdx(idx);
   };
 
   const goNext = () => {
-    const next = Math.min(pageIdx + 1, 2);
-    goToPage(next);
+    haptic();
+    setPageIdx(p => Math.min(p + 1, 2));
+  };
+
+  const goPrev = () => {
+    haptic();
+    setPageIdx(p => Math.max(p - 1, 0));
   };
 
   const goSkip = () => {
-    goToPage(2);
+    haptic();
+    setPageIdx(2);
   };
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    if (viewableItems.length > 0 && viewableItems[0].index != null) {
-      setPageIdx(viewableItems[0].index);
+  // Touch gesture handlers for swipe left/right
+  const handleTouchStart = (e: any) => {
+    touchStartX.current = e.nativeEvent.pageX;
+    touchStartY.current = e.nativeEvent.pageY;
+  };
+
+  const handleTouchEnd = (e: any) => {
+    const dx = e.nativeEvent.pageX - touchStartX.current;
+    const dy = e.nativeEvent.pageY - touchStartY.current;
+    // Only detect swipe if horizontal movement is dominant and > 40px
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0) {
+        // Swiped left -> next page
+        goNext();
+      } else {
+        // Swiped right -> previous page
+        goPrev();
+      }
     }
-  });
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
+  };
 
   const c = COPY[lang];
-  const pages = [
-    {
-      key: 'welcome',
-      el: <PageWelcome c={c} lang={lang} setLang={setLang} haptic={haptic} pageWidth={PAGE_W} />,
-    },
-    { key: 'features', el: <PageFeatures lang={lang} c={c} /> },
-    {
-      key: 'start',
-      el: <PageGetStarted c={c} checking={checking} router={router} haptic={haptic} />,
-    },
-  ];
 
   return (
     <View style={root.outerScreen}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Deep luxury cosmic background */}
+      {/* Deep luxury cosmic background gradient */}
       <LinearGradient
         colors={['#010812', '#050f28', '#091a48', '#050f28', '#010812']}
         locations={[0, 0.22, 0.5, 0.78, 1]}
@@ -880,61 +774,35 @@ export default function SplashScreen() {
         end={{ x: 0.85, y: 1 }}
       />
 
-      {/* Main phone frame: centered on desktop web, edge-to-edge on mobile */}
+      {/* Main app frame */}
       <View
-        style={[
-          root.appFrame,
-          {
-            width: PAGE_W,
-            ...(Platform.OS === 'web' && winWidth > 480
-              ? {
-                  borderRadius: 32,
-                  marginVertical: Math.max(16, (winHeight - 840) / 2),
-                  height: Math.min(winHeight - 32, 820),
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 255, 255, 0.12)',
-                  shadowColor: '#000000',
-                  shadowOffset: { width: 0, height: 20 },
-                  shadowOpacity: 0.85,
-                  shadowRadius: 40,
-                  elevation: 25,
-                }
-              : {}),
-          },
-        ]}
+        style={root.appFrame}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
-        {/* FlatList horizontal paging */}
-        <FlatList
-          ref={flatRef}
-          data={pages}
-          keyExtractor={item => item.key}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
-          getItemLayout={(_, index) => ({
-            length: PAGE_W,
-            offset: PAGE_W * index,
-            index,
-          })}
-          onViewableItemsChanged={onViewableItemsChanged.current}
-          viewabilityConfig={viewabilityConfig.current}
-          style={{ flex: 1 }}
-          renderItem={({ item }) => (
-            <View style={{ width: PAGE_W, flex: 1 }}>
-              <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-                {item.el}
-              </SafeAreaView>
-            </View>
-          )}
-        />
+        <SafeAreaView style={root.safeArea} edges={['top']}>
+          {/* Active page rendering */}
+          <View style={root.pageContent}>
+            {pageIdx === 0 && (
+              <PageWelcome c={c} lang={lang} setLang={setLang} haptic={haptic} />
+            )}
+            {pageIdx === 1 && <PageFeatures lang={lang} c={c} />}
+            {pageIdx === 2 && (
+              <PageGetStarted
+                c={c}
+                checking={checking}
+                router={router}
+                haptic={haptic}
+              />
+            )}
+          </View>
+        </SafeAreaView>
 
-        {/* Navigation bar at bottom of frame */}
-        <View style={[root.navBar, { height: NAV_H }]}>
+        {/* Bottom Navigation Bar */}
+        <View style={root.navBar}>
           {/* Dot indicators */}
           <View style={root.dots}>
-            {pages.map((_, i) => (
+            {[0, 1, 2].map(i => (
               <TouchableOpacity
                 key={i}
                 onPress={() => goToPage(i)}
@@ -967,7 +835,7 @@ export default function SplashScreen() {
             ) : (
               <TouchableOpacity onPress={() => goToPage(0)} style={root.backBtn} activeOpacity={0.75}>
                 <Ionicons name="arrow-back" size={14} color="#94a3b8" style={{ marginRight: 5 }} />
-                <Text style={root.backTxt}>Back to start</Text>
+                <Text style={root.backTxt}>{c.back}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -985,20 +853,33 @@ export default function SplashScreen() {
 const root = StyleSheet.create({
   outerScreen: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#010812',
     alignItems: 'center',
     justifyContent: 'center',
   },
   appFrame: {
     flex: 1,
-    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 460,
+    height: '100%',
     backgroundColor: '#010812',
+    overflow: 'hidden',
+  },
+  safeArea: {
+    flex: 1,
+    width: '100%',
+  },
+  pageContent: {
+    flex: 1,
+    width: '100%',
   },
   navBar: {
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 18 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
     paddingTop: 8,
-    backgroundColor: 'rgba(1,8,18,0.95)',
+    backgroundColor: 'rgba(1,8,18,0.96)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center',
@@ -1008,7 +889,7 @@ const root = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   navRow: {
     flexDirection: 'row',
@@ -1064,9 +945,10 @@ const root = StyleSheet.create({
 const pg = StyleSheet.create({
   root: {
     flex: 1,
+    width: '100%',
     paddingHorizontal: 20,
     paddingTop: 6,
-    paddingBottom: 10,
+    paddingBottom: 8,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
@@ -1151,7 +1033,7 @@ const pg = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // Logo wrapper: Fixed 240×240 box
+  // Logo wrapper: Fixed 220×220 box
   logoWrap: {
     width: LOGO_WRAP_SIZE,
     height: LOGO_WRAP_SIZE,
@@ -1169,19 +1051,19 @@ const pg = StyleSheet.create({
     elevation: 16,
   },
   medallion: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    padding: 3.5,
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    padding: 3,
     shadowColor: '#f5a623',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.55,
-    shadowRadius: 20,
+    shadowRadius: 18,
     elevation: 18,
   },
   medalGrad: {
     flex: 1,
-    borderRadius: 67,
+    borderRadius: 63,
     padding: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1189,20 +1071,20 @@ const pg = StyleSheet.create({
   medalInner: {
     width: '100%',
     height: '100%',
-    borderRadius: 65,
+    borderRadius: 61,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   logoImg: {
-    width: 124,
-    height: 124,
+    width: 118,
+    height: 118,
   },
   vBadge: {
     position: 'absolute',
-    bottom: 22,
-    right: 18,
+    bottom: 20,
+    right: 16,
     shadowColor: '#f5a623',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
@@ -1220,8 +1102,8 @@ const pg = StyleSheet.create({
   },
   starBadge: {
     position: 'absolute',
-    top: 22,
-    right: 18,
+    top: 20,
+    right: 16,
     width: 19,
     height: 19,
     borderRadius: 9.5,
@@ -1241,7 +1123,7 @@ const pg = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 7,
+    marginBottom: 6,
     width: '100%',
   },
   mottoDash: {
@@ -1341,7 +1223,8 @@ const pg = StyleSheet.create({
 const p2 = StyleSheet.create({
   root: {
     flex: 1,
-    paddingHorizontal: 16,
+    width: '100%',
+    paddingHorizontal: 18,
     paddingTop: 10,
     paddingBottom: 6,
     justifyContent: 'space-between',
@@ -1366,7 +1249,7 @@ const p2 = StyleSheet.create({
   },
 
   header: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   badge: {
     flexDirection: 'row',
@@ -1460,6 +1343,7 @@ const p2 = StyleSheet.create({
 const p3 = StyleSheet.create({
   root: {
     flex: 1,
+    width: '100%',
     paddingHorizontal: 18,
     paddingTop: 10,
     paddingBottom: 6,
