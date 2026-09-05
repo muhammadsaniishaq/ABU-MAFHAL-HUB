@@ -8,17 +8,20 @@ interface PaystackPaymentProps {
     visible: boolean;
     amount: number; // in Naira
     email: string;
+    userId?: string;
     publicKey: string;
     onSuccess: (response: any) => void;
     onCancel: () => void;
     onClose: () => void;
 }
 
-export default function PaystackPayment({ visible, amount, email, publicKey, onSuccess, onCancel, onClose }: PaystackPaymentProps) {
+export default function PaystackPayment({ visible, amount, email, userId, publicKey, onSuccess, onCancel, onClose }: PaystackPaymentProps) {
     const webViewRef = useRef<WebView>(null);
 
     // Amount needs to be passed in kobo to Paystack (N1 = 100 kobo)
-    const amountKobo = amount * 100;
+    const amountKobo = Math.round(amount * 100);
+    const cleanUserId = (userId || '').replace(/[^a-zA-Z0-9]/g, '');
+    const generatedRef = 'PAY_' + (cleanUserId || 'GUEST') + '_' + Date.now();
 
     const paystackHtml = `
       <!DOCTYPE html>
@@ -56,12 +59,26 @@ export default function PaystackPayment({ visible, amount, email, publicKey, onS
                             email: '${email}',
                             amount: ${amountKobo},
                             currency: 'NGN',
-                            ref: 'PAY-' + Math.floor((Math.random() * 1000000000) + 1),
+                            ref: '${generatedRef}',
+                            metadata: {
+                                user_id: '${userId || ""}',
+                                custom_fields: [
+                                    {
+                                        display_name: "User ID",
+                                        variable_name: "user_id",
+                                        value: "${userId || ""}"
+                                    }
+                                ]
+                            },
                             callback: function(response) {
+                                var resPayload = Object.assign({}, response, {
+                                    reference: response.reference || response.trxref || '${generatedRef}',
+                                    user_id: '${userId || ""}'
+                                });
                                 if (window.ReactNativeWebView) {
-                                    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'success', data: response}));
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'success', data: resPayload}));
                                 } else {
-                                    window.parent.postMessage(JSON.stringify({type: 'success', data: response}), '*');
+                                    window.parent.postMessage(JSON.stringify({type: 'success', data: resPayload}), '*');
                                 }
                             },
                             onClose: function() {

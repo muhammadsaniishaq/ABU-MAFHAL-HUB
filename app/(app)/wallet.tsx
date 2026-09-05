@@ -11,6 +11,7 @@ import {
     TextInput,
     Platform,
     Modal,
+    ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +50,9 @@ export default function WalletScreen() {
     const [paystackVisible, setPaystackVisible] = useState(false);
     const [paystackKey, setPaystackKey] = useState('');
     const [userEmail, setUserEmail] = useState('');
+    const [currentUserId, setCurrentUserId] = useState('');
+    const [verifyingPayment, setVerifyingPayment] = useState(false);
+    const [verifyStatusText, setVerifyStatusText] = useState('Tabbatar da biya...');
 
     useEffect(() => {
         if (!settingsLoading) {
@@ -66,6 +70,8 @@ export default function WalletScreen() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
+
+            setCurrentUserId(user.id);
 
             const [profileRes, vAccountsRes, statsRes, recentRes, settingsRes] = await Promise.all([
                 supabase.from('profiles').select('balance, bvn, kyc_tier').eq('id', user.id).single(),
@@ -229,6 +235,76 @@ export default function WalletScreen() {
                 return 'Fund Transfer';
             default:
                 return 'Service Purchase';
+        }
+    };
+
+    const handlePaystackSuccess = async (response: any) => {
+        try {
+            setPaystackVisible(false);
+            setVerifyingPayment(true);
+            setVerifyStatusText('Muna tabbatar da kudi tare da Paystack...');
+
+            const reference = response?.reference || response?.trxref || response?.transaction;
+            console.log('[Paystack] Payment client success callback, reference:', reference);
+
+            if (!reference) {
+                Alert.alert("Sanarwa", "An kammala biya. Da fatan za a duba wallet bayan 'yan dakiku.");
+                await fetchWalletData();
+                return;
+            }
+
+            // Call edge function verify_paystack directly for immediate crediting
+            const { data, error } = await supabase.functions.invoke('payment-webhook', {
+                body: {
+                    action: 'verify_paystack',
+                    reference: reference,
+                    userId: currentUserId,
+                    amount: Number(fundAmount) || 0,
+                }
+            });
+
+            console.log('[Paystack] Verification invoke result:', data, error);
+
+            if (error) {
+                console.error('[Paystack] Verification invoke error:', error);
+                Alert.alert(
+                    "Ana Kan Aiki",
+                    "An karɓi biyan ku daga banki. Tsarin zai saka kudin a wallet dinku ta atomatik ta webhook.",
+                    [{ text: "To", onPress: () => fetchWalletData() }]
+                );
+                return;
+            }
+
+            if (data?.success) {
+                if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                const creditedAmount = data.amount !== undefined ? data.amount : fundAmount;
+                const newBalMsg = data.new_balance !== undefined ? `\nSabon Balance: ₦${Number(data.new_balance).toLocaleString()}` : '';
+                Alert.alert(
+                    "An Saka Kuɗi A Wallet! 🎉",
+                    `An yi nasarar tabbatarwa tare da saka ₦${Number(creditedAmount).toLocaleString()} a cikin wallet ɗinku.${newBalMsg}`,
+                    [{ text: "Madalla", onPress: () => fetchWalletData() }]
+                );
+                setFundAmount('');
+                await fetchWalletData();
+            } else {
+                Alert.alert(
+                    "Sanarwa",
+                    data?.message || "Ba a kammala tabbatarwa ba tukuna. Idan an cire kudin a banki, za a zuba shi ta atomatik.",
+                    [{ text: "To", onPress: () => fetchWalletData() }]
+                );
+            }
+        } catch (err: any) {
+            console.error('[Paystack] Verification catch error:', err);
+            Alert.alert(
+                "Sanarwa",
+                "Kudin ku ya fita. Tsarin zai saka shi a wallet ta atomatik cikin kankanin lokaci.",
+                [{ text: "To", onPress: () => fetchWalletData() }]
+            );
+            await fetchWalletData();
+        } finally {
+            setVerifyingPayment(false);
         }
     };
 
@@ -738,16 +814,36 @@ export default function WalletScreen() {
                     visible={paystackVisible}
                     amount={Number(fundAmount)}
                     email={userEmail || 'user@example.com'}
+                    userId={currentUserId}
                     publicKey={paystackKey}
-                    onSuccess={() => {
-                        Alert.alert("Payment Successful", "Your wallet will be credited shortly.");
-                        setFundAmount('');
-                        setTimeout(() => fetchWalletData(), 3000);
-                    }}
-                    onCancel={() => Alert.alert("Payment Cancelled", "Transaction was cancelled.")}
+                    onSuccess={handlePaystackSuccess}
+                    onCancel={() => Alert.alert("An Soke Biya", "An fasa biyan kudin.")}
                     onClose={() => setPaystackVisible(false)}
                 />
             )}
+
+            {/* Payment Verifying Loading Modal */}
+            <Modal
+                visible={verifyingPayment}
+                transparent={true}
+                animationType="fade"
+            >
+                <View style={s.verifyModalBackdrop}>
+                    <View style={s.verifyModalCard}>
+                        <View style={s.verifyIconCircle}>
+                            <ActivityIndicator size="large" color="#F59E0B" />
+                        </View>
+                        <Text style={s.verifyTitle}>Tabbatar Da Biya...</Text>
+                        <Text style={s.verifySub}>
+                            {verifyStatusText || 'Muna tabbatar da biyan ku daga Paystack tare da zuba kudin a wallet dinku nan take...'}
+                        </Text>
+                        <View style={s.verifyWarningBadge}>
+                            <Ionicons name="shield-checkmark" size={15} color="#10B981" />
+                            <Text style={s.verifyWarningText}>Kada ku rufe app din har sai an gama</Text>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -1546,5 +1642,69 @@ const s = StyleSheet.create({
         fontSize: 11.5,
         fontWeight: '900',
         textTransform: 'uppercase',
+    },
+    verifyModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(2, 6, 23, 0.78)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    verifyModalCard: {
+        width: '100%',
+        maxWidth: 340,
+        backgroundColor: '#0F172A',
+        borderRadius: 22,
+        padding: 26,
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    verifyIconCircle: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    verifyTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '900',
+        marginBottom: 8,
+        letterSpacing: -0.2,
+        textAlign: 'center',
+    },
+    verifySub: {
+        color: '#94A3B8',
+        fontSize: 12.5,
+        textAlign: 'center',
+        lineHeight: 18,
+        marginBottom: 18,
+    },
+    verifyWarningBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(16, 185, 129, 0.25)',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 20,
+    },
+    verifyWarningText: {
+        color: '#10B981',
+        fontSize: 11,
+        fontWeight: '700',
     },
 });
