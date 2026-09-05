@@ -146,7 +146,8 @@ CREATE OR REPLACE FUNCTION public.execute_user_bank_withdrawal(
   p_bank_name text,
   p_account_number text,
   p_account_name text,
-  p_narration text default 'Bank Transfer'
+  p_narration text default 'Bank Transfer',
+  p_user_id uuid default null
 )
 returns jsonb as $$
 declare
@@ -155,9 +156,15 @@ declare
   v_new_bal numeric;
   v_ref text;
 begin
-  v_user_id := auth.uid();
+  v_user_id := coalesce(p_user_id, auth.uid());
   if v_user_id is null then
     raise exception 'Not authenticated';
+  end if;
+
+  if p_user_id is not null and p_user_id != auth.uid() then
+    if current_setting('request.jwt.claims', true)::jsonb->>'role' != 'service_role' and not public.is_admin() then
+       raise exception 'Unauthorized';
+    end if;
   end if;
 
   if p_amount <= 0 then

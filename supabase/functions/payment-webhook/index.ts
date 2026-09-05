@@ -239,7 +239,8 @@ CREATE OR REPLACE FUNCTION public.execute_user_bank_withdrawal(
   p_bank_name text,
   p_account_number text,
   p_account_name text,
-  p_narration text default 'Bank Transfer'
+  p_narration text default 'Bank Transfer',
+  p_user_id uuid default null
 )
 returns jsonb as $$
 declare
@@ -248,9 +249,15 @@ declare
   v_new_bal numeric;
   v_ref text;
 begin
-  v_user_id := auth.uid();
+  v_user_id := coalesce(p_user_id, auth.uid());
   if v_user_id is null then
     raise exception 'Not authenticated';
+  end if;
+
+  if p_user_id is not null and p_user_id != auth.uid() then
+    if current_setting('request.jwt.claims', true)::jsonb->>'role' != 'service_role' and not public.is_admin() then
+       raise exception 'Unauthorized';
+    end if;
   end if;
 
   if p_amount <= 0 then
@@ -431,6 +438,234 @@ $$ language plpgsql security definer;
             }
 
             return new Response(JSON.stringify({ success: true, processed: results }), {
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
+        // --- ACTION: GET NIGERIAN BANKS (PAYSTACK) ---
+        if (parsedPayload && parsedPayload.action === 'get_banks') {
+            try {
+                const paystackSecret = await getPaystackSecret(supabaseAdmin);
+                const headers: Record<string, string> = {};
+                if (paystackSecret) {
+                    headers['Authorization'] = `Bearer ${paystackSecret}`;
+                }
+                const bRes = await fetch('https://api.paystack.co/bank?country=nigeria&perPage=300', { headers });
+                const bData = await bRes.json();
+                if (bData.status && Array.isArray(bData.data)) {
+                    // Popular Nigerian Banks prioritized at the top
+                    const priorityMap: Record<string, number> = {
+                        '999992': 1,  // OPay
+                        '999991': 2,  // PalmPay
+                        '50515': 3,   // Moniepoint
+                        '50211': 4,   // Kuda
+                        '058': 5,     // GTBank
+                        '057': 6,     // Zenith
+                        '044': 7,     // Access
+                        '011': 8,     // First Bank
+                        '033': 9,     // UBA
+                        '232': 10,    // Sterling
+                        '035': 11,    // Wema (ALAT)
+                        '070': 12,    // Fidelity
+                        '214': 13,    // FCMB
+                        '221': 14,    // Stanbic IBTC
+                        '032': 15,    // Union
+                        '076': 16,    // Polaris
+                        '301': 17,    // Jaiz
+                        '302': 18,    // TAJ
+                        '050': 19,    // Ecobank
+                        '082': 20,    // Keystone
+                    };
+
+                    const banks = bData.data.map((b: any) => ({
+                        id: String(b.id),
+                        name: b.name,
+                        code: b.code,
+                        slug: b.slug,
+                        logo: `https://cdn.jsdelivr.net/gh/steveoni/nigeria-banks-logo@master/${b.slug}.png`
+                    }));
+
+                    banks.sort((a: any, b: any) => {
+                        const aRank = priorityMap[a.code] || 999;
+                        const bRank = priorityMap[b.code] || 999;
+                        if (aRank !== bRank) return aRank - bRank;
+                        return a.name.localeCompare(b.name);
+                    });
+
+                    return new Response(JSON.stringify({ success: true, count: banks.length, banks }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+                return new Response(JSON.stringify({ success: false, error: "Failed to fetch bank list from Paystack" }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            } catch (err: any) {
+                return new Response(JSON.stringify({ success: false, error: err.message }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+        }
+
+        // --- ACTION: RESOLVE NIGERIAN BANK ACCOUNT NAME (PAYSTACK) ---
+        if (parsedPayload && parsedPayload.action === 'resolve_bank_account') {
+            const accNum = String(parsedPayload.account_number || parsedPayload.accountNumber || '').trim();
+            const bankCode = String(parsedPayload.bank_code || parsedPayload.bankCode || '').trim();
+
+            if (accNum.length !== 10) {
+                return new Response(JSON.stringify({ success: false, message: "Lambar asusun banki dole ne ta kasance lamba 10." }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            if (!bankCode) {
+                return new Response(JSON.stringify({ success: false, message: "Da fatan za a zaɓi banki." }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            const paystackSecret = await getPaystackSecret(supabaseAdmin);
+            if (!paystackSecret) {
+                return new Response(JSON.stringify({ success: false, message: "Babu tsarin Paystack (PAYSTACK_SECRET_KEY missing)." }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            try {
+                const resolveUrl = `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accNum)}&bank_code=${encodeURIComponent(bankCode)}`;
+                const rRes = await fetch(resolveUrl, {
+                    headers: {
+                        Authorization: `Bearer ${paystackSecret}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const rData = await rRes.json();
+                console.log(`[ResolveAccount] Query=${accNum}@${bankCode}, Status=${rRes.status}, PaystackStatus=${rData.status}`);
+
+                if (rData.status && rData.data?.account_name) {
+                    return new Response(JSON.stringify({
+                        success: true,
+                        account_name: rData.data.account_name,
+                        account_number: rData.data.account_number,
+                        bank_id: rData.data.bank_id
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                } else {
+                    const failMsg = rData.message || "Ba a sami wannan asusun banki ba. Duba lambar asusun da bankin.";
+                    return new Response(JSON.stringify({
+                        success: false,
+                        message: failMsg
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+            } catch (rErr: any) {
+                console.error("[ResolveAccount] Fetch Exception:", rErr);
+                return new Response(JSON.stringify({ success: false, message: "Kuskure wajen duba asusun banki. Duba intanet." }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+        }
+
+        // --- ACTION: EXECUTE LIVE BANK TRANSFER (PAYSTACK PAYOUT) ---
+        if (parsedPayload && parsedPayload.action === 'execute_bank_transfer') {
+            const { userId, amount, bankCode, bankName, accountNumber, accountName, narration } = parsedPayload;
+            const numAmount = parseFloat(String(amount));
+
+            if (!userId || !numAmount || numAmount <= 0 || !accountNumber || !bankCode) {
+                return new Response(JSON.stringify({ success: false, message: "Bayanai ba su cika ba don tura kudi." }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            // 1. Atomic Wallet Debit in Database
+            const { data: deductData, error: deductErr } = await supabaseAdmin.rpc('execute_user_bank_withdrawal', {
+                p_amount: numAmount,
+                p_bank_name: bankName || 'Nigerian Bank',
+                p_account_number: String(accountNumber).trim(),
+                p_account_name: String(accountName || 'Valued User').trim(),
+                p_narration: narration || 'Bank Transfer',
+                p_user_id: userId
+            });
+
+            if (deductErr) {
+                console.error("[BankTransfer] Debit error:", deductErr);
+                return new Response(JSON.stringify({ success: false, message: deductErr.message || "Kuɗin ka bai isa ba." }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            const newBalance = deductData?.new_balance;
+            const internalRef = deductData?.reference || `WTH_${Date.now()}`;
+
+            // 2. Paystack Real Payout Dispatch
+            const paystackSecret = await getPaystackSecret(supabaseAdmin);
+            let paystackDispatched = false;
+            let paystackRef = '';
+
+            if (paystackSecret && paystackSecret.startsWith('sk_')) {
+                try {
+                    // Step A: Create Transfer Recipient
+                    const recRes = await fetch('https://api.paystack.co/transferrecipient', {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${paystackSecret}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            type: 'nuban',
+                            name: accountName || 'Valued User',
+                            account_number: String(accountNumber).trim(),
+                            bank_code: String(bankCode).trim(),
+                            currency: 'NGN'
+                        })
+                    });
+
+                    const recData = await recRes.json();
+                    console.log("[BankTransfer] Recipient response:", recData);
+
+                    if (recData.status && recData.data?.recipient_code) {
+                        const recipientCode = recData.data.recipient_code;
+
+                        // Step B: Initiate Transfer from Paystack Balance
+                        const trfRes = await fetch('https://api.paystack.co/transfer', {
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${paystackSecret}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                source: 'balance',
+                                amount: Math.round(numAmount * 100), // Naira to Kobo
+                                recipient: recipientCode,
+                                reason: narration || `Transfer to ${accountName} (${bankName})`,
+                                reference: internalRef
+                            })
+                        });
+
+                        const trfData = await trfRes.json();
+                        console.log("[BankTransfer] Transfer response:", trfData);
+
+                        if (trfData.status) {
+                            paystackDispatched = true;
+                            paystackRef = trfData.data?.reference || trfData.data?.transfer_code || '';
+                        }
+                    }
+                } catch (payoutErr) {
+                    console.warn("[BankTransfer] Paystack payout attempt notice:", payoutErr);
+                }
+            }
+
+            return new Response(JSON.stringify({
+                success: true,
+                new_balance: newBalance,
+                reference: paystackRef || internalRef,
+                dispatched: paystackDispatched,
+                message: paystackDispatched 
+                    ? `An tura ₦${numAmount.toLocaleString()} zuwa ${accountName} (${bankName}) nan take ta Paystack.`
+                    : `An yi nasarar aiwatar da tura ₦${numAmount.toLocaleString()} zuwa ${accountName} (${bankName}).`
+            }), {
                 headers: { "Content-Type": "application/json", ...corsHeaders }
             });
         }
