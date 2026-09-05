@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Network Assets & Data
 const NETWORK_LOGOS: Record<string, any> = {
@@ -109,6 +110,8 @@ const safeLayoutAnimation = () => {
 };
 
 export default function AirtimeScreen() {
+    const insets = useSafeAreaInsets();
+    const headerTopPadding = Math.max(insets.top, Platform.OS === 'android' ? 32 : 20) + 12;
     const [network, setNetwork] = useState('mtn');
     const [amount, setAmount] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -356,21 +359,49 @@ export default function AirtimeScreen() {
     };
 
     return (
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            className="flex-1 bg-gray-50"
-            style={isWeb && { backgroundColor: '#f4f6fb' }}
-        >
-            <Stack.Screen options={{ title: 'Buy Airtime', headerTintColor: '#0d1b3e', headerStyle: { backgroundColor: '#fff' }, headerShadowVisible: false }} />
-            <StatusBar style="dark" />
-
-            <ScrollView 
-                style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
-                contentContainerStyle={[
-                    { padding: 16, paddingBottom: 130, paddingTop: 16 },
-                    isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
+        <View style={{ flex: 1, backgroundColor: '#f4f6fb' }}>
+            <StatusBar style="light" />
+            
+            {/* Premium Curved Header */}
+            <LinearGradient 
+                colors={['#060d21', '#0d1b3e']} 
+                style={[
+                    s.headerContainer,
+                    { paddingTop: headerTopPadding },
+                    isWeb && s.webPageContainer
                 ]}
             >
+                <View style={s.headerTop}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={20} color="#ffffff" />
+                    </TouchableOpacity>
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={s.headerTitle}>Buy Airtime</Text>
+                        {balance !== null && (
+                            <View style={s.balanceBadge}>
+                                <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
+                                <Text style={s.headerBalance}>
+                                    ₦{Number(balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={{ width: 36 }} />
+                </View>
+            </LinearGradient>
+
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                className="flex-1 bg-gray-50"
+                style={isWeb && { backgroundColor: '#f4f6fb' }}
+            >
+                <ScrollView 
+                    style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
+                    contentContainerStyle={[
+                        { padding: 16, paddingBottom: 130, paddingTop: 14 },
+                        isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
+                    ]}
+                >
                 
                 {/* Balance Display - Modern Gradient */}
                 {balance !== null && (
@@ -844,10 +875,60 @@ export default function AirtimeScreen() {
                 requiredFor="purchase"
             />
         </KeyboardAvoidingView>
+    </View>
     );
 }
 
 const s = StyleSheet.create({
+  headerContainer: {
+    paddingBottom: 16,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  webPageContainer: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 450,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  balanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+  },
+  headerBalance: {
+    color: '#f5a623',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   networksContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

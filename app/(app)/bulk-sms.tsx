@@ -6,6 +6,8 @@ import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 const BIGIHUB_API_URL = Platform.OS === 'web' 
     ? 'https://corsproxy.io/?' + encodeURIComponent(process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/')
@@ -26,6 +28,8 @@ const QUICK_TEMPLATES = {
 
 export default function UserBulkSMS() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
+    const headerTopPadding = Math.max(insets.top, Platform.OS === 'android' ? 32 : 20) + 12;
     const [loading, setLoading] = useState(false);
     const [initializing, setInitializing] = useState(true);
 
@@ -340,19 +344,47 @@ FORMATTING & STYLE RULES:
     }
 
     return (
-        <KeyboardAvoidingView 
-            style={{ flex: 1, backgroundColor: '#f8fafc' }} 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-            <Stack.Screen options={{
-                headerTitle: "Bulk SMS",
-                headerStyle: { backgroundColor: '#f8fafc' },
-                headerTintColor: NAVY,
-                headerShadowVisible: false,
-                headerBackTitle: 'Back'
-            }} />
+        <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+            <StatusBar style="light" />
+            
+            {/* Premium Curved Header */}
+            <LinearGradient 
+                colors={['#060d21', '#0d1b3e']} 
+                style={{
+                    paddingTop: headerTopPadding,
+                    paddingBottom: 16,
+                    paddingHorizontal: 16,
+                    borderBottomLeftRadius: 20,
+                    borderBottomRightRadius: 20,
+                    width: '100%',
+                }}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <TouchableOpacity 
+                        onPress={() => router.back()} 
+                        style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' }}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="arrow-back" size={20} color="#ffffff" />
+                    </TouchableOpacity>
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 }}>Bulk SMS</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 166, 35, 0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, marginTop: 4, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.25)' }}>
+                            <Ionicons name="wallet-outline" size={11} color="#f5a623" style={{ marginRight: 4 }} />
+                            <Text style={{ color: '#f5a623', fontSize: 11.5, fontWeight: '800' }}>
+                                ₦{userBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={{ width: 36 }} />
+                </View>
+            </LinearGradient>
 
-            <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
+            <KeyboardAvoidingView 
+                style={{ flex: 1 }} 
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 14, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
                 
                 {/* Slim Balance Card */}
                 <LinearGradient 
@@ -575,6 +607,7 @@ FORMATTING & STYLE RULES:
                     </View>
                 </View>
             </Modal>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </View>
     );
 }

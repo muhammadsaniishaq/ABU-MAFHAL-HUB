@@ -12,10 +12,13 @@ import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: W } = Dimensions.get('window');
 
 export default function SmileScreen() {
+    const insets = useSafeAreaInsets();
+    const headerTopPadding = Math.max(insets.top, Platform.OS === 'android' ? 32 : 20) + 12;
     const [accountId, setAccountId] = useState('');
     const [packages, setPackages] = useState<any[]>([]);
     const [selectedPackage, setSelectedPackage] = useState<any>(null);
@@ -180,18 +183,17 @@ export default function SmileScreen() {
         } finally {
             setIsSubmitting(false);
         }
-    };    return (
-        <View style={s.container}>
-            <StatusBar style="dark" />
+    };
 
-            
+    return (
+        <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
             
             {/* Premium Curved Header matching Data page */}
             <LinearGradient 
                 colors={['#060d21', '#0d1b3e']} 
-                style={s.headerContainer}
+                style={[s.headerContainer, { paddingTop: headerTopPadding }]}
             >
                 <View style={s.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
@@ -536,7 +538,6 @@ const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f4f6fb' }, 
     
     headerContainer: {
-        paddingTop: Platform.OS === 'ios' ? 50 : 35,
         paddingBottom: 16,
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,

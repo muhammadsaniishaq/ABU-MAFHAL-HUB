@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
 import * as Haptics from 'expo-haptics';
 import { createAppNotification } from '../../services/notificationsHelper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web' && width > 768;
@@ -29,6 +30,8 @@ const NETWORK_LOGOS: Record<string, any> = {
 };
 
 export default function AirtimeToCashScreen() {
+    const insets = useSafeAreaInsets();
+    const headerTopPadding = Math.max(insets.top, Platform.OS === 'android' ? 32 : 20) + 12;
     const [userId, setUserId] = useState<string | null>(null);
     const [userPhone, setUserPhone] = useState<string | null>(null);
 
@@ -354,7 +357,7 @@ export default function AirtimeToCashScreen() {
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
                 
                 {/* Curved Navy Header with Clean Centered Title */}
-                <LinearGradient colors={['#060d21', '#0d1b3e', '#1e293b']} style={s.headerContainer}>
+                <LinearGradient colors={['#060d21', '#0d1b3e', '#1e293b']} style={[s.headerContainer, { paddingTop: headerTopPadding }]}>
                     <View style={s.headerTop}>
                         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
                             <Ionicons name="arrow-back" size={18} color="white" />
@@ -595,7 +598,6 @@ const s = StyleSheet.create({
         backgroundColor: '#f4f6fb',
     },
     headerContainer: {
-        paddingTop: Platform.OS === 'ios' ? 48 : 36,
         paddingBottom: 16,
         paddingHorizontal: 16,
         borderBottomLeftRadius: 20,
@@ -607,9 +609,9 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
     },
     backBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: 'rgba(255, 255, 255, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
