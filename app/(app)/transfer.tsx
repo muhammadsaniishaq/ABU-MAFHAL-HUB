@@ -278,135 +278,99 @@ export default function TransferScreen() {
             }
 
             if (activeTab === 'p2p') {
-                // Execute P2P Wallet Transfer
+                // Execute P2P Wallet Transfer via secure atomic RPC
                 const recipientId = matchedUser!.id;
                 const recipientName = matchedUser!.full_name;
 
-                // Try RPC first for atomic integrity
-                let rpcSucceeded = false;
-                try {
-                    const { data: rpcData, error: rpcError } = await supabase.rpc('execute_wallet_transfer', {
-                        sender_id: user.id,
-                        target_id: recipientId,
-                        amount: numAmount,
-                        note: note.trim() || 'Wallet Transfer',
-                    });
+                const { data: rpcData, error: rpcError } = await supabase.rpc('execute_wallet_transfer', {
+                    sender_id: user.id,
+                    target_id: recipientId,
+                    amount: numAmount,
+                    note: note.trim() || 'Wallet Transfer',
+                });
 
-                    if (!rpcError) {
-                        rpcSucceeded = true;
-                    }
-                } catch (rpcEx) {
-                    console.warn('execute_wallet_transfer RPC exception:', rpcEx);
+                if (rpcError) {
+                    throw new Error(rpcError.message || 'Kuskure wajen tura kudi tsakanin asusu.');
                 }
 
-                // Fallback atomic balance updates if RPC is not deployed or failed
-                if (!rpcSucceeded) {
-                    const newSenderBal = Math.max(0, liveBal - numAmount);
-                    const { error: debitErr } = await supabase
-                        .from('profiles')
-                        .update({ balance: newSenderBal })
-                        .eq('id', user.id);
-                    if (debitErr) throw debitErr;
+                const finalNewBal = rpcData?.new_balance !== undefined 
+                    ? parseFloat(String(rpcData.new_balance)) 
+                    : Math.max(0, liveBal - numAmount);
 
-                    // Credit recipient
-                    const { data: recProfile } = await supabase
-                        .from('profiles')
-                        .select('balance')
-                        .eq('id', recipientId)
-                        .single();
-                    const recBal = recProfile && recProfile.balance !== null ? parseFloat(String(recProfile.balance)) : 0;
-                    await supabase
-                        .from('profiles')
-                        .update({ balance: recBal + numAmount })
-                        .eq('id', recipientId);
-
-                    // Insert Sender Transaction
-                    await supabase.from('transactions').insert({
-                        user_id: user.id,
-                        type: 'transfer',
-                        amount: numAmount,
-                        status: 'success',
-                        description: `Transfer to ${recipientName} (${matchedUser?.email || matchedUser?.phone || 'Wallet'})`,
-                        reference: refCode,
-                    });
-
-                    // Insert Recipient Transaction
-                    await supabase.from('transactions').insert({
-                        user_id: recipientId,
-                        type: 'deposit',
-                        amount: numAmount,
-                        status: 'success',
-                        description: `Transfer received from Abu Mafhal Member`,
-                        reference: `${refCode}_IN`,
-                    });
-                }
+                const finalRef = rpcData?.reference || refCode;
 
                 // Send In-App Notifications
-                await createAppNotification(
-                    user.id,
-                    'An Tura Kuɗi!',
-                    `An yi nasarar tura ₦${numAmount.toLocaleString()} zuwa ga ${recipientName}.`,
-                    'transfer',
-                    'normal',
-                    { route: '/(app)/history' }
-                );
+                try {
+                    await createAppNotification(
+                        user.id,
+                        'An Tura Kuɗi!',
+                        `An yi nasarar tura ₦${numAmount.toLocaleString()} zuwa ga ${recipientName}.`,
+                        'transfer',
+                        'normal',
+                        { route: '/(app)/history' }
+                    );
 
-                await createAppNotification(
-                    recipientId,
-                    'An Saka Kuɗi A Wallet!',
-                    `Kun sami tura kuɗi na ₦${numAmount.toLocaleString()} a cikin wallet ɗinku.`,
-                    'deposit',
-                    'normal',
-                    { route: '/(app)/wallet' }
-                );
+                    await createAppNotification(
+                        recipientId,
+                        'An Saka Kuɗi A Wallet!',
+                        `Kun sami tura kuɗi na ₦${numAmount.toLocaleString()} a cikin wallet ɗinku.`,
+                        'deposit',
+                        'normal',
+                        { route: '/(app)/wallet' }
+                    );
+                } catch (notifErr) {
+                    console.warn('Notification send notice:', notifErr);
+                }
 
-                const finalNewBal = Math.max(0, liveBal - numAmount);
                 setUserBalance(finalNewBal);
                 setLastTxDetails({
-                    reference: refCode,
+                    reference: finalRef,
                     amount: numAmount,
                     recipient: recipientName,
                     type: 'p2p',
                     newBalance: finalNewBal,
                 });
             } else {
-                // Execute Bank Transfer (Withdrawal)
-                const newSenderBal = Math.max(0, liveBal - numAmount);
-
-                const { error: debitErr } = await supabase
-                    .from('profiles')
-                    .update({ balance: newSenderBal })
-                    .eq('id', user.id);
-
-                if (debitErr) throw debitErr;
-
-                // Log withdrawal transaction
-                await supabase.from('transactions').insert({
-                    user_id: user.id,
-                    type: 'withdrawal',
-                    amount: numAmount,
-                    status: 'success',
-                    description: `Transfer to ${accountName.trim()} - ${selectedBank!.name} (${accountNumber.trim()})`,
-                    reference: refCode,
+                // Execute Bank Transfer (Withdrawal) via secure atomic RPC
+                const { data: rpcData, error: rpcError } = await supabase.rpc('execute_user_bank_withdrawal', {
+                    p_amount: numAmount,
+                    p_bank_name: selectedBank!.name,
+                    p_account_number: accountNumber.trim(),
+                    p_account_name: accountName.trim(),
+                    p_narration: note.trim() || 'Bank Transfer',
                 });
 
-                // Send notification
-                await createAppNotification(
-                    user.id,
-                    'An Tura Kuɗi Zuwa Banki',
-                    `An yi nasarar cire ₦${numAmount.toLocaleString()} zuwa ${selectedBank!.name} (${accountNumber.trim()}).`,
-                    'transfer',
-                    'normal',
-                    { route: '/(app)/history' }
-                );
+                if (rpcError) {
+                    throw new Error(rpcError.message || 'Kuskure wajen cire kudi zuwa banki.');
+                }
 
-                setUserBalance(newSenderBal);
+                const finalNewBal = rpcData?.new_balance !== undefined 
+                    ? parseFloat(String(rpcData.new_balance)) 
+                    : Math.max(0, liveBal - numAmount);
+
+                const finalRef = rpcData?.reference || refCode;
+
+                // Send notification
+                try {
+                    await createAppNotification(
+                        user.id,
+                        'An Tura Kuɗi Zuwa Banki',
+                        `An yi nasarar cire ₦${numAmount.toLocaleString()} zuwa ${selectedBank!.name} (${accountNumber.trim()}).`,
+                        'transfer',
+                        'normal',
+                        { route: '/(app)/history' }
+                    );
+                } catch (notifErr) {
+                    console.warn('Notification send notice:', notifErr);
+                }
+
+                setUserBalance(finalNewBal);
                 setLastTxDetails({
-                    reference: refCode,
+                    reference: finalRef,
                     amount: numAmount,
                     recipient: `${accountName.trim()} (${selectedBank!.name})`,
                     type: 'bank',
-                    newBalance: newSenderBal,
+                    newBalance: finalNewBal,
                 });
             }
 
