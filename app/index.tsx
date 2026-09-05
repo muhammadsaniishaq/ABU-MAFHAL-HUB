@@ -50,6 +50,22 @@ const COPY = {
     p2Sub: 'All telecom & payment needs in one place',
     p3Title: 'How It Works',
     p3Sub: 'Start earning in 3 simple steps',
+    p3Badge: 'VIP LAUNCHPAD',
+    p3MascotName: 'Khadijah · Banking Lead',
+    p3MascotSpeech: '“Open your dedicated bank account with ₦0 fee and start in 30 seconds!”',
+    p3MascotPerk: 'Zero Setup Fee · Instant Bank Account',
+    p3Step1Title: 'Auto Wallet',
+    p3Step1Desc: 'Virtual Bank',
+    p3Step1Tag: 'Moniepoint · Wema',
+    p3Step2Title: 'Pick & Buy',
+    p3Step2Desc: '5G Data & Bills',
+    p3Step2Tag: '0.4s Instant API',
+    p3Step3Title: 'Earn & Profit',
+    p3Step3Desc: '3% Cashback',
+    p3Step3Tag: 'Wholesale Rates',
+    p3LiveTitle: 'AUTOMATED DISPATCH ENGINE',
+    p3LiveActive: 'LIVE · 0.4s SPEED',
+    p3FreeTag: 'FREE · 30 SECONDS',
     steps: ['Fund Your\nWallet', 'Pick a\nService', 'Get Instant\nDelivery'],
     stepIcons: ['wallet-outline', 'grid-outline', 'checkmark-done-circle-outline'] as const,
     signin: 'Sign In to Account',
@@ -81,7 +97,23 @@ const COPY = {
     p2Title: 'Duk Abin Da Kake Bukata',
     p2Sub: 'Sayen data, airtime da biyan kudi a wuri guda',
     p3Title: 'Yadda Ake Fara Amfani',
-    p3Sub: 'Fara samun riba cikin matakai 3',
+    p3Sub: 'Fara samun riba cikin matakai 3 kacal',
+    p3Badge: 'KADDAMAR DA ASUSU',
+    p3MascotName: 'Khadijah · Kwararriyar Asusu',
+    p3MascotSpeech: '“Sami lambar asusun bankinka ta musamman kyauta ka fara a sakan 30!”',
+    p3MascotPerk: 'Babu Kudin Bude Asusu · Nan Take',
+    p3Step1Title: 'Cika Wallet',
+    p3Step1Desc: 'Lambar Banki',
+    p3Step1Tag: 'Moniepoint · Wema',
+    p3Step2Title: 'Zabi Sabis',
+    p3Step2Desc: 'Data 5G da Bil',
+    p3Step2Tag: 'Sakan 0.4 Ana Turawa',
+    p3Step3Title: 'Samu Riba',
+    p3Step3Desc: '3% Kyauta',
+    p3Step3Tag: 'Farashin Sari',
+    p3LiveTitle: 'TSARIN AIKI NA KAI TSAYE',
+    p3LiveActive: 'KAI TSAYE · SAKAN 0.4',
+    p3FreeTag: 'KYAUTA · SAKAN 30',
     steps: ['Cika\nWallet', 'Zabi\nSabis', 'Karba\nNan Take'],
     stepIcons: ['wallet-outline', 'grid-outline', 'checkmark-done-circle-outline'] as const,
     signin: 'Shiga Cikin Asusu',
@@ -221,6 +253,53 @@ const NETWORKS = [
   { name: 'Airtel', color: '#ff3b3b', bg: 'rgba(255,59,59,0.15)' },
   { name: 'Glo', color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
   { name: '9mobile', color: '#a3e635', bg: 'rgba(163,230,53,0.15)' },
+];
+
+const P3_SIMULATED_TRANSACTIONS = [
+  {
+    icon: 'wifi' as const,
+    color: '#38bdf8',
+    serviceEn: 'MTN 5G SME 10GB',
+    serviceHa: 'MTN 5G SME 10GB',
+    target: '0814 ••• 5291',
+    amount: '₦2,450',
+    statusEn: 'DELIVERED · 0.3s',
+    statusHa: 'AN TURA · 0.3s',
+    tag: '5G SME',
+  },
+  {
+    icon: 'wallet' as const,
+    color: '#f5a623',
+    serviceEn: 'Auto Wallet Fund',
+    serviceHa: 'Zuba Kudi a Wallet',
+    target: 'Moniepoint Virtual',
+    amount: '+₦15,000',
+    statusEn: 'CREDITED · 0.0s',
+    statusHa: 'YA SHIGA · 0.0s',
+    tag: 'AUTO BANK',
+  },
+  {
+    icon: 'flash' as const,
+    color: '#10b981',
+    serviceEn: 'AEDC Prepaid Token',
+    serviceHa: 'Token din Wutar AEDC',
+    target: 'Meter 4509 ••• 1102',
+    amount: '₦5,000',
+    statusEn: 'TOKEN READY',
+    statusHa: 'TOKEN YA FITO',
+    tag: 'INSTANT TOKEN',
+  },
+  {
+    icon: 'call' as const,
+    color: '#a855f7',
+    serviceEn: 'Airtel Airtime + Bonus',
+    serviceHa: 'Katin Airtel + Riba',
+    target: '0802 ••• 8823',
+    amount: '₦2,000',
+    statusEn: 'CASHBACK ADDED',
+    statusHa: 'AN BA DA CASHBACK',
+    tag: '3% CASHBACK',
+  },
 ];
 
 const LOGO_WRAP_SIZE = 220;
@@ -802,15 +881,245 @@ function PageFeatures({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PAGE 3 — GET STARTED
+// PAGE 3 HELPERS: Mascot, Steps & Live Simulator
+// ─────────────────────────────────────────────────────────────────────────────
+function P3MascotWelcome({
+  c,
+}: {
+  c: typeof COPY.en;
+}) {
+  const floatAnim = useSharedValue(0);
+
+  useEffect(() => {
+    floatAnim.value = withRepeat(
+      withSequence(
+        withTiming(-3, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration: 1600, easing: Easing.inOut(Easing.quad) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedAvatar = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatAnim.value }],
+  }));
+
+  return (
+    <View style={p3.mascotCard}>
+      <LinearGradient
+        colors={['rgba(255,255,255,0.07)', 'rgba(255,255,255,0.02)']}
+        style={[StyleSheet.absoluteFillObject, { borderRadius: 14 }]}
+      />
+      {/* 3D Mascot Avatar */}
+      <Animated.View style={[p3.mascotAvatarWrap, animatedAvatar]}>
+        <Image
+          source={require('../assets/images/avatar_wallet.jpg')}
+          style={p3.mascotAvatarImg}
+          resizeMode="cover"
+        />
+        <View style={p3.mascotOnlineBadge}>
+          <View style={p3.mascotOnlineDot} />
+        </View>
+      </Animated.View>
+
+      {/* Speech Bubble / Info */}
+      <View style={p3.mascotTextCol}>
+        <View style={p3.mascotHeaderRow}>
+          <Text style={p3.mascotName}>{c.p3MascotName}</Text>
+          <View style={p3.mascotVipBadge}>
+            <Ionicons name="sparkles" size={9} color="#f5a623" style={{ marginRight: 3 }} />
+            <Text style={p3.mascotVipTxt}>VIP AUTO</Text>
+          </View>
+        </View>
+        <Text style={p3.mascotSpeech} numberOfLines={2}>
+          {c.p3MascotSpeech}
+        </Text>
+        <View style={p3.mascotPerkRow}>
+          <Ionicons name="checkmark-circle" size={10} color="#10b981" style={{ marginRight: 3 }} />
+          <Text style={p3.mascotPerkTxt}>{c.p3MascotPerk}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function P3StepMatrix({
+  c,
+  haptic,
+}: {
+  c: typeof COPY.en;
+  haptic: () => void;
+}) {
+  const [activeStep, setActiveStep] = useState(0);
+
+  const steps = [
+    {
+      num: '01',
+      icon: 'wallet' as const,
+      color: '#f5a623',
+      title: c.p3Step1Title,
+      desc: c.p3Step1Desc,
+      tag: c.p3Step1Tag,
+    },
+    {
+      num: '02',
+      icon: 'flash' as const,
+      color: '#38bdf8',
+      title: c.p3Step2Title,
+      desc: c.p3Step2Desc,
+      tag: c.p3Step2Tag,
+    },
+    {
+      num: '03',
+      icon: 'trending-up' as const,
+      color: '#10b981',
+      title: c.p3Step3Title,
+      desc: c.p3Step3Desc,
+      tag: c.p3Step3Tag,
+    },
+  ];
+
+  return (
+    <View style={p3.stepsMatrixRow}>
+      {steps.map((s, i) => {
+        const isSelected = activeStep === i;
+        return (
+          <TouchableOpacity
+            key={i}
+            activeOpacity={0.82}
+            onPress={() => {
+              haptic();
+              setActiveStep(i);
+            }}
+            style={[
+              p3.stepCard,
+              {
+                borderColor: isSelected ? s.color : s.color + '33',
+                backgroundColor: isSelected ? s.color + '18' : 'rgba(255,255,255,0.035)',
+              },
+            ]}
+          >
+            {/* Step header with number and icon */}
+            <View style={p3.stepCardHeader}>
+              <View style={[p3.stepNumPill, { backgroundColor: s.color + '25', borderColor: s.color + '55' }]}>
+                <Text style={[p3.stepNumText, { color: s.color }]}>{s.num}</Text>
+              </View>
+              <View style={[p3.stepIconCircle, { backgroundColor: s.color + '20' }]}>
+                <Ionicons name={s.icon} size={13} color={s.color} />
+              </View>
+            </View>
+
+            {/* Title & Desc */}
+            <Text style={[p3.stepCardTitle, isSelected && { color: '#ffffff' }]} numberOfLines={1}>
+              {s.title}
+            </Text>
+            <Text style={p3.stepCardDesc} numberOfLines={1}>
+              {s.desc}
+            </Text>
+
+            {/* Bottom tag */}
+            <View style={[p3.stepTagPill, { backgroundColor: s.color + '15', borderColor: s.color + '30' }]}>
+              <Text style={[p3.stepTagTxt, { color: s.color }]} numberOfLines={1}>
+                {s.tag}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function P3LiveSimulator({
+  lang,
+  c,
+}: {
+  lang: LangKey;
+  c: typeof COPY.en;
+}) {
+  const [txIndex, setTxIndex] = useState(0);
+  const opacityAnim = useSharedValue(1);
+  const slideAnim = useSharedValue(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      opacityAnim.value = withTiming(0, { duration: 180 }, () => {
+        slideAnim.value = 8;
+        opacityAnim.value = withTiming(1, { duration: 240 });
+        slideAnim.value = withSpring(0, { damping: 14, stiffness: 120 });
+      });
+      setTxIndex(prev => (prev + 1) % P3_SIMULATED_TRANSACTIONS.length);
+    }, 3400);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacityAnim.value,
+    transform: [{ translateY: slideAnim.value }],
+  }));
+
+  const item = P3_SIMULATED_TRANSACTIONS[txIndex];
+  const serviceName = lang === 'ha' ? item.serviceHa : item.serviceEn;
+  const statusText = lang === 'ha' ? item.statusHa : item.statusEn;
+
+  return (
+    <View style={p3.simCard}>
+      <LinearGradient
+        colors={['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.02)']}
+        style={[StyleSheet.absoluteFillObject, { borderRadius: 12 }]}
+      />
+      {/* Header bar of the ticker */}
+      <View style={p3.simHeader}>
+        <View style={p3.simRadarRow}>
+          <View style={p3.simRadarDot} />
+          <Text style={p3.simHeaderTitle}>{c.p3LiveTitle}</Text>
+        </View>
+        <View style={p3.simSpeedBadge}>
+          <Ionicons name="speedometer-outline" size={9} color="#10b981" style={{ marginRight: 3 }} />
+          <Text style={p3.simSpeedTxt}>{c.p3LiveActive}</Text>
+        </View>
+      </View>
+
+      {/* Animated content */}
+      <Animated.View style={[p3.simBody, animatedStyle]}>
+        <View style={[p3.simIconWrap, { backgroundColor: item.color + '22', borderColor: item.color + '55' }]}>
+          <Ionicons name={item.icon} size={15} color={item.color} />
+        </View>
+
+        <View style={p3.simInfoCol}>
+          <Text style={p3.simServiceText} numberOfLines={1}>
+            {serviceName}
+          </Text>
+          <Text style={p3.simTargetText} numberOfLines={1}>
+            {item.target}
+          </Text>
+        </View>
+
+        <View style={p3.simRightCol}>
+          <Text style={p3.simAmountText}>{item.amount}</Text>
+          <View style={[p3.simStatusBadge, { backgroundColor: '#10b98125', borderColor: '#10b98155' }]}>
+            <Text style={p3.simStatusText}>{statusText}</Text>
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGE 3 — GET STARTED (Smart Financial Launchpad & Live Automation Engine)
 // ─────────────────────────────────────────────────────────────────────────────
 function PageGetStarted({
   c,
+  lang,
   checking,
   router,
   haptic,
 }: {
   c: typeof COPY.en;
+  lang: LangKey;
   checking: boolean;
   router: any;
   haptic: () => void;
@@ -823,84 +1132,23 @@ function PageGetStarted({
       {/* Header */}
       <View style={p3.header}>
         <View style={p3.badge}>
-          <Ionicons name="rocket" size={11} color="#f5a623" style={{ marginRight: 5 }} />
-          <Text style={p3.badgeTxt}>GET STARTED</Text>
+          <Ionicons name="flash" size={10} color="#f5a623" style={{ marginRight: 5 }} />
+          <Text style={p3.badgeTxt}>{c.p3Badge}</Text>
         </View>
         <Text style={p3.title}>{c.p3Title}</Text>
         <Text style={p3.sub}>{c.p3Sub}</Text>
       </View>
 
-      {/* How it works */}
-      <View style={p3.stepsRow}>
-        {c.steps.map((label, i) => (
-          <React.Fragment key={i}>
-            <View style={p3.stepItem}>
-              <LinearGradient
-                colors={['#f5a623', '#c77d10']}
-                style={p3.stepNum}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={p3.stepNumTxt}>{i + 1}</Text>
-              </LinearGradient>
-              <View style={p3.stepIconBox}>
-                <Ionicons name={c.stepIcons[i]} size={20} color="#f5a623" />
-              </View>
-              <Text style={p3.stepLabel}>{label}</Text>
-            </View>
-            {i < 2 && (
-              <View style={p3.stepArrow}>
-                <Ionicons name="chevron-forward" size={14} color="rgba(245,166,35,0.45)" />
-              </View>
-            )}
-          </React.Fragment>
-        ))}
-      </View>
+      {/* VIP Onboarding Mascot Welcome Card */}
+      <P3MascotWelcome c={c} />
 
-      {/* Network badges */}
-      <View style={p3.netsBlock}>
-        <Text style={p3.netsTitle}>{c.networks}</Text>
-        <View style={p3.netsRow}>
-          {NETWORKS.map(n => (
-            <View
-              key={n.name}
-              style={[p3.netChip, { backgroundColor: n.bg, borderColor: n.color + '55' }]}
-            >
-              <View style={[p3.netDot, { backgroundColor: n.color }]} />
-              <Text style={[p3.netTxt, { color: n.color }]}>{n.name}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+      {/* Interactive 3-Step Glassmorphic Matrix */}
+      <P3StepMatrix c={c} haptic={haptic} />
 
-      {/* Notification preview card */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
-        style={p3.notifCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={p3.notifIcon}>
-          <LinearGradient
-            colors={['#10b981', '#059669']}
-            style={{ flex: 1, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
-          </LinearGradient>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={p3.notifTitle}>{c.notifTitle}</Text>
-          <Text style={p3.notifBody}>{c.notifBody}</Text>
-        </View>
-        <View style={{ alignItems: 'center', gap: 3 }}>
-          <View style={p3.notifDot} />
-          <Text style={p3.notifNow}>now</Text>
-        </View>
-      </LinearGradient>
+      {/* Live Automated Dispatch Simulator */}
+      <P3LiveSimulator lang={lang} c={c} />
 
-      {/* CTA Buttons */}
+      {/* Action Buttons Block */}
       <View style={p3.btnBlock}>
         {checking ? (
           <View style={p3.loadCard}>
@@ -908,11 +1156,12 @@ function PageGetStarted({
             <Text style={p3.loadTxt}>{c.verify}</Text>
           </View>
         ) : (
-          <View style={{ gap: 9 }}>
+          <View style={{ gap: 8 }}>
+            {/* Primary Action: Create Free Account */}
             <TouchableOpacity
               onPress={() => {
                 haptic();
-                router.push('/(auth)/login');
+                router.push('/(auth)/signup');
               }}
               activeOpacity={0.87}
               style={p3.primaryWrap}
@@ -924,33 +1173,42 @@ function PageGetStarted({
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="person" size={15} color="#010812" />
-                <Text style={p3.primaryTxt}>{c.signin}</Text>
+                <View style={p3.primaryLeftIcon}>
+                  <Ionicons name="sparkles" size={15} color="#010812" />
+                </View>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={p3.primaryTxt}>{c.signup}</Text>
+                  <Text style={p3.primarySubTxt}>{c.p3FreeTag}</Text>
+                </View>
                 <View style={p3.arrow}>
                   <Ionicons name="arrow-forward" size={12} color="#010812" />
                 </View>
               </LinearGradient>
             </TouchableOpacity>
 
+            {/* Secondary Action: Sign In to Account */}
             <TouchableOpacity
               onPress={() => {
                 haptic();
-                router.push('/(auth)/signup');
+                router.push('/(auth)/login');
               }}
               activeOpacity={0.8}
               style={p3.secondaryBtn}
             >
-              <Ionicons name="person-add-outline" size={14} color="#dde4ef" style={{ marginRight: 6 }} />
-              <Text style={p3.secondaryTxt}>{c.signup}</Text>
+              <Ionicons name="log-in-outline" size={15} color="#38bdf8" style={{ marginRight: 6 }} />
+              <Text style={p3.secondaryTxt}>{c.signin}</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
 
-      {/* SSL Footnote */}
+      {/* SSL & Trust Footnote */}
       <View style={p3.sslRow}>
-        <Ionicons name="shield-checkmark" size={10} color="#10b981" />
+        <Ionicons name="shield-checkmark" size={11} color="#10b981" />
         <Text style={p3.sslTxt}>{c.ssl}</Text>
+        <Text style={p3.sslDivider}>•</Text>
+        <Ionicons name="flash" size={10} color="#f5a623" />
+        <Text style={p3.sslTxt}>99.98% Automated</Text>
       </View>
     </View>
   );
@@ -1097,6 +1355,7 @@ export default function SplashScreen() {
             {pageIdx === 2 && (
               <PageGetStarted
                 c={c}
+                lang={lang}
                 checking={checking}
                 router={router}
                 haptic={haptic}
@@ -1918,9 +2177,9 @@ const p3 = StyleSheet.create({
   root: {
     flex: 1,
     width: '100%',
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 4,
     justifyContent: 'space-between',
   },
   blobA: {
@@ -1943,162 +2202,292 @@ const p3 = StyleSheet.create({
   },
 
   header: {
-    marginBottom: 4,
+    marginBottom: 2,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: 9,
-    paddingVertical: 3.5,
-    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(245,166,35,0.28)',
-    backgroundColor: 'rgba(245,166,35,0.1)',
-    marginBottom: 6,
+    borderColor: 'rgba(245,166,35,0.3)',
+    backgroundColor: 'rgba(245,166,35,0.12)',
+    marginBottom: 4,
   },
   badgeTxt: {
     color: '#f5a623',
     fontSize: 8.5,
     fontWeight: '800',
-    letterSpacing: 1.3,
+    letterSpacing: 1.2,
   },
   title: {
     color: '#ffffff',
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '900',
-    letterSpacing: 0.3,
-    marginBottom: 2,
+    letterSpacing: 0.2,
+    marginBottom: 1,
   },
   sub: {
     color: '#8ea4c4',
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '500',
   },
 
-  // Steps
-  stepsRow: {
+  // Mascot Card
+  mascotCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(245,166,35,0.22)',
+    backgroundColor: 'rgba(13,37,97,0.45)',
+    gap: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  mascotAvatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#f5a623',
+    position: 'relative',
+  },
+  mascotAvatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+  },
+  mascotOnlineBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#071434',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  stepItem: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 4,
+  mascotOnlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10b981',
   },
-  stepNum: {
+  mascotTextCol: {
+    flex: 1,
+    gap: 1,
+  },
+  mascotHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 1,
+  },
+  mascotName: {
+    color: '#f0f4ff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  mascotVipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245,166,35,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,166,35,0.3)',
+  },
+  mascotVipTxt: {
+    color: '#f5a623',
+    fontSize: 7.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  mascotSpeech: {
+    color: '#cbd5e1',
+    fontSize: 9.5,
+    fontWeight: '500',
+    lineHeight: 13,
+  },
+  mascotPerkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  mascotPerkTxt: {
+    color: '#10b981',
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
+
+  // Steps Matrix
+  stepsMatrixRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  stepCard: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  stepCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 2,
+    marginBottom: 2,
+  },
+  stepNumPill: {
+    paddingHorizontal: 4.5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  stepNumText: {
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  stepIconCircle: {
     width: 22,
     height: 22,
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepNumTxt: {
-    color: '#010812',
+  stepCardTitle: {
+    color: '#f1f5f9',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  stepCardDesc: {
+    color: '#94a3b8',
+    fontSize: 8,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  stepTagPill: {
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 1,
+  },
+  stepTagTxt: {
+    fontSize: 7.5,
+    fontWeight: '800',
+  },
+
+  // Live Simulator
+  simCard: {
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.22)',
+    backgroundColor: 'rgba(13,37,97,0.4)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  simHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  simRadarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  simRadarDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+  },
+  simHeaderTitle: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  simSpeedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  simSpeedTxt: {
+    color: '#10b981',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  simBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  simIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  simInfoCol: {
+    flex: 1,
+  },
+  simServiceText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  simTargetText: {
+    color: '#94a3b8',
+    fontSize: 9,
+    fontWeight: '500',
+  },
+  simRightCol: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  simAmountText: {
+    color: '#f5a623',
     fontSize: 11,
     fontWeight: '900',
   },
-  stepIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(245,166,35,0.1)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(245,166,35,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepLabel: {
-    color: '#94a3b8',
-    fontSize: 9.5,
-    textAlign: 'center',
-    fontWeight: '700',
-    lineHeight: 13,
-    maxWidth: 75,
-  },
-  stepArrow: {
-    paddingTop: 36,
-  },
-
-  // Networks
-  netsBlock: {},
-  netsTitle: {
-    color: '#64748b',
-    fontSize: 8.5,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  netsRow: {
-    flexDirection: 'row',
-    gap: 7,
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  netChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4.5,
-    paddingHorizontal: 10,
-    paddingVertical: 5.5,
-    borderRadius: 10,
+  simStatusBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 6,
     borderWidth: 1,
   },
-  netDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  netTxt: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
-
-  // Notif preview
-  notifCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    padding: 10,
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  notifIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-  },
-  notifTitle: {
-    color: '#f0f4ff',
-    fontSize: 11.5,
-    fontWeight: '800',
-    marginBottom: 1.5,
-  },
-  notifBody: {
-    color: '#8ea4c4',
-    fontSize: 9.5,
-  },
-  notifDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#10b981',
-  },
-  notifNow: {
+  simStatusText: {
     color: '#10b981',
-    fontSize: 8.5,
+    fontSize: 7.5,
     fontWeight: '800',
   },
 
-  // Buttons
+  // Buttons Block
   btnBlock: {},
   loadCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 9,
     paddingVertical: 12,
     paddingHorizontal: 12,
@@ -2116,29 +2505,43 @@ const p3 = StyleSheet.create({
     borderRadius: 13,
     overflow: 'hidden',
     shadowColor: '#f5a623',
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.42,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowRadius: 10,
+    elevation: 8,
   },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  primaryLeftIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(1,8,18,0.15)',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
   },
   primaryTxt: {
     color: '#010812',
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '900',
     letterSpacing: 0.2,
   },
+  primarySubTxt: {
+    color: 'rgba(1,8,18,0.68)',
+    fontSize: 7.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginTop: 1,
+  },
   arrow: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: 'rgba(1,8,18,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2147,15 +2550,15 @@ const p3 = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderRadius: 13,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   secondaryTxt: {
     color: '#dde4ef',
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '700',
   },
 
@@ -2167,8 +2570,12 @@ const p3 = StyleSheet.create({
     justifyContent: 'center',
   },
   sslTxt: {
-    color: '#475569',
-    fontSize: 9,
+    color: '#64748b',
+    fontSize: 8.5,
     fontWeight: '600',
+  },
+  sslDivider: {
+    color: '#334155',
+    fontSize: 8,
   },
 });
