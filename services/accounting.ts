@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Alert } from 'react-native';
 
 export interface ExpenseRecord {
@@ -40,6 +41,35 @@ export interface UserLiquidityMetrics {
     }[];
 }
 
+export interface DailyTrendPoint {
+    date: string;
+    dayName: string;
+    revenue: number;
+    profit: number;
+    salesCount: number;
+}
+
+export interface AdminClearanceInfo {
+    id: string;
+    fullName: string;
+    email: string;
+    role: string;
+    isMasterAdmin: boolean;
+    hasClearance: boolean;
+}
+
+export interface FinancialHealthAdvisory {
+    rating: 'AAA' | 'AA' | 'A' | 'BBB' | 'WARNING';
+    headline: string;
+    summary: string;
+    topDriverName: string;
+    topDriverProfit: number;
+    topDriverShare: number;
+    burnRate: number;
+    liquidityStatus: 'Strong' | 'Adequate' | 'Watchlist';
+    recommendation: string;
+}
+
 export interface AccountingMetrics {
     totalRevenue: number;
     totalCost: number;
@@ -56,6 +86,7 @@ export interface AccountingMetrics {
     userLiquidity: UserLiquidityMetrics;
     dailyRunRate: number;
     projectedMonthlyProfit: number;
+    dailyTrends: DailyTrendPoint[];
 }
 
 export const EXPENSE_CATEGORIES = [
@@ -156,6 +187,111 @@ export const checkProfitAccessClearance = async (): Promise<{ authorized: boolea
     } catch (err) {
         console.error('[Accounting Security] Error checking clearance:', err);
         return { authorized: false, role: 'error', email: '' };
+    }
+};
+
+/**
+ * Fetch all administrator accounts and their profit clearance status.
+ */
+export const getAdminsWithProfitClearance = async (): Promise<AdminClearanceInfo[]> => {
+    try {
+        const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, role')
+            .in('role', ['admin', 'super_admin', 'agent'])
+            .order('role', { ascending: false });
+
+        if (error) {
+            console.error('[Clearance] Error fetching admin profiles:', error);
+        }
+
+        const { data: setting } = await supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'authorized_profit_admins')
+            .maybeSingle();
+
+        const masterEmails = ['sale.abumafhal@gmail.com', 'abumafhal@gmail.com'];
+        let authorizedList: string[] = [];
+        if (setting?.value) {
+            authorizedList = Array.isArray(setting.value)
+                ? setting.value.map((e: any) => String(e).toLowerCase().trim())
+                : String(setting.value).toLowerCase().split(',').map((s: string) => s.trim());
+        }
+
+        const list: AdminClearanceInfo[] = (profiles || []).map((p: any) => {
+            const email = (p.email || '').toLowerCase().trim();
+            const isMaster = masterEmails.includes(email);
+            const isSuper = p.role === 'super_admin';
+            const isAuthorized = isMaster || isSuper || authorizedList.includes(email) || authorizedList.includes(p.id);
+
+            return {
+                id: p.id,
+                fullName: p.full_name || 'System Staff',
+                email: p.email || 'N/A',
+                role: p.role || 'admin',
+                isMasterAdmin: isMaster || isSuper,
+                hasClearance: isAuthorized
+            };
+        });
+
+        return list;
+    } catch (err) {
+        console.error('[Clearance] Exception in getAdminsWithProfitClearance:', err);
+        return [];
+    }
+};
+
+/**
+ * Toggle Profit Access Clearance for an administrator (Persisted to app_settings).
+ */
+export const toggleAdminProfitClearance = async (
+    targetEmailOrId: string,
+    grant: boolean
+): Promise<{ success: boolean; error?: string }> => {
+    try {
+        const normalized = targetEmailOrId.toLowerCase().trim();
+        
+        const { data: currentSetting } = await supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'authorized_profit_admins')
+            .maybeSingle();
+
+        let currentList: string[] = [];
+        if (currentSetting?.value) {
+            currentList = Array.isArray(currentSetting.value)
+                ? currentSetting.value.map((e: any) => String(e).toLowerCase().trim())
+                : String(currentSetting.value).toLowerCase().split(',').map((s: string) => s.trim());
+        }
+
+        let updatedList: string[];
+        if (grant) {
+            if (!currentList.includes(normalized)) {
+                updatedList = [...currentList, normalized];
+            } else {
+                updatedList = currentList;
+            }
+        } else {
+            updatedList = currentList.filter(item => item !== normalized);
+        }
+
+        const { error } = await supabase
+            .from('app_settings')
+            .upsert({
+                key: 'authorized_profit_admins',
+                value: updatedList,
+                description: 'List of emails or IDs of admins authorized to access profit ledger',
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+        if (error) {
+            return { success: false, error: error.message };
+        }
+
+        return { success: true };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'Failed to toggle clearance.' };
     }
 };
 
@@ -438,6 +574,17 @@ export const calculateAccountingMetrics = async (
         'other': { serviceName: 'Other Services', type: 'other', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
     };
 
+    // 7-day trend accumulator
+    const trendMap = new Map<string, { revenue: number; profit: number; salesCount: number }>();
+    const nowForTrends = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(nowForTrends.getFullYear(), nowForTrends.getMonth(), nowForTrends.getDate() - i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        trendMap.set(`${yyyy}-${mm}-${dd}`, { revenue: 0, profit: 0, salesCount: 0 });
+    }
+
     const enrichedTxns: any[] = [];
 
     for (const tx of transactions) {
@@ -548,6 +695,17 @@ export const calculateAccountingMetrics = async (
         totalCost += itemCost;
         grossProfit += itemProfit;
 
+        // Track 7-day trend
+        if (tx.created_at) {
+            const txDateKey = tx.created_at.split('T')[0];
+            if (trendMap.has(txDateKey)) {
+                const tr = trendMap.get(txDateKey)!;
+                tr.revenue += itemRevenue;
+                tr.profit += itemProfit;
+                tr.salesCount += 1;
+            }
+        }
+
         if (serviceBreakdown[categoryKey]) {
             serviceBreakdown[categoryKey].revenue += itemRevenue;
             serviceBreakdown[categoryKey].cost += itemCost;
@@ -576,6 +734,20 @@ export const calculateAccountingMetrics = async (
         const item = serviceBreakdown[key];
         item.marginPercent = item.revenue > 0 ? (item.profit / item.revenue) * 100 : 0;
     }
+
+    // Convert trendMap to dailyTrends array
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dailyTrends: DailyTrendPoint[] = Array.from(trendMap.entries()).map(([dateStr, val]) => {
+        const d = new Date(dateStr + 'T12:00:00');
+        const dayName = isNaN(d.getTime()) ? '' : dayLabels[d.getDay()];
+        return {
+            date: dateStr,
+            dayName,
+            revenue: val.revenue,
+            profit: val.profit,
+            salesCount: val.salesCount
+        };
+    });
 
     // Aggregate expenses
     let totalExpenses = 0;
@@ -623,6 +795,71 @@ export const calculateAccountingMetrics = async (
         },
         dailyRunRate,
         projectedMonthlyProfit,
+        dailyTrends,
+    };
+};
+
+/**
+ * Smart Executive Financial Health Diagnostics & Advisory.
+ */
+export const getFinancialHealthAdvisory = (metrics: AccountingMetrics): FinancialHealthAdvisory => {
+    const gross = metrics.grossProfit;
+    const net = metrics.netProfit;
+    const expenses = metrics.totalExpenses;
+    const rev = metrics.totalRevenue;
+    const liabilities = metrics.userLiquidity.totalUserBalances;
+
+    let topName = 'Data Bundles';
+    let topProfit = 0;
+    Object.values(metrics.serviceBreakdown).forEach(s => {
+        if (s.profit > topProfit) {
+            topProfit = s.profit;
+            topName = s.serviceName;
+        }
+    });
+
+    const topShare = gross > 0 ? (topProfit / gross) * 100 : 0;
+    const burnRate = gross > 0 ? (expenses / gross) * 100 : 0;
+
+    let rating: 'AAA' | 'AA' | 'A' | 'BBB' | 'WARNING' = 'A';
+    let headline = 'Healthy Commercial Operations';
+    let summary = 'Platform maintains positive unit economics with sustainable profit margins across services.';
+    let recommendation = 'Maintain current pricing structures while scaling high-volume telecom and data products.';
+
+    if (net < 0) {
+        rating = 'WARNING';
+        headline = 'Operating Deficit Detected';
+        summary = 'Expenditures exceed gross trading surplus in this period. Immediate expense audit recommended.';
+        recommendation = 'Reduce non-essential operating overhead and review API vendor cost tiers.';
+    } else if (metrics.profitMargin >= 20 && burnRate < 20) {
+        rating = 'AAA';
+        headline = 'Exceptional Profitability & Low Burn';
+        summary = 'Outstanding financial performance with strong unit margins and well-contained operating costs.';
+        recommendation = 'Opportunity to aggressively scale customer acquisition and marketing spend.';
+    } else if (metrics.profitMargin >= 12 && burnRate < 45) {
+        rating = 'AA';
+        headline = 'Strong Commercial Margin';
+        summary = 'Healthy profit margins with balanced operational expenditure.';
+        recommendation = 'Expand inventory and negotiate higher volume discounts with telecom vendors.';
+    } else if (burnRate >= 60) {
+        rating = 'BBB';
+        headline = 'High Expense Ratio';
+        summary = 'Operating expenditures consume over 60% of gross trading profits.';
+        recommendation = 'Audit recurring server, marketing, or staffing costs to protect net earnings.';
+    }
+
+    const liquidityStatus = liabilities > (rev * 3 + 100000) ? 'Watchlist' : liabilities > rev ? 'Adequate' : 'Strong';
+
+    return {
+        rating,
+        headline,
+        summary,
+        topDriverName: topName,
+        topDriverProfit: topProfit,
+        topDriverShare: topShare,
+        burnRate,
+        liquidityStatus,
+        recommendation
     };
 };
 
@@ -770,5 +1007,103 @@ export const generateProfitLossPDF = async (
         await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
     } catch (err: any) {
         Alert.alert('PDF Export Notice', err.message || 'Failed to generate PDF document.');
+    }
+};
+
+/**
+ * Generate and export a comprehensive Excel-compatible CSV Financial Spreadsheet.
+ */
+export const exportFinancialCSV = async (
+    metrics: AccountingMetrics,
+    periodLabel: string
+): Promise<void> => {
+    try {
+        const dateStr = new Date().toISOString().split('T')[0];
+        const rows: string[] = [];
+
+        // 1. Title & Header
+        rows.push('"ABU MAFHAL HUB - EXECUTIVE FINANCIAL STATEMENT"');
+        rows.push(`"Reporting Period:","${periodLabel}"`);
+        rows.push(`"Generated Date:","${formatAccountingDate(new Date().toISOString(), true)}"`);
+        rows.push(`"Security Level:","Super Administrator Confidential"`);
+        rows.push('');
+
+        // 2. Executive Summary
+        rows.push('"EXECUTIVE SUMMARY"');
+        rows.push('"Metric","Amount (NGN)","Details"');
+        rows.push(`"Gross Revenue",${metrics.totalRevenue.toFixed(2)},"Total transaction volume collected"`);
+        rows.push(`"Cost of Sales",${metrics.totalCost.toFixed(2)},"API wholesale cost / provider purchase prices"`);
+        rows.push(`"Gross Profit",${metrics.grossProfit.toFixed(2)},"Revenue minus wholesale costs"`);
+        rows.push(`"Operating Expenses",${metrics.totalExpenses.toFixed(2)},"Total logged business expenditures"`);
+        rows.push(`"Net Profit",${metrics.netProfit.toFixed(2)},"Actual cash surplus / take-home earnings"`);
+        rows.push(`"Gross Profit Margin",${metrics.profitMargin.toFixed(2)}%,"Gross trading margin percentage"`);
+        rows.push(`"Completed Transactions",${metrics.successfulTransactionsCount},"Total successful customer service orders"`);
+        rows.push(`"Daily Profit Run-Rate",${metrics.dailyRunRate.toFixed(2)},"Average net profit earned per day"`);
+        rows.push(`"Projected Monthly Profit",${metrics.projectedMonthlyProfit.toFixed(2)},"30-day extrapolated net projection"`);
+        rows.push('');
+
+        // 3. Customer Wallet Liabilities
+        rows.push('"CUSTOMER BALANCES & LIABILITIES PORTFOLIO"');
+        rows.push('"Metric","Value"');
+        rows.push(`"Total Held Customer Balances (Liabilities)",${metrics.userLiquidity.totalUserBalances.toFixed(2)}`);
+        rows.push(`"Funded User Wallets",${metrics.userLiquidity.fundedUserCount}`);
+        rows.push(`"Total Registered Accounts",${metrics.userLiquidity.totalUserCount}`);
+        rows.push(`"Average Funded Balance",${metrics.userLiquidity.averageUserBalance.toFixed(2)}`);
+        rows.push('');
+
+        // 4. Service Breakdown Matrix
+        rows.push('"SERVICE PROFIT MATRIX (ALL 18 SERVICES)"');
+        rows.push('"Service Name","Service Type","Orders Count","Revenue (NGN)","Cost (NGN)","Profit (NGN)","Margin %"');
+        Object.values(metrics.serviceBreakdown).forEach(s => {
+            rows.push(`"${s.serviceName}","${s.type}",${s.transactionCount},${s.revenue.toFixed(2)},${s.cost.toFixed(2)},${s.profit.toFixed(2)},${s.marginPercent.toFixed(2)}%`);
+        });
+        rows.push('');
+
+        // 5. Operating Expenses Log
+        rows.push('"OPERATING EXPENDITURE LOG"');
+        rows.push('"Date","Title","Category","Payment Method","Amount (NGN)","Notes"');
+        if (metrics.recentExpenses && metrics.recentExpenses.length > 0) {
+            metrics.recentExpenses.forEach(e => {
+                const noteClean = (e.notes || '').replace(/"/g, '""');
+                rows.push(`"${e.expense_date}","${e.title.replace(/"/g, '""')}","${e.category.replace('_', ' ').toUpperCase()}","${e.payment_method.replace('_', ' ')}",${e.amount.toFixed(2)},"${noteClean}"`);
+            });
+        } else {
+            rows.push('"No operating expenses recorded for this period"');
+        }
+        rows.push('');
+
+        // 6. Recent Sales Margin Records
+        rows.push('"INDIVIDUAL SALES MARGIN AUDIT"');
+        rows.push('"Reference / ID","Date","Service","Customer Name","Customer Email","Revenue (NGN)","Cost (NGN)","Profit (NGN)","Margin %"');
+        if (metrics.recentTransactions && metrics.recentTransactions.length > 0) {
+            metrics.recentTransactions.forEach(t => {
+                const ref = (t.reference || t.id || 'N/A').replace(/"/g, '""');
+                const sName = (t.serviceName || 'Order').replace(/"/g, '""');
+                const cName = (t.customerName || 'Customer').replace(/"/g, '""');
+                const cEmail = (t.customerEmail || '').replace(/"/g, '""');
+                rows.push(`"${ref}","${formatAccountingDate(t.created_at, true)}","${sName}","${cName}","${cEmail}",${(t.revenue || 0).toFixed(2)},${(t.cost || 0).toFixed(2)},${(t.profit || 0).toFixed(2)},${(t.marginPercent || 0).toFixed(2)}%`);
+            });
+        }
+
+        const csvContent = rows.join('\n');
+        const filename = `Abu_Mafhal_Financial_Report_${dateStr}_${Date.now()}.csv`;
+        const fileUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory}${filename}`;
+
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+            encoding: FileSystem.EncodingType.UTF8
+        });
+
+        if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(fileUri, {
+                mimeType: 'text/csv',
+                dialogTitle: 'Export Abu Mafhal Financial Spreadsheet (CSV)',
+                UTI: 'public.comma-separated-values-text'
+            });
+        } else {
+            Alert.alert('Spreadsheet Export', `File generated at: ${fileUri}`);
+        }
+    } catch (err: any) {
+        console.error('[CSV Export] Error:', err);
+        Alert.alert('CSV Export Notice', err.message || 'Failed to generate financial spreadsheet.');
     }
 };

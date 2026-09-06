@@ -11,7 +11,8 @@ import {
     TextInput,
     Platform,
     RefreshControl,
-    Dimensions
+    Dimensions,
+    Switch
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,15 +23,21 @@ import * as Clipboard from 'expo-clipboard';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import {
     checkProfitAccessClearance,
+    getAdminsWithProfitClearance,
+    toggleAdminProfitClearance,
     calculateAccountingMetrics,
     fetchExpenses,
     recordExpense,
     deleteExpense,
     generateProfitLossPDF,
+    exportFinancialCSV,
+    getFinancialHealthAdvisory,
     formatNaira,
     formatAccountingDate,
     AccountingMetrics,
     ExpenseRecord,
+    AdminClearanceInfo,
+    FinancialHealthAdvisory,
     EXPENSE_CATEGORIES,
     PAYMENT_METHODS
 } from '../../services/accounting';
@@ -153,6 +160,21 @@ function AccountingContent() {
     const [newNotes, setNewNotes] = useState('');
     const [savingExpense, setSavingExpense] = useState(false);
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+
+    // Service Sorting Mode
+    const [serviceSortMode, setServiceSortMode] = useState<'default' | 'profit' | 'margin'>('default');
+
+    // Super Admin Clearance Vault
+    const [clearanceModalVisible, setClearanceModalVisible] = useState(false);
+    const [adminList, setAdminList] = useState<AdminClearanceInfo[]>([]);
+    const [loadingAdmins, setLoadingAdmins] = useState(false);
+    const [togglingAdminEmail, setTogglingAdminEmail] = useState<string | null>(null);
+
+    // Whale Inspector Modal
+    const [selectedWhale, setSelectedWhale] = useState<{ id: string; name: string; email: string; balance: number } | null>(null);
+
+    // Exporting CSV State
+    const [exportingCSV, setExportingCSV] = useState(false);
 
     // 1. Verify Super Admin Access Clearance
     useEffect(() => {
@@ -278,12 +300,57 @@ function AccountingContent() {
         );
     };
 
-    // 6. Handle Export Report
+    // 6. Handle Export PDF Report
     const handleExport = async () => {
         if (!metrics) return;
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const { label } = getDateRange(timeRange);
         await generateProfitLossPDF(metrics, label);
+    };
+
+    // 7. Handle Export CSV Spreadsheet
+    const handleExportCSV = async () => {
+        if (!metrics) return;
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setExportingCSV(true);
+        const { label } = getDateRange(timeRange);
+        await exportFinancialCSV(metrics, label);
+        setExportingCSV(false);
+    };
+
+    // 8. Super Admin Clearance Vault Management
+    const openClearanceVault = async () => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setClearanceModalVisible(true);
+        setLoadingAdmins(true);
+        const list = await getAdminsWithProfitClearance();
+        setAdminList(list);
+        setLoadingAdmins(false);
+    };
+
+    const handleToggleClearance = async (admin: AdminClearanceInfo) => {
+        if (admin.isMasterAdmin) {
+            Alert.alert('Protected Authority', 'Master Super Administrator clearance is foundational and cannot be revoked.');
+            return;
+        }
+
+        const newStatus = !admin.hasClearance;
+        setTogglingAdminEmail(admin.email);
+        const res = await toggleAdminProfitClearance(admin.email, newStatus);
+        setTogglingAdminEmail(null);
+
+        if (res.success) {
+            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setAdminList(prev => prev.map(a => a.email === admin.email ? { ...a, hasClearance: newStatus } : a));
+            Alert.alert(
+                'Clearance Updated',
+                newStatus 
+                    ? `Granted profit and accounting ledger clearance to ${admin.fullName} (${admin.email}).`
+                    : `Revoked profit and accounting clearance from ${admin.fullName} (${admin.email}).`
+            );
+        } else {
+            Alert.alert('Security Error', res.error || 'Failed to update clearance setting.');
+        }
     };
 
     const copyReference = (ref: string) => {
@@ -336,12 +403,21 @@ function AccountingContent() {
 
     const isNetProfitable = (metrics?.netProfit || 0) >= 0;
 
-    // Filter services list based on search
-    const filteredServices = Object.values(metrics?.serviceBreakdown || {}).filter(serv => {
-        if (!serviceSearch.trim()) return true;
-        const q = serviceSearch.toLowerCase().trim();
-        return serv.serviceName.toLowerCase().includes(q) || serv.type.toLowerCase().includes(q);
-    });
+    // Filter & sort services list based on search and sort mode
+    const filteredServices = Object.values(metrics?.serviceBreakdown || {})
+        .filter(serv => {
+            if (!serviceSearch.trim()) return true;
+            const q = serviceSearch.toLowerCase().trim();
+            return serv.serviceName.toLowerCase().includes(q) || serv.type.toLowerCase().includes(q);
+        })
+        .sort((a, b) => {
+            if (serviceSortMode === 'profit') {
+                return b.profit - a.profit;
+            } else if (serviceSortMode === 'margin') {
+                return b.marginPercent - a.marginPercent;
+            }
+            return 0;
+        });
 
     return (
         <View style={styles.container}>
@@ -369,13 +445,39 @@ function AccountingContent() {
                         <Text style={styles.headerSub}>EXECUTIVE PROFIT & LOSS LEDGER</Text>
                     </View>
 
-                    <TouchableOpacity
-                        onPress={handleExport}
-                        style={styles.exportBtn}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="share-outline" size={18} color={C.goldBright} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {/* Admin Clearance Vault */}
+                        <TouchableOpacity
+                            onPress={openClearanceVault}
+                            style={styles.exportBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="key-outline" size={16} color={C.goldBright} />
+                        </TouchableOpacity>
+
+                        {/* Export CSV / Excel */}
+                        <TouchableOpacity
+                            onPress={handleExportCSV}
+                            style={styles.exportBtn}
+                            activeOpacity={0.8}
+                            disabled={exportingCSV}
+                        >
+                            {exportingCSV ? (
+                                <ActivityIndicator size="small" color={C.goldBright} />
+                            ) : (
+                                <Ionicons name="grid-outline" size={16} color={C.goldBright} />
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Export PDF */}
+                        <TouchableOpacity
+                            onPress={handleExport}
+                            style={styles.exportBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="share-outline" size={16} color={C.goldBright} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* TIMEFRAME SELECTOR PILLS */}
@@ -532,7 +634,134 @@ function AccountingContent() {
                                 </View>
                             </View>
 
-                            {/* 3. TOTAL USER WALLET BALANCES & LIABILITIES */}
+                            {/* 3. SMART EXECUTIVE FINANCIAL HEALTH & ADVISORY */}
+                            {metrics && (() => {
+                                const adv = getFinancialHealthAdvisory(metrics);
+                                const isGood = adv.rating === 'AAA' || adv.rating === 'AA' || adv.rating === 'A';
+                                return (
+                                    <View style={[styles.advisoryCard, { borderColor: isGood ? 'rgba(217, 119, 6, 0.3)' : 'rgba(220, 38, 38, 0.3)' }]}>
+                                        <View style={styles.advisoryTopRow}>
+                                            <View style={[styles.ratingBadge, { backgroundColor: isGood ? C.goldBg : C.coralBg }]}>
+                                                <Ionicons name="shield-checkmark" size={12} color={isGood ? C.gold : C.coral} />
+                                                <Text style={[styles.ratingText, { color: isGood ? C.gold : C.coral }]}>
+                                                    {adv.rating} HEALTH RATING
+                                                </Text>
+                                            </View>
+                                            <View style={styles.solvencyPill}>
+                                                <Text style={styles.solvencyPillText}>Liquidity: {adv.liquidityStatus}</Text>
+                                            </View>
+                                        </View>
+
+                                        <Text style={styles.advisoryHeadline}>{adv.headline}</Text>
+                                        <Text style={styles.advisorySummary}>{adv.summary}</Text>
+
+                                        <View style={styles.advisoryMetricsRow}>
+                                            <View style={styles.advisoryMetricCol}>
+                                                <Text style={styles.advisoryMetricLbl}>Top Profit Driver</Text>
+                                                <Text style={styles.advisoryMetricVal} numberOfLines={1}>{adv.topDriverName}</Text>
+                                                <Text style={styles.advisoryMetricSub}>{adv.topDriverShare.toFixed(1)}% of profit</Text>
+                                            </View>
+                                            <View style={styles.advisoryDivider} />
+                                            <View style={styles.advisoryMetricCol}>
+                                                <Text style={styles.advisoryMetricLbl}>Expense Burn Ratio</Text>
+                                                <Text style={[styles.advisoryMetricVal, { color: adv.burnRate > 50 ? C.coral : C.textMain }]}>
+                                                    {adv.burnRate.toFixed(1)}%
+                                                </Text>
+                                                <Text style={styles.advisoryMetricSub}>of trading gross</Text>
+                                            </View>
+                                            <View style={styles.advisoryDivider} />
+                                            <View style={styles.advisoryMetricCol}>
+                                                <Text style={styles.advisoryMetricLbl}>Whale Liability Ratio</Text>
+                                                <Text style={[styles.advisoryMetricVal, { color: C.emerald }]}>100%</Text>
+                                                <Text style={styles.advisoryMetricSub}>fully backed</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.advisoryRecommendationBox}>
+                                            <Ionicons name="bulb-outline" size={15} color={C.gold} />
+                                            <Text style={styles.advisoryRecommendationText}>{adv.recommendation}</Text>
+                                        </View>
+                                    </View>
+                                );
+                            })()}
+
+                            {/* 4. MONTHLY PROFIT TARGET MILESTONE */}
+                            <View style={styles.targetProgressCard}>
+                                <View style={styles.targetProgressTop}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="flag" size={14} color={C.blue} />
+                                        <Text style={styles.targetProgressTitle}>Monthly Net Profit Milestone</Text>
+                                    </View>
+                                    <Text style={styles.targetProgressGoal}>Goal: ₦1,000,000</Text>
+                                </View>
+                                <View style={styles.targetProgressBarTrack}>
+                                    <View
+                                        style={[
+                                            styles.targetProgressBarFill,
+                                            { width: `${Math.min(100, Math.max(2, Math.round(((metrics?.netProfit || 0) / 1000000) * 100)))}%` }
+                                        ]}
+                                    />
+                                </View>
+                                <View style={styles.targetProgressBottomRow}>
+                                    <Text style={styles.targetProgressEarned}>
+                                        Current: {formatNaira(metrics?.netProfit || 0)}
+                                    </Text>
+                                    <Text style={styles.targetProgressPct}>
+                                        {Math.max(0, ((metrics?.netProfit || 0) / 1000000 * 100)).toFixed(1)}% Completed
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* 5. 7-DAY PERFORMANCE PROGRESSION BARS */}
+                            {metrics?.dailyTrends && metrics.dailyTrends.length > 0 && (
+                                <View style={styles.trendChartCard}>
+                                    <View style={styles.trendChartHeader}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="bar-chart" size={15} color={C.goldBright} />
+                                            <Text style={styles.trendChartTitle}>7-Day Profit Progression</Text>
+                                        </View>
+                                        <View style={styles.trendBadge}>
+                                            <Text style={styles.trendBadgeText}>DAILY TRENDS</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.trendBarsRow}>
+                                        {(() => {
+                                            const maxProfit = Math.max(...metrics.dailyTrends.map(t => Math.max(t.profit, 1)));
+                                            return metrics.dailyTrends.map((point, pIdx) => {
+                                                const heightPct = Math.max(12, Math.min(100, Math.round((Math.max(0, point.profit) / maxProfit) * 90)));
+                                                const isPeak = point.profit > 0 && point.profit === Math.max(...metrics.dailyTrends.map(t => t.profit));
+                                                return (
+                                                    <View key={point.date || pIdx} style={styles.trendBarCol}>
+                                                        <Text style={styles.trendBarValueText} numberOfLines={1}>
+                                                            {point.profit > 0 ? `+₦${(point.profit / 1000).toFixed(point.profit >= 10000 ? 0 : 1)}k` : '₦0'}
+                                                        </Text>
+                                                        <View style={styles.trendBarTrack}>
+                                                            <View
+                                                                style={[
+                                                                    styles.trendBarFill,
+                                                                    {
+                                                                        height: `${heightPct}%`,
+                                                                        backgroundColor: isPeak ? C.goldBright : (point.profit > 0 ? C.emerald : '#CBD5E1')
+                                                                    }
+                                                                ]}
+                                                            />
+                                                        </View>
+                                                        <Text style={[styles.trendBarDayLabel, isPeak && { color: C.gold, fontWeight: '800' }]}>
+                                                            {point.dayName}
+                                                        </Text>
+                                                        <Text style={styles.trendBarOrdersCount}>
+                                                            {point.salesCount} tx
+                                                        </Text>
+                                                    </View>
+                                                );
+                                            });
+                                        })()}
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* 6. TOTAL USER WALLET BALANCES & LIABILITIES */}
                             <View style={styles.userBalanceHeroCard}>
                                 <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.userBalanceHeroGrad}>
                                     <View style={styles.userBalanceTopRow}>
@@ -583,10 +812,18 @@ function AccountingContent() {
                                     <View style={styles.topHoldersSection}>
                                         <View style={styles.topHoldersHeader}>
                                             <Text style={styles.topHoldersTitle}>Highest Balance Holders (Whales)</Text>
-                                            <Text style={styles.topHoldersSub}>Top Customer Deposits</Text>
+                                            <Text style={styles.topHoldersSub}>Tap to inspect customer profile</Text>
                                         </View>
                                         {metrics.userLiquidity.topHolders.map((holder, idx) => (
-                                            <View key={holder.id || idx} style={styles.holderRow}>
+                                            <TouchableOpacity
+                                                key={holder.id || idx}
+                                                style={styles.holderRow}
+                                                activeOpacity={0.7}
+                                                onPress={() => {
+                                                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                    setSelectedWhale(holder);
+                                                }}
+                                            >
                                                 <View style={styles.holderRankCircle}>
                                                     <Text style={styles.holderRankText}>#{idx + 1}</Text>
                                                 </View>
@@ -594,8 +831,11 @@ function AccountingContent() {
                                                     <Text style={styles.holderName} numberOfLines={1}>{holder.name}</Text>
                                                     <Text style={styles.holderEmail} numberOfLines={1}>{holder.email}</Text>
                                                 </View>
-                                                <Text style={styles.holderBalance}>{formatNaira(holder.balance)}</Text>
-                                            </View>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text style={styles.holderBalance}>{formatNaira(holder.balance)}</Text>
+                                                    <Text style={styles.holderInspectHint}>Tap to view →</Text>
+                                                </View>
+                                            </TouchableOpacity>
                                         ))}
                                     </View>
                                 )}
@@ -714,22 +954,74 @@ function AccountingContent() {
                                 )}
                             </View>
 
+                            {/* Sorting Mode Selector */}
+                            <View style={styles.sortPillsRow}>
+                                <Text style={styles.sortPillsLabel}>Sort Mode:</Text>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                        setServiceSortMode('default');
+                                    }}
+                                    style={[styles.sortPill, serviceSortMode === 'default' && styles.sortPillActive]}
+                                >
+                                    <Text style={[styles.sortPillText, serviceSortMode === 'default' && styles.sortPillTextActive]}>
+                                        All Products
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                        setServiceSortMode('profit');
+                                    }}
+                                    style={[styles.sortPill, serviceSortMode === 'profit' && styles.sortPillActive]}
+                                >
+                                    <Ionicons name="trophy" size={11} color={serviceSortMode === 'profit' ? C.goldBright : C.textSub} />
+                                    <Text style={[styles.sortPillText, serviceSortMode === 'profit' && styles.sortPillTextActive]}>
+                                        Top Profit
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                        setServiceSortMode('margin');
+                                    }}
+                                    style={[styles.sortPill, serviceSortMode === 'margin' && styles.sortPillActive]}
+                                >
+                                    <Ionicons name="pie-chart" size={11} color={serviceSortMode === 'margin' ? C.goldBright : C.textSub} />
+                                    <Text style={[styles.sortPillText, serviceSortMode === 'margin' && styles.sortPillTextActive]}>
+                                        Margin %
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
                             {filteredServices.map((serv) => {
                                 const meta = getServiceMeta(serv.type);
                                 return (
                                     <View key={serv.type} style={styles.breakdownCard}>
                                         <View style={styles.breakdownCardHeader}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                                                 <View style={[styles.breakdownIconWrap, { backgroundColor: meta.bg }]}>
                                                     <Ionicons name={meta.icon as any} size={15} color={meta.color} />
                                                 </View>
-                                                <View>
+                                                <View style={{ flex: 1 }}>
                                                     <Text style={styles.breakdownServiceName}>{serv.serviceName}</Text>
                                                     <Text style={styles.breakdownServiceType}>{meta.label}</Text>
                                                 </View>
                                             </View>
-                                            <View style={styles.breakdownTag}>
-                                                <Text style={styles.breakdownTagText}>{serv.transactionCount} Orders</Text>
+                                            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                                                <View style={styles.breakdownTag}>
+                                                    <Text style={styles.breakdownTagText}>{serv.transactionCount} Orders</Text>
+                                                </View>
+                                                {metrics?.grossProfit && metrics.grossProfit > 0 && serv.profit > 0 ? (
+                                                    <View style={styles.profitShareBadge}>
+                                                        <Ionicons name="sparkles" size={9} color={C.gold} />
+                                                        <Text style={styles.profitShareText}>
+                                                            {((serv.profit / metrics.grossProfit) * 100).toFixed(1)}% of profit
+                                                        </Text>
+                                                    </View>
+                                                ) : null}
                                             </View>
                                         </View>
 
@@ -1090,6 +1382,169 @@ function AccountingContent() {
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* MODAL 3: SUPER ADMIN CLEARANCE VAULT */}
+            <Modal
+                visible={clearanceModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setClearanceModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeaderRow}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                <View style={[styles.modalIconWrap, { backgroundColor: C.goldBg }]}>
+                                    <Ionicons name="key" size={16} color={C.gold} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.modalTitle}>Clearance Access Vault</Text>
+                                    <Text style={styles.clearanceModalSub}>Grant or revoke accounting access</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={() => setClearanceModalVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <Ionicons name="close" size={20} color={C.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.clearanceExplainerBox}>
+                            <Ionicons name="information-circle-outline" size={16} color={C.navyMid} />
+                            <Text style={styles.clearanceExplainerText}>
+                                Authorized administrators gain live visibility into profit margins across all 18 services, customer wallet liabilities, and expense management.
+                            </Text>
+                        </View>
+
+                        {loadingAdmins ? (
+                            <View style={{ padding: 30, alignItems: 'center' }}>
+                                <ActivityIndicator size="small" color={C.goldBright} />
+                                <Text style={styles.adminLoadingText}>Loading Staff Accounts...</Text>
+                            </View>
+                        ) : (
+                            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 360, marginTop: 8 }}>
+                                {adminList.map((admin) => {
+                                    const isToggling = togglingAdminEmail === admin.email;
+                                    return (
+                                        <View key={admin.id} style={styles.adminClearanceRow}>
+                                            <View style={{ flex: 1, marginRight: 10 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                                    <Text style={styles.adminNameText} numberOfLines={1}>{admin.fullName}</Text>
+                                                    <View style={[styles.adminRoleBadge, { backgroundColor: admin.isMasterAdmin ? C.goldBg : '#F1F5F9' }]}>
+                                                        <Text style={[styles.adminRoleText, { color: admin.isMasterAdmin ? C.gold : C.textSub }]}>
+                                                            {admin.role.toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={styles.adminEmailText} numberOfLines={1}>{admin.email}</Text>
+                                                {admin.isMasterAdmin ? (
+                                                    <Text style={styles.adminMasterNotice}>Master Authority (Permanent)</Text>
+                                                ) : null}
+                                            </View>
+
+                                            {admin.isMasterAdmin ? (
+                                                <View style={styles.masterLockBadge}>
+                                                    <Ionicons name="lock-closed" size={14} color={C.gold} />
+                                                </View>
+                                            ) : (
+                                                <View style={{ alignItems: 'center' }}>
+                                                    {isToggling ? (
+                                                        <ActivityIndicator size="small" color={C.goldBright} />
+                                                    ) : (
+                                                        <Switch
+                                                            value={admin.hasClearance}
+                                                            onValueChange={() => handleToggleClearance(admin)}
+                                                            trackColor={{ false: '#CBD5E1', true: '#FDE68A' }}
+                                                            thumbColor={admin.hasClearance ? C.gold : '#94A3B8'}
+                                                        />
+                                                    )}
+                                                </View>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+                        )}
+
+                        <TouchableOpacity
+                            onPress={() => setClearanceModalVisible(false)}
+                            style={[styles.modalCancelBtn, { marginTop: 14, width: '100%', alignItems: 'center' }]}
+                        >
+                            <Text style={styles.modalCancelText}>Close Vault</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* MODAL 4: WHALE ACCOUNT DETAILS INSPECTOR */}
+            <Modal
+                visible={!!selectedWhale}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSelectedWhale(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.inspectorCard}>
+                        <View style={styles.modalHeaderRow}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={[styles.modalIconWrap, { backgroundColor: C.emeraldBg }]}>
+                                    <Ionicons name="wallet" size={18} color={C.emerald} />
+                                </View>
+                                <Text style={styles.modalTitle}>Customer Deposit Details</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setSelectedWhale(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <Ionicons name="close" size={20} color={C.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {selectedWhale && (
+                            <View style={{ marginTop: 6 }}>
+                                <View style={[styles.inspectorHeroBox, { borderColor: C.emeraldBorder, backgroundColor: C.emeraldBg }]}>
+                                    <Text style={[styles.inspectorHeroLabel, { color: C.emerald }]}>WALLET LIQUIDITY HELD</Text>
+                                    <Text style={[styles.inspectorHeroVal, { color: C.emerald }]}>
+                                        {formatNaira(selectedWhale.balance)}
+                                    </Text>
+                                    <Text style={[styles.inspectorHeroMargin, { color: C.emerald }]}>100% Guaranteed Reserve</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Customer Name</Text>
+                                    <Text style={styles.inspectorFieldVal}>{selectedWhale.name}</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Email Address</Text>
+                                    <TouchableOpacity
+                                        onPress={() => copyReference(selectedWhale.email)}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                    >
+                                        <Text style={[styles.inspectorFieldVal, { color: C.blue }]}>{selectedWhale.email}</Text>
+                                        <Ionicons name="copy-outline" size={13} color={C.blue} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={[styles.inspectorFieldRow, { borderBottomWidth: 0 }]}>
+                                    <Text style={styles.inspectorFieldLbl}>Database User ID</Text>
+                                    <TouchableOpacity
+                                        onPress={() => copyReference(selectedWhale.id)}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                    >
+                                        <Text style={[styles.inspectorFieldVal, { color: C.blue }]} numberOfLines={1}>
+                                            {selectedWhale.id.substring(0, 16)}...
+                                        </Text>
+                                        <Ionicons name="copy-outline" size={13} color={C.blue} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => setSelectedWhale(null)}
+                                    style={styles.inspectorCloseBtn}
+                                >
+                                    <Text style={styles.inspectorCloseBtnText}>Close Customer Details</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -2220,5 +2675,373 @@ const styles = StyleSheet.create({
         color: C.white,
         fontSize: 12.5,
         fontWeight: '900',
+    },
+
+    // --- SMART FINANCIAL HEALTH & ADVISORY ---
+    advisoryCard: {
+        backgroundColor: C.cardBg,
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1.5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
+    },
+    advisoryTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    ratingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    ratingText: {
+        fontSize: 10.5,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    solvencyPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+    },
+    solvencyPillText: {
+        color: C.textSub,
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    advisoryHeadline: {
+        color: C.navy,
+        fontSize: 14,
+        fontWeight: '900',
+        marginBottom: 4,
+    },
+    advisorySummary: {
+        color: C.textSub,
+        fontSize: 11.5,
+        lineHeight: 16,
+        marginBottom: 12,
+    },
+    advisoryMetricsRow: {
+        flexDirection: 'row',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 10,
+        alignItems: 'center',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    advisoryMetricCol: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    advisoryMetricLbl: {
+        color: C.textMuted,
+        fontSize: 9.5,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    advisoryMetricVal: {
+        color: C.navy,
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    advisoryMetricSub: {
+        color: C.textSub,
+        fontSize: 9,
+        marginTop: 1,
+    },
+    advisoryDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: C.cardBorder,
+    },
+    advisoryRecommendationBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: C.goldLight,
+        padding: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: C.goldBorder,
+    },
+    advisoryRecommendationText: {
+        flex: 1,
+        color: '#92400E',
+        fontSize: 11,
+        fontWeight: '600',
+        lineHeight: 15,
+    },
+
+    // --- MONTHLY NET PROFIT TARGET MILESTONE ---
+    targetProgressCard: {
+        backgroundColor: C.cardBg,
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    targetProgressTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    targetProgressTitle: {
+        color: C.navy,
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    targetProgressGoal: {
+        color: C.blue,
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    targetProgressBarTrack: {
+        height: 8,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 4,
+        overflow: 'hidden',
+        marginBottom: 8,
+    },
+    targetProgressBarFill: {
+        height: '100%',
+        backgroundColor: C.blue,
+        borderRadius: 4,
+    },
+    targetProgressBottomRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    targetProgressEarned: {
+        color: C.textSub,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    targetProgressPct: {
+        color: C.navy,
+        fontSize: 11,
+        fontWeight: '900',
+    },
+
+    // --- 7-DAY PERFORMANCE TREND BARS ---
+    trendChartCard: {
+        backgroundColor: C.cardBg,
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    trendChartHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    trendChartTitle: {
+        color: C.navy,
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    trendBadge: {
+        backgroundColor: C.goldBg,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    trendBadgeText: {
+        color: C.gold,
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+    trendBarsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        height: 110,
+        paddingTop: 10,
+    },
+    trendBarCol: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        height: '100%',
+    },
+    trendBarValueText: {
+        color: C.textSub,
+        fontSize: 8.5,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    trendBarTrack: {
+        width: 14,
+        height: 60,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 7,
+        justifyContent: 'flex-end',
+        overflow: 'hidden',
+        marginBottom: 6,
+    },
+    trendBarFill: {
+        width: '100%',
+        borderRadius: 7,
+    },
+    trendBarDayLabel: {
+        color: C.textSub,
+        fontSize: 10,
+        fontWeight: '700',
+        marginBottom: 1,
+    },
+    trendBarOrdersCount: {
+        color: C.textMuted,
+        fontSize: 8,
+        fontWeight: '600',
+    },
+
+    // --- HOLDER INSPECT HINT ---
+    holderInspectHint: {
+        color: C.blue,
+        fontSize: 9,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+
+    // --- SORTING PILLS & PROFIT SHARE ---
+    sortPillsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 12,
+    },
+    sortPillsLabel: {
+        color: C.textSub,
+        fontSize: 11,
+        fontWeight: '700',
+        marginRight: 2,
+    },
+    sortPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    sortPillActive: {
+        backgroundColor: C.navy,
+        borderColor: C.navy,
+    },
+    sortPillText: {
+        color: C.textSub,
+        fontSize: 10.5,
+        fontWeight: '700',
+    },
+    sortPillTextActive: {
+        color: C.goldBright,
+        fontWeight: '900',
+    },
+    profitShareBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: C.goldBg,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 0.5,
+        borderColor: C.goldBorder,
+    },
+    profitShareText: {
+        color: C.gold,
+        fontSize: 9,
+        fontWeight: '800',
+    },
+
+    // --- SUPER ADMIN CLEARANCE VAULT MODAL ---
+    clearanceModalSub: {
+        color: C.textSub,
+        fontSize: 10.5,
+        marginTop: 1,
+    },
+    clearanceExplainerBox: {
+        flexDirection: 'row',
+        gap: 8,
+        backgroundColor: '#F1F5F9',
+        padding: 10,
+        borderRadius: 10,
+        marginTop: 10,
+        alignItems: 'flex-start',
+    },
+    clearanceExplainerText: {
+        flex: 1,
+        color: C.navyMid,
+        fontSize: 11,
+        lineHeight: 15,
+        fontWeight: '500',
+    },
+    adminLoadingText: {
+        color: C.textSub,
+        fontSize: 11,
+        marginTop: 8,
+        fontWeight: '600',
+    },
+    adminClearanceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        marginBottom: 8,
+    },
+    adminNameText: {
+        color: C.navy,
+        fontSize: 12.5,
+        fontWeight: '800',
+    },
+    adminRoleBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    adminRoleText: {
+        fontSize: 9,
+        fontWeight: '900',
+    },
+    adminEmailText: {
+        color: C.textSub,
+        fontSize: 11,
+    },
+    adminMasterNotice: {
+        color: C.gold,
+        fontSize: 9.5,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    masterLockBadge: {
+        padding: 6,
+        backgroundColor: C.goldBg,
+        borderRadius: 8,
     },
 });
