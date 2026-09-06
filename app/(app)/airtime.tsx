@@ -12,6 +12,7 @@ import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { validateNigerianPhone } from '../../utils/securityUtils';
 
 // Network Assets & Data
 const NETWORK_LOGOS: Record<string, any> = {
@@ -206,7 +207,24 @@ export default function AirtimeScreen() {
     };
 
     const handlePurchase = async () => {
-        if (!network || !amount || phoneNumber.length < 10) return;
+        if (!network) {
+            Alert.alert("Network Required", "Please select a mobile network.");
+            return;
+        }
+        if (!amount || Number(amount) < 50) {
+            Alert.alert("Invalid Amount", "Please enter an amount of at least ₦50.");
+            return;
+        }
+        if (phoneNumber.length !== 11) {
+            Alert.alert("Incomplete Phone Number", `Phone number is incomplete (${phoneNumber.length}/11 digits). Please enter all 11 digits before proceeding.`);
+            return;
+        }
+
+        const phoneValidation = validateNigerianPhone(phoneNumber);
+        if (!phoneValidation.isValid) {
+            Alert.alert("Invalid Phone Number", phoneValidation.error || "Please enter a valid 11-digit Nigerian mobile phone number.");
+            return;
+        }
 
         if (balance !== null && Number(amount || 0) > Number(balance || 0)) {
             Alert.alert("Insufficient Funds", `Your wallet balance (₦${Number(balance || 0).toLocaleString()}) is insufficient for this transaction.`);
@@ -563,7 +581,7 @@ export default function AirtimeScreen() {
                 <View style={[
                     s.inputContainer,
                     phoneFocused && s.inputContainerFocused,
-                    phoneNumber.length >= 10 && s.inputContainerSuccess
+                    phoneNumber.length === 11 && s.inputContainerSuccess
                 ]}>
                     <View style={s.inputIconWrapper}>
                         {network && NETWORK_LOGOS[network] ? (
@@ -603,7 +621,7 @@ export default function AirtimeScreen() {
                 </View>
 
                 {/* Save Beneficiary Toggle */}
-                {phoneNumber.length >= 10 && !beneficiaries.find(b => b.account_number === phoneNumber) && (
+                {phoneNumber.length === 11 && !beneficiaries.find(b => b.account_number === phoneNumber) && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', padding: 12, borderRadius: 16 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <View style={{ backgroundColor: 'rgba(22, 163, 74, 0.12)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
@@ -802,12 +820,12 @@ export default function AirtimeScreen() {
                 {/* Purchase Button - Modern Gradient */}
                 <TouchableOpacity
                     onPress={handlePurchase}
-                    disabled={!network || !amount || phoneNumber.length < 10 || loading}
+                    disabled={!network || !amount || phoneNumber.length !== 11 || loading}
                     activeOpacity={0.8}
                     style={s.purchaseButtonWrapper}
                 >
                     <LinearGradient
-                        colors={ (!network || !amount || phoneNumber.length < 10 || loading) 
+                        colors={ (!network || !amount || phoneNumber.length !== 11 || loading) 
                              ? ['#e2e8f0', '#cbd5e1'] // Disabled Gray
                              : ['#0d1b3e', '#142258', '#f5a623'] // Premium Brand Gradient
                         }
@@ -821,14 +839,14 @@ export default function AirtimeScreen() {
                              <>
                                 <Text style={[
                                     s.purchaseButtonText,
-                                    (!network || !amount || phoneNumber.length < 10) && s.purchaseButtonTextDisabled
+                                    (!network || !amount || phoneNumber.length !== 11) && s.purchaseButtonTextDisabled
                                 ]}>
                                     Pay securely
                                 </Text>
                                 <Ionicons 
                                     name="lock-closed" 
                                     size={18} 
-                                    color={(!network || !amount || phoneNumber.length < 10) ? '#94a3b8' : 'white'} 
+                                    color={(!network || !amount || phoneNumber.length !== 11) ? '#94a3b8' : 'white'} 
                                 />
                             </>
                         )}

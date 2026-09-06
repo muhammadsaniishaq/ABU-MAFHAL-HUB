@@ -22,6 +22,7 @@ import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { useAuthTheme } from '../../hooks/useAuthTheme';
 import Mascot3D from '../../components/Mascot3D';
+import { validateNigerianPhone, isPotentialXssPayload, sanitizeText } from '../../utils/securityUtils';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -500,9 +501,14 @@ export default function SignupScreen() {
             return;
         }
 
-        // Strict XSS & HTML Script Injection Protection
-        if (/[<>{}[\]\\\/`"']|script|javascript:|onerror|onload/i.test(cleanFullName)) {
+        // Strict XSS & HTML Script Injection Protection on Name & Username
+        if (isPotentialXssPayload(cleanFullName)) {
             notifyUser('Invalid Characters In Name ❌', 'Please enter a valid personal name without symbols, HTML, or code tags.');
+            return;
+        }
+
+        if (isPotentialXssPayload(cleanUsername)) {
+            notifyUser('Invalid Username ❌', 'Username contains invalid special characters.');
             return;
         }
 
@@ -518,11 +524,19 @@ export default function SignupScreen() {
             return;
         }
 
-        // 2. Strict Phone Validation
-        const phoneDigits = cleanPhoneInput.replace(/\D/g, '');
-        if (!phoneDigits || phoneDigits.length < 10) {
-            notifyUser('Valid Phone Required 📱', 'Please enter a valid phone number (10 or 11 digits).');
-            return;
+        // 2. Strict Phone Validation (Check for completeness & valid prefix)
+        if (selectedCountry.code === 'NG' || selectedCountry.dialCode === '+234') {
+            const phoneRes = validateNigerianPhone(cleanPhoneInput);
+            if (!phoneRes.isValid) {
+                notifyUser('Incomplete Phone Number 📱', phoneRes.error || 'Please enter a complete 11-digit Nigerian phone number.');
+                return;
+            }
+        } else {
+            const phoneDigits = cleanPhoneInput.replace(/\D/g, '');
+            if (!phoneDigits || phoneDigits.length < 9) {
+                notifyUser('Valid Phone Required 📱', 'Please enter a complete phone number.');
+                return;
+            }
         }
 
         // 3. Strict Password Security Check

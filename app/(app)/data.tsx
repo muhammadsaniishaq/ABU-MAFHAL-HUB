@@ -15,6 +15,7 @@ import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { validateNigerianPhone } from '../../utils/securityUtils';
 
 export interface ExtractedPlanInfo {
     volumeVal: string;
@@ -471,13 +472,19 @@ export default function DataScreen() {
 
     const handlePurchase = () => {
         if (!network || !phoneNumber || !selectedPlan) {
-            Alert.alert("Error", "Please fill all fields");
+            Alert.alert("Missing Details", "Please select a network, data plan, and enter a phone number.");
             return;
         }
 
-        if (phoneNumber.length < 11) {
-             Alert.alert("Invalid Phone", "Please enter a valid 11-digit phone number");
-             return;
+        if (phoneNumber.length !== 11) {
+            Alert.alert("Incomplete Phone Number", `Phone number is incomplete (${phoneNumber.length}/11 digits). Please enter all 11 digits.`);
+            return;
+        }
+
+        const phoneValidation = validateNigerianPhone(phoneNumber);
+        if (!phoneValidation.isValid) {
+            Alert.alert("Invalid Phone Number", phoneValidation.error || "Please enter a valid 11-digit Nigerian mobile phone number.");
+            return;
         }
 
         setShowConfirmation(true);

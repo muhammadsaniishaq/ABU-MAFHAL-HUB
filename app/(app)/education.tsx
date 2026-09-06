@@ -8,6 +8,7 @@ import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { validateNigerianPhone } from '../../utils/securityUtils';
 
 // Import local assets
 const logoWaec = require('../../assets/exams/waec.png');
@@ -174,8 +175,13 @@ export default function EducationScreen() {
                 Alert.alert("Required", "Please enter a valid 10-digit Profile ID for JAMB.");
                 return;
             }
-            if (!phoneNumber || phoneNumber.length < 11) {
-                 Alert.alert("Required", "Please enter a valid 11-digit Phone Number.");
+            if (!phoneNumber || phoneNumber.length !== 11) {
+                 Alert.alert("Incomplete Phone", `Phone number is incomplete (${phoneNumber?.length || 0}/11 digits). Please enter all 11 digits.`);
+                 return;
+            }
+            const pVal = validateNigerianPhone(phoneNumber);
+            if (!pVal.isValid) {
+                 Alert.alert("Invalid Phone Number", pVal.error || "Please enter a valid 11-digit Nigerian mobile phone number.");
                  return;
             }
             if (!profileVerified) {

@@ -13,6 +13,7 @@ import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
+import { validateNigerianPhone } from '../../../utils/securityUtils';
 
 // Helper to safely load external images on Web for canvas rendering
 const getSafeImageUrl = (url: string) => {
@@ -231,8 +232,12 @@ export default function VerifyPhoneScreen() {
 
     const handleVerify = async () => {
         const cleanPhone = phone.trim();
-        if (cleanPhone.length < 10) {
-            return showAlert('Phone Number Invalid', 'Please enter a valid phone number (e.g. 080xxxxxxxx).', 'warning');
+        if (cleanPhone.length !== 11) {
+            return showAlert('Incomplete Phone Number', `Phone number is incomplete (${cleanPhone.length}/11 digits). Please enter all 11 digits (e.g. 080xxxxxxxx).`, 'warning');
+        }
+        const pVal = validateNigerianPhone(cleanPhone);
+        if (!pVal.isValid) {
+            return showAlert('Invalid Phone Number', pVal.error || 'Please enter a valid 11-digit Nigerian phone number.', 'warning');
         }
         const layoutItem = layouts.find(l => l.id === selectedLayout);
         const totalPrice = layoutItem ? layoutItem.price : 0;
