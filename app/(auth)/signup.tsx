@@ -500,6 +500,12 @@ export default function SignupScreen() {
             return;
         }
 
+        // Strict XSS & HTML Script Injection Protection
+        if (/[<>{}[\]\\\/`"']|script|javascript:|onerror|onload/i.test(cleanFullName)) {
+            notifyUser('Invalid Characters In Name ❌', 'Please enter a valid personal name without symbols, HTML, or code tags.');
+            return;
+        }
+
         if (!cleanUsername || cleanUsername.length < 3) {
             notifyUser('Valid Username Required 👤', 'Please choose a valid Username (at least 3 letters or numbers).');
             return;
