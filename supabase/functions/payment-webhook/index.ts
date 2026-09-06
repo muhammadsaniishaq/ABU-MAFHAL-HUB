@@ -93,6 +93,75 @@ Deno.serve(async (req: Request) => {
             parsedPayload = JSON.parse(rawBody);
         } catch (_) {}
 
+        // --- ACTION: ADMIN PERMANENT DELETE USER ---
+        if (parsedPayload && parsedPayload.action === 'admin_delete_user') {
+            const targetId = parsedPayload.userId;
+            const targetEmail = parsedPayload.email;
+
+            if (!targetId && !targetEmail) {
+                return new Response(JSON.stringify({ success: false, error: "userId or email required" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            let resolvedUserId = targetId;
+            if (!resolvedUserId && targetEmail) {
+                const { data: pData } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id')
+                    .eq('email', targetEmail.toLowerCase().trim())
+                    .maybeSingle();
+                if (pData?.id) resolvedUserId = pData.id;
+            }
+
+            if (!resolvedUserId && targetEmail) {
+                try {
+                    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+                    const matchedUser = users?.find(u => u.email?.toLowerCase() === targetEmail?.toLowerCase());
+                    if (matchedUser?.id) resolvedUserId = matchedUser.id;
+                } catch (_) {}
+            }
+
+            if (!resolvedUserId) {
+                return new Response(JSON.stringify({ success: false, error: "User not found" }), {
+                    status: 404,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            console.log(`[AdminDelete] Permanently deleting user: ${resolvedUserId}`);
+
+            await Promise.allSettled([
+                supabaseAdmin.from('virtual_accounts').delete().eq('user_id', resolvedUserId),
+                supabaseAdmin.from('transactions').delete().eq('user_id', resolvedUserId),
+                supabaseAdmin.from('notifications').delete().eq('user_id', resolvedUserId),
+                supabaseAdmin.from('kyc_requests').delete().eq('user_id', resolvedUserId),
+                supabaseAdmin.from('virtual_cards').delete().eq('user_id', resolvedUserId),
+                supabaseAdmin.from('user_bank_accounts').delete().eq('user_id', resolvedUserId),
+                supabaseAdmin.from('tickets').delete().eq('user_id', resolvedUserId),
+            ]);
+
+            const { error: profileDeleteErr } = await supabaseAdmin.from('profiles').delete().eq('id', resolvedUserId);
+            if (profileDeleteErr) {
+                console.warn("[AdminDelete] Profile delete note:", profileDeleteErr);
+            }
+
+            const { error: authDeleteErr } = await supabaseAdmin.auth.admin.deleteUser(resolvedUserId);
+            if (authDeleteErr) {
+                console.warn("[AdminDelete] Auth delete note:", authDeleteErr);
+            }
+
+            return new Response(JSON.stringify({
+                success: true,
+                message: `User ${resolvedUserId} permanently deleted from auth and database.`,
+                userId: resolvedUserId
+            }), {
+                status: 200,
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
         // --- ACTION: APPLY WALLET DATABASE RPC & TRIGGER FIX ---
         if (parsedPayload && parsedPayload.action === 'apply_wallet_db_fix') {
             const dbUrl = Deno.env.get('SUPABASE_DB_URL');

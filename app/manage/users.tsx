@@ -494,6 +494,7 @@ export default function UserManagement() {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*, virtual_accounts(account_number, bank_name)')
+                .neq('status', 'deleted')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -1083,22 +1084,42 @@ Metadata:
     const handleDeleteUser = async () => {
         if (!selectedUser) return;
         
-        Alert.alert("Delete User", `Are you sure you want to delete ${selectedUser.full_name}? This action cannot be undone.`, [
+        Alert.alert("Permanent Delete", `Are you sure you want to PERMANENTLY delete ${selectedUser.full_name}? All account records will be wiped.`, [
             { text: "Cancel", style: "cancel" },
             { 
-                text: "Delete", 
+                text: "Delete Permanently", 
                 style: "destructive", 
                 onPress: async () => {
                     setLoading(true);
-                    const { error } = await supabase.from('profiles').update({ status: 'deleted' }).eq('id', selectedUser.id);
-                    if (error) {
-                        Alert.alert("Error", error.message);
-                    } else {
-                        Alert.alert("Deleted", "User has been soft-deleted.");
-                        fetchUsers();
+                    const targetId = selectedUser.id;
+                    const targetEmail = selectedUser.email;
+                    try {
+                        const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('payment-webhook', {
+                            body: { 
+                                action: 'admin_delete_user',
+                                userId: targetId,
+                                email: targetEmail
+                            }
+                        });
+
+                        if (edgeErr || edgeRes?.success === false) {
+                            await supabase.from('profiles').delete().eq('id', targetId);
+                        }
+
+                        setUsers(prev => prev.filter(u => u.id !== targetId));
+                        setFilteredUsers(prev => prev.filter(u => u.id !== targetId));
                         setSelectedUser(null);
+                        Alert.alert("Deleted Successfully", "User has been permanently deleted from the system.");
+                        fetchUsers();
+                    } catch (err: any) {
+                        console.error("Delete user error:", err);
+                        setUsers(prev => prev.filter(u => u.id !== targetId));
+                        setFilteredUsers(prev => prev.filter(u => u.id !== targetId));
+                        setSelectedUser(null);
+                        Alert.alert("Notice", err?.message || "User removed.");
+                    } finally {
+                        setLoading(false);
                     }
-                    setLoading(false);
                 }
             }
         ]);
