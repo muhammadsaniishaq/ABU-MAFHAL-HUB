@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { validateNigerianPhone } from '../../utils/securityUtils';
 
@@ -30,6 +31,16 @@ const NETWORKS_DATA = [
     { id: '9mobile', name: '9mobile', color: '#006B3E', cashback: '3% Off', discountRate: 0.03, prefixes: ['0809', '0818', '0817', '0909', '0908'] },
     { id: 'vitel', name: 'VITEL', color: '#6366F1', cashback: '2% Off', discountRate: 0.02, prefixes: ['070', '091'] },
 ];
+
+const formatCurrency = (val: number | string | null | undefined): string => {
+    const num = Number(val || 0);
+    if (isNaN(num)) return '0.00';
+    try {
+        return num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch {
+        return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+};
 
 const getNetworkStyles = (netId: string, isSelected: boolean) => {
     if (!isSelected) {
@@ -102,7 +113,7 @@ const getNetworkStyles = (netId: string, isSelected: boolean) => {
 
 const safeLayoutAnimation = () => {
     try {
-        if (Platform.OS !== 'web') {
+        if (Platform.OS !== 'web' && LayoutAnimation?.configureNext && LayoutAnimation?.Presets?.easeInEaseOut) {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         }
     } catch {
@@ -110,9 +121,9 @@ const safeLayoutAnimation = () => {
     }
 };
 
-export default function AirtimeScreen() {
+function AirtimeScreenContent() {
     const insets = useSafeAreaInsets();
-    const headerTopPadding = Math.max(insets.top, Platform.OS === 'android' ? 32 : 20) + 12;
+    const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 32 : 20) + 12;
     const [network, setNetwork] = useState('mtn');
     const [amount, setAmount] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -148,30 +159,38 @@ export default function AirtimeScreen() {
     }, []);
 
     const fetchData = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+        try {
+            const { data, error: userError } = await supabase.auth.getUser();
+            const user = data?.user;
+            if (userError || !user) return;
+
             await Promise.allSettled([
                 supabase.from('beneficiaries').select('*').eq('user_id', user.id).then(({ data: bens }) => {
-                    if (bens) setBeneficiaries(bens);
+                    if (bens && Array.isArray(bens)) setBeneficiaries(bens);
                 }),
-                supabase.from('profiles').select('balance, phone').eq('id', user.id).single().then(({ data: profile }) => {
+                supabase.from('profiles').select('balance, phone').eq('id', user.id).maybeSingle().then(({ data: profile }) => {
                     if (profile) {
-                        setBalance(profile.balance);
-                        if (profile.phone) setUserPhone(profile.phone);
+                        if (profile.balance !== undefined && profile.balance !== null) {
+                            setBalance(Number(profile.balance));
+                        }
+                        if (profile.phone && typeof profile.phone === 'string' && profile.phone.trim().length > 0) {
+                            setUserPhone(profile.phone.trim());
+                        }
                     }
                 }),
                 supabase.from('transactions').select('*').eq('user_id', user.id).eq('type', 'airtime').eq('status', 'success').order('created_at', { ascending: false }).limit(20).then(({ data: txns }) => {
-                    if (txns) {
+                    if (txns && Array.isArray(txns)) {
                         const uniqueRecents: any[] = [];
                         const seenPhones = new Set();
                         txns.forEach((t: any) => {
-                            const match = t.description?.match(/:\s*(\w+)\s+([\d+]+)/);
+                            if (!t?.description) return;
+                            const match = t.description.match(/:\s*(\w+)\s+([\d+]+)/);
                             if (match) {
-                                const net = match[1].toLowerCase();
-                                const pho = match[2];
-                                if (!seenPhones.has(pho)) {
+                                const net = String(match[1] || 'mtn').toLowerCase();
+                                const pho = String(match[2] || '');
+                                if (pho && !seenPhones.has(pho)) {
                                     seenPhones.add(pho);
-                                    uniqueRecents.push({ id: t.id, network: net, phone: pho });
+                                    uniqueRecents.push({ id: t.id || `${net}-${pho}`, network: net, phone: pho });
                                 }
                             }
                         });
@@ -179,6 +198,8 @@ export default function AirtimeScreen() {
                     }
                 })
             ]);
+        } catch (err) {
+            console.warn('Airtime fetchData error:', err);
         }
     };
 
@@ -201,7 +222,6 @@ export default function AirtimeScreen() {
 
     // Helper to format amount
     const handleAmountChange = (text: string) => {
-        // Remove non-numeric chars
         const clean = text.replace(/[^0-9]/g, '');
         setAmount(clean);
     };
@@ -227,11 +247,10 @@ export default function AirtimeScreen() {
         }
 
         if (balance !== null && Number(amount || 0) > Number(balance || 0)) {
-            Alert.alert("Insufficient Funds", `Your wallet balance (₦${Number(balance || 0).toLocaleString()}) is insufficient for this transaction.`);
+            Alert.alert("Insufficient Funds", `Your wallet balance (₦${formatCurrency(balance)}) is insufficient for this transaction.`);
             return;
         }
 
-        // Open Confirmation Modal instead of Security Modal directly
         setShowConfirmation(true);
     };
 
@@ -245,13 +264,12 @@ export default function AirtimeScreen() {
 
             // Save Beneficiary if selected
             if (saveBeneficiary) {
-                // Check if already exists to avoid dupes? (Primitive check)
                 const exists = beneficiaries.find(b => b.account_number === phoneNumber);
                 if (!exists) {
                     await supabase.from('beneficiaries').insert({
                         user_id: user.id,
-                        name: `My ${activeNetwork.toUpperCase()} Line`, // Default Name
-                        bank_name: activeNetwork.toUpperCase(), // Treat Network as Bank Name
+                        name: `My ${activeNetwork.toUpperCase()} Line`,
+                        bank_name: activeNetwork.toUpperCase(),
                         account_number: phoneNumber
                     });
                 }
@@ -264,11 +282,10 @@ export default function AirtimeScreen() {
             });
 
             if (result.success) {
-                // Send Notification
                 await createAppNotification(
                     user.id,
                     "Airtime Purchase Successful",
-                    `You have successfully purchased ₦${amount} airtime for ${phoneNumber} (${activeNetwork.toUpperCase()}).`,
+                    `You have successfully purchased ₦${formatCurrency(amount)} airtime for ${phoneNumber} (${activeNetwork.toUpperCase()}).`,
                     "airtime",
                     "normal",
                     { route: "/(app)/history" }
@@ -277,7 +294,7 @@ export default function AirtimeScreen() {
                 router.replace({
                     pathname: '/success',
                     params: {
-                        amount: `₦${Number(amount || 0).toLocaleString()}`,
+                        amount: `₦${formatCurrency(amount)}`,
                         type: 'Airtime Purchase',
                         reference: result.reference
                     }
@@ -342,12 +359,12 @@ export default function AirtimeScreen() {
                         
                         <FlatList
                             data={filteredBens}
-                            keyExtractor={item => item.id}
+                            keyExtractor={(item, index) => item?.id ? String(item.id) : String(index)}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
                                     style={s.beneficiaryItem}
                                     onPress={() => {
-                                        setPhoneNumber(item.account_number); // Using account_number as phone
+                                        setPhoneNumber(item.account_number);
                                         detectNetwork(item.account_number);
                                         setBeneficiarySearch('');
                                         setShowBeneficiaryModal(false);
@@ -395,23 +412,22 @@ export default function AirtimeScreen() {
                     </TouchableOpacity>
                     <View style={{ alignItems: 'center' }}>
                         <Text style={s.headerTitle}>Buy Airtime</Text>
-                        {balance !== null && (
+                        {Boolean(balance !== null) ? (
                             <View style={s.balanceBadge}>
                                 <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
                                 <Text style={s.headerBalance}>
-                                    ₦{Number(balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    ₦{formatCurrency(balance)}
                                 </Text>
                             </View>
-                        )}
+                        ) : null}
                     </View>
                     <View style={{ width: 36 }} />
                 </View>
             </LinearGradient>
 
             <KeyboardAvoidingView 
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1 bg-gray-50"
-                style={isWeb && { backgroundColor: '#f4f6fb' }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={[{ flex: 1, backgroundColor: '#f4f6fb' }, isWeb && s.webPageContainer]}
             >
                 <ScrollView 
                     style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
@@ -422,7 +438,7 @@ export default function AirtimeScreen() {
                 >
                 
                 {/* Balance Display - Modern Gradient */}
-                {balance !== null && (
+                {Boolean(balance !== null) ? (
                     <LinearGradient
                         colors={['#0d1b3e', '#142258']}
                         start={{ x: 0, y: 0 }}
@@ -431,7 +447,7 @@ export default function AirtimeScreen() {
                     >
                         <View style={{ flex: 1 }}>
                             <Text style={s.balanceLabel}>Total Balance</Text>
-                            <Text style={s.balanceAmount}>₦{Number(balance || 0).toLocaleString()}</Text>
+                            <Text style={s.balanceAmount}>₦{formatCurrency(balance)}</Text>
                             
                             {/* Cashback Savings Badge Decoration */}
                             <View style={s.savingsBadge}>
@@ -443,19 +459,19 @@ export default function AirtimeScreen() {
                             <Ionicons name="wallet-outline" size={20} color="#f5a623" />
                         </View>
                     </LinearGradient>
-                )}
+                ) : null}
 
                 {/* Dynamic Banners */}
                 <DynamicBanners placement="airtime" />
 
                 {/* Recent Top-ups */}
-                {recents.length > 0 && (
+                {Boolean(recents && recents.length > 0) ? (
                     <View style={{ marginBottom: 16 }}>
                         <Text style={{ fontSize: 11, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 }}>Recent Top-ups</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}>
-                            {recents.map((item) => (
+                            {recents.map((item, idx) => (
                                 <TouchableOpacity
-                                    key={item.id}
+                                    key={item.id || String(idx)}
                                     onPress={() => {
                                         setPhoneNumber(item.phone);
                                         detectNetwork(item.phone);
@@ -479,21 +495,21 @@ export default function AirtimeScreen() {
                                     activeOpacity={0.75}
                                 >
                                     <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' }}>
-                                        {NETWORK_LOGOS[item.network] ? (
+                                        {item.network && NETWORK_LOGOS[item.network] ? (
                                             <Image source={NETWORK_LOGOS[item.network]} style={{ width: 24, height: 24 }} resizeMode="contain" />
                                         ) : (
                                             <Ionicons name="person" size={14} color="#94a3b8" />
                                         )}
                                     </View>
                                     <View>
-                                        <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 11.5 }}>{item.phone}</Text>
-                                        <Text style={{ color: '#64748b', fontSize: 9.5, fontWeight: '600', textTransform: 'capitalize' }}>{item.network}</Text>
+                                        <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 11.5 }}>{item.phone || ''}</Text>
+                                        <Text style={{ color: '#64748b', fontSize: 9.5, fontWeight: '600', textTransform: 'capitalize' }}>{item.network || ''}</Text>
                                     </View>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                     </View>
-                )}
+                ) : null}
 
                 {/* Network Section */}
                 <Text style={{ fontSize: 13, fontWeight: '800', color: '#0d1b3e', marginBottom: 10, marginLeft: 4 }}>Select Network</Text>
@@ -540,11 +556,11 @@ export default function AirtimeScreen() {
                                 <View style={{ backgroundColor: nStyles.badgeBg, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, marginTop: 3 }}>
                                     <Text style={{ fontSize: 7.5, fontWeight: '800', color: nStyles.badgeText }}>{net.cashback}</Text>
                                 </View>
-                                {isSelected && (
+                                {isSelected ? (
                                     <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: nStyles.accent, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
                                         <Ionicons name="checkmark" size={8} color="white" />
                                     </View>
-                                )}
+                                ) : null}
                             </TouchableOpacity>
                         );
                     })}
@@ -602,16 +618,16 @@ export default function AirtimeScreen() {
                         onFocus={() => setPhoneFocused(true)}
                         onBlur={() => setPhoneFocused(false)}
                     />
-                    {userPhone && phoneNumber !== userPhone && (
+                    {Boolean(userPhone && phoneNumber !== userPhone) ? (
                         <TouchableOpacity 
                             onPress={() => {
-                                handlePhoneChange(userPhone);
+                                handlePhoneChange(userPhone || '');
                             }}
                             style={s.meButton}
                         >
                             <Text style={s.meButtonText}>ME</Text>
                         </TouchableOpacity>
-                    )}
+                    ) : null}
                     <TouchableOpacity 
                         onPress={() => setShowBeneficiaryModal(true)}
                         style={s.beneficiarySelectButton}
@@ -621,7 +637,7 @@ export default function AirtimeScreen() {
                 </View>
 
                 {/* Save Beneficiary Toggle */}
-                {phoneNumber.length === 11 && !beneficiaries.find(b => b.account_number === phoneNumber) && (
+                {Boolean(phoneNumber.length === 11 && !beneficiaries.find(b => b.account_number === phoneNumber)) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', padding: 12, borderRadius: 16 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <View style={{ backgroundColor: 'rgba(22, 163, 74, 0.12)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
@@ -639,7 +655,7 @@ export default function AirtimeScreen() {
                             value={saveBeneficiary}
                         />
                     </View>
-                )}
+                ) : null}
 
                 {/* Amount Input */}
                 <Text style={s.inputLabel}>Amount</Text>
@@ -687,7 +703,7 @@ export default function AirtimeScreen() {
                 </View>
 
                 {/* Real-time Savings Estimator Card */}
-                {network && amount && Number(amount) > 0 && (
+                {Boolean(network && amount && Number(amount) > 0) ? (
                     <View style={s.estimatorContainer}>
                         <View style={s.estimatorHeader}>
                             <Ionicons name="sparkles" size={15} color="#d97706" style={{ marginRight: 6 }} />
@@ -696,21 +712,21 @@ export default function AirtimeScreen() {
                         <View style={s.estimatorDivider} />
                         <View style={s.estimatorRow}>
                             <Text style={s.estimatorLabel}>Original Price:</Text>
-                            <Text style={s.estimatorValue}>₦{Number(amount || 0).toLocaleString()}</Text>
+                            <Text style={s.estimatorValue}>₦{formatCurrency(amount)}</Text>
                         </View>
                         <View style={s.estimatorRow}>
                             <Text style={s.estimatorLabel}>Cashback Discount ({NETWORKS_DATA.find(n => n.id === network)?.cashback || '2% Off'}):</Text>
-                            <Text style={[s.estimatorValue, { color: '#16a34a' }]}>-₦{(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}</Text>
+                            <Text style={[s.estimatorValue, { color: '#16a34a' }]}>-₦{formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))}</Text>
                         </View>
                         <View style={s.estimatorRow}>
                             <Text style={s.estimatorLabelTotal}>You Pay:</Text>
-                            <Text style={s.estimatorValueTotal}>₦{(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}</Text>
+                            <Text style={s.estimatorValueTotal}>₦{formatCurrency(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)))}</Text>
                         </View>
                         <View style={[s.estimatorBadge, { backgroundColor: '#fef3c7' }]}>
-                            <Text style={s.estimatorBadgeText}>🎉 Saved ₦{(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()} with {NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase()} Smart Top-up!</Text>
+                            <Text style={s.estimatorBadgeText}>🎉 Saved ₦{formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))} with {NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase()} Smart Top-up!</Text>
                         </View>
                     </View>
-                )}
+                ) : null}
 
                 {/* Auto-Refill Schedule Planner */}
                 <View style={s.scheduleContainer}>
@@ -740,7 +756,7 @@ export default function AirtimeScreen() {
                         />
                     </TouchableOpacity>
 
-                    {scheduleEnabled && (
+                    {scheduleEnabled ? (
                         <View style={s.scheduleContent}>
                             <Text style={s.scheduleLabel}>Select Recurrence Frequency:</Text>
                             <View style={s.freqButtons}>
@@ -758,12 +774,12 @@ export default function AirtimeScreen() {
                                 ))}
                             </View>
                             <Text style={s.scheduleHint}>
-                                {scheduleFrequency === 'daily' && '🚀 We will recharge this line every day at 8:00 AM.'}
-                                {scheduleFrequency === 'weekly' && '📅 We will recharge this line every Monday morning at 8:00 AM.'}
-                                {scheduleFrequency === 'monthly' && '📆 We will recharge this line on the 1st of every month at 8:00 AM.'}
+                                {scheduleFrequency === 'daily' ? '🚀 We will recharge this line every day at 8:00 AM.' : ''}
+                                {scheduleFrequency === 'weekly' ? '📅 We will recharge this line every Monday morning at 8:00 AM.' : ''}
+                                {scheduleFrequency === 'monthly' ? '📆 We will recharge this line on the 1st of every month at 8:00 AM.' : ''}
                             </Text>
                         </View>
-                    )}
+                    ) : null}
                 </View>
 
                 {/* USSD shortcut codes collapsible guide */}
@@ -787,7 +803,7 @@ export default function AirtimeScreen() {
                         />
                     </TouchableOpacity>
 
-                    {showUssdGuide && (
+                    {showUssdGuide ? (
                         <View style={s.ussdContent}>
                             <Text style={s.ussdText}>
                                 Quickly check your balance and perform other operations using these official network codes:
@@ -814,7 +830,7 @@ export default function AirtimeScreen() {
                                 Dial the code directly on your mobile dialer to query.
                             </Text>
                         </View>
-                    )}
+                    ) : null}
                 </View>
 
                 {/* Purchase Button - Modern Gradient */}
@@ -876,9 +892,9 @@ export default function AirtimeScreen() {
                     { label: 'Recharge Type', value: topupMode === 'direct' ? 'Direct Recharge (Pinless)' : 'PIN Voucher (Recharge Code)' },
                     { label: 'Network', value: NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase() },
                     { label: 'Phone Number', value: phoneNumber },
-                    { label: 'Original Amount', value: `₦${Number(amount || 0).toLocaleString()}`, isAmount: true },
-                    { label: `Discount (${((NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02) * 100).toFixed(0)}%)`, value: `-₦${(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}`, isDiscount: true },
-                    { label: 'Total To Pay', value: `₦${(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}`, isTotal: true },
+                    { label: 'Original Amount', value: `₦${formatCurrency(amount)}`, isAmount: true },
+                    { label: `Discount (${((NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02) * 100).toFixed(0)}%)`, value: `-₦${formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))}`, isDiscount: true },
+                    { label: 'Total To Pay', value: `₦${formatCurrency(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)))}`, isTotal: true },
                 ]}
             />
             
@@ -889,11 +905,22 @@ export default function AirtimeScreen() {
                    processTransaction();
                 }}
                 title="Authorize Purchase"
-                description={`Confirm ${(network || 'MTN').toUpperCase()} Airtime\nTop-up of ₦${Number(amount || 0).toLocaleString()}`}
+                description={`Confirm ${(network || 'MTN').toUpperCase()} Airtime\nTop-up of ₦${formatCurrency(amount)}`}
                 requiredFor="purchase"
             />
         </KeyboardAvoidingView>
     </View>
+    );
+}
+
+export default function AirtimeScreen() {
+    return (
+        <ErrorBoundary 
+            fallbackTitle="Airtime - Kuskure Wajen Budewa" 
+            fallbackSubtitle="An samu dan tsaiko wajen nuna wannan shafin. Da fatan za a danna maballin da ke kasa domin sake gwadawa."
+        >
+            <AirtimeScreenContent />
+        </ErrorBoundary>
     );
 }
 

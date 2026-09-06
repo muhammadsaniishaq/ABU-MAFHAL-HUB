@@ -55,8 +55,9 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
 
       if (data && data.length > 0) {
         const matched = data.filter((b: any) => {
-          if (!b.placement || b.placement.toLowerCase().includes('all') || b.placement.toLowerCase().includes('dashboard')) return true;
-          if (placement && b.placement.toLowerCase().includes(placement.toLowerCase())) return true;
+          const p = String(b.placement || '').toLowerCase();
+          if (!p || p.includes('all') || p.includes('dashboard')) return true;
+          if (placement && p.includes(String(placement).toLowerCase())) return true;
           return false;
         });
         setActiveBanners(matched.length > 0 ? matched : data);
@@ -67,6 +68,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
   };
 
   const handleBannerClick = async (banner: any) => {
+    if (!banner?.id) return;
     supabase.rpc('increment_banner_click', { banner_id: banner.id }).then(({ error }) => {
       if (error) console.log('Banner click track error:', error);
     });
@@ -76,14 +78,14 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
   };
 
   const handleScrollEnd = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
+    const offsetX = event.nativeEvent?.contentOffset?.x || 0;
     const index = Math.round(offsetX / ITEM_STRIDE);
     if (index >= 0 && index < activeBanners.length) {
       setCurrentBannerIndex(index);
     }
   };
 
-  if (activeBanners.length === 0) return null;
+  if (!activeBanners || activeBanners.length === 0) return null;
 
   return (
     <View style={styles.container}>
@@ -92,7 +94,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
         data={activeBanners}
         horizontal
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item?.id ? String(item.id) : String(index)}
         decelerationRate="fast"
         snapToInterval={ITEM_STRIDE}
         snapToAlignment="start"
@@ -105,31 +107,33 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
         onMomentumScrollEnd={handleScrollEnd}
         onTouchStart={() => { isUserTouching.current = true; }}
         onTouchEnd={() => { setTimeout(() => { isUserTouching.current = false; }, 2500); }}
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            onPress={() => handleBannerClick(item)}
-            activeOpacity={0.92}
-            style={styles.bannerCard}
-          >
-            {item.image_url ? (
-              <View style={styles.imageContainer}>
-                {/* Full-bleed ambient blurred backdrop: Fills all side spaces with matching colors */}
-                <Image 
-                  source={{ uri: item.image_url }} 
-                  style={StyleSheet.absoluteFillObject} 
-                  resizeMode="cover" 
-                  blurRadius={14} 
-                />
-                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
+        renderItem={({ item }) => {
+          const hasImage = Boolean(item?.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0);
+          return (
+            <TouchableOpacity 
+              onPress={() => handleBannerClick(item)}
+              activeOpacity={0.92}
+              style={styles.bannerCard}
+            >
+              {hasImage ? (
+                <View style={styles.imageContainer}>
+                  {/* Full-bleed ambient blurred backdrop */}
+                  <Image 
+                    source={{ uri: item.image_url }} 
+                    style={StyleSheet.absoluteFillObject} 
+                    resizeMode="cover" 
+                    blurRadius={14} 
+                  />
+                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
 
-                {/* Crisp foreground banner: 100% complete, zero cropping, nothing cut off */}
-                <Image 
-                  source={{ uri: item.image_url }} 
-                  style={styles.bannerImage} 
-                  resizeMode="contain" 
-                />
-              </View>
-            ) : (
+                  {/* Crisp foreground banner */}
+                  <Image 
+                    source={{ uri: item.image_url }} 
+                    style={styles.bannerImage} 
+                    resizeMode="contain" 
+                  />
+                </View>
+              ) : (
               <LinearGradient 
                 colors={['#0F172A', '#1E293B', '#0B132B']} 
                 start={{ x: 0, y: 0 }} 
@@ -156,7 +160,8 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
               </LinearGradient>
             )}
           </TouchableOpacity>
-        )}
+        );
+      }}
       />
 
       {/* Pagination Indicator Dots */}
