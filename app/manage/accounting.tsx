@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import {
     checkProfitAccessClearance,
@@ -36,7 +37,7 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Modern Executive Navy & Gold Theme (Light Background)
+// Executive Navy & Gold Theme (Light Background)
 const C = {
     bg: '#F8FAFC',
     cardBg: '#FFFFFF',
@@ -59,6 +60,8 @@ const C = {
     blue: '#2563EB',
     blueBg: '#EFF6FF',
     blueBorder: '#BFDBFE',
+    purple: '#7C3AED',
+    purpleBg: '#F5F3FF',
     white: '#FFFFFF',
     textMain: '#0F172A',
     textSub: '#475569',
@@ -66,6 +69,48 @@ const C = {
 };
 
 type TimeRange = 'today' | 'yesterday' | 'week' | 'month' | 'all';
+type TabType = 'overview' | 'services' | 'expenses' | 'transactions';
+
+const getServiceMeta = (type: string) => {
+    switch (type) {
+        case 'social_boost':
+            return { icon: 'rocket', color: '#EC4899', bg: '#FDF2F8', label: 'Social Boost & SMM' };
+        case 'cac':
+            return { icon: 'business', color: '#6366F1', bg: '#EEF2FF', label: 'CAC Registration' };
+        case 'nin':
+            return { icon: 'finger-print', color: '#059669', bg: '#ECFDF5', label: 'NIN Verification' };
+        case 'bvn':
+            return { icon: 'shield-checkmark', color: '#2563EB', bg: '#EFF6FF', label: 'BVN Validation' };
+        case 'virtual_cards':
+            return { icon: 'card', color: '#8B5CF6', bg: '#F5F3FF', label: 'Virtual Cards' };
+        case 'airtime_to_cash':
+            return { icon: 'swap-horizontal', color: '#D97706', bg: '#FFFBEB', label: 'Airtime to Cash' };
+        case 'crypto':
+            return { icon: 'logo-bitcoin', color: '#F59E0B', bg: '#FFFBEB', label: 'Crypto Assets' };
+        case 'bulk_sms':
+            return { icon: 'chatbubbles', color: '#0891B2', bg: '#ECFEFF', label: 'Bulk SMS' };
+        case 'smile':
+            return { icon: 'wifi', color: '#7C3AED', bg: '#F5F3FF', label: 'Smile 4G' };
+        case 'recharge_pin':
+            return { icon: 'barcode', color: '#0D9488', bg: '#F0FDFA', label: 'Card Printing' };
+        case 'data':
+            return { icon: 'cellular', color: '#3B82F6', bg: '#EFF6FF', label: 'Data Bundles' };
+        case 'airtime':
+            return { icon: 'call', color: '#F59E0B', bg: '#FFFBEB', label: 'Airtime VTU' };
+        case 'electricity':
+            return { icon: 'flash', color: '#EAB308', bg: '#FEFCE8', label: 'Electricity Bills' };
+        case 'tv':
+            return { icon: 'tv', color: '#9333EA', bg: '#FAF5FF', label: 'Cable TV' };
+        case 'education':
+            return { icon: 'school', color: '#2563EB', bg: '#EFF6FF', label: 'Exam PINs' };
+        case 'transfer':
+            return { icon: 'send', color: '#059669', bg: '#ECFDF5', label: 'Transfers' };
+        case 'funding_fee':
+            return { icon: 'wallet', color: '#D97706', bg: '#FFFBEB', label: 'Gateway Fees' };
+        default:
+            return { icon: 'receipt', color: '#64748B', bg: '#F8FAFC', label: 'Other' };
+    }
+};
 
 export default function AccountingScreen() {
     return (
@@ -88,10 +133,16 @@ function AccountingContent() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [timeRange, setTimeRange] = useState<TimeRange>('month');
-    const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'breakdown'>('overview');
+    const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+    // Search query for services tab
+    const [serviceSearch, setServiceSearch] = useState('');
 
     // Financial Metrics
     const [metrics, setMetrics] = useState<AccountingMetrics | null>(null);
+
+    // Inspector Modal
+    const [selectedTx, setSelectedTx] = useState<any | null>(null);
 
     // Add Expense Modal
     const [addExpenseVisible, setAddExpenseVisible] = useState(false);
@@ -119,7 +170,7 @@ function AccountingContent() {
         return () => { isMounted = false; };
     }, []);
 
-    // 2. Compute date boundaries for selected TimeRange (Strictly English)
+    // 2. Compute date boundaries for selected TimeRange
     const getDateRange = (range: TimeRange): { start?: Date; end?: Date; label: string } => {
         const now = new Date();
         if (range === 'today') {
@@ -235,7 +286,13 @@ function AccountingContent() {
         await generateProfitLossPDF(metrics, label);
     };
 
-    // --- ACCESS DENIED SCREEN FOR UNAUTHORIZED USERS (LIGHT + NAVY & GOLD) ---
+    const copyReference = (ref: string) => {
+        Clipboard.setStringAsync(ref);
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Copied', 'Reference ID copied to clipboard.');
+    };
+
+    // --- ACCESS DENIED SCREEN ---
     if (authLoading) {
         return (
             <View style={[styles.centerBox, { backgroundColor: C.bg }]}>
@@ -278,6 +335,13 @@ function AccountingContent() {
     }
 
     const isNetProfitable = (metrics?.netProfit || 0) >= 0;
+
+    // Filter services list based on search
+    const filteredServices = Object.values(metrics?.serviceBreakdown || {}).filter(serv => {
+        if (!serviceSearch.trim()) return true;
+        const q = serviceSearch.toLowerCase().trim();
+        return serv.serviceName.toLowerCase().includes(q) || serv.type.toLowerCase().includes(q);
+    });
 
     return (
         <View style={styles.container}>
@@ -347,32 +411,40 @@ function AccountingContent() {
                     })}
                 </ScrollView>
 
-                {/* FLOATING VIEW TABS SWITCHER */}
+                {/* 4 VIEW TABS SWITCHER */}
                 <View style={styles.tabBar}>
                     <TouchableOpacity
                         onPress={() => setActiveTab('overview')}
                         style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
                     >
-                        <Ionicons name="stats-chart" size={13} color={activeTab === 'overview' ? C.goldBright : C.textMuted} />
+                        <Ionicons name="stats-chart" size={12} color={activeTab === 'overview' ? C.navy : 'rgba(255,255,255,0.7)'} />
                         <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>Overview</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('services')}
+                        style={[styles.tabItem, activeTab === 'services' && styles.tabItemActive]}
+                    >
+                        <Ionicons name="apps" size={12} color={activeTab === 'services' ? C.navy : 'rgba(255,255,255,0.7)'} />
+                        <Text style={[styles.tabText, activeTab === 'services' && styles.tabTextActive]}>Services</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         onPress={() => setActiveTab('expenses')}
                         style={[styles.tabItem, activeTab === 'expenses' && styles.tabItemActive]}
                     >
-                        <Ionicons name="wallet" size={13} color={activeTab === 'expenses' ? C.coral : C.textMuted} />
+                        <Ionicons name="wallet" size={12} color={activeTab === 'expenses' ? C.navy : 'rgba(255,255,255,0.7)'} />
                         <Text style={[styles.tabText, activeTab === 'expenses' && styles.tabTextActive]}>
-                            Expenses ({metrics?.expensesCount || 0})
+                            Costs ({metrics?.expensesCount || 0})
                         </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        onPress={() => setActiveTab('breakdown')}
-                        style={[styles.tabItem, activeTab === 'breakdown' && styles.tabItemActive]}
+                        onPress={() => setActiveTab('transactions')}
+                        style={[styles.tabItem, activeTab === 'transactions' && styles.tabItemActive]}
                     >
-                        <Ionicons name="pie-chart" size={13} color={activeTab === 'breakdown' ? C.blue : C.textMuted} />
-                        <Text style={[styles.tabText, activeTab === 'breakdown' && styles.tabTextActive]}>Services</Text>
+                        <Ionicons name="list" size={12} color={activeTab === 'transactions' ? C.navy : 'rgba(255,255,255,0.7)'} />
+                        <Text style={[styles.tabText, activeTab === 'transactions' && styles.tabTextActive]}>Sales</Text>
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
@@ -381,7 +453,7 @@ function AccountingContent() {
             {loading ? (
                 <View style={styles.centerBox}>
                     <ActivityIndicator size="large" color={C.goldBright} />
-                    <Text style={styles.loadingDataText}>Calculating Financial Metrics...</Text>
+                    <Text style={styles.loadingDataText}>Calculating Real-time Financial Metrics...</Text>
                 </View>
             ) : (
                 <ScrollView
@@ -389,118 +461,215 @@ function AccountingContent() {
                     showsVerticalScrollIndicator={false}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.goldBright} />}
                 >
-                    {/* 1. MASTER NET PROFIT HERO CARD (LUXURY EXECUTIVE NAVY & GOLD) */}
-                    <LinearGradient
-                        colors={isNetProfitable ? ['#0A1128', '#0F172A', '#132A3E'] : ['#2C0B0E', '#1F080A', '#130506']}
-                        style={[styles.netProfitCard, { borderColor: isNetProfitable ? 'rgba(245, 158, 11, 0.4)' : 'rgba(239, 68, 68, 0.4)' }]}
-                    >
-                        <View style={styles.netProfitTopRow}>
-                            <View style={[styles.badgePill, { backgroundColor: isNetProfitable ? 'rgba(5, 150, 105, 0.2)' : 'rgba(220, 38, 38, 0.2)' }]}>
-                                <Ionicons name={isNetProfitable ? "trending-up" : "trending-down"} size={12} color={isNetProfitable ? '#34D399' : '#F87171'} />
-                                <Text style={[styles.badgeText, { color: isNetProfitable ? '#34D399' : '#F87171' }]}>
-                                    {isNetProfitable ? 'NET PROFITABLE' : 'NET DEFICIT'}
-                                </Text>
-                            </View>
-                            <View style={[styles.badgePill, { backgroundColor: 'rgba(245, 158, 11, 0.18)', borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.35)' }]}>
-                                <Ionicons name="pie-chart" size={11} color={C.goldBright} />
-                                <Text style={[styles.badgeText, { color: C.goldBright }]}>
-                                    {metrics?.profitMargin ? metrics.profitMargin.toFixed(1) : '0.0'}% MARGIN
-                                </Text>
-                            </View>
-                        </View>
-
-                        <Text style={styles.netProfitLabel}>NET OPERATING PROFIT</Text>
-                        <Text style={[styles.netProfitValue, { color: isNetProfitable ? '#34D399' : '#F87171' }]}>
-                            {formatNaira(metrics?.netProfit || 0)}
-                        </Text>
-                        <Text style={styles.netProfitSub}>
-                            Gross Profit ({formatNaira(metrics?.grossProfit || 0)}) − Total Expenses ({formatNaira(metrics?.totalExpenses || 0)})
-                        </Text>
-                    </LinearGradient>
-
-                    {/* 2. 4 SECONDARY METRIC CARDS (CRISP WHITE ON LIGHT BG) */}
-                    <View style={styles.metricsGrid}>
-                        {/* Gross Revenue */}
-                        <View style={styles.metricCard}>
-                            <View style={[styles.metricIconWrap, { backgroundColor: C.blueBg }]}>
-                                <Ionicons name="cart" size={15} color={C.blue} />
-                            </View>
-                            <Text style={styles.metricLabel}>Gross Revenue</Text>
-                            <Text style={styles.metricValue}>{formatNaira(metrics?.totalRevenue || 0)}</Text>
-                            <Text style={styles.metricHint}>{metrics?.successfulTransactionsCount || 0} Successful Sales</Text>
-                        </View>
-
-                        {/* Cost of Sales (API Costs) */}
-                        <View style={styles.metricCard}>
-                            <View style={[styles.metricIconWrap, { backgroundColor: '#F1F5F9' }]}>
-                                <Ionicons name="cube" size={15} color={C.textSub} />
-                            </View>
-                            <Text style={styles.metricLabel}>Cost of Sales</Text>
-                            <Text style={[styles.metricValue, { color: C.textSub }]}>{formatNaira(metrics?.totalCost || 0)}</Text>
-                            <Text style={styles.metricHint}>Provider Settlements</Text>
-                        </View>
-
-                        {/* Gross Profit */}
-                        <View style={styles.metricCard}>
-                            <View style={[styles.metricIconWrap, { backgroundColor: C.emeraldBg }]}>
-                                <Ionicons name="sparkles" size={15} color={C.emerald} />
-                            </View>
-                            <Text style={styles.metricLabel}>Gross Profit</Text>
-                            <Text style={[styles.metricValue, { color: C.emerald }]}>{formatNaira(metrics?.grossProfit || 0)}</Text>
-                            <Text style={styles.metricHint}>Before Operating Costs</Text>
-                        </View>
-
-                        {/* Total Expenses */}
-                        <View style={styles.metricCard}>
-                            <View style={[styles.metricIconWrap, { backgroundColor: C.coralBg }]}>
-                                <Ionicons name="arrow-down-circle" size={15} color={C.coral} />
-                            </View>
-                            <Text style={styles.metricLabel}>Operating Expenses</Text>
-                            <Text style={[styles.metricValue, { color: C.coral }]}>{formatNaira(metrics?.totalExpenses || 0)}</Text>
-                            <Text style={styles.metricHint}>{metrics?.expensesCount || 0} Recorded Costs</Text>
-                        </View>
-                    </View>
-
-                    {/* 3. TAB SPECIFIC SECTIONS */}
+                    {/* TAB 1: OVERVIEW */}
                     {activeTab === 'overview' && (
-                        <View style={styles.sectionContainer}>
-                            {/* Top Service Earners */}
-                            <View style={styles.sectionHeaderRow}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="trophy" size={15} color={C.gold} />
-                                    <Text style={styles.sectionTitle}>Service Profit Performance</Text>
+                        <>
+                            {/* 1. MASTER NET PROFIT HERO CARD */}
+                            <LinearGradient
+                                colors={isNetProfitable ? ['#0A1128', '#0F172A', '#132A3E'] : ['#2C0B0E', '#1F080A', '#130506']}
+                                style={[styles.netProfitCard, { borderColor: isNetProfitable ? 'rgba(245, 158, 11, 0.4)' : 'rgba(239, 68, 68, 0.4)' }]}
+                            >
+                                <View style={styles.netProfitTopRow}>
+                                    <View style={[styles.badgePill, { backgroundColor: isNetProfitable ? 'rgba(5, 150, 105, 0.2)' : 'rgba(220, 38, 38, 0.2)' }]}>
+                                        <Ionicons name={isNetProfitable ? "trending-up" : "trending-down"} size={12} color={isNetProfitable ? '#34D399' : '#F87171'} />
+                                        <Text style={[styles.badgeText, { color: isNetProfitable ? '#34D399' : '#F87171' }]}>
+                                            {isNetProfitable ? 'NET PROFITABLE' : 'NET DEFICIT'}
+                                        </Text>
+                                    </View>
+                                    <View style={[styles.badgePill, { backgroundColor: 'rgba(245, 158, 11, 0.18)', borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.35)' }]}>
+                                        <Ionicons name="pie-chart" size={11} color={C.goldBright} />
+                                        <Text style={[styles.badgeText, { color: C.goldBright }]}>
+                                            {metrics?.profitMargin ? metrics.profitMargin.toFixed(1) : '0.0'}% MARGIN
+                                        </Text>
+                                    </View>
                                 </View>
-                                <Text style={styles.sectionSubTitle}>Top Revenue Drivers</Text>
+
+                                <Text style={styles.netProfitLabel}>NET OPERATING PROFIT</Text>
+                                <Text style={[styles.netProfitValue, { color: isNetProfitable ? '#34D399' : '#F87171' }]}>
+                                    {formatNaira(metrics?.netProfit || 0)}
+                                </Text>
+                                <Text style={styles.netProfitSub}>
+                                    Gross Profit ({formatNaira(metrics?.grossProfit || 0)}) − Total Expenses ({formatNaira(metrics?.totalExpenses || 0)})
+                                </Text>
+                            </LinearGradient>
+
+                            {/* 2. 4 SECONDARY METRIC CARDS */}
+                            <View style={styles.metricsGrid}>
+                                <View style={styles.metricCard}>
+                                    <View style={[styles.metricIconWrap, { backgroundColor: C.blueBg }]}>
+                                        <Ionicons name="cart" size={15} color={C.blue} />
+                                    </View>
+                                    <Text style={styles.metricLabel}>Gross Revenue</Text>
+                                    <Text style={styles.metricValue}>{formatNaira(metrics?.totalRevenue || 0)}</Text>
+                                    <Text style={styles.metricHint}>{metrics?.successfulTransactionsCount || 0} Successful Sales</Text>
+                                </View>
+
+                                <View style={styles.metricCard}>
+                                    <View style={[styles.metricIconWrap, { backgroundColor: '#F1F5F9' }]}>
+                                        <Ionicons name="cube" size={15} color={C.textSub} />
+                                    </View>
+                                    <Text style={styles.metricLabel}>Cost of Sales</Text>
+                                    <Text style={[styles.metricValue, { color: C.textSub }]}>{formatNaira(metrics?.totalCost || 0)}</Text>
+                                    <Text style={styles.metricHint}>Provider Settlements</Text>
+                                </View>
+
+                                <View style={styles.metricCard}>
+                                    <View style={[styles.metricIconWrap, { backgroundColor: C.emeraldBg }]}>
+                                        <Ionicons name="sparkles" size={15} color={C.emerald} />
+                                    </View>
+                                    <Text style={styles.metricLabel}>Gross Profit</Text>
+                                    <Text style={[styles.metricValue, { color: C.emerald }]}>{formatNaira(metrics?.grossProfit || 0)}</Text>
+                                    <Text style={styles.metricHint}>Before Operating Costs</Text>
+                                </View>
+
+                                <View style={styles.metricCard}>
+                                    <View style={[styles.metricIconWrap, { backgroundColor: C.coralBg }]}>
+                                        <Ionicons name="arrow-down-circle" size={15} color={C.coral} />
+                                    </View>
+                                    <Text style={styles.metricLabel}>Operating Expenses</Text>
+                                    <Text style={[styles.metricValue, { color: C.coral }]}>{formatNaira(metrics?.totalExpenses || 0)}</Text>
+                                    <Text style={styles.metricHint}>{metrics?.expensesCount || 0} Recorded Costs</Text>
+                                </View>
                             </View>
 
-                            {metrics?.serviceBreakdown && Object.values(metrics.serviceBreakdown)
-                                .filter(s => s.revenue > 0 || s.profit > 0)
-                                .sort((a, b) => b.profit - a.profit)
-                                .map((serv, idx) => (
-                                    <View key={serv.type || idx} style={styles.serviceRow}>
-                                        <View style={styles.serviceIconCircle}>
-                                            <Ionicons
-                                                name={serv.type === 'data' ? 'wifi' : serv.type === 'airtime' ? 'call' : serv.type === 'electricity' ? 'flash' : serv.type === 'tv' ? 'tv' : 'receipt'}
-                                                size={16}
-                                                color={C.gold}
-                                            />
-                                        </View>
-                                        <View style={{ flex: 1, marginHorizontal: 10 }}>
-                                            <Text style={styles.serviceName}>{serv.serviceName}</Text>
-                                            <Text style={styles.serviceMeta}>
-                                                {serv.transactionCount} sales • Volume: {formatNaira(serv.revenue)}
-                                            </Text>
-                                        </View>
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={styles.serviceProfit}>{formatNaira(serv.profit)}</Text>
-                                            <View style={styles.serviceMarginBadge}>
-                                                <Text style={styles.serviceMarginText}>{serv.marginPercent.toFixed(1)}% Margin</Text>
+                            {/* 3. TOTAL USER WALLET BALANCES & LIABILITIES */}
+                            <View style={styles.userBalanceHeroCard}>
+                                <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.userBalanceHeroGrad}>
+                                    <View style={styles.userBalanceTopRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View style={styles.userBalanceIconCircle}>
+                                                <Ionicons name="people" size={16} color={C.goldBright} />
+                                            </View>
+                                            <View>
+                                                <Text style={styles.userBalanceTitle}>TOTAL USER WALLET BALANCES</Text>
+                                                <Text style={styles.userBalanceSub}>Platform Customer Liabilities</Text>
                                             </View>
                                         </View>
+                                        <View style={styles.solvencyBadge}>
+                                            <Ionicons name="shield-checkmark" size={11} color="#34D399" />
+                                            <Text style={styles.solvencyBadgeText}>100% BACKED</Text>
+                                        </View>
                                     </View>
-                                ))}
 
-                            {/* Quick Action to Record Expense */}
+                                    <Text style={styles.userBalanceAmount}>
+                                        {formatNaira(metrics?.userLiquidity?.totalUserBalances || 0)}
+                                    </Text>
+                                    <Text style={styles.userBalanceHint}>
+                                        Total funds currently deposited and held across all user accounts in the platform database.
+                                    </Text>
+
+                                    <View style={styles.userBalanceStatsRow}>
+                                        <View style={styles.userBalanceStatItem}>
+                                            <Text style={styles.userBalanceStatVal}>{metrics?.userLiquidity?.totalUserCount || 0}</Text>
+                                            <Text style={styles.userBalanceStatLbl}>Total Accounts</Text>
+                                        </View>
+                                        <View style={styles.userBalanceStatDivider} />
+                                        <View style={styles.userBalanceStatItem}>
+                                            <Text style={styles.userBalanceStatVal}>{metrics?.userLiquidity?.fundedUserCount || 0}</Text>
+                                            <Text style={styles.userBalanceStatLbl}>Funded Wallets</Text>
+                                        </View>
+                                        <View style={styles.userBalanceStatDivider} />
+                                        <View style={styles.userBalanceStatItem}>
+                                            <Text style={styles.userBalanceStatVal}>
+                                                {formatNaira(metrics?.userLiquidity?.averageUserBalance || 0)}
+                                            </Text>
+                                            <Text style={styles.userBalanceStatLbl}>Average Balance</Text>
+                                        </View>
+                                    </View>
+                                </LinearGradient>
+
+                                {/* Whale Accounts / Top Balance Holders */}
+                                {metrics?.userLiquidity?.topHolders && metrics.userLiquidity.topHolders.length > 0 && (
+                                    <View style={styles.topHoldersSection}>
+                                        <View style={styles.topHoldersHeader}>
+                                            <Text style={styles.topHoldersTitle}>Highest Balance Holders (Whales)</Text>
+                                            <Text style={styles.topHoldersSub}>Top Customer Deposits</Text>
+                                        </View>
+                                        {metrics.userLiquidity.topHolders.map((holder, idx) => (
+                                            <View key={holder.id || idx} style={styles.holderRow}>
+                                                <View style={styles.holderRankCircle}>
+                                                    <Text style={styles.holderRankText}>#{idx + 1}</Text>
+                                                </View>
+                                                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                                    <Text style={styles.holderName} numberOfLines={1}>{holder.name}</Text>
+                                                    <Text style={styles.holderEmail} numberOfLines={1}>{holder.email}</Text>
+                                                </View>
+                                                <Text style={styles.holderBalance}>{formatNaira(holder.balance)}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* 4. PERFORMANCE RUN-RATE & MONTHLY FORECAST */}
+                            <View style={styles.projectionCard}>
+                                <View style={styles.projectionHeader}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="trending-up" size={15} color={C.emerald} />
+                                        <Text style={styles.projectionTitle}>Profit Run-Rate & Projections</Text>
+                                    </View>
+                                    <View style={styles.projectionTag}>
+                                        <Text style={styles.projectionTagText}>FORECAST</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.projectionGrid}>
+                                    <View style={styles.projectionCol}>
+                                        <Text style={styles.projectionColLbl}>Daily Average Net</Text>
+                                        <Text style={styles.projectionColVal}>{formatNaira(metrics?.dailyRunRate || 0)}</Text>
+                                        <Text style={styles.projectionColSub}>per 24 hour pace</Text>
+                                    </View>
+                                    <View style={styles.projectionColDivider} />
+                                    <View style={styles.projectionCol}>
+                                        <Text style={styles.projectionColLbl}>30-Day Projected Net</Text>
+                                        <Text style={[styles.projectionColVal, { color: C.emerald }]}>
+                                            {formatNaira(metrics?.projectedMonthlyProfit || 0)}
+                                        </Text>
+                                        <Text style={styles.projectionColSub}>estimated monthly profit</Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* 5. TOP SERVICE PERFORMERS (QUICK VIEW) */}
+                            <View style={styles.sectionContainer}>
+                                <View style={styles.sectionHeaderRow}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="trophy" size={15} color={C.gold} />
+                                        <Text style={styles.sectionTitle}>Top Revenue Driving Services</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setActiveTab('services')}>
+                                        <Text style={styles.sectionSubTitle}>View All Services →</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {Object.values(metrics?.serviceBreakdown || {})
+                                    .filter(s => s.revenue > 0 || s.profit > 0)
+                                    .sort((a, b) => b.profit - a.profit)
+                                    .slice(0, 5)
+                                    .map((serv, idx) => {
+                                        const meta = getServiceMeta(serv.type);
+                                        return (
+                                            <View key={serv.type || idx} style={styles.serviceRow}>
+                                                <View style={[styles.serviceIconCircle, { backgroundColor: meta.bg }]}>
+                                                    <Ionicons name={meta.icon as any} size={16} color={meta.color} />
+                                                </View>
+                                                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                                    <Text style={styles.serviceName}>{serv.serviceName}</Text>
+                                                    <Text style={styles.serviceMeta}>
+                                                        {serv.transactionCount} completed • Volume: {formatNaira(serv.revenue)}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text style={styles.serviceProfit}>{formatNaira(serv.profit)}</Text>
+                                                    <View style={styles.serviceMarginBadge}>
+                                                        <Text style={styles.serviceMarginText}>{serv.marginPercent.toFixed(1)}% Margin</Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                            </View>
+
+                            {/* 6. QUICK ACTION: RECORD EXPENSE BANNER */}
                             <TouchableOpacity
                                 onPress={() => setAddExpenseVisible(true)}
                                 style={styles.quickAddExpenseBanner}
@@ -517,12 +686,80 @@ function AccountingContent() {
                                     <Ionicons name="chevron-forward" size={18} color={C.goldBright} />
                                 </LinearGradient>
                             </TouchableOpacity>
+                        </>
+                    )}
+
+                    {/* TAB 2: ALL SERVICES BREAKDOWN */}
+                    {activeTab === 'services' && (
+                        <View style={styles.sectionContainer}>
+                            <View style={styles.sectionHeaderRow}>
+                                <Text style={styles.sectionTitle}>All Products & Services Matrix</Text>
+                                <Text style={styles.sectionSubTitle}>{filteredServices.length} Products Tracked</Text>
+                            </View>
+
+                            {/* Search Filter Box */}
+                            <View style={styles.serviceSearchWrap}>
+                                <Ionicons name="search" size={14} color={C.textMuted} />
+                                <TextInput
+                                    style={styles.serviceSearchInput}
+                                    placeholder="Filter by service name (e.g. CAC, Social, NIN, Data)..."
+                                    placeholderTextColor={C.textMuted}
+                                    value={serviceSearch}
+                                    onChangeText={setServiceSearch}
+                                />
+                                {serviceSearch.length > 0 && (
+                                    <TouchableOpacity onPress={() => setServiceSearch('')}>
+                                        <Ionicons name="close-circle" size={16} color={C.textMuted} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {filteredServices.map((serv) => {
+                                const meta = getServiceMeta(serv.type);
+                                return (
+                                    <View key={serv.type} style={styles.breakdownCard}>
+                                        <View style={styles.breakdownCardHeader}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <View style={[styles.breakdownIconWrap, { backgroundColor: meta.bg }]}>
+                                                    <Ionicons name={meta.icon as any} size={15} color={meta.color} />
+                                                </View>
+                                                <View>
+                                                    <Text style={styles.breakdownServiceName}>{serv.serviceName}</Text>
+                                                    <Text style={styles.breakdownServiceType}>{meta.label}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={styles.breakdownTag}>
+                                                <Text style={styles.breakdownTagText}>{serv.transactionCount} Orders</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.breakdownGrid}>
+                                            <View style={styles.breakdownCol}>
+                                                <Text style={styles.breakdownColLabel}>Revenue</Text>
+                                                <Text style={styles.breakdownColVal}>{formatNaira(serv.revenue)}</Text>
+                                            </View>
+                                            <View style={styles.breakdownCol}>
+                                                <Text style={styles.breakdownColLabel}>Cost of Sales</Text>
+                                                <Text style={[styles.breakdownColVal, { color: C.textSub }]}>{formatNaira(serv.cost)}</Text>
+                                            </View>
+                                            <View style={styles.breakdownCol}>
+                                                <Text style={styles.breakdownColLabel}>Net Profit</Text>
+                                                <Text style={[styles.breakdownColVal, { color: C.emerald }]}>{formatNaira(serv.profit)}</Text>
+                                            </View>
+                                            <View style={[styles.breakdownCol, { alignItems: 'flex-end' }]}>
+                                                <Text style={styles.breakdownColLabel}>Margin</Text>
+                                                <Text style={[styles.breakdownColVal, { color: C.gold }]}>{serv.marginPercent.toFixed(1)}%</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                );
+                            })}
                         </View>
                     )}
 
+                    {/* TAB 3: OPERATING EXPENSES */}
                     {activeTab === 'expenses' && (
                         <View style={styles.sectionContainer}>
-                            {/* Expense Action Header */}
                             <View style={styles.expenseActionHeader}>
                                 <View>
                                     <Text style={styles.sectionTitle}>Operating Expenses Ledger</Text>
@@ -540,7 +777,7 @@ function AccountingContent() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Expense Category Filters */}
+                            {/* Category Filter Pills */}
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.expFilterBar}>
                                 <TouchableOpacity
                                     onPress={() => setSelectedCategoryFilter('all')}
@@ -600,38 +837,53 @@ function AccountingContent() {
                         </View>
                     )}
 
-                    {activeTab === 'breakdown' && (
+                    {/* TAB 4: LIVE SALES & TRANSACTION MARGIN INSPECTOR */}
+                    {activeTab === 'transactions' && (
                         <View style={styles.sectionContainer}>
                             <View style={styles.sectionHeaderRow}>
-                                <Text style={styles.sectionTitle}>Service Margin & Turnover Analysis</Text>
-                                <Text style={styles.sectionSubTitle}>Detailed Breakdown</Text>
+                                <Text style={styles.sectionTitle}>Real-time Sales Margin Inspector</Text>
+                                <Text style={styles.sectionSubTitle}>Tap any sale to inspect details</Text>
                             </View>
 
-                            {metrics?.serviceBreakdown && Object.values(metrics.serviceBreakdown).map((serv) => (
-                                <View key={serv.type} style={styles.breakdownCard}>
-                                    <View style={styles.breakdownCardHeader}>
-                                        <Text style={styles.breakdownServiceName}>{serv.serviceName}</Text>
-                                        <View style={styles.breakdownTag}>
-                                            <Text style={styles.breakdownTagText}>{serv.transactionCount} Completed</Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.breakdownGrid}>
-                                        <View style={styles.breakdownCol}>
-                                            <Text style={styles.breakdownColLabel}>Revenue</Text>
-                                            <Text style={styles.breakdownColVal}>{formatNaira(serv.revenue)}</Text>
-                                        </View>
-                                        <View style={styles.breakdownCol}>
-                                            <Text style={styles.breakdownColLabel}>Cost of Sales</Text>
-                                            <Text style={[styles.breakdownColVal, { color: C.textSub }]}>{formatNaira(serv.cost)}</Text>
-                                        </View>
-                                        <View style={styles.breakdownCol}>
-                                            <Text style={styles.breakdownColLabel}>Gross Profit</Text>
-                                            <Text style={[styles.breakdownColVal, { color: C.emerald }]}>{formatNaira(serv.profit)}</Text>
-                                        </View>
-                                    </View>
+                            {metrics?.recentTransactions && metrics.recentTransactions.length > 0 ? (
+                                metrics.recentTransactions.map((tx) => {
+                                    const meta = getServiceMeta(tx.serviceCategory);
+                                    return (
+                                        <TouchableOpacity
+                                            key={tx.id}
+                                            style={styles.txRow}
+                                            activeOpacity={0.7}
+                                            onPress={() => {
+                                                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                setSelectedTx(tx);
+                                            }}
+                                        >
+                                            <View style={[styles.txIconCircle, { backgroundColor: meta.bg }]}>
+                                                <Ionicons name={meta.icon as any} size={15} color={meta.color} />
+                                            </View>
+                                            <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                                <Text style={styles.txCustomerName} numberOfLines={1}>{tx.customerName}</Text>
+                                                <Text style={styles.txServiceLabel}>
+                                                    {tx.serviceName} • {formatAccountingDate(tx.created_at, true)}
+                                                </Text>
+                                            </View>
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={styles.txRevenue}>{formatNaira(tx.revenue)}</Text>
+                                                <View style={styles.txProfitPill}>
+                                                    <Ionicons name="arrow-up" size={9} color={C.emerald} />
+                                                    <Text style={styles.txProfitText}>+{formatNaira(tx.profit)}</Text>
+                                                </View>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })
+                            ) : (
+                                <View style={styles.emptyBox}>
+                                    <Ionicons name="receipt-outline" size={36} color={C.textMuted} />
+                                    <Text style={styles.emptyTitle}>No Sales Recorded in This Period</Text>
+                                    <Text style={styles.emptySub}>Transactions will appear here automatically as customers purchase services.</Text>
                                 </View>
-                            ))}
+                            )}
                         </View>
                     )}
 
@@ -639,7 +891,91 @@ function AccountingContent() {
                 </ScrollView>
             )}
 
-            {/* MODAL: RECORD NEW EXPENSE (EXECUTIVE NAVY & GOLD) */}
+            {/* MODAL 1: TRANSACTION MARGIN INSPECTOR */}
+            <Modal
+                visible={!!selectedTx}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSelectedTx(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.inspectorCard}>
+                        <View style={styles.modalHeaderRow}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={styles.modalIconWrap}>
+                                    <Ionicons name="information-circle" size={18} color={C.gold} />
+                                </View>
+                                <Text style={styles.modalTitle}>Transaction Margin Breakdown</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setSelectedTx(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <Ionicons name="close" size={20} color={C.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {selectedTx && (
+                            <View style={{ marginTop: 6 }}>
+                                <View style={styles.inspectorHeroBox}>
+                                    <Text style={styles.inspectorHeroLabel}>NET PROFIT EARNED</Text>
+                                    <Text style={styles.inspectorHeroVal}>+{formatNaira(selectedTx.profit)}</Text>
+                                    <Text style={styles.inspectorHeroMargin}>{selectedTx.marginPercent.toFixed(1)}% Margin</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Customer</Text>
+                                    <Text style={styles.inspectorFieldVal}>{selectedTx.customerName}</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Email</Text>
+                                    <Text style={styles.inspectorFieldVal}>{selectedTx.customerEmail || 'Not specified'}</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Service</Text>
+                                    <Text style={styles.inspectorFieldVal}>{selectedTx.serviceName}</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Customer Paid (Revenue)</Text>
+                                    <Text style={[styles.inspectorFieldVal, { color: C.navy, fontWeight: '900' }]}>{formatNaira(selectedTx.revenue)}</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Provider Cost (API Settlement)</Text>
+                                    <Text style={[styles.inspectorFieldVal, { color: C.textSub }]}>{formatNaira(selectedTx.cost)}</Text>
+                                </View>
+
+                                <View style={styles.inspectorFieldRow}>
+                                    <Text style={styles.inspectorFieldLbl}>Date & Time</Text>
+                                    <Text style={styles.inspectorFieldVal}>{formatAccountingDate(selectedTx.created_at, true)}</Text>
+                                </View>
+
+                                <View style={[styles.inspectorFieldRow, { borderBottomWidth: 0 }]}>
+                                    <Text style={styles.inspectorFieldLbl}>Reference ID</Text>
+                                    <TouchableOpacity
+                                        onPress={() => copyReference(selectedTx.reference || selectedTx.id)}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                    >
+                                        <Text style={[styles.inspectorFieldVal, { color: C.blue }]} numberOfLines={1}>
+                                            {(selectedTx.reference || selectedTx.id).substring(0, 18)}...
+                                        </Text>
+                                        <Ionicons name="copy-outline" size={13} color={C.blue} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => setSelectedTx(null)}
+                                    style={styles.inspectorCloseBtn}
+                                >
+                                    <Text style={styles.inspectorCloseBtnText}>Close Inspector</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* MODAL 2: RECORD NEW EXPENSE */}
             <Modal
                 visible={addExpenseVisible}
                 transparent
@@ -661,7 +997,6 @@ function AccountingContent() {
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
-                            {/* Title */}
                             <Text style={styles.inputLabel}>Expense Title / Description *</Text>
                             <TextInput
                                 style={styles.textInput}
@@ -671,7 +1006,6 @@ function AccountingContent() {
                                 onChangeText={setNewTitle}
                             />
 
-                            {/* Amount */}
                             <Text style={styles.inputLabel}>Amount (₦) *</Text>
                             <TextInput
                                 style={styles.textInput}
@@ -682,7 +1016,6 @@ function AccountingContent() {
                                 onChangeText={setNewAmount}
                             />
 
-                            {/* Category Selector */}
                             <Text style={styles.inputLabel}>Expense Category *</Text>
                             <View style={styles.catGrid}>
                                 {EXPENSE_CATEGORIES.map((cat) => {
@@ -703,7 +1036,6 @@ function AccountingContent() {
                                 })}
                             </View>
 
-                            {/* Payment Method */}
                             <Text style={styles.inputLabel}>Payment Method</Text>
                             <View style={styles.paymentMethodRow}>
                                 {PAYMENT_METHODS.map((method) => {
@@ -722,7 +1054,6 @@ function AccountingContent() {
                                 })}
                             </View>
 
-                            {/* Notes */}
                             <Text style={styles.inputLabel}>Notes / Remarks (Optional)</Text>
                             <TextInput
                                 style={[styles.textInput, { height: 64, textAlignVertical: 'top' }]}
@@ -734,7 +1065,6 @@ function AccountingContent() {
                             />
                         </ScrollView>
 
-                        {/* Submit Button Row */}
                         <View style={styles.modalBtnRow}>
                             <TouchableOpacity
                                 onPress={() => setAddExpenseVisible(false)}
@@ -792,7 +1122,7 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
 
-    // Access Denied Screen (Light Background + Navy & Gold)
+    // Access Denied Screen
     deniedContainer: {
         flex: 1,
         backgroundColor: C.bg,
@@ -874,7 +1204,7 @@ const styles = StyleSheet.create({
         fontWeight: '900',
     },
 
-    // Header Bar (Deep Navy & Gold)
+    // Header Bar
     headerBar: {
         paddingHorizontal: 16,
         paddingBottom: 12,
@@ -993,12 +1323,11 @@ const styles = StyleSheet.create({
         fontWeight: '900',
     },
 
-    // Scroll content
     scrollContent: {
         padding: 16,
     },
 
-    // Master Net Profit Hero Card (Luxury Navy & Gold Titanium Card)
+    // Master Net Profit Hero Card
     netProfitCard: {
         borderRadius: 22,
         padding: 18,
@@ -1047,12 +1376,12 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // 4 Metrics Grid (Crisp White on Light Slate)
+    // 4 Metrics Grid
     metricsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 10,
-        marginBottom: 16,
+        marginBottom: 14,
     },
     metricCard: {
         width: (width - 42) / 2,
@@ -1093,6 +1422,234 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
+    // User Balance & Liabilities Card
+    userBalanceHeroCard: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        backgroundColor: C.cardBg,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        marginBottom: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    userBalanceHeroGrad: {
+        padding: 16,
+    },
+    userBalanceTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    userBalanceIconCircle: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: C.goldBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: C.goldBorder,
+    },
+    userBalanceTitle: {
+        color: C.white,
+        fontSize: 10.5,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+    },
+    userBalanceSub: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 8.5,
+        fontWeight: '600',
+    },
+    solvencyBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        backgroundColor: 'rgba(5, 150, 105, 0.25)',
+        borderWidth: 0.5,
+        borderColor: '#059669',
+    },
+    solvencyBadgeText: {
+        color: '#34D399',
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    userBalanceAmount: {
+        color: C.goldBright,
+        fontSize: 26,
+        fontWeight: '900',
+        letterSpacing: -0.5,
+        marginBottom: 4,
+    },
+    userBalanceHint: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 10,
+        lineHeight: 14,
+        marginBottom: 14,
+    },
+    userBalanceStatsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+    },
+    userBalanceStatItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    userBalanceStatVal: {
+        color: C.white,
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    userBalanceStatLbl: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 8.5,
+        fontWeight: '700',
+        marginTop: 1,
+    },
+    userBalanceStatDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+    },
+    topHoldersSection: {
+        padding: 14,
+        backgroundColor: C.cardBg,
+    },
+    topHoldersHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        marginBottom: 6,
+    },
+    topHoldersTitle: {
+        color: C.navy,
+        fontSize: 11.5,
+        fontWeight: '800',
+    },
+    topHoldersSub: {
+        color: C.gold,
+        fontSize: 9.5,
+        fontWeight: '700',
+    },
+    holderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 7,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F8FAFC',
+    },
+    holderRankCircle: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    holderRankText: {
+        color: C.textSub,
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+    holderName: {
+        color: C.navy,
+        fontSize: 11.5,
+        fontWeight: '800',
+    },
+    holderEmail: {
+        color: C.textMuted,
+        fontSize: 9.5,
+    },
+    holderBalance: {
+        color: C.emerald,
+        fontSize: 12,
+        fontWeight: '900',
+    },
+
+    // Projections Card
+    projectionCard: {
+        backgroundColor: C.cardBg,
+        borderRadius: 18,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        marginBottom: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    projectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        marginBottom: 10,
+    },
+    projectionTitle: {
+        color: C.navy,
+        fontSize: 12.5,
+        fontWeight: '900',
+    },
+    projectionTag: {
+        backgroundColor: C.emeraldBg,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    projectionTagText: {
+        color: C.emerald,
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    projectionGrid: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    projectionCol: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    projectionColDivider: {
+        width: 1,
+        height: 36,
+        backgroundColor: '#F1F5F9',
+    },
+    projectionColLbl: {
+        color: C.textSub,
+        fontSize: 9.5,
+        fontWeight: '700',
+    },
+    projectionColVal: {
+        color: C.navy,
+        fontSize: 14,
+        fontWeight: '900',
+        marginVertical: 2,
+    },
+    projectionColSub: {
+        color: C.textMuted,
+        fontSize: 8.5,
+        fontWeight: '600',
+    },
+
     // Section styling
     sectionContainer: {
         backgroundColor: C.cardBg,
@@ -1100,7 +1657,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderWidth: 1,
         borderColor: C.cardBorder,
-        marginBottom: 16,
+        marginBottom: 14,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
@@ -1127,6 +1684,27 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 
+    // Service Search Box
+    serviceSearchWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        gap: 8,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    serviceSearchInput: {
+        flex: 1,
+        color: C.navy,
+        fontSize: 12,
+        fontWeight: '600',
+        padding: 0,
+    },
+
     // Service Row
     serviceRow: {
         flexDirection: 'row',
@@ -1139,11 +1717,8 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: C.goldBg,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: C.goldBorder,
     },
     serviceName: {
         color: C.navy,
@@ -1175,9 +1750,9 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 
-    // Quick Add Expense Banner (Navy & Gold Accent)
+    // Quick Add Expense Banner
     quickAddExpenseBanner: {
-        marginTop: 14,
+        marginTop: 4,
         borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
@@ -1206,6 +1781,69 @@ const styles = StyleSheet.create({
     quickAddSub: {
         color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 9.5,
+        marginTop: 2,
+    },
+
+    // Breakdown Cards
+    breakdownCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    breakdownCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    breakdownIconWrap: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    breakdownServiceName: {
+        color: C.navy,
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    breakdownServiceType: {
+        color: C.textSub,
+        fontSize: 9.5,
+    },
+    breakdownTag: {
+        backgroundColor: C.goldBg,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 0.5,
+        borderColor: C.goldBorder,
+    },
+    breakdownTagText: {
+        color: C.gold,
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    breakdownGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    breakdownCol: {
+        flex: 1,
+    },
+    breakdownColLabel: {
+        color: C.textSub,
+        fontSize: 9,
+        fontWeight: '700',
+    },
+    breakdownColVal: {
+        color: C.navy,
+        fontSize: 11.5,
+        fontWeight: '900',
         marginTop: 2,
     },
 
@@ -1316,59 +1954,122 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
 
-    // Breakdown Cards
-    breakdownCard: {
-        backgroundColor: '#F8FAFC',
-        borderRadius: 14,
-        padding: 12,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: C.cardBorder,
+    // Transaction Sales Rows
+    txRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
     },
-    breakdownCardHeader: {
+    txIconCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    txCustomerName: {
+        color: C.navy,
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    txServiceLabel: {
+        color: C.textSub,
+        fontSize: 9.5,
+        marginTop: 2,
+    },
+    txRevenue: {
+        color: C.navy,
+        fontSize: 12.5,
+        fontWeight: '900',
+    },
+    txProfitPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        backgroundColor: C.emeraldBg,
+        paddingHorizontal: 5,
+        paddingVertical: 1.5,
+        borderRadius: 5,
+        marginTop: 2,
+    },
+    txProfitText: {
+        color: C.emerald,
+        fontSize: 9,
+        fontWeight: '900',
+    },
+
+    // Inspector Modal
+    inspectorCard: {
+        backgroundColor: C.cardBg,
+        borderRadius: 22,
+        padding: 20,
+        marginHorizontal: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 14,
+        elevation: 6,
+    },
+    inspectorHeroBox: {
+        alignItems: 'center',
+        backgroundColor: C.emeraldBg,
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: C.emeraldBorder,
+        marginBottom: 12,
+    },
+    inspectorHeroLabel: {
+        color: C.emerald,
+        fontSize: 9.5,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+    },
+    inspectorHeroVal: {
+        color: '#065F46',
+        fontSize: 24,
+        fontWeight: '900',
+        marginVertical: 2,
+    },
+    inspectorHeroMargin: {
+        color: C.emerald,
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    inspectorFieldRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 8,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
     },
-    breakdownServiceName: {
-        color: C.navy,
-        fontSize: 12.5,
-        fontWeight: '800',
-    },
-    breakdownTag: {
-        backgroundColor: C.goldBg,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-        borderRadius: 6,
-        borderWidth: 0.5,
-        borderColor: C.goldBorder,
-    },
-    breakdownTagText: {
-        color: C.gold,
-        fontSize: 9,
-        fontWeight: '800',
-    },
-    breakdownGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    breakdownCol: {
-        flex: 1,
-    },
-    breakdownColLabel: {
+    inspectorFieldLbl: {
         color: C.textSub,
-        fontSize: 9.5,
+        fontSize: 10.5,
         fontWeight: '700',
     },
-    breakdownColVal: {
+    inspectorFieldVal: {
+        color: C.navy,
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    inspectorCloseBtn: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        paddingVertical: 11,
+        alignItems: 'center',
+        marginTop: 14,
+    },
+    inspectorCloseBtnText: {
         color: C.navy,
         fontSize: 12,
-        fontWeight: '900',
-        marginTop: 2,
+        fontWeight: '800',
     },
 
-    // Modal Styles (Executive White + Navy & Gold)
+    // Modal Styles
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(15, 23, 42, 0.65)',

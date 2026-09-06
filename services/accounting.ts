@@ -27,6 +27,19 @@ export interface ServiceProfitSummary {
     transactionCount: number;
 }
 
+export interface UserLiquidityMetrics {
+    totalUserBalances: number;
+    totalUserCount: number;
+    fundedUserCount: number;
+    averageUserBalance: number;
+    topHolders: {
+        id: string;
+        name: string;
+        email: string;
+        balance: number;
+    }[];
+}
+
 export interface AccountingMetrics {
     totalRevenue: number;
     totalCost: number;
@@ -40,6 +53,9 @@ export interface AccountingMetrics {
     categoryExpenseBreakdown: Record<string, number>;
     recentTransactions: any[];
     recentExpenses: ExpenseRecord[];
+    userLiquidity: UserLiquidityMetrics;
+    dailyRunRate: number;
+    projectedMonthlyProfit: number;
 }
 
 export const EXPENSE_CATEGORIES = [
@@ -361,7 +377,42 @@ export const calculateAccountingMetrics = async (
     // 4. Fetch Expenses for the same period
     const expenses = await fetchExpenses(startDate, endDate);
 
-    // 5. Aggregate calculations
+    // 5. Query User Accounts & Total Balances (Total User Balances / Platform Liabilities)
+    const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, balance')
+        .order('balance', { ascending: false });
+
+    let totalUserBalances = 0;
+    let fundedUserCount = 0;
+    const topHolders: { id: string; name: string; email: string; balance: number }[] = [];
+    const userMap = new Map<string, { name: string; email: string }>();
+
+    if (profilesData && profilesData.length > 0) {
+        for (const p of profilesData) {
+            const bal = parseFloat(p.balance || '0');
+            userMap.set(p.id, {
+                name: p.full_name || 'Customer',
+                email: p.email || 'N/A'
+            });
+            if (bal > 0) {
+                totalUserBalances += bal;
+                fundedUserCount += 1;
+                if (topHolders.length < 6) {
+                    topHolders.push({
+                        id: p.id,
+                        name: p.full_name || 'Anonymous User',
+                        email: p.email || 'N/A',
+                        balance: bal,
+                    });
+                }
+            }
+        }
+    }
+    const totalUserCount = profilesData ? profilesData.length : 0;
+    const averageUserBalance = fundedUserCount > 0 ? (totalUserBalances / fundedUserCount) : 0;
+
+    // 6. Comprehensive Service Profit Matrix
     let totalRevenue = 0;
     let totalCost = 0;
     let grossProfit = 0;
@@ -369,15 +420,25 @@ export const calculateAccountingMetrics = async (
     const serviceBreakdown: Record<string, ServiceProfitSummary> = {
         'data': { serviceName: 'Data Bundles', type: 'data', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
         'airtime': { serviceName: 'Airtime VTU', type: 'airtime', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
-        'electricity': { serviceName: 'Electricity Bills', type: 'electricity', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'social_boost': { serviceName: 'Social Media Boost / SMM', type: 'social_boost', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'cac': { serviceName: 'CAC Business Services', type: 'cac', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'bvn': { serviceName: 'BVN Validation & Slips', type: 'bvn', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'nin': { serviceName: 'NIN Verification & Slips', type: 'nin', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'electricity': { serviceName: 'Electricity Bills (Disco)', type: 'electricity', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
         'tv': { serviceName: 'Cable TV (DSTV/GOTV)', type: 'tv', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
-        'education': { serviceName: 'Exam PINs (WAEC/NECO)', type: 'education', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
-        'recharge_pin_purchase': { serviceName: 'Recharge Cards Printing', type: 'recharge_pin_purchase', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
-        'identity': { serviceName: 'NIN / BVN Verification', type: 'identity', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
-        'crypto': { serviceName: 'Crypto & Assets', type: 'crypto', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
-        'funding_fee': { serviceName: 'Gateway & Funding Fees', type: 'funding_fee', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'education': { serviceName: 'Exam PINs (WAEC/NECO/JAMB)', type: 'education', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'airtime_to_cash': { serviceName: 'Airtime to Cash', type: 'airtime_to_cash', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'virtual_cards': { serviceName: 'Virtual Cards (USD & NGN)', type: 'virtual_cards', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'crypto': { serviceName: 'Crypto Assets (USDT/BTC)', type: 'crypto', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'bulk_sms': { serviceName: 'Bulk SMS Messaging', type: 'bulk_sms', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'smile': { serviceName: 'Smile 4G Data & Voice', type: 'smile', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'recharge_pin': { serviceName: 'Recharge Card Printing', type: 'recharge_pin', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'transfer': { serviceName: 'Transfers & Agency Banking', type: 'transfer', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
+        'funding_fee': { serviceName: 'Gateway & Top-up Fees', type: 'funding_fee', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
         'other': { serviceName: 'Other Services', type: 'other', revenue: 0, cost: 0, profit: 0, marginPercent: 0, transactionCount: 0 },
     };
+
+    const enrichedTxns: any[] = [];
 
     for (const tx of transactions) {
         const amt = parseFloat(tx.amount || 0);
@@ -391,9 +452,44 @@ export const calculateAccountingMetrics = async (
         let itemCost = 0;
         let categoryKey = 'other';
 
-        if (typeLower === 'data' || descLower.includes('data bundle')) {
+        if (typeLower === 'social_boost' || typeLower === 'social' || descLower.includes('social boost') || descLower.includes('followers') || descLower.includes('likes') || descLower.includes('views') || descLower.includes('smm') || descLower.includes('nineboost')) {
+            categoryKey = 'social_boost';
+            itemProfit = amt * 0.28; // ~28% SMM markup margin
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'cac' || typeLower === 'cac_registration' || descLower.includes('cac') || descLower.includes('business registration') || descLower.includes('corporate affairs') || descLower.includes('incorporation')) {
+            categoryKey = 'cac';
+            itemProfit = amt * 0.35; // ~35% Corporate Services margin
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'bvn' || typeLower === 'bvn_verification' || descLower.includes('bvn')) {
+            categoryKey = 'bvn';
+            itemProfit = amt * 0.50; // ~50% BVN margin (e.g. ₦150 cost, ₦300-₦500 charged)
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'nin' || typeLower === 'nin_verification' || descLower.includes('nin') || descLower.includes('nimc') || descLower.includes('ipe')) {
+            categoryKey = 'nin';
+            itemProfit = amt * 0.50; // ~50% NIN margin
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'airtime_to_cash' || descLower.includes('airtime to cash') || descLower.includes('a2c')) {
+            categoryKey = 'airtime_to_cash';
+            itemProfit = amt * 0.10; // ~10% conversion spread
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'card_creation' || typeLower === 'card_funding' || descLower.includes('virtual card') || descLower.includes('card creation') || descLower.includes('card funding')) {
+            categoryKey = 'virtual_cards';
+            itemProfit = amt * 0.05; // 5% creation / funding FX spread
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'bulk_sms' || descLower.includes('bulk sms') || descLower.includes('sms units')) {
+            categoryKey = 'bulk_sms';
+            itemProfit = amt * 0.30; // ~30% SMS gateway margin
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'smile' || descLower.includes('smile')) {
+            categoryKey = 'smile';
+            itemProfit = amt * 0.04; // 4% Smile margin
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'recharge_pin' || typeLower === 'recharge_pin_purchase' || descLower.includes('recharge pin') || descLower.includes('e-pin')) {
+            categoryKey = 'recharge_pin';
+            itemProfit = amt * 0.02; // ~2% pin printing margin
+            itemCost = Math.max(0, itemRevenue - itemProfit);
+        } else if (typeLower === 'data' || descLower.includes('data bundle') || descLower.includes('sme') || descLower.includes('gifting')) {
             categoryKey = 'data';
-            // Match against plan if possible
             let matchedMargin = 0;
             for (const [key, plan] of dataPlanMap.entries()) {
                 if (descLower.includes(key)) {
@@ -403,9 +499,9 @@ export const calculateAccountingMetrics = async (
             }
             itemProfit = matchedMargin > 0 ? matchedMargin : (amt * defaultDataMarginPercent);
             itemCost = Math.max(0, itemRevenue - itemProfit);
-        } else if (typeLower === 'airtime' || descLower.includes('airtime')) {
+        } else if (typeLower === 'airtime' || descLower.includes('airtime') || descLower.includes('vtu')) {
             categoryKey = 'airtime';
-            let marginRate = 0.02; // default 2%
+            let marginRate = 0.02;
             if (descLower.includes('mtn')) marginRate = airtimeMarginMap.get('MTN') || 0.015;
             else if (descLower.includes('glo')) marginRate = airtimeMarginMap.get('GLO') || 0.04;
             else if (descLower.includes('airtel')) marginRate = airtimeMarginMap.get('AIRTEL') || 0.025;
@@ -413,43 +509,38 @@ export const calculateAccountingMetrics = async (
             
             itemProfit = amt * marginRate;
             itemCost = Math.max(0, itemRevenue - itemProfit);
-        } else if (typeLower === 'electricity' || descLower.includes('electric') || descLower.includes('disco')) {
+        } else if (typeLower === 'electricity' || descLower.includes('electric') || descLower.includes('disco') || descLower.includes('meter')) {
             categoryKey = 'electricity';
-            itemProfit = 100; // Flat convenience fee profit
+            itemProfit = 100;
             if (itemProfit > amt) itemProfit = amt * 0.02;
             itemCost = Math.max(0, itemRevenue - itemProfit);
-        } else if (typeLower === 'tv' || descLower.includes('dstv') || descLower.includes('gotv') || descLower.includes('startimes')) {
+        } else if (typeLower === 'tv' || descLower.includes('dstv') || descLower.includes('gotv') || descLower.includes('startimes') || descLower.includes('showmax') || descLower.includes('cable')) {
             categoryKey = 'tv';
-            itemProfit = 100; // Flat subscription fee profit
+            itemProfit = 100;
             if (itemProfit > amt) itemProfit = amt * 0.015;
             itemCost = Math.max(0, itemRevenue - itemProfit);
-        } else if (typeLower === 'education' || descLower.includes('waec') || descLower.includes('neco') || descLower.includes('nabteb')) {
+        } else if (typeLower === 'education' || descLower.includes('waec') || descLower.includes('neco') || descLower.includes('nabteb') || descLower.includes('jamb')) {
             categoryKey = 'education';
-            itemProfit = 350; // Average exam pin profit
+            itemProfit = 350;
             if (itemProfit > amt) itemProfit = amt * 0.08;
             itemCost = Math.max(0, itemRevenue - itemProfit);
-        } else if (typeLower === 'recharge_pin_purchase' || descLower.includes('recharge pin')) {
-            categoryKey = 'recharge_pin_purchase';
-            itemProfit = amt * 0.018; // ~1.8% pin printing margin
-            itemCost = Math.max(0, itemRevenue - itemProfit);
-        } else if (typeLower === 'payment' && (descLower.includes('nin') || descLower.includes('bvn') || descLower.includes('cac'))) {
-            categoryKey = 'identity';
-            itemProfit = amt * 0.25; // ~25% identity profit margin
-            itemCost = Math.max(0, itemRevenue - itemProfit);
-        } else if (typeLower.startsWith('crypto_') || descLower.includes('crypto') || descLower.includes('usdt') || descLower.includes('gas')) {
+        } else if (typeLower.startsWith('crypto') || descLower.includes('crypto') || descLower.includes('usdt') || descLower.includes('btc') || descLower.includes('swap')) {
             categoryKey = 'crypto';
-            itemProfit = amt * 0.015; // 1.5% exchange spread
+            itemProfit = amt * 0.015;
             itemCost = Math.max(0, itemRevenue - itemProfit);
         } else if (typeLower === 'fee' || descLower.includes('deposit fee') || descLower.includes('monnify fee') || descLower.includes('gateway fee')) {
             categoryKey = 'funding_fee';
-            itemProfit = amt; // Direct fee revenue is 100% profit to platform
+            itemProfit = amt;
+            itemCost = 0;
+        } else if (typeLower === 'transfer_fee' || descLower.includes('transfer fee') || descLower.includes('interbank fee')) {
+            categoryKey = 'transfer';
+            itemProfit = amt;
             itemCost = 0;
         } else if (typeLower === 'deposit' || typeLower === 'transfer') {
-            // Internal ledger movements are not service sales
             continue;
         } else {
             categoryKey = 'other';
-            itemProfit = amt * 0.05; // 5% generic margin
+            itemProfit = amt * 0.05;
             itemCost = Math.max(0, itemRevenue - itemProfit);
         }
 
@@ -462,6 +553,21 @@ export const calculateAccountingMetrics = async (
             serviceBreakdown[categoryKey].cost += itemCost;
             serviceBreakdown[categoryKey].profit += itemProfit;
             serviceBreakdown[categoryKey].transactionCount += 1;
+        }
+
+        if (enrichedTxns.length < 30) {
+            const userInfo = userMap.get(tx.user_id);
+            enrichedTxns.push({
+                ...tx,
+                customerName: userInfo?.name || 'Registered Customer',
+                customerEmail: userInfo?.email || '',
+                serviceCategory: categoryKey,
+                serviceName: serviceBreakdown[categoryKey]?.serviceName || 'Service Order',
+                revenue: itemRevenue,
+                cost: itemCost,
+                profit: itemProfit,
+                marginPercent: itemRevenue > 0 ? (itemProfit / itemRevenue) * 100 : 0
+            });
         }
     }
 
@@ -482,6 +588,19 @@ export const calculateAccountingMetrics = async (
     const netProfit = grossProfit - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
+    // Daily Run-Rate and Projections
+    const now = new Date();
+    let daysCount = 30;
+    if (startDate && endDate) {
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+        daysCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    } else if (startDate) {
+        const diffTime = Math.abs(now.getTime() - startDate.getTime());
+        daysCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    }
+    const dailyRunRate = netProfit / daysCount;
+    const projectedMonthlyProfit = dailyRunRate * 30;
+
     return {
         totalRevenue,
         totalCost,
@@ -493,8 +612,17 @@ export const calculateAccountingMetrics = async (
         expensesCount: expenses.length,
         serviceBreakdown,
         categoryExpenseBreakdown,
-        recentTransactions: transactions.slice(0, 10),
-        recentExpenses: expenses.slice(0, 10),
+        recentTransactions: enrichedTxns,
+        recentExpenses: expenses.slice(0, 15),
+        userLiquidity: {
+            totalUserBalances,
+            totalUserCount,
+            fundedUserCount,
+            averageUserBalance,
+            topHolders
+        },
+        dailyRunRate,
+        projectedMonthlyProfit,
     };
 };
 
