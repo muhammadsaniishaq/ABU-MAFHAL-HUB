@@ -22,6 +22,9 @@ import { Asset } from 'expo-asset';
 import ViewShot from 'react-native-view-shot';
 import jsQR from 'jsqr';
 import { ABU_MAFHAL_LOGO_B64 } from '../../assets/images/logoB64';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import QRCode from 'react-native-qrcode-svg';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 const T = {
   navy:    '#0d1b3e',
@@ -35,7 +38,41 @@ const T = {
   indigo:  '#4F46E5',
 };
 
+// Hermes & Android safe formatting helpers
+const safeFormatCurrency = (val: any) => {
+  const num = parseFloat(val);
+  if (isNaN(num)) return '0.00';
+  return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+const safeFormatDate = (dateStr: any, includeTime = false) => {
+  try {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()] || '';
+    const day = d.getDate();
+    if (!includeTime) return `${month} ${day}`;
+    const hours = d.getHours().toString().padStart(2, '0');
+    const mins = d.getMinutes().toString().padStart(2, '0');
+    return `${month} ${day}, ${hours}:${mins}`;
+  } catch {
+    return '';
+  }
+};
+
 export default function QRPayScreen() {
+    return (
+        <ErrorBoundary fallbackTitle="QR Pay Error" fallbackSubtitle="An unexpected issue occurred in QR Pay. Tap below to reload.">
+            <QRPayContent />
+        </ErrorBoundary>
+    );
+}
+
+function QRPayContent() {
+    const insets = useSafeAreaInsets();
+    const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 38 : 20) + 8;
     const { settings } = useAppSettings();
     const router = useRouter();
     const isFocused = useIsFocused();
@@ -181,8 +218,10 @@ export default function QRPayScreen() {
     }, [cameraActive]);
 
     useEffect(() => {
-        loadUserProfile();
-    }, []);
+        if (isFocused) {
+            loadUserProfile();
+        }
+    }, [isFocused]);
 
     useEffect(() => {
         if ((activeTab === 'scan' || cameraActive) && !scanned) {
@@ -234,7 +273,7 @@ export default function QRPayScreen() {
                 .select('id, amount, type, status, description, created_at')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false })
-                .limit(5);
+                .limit(12);
             if (!error && data) {
                 setRecentTransfers(data);
             }
@@ -952,14 +991,8 @@ export default function QRPayScreen() {
         
         setIsSharingReceipt(true);
         const transferAmt = parseFloat(amount);
-        const formattedAmount = transferAmt.toLocaleString('en-US', { minimumFractionDigits: 2 });
-        const dateStr = new Date().toLocaleDateString('en-NG', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const formattedAmount = safeFormatCurrency(transferAmt);
+        const dateStr = safeFormatDate(new Date(), true);
         const reference = 'QR-' + Math.floor(Date.now() / 1000);
         
         // 1. Download logo asset locally for rendering inside the document
@@ -1361,14 +1394,6 @@ export default function QRPayScreen() {
         }
     };
 
-    if (!permission) {
-        return (
-            <View className="flex-1 bg-white items-center justify-center">
-                <ActivityIndicator size="large" color="#0056D2" />
-            </View>
-        );
-    }
-
     // Build user QR code payload with optional requested amount
     const myCodePayload = currentUser ? JSON.stringify({
         type: 'transfer',
@@ -1383,10 +1408,10 @@ export default function QRPayScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Ultra-Sleek Executive Curved Header */}
+            {/* Ultra-Sleek Executive Curved Header (Safe Area Protected) */}
             <LinearGradient 
               colors={['#060B18', '#0D1B3E']} 
-              style={s.headerContainer}
+              style={[s.headerContainer, { paddingTop: headerTopPadding }]}
             >
               <View style={s.headerTop}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
@@ -1404,7 +1429,7 @@ export default function QRPayScreen() {
                   >
                     <Ionicons name="wallet-outline" size={11} color="#F5A623" style={{ marginRight: 4 }} />
                     <Text style={s.headerBalance}>
-                      {showBalance ? `₦${userBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '₦ • • • • • •'}
+                      {showBalance ? `₦${safeFormatCurrency(userBalance)}` : '₦ • • • • • •'}
                     </Text>
                     <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={11} color="#F5A623" style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
@@ -1619,12 +1644,12 @@ export default function QRPayScreen() {
                                                             {tx.description || 'Wallet Transfer'}
                                                         </Text>
                                                         <Text style={s.recentTxDate}>
-                                                            {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                            {safeFormatDate(tx.created_at)}
                                                         </Text>
                                                     </View>
                                                     <View style={{ alignItems: 'flex-end' }}>
                                                         <Text style={s.recentTxAmount}>
-                                                            ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                            ₦{safeFormatCurrency(tx.amount)}
                                                         </Text>
                                                         <Text style={{ fontSize: 8.5, color: '#10B981', fontWeight: '800' }}>Tap to Pay</Text>
                                                     </View>
@@ -1744,10 +1769,11 @@ export default function QRPayScreen() {
                                             <View style={[s.qrCorner, s.qrCornerBL]} />
                                             <View style={[s.qrCorner, s.qrCornerBR]} />
 
-                                            <Image
-                                                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(myCodePayload)}&color=0D1B3E&margin=0` }}
-                                                style={{ width: 126, height: 126 }}
-                                                resizeMode="contain"
+                                            <QRCode
+                                                value={myCodePayload || 'https://abumafhalsub.com'}
+                                                size={116}
+                                                color="#0D1B3E"
+                                                backgroundColor="#FFFFFF"
                                             />
                                         </View>
 
@@ -1758,7 +1784,7 @@ export default function QRPayScreen() {
                                                     <Ionicons name="pricetag" size={9} color="#0D1B3E" />
                                                 </View>
                                                 <Text style={s.requestedAmountTxt}>
-                                                    Amount: <Text style={{ fontWeight: '900', color: '#0D1B3E' }}>₦{parseFloat(requestedAmount).toLocaleString()}</Text>
+                                                    Amount: <Text style={{ fontWeight: '900', color: '#0D1B3E' }}>₦{safeFormatCurrency(requestedAmount)}</Text>
                                                 </Text>
                                                 <TouchableOpacity 
                                                     onPress={() => {
@@ -1825,7 +1851,7 @@ export default function QRPayScreen() {
                                             {requestedAmount ? 'Edit Amount' : 'Set Amount'}
                                         </Text>
                                         <Text style={[s.featureActionSub, { color: '#FBBF24' }]}>
-                                            {requestedAmount ? `₦${parseFloat(requestedAmount).toLocaleString()}` : 'Custom'}
+                                            {requestedAmount ? `₦${safeFormatCurrency(requestedAmount)}` : 'Custom'}
                                         </Text>
                                     </LinearGradient>
                                 </TouchableOpacity>
@@ -1916,11 +1942,11 @@ export default function QRPayScreen() {
                                                             {tx.description || 'Wallet Transfer'}
                                                         </Text>
                                                         <Text style={s.recentTxDate}>
-                                                            {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                            {safeFormatDate(tx.created_at, true)}
                                                         </Text>
                                                     </View>
                                                     <Text style={s.recentTxAmount}>
-                                                        ₦{parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        ₦{safeFormatCurrency(tx.amount)}
                                                     </Text>
                                                 </View>
                                             ))
@@ -2026,7 +2052,7 @@ export default function QRPayScreen() {
                                         activeOpacity={0.7}
                                     >
                                         <Text style={[s.quickChipText, amount === val && s.quickChipTextActive]}>
-                                            ₦{parseInt(val).toLocaleString()}
+                                            ₦{safeFormatCurrency(val)}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
@@ -2045,7 +2071,7 @@ export default function QRPayScreen() {
                             <View style={s.balanceWrapper}>
                                 <Ionicons name="wallet-outline" size={14} color="#f5a623" />
                                 <Text style={s.balanceTextDecorated}>
-                                    Available: <Text style={{ color: 'white', fontWeight: '900' }}>₦{userBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                                    Available: <Text style={{ color: 'white', fontWeight: '900' }}>₦{safeFormatCurrency(userBalance)}</Text>
                                 </Text>
                             </View>
 
@@ -2346,7 +2372,7 @@ export default function QRPayScreen() {
                                 backgroundColor: '#030712',
                             }}
                         />
-                    ) : !scanned ? (
+                    ) : !scanned && permission?.granted ? (
                         <CameraView
                             style={StyleSheet.absoluteFillObject}
                             facing="back"
@@ -2356,6 +2382,25 @@ export default function QRPayScreen() {
                                 barcodeTypes: ["qr"],
                             }}
                         />
+                    ) : !scanned ? (
+                        <View style={{ flex: 1, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                            <Ionicons name="camera-outline" size={44} color="#F5A623" />
+                            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>Camera Permission Needed</Text>
+                            <Text style={{ color: '#94A3B8', fontSize: 12.5, textAlign: 'center', marginTop: 8, marginBottom: 20 }}>
+                                Camera access is needed to scan recipient QR codes.
+                            </Text>
+                            <TouchableOpacity
+                                onPress={async () => {
+                                    const res = await requestPermission();
+                                    if (!res?.granted) {
+                                        showScanNotice("Permission Denied", "Camera permission is disabled. You can also upload a QR photo from your gallery.");
+                                    }
+                                }}
+                                style={{ backgroundColor: '#F5A623', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12 }}
+                            >
+                                <Text style={{ color: '#0D1B3E', fontWeight: '800', fontSize: 13 }}>Grant Permission</Text>
+                            </TouchableOpacity>
+                        </View>
                     ) : null}
 
                     {scanned && (
@@ -2609,8 +2654,8 @@ const s = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 90,
+    paddingTop: 8,
+    paddingBottom: 130,
   },
   // Permission Card
   permissionCard: {
@@ -2683,15 +2728,15 @@ const s = StyleSheet.create({
   // Executive Luxury VIP QR Card (Compact, Horizontal Balanced & Perfectly Arranged)
   myCodeCard: {
     width: '100%',
-    maxWidth: 350,
-    borderRadius: 22,
-    padding: 14,
+    maxWidth: 330,
+    borderRadius: 20,
+    padding: 12,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 6,
     borderWidth: 1.2,
     borderColor: 'rgba(245, 166, 35, 0.3)',
     overflow: 'hidden',
@@ -2976,7 +3021,7 @@ const s = StyleSheet.create({
   featureActionGrid: {
     flexDirection: 'row',
     width: '100%',
-    maxWidth: 350,
+    maxWidth: 330,
     marginTop: 10,
     gap: 8,
   },
@@ -3020,7 +3065,7 @@ const s = StyleSheet.create({
   },
   recentTransfersContainer: {
     width: '100%',
-    maxWidth: 350,
+    maxWidth: 330,
     marginTop: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
@@ -3573,14 +3618,15 @@ const s = StyleSheet.create({
 
   // Compact Scan Tab Dashboard
   scanDashboardContainer: {
+    flexGrow: 1,
     paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 60,
+    paddingTop: 8,
+    paddingBottom: 130,
     alignItems: 'center',
   },
   modernScanHubCard: {
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 330,
     borderRadius: 18,
     padding: 10,
     alignItems: 'center',
