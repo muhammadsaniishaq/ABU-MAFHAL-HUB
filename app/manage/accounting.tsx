@@ -36,32 +36,40 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Brand Colors
+// Modern Executive Navy & Gold Theme (Light Background)
 const C = {
-    navyDark: '#060B18',
+    bg: '#F8FAFC',
+    cardBg: '#FFFFFF',
+    cardBorder: '#E2E8F0',
+    navyDark: '#0A1128',
     navy: '#0F172A',
     navyMid: '#1E293B',
     navyLight: '#334155',
     gold: '#D97706',
-    goldLight: '#F59E0B',
+    goldBright: '#F59E0B',
+    goldLight: '#FFFBEB',
     goldBg: 'rgba(245, 158, 11, 0.12)',
-    emerald: '#10B981',
-    emeraldBg: 'rgba(16, 185, 129, 0.12)',
-    coral: '#EF4444',
-    coralBg: 'rgba(239, 68, 68, 0.12)',
-    blue: '#3B82F6',
-    blueBg: 'rgba(59, 130, 246, 0.12)',
+    goldBorder: '#FDE68A',
+    emerald: '#059669',
+    emeraldBg: '#ECFDF5',
+    emeraldBorder: '#A7F3D0',
+    coral: '#DC2626',
+    coralBg: '#FEF2F2',
+    coralBorder: '#FECACA',
+    blue: '#2563EB',
+    blueBg: '#EFF6FF',
+    blueBorder: '#BFDBFE',
     white: '#FFFFFF',
+    textMain: '#0F172A',
+    textSub: '#475569',
     textMuted: '#94A3B8',
-    border: 'rgba(255, 255, 255, 0.08)',
-    cardBg: '#0F172A',
 };
 
 type TimeRange = 'today' | 'yesterday' | 'week' | 'month' | 'all';
 
 export default function AccountingScreen() {
     return (
-        <ErrorBoundary fallbackTitle="Accounting Hub Notice" fallbackSubtitle="An unexpected issue occurred while calculating financial records.">
+        <ErrorBoundary fallbackTitle="Financial Ledger Notice" fallbackSubtitle="An unexpected issue occurred while calculating financial records.">
             <AccountingContent />
         </ErrorBoundary>
     );
@@ -111,26 +119,26 @@ function AccountingContent() {
         return () => { isMounted = false; };
     }, []);
 
-    // 2. Compute date boundaries for selected TimeRange
+    // 2. Compute date boundaries for selected TimeRange (Strictly English)
     const getDateRange = (range: TimeRange): { start?: Date; end?: Date; label: string } => {
         const now = new Date();
         if (range === 'today') {
             const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            return { start, label: 'Today (Yau)' };
+            return { start, label: 'Today' };
         } else if (range === 'yesterday') {
             const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
             const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
-            return { start, end, label: 'Yesterday (Jiya)' };
+            return { start, end, label: 'Yesterday' };
         } else if (range === 'week') {
             const dayOfWeek = now.getDay();
             const distance = (dayOfWeek + 6) % 7; // Monday start
             const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distance, 0, 0, 0);
-            return { start, label: 'This Week (Wannan Satin)' };
+            return { start, label: 'This Week' };
         } else if (range === 'month') {
             const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-            return { start, label: 'This Month (Wannan Watan)' };
+            return { start, label: 'This Month' };
         }
-        return { label: 'All Time (Gaba Daya)' };
+        return { label: 'All Time' };
     };
 
     // 3. Load accounting data from Supabase
@@ -159,33 +167,32 @@ function AccountingContent() {
         loadAccountingData();
     };
 
-    // 4. Handle Expense Creation
+    // 4. Handle Save New Expense
     const handleSaveExpense = async () => {
+        const parsedAmount = parseFloat(newAmount);
         if (!newTitle.trim()) {
-            Alert.alert('Required', 'Please enter a description for this expense.');
+            Alert.alert('Required Field', 'Please enter a title or description for the expense.');
             return;
         }
-        const amt = parseFloat(newAmount);
-        if (isNaN(amt) || amt <= 0) {
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
             Alert.alert('Invalid Amount', 'Please enter a valid expense amount in Naira.');
             return;
         }
 
         setSavingExpense(true);
-        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
         const res = await recordExpense({
-            title: newTitle,
-            amount: amt,
+            title: newTitle.trim(),
             category: newCategory,
+            amount: parsedAmount,
             payment_method: newPaymentMethod,
-            notes: newNotes,
+            notes: newNotes.trim() || undefined,
+            expense_date: new Date().toISOString().split('T')[0]
         });
-
         setSavingExpense(false);
 
         if (res.success) {
-            Alert.alert('Recorded', `Expense of ${formatNaira(amt)} has been recorded.`);
+            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('Recorded', `Expense of ${formatNaira(parsedAmount)} has been logged successfully.`);
             setAddExpenseVisible(false);
             setNewTitle('');
             setNewAmount('');
@@ -228,12 +235,12 @@ function AccountingContent() {
         await generateProfitLossPDF(metrics, label);
     };
 
-    // --- ACCESS DENIED SCREEN FOR NON-SUPER-ADMIN ---
+    // --- ACCESS DENIED SCREEN FOR UNAUTHORIZED USERS (LIGHT + NAVY & GOLD) ---
     if (authLoading) {
         return (
-            <View style={[styles.centerBox, { backgroundColor: C.navyDark }]}>
+            <View style={[styles.centerBox, { backgroundColor: C.bg }]}>
                 <Stack.Screen options={{ headerShown: false }} />
-                <ActivityIndicator size="large" color={C.gold} />
+                <ActivityIndicator size="large" color={C.goldBright} />
                 <Text style={styles.verifyingText}>VERIFYING SUPER ADMIN CLEARANCE...</Text>
             </View>
         );
@@ -245,14 +252,14 @@ function AccountingContent() {
                 <Stack.Screen options={{ headerShown: false }} />
                 <View style={styles.deniedCard}>
                     <View style={styles.deniedIconCircle}>
-                        <Ionicons name="shield-outline" size={48} color={C.coral} />
+                        <Ionicons name="shield-outline" size={44} color={C.coral} />
                     </View>
                     <Text style={styles.deniedTitle}>SUPER ADMIN CLEARANCE REQUIRED</Text>
                     <Text style={styles.deniedSub}>
-                        Baka da cikakken izinin shiga wannan sashen. Lissafin Riba da Kashe-kashe (Profits & Expenses Ledger) an ware shi ne don babban Super Admin kawai.
+                        You do not have administrative clearance to access the Executive Profit & Loss Ledger. This portal is strictly restricted to authorized Super Administrators.
                     </Text>
                     <View style={styles.deniedAccountBadge}>
-                        <Ionicons name="person-outline" size={13} color={C.textMuted} />
+                        <Ionicons name="person-outline" size={13} color={C.textSub} />
                         <Text style={styles.deniedAccountEmail}>{userEmail || 'Unauthorized Account'}</Text>
                     </View>
                     <TouchableOpacity
@@ -260,8 +267,8 @@ function AccountingContent() {
                         style={styles.deniedReturnBtn}
                         activeOpacity={0.85}
                     >
-                        <LinearGradient colors={[C.gold, '#B45309']} style={styles.deniedReturnGrad}>
-                            <Ionicons name="arrow-back" size={16} color={C.navyDark} />
+                        <LinearGradient colors={[C.navyDark, C.navy]} style={styles.deniedReturnGrad}>
+                            <Ionicons name="arrow-back" size={16} color={C.goldBright} />
                             <Text style={styles.deniedReturnText}>Return to Management</Text>
                         </LinearGradient>
                     </TouchableOpacity>
@@ -276,7 +283,7 @@ function AccountingContent() {
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* EXECUTIVE APP BAR */}
+            {/* EXECUTIVE APP BAR (DEEP NAVY & GOLD ACCENTS) */}
             <LinearGradient
                 colors={[C.navyDark, C.navy]}
                 style={[styles.headerBar, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 38 : 20) + 6 }]}
@@ -292,10 +299,10 @@ function AccountingContent() {
 
                     <View style={{ alignItems: 'center' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Ionicons name="calculator" size={16} color={C.gold} />
-                            <Text style={styles.headerTitle}>Riba & Kashe-kashe</Text>
+                            <Ionicons name="calculator" size={16} color={C.goldBright} />
+                            <Text style={styles.headerTitle}>Profit & Operating Expenses</Text>
                         </View>
-                        <Text style={styles.headerSub}>EXECUTIVE PROFIT & EXPENSE HUB</Text>
+                        <Text style={styles.headerSub}>EXECUTIVE PROFIT & LOSS LEDGER</Text>
                     </View>
 
                     <TouchableOpacity
@@ -303,7 +310,7 @@ function AccountingContent() {
                         style={styles.exportBtn}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="share-outline" size={18} color={C.gold} />
+                        <Ionicons name="share-outline" size={18} color={C.goldBright} />
                     </TouchableOpacity>
                 </View>
 
@@ -315,11 +322,11 @@ function AccountingContent() {
                 >
                     {(['today', 'yesterday', 'week', 'month', 'all'] as TimeRange[]).map((r) => {
                         const labels: Record<TimeRange, string> = {
-                            today: 'Yau (Today)',
-                            yesterday: 'Jiya',
-                            week: 'Satin Nan',
-                            month: 'Watan Nan',
-                            all: 'Gaba Daya'
+                            today: 'Today',
+                            yesterday: 'Yesterday',
+                            week: 'This Week',
+                            month: 'This Month',
+                            all: 'All Time'
                         };
                         const active = timeRange === r;
                         return (
@@ -340,13 +347,13 @@ function AccountingContent() {
                     })}
                 </ScrollView>
 
-                {/* VIEW TABS SWITCHER */}
+                {/* FLOATING VIEW TABS SWITCHER */}
                 <View style={styles.tabBar}>
                     <TouchableOpacity
                         onPress={() => setActiveTab('overview')}
                         style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
                     >
-                        <Ionicons name="stats-chart" size={12} color={activeTab === 'overview' ? C.gold : C.textMuted} />
+                        <Ionicons name="stats-chart" size={13} color={activeTab === 'overview' ? C.goldBright : C.textMuted} />
                         <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>Overview</Text>
                     </TouchableOpacity>
 
@@ -354,9 +361,9 @@ function AccountingContent() {
                         onPress={() => setActiveTab('expenses')}
                         style={[styles.tabItem, activeTab === 'expenses' && styles.tabItemActive]}
                     >
-                        <Ionicons name="wallet" size={12} color={activeTab === 'expenses' ? C.coral : C.textMuted} />
+                        <Ionicons name="wallet" size={13} color={activeTab === 'expenses' ? C.coral : C.textMuted} />
                         <Text style={[styles.tabText, activeTab === 'expenses' && styles.tabTextActive]}>
-                            Kashe-kashe ({metrics?.expensesCount || 0})
+                            Expenses ({metrics?.expensesCount || 0})
                         </Text>
                     </TouchableOpacity>
 
@@ -364,45 +371,45 @@ function AccountingContent() {
                         onPress={() => setActiveTab('breakdown')}
                         style={[styles.tabItem, activeTab === 'breakdown' && styles.tabItemActive]}
                     >
-                        <Ionicons name="pie-chart" size={12} color={activeTab === 'breakdown' ? C.blue : C.textMuted} />
+                        <Ionicons name="pie-chart" size={13} color={activeTab === 'breakdown' ? C.blue : C.textMuted} />
                         <Text style={[styles.tabText, activeTab === 'breakdown' && styles.tabTextActive]}>Services</Text>
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
 
-            {/* MAIN DASHBOARD CONTENT */}
+            {/* MAIN DASHBOARD CONTENT (LIGHT BACKGROUND) */}
             {loading ? (
                 <View style={styles.centerBox}>
-                    <ActivityIndicator size="large" color={C.gold} />
-                    <Text style={styles.loadingDataText}>Lissafa Riba da Kashe-kashe...</Text>
+                    <ActivityIndicator size="large" color={C.goldBright} />
+                    <Text style={styles.loadingDataText}>Calculating Financial Metrics...</Text>
                 </View>
             ) : (
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.goldBright} />}
                 >
-                    {/* 1. MASTER NET PROFIT HERO CARD */}
+                    {/* 1. MASTER NET PROFIT HERO CARD (LUXURY EXECUTIVE NAVY & GOLD) */}
                     <LinearGradient
-                        colors={isNetProfitable ? ['#052E16', '#022C22', '#064E3B'] : ['#450A0A', '#2C0A0A', '#370A0A']}
-                        style={[styles.netProfitCard, { borderColor: isNetProfitable ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)' }]}
+                        colors={isNetProfitable ? ['#0A1128', '#0F172A', '#132A3E'] : ['#2C0B0E', '#1F080A', '#130506']}
+                        style={[styles.netProfitCard, { borderColor: isNetProfitable ? 'rgba(245, 158, 11, 0.4)' : 'rgba(239, 68, 68, 0.4)' }]}
                     >
                         <View style={styles.netProfitTopRow}>
-                            <View style={[styles.badgePill, { backgroundColor: isNetProfitable ? C.emeraldBg : C.coralBg }]}>
-                                <Ionicons name={isNetProfitable ? "trending-up" : "trending-down"} size={12} color={isNetProfitable ? C.emerald : C.coral} />
-                                <Text style={[styles.badgeText, { color: isNetProfitable ? C.emerald : C.coral }]}>
+                            <View style={[styles.badgePill, { backgroundColor: isNetProfitable ? 'rgba(5, 150, 105, 0.2)' : 'rgba(220, 38, 38, 0.2)' }]}>
+                                <Ionicons name={isNetProfitable ? "trending-up" : "trending-down"} size={12} color={isNetProfitable ? '#34D399' : '#F87171'} />
+                                <Text style={[styles.badgeText, { color: isNetProfitable ? '#34D399' : '#F87171' }]}>
                                     {isNetProfitable ? 'NET PROFITABLE' : 'NET DEFICIT'}
                                 </Text>
                             </View>
-                            <View style={[styles.badgePill, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
-                                <Ionicons name="pie-chart" size={11} color={C.gold} />
-                                <Text style={[styles.badgeText, { color: C.gold }]}>
+                            <View style={[styles.badgePill, { backgroundColor: 'rgba(245, 158, 11, 0.18)', borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.35)' }]}>
+                                <Ionicons name="pie-chart" size={11} color={C.goldBright} />
+                                <Text style={[styles.badgeText, { color: C.goldBright }]}>
                                     {metrics?.profitMargin ? metrics.profitMargin.toFixed(1) : '0.0'}% MARGIN
                                 </Text>
                             </View>
                         </View>
 
-                        <Text style={styles.netProfitLabel}>RIBA TA ASALI (NET PROFIT)</Text>
+                        <Text style={styles.netProfitLabel}>NET OPERATING PROFIT</Text>
                         <Text style={[styles.netProfitValue, { color: isNetProfitable ? '#34D399' : '#F87171' }]}>
                             {formatNaira(metrics?.netProfit || 0)}
                         </Text>
@@ -411,46 +418,46 @@ function AccountingContent() {
                         </Text>
                     </LinearGradient>
 
-                    {/* 2. 4 SECONDARY METRIC CARDS */}
+                    {/* 2. 4 SECONDARY METRIC CARDS (CRISP WHITE ON LIGHT BG) */}
                     <View style={styles.metricsGrid}>
                         {/* Gross Revenue */}
                         <View style={styles.metricCard}>
                             <View style={[styles.metricIconWrap, { backgroundColor: C.blueBg }]}>
-                                <Ionicons name="cart" size={14} color={C.blue} />
+                                <Ionicons name="cart" size={15} color={C.blue} />
                             </View>
-                            <Text style={styles.metricLabel}>Jimillar Ciniki</Text>
+                            <Text style={styles.metricLabel}>Gross Revenue</Text>
                             <Text style={styles.metricValue}>{formatNaira(metrics?.totalRevenue || 0)}</Text>
                             <Text style={styles.metricHint}>{metrics?.successfulTransactionsCount || 0} Successful Sales</Text>
                         </View>
 
                         {/* Cost of Sales (API Costs) */}
                         <View style={styles.metricCard}>
-                            <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
-                                <Ionicons name="cube" size={14} color={C.textMuted} />
+                            <View style={[styles.metricIconWrap, { backgroundColor: '#F1F5F9' }]}>
+                                <Ionicons name="cube" size={15} color={C.textSub} />
                             </View>
-                            <Text style={styles.metricLabel}>Kudin Kaya (API)</Text>
-                            <Text style={[styles.metricValue, { color: C.textMuted }]}>{formatNaira(metrics?.totalCost || 0)}</Text>
-                            <Text style={styles.metricHint}>Paid to Providers</Text>
+                            <Text style={styles.metricLabel}>Cost of Sales</Text>
+                            <Text style={[styles.metricValue, { color: C.textSub }]}>{formatNaira(metrics?.totalCost || 0)}</Text>
+                            <Text style={styles.metricHint}>Provider Settlements</Text>
                         </View>
 
                         {/* Gross Profit */}
                         <View style={styles.metricCard}>
                             <View style={[styles.metricIconWrap, { backgroundColor: C.emeraldBg }]}>
-                                <Ionicons name="sparkles" size={14} color={C.emerald} />
+                                <Ionicons name="sparkles" size={15} color={C.emerald} />
                             </View>
-                            <Text style={styles.metricLabel}>Jimillar Riba</Text>
+                            <Text style={styles.metricLabel}>Gross Profit</Text>
                             <Text style={[styles.metricValue, { color: C.emerald }]}>{formatNaira(metrics?.grossProfit || 0)}</Text>
-                            <Text style={styles.metricHint}>Before Expenses</Text>
+                            <Text style={styles.metricHint}>Before Operating Costs</Text>
                         </View>
 
                         {/* Total Expenses */}
                         <View style={styles.metricCard}>
                             <View style={[styles.metricIconWrap, { backgroundColor: C.coralBg }]}>
-                                <Ionicons name="arrow-down-circle" size={14} color={C.coral} />
+                                <Ionicons name="arrow-down-circle" size={15} color={C.coral} />
                             </View>
-                            <Text style={styles.metricLabel}>Kashe-kashe</Text>
+                            <Text style={styles.metricLabel}>Operating Expenses</Text>
                             <Text style={[styles.metricValue, { color: C.coral }]}>{formatNaira(metrics?.totalExpenses || 0)}</Text>
-                            <Text style={styles.metricHint}>{metrics?.expensesCount || 0} Expenditures</Text>
+                            <Text style={styles.metricHint}>{metrics?.expensesCount || 0} Recorded Costs</Text>
                         </View>
                     </View>
 
@@ -460,10 +467,10 @@ function AccountingContent() {
                             {/* Top Service Earners */}
                             <View style={styles.sectionHeaderRow}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="trophy" size={14} color={C.gold} />
-                                    <Text style={styles.sectionTitle}>Kowanne Fanni & Ribarsa</Text>
+                                    <Ionicons name="trophy" size={15} color={C.gold} />
+                                    <Text style={styles.sectionTitle}>Service Profit Performance</Text>
                                 </View>
-                                <Text style={styles.sectionSubTitle}>Top Profit Earners</Text>
+                                <Text style={styles.sectionSubTitle}>Top Revenue Drivers</Text>
                             </View>
 
                             {metrics?.serviceBreakdown && Object.values(metrics.serviceBreakdown)
@@ -481,13 +488,13 @@ function AccountingContent() {
                                         <View style={{ flex: 1, marginHorizontal: 10 }}>
                                             <Text style={styles.serviceName}>{serv.serviceName}</Text>
                                             <Text style={styles.serviceMeta}>
-                                                {serv.transactionCount} sales • Turn over: {formatNaira(serv.revenue)}
+                                                {serv.transactionCount} sales • Volume: {formatNaira(serv.revenue)}
                                             </Text>
                                         </View>
                                         <View style={{ alignItems: 'flex-end' }}>
                                             <Text style={styles.serviceProfit}>{formatNaira(serv.profit)}</Text>
                                             <View style={styles.serviceMarginBadge}>
-                                                <Text style={styles.serviceMarginText}>{serv.marginPercent.toFixed(1)}% Riba</Text>
+                                                <Text style={styles.serviceMarginText}>{serv.marginPercent.toFixed(1)}% Margin</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -499,15 +506,15 @@ function AccountingContent() {
                                 style={styles.quickAddExpenseBanner}
                                 activeOpacity={0.85}
                             >
-                                <LinearGradient colors={[C.navyMid, C.navyDark]} style={styles.quickAddExpenseGrad}>
+                                <LinearGradient colors={[C.navyDark, C.navy]} style={styles.quickAddExpenseGrad}>
                                     <View style={styles.quickAddIconCircle}>
-                                        <Ionicons name="add" size={20} color={C.gold} />
+                                        <Ionicons name="add" size={20} color={C.goldBright} />
                                     </View>
                                     <View style={{ flex: 1, marginHorizontal: 12 }}>
-                                        <Text style={styles.quickAddTitle}>Shigar da Sabon Kashe-Kudi</Text>
-                                        <Text style={styles.quickAddSub}>Record hosting, API top-up, salaries, or marketing</Text>
+                                        <Text style={styles.quickAddTitle}>Record Operating Expense</Text>
+                                        <Text style={styles.quickAddSub}>Log server infrastructure, API top-up, staff salaries, or marketing</Text>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={18} color={C.gold} />
+                                    <Ionicons name="chevron-forward" size={18} color={C.goldBright} />
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
@@ -518,8 +525,8 @@ function AccountingContent() {
                             {/* Expense Action Header */}
                             <View style={styles.expenseActionHeader}>
                                 <View>
-                                    <Text style={styles.sectionTitle}>Tattara Kashe-kashe (Expenses)</Text>
-                                    <Text style={styles.sectionSubTitle}>Jimilla: {formatNaira(metrics?.totalExpenses || 0)}</Text>
+                                    <Text style={styles.sectionTitle}>Operating Expenses Ledger</Text>
+                                    <Text style={styles.sectionSubTitle}>Total Costs: {formatNaira(metrics?.totalExpenses || 0)}</Text>
                                 </View>
                                 <TouchableOpacity
                                     onPress={() => setAddExpenseVisible(true)}
@@ -560,7 +567,7 @@ function AccountingContent() {
                                         const catObj = EXPENSE_CATEGORIES.find(c => c.id === exp.category) || EXPENSE_CATEGORIES[7];
                                         return (
                                             <View key={exp.id} style={styles.expenseItemRow}>
-                                                <View style={[styles.expenseIconCircle, { backgroundColor: catObj.color + '22' }]}>
+                                                <View style={[styles.expenseIconCircle, { backgroundColor: catObj.color + '18' }]}>
                                                     <Ionicons name={catObj.icon as any} size={16} color={catObj.color} />
                                                 </View>
                                                 <View style={{ flex: 1, marginHorizontal: 10 }}>
@@ -577,7 +584,7 @@ function AccountingContent() {
                                                         style={styles.deleteExpenseBtn}
                                                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                                     >
-                                                        <Ionicons name="trash-outline" size={13} color={C.coral} />
+                                                        <Ionicons name="trash-outline" size={14} color={C.coral} />
                                                     </TouchableOpacity>
                                                 </View>
                                             </View>
@@ -585,9 +592,9 @@ function AccountingContent() {
                                     })
                             ) : (
                                 <View style={styles.emptyBox}>
-                                    <Ionicons name="wallet-outline" size={32} color={C.textMuted} />
-                                    <Text style={styles.emptyTitle}>Babu Kashe-kudi a Wannan Lokacin</Text>
-                                    <Text style={styles.emptySub}>Danna maballin "+ Add Expense" a sama don shigar da sabon kashe kudi.</Text>
+                                    <Ionicons name="wallet-outline" size={36} color={C.textMuted} />
+                                    <Text style={styles.emptyTitle}>No Expenses Recorded in This Period</Text>
+                                    <Text style={styles.emptySub}>Tap "+ Add Expense" above to log a new operating expenditure.</Text>
                                 </View>
                             )}
                         </View>
@@ -596,7 +603,7 @@ function AccountingContent() {
                     {activeTab === 'breakdown' && (
                         <View style={styles.sectionContainer}>
                             <View style={styles.sectionHeaderRow}>
-                                <Text style={styles.sectionTitle}>Cikakken Rahoton Riba na Kowacce Sana'a</Text>
+                                <Text style={styles.sectionTitle}>Service Margin & Turnover Analysis</Text>
                                 <Text style={styles.sectionSubTitle}>Detailed Breakdown</Text>
                             </View>
 
@@ -605,21 +612,21 @@ function AccountingContent() {
                                     <View style={styles.breakdownCardHeader}>
                                         <Text style={styles.breakdownServiceName}>{serv.serviceName}</Text>
                                         <View style={styles.breakdownTag}>
-                                            <Text style={styles.breakdownTagText}>{serv.transactionCount} Sales</Text>
+                                            <Text style={styles.breakdownTagText}>{serv.transactionCount} Completed</Text>
                                         </View>
                                     </View>
 
                                     <View style={styles.breakdownGrid}>
                                         <View style={styles.breakdownCol}>
-                                            <Text style={styles.breakdownColLabel}>Revenue (Ciniki)</Text>
+                                            <Text style={styles.breakdownColLabel}>Revenue</Text>
                                             <Text style={styles.breakdownColVal}>{formatNaira(serv.revenue)}</Text>
                                         </View>
                                         <View style={styles.breakdownCol}>
-                                            <Text style={styles.breakdownColLabel}>Cost (Kudin API)</Text>
-                                            <Text style={[styles.breakdownColVal, { color: C.textMuted }]}>{formatNaira(serv.cost)}</Text>
+                                            <Text style={styles.breakdownColLabel}>Cost of Sales</Text>
+                                            <Text style={[styles.breakdownColVal, { color: C.textSub }]}>{formatNaira(serv.cost)}</Text>
                                         </View>
                                         <View style={styles.breakdownCol}>
-                                            <Text style={styles.breakdownColLabel}>Profit (Riba)</Text>
+                                            <Text style={styles.breakdownColLabel}>Gross Profit</Text>
                                             <Text style={[styles.breakdownColVal, { color: C.emerald }]}>{formatNaira(serv.profit)}</Text>
                                         </View>
                                     </View>
@@ -632,7 +639,7 @@ function AccountingContent() {
                 </ScrollView>
             )}
 
-            {/* MODAL: RECORD NEW EXPENSE */}
+            {/* MODAL: RECORD NEW EXPENSE (EXECUTIVE NAVY & GOLD) */}
             <Modal
                 visible={addExpenseVisible}
                 transparent
@@ -646,26 +653,26 @@ function AccountingContent() {
                                 <View style={styles.modalIconWrap}>
                                     <Ionicons name="receipt" size={16} color={C.gold} />
                                 </View>
-                                <Text style={styles.modalTitle}>Shigar da Kashe-Kudi</Text>
+                                <Text style={styles.modalTitle}>Record Operating Expense</Text>
                             </View>
-                            <TouchableOpacity onPress={() => setAddExpenseVisible(false)}>
-                                <Ionicons name="close" size={20} color={C.textMuted} />
+                            <TouchableOpacity onPress={() => setAddExpenseVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <Ionicons name="close" size={20} color={C.textSub} />
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+                        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
                             {/* Title */}
-                            <Text style={styles.inputLabel}>Bayani / Sunan Abin da aka biya *</Text>
+                            <Text style={styles.inputLabel}>Expense Title / Description *</Text>
                             <TextInput
                                 style={styles.textInput}
-                                placeholder="Misali: Top-up a BilalSadaSub API"
+                                placeholder="e.g., API Wallet Top-up (BilalSadaSub)"
                                 placeholderTextColor={C.textMuted}
                                 value={newTitle}
                                 onChangeText={setNewTitle}
                             />
 
                             {/* Amount */}
-                            <Text style={styles.inputLabel}>Adadin Kudi (₦) *</Text>
+                            <Text style={styles.inputLabel}>Amount (₦) *</Text>
                             <TextInput
                                 style={styles.textInput}
                                 placeholder="0.00"
@@ -676,7 +683,7 @@ function AccountingContent() {
                             />
 
                             {/* Category Selector */}
-                            <Text style={styles.inputLabel}>Bangaren Kashe Kudi *</Text>
+                            <Text style={styles.inputLabel}>Expense Category *</Text>
                             <View style={styles.catGrid}>
                                 {EXPENSE_CATEGORIES.map((cat) => {
                                     const isSelected = newCategory === cat.id;
@@ -687,7 +694,7 @@ function AccountingContent() {
                                             style={[styles.catOption, isSelected && styles.catOptionSelected]}
                                             activeOpacity={0.8}
                                         >
-                                            <Ionicons name={cat.icon as any} size={12} color={isSelected ? C.gold : C.textMuted} />
+                                            <Ionicons name={cat.icon as any} size={12} color={isSelected ? C.gold : C.textSub} />
                                             <Text style={[styles.catOptionText, isSelected && styles.catOptionTextSelected]}>
                                                 {cat.label}
                                             </Text>
@@ -697,7 +704,7 @@ function AccountingContent() {
                             </View>
 
                             {/* Payment Method */}
-                            <Text style={styles.inputLabel}>Hanyar Biya</Text>
+                            <Text style={styles.inputLabel}>Payment Method</Text>
                             <View style={styles.paymentMethodRow}>
                                 {PAYMENT_METHODS.map((method) => {
                                     const isSelected = newPaymentMethod === method.id;
@@ -716,10 +723,10 @@ function AccountingContent() {
                             </View>
 
                             {/* Notes */}
-                            <Text style={styles.inputLabel}>Karin Bayani (Na Zabi)</Text>
+                            <Text style={styles.inputLabel}>Notes / Remarks (Optional)</Text>
                             <TextInput
-                                style={[styles.textInput, { height: 60, textAlignVertical: 'top' }]}
-                                placeholder="Karin bayani kan wannan biyan..."
+                                style={[styles.textInput, { height: 64, textAlignVertical: 'top' }]}
+                                placeholder="Provide any vendor details, reference code, or comments..."
                                 placeholderTextColor={C.textMuted}
                                 multiline
                                 value={newNotes}
@@ -727,7 +734,7 @@ function AccountingContent() {
                             />
                         </ScrollView>
 
-                        {/* Submit Button */}
+                        {/* Submit Button Row */}
                         <View style={styles.modalBtnRow}>
                             <TouchableOpacity
                                 onPress={() => setAddExpenseVisible(false)}
@@ -741,12 +748,12 @@ function AccountingContent() {
                                 style={styles.modalSaveBtn}
                                 disabled={savingExpense}
                             >
-                                <LinearGradient colors={[C.gold, '#B45309']} style={styles.modalSaveGrad}>
+                                <LinearGradient colors={[C.navyDark, C.navy]} style={styles.modalSaveGrad}>
                                     {savingExpense ? (
-                                        <ActivityIndicator size="small" color={C.navyDark} />
+                                        <ActivityIndicator size="small" color={C.goldBright} />
                                     ) : (
                                         <>
-                                            <Ionicons name="checkmark-circle" size={16} color={C.navyDark} />
+                                            <Ionicons name="checkmark-circle" size={16} color={C.goldBright} />
                                             <Text style={styles.modalSaveText}>Record Expense</Text>
                                         </>
                                     )}
@@ -763,7 +770,7 @@ function AccountingContent() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: C.navyDark,
+        backgroundColor: C.bg,
     },
     centerBox: {
         flex: 1,
@@ -772,23 +779,23 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     verifyingText: {
-        color: C.gold,
+        color: C.navy,
         fontSize: 11,
         fontWeight: '900',
         letterSpacing: 1,
         marginTop: 14,
     },
     loadingDataText: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 12,
         fontWeight: '700',
         marginTop: 10,
     },
 
-    // Access Denied Screen
+    // Access Denied Screen (Light Background + Navy & Gold)
     deniedContainer: {
         flex: 1,
-        backgroundColor: C.navyDark,
+        backgroundColor: C.bg,
         alignItems: 'center',
         justifyContent: 'center',
         padding: 20,
@@ -800,8 +807,13 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         padding: 24,
         alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: 'rgba(239, 68, 68, 0.3)',
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 4,
     },
     deniedIconCircle: {
         width: 72,
@@ -811,9 +823,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
+        borderWidth: 1,
+        borderColor: C.coralBorder,
     },
     deniedTitle: {
-        color: C.white,
+        color: C.navy,
         fontSize: 14,
         fontWeight: '900',
         letterSpacing: 0.5,
@@ -821,7 +835,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     deniedSub: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 12,
         lineHeight: 18,
         textAlign: 'center',
@@ -831,16 +845,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: '#F1F5F9',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 12,
         marginBottom: 20,
     },
     deniedAccountEmail: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 11,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     deniedReturnBtn: {
         width: '100%',
@@ -855,35 +869,40 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     deniedReturnText: {
-        color: C.navyDark,
+        color: C.white,
         fontSize: 13,
         fontWeight: '900',
     },
 
-    // Header Bar
+    // Header Bar (Deep Navy & Gold)
     headerBar: {
         paddingHorizontal: 16,
-        paddingBottom: 10,
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
-        borderBottomWidth: 1,
-        borderColor: C.border,
+        paddingBottom: 12,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        borderBottomWidth: 1.5,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 6,
     },
     headerTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     backButton: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
     },
     headerTitle: {
         color: C.white,
@@ -892,11 +911,11 @@ const styles = StyleSheet.create({
         letterSpacing: -0.2,
     },
     headerSub: {
-        color: C.gold,
+        color: C.goldBright,
         fontSize: 8.5,
         fontWeight: '800',
-        letterSpacing: 0.8,
-        marginTop: 1,
+        letterSpacing: 1,
+        marginTop: 2,
     },
     exportBtn: {
         width: 36,
@@ -906,7 +925,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderColor: 'rgba(245, 158, 11, 0.4)',
     },
 
     // Time filter pills
@@ -919,55 +938,58 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
     },
     timePillActive: {
         backgroundColor: C.goldBg,
-        borderColor: C.gold,
+        borderColor: C.goldBright,
     },
     timePillText: {
-        color: C.textMuted,
+        color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 11,
         fontWeight: '700',
     },
     timePillTextActive: {
-        color: C.gold,
+        color: C.goldBright,
         fontWeight: '900',
     },
 
     // Tabs
     tabBar: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(0, 0, 0, 0.35)',
-        borderRadius: 12,
+        backgroundColor: 'rgba(0, 0, 0, 0.28)',
+        borderRadius: 14,
         padding: 3,
         marginTop: 8,
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
     },
     tabItem: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 6,
-        borderRadius: 9,
+        paddingVertical: 7,
+        borderRadius: 11,
         gap: 5,
     },
     tabItemActive: {
-        backgroundColor: C.cardBg,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: C.white,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
     tabText: {
-        color: C.textMuted,
+        color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 11,
         fontWeight: '700',
     },
     tabTextActive: {
-        color: C.white,
+        color: C.navy,
         fontWeight: '900',
     },
 
@@ -976,16 +998,16 @@ const styles = StyleSheet.create({
         padding: 16,
     },
 
-    // Master Net Profit Hero Card
+    // Master Net Profit Hero Card (Luxury Navy & Gold Titanium Card)
     netProfitCard: {
-        borderRadius: 20,
+        borderRadius: 22,
         padding: 18,
         borderWidth: 1.5,
         marginBottom: 14,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 18,
         elevation: 6,
     },
     netProfitTopRow: {
@@ -998,7 +1020,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingVertical: 3.5,
         borderRadius: 10,
         gap: 4,
     },
@@ -1008,10 +1030,10 @@ const styles = StyleSheet.create({
         letterSpacing: 0.4,
     },
     netProfitLabel: {
-        color: C.textMuted,
+        color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 10,
         fontWeight: '800',
-        letterSpacing: 0.8,
+        letterSpacing: 1,
     },
     netProfitValue: {
         fontSize: 28,
@@ -1025,7 +1047,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // 4 Metrics Grid
+    // 4 Metrics Grid (Crisp White on Light Slate)
     metricsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -1035,45 +1057,55 @@ const styles = StyleSheet.create({
     metricCard: {
         width: (width - 42) / 2,
         backgroundColor: C.cardBg,
-        borderRadius: 16,
-        padding: 12,
+        borderRadius: 18,
+        padding: 14,
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: C.cardBorder,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
     },
     metricIconWrap: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8,
     },
     metricLabel: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
     },
     metricValue: {
-        color: C.white,
+        color: C.navy,
         fontSize: 15,
         fontWeight: '900',
-        marginVertical: 2,
+        marginVertical: 3,
     },
     metricHint: {
         color: C.textMuted,
-        fontSize: 9,
+        fontSize: 9.5,
         fontWeight: '600',
     },
 
     // Section styling
     sectionContainer: {
         backgroundColor: C.cardBg,
-        borderRadius: 18,
-        padding: 14,
+        borderRadius: 20,
+        padding: 16,
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: C.cardBorder,
         marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
     },
     sectionHeaderRow: {
         flexDirection: 'row',
@@ -1081,12 +1113,12 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingBottom: 10,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+        borderBottomColor: '#F1F5F9',
         marginBottom: 10,
     },
     sectionTitle: {
-        color: C.white,
-        fontSize: 12.5,
+        color: C.navy,
+        fontSize: 13,
         fontWeight: '900',
     },
     sectionSubTitle: {
@@ -1101,24 +1133,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+        borderBottomColor: '#F8FAFC',
     },
     serviceIconCircle: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: C.goldBg,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: C.goldBorder,
     },
     serviceName: {
-        color: C.white,
-        fontSize: 12,
+        color: C.navy,
+        fontSize: 12.5,
         fontWeight: '800',
     },
     serviceMeta: {
-        color: C.textMuted,
-        fontSize: 9.5,
+        color: C.textSub,
+        fontSize: 10,
         marginTop: 2,
     },
     serviceProfit: {
@@ -1132,6 +1166,8 @@ const styles = StyleSheet.create({
         paddingVertical: 1.5,
         borderRadius: 6,
         marginTop: 2,
+        borderWidth: 0.5,
+        borderColor: C.emeraldBorder,
     },
     serviceMarginText: {
         color: C.emerald,
@@ -1139,35 +1175,37 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 
-    // Quick Add Expense Banner
+    // Quick Add Expense Banner (Navy & Gold Accent)
     quickAddExpenseBanner: {
         marginTop: 14,
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.25)',
+        borderColor: 'rgba(245, 158, 11, 0.35)',
     },
     quickAddExpenseGrad: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
+        padding: 14,
     },
     quickAddIconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         backgroundColor: C.goldBg,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: C.goldBorder,
     },
     quickAddTitle: {
         color: C.white,
-        fontSize: 11.5,
+        fontSize: 12,
         fontWeight: '800',
     },
     quickAddSub: {
-        color: C.textMuted,
-        fontSize: 9,
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 9.5,
         marginTop: 2,
     },
 
@@ -1185,8 +1223,8 @@ const styles = StyleSheet.create({
     addExpenseGrad: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
         gap: 5,
     },
     addExpenseBtnText: {
@@ -1201,18 +1239,18 @@ const styles = StyleSheet.create({
     },
     expFilterPill: {
         paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        paddingVertical: 5,
+        borderRadius: 9,
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: C.cardBorder,
     },
     expFilterPillActive: {
         backgroundColor: C.coralBg,
-        borderColor: C.coral,
+        borderColor: C.coralBorder,
     },
     expFilterText: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 10,
         fontWeight: '700',
     },
@@ -1225,54 +1263,54 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+        borderBottomColor: '#F1F5F9',
     },
     expenseIconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         alignItems: 'center',
         justifyContent: 'center',
     },
     expenseTitle: {
-        color: C.white,
-        fontSize: 11.5,
+        color: C.navy,
+        fontSize: 12,
         fontWeight: '800',
     },
     expenseMeta: {
-        color: C.textMuted,
-        fontSize: 9,
+        color: C.textSub,
+        fontSize: 9.5,
         marginTop: 2,
     },
     expenseNotes: {
         color: C.gold,
-        fontSize: 9,
+        fontSize: 9.5,
         marginTop: 2,
         fontStyle: 'italic',
     },
     expenseAmount: {
         color: C.coral,
-        fontSize: 12.5,
+        fontSize: 13,
         fontWeight: '900',
     },
     deleteExpenseBtn: {
         marginTop: 4,
-        padding: 2,
+        padding: 4,
     },
     emptyBox: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 30,
+        paddingVertical: 32,
     },
     emptyTitle: {
-        color: C.white,
-        fontSize: 12,
+        color: C.navy,
+        fontSize: 12.5,
         fontWeight: '800',
         marginTop: 8,
     },
     emptySub: {
-        color: C.textMuted,
-        fontSize: 10,
+        color: C.textSub,
+        fontSize: 10.5,
         textAlign: 'center',
         marginTop: 4,
         paddingHorizontal: 20,
@@ -1280,12 +1318,12 @@ const styles = StyleSheet.create({
 
     // Breakdown Cards
     breakdownCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        backgroundColor: '#F8FAFC',
         borderRadius: 14,
         padding: 12,
         marginBottom: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.06)',
+        borderColor: C.cardBorder,
     },
     breakdownCardHeader: {
         flexDirection: 'row',
@@ -1294,15 +1332,17 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     breakdownServiceName: {
-        color: C.white,
-        fontSize: 12,
+        color: C.navy,
+        fontSize: 12.5,
         fontWeight: '800',
     },
     breakdownTag: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        paddingHorizontal: 6,
+        backgroundColor: C.goldBg,
+        paddingHorizontal: 7,
         paddingVertical: 2,
         borderRadius: 6,
+        borderWidth: 0.5,
+        borderColor: C.goldBorder,
     },
     breakdownTagText: {
         color: C.gold,
@@ -1317,30 +1357,33 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     breakdownColLabel: {
-        color: C.textMuted,
-        fontSize: 9,
+        color: C.textSub,
+        fontSize: 9.5,
         fontWeight: '700',
     },
     breakdownColVal: {
-        color: C.white,
-        fontSize: 11.5,
+        color: C.navy,
+        fontSize: 12,
         fontWeight: '900',
         marginTop: 2,
     },
 
-    // Modal Styles
+    // Modal Styles (Executive White + Navy & Gold)
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
         justifyContent: 'flex-end',
     },
     modalCard: {
         backgroundColor: C.cardBg,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderTopLeftRadius: 26,
+        borderTopRightRadius: 26,
+        padding: 22,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
     },
     modalHeaderRow: {
         flexDirection: 'row',
@@ -1348,24 +1391,26 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingBottom: 14,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        borderBottomColor: '#F1F5F9',
         marginBottom: 14,
     },
     modalIconWrap: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: C.goldBg,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: C.goldBorder,
     },
     modalTitle: {
-        color: C.white,
-        fontSize: 14,
+        color: C.navy,
+        fontSize: 14.5,
         fontWeight: '900',
     },
     inputLabel: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
@@ -1373,13 +1418,13 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     textInput: {
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderColor: '#CBD5E1',
         borderRadius: 12,
         paddingHorizontal: 12,
         paddingVertical: 10,
-        color: C.white,
+        color: C.navy,
         fontSize: 13,
         fontWeight: '600',
     },
@@ -1395,16 +1440,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: C.cardBorder,
     },
     catOptionSelected: {
         backgroundColor: C.goldBg,
-        borderColor: C.gold,
+        borderColor: C.goldBright,
     },
     catOptionText: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 9.5,
         fontWeight: '700',
     },
@@ -1421,16 +1466,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: C.border,
+        borderColor: C.cardBorder,
     },
     payMethodPillActive: {
-        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        backgroundColor: C.blueBg,
         borderColor: C.blue,
     },
     payMethodText: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 10,
         fontWeight: '700',
     },
@@ -1447,12 +1492,14 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: C.cardBorder,
     },
     modalCancelText: {
-        color: C.textMuted,
+        color: C.textSub,
         fontSize: 12,
         fontWeight: '700',
     },
@@ -1469,7 +1516,7 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     modalSaveText: {
-        color: C.navyDark,
+        color: C.white,
         fontSize: 12.5,
         fontWeight: '900',
     },

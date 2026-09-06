@@ -548,7 +548,7 @@ export const generateProfitLossPDF = async (
 
                 <div class="net-box">
                     <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: ${isNetProfitable ? '#16A34A' : '#DC2626'}">
-                        ${isNetProfitable ? 'NET PROFIT (RIBA TA ASALI)' : 'NET LOSS'}
+                        ${isNetProfitable ? 'NET OPERATING PROFIT' : 'NET OPERATING DEFICIT'}
                     </div>
                     <div class="net-val">${formatNaira(metrics.netProfit)}</div>
                     <div style="font-size: 11px; color: #64748B; margin-top: 4px;">
@@ -566,7 +566,7 @@ export const generateProfitLossPDF = async (
                         <div class="kpi-val" style="color: #64748B">${formatNaira(metrics.totalCost)}</div>
                     </div>
                     <div class="kpi-box">
-                        <div class="kpi-label">Gross Profit (Riba)</div>
+                        <div class="kpi-label">Gross Profit</div>
                         <div class="kpi-val" style="color: #10B981">${formatNaira(metrics.grossProfit)}</div>
                     </div>
                     <div class="kpi-box">
@@ -583,7 +583,7 @@ export const generateProfitLossPDF = async (
                             <th class="num">Txns</th>
                             <th class="num">Revenue</th>
                             <th class="num">Cost of Sales</th>
-                            <th class="num">Profit (Riba)</th>
+                            <th class="num">Profit</th>
                             <th class="num">Margin</th>
                         </tr>
                     </thead>
@@ -603,7 +603,7 @@ export const generateProfitLossPDF = async (
                     </tbody>
                 </table>
 
-                <h4 style="margin-bottom: 6px; font-size: 13px;">Recent Operational Expenses (Kashe-kashe)</h4>
+                <h4 style="margin-bottom: 6px; font-size: 13px;">Recent Operating Expenditures</h4>
                 <table>
                     <thead>
                         <tr>

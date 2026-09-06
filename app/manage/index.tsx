@@ -106,7 +106,7 @@ const MODS = {
 
 const QUICK = [
   { l:'Master Hub',  i:'ribbon',           r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
-  { l:'Riba & Expenses', i:'calculator',   r:'/manage/accounting',     c:G,  b:GL,  tag:'Super', sup:true },
+  { l:'Profits & Expenses', i:'calculator', r:'/manage/accounting',     c:G,  b:GL,  tag:'Super', sup:true },
   { l:'Audit Logs',  i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
   { l:'Users',       i:'people',           r:'/manage/users',          c:G,  b:GL },
   { l:'Liquidity',   i:'wallet',           r:'/manage/liquidity',      c:N,  b:NL },
