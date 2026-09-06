@@ -52,13 +52,76 @@ export default function WalletScreen() {
     const [userEmail, setUserEmail] = useState('');
     const [currentUserId, setCurrentUserId] = useState('');
     const [verifyingPayment, setVerifyingPayment] = useState(false);
-    const [verifyStatusText, setVerifyStatusText] = useState('Tabbatar da biya...');
+    const [verifyStatusText, setVerifyStatusText] = useState('Verifying payment...');
+
+    // Verified Success Confirmation Modal
+    const [cardSuccessModalVisible, setCardSuccessModalVisible] = useState(false);
+    const [cardSuccessDetails, setCardSuccessDetails] = useState<{
+        amount: number;
+        grossAmount?: number;
+        fee?: number;
+        newBalance: number;
+        reference: string;
+        date: string;
+    } | null>(null);
 
     useEffect(() => {
         if (!settingsLoading) {
             setShowBalance(!settings.hide_user_balances);
         }
     }, [settingsLoading, settings.hide_user_balances]);
+
+    // Live Realtime Postgres Listener for Instant Wallet Balance & Transactions Update
+    useEffect(() => {
+        let profileChannel: any = null;
+        let isMounted = true;
+
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user && isMounted) {
+                profileChannel = supabase.channel(`wallet-realtime-${user.id}`)
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'profiles',
+                        filter: `id=eq.${user.id}`
+                    }, (payload: any) => {
+                        if (payload.new && payload.new.balance !== undefined) {
+                            const newBal = parseFloat(String(payload.new.balance));
+                            console.log('[Wallet Live] Instant balance update:', newBal);
+                            setBalance(newBal);
+                            if (Platform.OS !== 'web') {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            }
+                        }
+                    })
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'transactions',
+                        filter: `user_id=eq.${user.id}`
+                    }, (payload: any) => {
+                        if (payload.new) {
+                            console.log('[Wallet Live] Instant transaction detected:', payload.new);
+                            setRecentTransactions(prev => [payload.new, ...prev.filter(t => t.id !== payload.new.id).slice(0, 3)]);
+                            if (payload.new.type === 'deposit') {
+                                setTotalIn(prev => prev + (parseFloat(payload.new.amount) || 0));
+                                if (Platform.OS !== 'web') {
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                }
+                            }
+                        }
+                    })
+                    .subscribe();
+            }
+        });
+
+        return () => {
+            isMounted = false;
+            if (profileChannel) {
+                supabase.removeChannel(profileChannel);
+            }
+        };
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
@@ -81,17 +144,42 @@ export default function WalletScreen() {
                 supabase.from('app_settings').select('key, value').in('key', ['funding_fee_fixed_threshold', 'funding_fee_under_threshold', 'funding_fee_above_threshold'])
             ]);
 
-            setUserEmail(user.email || '');
+            const fallbackEmail = user.email || (user.phone ? `${user.phone.replace(/\D/g, '')}@abumafhalsub.com.ng` : 'customer@abumafhalsub.com.ng');
+            setUserEmail(fallbackEmail);
 
             let finalKey = '';
+            // 1. Try system_secrets (works for admins)
             const { data: paystackDbKey } = await supabase.from('system_secrets').select('value').eq('key', 'PAYSTACK_PUBLIC_KEY').maybeSingle();
 
             if (paystackDbKey && paystackDbKey.value && paystackDbKey.value.length > 10) {
                 finalKey = paystackDbKey.value.trim();
             } else {
+                // 2. Try app_settings (publicly accessible by all authenticated users)
+                const { data: appKey } = await supabase.from('app_settings').select('value').in('key', ['paystack_public_key', 'PAYSTACK_PUBLIC_KEY']).maybeSingle();
+                if (appKey && appKey.value && appKey.value.length > 10) {
+                    finalKey = appKey.value.trim();
+                }
+            }
+
+            if (!finalKey) {
+                // 3. Try envKey
                 const envKey = process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY;
                 if (envKey && envKey.length > 10 && !envKey.includes('...')) {
                     finalKey = envKey.trim();
+                }
+            }
+
+            if (!finalKey) {
+                // 4. Try edge function payment-webhook get_paystack_public_key (bypasses RLS)
+                try {
+                    const { data: edgeKeyRes } = await supabase.functions.invoke('payment-webhook', {
+                        body: { action: 'get_paystack_public_key' }
+                    });
+                    if (edgeKeyRes?.publicKey && edgeKeyRes.publicKey.length > 10) {
+                        finalKey = edgeKeyRes.publicKey.trim();
+                    }
+                } catch (e) {
+                    console.warn('[Wallet] Public key fetch edge error:', e);
                 }
             }
 
@@ -242,13 +330,13 @@ export default function WalletScreen() {
         try {
             setPaystackVisible(false);
             setVerifyingPayment(true);
-            setVerifyStatusText('Muna tabbatar da kudi tare da Paystack...');
+            setVerifyStatusText('Verifying payment with Paystack...');
 
             const reference = response?.reference || response?.trxref || response?.transaction;
             console.log('[Paystack] Payment client success callback, reference:', reference);
 
             if (!reference) {
-                Alert.alert("Sanarwa", "An kammala biya. Da fatan za a duba wallet bayan 'yan dakiku.");
+                Alert.alert("Notice", "Payment completed. Please check your wallet balance in a few moments.");
                 await fetchWalletData();
                 return;
             }
@@ -268,9 +356,9 @@ export default function WalletScreen() {
             if (error) {
                 console.error('[Paystack] Verification invoke error:', error);
                 Alert.alert(
-                    "Ana Kan Aiki",
-                    "An karɓi biyan ku daga banki. Tsarin zai saka kudin a wallet dinku ta atomatik ta webhook.",
-                    [{ text: "To", onPress: () => fetchWalletData() }]
+                    "Processing Payment",
+                    "Your payment has been received from your bank. Your wallet will be credited automatically.",
+                    [{ text: "OK", onPress: () => fetchWalletData() }]
                 );
                 return;
             }
@@ -279,28 +367,35 @@ export default function WalletScreen() {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
-                const creditedAmount = data.amount !== undefined ? data.amount : fundAmount;
-                const newBalMsg = data.new_balance !== undefined ? `\nSabon Balance: ₦${Number(data.new_balance).toLocaleString()}` : '';
-                Alert.alert(
-                    "An Saka Kuɗi A Wallet! 🎉",
-                    `An yi nasarar tabbatarwa tare da saka ₦${Number(creditedAmount).toLocaleString()} a cikin wallet ɗinku.${newBalMsg}`,
-                    [{ text: "Madalla", onPress: () => fetchWalletData() }]
-                );
+                const creditedAmount = data.amount !== undefined ? Number(data.amount) : (Number(fundAmount) || 0);
+                const grossAmt = data.gross_amount !== undefined ? Number(data.gross_amount) : (Number(fundAmount) || 0);
+                const feeVal = data.fee !== undefined ? Number(data.fee) : 0;
+                const finalBal = data.new_balance !== undefined ? Number(data.new_balance) : (balance + creditedAmount);
+
+                setCardSuccessDetails({
+                    amount: creditedAmount,
+                    grossAmount: grossAmt,
+                    fee: feeVal,
+                    newBalance: finalBal,
+                    reference: String(data.reference || reference),
+                    date: new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
+                });
+                setCardSuccessModalVisible(true);
                 setFundAmount('');
                 await fetchWalletData();
             } else {
                 Alert.alert(
-                    "Sanarwa",
-                    data?.message || "Ba a kammala tabbatarwa ba tukuna. Idan an cire kudin a banki, za a zuba shi ta atomatik.",
-                    [{ text: "To", onPress: () => fetchWalletData() }]
+                    "Payment Notice",
+                    data?.message || "Payment verification is pending. If your account was debited, your wallet will be credited automatically.",
+                    [{ text: "OK", onPress: () => fetchWalletData() }]
                 );
             }
         } catch (err: any) {
             console.error('[Paystack] Verification catch error:', err);
             Alert.alert(
-                "Sanarwa",
-                "Kudin ku ya fita. Tsarin zai saka shi a wallet ta atomatik cikin kankanin lokaci.",
-                [{ text: "To", onPress: () => fetchWalletData() }]
+                "Payment Notice",
+                "Payment received. Your wallet balance will be updated automatically in a few moments.",
+                [{ text: "OK", onPress: () => fetchWalletData() }]
             );
             await fetchWalletData();
         } finally {
@@ -743,7 +838,7 @@ export default function WalletScreen() {
                                 </Text>
 
                                 <View style={s.amountInputContainer}>
-                                    <Text style={s.amountInputHeader}>FUNDING AMOUNT</Text>
+                                    <Text style={s.amountInputHeader}>FUNDING AMOUNT (NGN)</Text>
                                     <View style={s.amountInputFlexRow}>
                                         <Text style={s.currencyPrefix}>₦</Text>
                                         <TextInput
@@ -766,7 +861,7 @@ export default function WalletScreen() {
 
                                         <View style={s.liveCalcRow}>
                                             <Text style={s.liveCalcLabel}>
-                                                Deposit Fee ({parseFloat(fundAmount) < feeThreshold ? `Fixed ₦${feeUnder}` : `${feeAbove}%`}):
+                                                Processing Fee ({parseFloat(fundAmount) < feeThreshold ? `Fixed ₦${feeUnder}` : `${feeAbove}%`}):
                                             </Text>
                                             <Text style={{ color: '#EF4444', fontSize: 10.5, fontWeight: '700' }}>
                                                 -₦{(parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100)).toLocaleString()}
@@ -776,7 +871,7 @@ export default function WalletScreen() {
                                         <View style={s.liveCalcDivider} />
 
                                         <View style={[s.liveCalcRow, { marginTop: 2 }]}>
-                                            <Text style={s.liveCalcNetLabel}>Net Credit:</Text>
+                                            <Text style={s.liveCalcNetLabel}>Net Amount to Wallet:</Text>
                                             <Text style={s.liveCalcNetVal}>
                                                 ₦{Math.max(0, parseFloat(fundAmount) - (parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100))).toLocaleString()}
                                             </Text>
@@ -785,13 +880,28 @@ export default function WalletScreen() {
                                 )}
 
                                 <TouchableOpacity
-                                    onPress={() => {
-                                        if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) < 100) {
+                                    onPress={async () => {
+                                        const numAmt = parseFloat(fundAmount);
+                                        if (!fundAmount || isNaN(numAmt) || numAmt < 100) {
                                             Alert.alert("Invalid Amount", "Please enter an amount of at least ₦100.");
                                             return;
                                         }
                                         if (!paystackKey) {
-                                            Alert.alert("Configuration Error", "Paystack public key is not configured.");
+                                            // Quick fallback fetch if key was still loading
+                                            try {
+                                                const { data: edgeRes } = await supabase.functions.invoke('payment-webhook', {
+                                                    body: { action: 'get_paystack_public_key' }
+                                                });
+                                                if (edgeRes?.publicKey && edgeRes.publicKey.length > 10) {
+                                                    setPaystackKey(edgeRes.publicKey.trim());
+                                                    setPaystackVisible(true);
+                                                    setFundModalVisible(false);
+                                                    return;
+                                                }
+                                            } catch (e) {
+                                                console.warn("Key retry notice:", e);
+                                            }
+                                            Alert.alert("Connection Error", "Paystack public key is not available right now. Please try again or contact support.");
                                             return;
                                         }
                                         setPaystackVisible(true);
@@ -800,7 +910,7 @@ export default function WalletScreen() {
                                     style={s.submitPayBtn}
                                     activeOpacity={0.85}
                                 >
-                                    <Text style={s.submitPayBtnText}>Proceed to Pay ₦{fundAmount || '0.00'}</Text>
+                                    <Text style={s.submitPayBtnText}>Pay with Card • ₦{fundAmount || '0.00'}</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -813,11 +923,11 @@ export default function WalletScreen() {
                 <PaystackPayment
                     visible={paystackVisible}
                     amount={Number(fundAmount)}
-                    email={userEmail || 'user@example.com'}
+                    email={userEmail || 'customer@abumafhalsub.com.ng'}
                     userId={currentUserId}
                     publicKey={paystackKey}
                     onSuccess={handlePaystackSuccess}
-                    onCancel={() => Alert.alert("An Soke Biya", "An fasa biyan kudin.")}
+                    onCancel={() => Alert.alert("Payment Cancelled", "You cancelled the payment. Your account was not charged.")}
                     onClose={() => setPaystackVisible(false)}
                 />
             )}
@@ -833,14 +943,136 @@ export default function WalletScreen() {
                         <View style={s.verifyIconCircle}>
                             <ActivityIndicator size="large" color="#F59E0B" />
                         </View>
-                        <Text style={s.verifyTitle}>Tabbatar Da Biya...</Text>
+                        <Text style={s.verifyTitle}>Verifying Payment...</Text>
                         <Text style={s.verifySub}>
-                            {verifyStatusText || 'Muna tabbatar da biyan ku daga Paystack tare da zuba kudin a wallet dinku nan take...'}
+                            {verifyStatusText || 'Verifying your payment with Paystack and crediting your wallet instantly...'}
                         </Text>
                         <View style={s.verifyWarningBadge}>
                             <Ionicons name="shield-checkmark" size={15} color="#10B981" />
-                            <Text style={s.verifyWarningText}>Kada ku rufe app din har sai an gama</Text>
+                            <Text style={s.verifyWarningText}>Please do not close the app while verification is in progress</Text>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ── HIGH DEFINITION CARD SUCCESS RECEIPT MODAL ───────── */}
+            <Modal
+                visible={cardSuccessModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setCardSuccessModalVisible(false)}
+            >
+                <View style={s.verifyModalBackdrop}>
+                    <View style={[s.verifyModalCard, { maxWidth: 360, padding: 22, backgroundColor: '#FFFFFF', borderColor: '#10B981', borderWidth: 2 }]}>
+                        {/* Success Icon Circle */}
+                        <View style={{
+                            width: 68,
+                            height: 68,
+                            borderRadius: 34,
+                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 12,
+                            borderWidth: 2,
+                            borderColor: '#10B981'
+                        }}>
+                            <Ionicons name="checkmark-circle" size={44} color="#10B981" />
+                        </View>
+
+                        {/* Title & Badge */}
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A', textAlign: 'center' }}>
+                            Wallet Credited Successfully! 🎉
+                        </Text>
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            paddingHorizontal: 10,
+                            paddingVertical: 3,
+                            borderRadius: 12,
+                            marginTop: 6,
+                            marginBottom: 12
+                        }}>
+                            <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+                            <Text style={{ color: '#10B981', fontSize: 10.5, fontWeight: '800' }}>
+                                Payment Verified
+                            </Text>
+                        </View>
+
+                        {/* Amount Banner */}
+                        <View style={{
+                            width: '100%',
+                            backgroundColor: '#F8FAFC',
+                            borderRadius: 14,
+                            padding: 12,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            alignItems: 'center',
+                            marginBottom: 12
+                        }}>
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                Net Amount Credited
+                            </Text>
+                            <Text style={{ fontSize: 24, fontWeight: '900', color: '#10B981', marginTop: 2 }}>
+                                ₦{Number(cardSuccessDetails?.amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Text>
+                        </View>
+
+                        {/* Transaction Receipt Breakdown Table */}
+                        <View style={{ width: '100%', backgroundColor: '#F8FAFC', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                            {cardSuccessDetails?.grossAmount && cardSuccessDetails.grossAmount > (cardSuccessDetails.amount || 0) && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                                    <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '600' }}>Total Amount Paid:</Text>
+                                    <Text style={{ fontSize: 10.5, color: '#0F172A', fontWeight: '800' }}>₦{Number(cardSuccessDetails.grossAmount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                </View>
+                            )}
+                            {cardSuccessDetails?.fee !== undefined && cardSuccessDetails.fee > 0 && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                                    <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '600' }}>Deposit Fee:</Text>
+                                    <Text style={{ fontSize: 10.5, color: '#EF4444', fontWeight: '800' }}>-₦{Number(cardSuccessDetails.fee).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                </View>
+                            )}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                                <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '600' }}>New Wallet Balance:</Text>
+                                <Text style={{ fontSize: 10.5, color: '#0F172A', fontWeight: '800' }}>₦{Number(cardSuccessDetails?.newBalance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                                <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '600' }}>Transaction Reference:</Text>
+                                <Text style={{ fontSize: 10, color: '#0F172A', fontWeight: '700' }} numberOfLines={1}>{cardSuccessDetails?.reference || 'N/A'}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '600' }}>Date:</Text>
+                                <Text style={{ fontSize: 10, color: '#0F172A', fontWeight: '700' }}>{cardSuccessDetails?.date || new Date().toLocaleDateString()}</Text>
+                            </View>
+                        </View>
+
+                        {/* Action Buttons */}
+                        <TouchableOpacity
+                            onPress={() => setCardSuccessModalVisible(false)}
+                            style={{
+                                width: '100%',
+                                height: 42,
+                                backgroundColor: '#10B981',
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: 6
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900' }}>Done</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                setCardSuccessModalVisible(false);
+                                router.push('/(app)/history');
+                            }}
+                            style={{ paddingVertical: 6 }}
+                        >
+                            <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '700' }}>View Transaction History</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>

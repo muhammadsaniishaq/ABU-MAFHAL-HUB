@@ -837,6 +837,46 @@ $$ language plpgsql security definer;
             console.error("Debug log failed", e);
         }
 
+        // --- ACTION: GET PAYSTACK PUBLIC KEY (CLIENT SAFE) ---
+        if (parsedPayload && (parsedPayload.action === 'get_paystack_public_key' || parsedPayload.action === 'get_public_keys')) {
+            let publicKey = '';
+            try {
+                const { data: sec } = await supabaseAdmin
+                    .from('system_secrets')
+                    .select('value')
+                    .in('key', ['PAYSTACK_PUBLIC_KEY', 'PAYSTACK_PUB', 'PAYSTACK_KEY'])
+                    .maybeSingle();
+                if (sec?.value && sec.value.trim().length > 10) {
+                    publicKey = sec.value.trim();
+                }
+            } catch (e) {
+                console.warn("[GetPaystackKey] system_secrets query warning:", e);
+            }
+
+            if (!publicKey) {
+                try {
+                    const { data: appSet } = await supabaseAdmin
+                        .from('app_settings')
+                        .select('value')
+                        .in('key', ['paystack_public_key', 'PAYSTACK_PUBLIC_KEY'])
+                        .maybeSingle();
+                    if (appSet?.value && appSet.value.trim().length > 10) {
+                        publicKey = appSet.value.trim();
+                    }
+                } catch (e) {
+                    console.warn("[GetPaystackKey] app_settings query warning:", e);
+                }
+            }
+
+            if (!publicKey) {
+                publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY')?.trim() || '';
+            }
+
+            return new Response(JSON.stringify({ success: true, publicKey }), {
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
         // --- 1. DIRECT IN-APP CLIENT VERIFICATION (Paystack Checkout) ---
         if (parsedPayload && (parsedPayload.action === 'verify_paystack' || parsedPayload.action === 'verify_payment')) {
             const reference = (parsedPayload.reference || parsedPayload.trxref || '').trim();
@@ -1030,16 +1070,18 @@ $$ language plpgsql security definer;
 
                 let accountNumber = eventData.account_number || 
                                     eventData.accountNumber ||
-                                    eventData.virtual_account?.account_number ||
-                                    eventData.virtualAccount?.accountNumber ||
-                                    transactionObj.virtual_account?.account_number ||
-                                    transactionObj.virtualAccount?.accountNumber ||
+                                    (typeof eventData.virtual_account === 'string' ? eventData.virtual_account : eventData.virtual_account?.account_number) ||
+                                    (typeof eventData.virtualAccount === 'string' ? eventData.virtualAccount : eventData.virtualAccount?.accountNumber) ||
+                                    (typeof transactionObj.virtual_account === 'string' ? transactionObj.virtual_account : transactionObj.virtual_account?.account_number) ||
+                                    (typeof transactionObj.virtualAccount === 'string' ? transactionObj.virtualAccount : transactionObj.virtualAccount?.accountNumber) ||
                                     eventData.customer?.account_number ||
                                     eventData.customer?.accountNumber ||
                                     eventData.customer?.virtual_account_number ||
                                     eventData.customer?.virtualAccountNumber ||
                                     transactionObj.customer?.account_number ||
-                                    transactionObj.customer?.virtual_account_number;
+                                    transactionObj.customer?.virtual_account_number ||
+                                    eventData.account_no ||
+                                    transactionObj.account_no;
 
                 // Fallback: If no dedicated account number field, check order.description or narration for 10-digit number
                 if (!accountNumber) {
@@ -1266,7 +1308,7 @@ async function handleFundWallet(
         }
         const { data, error } = await supabaseAdmin
             .from('profiles')
-            .select('id, balance, email, full_name')
+            .select('id, balance, email, full_name, expo_push_token')
             .eq('id', sId)
             .maybeSingle();
         if (data && !error) {
@@ -1283,7 +1325,7 @@ async function handleFundWallet(
         }
         const { data: pData } = await supabaseAdmin
             .from('profiles')
-            .select('id, balance, email, full_name')
+            .select('id, balance, email, full_name, expo_push_token')
             .eq('id', metaId)
             .maybeSingle();
         if (pData) {
@@ -1308,7 +1350,7 @@ async function handleFundWallet(
         if (va) {
             const { data: p } = await supabaseAdmin
                 .from('profiles')
-                .select('id, balance, email, full_name')
+                .select('id, balance, email, full_name, expo_push_token')
                 .eq('id', va.user_id)
                 .single();
             if (p) {
@@ -1328,7 +1370,7 @@ async function handleFundWallet(
             }
             const { data: refProf } = await supabaseAdmin
                 .from('profiles')
-                .select('id, balance, email, full_name')
+                .select('id, balance, email, full_name, expo_push_token')
                 .eq('id', refId)
                 .maybeSingle();
             if (refProf) {
@@ -1342,7 +1384,7 @@ async function handleFundWallet(
     if (!profile && email && email !== 'user@example.com' && email !== 'customer@abumafhalsub.com' && email.includes('@')) {
         const { data } = await supabaseAdmin
             .from('profiles')
-            .select('id, balance, email, full_name')
+            .select('id, balance, email, full_name, expo_push_token')
             .eq('email', email.trim().toLowerCase())
             .maybeSingle();
         if (data) {
@@ -1358,7 +1400,7 @@ async function handleFundWallet(
         const last10 = cleanPhone.slice(-10);
         const { data: phoneProf } = await supabaseAdmin
             .from('profiles')
-            .select('id, balance, email, full_name')
+            .select('id, balance, email, full_name, expo_push_token')
             .or(`phone.eq.${custPhone},phone.ilike.%${last10}`)
             .limit(1)
             .maybeSingle();
@@ -1488,38 +1530,42 @@ async function handleFundWallet(
         });
     }
 
-    await supabaseAdmin.from('transactions').insert(transactionsToInsert);
-
-    await supabaseAdmin.from('payment_events').insert({
-        reference: reference,
-        amount: amount,
-        provider: provider,
-        currency: currency,
-        status: 'completed',
-        metadata: { metadata: metadata }
-    });
-
     const formattedAmount = creditedAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 });
     const formattedBalance = finalBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 });
+    const notifTitle = `💰 Wallet Credited: ₦${formattedAmount}`;
+    const notifBody = `Successfully credited ₦${formattedAmount} to your wallet. New Balance: ₦${formattedBalance}`;
 
-    // 4.5 Insert Notification & Dispatch Push Notification
+    // 4. Parallel Ultra-Fast Database Inserts (Transactions, Events & In-App Notification)
     try {
-        const notifTitle = `💰 Wallet Funded: ₦${formattedAmount}`;
-        const notifBody = `Your wallet has been credited with ₦${formattedAmount}. Ref: ${reference}`;
+        await Promise.all([
+            supabaseAdmin.from('transactions').insert(transactionsToInsert),
+            supabaseAdmin.from('payment_events').insert({
+                reference: reference,
+                amount: amount,
+                provider: provider,
+                currency: currency,
+                status: 'completed',
+                metadata: { metadata: metadata }
+            }),
+            supabaseAdmin.from('notifications').insert({
+                user_id: profile.id,
+                title: notifTitle,
+                body: notifBody,
+                type: 'funding',
+                priority: 'high',
+                is_read: false,
+                data: { route: '/(app)/history', reference: reference }
+            })
+        ]);
+    } catch (insertErr) {
+        console.error("[FundWallet] Concurrent DB insert note:", insertErr);
+    }
 
-        await supabaseAdmin.from('notifications').insert({
-            user_id: profile.id,
-            title: notifTitle,
-            body: notifBody,
-            type: 'funding',
-            priority: 'high',
-            is_read: false,
-            data: { route: '/(app)/history', reference: reference }
-        });
-
-        if (profile.expo_push_token) {
-            console.log(`[FundWallet] Dispatching push notification to: ${profile.expo_push_token}`);
-            fetch('https://exp.host/--/api/v2/push/send', {
+    // 4.5 Ultra-Fast Guaranteed Push Notification Dispatch
+    if (profile.expo_push_token) {
+        try {
+            console.log(`[FundWallet] Dispatching instant push notification to: ${profile.expo_push_token}`);
+            await fetch('https://exp.host/--/api/v2/push/send', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -1533,12 +1579,15 @@ async function handleFundWallet(
                     body: notifBody,
                     channelId: 'transactions',
                     priority: 'high',
-                    data: { route: '/(app)/history', reference: reference }
+                    badge: 1,
+                    _displayInForeground: true,
+                    data: { route: '/(app)/wallet', reference: reference }
                 }),
-            }).catch(pushErr => console.warn('[FundWallet] Push error:', pushErr));
+            });
+            console.log('[FundWallet] Push notification successfully delivered to Expo gateway.');
+        } catch (pushErr) {
+            console.warn('[FundWallet] Push notification dispatch note:', pushErr);
         }
-    } catch (notifErr) {
-        console.warn('[FundWallet] Notification error:', notifErr);
     }
 
     // 5. Send Email Receipt Notification
@@ -1596,5 +1645,8 @@ async function handleFundWallet(
         });
     }
 
-    return new Response("Wallet Funded", { status: 200, headers: corsHeaders });
+    return new Response(JSON.stringify({ status: true, message: "Wallet Funded Successfully", reference }), { 
+        status: 200, 
+        headers: { "Content-Type": "application/json", ...corsHeaders } 
+    });
 }

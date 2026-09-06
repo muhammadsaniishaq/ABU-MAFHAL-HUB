@@ -99,7 +99,7 @@ export default function PaystackPayment({ visible, amount, email, userId, public
                     }
                 }
             </script>
-            <script src="https://js.paystack.co/v1/inline.js" onload="payWithPaystack()" onerror="updateStatus('Failed to load Paystack script. Check internet.', true)"></script>
+            <script src="https://js.paystack.co/v1/inline.js" onload="payWithPaystack()" onerror="updateStatus('Failed to load Paystack script. Please check your internet connection.', true)"></script>
         </body>
       </html>
     `;
@@ -150,7 +150,7 @@ export default function PaystackPayment({ visible, amount, email, userId, public
         <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
             <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: 'white', zIndex: 10 }}>
-                    <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#1E293B' }}>Complete Payment</Text>
+                    <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#1E293B' }}>Complete Payment (Paystack)</Text>
                     <TouchableOpacity onPress={onClose} style={{ padding: 8, backgroundColor: '#F3F4F6', borderRadius: 999 }}>
                         <Ionicons name="close" size={24} color="#333" />
                     </TouchableOpacity>
