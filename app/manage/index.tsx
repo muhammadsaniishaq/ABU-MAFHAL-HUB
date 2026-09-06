@@ -67,6 +67,7 @@ const MODS = {
     { t:'Rates',           i:'stats-chart',      r:'/manage/rates',          c:G,  b:GL,  tag:'Live' },
   ],
   finance: [
+    { t:'Profit & Expenses', i:'calculator',     r:'/manage/accounting',     c:G,  b:GL,  tag:'Super', sup:true },
     { t:'Risk Control',    i:'alert-circle',     r:'/manage/risk',           c:N,  b:NL },
     { t:'Analytics',       i:'bar-chart',        r:'/manage/reports',        c:G,  b:GL },
     { t:'Comms Center',    i:'megaphone',        r:'/manage/communications', c:N,  b:NL },
@@ -105,6 +106,7 @@ const MODS = {
 
 const QUICK = [
   { l:'Master Hub',  i:'ribbon',           r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
+  { l:'Riba & Expenses', i:'calculator',   r:'/manage/accounting',     c:G,  b:GL,  tag:'Super', sup:true },
   { l:'Audit Logs',  i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
   { l:'Users',       i:'people',           r:'/manage/users',          c:G,  b:GL },
   { l:'Liquidity',   i:'wallet',           r:'/manage/liquidity',      c:N,  b:NL },
@@ -206,7 +208,7 @@ export default function AdminDashboard() {
   MODS.operations[2].badge = counts.kyc;
   MODS.operations[7].badge = counts.tickets;
 
-  const isSuper = profile?.role==='super_admin';
+  const isSuper = profile?.role==='super_admin' || profile?.email==='sale.abumafhal@gmail.com' || profile?.email==='abumafhal@gmail.com';
   const isAdmin = isSuper || profile?.role==='admin';
   const visibleTabs = TABS.filter(t=>!t.sup||isSuper);
 

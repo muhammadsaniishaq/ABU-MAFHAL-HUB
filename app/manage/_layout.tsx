@@ -167,6 +167,7 @@ export default function AdminLayout() {
             <Stack.Screen name="cards" options={{ title: 'Card Issuer' }} />
             <Stack.Screen name="lending" options={{ title: 'Lending HQ' }} />
             <Stack.Screen name="wealth" options={{ title: 'Wealth & Assets' }} />
+            <Stack.Screen name="accounting" options={{ title: 'Profit & Expense Ledger' }} />
         </Stack>
     );
 }
