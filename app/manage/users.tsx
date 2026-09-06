@@ -1107,14 +1107,12 @@ Metadata:
                         }
 
                         setUsers(prev => prev.filter(u => u.id !== targetId));
-                        setFilteredUsers(prev => prev.filter(u => u.id !== targetId));
                         setSelectedUser(null);
                         Alert.alert("Deleted Successfully", "User has been permanently deleted from the system.");
                         fetchUsers();
                     } catch (err: any) {
                         console.error("Delete user error:", err);
                         setUsers(prev => prev.filter(u => u.id !== targetId));
-                        setFilteredUsers(prev => prev.filter(u => u.id !== targetId));
                         setSelectedUser(null);
                         Alert.alert("Notice", err?.message || "User removed.");
                     } finally {
