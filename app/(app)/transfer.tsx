@@ -33,6 +33,7 @@ import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import SecurityModal from '../../components/SecurityModal';
 import DynamicBanners from '../../components/DynamicBanners';
+import { createAppNotification } from '../../services/notificationsHelper';
 
 export interface BankItem {
     id: string;
@@ -331,6 +332,7 @@ export default function TransferScreen() {
 
     // Balance States
     const [currentUserId, setCurrentUserId] = useState<string>('');
+    const [currentUserName, setCurrentUserName] = useState<string>('');
     const [userBalance, setUserBalance] = useState<number>(0);
     const [showBalance, setShowBalance] = useState(true);
     const [loadingBalance, setLoadingBalance] = useState(false);
@@ -449,11 +451,12 @@ export default function TransferScreen() {
                 setCurrentUserId(user.id);
                 const { data } = await supabase
                     .from('profiles')
-                    .select('balance')
+                    .select('balance, full_name')
                     .eq('id', user.id)
                     .single();
                 if (data) {
                     setUserBalance(Number(data.balance) || 0);
+                    if (data.full_name) setCurrentUserName(data.full_name);
                 }
                 fetchTransferHistory(user.id);
             }
@@ -735,8 +738,40 @@ export default function TransferScreen() {
                 const newBal = data?.new_balance ?? Math.max(0, userBalance - currentAmount);
                 setUserBalance(newBal);
 
+                const p2pRef = data?.reference || `TRF-P2P-${Date.now()}`;
+
+                // Instant Push Notification for Sender (Debit Alert)
+                createAppNotification(
+                    currentUserId,
+                    `Debit Alert: ₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                    `₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} transferred to ${matchedUser!.full_name}. New Balance: ₦${newBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                    'transfer',
+                    'high',
+                    { type: 'p2p_debit', amount: currentAmount, recipient: matchedUser!.full_name, reference: p2pRef }
+                );
+
+                // Instant Notification for Recipient (Credit Alert)
+                if (matchedUser?.id) {
+                    createAppNotification(
+                        matchedUser.id,
+                        `Credit Alert: ₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                        `You received ₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} from ${currentUserName || 'Abu Mafhal Hub User'}.`,
+                        'transfer',
+                        'high',
+                        { type: 'p2p_credit', amount: currentAmount, sender: currentUserName, reference: p2pRef }
+                    );
+                }
+
+                // Immediately sync balance with database
+                try {
+                    const { data: prof } = await supabase.from('profiles').select('balance').eq('id', currentUserId).maybeSingle();
+                    if (prof && prof.balance !== undefined && prof.balance !== null) {
+                        setUserBalance(Number(prof.balance));
+                    }
+                } catch (_) {}
+
                 setLastTxDetails({
-                    reference: data?.reference || `TRF-P2P-${Date.now()}`,
+                    reference: p2pRef,
                     sessionId: data?.reference,
                     status: 'SUCCESSFUL',
                     amount: currentAmount,
@@ -777,6 +812,35 @@ export default function TransferScreen() {
                 const finalNewBal = data?.new_balance ?? Math.max(0, userBalance - currentTotalDebit);
                 setUserBalance(finalNewBal);
 
+                const bankTxRef = data?.reference || `WTH-${Date.now()}`;
+
+                // Instant Push Notification for Sender (Debit Alert with Sound & Drop-Down Banner)
+                createAppNotification(
+                    currentUserId,
+                    `Debit Alert: ₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                    `₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} sent to ${accountName.trim()} (${selectedBank!.name}). New Balance: ₦${finalNewBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                    'transfer',
+                    'high',
+                    {
+                        type: 'bank_debit',
+                        amount: currentAmount,
+                        fee: transferFee,
+                        totalDebit: currentTotalDebit,
+                        recipient: accountName.trim(),
+                        bank: selectedBank!.name,
+                        accountNumber: accountNumber.trim(),
+                        reference: bankTxRef
+                    }
+                );
+
+                // Immediately sync balance with database
+                try {
+                    const { data: prof } = await supabase.from('profiles').select('balance').eq('id', currentUserId).maybeSingle();
+                    if (prof && prof.balance !== undefined && prof.balance !== null) {
+                        setUserBalance(Number(prof.balance));
+                    }
+                } catch (_) {}
+
                 // Save to recent beneficiaries
                 await saveRecentBeneficiary(accountNumber.trim(), accountName.trim(), selectedBank!.code, selectedBank!.name);
 
@@ -784,7 +848,7 @@ export default function TransferScreen() {
                 const txSessionId = data?.session_id || data?.reference || undefined;
 
                 setLastTxDetails({
-                    reference: data?.reference || `WTH-${Date.now()}`,
+                    reference: bankTxRef,
                     sessionId: txSessionId,
                     status: txStatus,
                     amount: currentAmount,

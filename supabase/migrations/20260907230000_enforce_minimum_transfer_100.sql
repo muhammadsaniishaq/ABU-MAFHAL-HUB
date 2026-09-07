@@ -1,7 +1,11 @@
 -- Migration: 20260907230000_enforce_minimum_transfer_100.sql
 -- Description: Enforce strict minimum transfer of NGN 100 on bank withdrawals and P2P transfers
 
--- 1. Enforce minimum NGN 100 on execute_user_bank_withdrawal
+-- 1. Drop overloaded signatures and enforce minimum NGN 100 on execute_user_bank_withdrawal
+DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid);
+DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid, numeric);
+DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal;
+
 CREATE OR REPLACE FUNCTION public.execute_user_bank_withdrawal(
   p_amount numeric,
   p_bank_name text,
@@ -25,8 +29,11 @@ begin
     raise exception 'Not authenticated';
   end if;
 
-  if p_user_id is not null and p_user_id != auth.uid() then
-    if current_setting('request.jwt.claims', true)::jsonb->>'role' != 'service_role' and not public.is_admin() then
+  if p_user_id is not null and (auth.uid() is null or p_user_id != auth.uid()) then
+    if coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb->>'role', '') != 'service_role'
+       and coalesce(auth.role(), '') != 'service_role'
+       and current_user not in ('service_role', 'postgres')
+       and not public.is_admin() then
        raise exception 'Unauthorized';
     end if;
   end if;
