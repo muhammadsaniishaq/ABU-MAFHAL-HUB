@@ -1162,15 +1162,23 @@ $$ language plpgsql security definer;
                             .eq('reference', txRef);
                     } catch (_) {}
 
+                    const finalStatus = (trfData.data?.status === 'SUCCESSFUL' || trfData.data?.status === 'success') ? 'SUCCESSFUL' : (trfData.data?.status || 'PENDING');
+                    const sessionId = trfData.data?.complete_message || trfData.data?.reference || flwRef;
+
                     return new Response(JSON.stringify({
                         success: true,
                         dispatched: true,
+                        status: finalStatus,
                         provider: 'flutterwave',
                         new_balance: newBalance,
                         reference: flwRef,
+                        session_id: sessionId,
                         fee: transferFee,
                         total_debit: totalDebit,
-                        message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Flutterwave. Transfer fee: ₦${transferFee.toLocaleString()}.`
+                        bank_name: bankName,
+                        account_number: accountNumber,
+                        account_name: accountName,
+                        message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Flutterwave. Status: ${finalStatus}.`
                     }), {
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
@@ -1299,15 +1307,23 @@ $$ language plpgsql security definer;
                     : Math.max(0, currentWalletBal - totalDebit);
                 const paystackRef = trfData.data?.reference || trfData.data?.transfer_code || internalRef;
 
+                const finalStatus = (trfData.data?.status === 'success' || trfData.data?.status === 'SUCCESSFUL') ? 'SUCCESSFUL' : (trfData.data?.status || 'PENDING');
+                const sessionId = trfData.data?.transfer_code || paystackRef;
+
                 return new Response(JSON.stringify({
                     success: true,
                     dispatched: true,
+                    status: finalStatus,
                     provider: 'paystack',
                     new_balance: newBalance,
                     reference: paystackRef,
+                    session_id: sessionId,
                     fee: transferFee,
                     total_debit: totalDebit,
-                    message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Paystack. Transfer fee: ₦${transferFee.toLocaleString()}.`
+                    bank_name: bankName,
+                    account_number: accountNumber,
+                    account_name: accountName,
+                    message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Paystack. Status: ${finalStatus}.`
                 }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
