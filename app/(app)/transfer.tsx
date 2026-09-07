@@ -693,13 +693,21 @@ export default function TransferScreen() {
             } else {
                 const { data, error } = await supabase.functions.invoke('payment-webhook', {
                     body: {
-                        action: 'disburse_bank_transfer',
+                        action: 'execute_bank_transfer',
+                        userId: currentUserId,
+                        user_id: currentUserId,
+                        bankCode: selectedBank!.code,
                         bank_code: selectedBank!.code,
+                        bankName: selectedBank!.name,
                         bank_name: selectedBank!.name,
+                        accountNumber: accountNumber.trim(),
                         account_number: accountNumber.trim(),
+                        accountName: accountName.trim(),
                         account_name: accountName.trim(),
                         amount: currentAmount,
                         fee: transferFee,
+                        totalDebit: currentTotalDebit,
+                        total_debit: currentTotalDebit,
                         narration: currentNarration || `Transfer to ${accountName.trim()}`,
                         provider: settings?.transfer_provider || 'flutterwave',
                     },

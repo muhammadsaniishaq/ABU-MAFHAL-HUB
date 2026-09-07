@@ -759,7 +759,7 @@ $$ language plpgsql security definer;
         }
 
         // --- ACTION: CHECK FLUTTERWAVE BALANCE & CAPABILITIES ---
-        if (parsedPayload && (parsedPayload.action === 'check_flutterwave_balance' || parsedPayload.action === 'check_flw_balance')) {
+        if (parsedPayload && (parsedPayload.action === 'check_flutterwave_balance' || parsedPayload.action === 'check_flw_balance' || parsedPayload.action === 'check_transfer_balance')) {
             try {
                 const flwSecret = await getFlutterwaveSecret(supabaseAdmin);
                 if (!flwSecret) {
@@ -796,7 +796,7 @@ $$ language plpgsql security definer;
         }
 
         // --- ACTION: RESOLVE NIGERIAN BANK ACCOUNT NAME (FLUTTERWAVE FIRST, PAYSTACK FALLBACK) ---
-        if (parsedPayload && parsedPayload.action === 'resolve_bank_account') {
+        if (parsedPayload && (parsedPayload.action === 'resolve_bank_account' || parsedPayload.action === 'resolve_account')) {
             const accNum = String(parsedPayload.account_number || parsedPayload.accountNumber || '').trim();
             const bankCode = String(parsedPayload.bank_code || parsedPayload.bankCode || '').trim();
 
@@ -902,12 +902,32 @@ $$ language plpgsql security definer;
         }
 
         // --- ACTION: EXECUTE LIVE BANK TRANSFER (FLUTTERWAVE / PAYSTACK) ---
-        if (parsedPayload && parsedPayload.action === 'execute_bank_transfer') {
-            const { userId, amount, bankCode, bankName, accountNumber, accountName, narration } = parsedPayload;
+        if (parsedPayload && (parsedPayload.action === 'execute_bank_transfer' || parsedPayload.action === 'disburse_bank_transfer')) {
+            // Verify and extract authenticated user ID from JWT if available for maximum security
+            let authenticatedUserId: string | null = null;
+            const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                try {
+                    const token = authHeader.replace(/^Bearer\s+/i, '');
+                    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+                    if (user?.id) authenticatedUserId = user.id;
+                } catch (_) {}
+            }
+
+            const userId = authenticatedUserId || parsedPayload.userId || parsedPayload.user_id;
+            const amount = parsedPayload.amount;
+            const bankCode = String(parsedPayload.bankCode || parsedPayload.bank_code || '').trim();
+            const bankName = String(parsedPayload.bankName || parsedPayload.bank_name || 'Nigerian Bank').trim();
+            const accountNumber = String(parsedPayload.accountNumber || parsedPayload.account_number || '').trim();
+            const accountName = String(parsedPayload.accountName || parsedPayload.account_name || 'Valued Recipient').trim();
+            const narration = parsedPayload.narration;
             const numAmount = parseFloat(String(amount));
 
             if (!userId || !numAmount || numAmount <= 0 || !accountNumber || !bankCode) {
-                return new Response(JSON.stringify({ success: false, message: "Incomplete transfer details provided." }), {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: "Incomplete transfer details: user authentication, amount, account number, and bank are required." 
+                }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             }
@@ -932,7 +952,9 @@ $$ language plpgsql security definer;
                 }
             }
 
-            const totalDebit = typeof parsedPayload.totalDebit === 'number' ? parsedPayload.totalDebit : (numAmount + transferFee);
+            const totalDebit = typeof parsedPayload.totalDebit === 'number' 
+                ? parsedPayload.totalDebit 
+                : (typeof parsedPayload.total_debit === 'number' ? parsedPayload.total_debit : (numAmount + transferFee));
 
             // 1. Verify user wallet balance in DB first without debiting yet
             const { data: userProfile, error: profileErr } = await supabaseAdmin
