@@ -8,11 +8,6 @@ const corsHeaders = {
 };
 
 async function getPaystackSecret(supabaseAdmin: SupabaseClient): Promise<string> {
-    const envSecret = Deno.env.get('PAYSTACK_SECRET_KEY')?.trim();
-    if (envSecret && envSecret.length > 10 && !envSecret.includes('...')) {
-        return envSecret;
-    }
-
     try {
         const { data: dbKeys } = await supabaseAdmin
             .from('system_secrets')
@@ -21,8 +16,12 @@ async function getPaystackSecret(supabaseAdmin: SupabaseClient): Promise<string>
 
         if (dbKeys && dbKeys.length > 0) {
             for (const k of dbKeys) {
-                if (k.value && k.value.trim().length > 10 && !k.value.includes('...')) {
-                    return k.value.trim();
+                let val = (k.value || '').trim();
+                if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                    val = val.slice(1, -1).trim();
+                }
+                if (val.length > 10 && !val.includes('...') && (val.startsWith('sk_live') || val.startsWith('sk_test') || val.startsWith('sk_'))) {
+                    return val;
                 }
             }
         }
@@ -33,22 +32,26 @@ async function getPaystackSecret(supabaseAdmin: SupabaseClient): Promise<string>
             .in('key', ['paystack_secret_key', 'PAYSTACK_SECRET_KEY'])
             .maybeSingle();
 
-        if (appSet && appSet.value && appSet.value.trim().length > 10) {
-            return appSet.value.trim();
+        if (appSet && appSet.value) {
+            let val = appSet.value.trim();
+            if (val.length > 10 && !val.includes('...')) {
+                return val;
+            }
         }
     } catch (e) {
         console.warn("[getPaystackSecret] Warning retrieving paystack secret:", e);
+    }
+
+    const envSecret = Deno.env.get('PAYSTACK_SECRET_KEY')?.trim();
+    if (envSecret && envSecret.length > 10 && !envSecret.includes('...')) {
+        return envSecret;
     }
 
     return '';
 }
 
 async function getFlutterwaveSecret(supabaseAdmin: SupabaseClient): Promise<string> {
-    const envSecret = Deno.env.get('FLUTTERWAVE_SECRET_KEY')?.trim();
-    if (envSecret && envSecret.length > 10 && !envSecret.includes('...')) {
-        return envSecret;
-    }
-
+    // 1. Prioritize active database system_secrets (Configured in API Vault)
     try {
         const { data: dbKeys } = await supabaseAdmin
             .from('system_secrets')
@@ -57,23 +60,41 @@ async function getFlutterwaveSecret(supabaseAdmin: SupabaseClient): Promise<stri
 
         if (dbKeys && dbKeys.length > 0) {
             for (const k of dbKeys) {
-                if (k.value && k.value.trim().length > 10 && !k.value.includes('...')) {
-                    return k.value.trim();
+                let val = (k.value || '').trim();
+                if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                    val = val.slice(1, -1).trim();
+                }
+                if (val.length > 10 && !val.includes('...') && (val.startsWith('FLWSECK') || val.startsWith('FLW'))) {
+                    console.log(`[getFlutterwaveSecret] Using system_secrets key (${k.key})`);
+                    return val;
                 }
             }
         }
 
+        // 2. Check app_settings
         const { data: appSet } = await supabaseAdmin
             .from('app_settings')
             .select('value')
             .in('key', ['flutterwave_secret_key', 'FLUTTERWAVE_SECRET_KEY'])
             .maybeSingle();
 
-        if (appSet && appSet.value && appSet.value.trim().length > 10) {
-            return appSet.value.trim();
+        if (appSet && appSet.value) {
+            let val = appSet.value.trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                val = val.slice(1, -1).trim();
+            }
+            if (val.length > 10 && !val.includes('...')) {
+                return val;
+            }
         }
     } catch (e) {
-        console.warn("[getFlutterwaveSecret] Warning retrieving flutterwave secret:", e);
+        console.warn("[getFlutterwaveSecret] Warning retrieving flutterwave secret from DB:", e);
+    }
+
+    // 3. Fallback to Deno env secret if DB has no secret configured
+    const envSecret = Deno.env.get('FLUTTERWAVE_SECRET_KEY')?.trim();
+    if (envSecret && envSecret.length > 10 && !envSecret.includes('...')) {
+        return envSecret;
     }
 
     return '';
