@@ -69,9 +69,8 @@ export default function AppLayout() {
                 <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
                 <Tabs.Screen name="kyc" options={{ href: null }} />
                 <Tabs.Screen name="virtual-cards" options={{ href: null }} />
-                <Tabs.Screen name="transfer" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+                <Tabs.Screen name="transfer" options={{ href: null }} />
                 <Tabs.Screen name="saved-cards" options={{ href: null }} />
-                <Tabs.Screen name="qr-pay" options={{ href: null }} />
                 <Tabs.Screen name="beneficiaries" options={{ href: null }} />
                 <Tabs.Screen name="support" options={{ href: null }} />
                 <Tabs.Screen name="nin-services" options={{ href: null }} />
