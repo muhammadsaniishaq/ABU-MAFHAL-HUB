@@ -1180,8 +1180,11 @@ $$ language plpgsql security definer;
                     const trfData = await trfRes.json();
                     console.log("[Flutterwave Transfer] Dispatch response:", trfData);
 
-                    if (trfData.status !== 'success') {
-                        let errMsg = trfData.message || "Bank payout rejected by Flutterwave. Your wallet was NOT charged.";
+                    // VERIFY THAT FLUTTERWAVE TRULY ACCEPTED AND DISPATCHED THE TRANSFER
+                    const isFlwDispatched = trfRes.ok && trfData.status === 'success' && trfData.data && trfData.data.id && String(trfData.data.status || '').toUpperCase() !== 'FAILED' && String(trfData.data.status || '').toUpperCase() !== 'REJECTED';
+
+                    if (!isFlwDispatched) {
+                        let errMsg = trfData.message || trfData.data?.complete_message || "Bank payout rejected by Flutterwave. Your wallet was NOT charged.";
                         const lowerMsg = errMsg.toLowerCase();
                         if (lowerMsg.includes("ip whitelist") || lowerMsg.includes("whitelisting")) {
                             errMsg = "Flutterwave IP Whitelisting Required: Flutterwave mandates adding an IP to your Whitelist for Transfers. In Flutterwave Dashboard -> Settings -> Whitelisted IP addresses, add your server IP (or 0.0.0.0). Alternatively, switch to Paystack in Admin Settings. Your wallet was NOT charged.";
@@ -1289,7 +1292,7 @@ $$ language plpgsql security definer;
                         supabaseAdmin,
                         userId,
                         `Debit Alert: ₦${numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
-                        `₦${numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} was sent to ${accountName} (${bankName}, ${accountNumber}). Bal: ₦${newBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                        `₦${numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} was sent to ${accountName} (${bankName}). Ref: ${flwRef}`,
                         {
                             type: 'transfer_debit',
                             reference: flwRef,
@@ -1416,7 +1419,10 @@ $$ language plpgsql security definer;
                 const trfData = await trfRes.json();
                 console.log("[Paystack Transfer] Transfer response:", trfData);
 
-                if (!trfData.status) {
+                // VERIFY THAT PAYSTACK TRULY ACCEPTED AND DISPATCHED THE TRANSFER
+                const isPaystackDispatched = trfRes.ok && trfData.status === true && trfData.data && String(trfData.data.status || '').toLowerCase() !== 'failed' && String(trfData.data.status || '').toLowerCase() !== 'rejected';
+
+                if (!isPaystackDispatched) {
                     return new Response(JSON.stringify({
                         success: false,
                         dispatched: false,
@@ -1518,7 +1524,7 @@ $$ language plpgsql security definer;
                     supabaseAdmin,
                     userId,
                     `Debit Alert: ₦${numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
-                    `₦${numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} was sent to ${accountName} (${bankName}, ${accountNumber}). Bal: ₦${newBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                    `₦${numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} was sent to ${accountName} (${bankName}). Ref: ${paystackRef}`,
                     {
                         type: 'transfer_debit',
                         reference: paystackRef,

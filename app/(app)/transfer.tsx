@@ -283,10 +283,6 @@ const generateReceiptHtml = (tx: {
                     <span class="detail-label">Narration / Remark</span>
                     <span class="detail-val">${tx.narration}</span>
                 </div>` : ''}
-                <div class="detail-row">
-                    <span class="detail-label">New Wallet Balance</span>
-                    <span class="detail-val highlight-green">${newBalDisplay}</span>
-                </div>
             </div>
             <div class="barcode-box">
                 <div class="seal-text">&#128274; Authentic Electronic Receipt</div>
@@ -680,23 +676,31 @@ export default function TransferScreen() {
     // Initiate Transfer (Opens confirmation)
     const handleInitiateTransfer = () => {
         if (numAmount <= 0) {
-            Alert.alert('Amount Required', 'Please enter a valid transfer amount.');
+            setErrorModalMessage('Da fatan za a shigar da adadin kuɗin da za a tura (Please enter transfer amount).');
             return;
         }
         if (numAmount < MIN_TRANSFER_AMOUNT) {
-            Alert.alert('Minimum Transfer Amount', `The minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+            setErrorModalMessage(`Mafi ƙarancin transfer shine ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Minimum transfer amount is ₦100.00).`);
             return;
         }
 
         if (!isFormValid) {
             if (activeTab === 'bank') {
-                if (!selectedBank) Alert.alert('Bank Required', 'Please choose destination bank.');
-                else if (accountNumber.trim().length !== 10) Alert.alert('Invalid Account', 'Enter 10-digit account number.');
-                else if (!accountName) Alert.alert('Account Unverified', 'Please wait for account name verification.');
-                else if (totalDebit > userBalance) Alert.alert('Insufficient Balance', `You need ₦${totalDebit.toLocaleString()} (including ₦${transferFee} fee).`);
+                if (!selectedBank) {
+                    setErrorModalMessage('Da fatan za a zaɓi bankin da za a tura kuɗin (Please select destination bank).');
+                } else if (accountNumber.trim().length !== 10) {
+                    setErrorModalMessage('Lambar asusu dole ne ta kasance lamba 10 cif (Enter a valid 10-digit account number).');
+                } else if (!accountName) {
+                    setErrorModalMessage('Ana kan tantance sunan mai asusu, da fatan a dakata kaɗan (Please wait for account name verification).');
+                } else if (totalDebit > userBalance) {
+                    setErrorModalMessage(`Kuɗin aljihunka bai isa ba (Insufficient Balance). Ana buƙatar ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (ciki har da kuɗin sabis ₦${transferFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}), amma kuna da ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+                }
             } else {
-                if (!matchedUser) Alert.alert('Recipient Required', 'Enter member phone, email, or username.');
-                else if (totalDebit > userBalance) Alert.alert('Insufficient Balance', `You have ₦${userBalance.toLocaleString()} available.`);
+                if (!matchedUser) {
+                    setErrorModalMessage('Da fatan za a shigar da lambar waya, imel ko sunan memba (Enter recipient phone, email or username).');
+                } else if (totalDebit > userBalance) {
+                    setErrorModalMessage(`Kuɗin aljihunka bai isa ba (Insufficient Balance). Ana buƙatar ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}, amma kuna da ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+                }
             }
             return;
         }
@@ -748,7 +752,7 @@ export default function TransferScreen() {
                 createAppNotification(
                     currentUserId,
                     `Debit Alert: ₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
-                    `₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} transferred to ${matchedUser!.full_name}. New Balance: ₦${newBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                    `₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} transferred to ${matchedUser!.full_name}. Ref: ${p2pRef}`,
                     'transfer',
                     'high',
                     { type: 'p2p_debit', amount: currentAmount, recipient: matchedUser!.full_name, reference: p2pRef }
@@ -810,8 +814,15 @@ export default function TransferScreen() {
                     },
                 });
 
-                if (error) throw new Error(error.message || 'Bank settlement request failed.');
-                if (data && data.success === false) throw new Error(data.message || 'Bank settlement rejected.');
+                if (error) {
+                    throw new Error(error.message || 'Bank settlement connection failed. No funds were debited from your wallet.');
+                }
+                if (!data || data.success !== true || !data.dispatched) {
+                    throw new Error(data?.message || 'Bank transfer was not accepted by the payment gateway. Your wallet was NOT charged.');
+                }
+                if (String(data.status || '').toUpperCase() === 'FAILED' || String(data.status || '').toUpperCase() === 'REJECTED') {
+                    throw new Error(data?.message || 'Bank gateway rejected the transfer. Your wallet was NOT charged.');
+                }
 
                 const finalNewBal = data?.new_balance ?? Math.max(0, userBalance - currentTotalDebit);
                 setUserBalance(finalNewBal);
@@ -822,7 +833,7 @@ export default function TransferScreen() {
                 createAppNotification(
                     currentUserId,
                     `Debit Alert: ₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
-                    `₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} sent to ${accountName.trim()} (${selectedBank!.name}). New Balance: ₦${finalNewBal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                    `₦${currentAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} sent to ${accountName.trim()} (${selectedBank!.name}). Ref: ${bankTxRef}`,
                     'transfer',
                     'high',
                     {
@@ -888,9 +899,19 @@ export default function TransferScreen() {
             }, 250);
         } catch (err: any) {
             console.error('Transfer execution error:', err);
-            const errMsg = err.message || 'Unable to complete transfer. Please check your network or wallet balance.';
+            const errMsg = err.message || 'Unable to complete transfer. Your wallet balance was NOT charged.';
             setTransferError(errMsg);
             setIsSubmitting(false);
+
+            // Immediately re-sync user balance from DB to verify untouched funds
+            if (currentUserId) {
+                try {
+                    const { data: prof } = await supabase.from('profiles').select('balance').eq('id', currentUserId).maybeSingle();
+                    if (prof && prof.balance !== undefined && prof.balance !== null) {
+                        setUserBalance(Number(prof.balance));
+                    }
+                } catch (_) {}
+            }
 
             setTimeout(() => {
                 setErrorModalMessage(errMsg);
@@ -1456,6 +1477,29 @@ export default function TransferScreen() {
                             </View>
                         )}
 
+                        {/* Smooth Insufficient Balance Warning Card */}
+                        {numAmount > 0 && totalDebit > userBalance && (
+                            <View style={s.insufficientBalanceCard}>
+                                <View style={s.insufficientIconWrap}>
+                                    <Ionicons name="wallet-outline" size={17} color="#DC2626" />
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={s.insufficientTitle}>Kuɗin Aljihunka Bai Isa Ba</Text>
+                                    <Text style={s.insufficientText}>
+                                        Kuna da <Text style={{ fontWeight: '800' }}>₦{userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>, amma ana buƙatar <Text style={{ fontWeight: '800', color: '#DC2626' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text> (ciki har da kuɗin sabis ₦{transferFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}).
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={s.topupSmallBtn}
+                                    onPress={() => router.push('/(app)/wallet')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="add-circle" size={14} color="#FFFFFF" style={{ marginRight: 3 }} />
+                                    <Text style={s.topupSmallBtnText}>Sanya Kuɗi</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
                         {/* Quick Amount Chips */}
                         <View style={s.chipRow}>
                             {QUICK_AMOUNTS.map((amt) => (
@@ -1665,6 +1709,29 @@ export default function TransferScreen() {
                                 <Text style={{ fontSize: 11.5, color: '#DC2626', fontWeight: '700' }}>
                                     Mafi karancin transfer shine ₦{MIN_TRANSFER_AMOUNT}.00 (Minimum transfer is ₦100)
                                 </Text>
+                            </View>
+                        )}
+
+                        {/* Smooth Insufficient Balance Warning Card */}
+                        {numAmount > 0 && totalDebit > userBalance && (
+                            <View style={s.insufficientBalanceCard}>
+                                <View style={s.insufficientIconWrap}>
+                                    <Ionicons name="wallet-outline" size={17} color="#DC2626" />
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={s.insufficientTitle}>Kuɗin Aljihunka Bai Isa Ba</Text>
+                                    <Text style={s.insufficientText}>
+                                        Kuna da <Text style={{ fontWeight: '800' }}>₦{userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>, amma ana buƙatar <Text style={{ fontWeight: '800', color: '#DC2626' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>.
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={s.topupSmallBtn}
+                                    onPress={() => router.push('/(app)/wallet')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="add-circle" size={14} color="#FFFFFF" style={{ marginRight: 3 }} />
+                                    <Text style={s.topupSmallBtnText}>Sanya Kuɗi</Text>
+                                </TouchableOpacity>
                             </View>
                         )}
 
@@ -2037,18 +2104,53 @@ export default function TransferScreen() {
             >
                 <View style={s.modalBackdrop}>
                     <View style={s.errorModalCard}>
-                        <View style={s.errorModalIconCircle}>
-                            <Ionicons name="alert-circle" size={28} color="#DC2626" />
+                        <View style={[
+                            s.errorModalIconCircle,
+                            (errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
+                        ]}>
+                            <Ionicons
+                                name={(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) ? "wallet-outline" : "alert-circle"}
+                                size={28}
+                                color="#DC2626"
+                            />
                         </View>
-                        <Text style={s.errorModalTitle}>Transfer Notice</Text>
+                        <Text style={s.errorModalTitle}>
+                            {(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) ? 'Kuɗin Aljihu Bai Isa Ba' : 'Sanarwar Canja Wuri'}
+                        </Text>
                         <Text style={s.errorModalMessage}>{errorModalMessage}</Text>
-                        <TouchableOpacity
-                            onPress={() => setErrorModalMessage(null)}
-                            style={s.errorModalBtn}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={s.errorModalBtnText}>OK, UNDERSTOOD</Text>
-                        </TouchableOpacity>
+                        
+                        <View style={{ width: '100%', gap: 8 }}>
+                            {(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setErrorModalMessage(null);
+                                        router.push('/(app)/wallet');
+                                    }}
+                                    style={[s.errorModalBtn, { backgroundColor: '#059669' }]}
+                                    activeOpacity={0.85}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="card" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                                        <Text style={s.errorModalBtnText}>SANYA KUƊI (ADD MONEY)</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                                onPress={() => setErrorModalMessage(null)}
+                                style={[
+                                    s.errorModalBtn,
+                                    (errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 }
+                                ]}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[
+                                    s.errorModalBtnText,
+                                    (errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && { color: '#475569' }
+                                ]}>
+                                    {(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) ? 'RUFE (CLOSE)' : 'TO, NA FAHIMTA'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -2191,9 +2293,9 @@ export default function TransferScreen() {
                                     </View>
                                 ) : null}
                                 <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>New Balance:</Text>
-                                    <Text style={[s.receiptVal, { color: '#059669', fontWeight: '900' }]}>
-                                        ₦{lastTxDetails ? lastTxDetails.newBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 }) : '0.00'}
+                                    <Text style={s.receiptLabel}>Verification:</Text>
+                                    <Text style={[s.receiptVal, { color: '#059669', fontWeight: '800' }]}>
+                                        Secured via NIBSS Network ✓
                                     </Text>
                                 </View>
                             </View>
@@ -3403,6 +3505,51 @@ const s = StyleSheet.create({
     errorModalBtnText: {
         color: '#FFFFFF',
         fontSize: 11.5,
+        fontWeight: '900',
+    },
+    insufficientBalanceCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1.2,
+        borderColor: '#FECACA',
+        borderRadius: 14,
+        padding: 12,
+        marginTop: 8,
+    },
+    insufficientIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FEE2E2',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+    },
+    insufficientTitle: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: '#991B1B',
+    },
+    insufficientText: {
+        fontSize: 10.5,
+        color: '#7F1D1D',
+        marginTop: 2,
+        lineHeight: 14,
+    },
+    topupSmallBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#DC2626',
+        paddingVertical: 7,
+        paddingHorizontal: 9,
+        borderRadius: 9,
+        marginLeft: 6,
+    },
+    topupSmallBtnText: {
+        color: '#FFFFFF',
+        fontSize: 10.5,
         fontWeight: '900',
     },
     successCard: {
