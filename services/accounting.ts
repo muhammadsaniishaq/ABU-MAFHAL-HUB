@@ -866,6 +866,8 @@ export const getFinancialHealthAdvisory = (metrics: AccountingMetrics): Financia
 
 /**
  * Generate a PDF Profit & Loss Executive Statement.
+ * Bulletproof print-safe architecture with official Abu Mafhal branding,
+ * corporate tags, 18-service performance matrix, liabilities portfolio, and CEO audit seal.
  */
 export const generateProfitLossPDF = async (
     metrics: AccountingMetrics,
@@ -876,9 +878,259 @@ export const generateProfitLossPDF = async (
         const refId = `AMH-FIN-${Date.now().toString().slice(-8)}`;
         const dateStr = new Date().toISOString().split('T')[0];
         const fileName = `Abu_Mafhal_Financial_Statement_${dateStr}_${Date.now()}.pdf`;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://abumafhal.com.ng/verify?ref=${refId}`)}`;
         const adv = getFinancialHealthAdvisory(metrics);
 
+        // Core Inner Printable Content (Self-contained, print-safe table layout)
+        const printableContent = `
+            <!-- EXECUTIVE BRANDED HEADER -->
+            <table style="width: 100%; border-collapse: collapse; background-color: #0A1128 !important; border-radius: 12px; border-bottom: 4px solid #DAA520; margin-bottom: 14px; color: #FFFFFF;">
+                <tr>
+                    <td style="padding: 16px 18px; vertical-align: middle;">
+                        <table style="border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 64px; vertical-align: middle;">
+                                    <img src="${ABU_MAFHAL_LOGO_B64}" width="58" height="58" style="width: 58px; height: 58px; border-radius: 10px; border: 2px solid #DAA520; background-color: #FFFFFF; object-fit: contain; padding: 2px; display: block;" alt="Abu Mafhal Logo" />
+                                </td>
+                                <td style="padding-left: 14px; vertical-align: middle;">
+                                    <div style="font-size: 21px; font-weight: 900; color: #FFFFFF; letter-spacing: 0.6px; line-height: 1.1;">ABU MAFHAL HUB</div>
+                                    <div style="font-size: 10.5px; font-weight: 800; color: #F59E0B; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 3px;">ABU MAFHAL ENTERPRISE LTD • RC-8979939</div>
+                                    <div style="font-size: 9.5px; color: #94A3B8; margin-top: 2px; font-weight: 500;">Executive Profit & Loss Ledger • Certified Commercial Statement</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td style="padding: 16px 18px; vertical-align: middle; text-align: right; width: 250px;">
+                        <div style="display: inline-block; background-color: rgba(245, 158, 11, 0.22) !important; border: 1.5px solid #DAA520; border-radius: 6px; padding: 3px 9px; color: #F59E0B; font-size: 9px; font-weight: 900; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 5px;">SUPER ADMIN STRICTLY CONFIDENTIAL</div>
+                        <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Ref:</b> <span style="font-family: 'Courier New', monospace; color: #F59E0B; font-weight: 800;">${refId}</span></div>
+                        <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Period:</b> ${periodLabel}</div>
+                        <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Date:</b> ${formatAccountingDate(new Date().toISOString(), true)}</div>
+                        <div style="display: inline-block; background-color: #064E3B !important; color: #34D399; border: 1px solid #059669; border-radius: 4px; padding: 1px 6px; font-size: 8.5px; font-weight: 800; margin-top: 4px; text-transform: uppercase;">✓ 100% AUDITED & VERIFIED</div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- TITANIUM NET PROFIT / LOSS SHOWCASE -->
+            <div style="background-color: ${isNetProfitable ? '#0F172A' : '#450A0A'} !important; border-radius: 12px; border: 1.5px solid ${isNetProfitable ? '#DAA520' : '#EF4444'}; padding: 16px 20px; margin-bottom: 14px; color: #FFFFFF;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px;">
+                    <tr>
+                        <td style="font-size: 11px; font-weight: 900; letter-spacing: 0.8px; color: ${isNetProfitable ? '#34D399' : '#F87171'}; text-transform: uppercase; vertical-align: middle;">
+                            ${isNetProfitable ? '★ NET TRADING SURPLUS (TAKE-HOME PROFIT)' : '⚠ NET OPERATING DEFICIT'}
+                        </td>
+                        <td style="text-align: right; vertical-align: middle;">
+                            <span style="background-color: rgba(245, 158, 11, 0.25) !important; border: 1px solid #DAA520; border-radius: 6px; padding: 2px 8px; font-size: 9.5px; font-weight: 900; color: #F59E0B;">${metrics.profitMargin.toFixed(1)}% GROSS MARGIN</span>
+                        </td>
+                    </tr>
+                </table>
+                <div style="font-size: 30px; font-weight: 900; color: ${isNetProfitable ? '#10B981' : '#EF4444'}; font-family: 'Courier New', monospace; margin: 3px 0 5px 0;">
+                    ${formatNaira(metrics.netProfit)}
+                </div>
+                <div style="font-size: 10.5px; color: #94A3B8; margin-bottom: 12px;">
+                    Gross Trading Margin (${formatNaira(metrics.grossProfit)}) minus Total Logged Expenses (${formatNaira(metrics.totalExpenses)})
+                </div>
+                <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 10px;">
+                    <tr>
+                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
+                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Daily Run-Rate</div>
+                            <div style="font-size: 12px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', monospace; margin-top: 2px;">${formatNaira(metrics.dailyRunRate)}/day</div>
+                        </td>
+                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
+                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">30-Day Projection</div>
+                            <div style="font-size: 12px; font-weight: 900; color: #34D399; font-family: 'Courier New', monospace; margin-top: 2px;">${formatNaira(metrics.projectedMonthlyProfit)}</div>
+                        </td>
+                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
+                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Commercial Health</div>
+                            <div style="font-size: 11px; font-weight: 900; color: #F59E0B; margin-top: 2px;">${adv.rating} (${adv.headline})</div>
+                        </td>
+                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
+                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Completed Orders</div>
+                            <div style="font-size: 12px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', monospace; margin-top: 2px;">${metrics.successfulTransactionsCount} Orders</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 4 CORE FINANCIAL KPIS -->
+            <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-bottom: 14px;">
+                <tr>
+                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
+                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Gross Revenue</div>
+                        <div style="font-size: 15px; font-weight: 900; color: #1D4ED8; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.totalRevenue)}</div>
+                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Total volume collected</div>
+                    </td>
+                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
+                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Cost of Sales</div>
+                        <div style="font-size: 15px; font-weight: 900; color: #475569; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.totalCost)}</div>
+                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Telecom & API wholesale</div>
+                    </td>
+                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
+                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Gross Trading Profit</div>
+                        <div style="font-size: 15px; font-weight: 900; color: #059669; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.grossProfit)}</div>
+                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Surplus before expenses</div>
+                    </td>
+                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
+                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Logged Expenses</div>
+                        <div style="font-size: 15px; font-weight: 900; color: #DC2626; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.totalExpenses)}</div>
+                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">${metrics.expensesCount} expenses logged</div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- CUSTOMER BALANCES & LIABILITIES PORTFOLIO -->
+            <table style="width: 100%; border-collapse: collapse; background-color: #F8FAFC !important; border: 1.5px solid #CBD5E1; border-radius: 10px; margin-bottom: 14px;">
+                <tr>
+                    <td style="padding: 12px 16px; vertical-align: middle;">
+                        <div style="display: inline-block; background-color: #ECFDF5 !important; color: #059669; border: 1px solid #A7F3D0; border-radius: 5px; padding: 1px 7px; font-size: 9px; font-weight: 800; margin-bottom: 4px;">100% Guaranteed Reserve Backed</div>
+                        <div style="font-size: 18px; font-weight: 900; color: #0F172A; font-family: 'Courier New', monospace;">${formatNaira(metrics.userLiquidity.totalUserBalances)}</div>
+                        <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Total user deposits held across platform database wallets (Customer Liabilities)</div>
+                    </td>
+                    <td style="padding: 12px 16px; vertical-align: middle; text-align: right; width: 280px;">
+                        <table style="border-collapse: collapse; margin-left: auto;">
+                            <tr>
+                                <td style="text-align: center; padding: 0 10px;">
+                                    <div style="font-size: 13px; font-weight: 900; color: #0F172A; font-family: 'Courier New', monospace;">${metrics.userLiquidity.totalUserCount}</div>
+                                    <div style="font-size: 9px; color: #64748B;">Registered Users</div>
+                                </td>
+                                <td style="text-align: center; padding: 0 10px; border-left: 1px solid #E2E8F0;">
+                                    <div style="font-size: 13px; font-weight: 900; color: #059669; font-family: 'Courier New', monospace;">${metrics.userLiquidity.fundedUserCount}</div>
+                                    <div style="font-size: 9px; color: #64748B;">Funded Wallets</div>
+                                </td>
+                                <td style="text-align: center; padding: 0 10px; border-left: 1px solid #E2E8F0;">
+                                    <div style="font-size: 13px; font-weight: 900; color: #0F172A; font-family: 'Courier New', monospace;">${formatNaira(metrics.userLiquidity.averageUserBalance)}</div>
+                                    <div style="font-size: 9px; color: #64748B;">Avg Balance</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- ALL 18 SERVICES PROFIT BREAKDOWN -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
+                <tr>
+                    <td style="font-size: 12px; font-weight: 900; color: #0F172A; vertical-align: middle;">Comprehensive Product & Service Performance Matrix</td>
+                    <td style="font-size: 9.5px; color: #64748B; font-weight: 800; text-align: right; vertical-align: middle;">18 Enterprise Services Tracked</td>
+                </tr>
+            </table>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 10px; background-color: #FFFFFF !important; border: 1px solid #CBD5E1; border-radius: 8px;">
+                <thead>
+                    <tr style="background-color: #0A1128 !important; color: #FFFFFF !important;">
+                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Service Name</th>
+                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Orders</th>
+                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Revenue</th>
+                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Cost of Sales</th>
+                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Gross Profit</th>
+                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Margin %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.values(metrics.serviceBreakdown)
+                        .filter(s => s.revenue > 0 || s.transactionCount > 0)
+                        .map((s, idx) => `
+                            <tr style="background-color: ${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'} !important; border-bottom: 1px solid #E2E8F0;">
+                                <td style="padding: 6px 9px; color: #0F172A; font-weight: 700;">${s.serviceName}</td>
+                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace;">${s.transactionCount}</td>
+                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace;">${formatNaira(s.revenue)}</td>
+                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace; color: #64748B;">${formatNaira(s.cost)}</td>
+                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace; color: #059669; font-weight: 800;">${formatNaira(s.profit)}</td>
+                                <td style="padding: 6px 9px; text-align: right;">
+                                    <span style="display: inline-block; background-color: #FFFBEB !important; border: 1px solid #FDE68A; color: #D97706; border-radius: 4px; padding: 1px 5px; font-size: 8.5px; font-weight: 800;">${s.marginPercent.toFixed(1)}%</span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    <tr style="background-color: #F1F5F9 !important; font-weight: 900; border-top: 2px solid #94A3B8; font-size: 10.5px;">
+                        <td style="padding: 8px 9px; color: #0A1128;"><b>PORTFOLIO TOTAL</b></td>
+                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace;">${metrics.successfulTransactionsCount}</td>
+                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace;">${formatNaira(metrics.totalRevenue)}</td>
+                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace;">${formatNaira(metrics.totalCost)}</td>
+                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace; color: #059669;">${formatNaira(metrics.grossProfit)}</td>
+                        <td style="padding: 8px 9px; text-align: right;">
+                            <span style="display: inline-block; background-color: #FFFBEB !important; border: 1px solid #FDE68A; color: #D97706; border-radius: 4px; padding: 1px 5px; font-size: 8.5px; font-weight: 800;">${metrics.profitMargin.toFixed(1)}%</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- LOGGED OPERATING EXPENDITURES -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
+                <tr>
+                    <td style="font-size: 12px; font-weight: 900; color: #0F172A; vertical-align: middle;">Logged Operating Expenditures</td>
+                    <td style="font-size: 9.5px; color: #64748B; font-weight: 800; text-align: right; vertical-align: middle;">${metrics.recentExpenses.length} Records</td>
+                </tr>
+            </table>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 10px; background-color: #FFFFFF !important; border: 1px solid #CBD5E1; border-radius: 8px;">
+                <thead>
+                    <tr style="background-color: #0A1128 !important; color: #FFFFFF !important;">
+                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Date</th>
+                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Description</th>
+                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Category</th>
+                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Payment Method</th>
+                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${metrics.recentExpenses.length > 0 
+                        ? metrics.recentExpenses.slice(0, 10).map((e, idx) => `
+                            <tr style="background-color: ${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'} !important; border-bottom: 1px solid #E2E8F0;">
+                                <td style="padding: 6px 9px; color: #64748B;">${formatAccountingDate(e.expense_date)}</td>
+                                <td style="padding: 6px 9px; color: #0F172A; font-weight: 700;">${e.title}</td>
+                                <td style="padding: 6px 9px; color: #475569;">${e.category.replace('_', ' ').toUpperCase()}</td>
+                                <td style="padding: 6px 9px; color: #64748B;">${e.payment_method.replace('_', ' ')}</td>
+                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace; color: #DC2626; font-weight: 800;">-${formatNaira(e.amount)}</td>
+                            </tr>
+                        `).join('')
+                        : '<tr><td colspan="5" style="text-align: center; color: #94A3B8; padding: 12px;">No operating expenses recorded for this reporting period.</td></tr>'
+                    }
+                </tbody>
+            </table>
+
+            <!-- AUDIT SIGNATURES & VERIFICATION SEAL -->
+            <table style="width: 100%; border-collapse: collapse; background-color: #F8FAFC !important; border: 1.5px solid #CBD5E1; border-radius: 12px; margin-bottom: 10px;">
+                <tr>
+                    <td style="padding: 14px 18px; width: 33%; vertical-align: top;">
+                        <div style="width: 130px; height: 1px; background-color: #94A3B8; margin-top: 14px; margin-bottom: 6px;"></div>
+                        <div style="font-size: 11.5px; font-weight: 900; color: #0A1128;">Sale Abu Mafhal</div>
+                        <div style="font-size: 9.5px; color: #64748B; margin-top: 1px;">Managing Director & CEO</div>
+                        <div style="font-size: 8.5px; color: #DAA520; font-weight: 800;">Abu Mafhal Enterprise Ltd</div>
+                    </td>
+                    <td style="padding: 14px 18px; width: 34%; vertical-align: top; text-align: center;">
+                        <div style="width: 130px; height: 1px; background-color: #94A3B8; margin-top: 14px; margin-bottom: 6px; margin-left: auto; margin-right: auto;"></div>
+                        <div style="font-size: 11.5px; font-weight: 900; color: #0A1128;">Audit & Financial Control</div>
+                        <div style="font-size: 9.5px; color: #64748B; margin-top: 1px;">Certified by Cloud Accounting</div>
+                        <div style="font-size: 8.5px; color: #059669; font-weight: 800;">✓ Automated Realtime Ledger</div>
+                    </td>
+                    <td style="padding: 14px 18px; width: 33%; vertical-align: middle; text-align: right;">
+                        <table style="border-collapse: collapse; margin-left: auto;">
+                            <tr>
+                                <td style="vertical-align: middle; padding-right: 10px; text-align: right;">
+                                    <div style="font-size: 9px; font-weight: 900; color: #0A1128; letter-spacing: 0.5px;">DIGITAL AUDIT SEAL</div>
+                                    <div style="font-size: 8px; color: #64748B; font-family: 'Courier New', monospace; margin-top: 2px;">${refId}</div>
+                                    <div style="font-size: 8px; color: #059669; font-weight: 700; margin-top: 1px;">abumafhal.com.ng</div>
+                                </td>
+                                <td style="vertical-align: middle;">
+                                    <!-- INLINE CERTIFIED GOLD SEAL SVG -->
+                                    <svg width="58" height="58" viewBox="0 0 100 100" style="display: block;">
+                                        <circle cx="50" cy="50" r="46" fill="#0A1128" stroke="#DAA520" stroke-width="3" />
+                                        <circle cx="50" cy="50" r="40" fill="none" stroke="#DAA520" stroke-width="1" stroke-dasharray="3,2" />
+                                        <path d="M50 24 L64 31 V48 C64 58 50 67 50 67 C50 67 36 58 36 48 V31 Z" fill="#1E293B" stroke="#DAA520" stroke-width="1.8" />
+                                        <path d="M44 46 L48 50 L56 41" fill="none" stroke="#34D399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        <text x="50" y="78" font-size="6.5" font-weight="900" fill="#DAA520" text-anchor="middle" font-family="sans-serif">CERTIFIED</text>
+                                        <text x="50" y="85" font-size="5" font-weight="700" fill="#94A3B8" text-anchor="middle" font-family="monospace">AUDIT</text>
+                                    </svg>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- DOCUMENT SECURITY FOOTER -->
+            <div style="text-align: center; font-size: 8.5px; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 8px;">
+                Confidential Enterprise Financial Document • Generated from Abu Mafhal Hub Super Admin Console • 
+                Secured by 256-bit Cloud Ledger Protocol • All Rights Reserved © ${new Date().getFullYear()} Abu Mafhal Ltd
+            </div>
+        `;
+
+        // Complete Standalone HTML Document
         const html = `
             <!DOCTYPE html>
             <html lang="en">
@@ -887,653 +1139,55 @@ export const generateProfitLossPDF = async (
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Abu_Mafhal_Financial_Statement_${refId}</title>
                 <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap');
-
                     @page {
                         size: A4 portrait;
-                        margin: 10mm 10mm 12mm 10mm;
+                        margin: 8mm 8mm 8mm 8mm;
                     }
-
                     * {
                         box-sizing: border-box;
                         margin: 0;
                         padding: 0;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        color-adjust: exact !important;
                     }
-
                     body {
-                        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-                        background: #FFFFFF;
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                        background-color: #FFFFFF !important;
                         color: #0F172A;
-                        padding: 16px;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
-
-                    /* EXECUTIVE HEADER WITH LOGO & GOLD ACCENTS */
-                    .header-banner {
-                        background: linear-gradient(135deg, #020617 0%, #0A1128 45%, #1E293B 100%);
-                        border-radius: 14px;
-                        padding: 20px 24px;
-                        color: #FFFFFF;
-                        border-bottom: 4px solid #DAA520;
-                        margin-bottom: 18px;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                    }
-
-                    .brand-wrap {
-                        display: flex;
-                        align-items: center;
-                        gap: 16px;
-                    }
-
-                    .brand-logo {
-                        width: 64px;
-                        height: 64px;
-                        border-radius: 14px;
-                        border: 2px solid #DAA520;
-                        background: #FFFFFF;
-                        object-fit: contain;
-                        padding: 3px;
-                    }
-
-                    .brand-title {
-                        font-size: 22px;
-                        font-weight: 900;
-                        color: #FFFFFF;
-                        letter-spacing: 0.5px;
-                        line-height: 1.1;
-                    }
-
-                    .brand-corp {
-                        font-size: 11px;
-                        font-weight: 800;
-                        color: #F59E0B;
-                        letter-spacing: 0.8px;
-                        text-transform: uppercase;
-                        margin-top: 3px;
-                    }
-
-                    .brand-desc {
-                        font-size: 10px;
-                        color: #94A3B8;
-                        margin-top: 2px;
-                        font-weight: 500;
-                    }
-
-                    .doc-meta {
-                        text-align: right;
-                    }
-
-                    .doc-badge {
-                        display: inline-block;
-                        background: rgba(245, 158, 11, 0.18);
-                        border: 1px solid #DAA520;
-                        border-radius: 6px;
-                        padding: 4px 10px;
-                        color: #F59E0B;
-                        font-size: 9.5px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 0.6px;
-                        margin-bottom: 6px;
-                    }
-
-                    .meta-line {
-                        font-size: 10.5px;
-                        color: #CBD5E1;
-                        line-height: 1.4;
-                    }
-
-                    /* TITANIUM HERO CARD */
-                    .net-profit-card {
-                        background: linear-gradient(135deg, ${isNetProfitable ? '#0F172A 0%, #1E293B 100%' : '#2D0D11 0%, #1B0709 100%'});
-                        border-radius: 14px;
-                        padding: 18px 22px;
-                        color: #FFFFFF;
-                        border: 1.5px solid ${isNetProfitable ? 'rgba(218, 165, 32, 0.45)' : 'rgba(239, 68, 68, 0.45)'};
-                        margin-bottom: 16px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-                    }
-
-                    .net-top-row {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 6px;
-                    }
-
-                    .net-label {
-                        font-size: 11px;
-                        font-weight: 800;
-                        letter-spacing: 1px;
-                        color: ${isNetProfitable ? '#34D399' : '#F87171'};
-                        text-transform: uppercase;
-                    }
-
-                    .net-margin-pill {
-                        background: rgba(245, 158, 11, 0.2);
-                        border: 1px solid rgba(245, 158, 11, 0.4);
-                        border-radius: 6px;
-                        padding: 3px 8px;
-                        font-size: 10px;
-                        font-weight: 800;
-                        color: #F59E0B;
-                    }
-
-                    .net-amount {
-                        font-size: 30px;
-                        font-weight: 900;
-                        color: ${isNetProfitable ? '#10B981' : '#EF4444'};
-                        font-family: 'JetBrains Mono', monospace;
-                        margin: 4px 0 6px 0;
-                    }
-
-                    .net-sub {
-                        font-size: 11px;
-                        color: #94A3B8;
-                        margin-bottom: 12px;
-                    }
-
-                    .net-pills-row {
-                        display: flex;
-                        gap: 10px;
-                        border-top: 1px solid rgba(255,255,255,0.1);
-                        padding-top: 10px;
-                    }
-
-                    .net-pill-item {
-                        flex: 1;
-                        background: rgba(255,255,255,0.04);
-                        border-radius: 8px;
-                        padding: 8px 10px;
-                        border: 1px solid rgba(255,255,255,0.07);
-                    }
-
-                    .net-pill-lbl {
-                        font-size: 9px;
-                        color: #94A3B8;
-                        font-weight: 700;
-                        text-transform: uppercase;
-                    }
-
-                    .net-pill-val {
-                        font-size: 12px;
-                        font-weight: 800;
-                        color: #FFFFFF;
-                        margin-top: 2px;
-                        font-family: 'JetBrains Mono', monospace;
-                    }
-
-                    /* 4 KPI TILES */
-                    .kpi-row {
-                        display: flex;
-                        gap: 10px;
-                        margin-bottom: 16px;
-                    }
-
-                    .kpi-card {
-                        flex: 1;
-                        background: #F8FAFC;
-                        border: 1px solid #E2E8F0;
-                        border-radius: 12px;
-                        padding: 12px 14px;
-                    }
-
-                    .kpi-title {
-                        font-size: 9.5px;
-                        font-weight: 800;
-                        color: #64748B;
-                        text-transform: uppercase;
-                        margin-bottom: 4px;
-                    }
-
-                    .kpi-num {
-                        font-size: 15px;
-                        font-weight: 900;
-                        color: #0F172A;
-                        font-family: 'JetBrains Mono', monospace;
-                    }
-
-                    .kpi-hint {
-                        font-size: 9.5px;
-                        color: #94A3B8;
-                        margin-top: 3px;
-                    }
-
-                    /* CUSTOMER WALLET LIABILITIES CARD */
-                    .liabilities-card {
-                        background: #F8FAFC;
-                        border: 1.5px solid #E2E8F0;
-                        border-radius: 12px;
-                        padding: 14px 18px;
-                        margin-bottom: 18px;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                    }
-
-                    .liabilities-left {
-                        flex: 1;
-                    }
-
-                    .liabilities-badge {
-                        display: inline-block;
-                        background: #ECFDF5;
-                        color: #059669;
-                        border: 1px solid #A7F3D0;
-                        border-radius: 6px;
-                        padding: 2px 8px;
-                        font-size: 9.5px;
-                        font-weight: 800;
-                        margin-bottom: 4px;
-                    }
-
-                    .liabilities-val {
-                        font-size: 20px;
-                        font-weight: 900;
-                        color: #0F172A;
-                        font-family: 'JetBrains Mono', monospace;
-                    }
-
-                    .liabilities-sub {
-                        font-size: 10.5px;
-                        color: #64748B;
-                        margin-top: 2px;
-                    }
-
-                    .liabilities-stats {
-                        display: flex;
-                        gap: 16px;
-                        text-align: right;
-                    }
-
-                    .stat-box-val {
-                        font-size: 13px;
-                        font-weight: 800;
-                        color: #0F172A;
-                        font-family: 'JetBrains Mono', monospace;
-                    }
-
-                    .stat-box-lbl {
-                        font-size: 9.5px;
-                        color: #64748B;
-                    }
-
-                    /* TABLES */
-                    .section-header {
-                        font-size: 13px;
-                        font-weight: 900;
-                        color: #0F172A;
-                        margin-bottom: 8px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                    }
-
-                    .section-count {
-                        font-size: 10px;
-                        color: #64748B;
-                        font-weight: 700;
-                    }
-
-                    table {
+                        padding: 10px;
                         width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 16px;
-                        font-size: 10.5px;
-                        background: #FFFFFF;
-                        border-radius: 8px;
-                        overflow: hidden;
-                        border: 1px solid #E2E8F0;
-                    }
-
-                    th {
-                        background: #0A1128;
-                        color: #FFFFFF;
-                        padding: 8px 10px;
-                        text-align: left;
-                        font-size: 9.5px;
-                        font-weight: 800;
-                        letter-spacing: 0.4px;
-                        text-transform: uppercase;
-                    }
-
-                    td {
-                        padding: 7px 10px;
-                        border-bottom: 1px solid #E2E8F0;
-                        color: #1E293B;
-                    }
-
-                    tr:nth-child(even) td {
-                        background: #F8FAFC;
-                    }
-
-                    .num {
-                        text-align: right;
-                        font-family: 'JetBrains Mono', monospace;
-                    }
-
-                    .profit-green {
-                        color: #059669;
-                        font-weight: 800;
-                    }
-
-                    .margin-badge {
-                        display: inline-block;
-                        background: #FFFBEB;
-                        border: 1px solid #FDE68A;
-                        color: #D97706;
-                        border-radius: 4px;
-                        padding: 1px 5px;
-                        font-size: 9px;
-                        font-weight: 800;
-                    }
-
-                    .table-total-row td {
-                        background: #F1F5F9;
-                        font-weight: 900;
-                        border-top: 2px solid #CBD5E1;
-                        font-size: 11px;
-                        color: #0F172A;
-                    }
-
-                    /* SIGNATURE & AUDIT FOOTER */
-                    .audit-box {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        background: #F8FAFC;
-                        border: 1px solid #E2E8F0;
-                        border-radius: 12px;
-                        padding: 14px 18px;
-                        margin-top: 12px;
-                        margin-bottom: 12px;
-                    }
-
-                    .sig-col {
-                        flex: 1;
-                    }
-
-                    .sig-name {
-                        font-size: 12px;
-                        font-weight: 900;
-                        color: #0A1128;
-                    }
-
-                    .sig-title {
-                        font-size: 10px;
-                        color: #64748B;
-                        margin-top: 2px;
-                    }
-
-                    .sig-line {
-                        width: 140px;
-                        height: 1px;
-                        background: #CBD5E1;
-                        margin-top: 18px;
-                        margin-bottom: 4px;
-                    }
-
-                    .qr-wrap {
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
-                    }
-
-                    .qr-img {
-                        width: 60px;
-                        height: 60px;
-                        border-radius: 6px;
-                        border: 1px solid #CBD5E1;
-                    }
-
-                    .footer-note {
-                        text-align: center;
-                        font-size: 9px;
-                        color: #94A3B8;
-                        border-top: 1px solid #E2E8F0;
-                        padding-top: 8px;
-                        margin-top: 10px;
                     }
                 </style>
             </head>
             <body>
-                <!-- BRANDED EXECUTIVE HEADER -->
-                <div class="header-banner">
-                    <div class="brand-wrap">
-                        <img class="brand-logo" src="${ABU_MAFHAL_LOGO_B64}" alt="Abu Mafhal Hub Logo" />
-                        <div>
-                            <div class="brand-title">ABU MAFHAL HUB</div>
-                            <div class="brand-corp">ABU MAFHAL ENTERPRISE LTD • RC-8979939</div>
-                            <div class="brand-desc">Executive Profit & Loss Ledger • Certified Commercial Statement</div>
-                        </div>
-                    </div>
-                    <div class="doc-meta">
-                        <div class="doc-badge">Official Financial Audit</div>
-                        <div class="meta-line"><b>Ref:</b> ${refId}</div>
-                        <div class="meta-line"><b>Period:</b> ${periodLabel}</div>
-                        <div class="meta-line"><b>Date:</b> ${formatAccountingDate(new Date(), true)}</div>
-                        <div class="meta-line" style="color: #F59E0B; font-weight: 700; font-size: 9px; margin-top: 2px;">SUPER ADMIN STRICTLY CONFIDENTIAL</div>
-                    </div>
-                </div>
-
-                <!-- TITANIUM NET PROFIT HERO CARD -->
-                <div class="net-profit-card">
-                    <div class="net-top-row">
-                        <div class="net-label">${isNetProfitable ? 'NET TRADING SURPLUS (PROFIT)' : 'NET OPERATING DEFICIT'}</div>
-                        <div class="net-margin-pill">${metrics.profitMargin.toFixed(1)}% GROSS MARGIN</div>
-                    </div>
-                    <div class="net-amount">${formatNaira(metrics.netProfit)}</div>
-                    <div class="net-sub">
-                        Gross Trading Profit (${formatNaira(metrics.grossProfit)}) − Total Logged Expenses (${formatNaira(metrics.totalExpenses)})
-                    </div>
-
-                    <div class="net-pills-row">
-                        <div class="net-pill-item">
-                            <div class="net-pill-lbl">Daily Run-Rate</div>
-                            <div class="net-pill-val">${formatNaira(metrics.dailyRunRate)}/day</div>
-                        </div>
-                        <div class="net-pill-item">
-                            <div class="net-pill-lbl">30-Day Extrapolation</div>
-                            <div class="net-pill-val" style="color: #34D399;">${formatNaira(metrics.projectedMonthlyProfit)}</div>
-                        </div>
-                        <div class="net-pill-item">
-                            <div class="net-pill-lbl">Commercial Rating</div>
-                            <div class="net-pill-val" style="color: #F59E0B;">${adv.rating} (${adv.headline})</div>
-                        </div>
-                        <div class="net-pill-item">
-                            <div class="net-pill-lbl">Orders Completed</div>
-                            <div class="net-pill-val">${metrics.successfulTransactionsCount} orders</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4 CORE COMMERCIAL KPIS -->
-                <div class="kpi-row">
-                    <div class="kpi-card">
-                        <div class="kpi-title">Gross Revenue</div>
-                        <div class="kpi-num" style="color: #2563EB;">${formatNaira(metrics.totalRevenue)}</div>
-                        <div class="kpi-hint">Total volume collected</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-title">Cost of Sales</div>
-                        <div class="kpi-num" style="color: #64748B;">${formatNaira(metrics.totalCost)}</div>
-                        <div class="kpi-hint">Telecom & API wholesale</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-title">Gross Trading Margin</div>
-                        <div class="kpi-num" style="color: #059669;">${formatNaira(metrics.grossProfit)}</div>
-                        <div class="kpi-hint">Profit before operating costs</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-title">Operating Expenses</div>
-                        <div class="kpi-num" style="color: #DC2626;">${formatNaira(metrics.totalExpenses)}</div>
-                        <div class="kpi-hint">${metrics.expensesCount} expenses logged</div>
-                    </div>
-                </div>
-
-                <!-- CUSTOMER BALANCES & LIABILITIES PORTFOLIO -->
-                <div class="liabilities-card">
-                    <div class="liabilities-left">
-                        <div class="liabilities-badge">100% Guaranteed Reserve Backed</div>
-                        <div class="liabilities-val">${formatNaira(metrics.userLiquidity.totalUserBalances)}</div>
-                        <div class="liabilities-sub">Total user deposits held across platform database wallets</div>
-                    </div>
-                    <div class="liabilities-stats">
-                        <div>
-                            <div class="stat-box-val">${metrics.userLiquidity.totalUserCount}</div>
-                            <div class="stat-box-lbl">Registered Users</div>
-                        </div>
-                        <div>
-                            <div class="stat-box-val">${metrics.userLiquidity.fundedUserCount}</div>
-                            <div class="stat-box-lbl">Funded Wallets</div>
-                        </div>
-                        <div>
-                            <div class="stat-box-val">${formatNaira(metrics.userLiquidity.averageUserBalance)}</div>
-                            <div class="stat-box-lbl">Avg Balance</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ALL 18 SERVICES PROFIT BREAKDOWN -->
-                <div class="section-header">
-                    <span>Comprehensive Product & Service Performance Matrix</span>
-                    <span class="section-count">18 Enterprise Services Tracked</span>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Service Name</th>
-                            <th class="num">Orders</th>
-                            <th class="num">Revenue</th>
-                            <th class="num">Cost of Sales</th>
-                            <th class="num">Gross Profit</th>
-                            <th class="num">Margin %</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${Object.values(metrics.serviceBreakdown)
-                            .filter(s => s.revenue > 0 || s.transactionCount > 0)
-                            .map(s => `
-                                <tr>
-                                    <td><b>${s.serviceName}</b></td>
-                                    <td class="num">${s.transactionCount}</td>
-                                    <td class="num">${formatNaira(s.revenue)}</td>
-                                    <td class="num">${formatNaira(s.cost)}</td>
-                                    <td class="num profit-green">${formatNaira(s.profit)}</td>
-                                    <td class="num"><span class="margin-badge">${s.marginPercent.toFixed(1)}%</span></td>
-                                </tr>
-                            `).join('')}
-                        <tr class="table-total-row">
-                            <td><b>PORTFOLIO TOTAL</b></td>
-                            <td class="num">${metrics.successfulTransactionsCount}</td>
-                            <td class="num">${formatNaira(metrics.totalRevenue)}</td>
-                            <td class="num">${formatNaira(metrics.totalCost)}</td>
-                            <td class="num profit-green">${formatNaira(metrics.grossProfit)}</td>
-                            <td class="num"><span class="margin-badge">${metrics.profitMargin.toFixed(1)}%</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <!-- OPERATING EXPENDITURES -->
-                <div class="section-header">
-                    <span>Logged Operating Expenditures</span>
-                    <span class="section-count">${metrics.recentExpenses.length} Records</span>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Category</th>
-                            <th>Payment Method</th>
-                            <th class="num">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${metrics.recentExpenses.length > 0 
-                            ? metrics.recentExpenses.map(e => `
-                                <tr>
-                                    <td>${formatAccountingDate(e.expense_date)}</td>
-                                    <td><b>${e.title}</b></td>
-                                    <td>${e.category.replace('_', ' ').toUpperCase()}</td>
-                                    <td>${e.payment_method.replace('_', ' ')}</td>
-                                    <td class="num" style="color: #DC2626; font-weight: 800;">-${formatNaira(e.amount)}</td>
-                                </tr>
-                            `).join('')
-                            : '<tr><td colspan="5" style="text-align: center; color: #94A3B8; padding: 12px;">No operating expenses recorded for this reporting period.</td></tr>'
-                        }
-                    </tbody>
-                </table>
-
-                <!-- AUDIT SIGNATURES & VERIFICATION -->
-                <div class="audit-box">
-                    <div class="sig-col">
-                        <div class="sig-line"></div>
-                        <div class="sig-name">Sale Abu Mafhal</div>
-                        <div class="sig-title">Managing Director & CEO • Abu Mafhal Hub</div>
-                    </div>
-                    <div class="sig-col" style="text-align: center;">
-                        <div class="sig-line" style="margin-left: auto; margin-right: auto;"></div>
-                        <div class="sig-name">Audit & Financial Control</div>
-                        <div class="sig-title">Certified by Abu Mafhal Cloud Accounting</div>
-                    </div>
-                    <div class="qr-wrap">
-                        <img class="qr-img" src="${qrUrl}" alt="Verification QR Code" />
-                        <div style="font-size: 9px; color: #64748B; text-align: left; line-height: 1.3;">
-                            <b>DIGITAL AUDIT STAMP</b><br/>
-                            Scan to verify authenticity<br/>
-                            abumafhal.com.ng
-                        </div>
-                    </div>
-                </div>
-
-                <div class="footer-note">
-                    Confidential Enterprise Document • Generated from Abu Mafhal Hub Super Admin Console • 
-                    Secured by 256-bit Cloud Ledger Protocol • All Rights Reserved © ${new Date().getFullYear()} Abu Mafhal Ltd
-                </div>
+                ${printableContent}
             </body>
             </html>
         `;
 
-        // 1. Web Auto-Download (Instant Automatic Download directly to phone/PC storage with ZERO print dialogs)
+        // 1. Web Auto-Download (Zero Dialogs, Crisp Rendering, Immune to Blank Canvas)
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             return new Promise<string | null>((resolve) => {
-                const triggerAutoDownload = () => {
+                const fallbackPrintWindow = () => {
                     try {
-                        const container = document.createElement('div');
-                        container.innerHTML = html;
-                        container.style.position = 'fixed';
-                        container.style.top = '-9999px';
-                        container.style.left = '-9999px';
-                        container.style.width = '794px';
-                        container.style.background = '#FFFFFF';
-                        document.body.appendChild(container);
-
-                        // @ts-ignore
-                        window.html2pdf().set({
-                            margin: [8, 8, 8, 8],
-                            filename: fileName,
-                            image: { type: 'jpeg', quality: 0.98 },
-                            html2canvas: { scale: 2, useCORS: true, logging: false },
-                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                        }).from(container).save().then(() => {
-                            document.body.removeChild(container);
+                        const printWindow = window.open('', '_blank');
+                        if (printWindow) {
+                            printWindow.document.open();
+                            printWindow.document.write(html);
+                            printWindow.document.close();
+                            setTimeout(() => {
+                                printWindow.focus();
+                                printWindow.print();
+                            }, 350);
                             resolve(fileName);
-                        }).catch((err: any) => {
-                            console.error('[html2pdf] conversion error:', err);
-                            document.body.removeChild(container);
-                            fallbackBlobDownload();
-                        });
-                    } catch (err) {
-                        console.error('[html2pdf] init error:', err);
-                        fallbackBlobDownload();
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('[Web Print Fallback] error:', e);
                     }
-                };
 
-                const fallbackBlobDownload = () => {
+                    // Direct Blob HTML fallback
                     try {
                         const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
                         const url = URL.createObjectURL(blob);
@@ -1546,8 +1200,65 @@ export const generateProfitLossPDF = async (
                         setTimeout(() => URL.revokeObjectURL(url), 2000);
                         resolve(fileName);
                     } catch (e) {
-                        console.error('[Web Fallback] error:', e);
+                        console.error('[Web Blob Fallback] error:', e);
                         resolve(null);
+                    }
+                };
+
+                const triggerAutoDownload = () => {
+                    try {
+                        const container = document.createElement('div');
+                        container.id = 'amh-pdf-root-container';
+                        // Render at viewport origin with negative z-index so html2canvas captures exact dimensions without blanking
+                        container.style.position = 'absolute';
+                        container.style.top = '0px';
+                        container.style.left = '0px';
+                        container.style.width = '794px';
+                        container.style.backgroundColor = '#FFFFFF';
+                        container.style.zIndex = '-99999';
+                        container.style.opacity = '1';
+                        container.style.pointerEvents = 'none';
+                        container.innerHTML = `
+                            <style>
+                                * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #FFFFFF; margin: 0; padding: 12px; }
+                            </style>
+                            <div style="padding: 12px; background: #FFFFFF;">
+                                ${printableContent}
+                            </div>
+                        `;
+                        document.body.appendChild(container);
+
+                        // @ts-ignore
+                        window.html2pdf().set({
+                            margin: [6, 6, 6, 6],
+                            filename: fileName,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: {
+                                scale: 2,
+                                useCORS: true,
+                                allowTaint: true,
+                                logging: false,
+                                width: 794,
+                                windowWidth: 794,
+                                x: 0,
+                                y: 0,
+                                scrollX: 0,
+                                scrollY: 0,
+                                backgroundColor: '#FFFFFF',
+                            },
+                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                        }).from(container).save().then(() => {
+                            if (document.body.contains(container)) document.body.removeChild(container);
+                            resolve(fileName);
+                        }).catch((err: any) => {
+                            console.error('[html2pdf] conversion error:', err);
+                            if (document.body.contains(container)) document.body.removeChild(container);
+                            fallbackPrintWindow();
+                        });
+                    } catch (err) {
+                        console.error('[html2pdf] init error:', err);
+                        fallbackPrintWindow();
                     }
                 };
 
@@ -1558,22 +1269,28 @@ export const generateProfitLossPDF = async (
                     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
                     script.onload = triggerAutoDownload;
                     script.onerror = () => {
-                        fallbackBlobDownload();
+                        fallbackPrintWindow();
                     };
                     document.head.appendChild(script);
                 }
             });
         }
 
-        // 2. Native Mobile Direct Auto-Download & Share
-        const { uri } = await Print.printToFileAsync({ html, base64: false });
+        // 2. Native Mobile Direct Auto-Download & Share (Exact A4 Dimensions: 595pt x 842pt)
+        const { uri } = await Print.printToFileAsync({
+            html,
+            width: 595,  // Exact standard A4 width in points
+            height: 842, // Exact standard A4 height in points
+            base64: false,
+        });
+
         const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
         const targetUri = `${docDir}${fileName}`;
 
         try {
             await FileSystem.copyAsync({ from: uri, to: targetUri });
         } catch {
-            // In case copy fails, retain uri
+            // Retain uri
         }
 
         if (await Sharing.isAvailableAsync()) {
