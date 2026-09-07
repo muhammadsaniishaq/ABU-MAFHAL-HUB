@@ -95,6 +95,8 @@ export default function APIVaultScreen() {
     // Core Active API Credentials State
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [bilalToken, setBilalToken] = useState('');
+    const [flutterwaveSecret, setFlutterwaveSecret] = useState('');
+    const [flutterwavePublicKey, setFlutterwavePublicKey] = useState('');
     const [paystackSecret, setPaystackSecret] = useState('');
     const [clubkonnectApiKey, setClubkonnectApiKey] = useState('');
     const [clubkonnectUserId, setClubkonnectUserId] = useState('');
@@ -221,6 +223,7 @@ export default function APIVaultScreen() {
                 'VTU_VENDOR', 'FAILOVER_MODE', 
                 'AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY',
                 'BILALSADASUB_TOKEN', 'BILAL_TOKEN', 'BILALSADASUB_API_KEY', 'BILAL_API_KEY',
+                'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET', 'FLUTTERWAVE_PUBLIC_KEY', 'FLUTTERWAVE_PUB',
                 'PAYSTACK_SECRET_KEY', 'PAYSTACK_KEY', 'PAYSTACK_SECRET', 'PAYSTACK_API_KEY',
                 'CLUBKONNECT_API_KEY', 'CLUBKONNECT_KEY', 'CLUBKONNECT_USER_ID', 'CLUBKONNECT_USER',
                 'IDPRO_API_KEY', 'IDPRO_KEY',
@@ -282,6 +285,12 @@ export default function APIVaultScreen() {
 
         const bilal = getFirstValid(map, 'BILALSADASUB_TOKEN', 'BILAL_TOKEN', 'BILALSADASUB_API_KEY', 'BILAL_API_KEY', 'BILALSADASUB_KEY');
         if (bilal) setBilalToken(bilal);
+
+        const flwSecret = getFirstValid(map, 'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET');
+        if (flwSecret) setFlutterwaveSecret(flwSecret);
+
+        const flwPub = getFirstValid(map, 'FLUTTERWAVE_PUBLIC_KEY', 'FLUTTERWAVE_PUB');
+        if (flwPub) setFlutterwavePublicKey(flwPub);
 
         const paystack = getFirstValid(map, 'PAYSTACK_SECRET_KEY', 'PAYSTACK_KEY', 'PAYSTACK_SECRET', 'PAYSTACK_API_KEY');
         if (paystack) setPaystackSecret(paystack);
@@ -353,10 +362,10 @@ export default function APIVaultScreen() {
 
     const toggleShowAllKeys = () => {
         const allKeys = [
-            'AGENTHUB_API_KEY', 'BILALSADASUB_TOKEN', 'PAYSTACK_SECRET_KEY', 'CLUBKONNECT_API_KEY',
-            'CLUBKONNECT_USER_ID', 'IDPRO_API_KEY', 'PAYVESSEL_API_KEY', 'PAYVESSEL_SECRET_KEY',
-            'NINEBOOST_API_KEY', 'NOWPAYMENTS_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN',
-            'TERMII_API_KEY', 'MONNIFY_API_KEY', 'MONNIFY_SECRET_KEY'
+            'AGENTHUB_API_KEY', 'BILALSADASUB_TOKEN', 'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_PUBLIC_KEY',
+            'PAYSTACK_SECRET_KEY', 'CLUBKONNECT_API_KEY', 'CLUBKONNECT_USER_ID', 'IDPRO_API_KEY',
+            'PAYVESSEL_API_KEY', 'PAYVESSEL_SECRET_KEY', 'NINEBOOST_API_KEY', 'NOWPAYMENTS_API_KEY',
+            'BIGI_API_TOKEN', 'BIGI_API_PIN', 'TERMII_API_KEY', 'MONNIFY_API_KEY', 'MONNIFY_SECRET_KEY'
         ];
         const hasUnvisible = allKeys.some(k => !visibleKeys[k]);
         const nextState: Record<string, boolean> = {};
@@ -377,14 +386,32 @@ export default function APIVaultScreen() {
         }, 600);
     };
 
-    const fetchLiveProviderBalance = (id: string, val: string) => {
+    const fetchLiveProviderBalance = async (id: string, val: string) => {
         if (!val || val.trim() === '') {
             showToast(`⚠️ ${id.toUpperCase()}: Please configure API Key first`);
             return;
         }
         setFetchingBalance(id);
+
+        if (id === 'flutterwave') {
+            try {
+                const { data, error } = await supabase.functions.invoke('payment-webhook', {
+                    body: { action: 'check_flutterwave_balance' }
+                });
+                if (!error && data?.success) {
+                    const balNum = Number(data.available_balance || 0);
+                    const formatted = `₦${balNum.toLocaleString('en-NG', { minimumFractionDigits: 2 })} Live`;
+                    setLiveBalances(prev => ({ ...prev, [id]: formatted }));
+                    showToast(`💰 FLUTTERWAVE: ${formatted}`);
+                    setFetchingBalance(null);
+                    return;
+                }
+            } catch (_) {}
+        }
+
         setTimeout(() => {
             const mockBalances: Record<string, string> = {
+                flutterwave: '₦215,400 Payout Float',
                 bilalsadasub: '₦45,280 Float',
                 bigi: '₦18,950 Float',
                 paystack: '₦142,500 Settlement',
@@ -428,6 +455,8 @@ export default function APIVaultScreen() {
             keys: {
                 AGENTHUB_API_KEY: agentHubApiKey,
                 BILALSADASUB_TOKEN: bilalToken,
+                FLUTTERWAVE_SECRET_KEY: flutterwaveSecret,
+                FLUTTERWAVE_PUBLIC_KEY: flutterwavePublicKey,
                 PAYSTACK_SECRET_KEY: paystackSecret,
                 CLUBKONNECT_API_KEY: clubkonnectApiKey,
                 CLUBKONNECT_USER_ID: clubkonnectUserId,
@@ -479,6 +508,8 @@ export default function APIVaultScreen() {
                 { canonical: 'FAILOVER_MODE', aliases: ['failover_mode'], value: failoverMode, desc: 'Failover Routing Strategy' },
                 { canonical: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], value: agentHubApiKey, desc: 'AgentHub API Key (NIN/BVN)' },
                 { canonical: 'BILALSADASUB_TOKEN', aliases: ['BILAL_TOKEN', 'BILALSADASUB_API_KEY'], value: bilalToken, desc: 'Bilalsadasub API Token' },
+                { canonical: 'FLUTTERWAVE_SECRET_KEY', aliases: ['FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET'], value: flutterwaveSecret, desc: 'Flutterwave Secret Key for Instant Bank Payouts' },
+                { canonical: 'FLUTTERWAVE_PUBLIC_KEY', aliases: ['FLUTTERWAVE_PUB'], value: flutterwavePublicKey, desc: 'Flutterwave Public Key' },
                 { canonical: 'PAYSTACK_SECRET_KEY', aliases: ['PAYSTACK_KEY', 'PAYSTACK_SECRET'], value: paystackSecret, desc: 'Paystack Secret Key' },
                 { canonical: 'CLUBKONNECT_API_KEY', aliases: ['CLUBKONNECT_KEY'], value: clubkonnectApiKey, desc: 'ClubKonnect API Key' },
                 { canonical: 'CLUBKONNECT_USER_ID', aliases: ['CLUBKONNECT_USER'], value: clubkonnectUserId, desc: 'ClubKonnect User ID' },
@@ -523,6 +554,15 @@ export default function APIVaultScreen() {
                         }
                     }
                 }
+            }
+
+            // Always ensure transfer provider is explicitly set to flutterwave when flutterwaveSecret is provided
+            if (flutterwaveSecret && flutterwaveSecret.trim() !== '') {
+                await supabase.from('app_settings').upsert({
+                    key: 'transfer_provider',
+                    value: 'flutterwave',
+                    updated_at: new Date().toISOString()
+                });
             }
 
             Alert.alert("Success 🎉", "All Vault credentials saved and synced across database keys!");
@@ -614,6 +654,24 @@ export default function APIVaultScreen() {
             setSecondaryValue: setClubkonnectUserId,
             secondaryPlaceholder: 'Enter ClubKonnect User ID...',
             secondaryKeyName: 'CLUBKONNECT_USER_ID'
+        },
+        {
+            id: 'flutterwave',
+            keyName: 'FLUTTERWAVE_SECRET_KEY',
+            title: 'Flutterwave Bank Transfer Engine',
+            provider: 'Flutterwave',
+            category: 'Payments',
+            value: flutterwaveSecret,
+            setValue: setFlutterwaveSecret,
+            placeholder: 'Enter Flutterwave Secret Key (FLWSECK_TEST-... or FLWSECK-...)',
+            description: 'Direct NIP bank settlement, instant account verification & automated payouts.',
+            icon: 'swap-horizontal-outline',
+            badgeTag: 'PRIMARY TRANSFER',
+            isSecret: true,
+            secondaryValue: flutterwavePublicKey,
+            setSecondaryValue: setFlutterwavePublicKey,
+            secondaryPlaceholder: 'Enter Flutterwave Public Key (FLWPUBK-...)...',
+            secondaryKeyName: 'FLUTTERWAVE_PUBLIC_KEY'
         },
         {
             id: 'paystack',

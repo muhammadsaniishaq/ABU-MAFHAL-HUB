@@ -233,10 +233,9 @@ export default function TransferScreen() {
 
     const validationHint = useMemo(() => {
         if (activeTab === 'bank') {
-            const activeProvName = settings?.transfer_provider === 'paystack' ? 'Paystack' : 'Flutterwave';
             if (!selectedBank) return 'Step 1: Tap to choose destination bank';
             if (accountNumber.trim().length < 10) return `Step 2: Enter 10-digit account (${accountNumber.trim().length}/10)`;
-            if (isResolvingAccount) return `Step 2: Verifying account name with ${activeProvName}...`;
+            if (isResolvingAccount) return 'Step 2: Verifying account name...';
             if (!accountName.trim()) return resolveError ? `⚠️ ${resolveError}` : 'Step 2: Awaiting verified account name';
             if (numAmount <= 0) return 'Step 3: Enter transfer amount';
             if (userBalance > 0 && totalDebit > userBalance) return `⚠️ Insufficient balance (Need: ₦${totalDebit.toLocaleString()})`;
@@ -681,7 +680,7 @@ export default function TransferScreen() {
         try {
             const detailsMsg = lastTxDetails.type === 'p2p'
                 ? `🧾 ABU MAFHAL HUB - WALLET TRANSFER RECEIPT\n\nAmount: ₦${lastTxDetails.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}\nTo: ${lastTxDetails.recipient}\nMethod: Abu Mafhal Wallet (Free ₦0 Fee)\nReference: ${lastTxDetails.reference}\nDate: ${lastTxDetails.date}\n\nThank you for choosing Abu Mafhal Hub!`
-                : `🧾 ABU MAFHAL HUB - BANK SETTLEMENT RECEIPT\n\nAmount: ₦${lastTxDetails.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}\nRecipient: ${lastTxDetails.recipient}\nDestination Bank: ${lastTxDetails.bankName}\nAccount Number: ${lastTxDetails.accountNumber}\nReference: ${lastTxDetails.reference}\nDate: ${lastTxDetails.date}\n\nDispatched instantly via Paystack on Abu Mafhal Hub!`;
+                : `🧾 ABU MAFHAL HUB - BANK SETTLEMENT RECEIPT\n\nAmount: ₦${lastTxDetails.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}\nRecipient: ${lastTxDetails.recipient}\nDestination Bank: ${lastTxDetails.bankName}\nAccount Number: ${lastTxDetails.accountNumber}\nReference: ${lastTxDetails.reference}\nDate: ${lastTxDetails.date}\n\nDispatched instantly via Direct Bank Settlement on Abu Mafhal Hub!`;
 
             await Share.share({
                 title: 'Abu Mafhal Hub - Transfer Receipt',
@@ -730,8 +729,8 @@ export default function TransferScreen() {
                     <View style={s.headerTitleCol}>
                         <Text style={s.headerTitle}>Transfer Funds</Text>
                         <View style={s.paystackPoweredRow}>
-                            <Ionicons name="shield-checkmark" size={12} color="#059669" />
-                            <Text style={s.headerSubtitle}>Paystack Instant Settlement</Text>
+                            <Ionicons name="shield-checkmark" size={12} color="#D97706" />
+                            <Text style={s.headerSubtitle}>Direct Bank Settlement</Text>
                         </View>
                     </View>
 
@@ -797,7 +796,7 @@ export default function TransferScreen() {
                     </Text>
                     <View style={[s.liveBadge, activeTab === 'bank' && s.liveBadgeActive]}>
                         <Text style={[s.liveBadgeText, activeTab === 'bank' && s.liveBadgeTextActive]}>
-                            {settings?.transfer_provider === 'paystack' ? 'Paystack' : 'Flutterwave'}
+                            Direct
                         </Text>
                     </View>
                 </TouchableOpacity>
@@ -844,9 +843,7 @@ export default function TransferScreen() {
                             <View style={{ flex: 1 }}>
                                 <Text style={s.cardTitle}>Send Money to Bank Account</Text>
                                 <Text style={s.cardSub}>
-                                    {settings?.transfer_provider === 'paystack'
-                                        ? 'Automated settlement to all Nigerian banks via Paystack'
-                                        : 'Automated instant settlement to all Nigerian banks via Flutterwave'}
+                                    Automated instant settlement to all Nigerian commercial banks & MFBs
                                 </Text>
                             </View>
                         </View>
@@ -877,7 +874,6 @@ export default function TransferScreen() {
                                     <BankLogoBadge bank={selectedBank} size={26} />
                                     <View style={{ flex: 1 }}>
                                         <Text style={s.selectedBankName} numberOfLines={1}>{selectedBank.name}</Text>
-                                        <Text style={s.selectedBankCode}>Code: {selectedBank.code}</Text>
                                     </View>
                                 </View>
                             ) : (
@@ -942,12 +938,12 @@ export default function TransferScreen() {
                             ) : null}
                         </View>
 
-                        {/* Paystack Auto-Resolution Feedback */}
+                        {/* Direct Auto-Resolution Feedback */}
                         {isResolvingAccount && (
                             <View style={s.resolvingStatusBox}>
-                                <ActivityIndicator size="small" color="#0369A1" />
+                                <ActivityIndicator size="small" color="#D97706" />
                                 <Text style={s.resolvingStatusText}>
-                                    Verifying account name with Paystack NUBAN...
+                                    Verifying account name with NUBAN...
                                 </Text>
                             </View>
                         )}
@@ -1351,7 +1347,7 @@ export default function TransferScreen() {
                             <Ionicons name="search" size={15} color="#F59E0B" style={{ marginRight: 6 }} />
                             <TextInput
                                 style={s.bankSearchInput}
-                                placeholder="Search bank name or code (e.g. OPay, GTBank)..."
+                                placeholder="Search bank name (e.g. OPay, GTBank)..."
                                 placeholderTextColor="#94A3B8"
                                 value={bankSearchText}
                                 onChangeText={setBankSearchText}
@@ -1393,7 +1389,6 @@ export default function TransferScreen() {
                                             <Text style={[s.bankItemName, isSelected && s.bankItemNameActive]} numberOfLines={1}>
                                                 {item.name}
                                             </Text>
-                                            <Text style={s.bankItemCode}>Code: {item.code}</Text>
                                         </View>
                                         {isSelected && (
                                             <Ionicons name="checkmark-circle" size={18} color="#F59E0B" />
@@ -1405,7 +1400,7 @@ export default function TransferScreen() {
                                 <View style={s.emptyBankState}>
                                     <Ionicons name="search-outline" size={28} color="#94A3B8" />
                                     <Text style={s.emptyBankTitle}>No Bank Found</Text>
-                                    <Text style={s.emptyBankSub}>Please check the spelling or search by bank code.</Text>
+                                    <Text style={s.emptyBankSub}>Please check the bank name spelling.</Text>
                                 </View>
                             )}
                         />
@@ -1621,7 +1616,7 @@ export default function TransferScreen() {
                                     <View style={s.receiptRow}>
                                         <Text style={s.receiptLabel}>Channel:</Text>
                                         <Text style={s.receiptVal}>
-                                            {lastTxDetails?.type === 'p2p' ? 'Abu Mafhal Wallet' : (settings?.transfer_provider === 'paystack' ? 'Paystack Settlement' : 'Flutterwave Settlement')}
+                                            {lastTxDetails?.type === 'p2p' ? 'Abu Mafhal Wallet' : 'Direct Bank Settlement'}
                                         </Text>
                                     </View>
                                     <View style={s.receiptRow}>
@@ -1726,7 +1721,7 @@ const s = StyleSheet.create({
         marginTop: 1,
     },
     headerSubtitle: {
-        color: '#059669',
+        color: '#D97706',
         fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.3,
@@ -1806,12 +1801,13 @@ const s = StyleSheet.create({
         gap: 6,
     },
     tabButtonActive: {
-        backgroundColor: '#1E40AF',
-        borderColor: '#1D4ED8',
-        shadowColor: '#1E40AF',
+        backgroundColor: '#0F172A',
+        borderColor: '#D97706',
+        borderWidth: 1.5,
+        shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 4,
+        shadowOpacity: 0.25,
+        shadowRadius: 5,
         elevation: 3,
     },
     tabButtonText: {
@@ -1820,7 +1816,7 @@ const s = StyleSheet.create({
         fontWeight: '700',
     },
     tabButtonTextActive: {
-        color: '#FFFFFF',
+        color: '#FBBF24',
         fontWeight: '900',
     },
     liveBadge: {
@@ -2042,16 +2038,16 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: '#E0F2FE',
+        backgroundColor: '#FEF3C7',
         borderWidth: 1,
-        borderColor: '#BAE6FD',
+        borderColor: '#FDE68A',
         borderRadius: 8,
         paddingHorizontal: 8,
         paddingVertical: 6,
         marginTop: 6,
     },
     resolvingStatusText: {
-        color: '#0284C7',
+        color: '#92400E',
         fontSize: 11,
         fontWeight: '700',
     },
@@ -2243,12 +2239,14 @@ const s = StyleSheet.create({
         marginBottom: 8,
     },
     submitBtnActive: {
-        backgroundColor: '#1E40AF',
-        shadowColor: '#1E40AF',
+        backgroundColor: '#0F172A',
+        borderWidth: 1.5,
+        borderColor: '#D97706',
+        shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.35,
         shadowRadius: 8,
-        elevation: 4,
+        elevation: 5,
     },
     submitBtnDisabled: {
         backgroundColor: '#CBD5E1',
@@ -2256,7 +2254,7 @@ const s = StyleSheet.create({
         borderColor: '#94A3B8',
     },
     submitBtnText: {
-        color: '#FFFFFF',
+        color: '#F59E0B',
         fontSize: 14,
         fontWeight: '900',
         letterSpacing: 0.6,
@@ -2520,12 +2518,14 @@ const s = StyleSheet.create({
         flex: 1.4,
         height: 44,
         borderRadius: 12,
-        backgroundColor: '#1E40AF',
+        backgroundColor: '#0F172A',
+        borderWidth: 1.2,
+        borderColor: '#D97706',
         alignItems: 'center',
         justifyContent: 'center',
     },
     proceedBtnText: {
-        color: '#FFFFFF',
+        color: '#F59E0B',
         fontSize: 12.5,
         fontWeight: '900',
     },
@@ -2700,12 +2700,14 @@ const s = StyleSheet.create({
         flex: 1,
         height: 42,
         borderRadius: 12,
-        backgroundColor: '#1E40AF',
+        backgroundColor: '#0F172A',
+        borderWidth: 1.2,
+        borderColor: '#D97706',
         alignItems: 'center',
         justifyContent: 'center',
     },
     doneBtnText: {
-        color: '#FFFFFF',
+        color: '#F59E0B',
         fontSize: 12,
         fontWeight: '900',
     },
