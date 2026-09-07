@@ -743,6 +743,21 @@ $$ language plpgsql security definer;
             }
         }
 
+        // --- ACTION: GET SERVER OUTBOUND IP ---
+        if (parsedPayload && parsedPayload.action === 'get_outbound_ip') {
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                return new Response(JSON.stringify({ success: true, outbound_ip: ipData.ip }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            } catch (ipErr: any) {
+                return new Response(JSON.stringify({ success: false, error: ipErr.message }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+        }
+
         // --- ACTION: CHECK FLUTTERWAVE BALANCE & CAPABILITIES ---
         if (parsedPayload && (parsedPayload.action === 'check_flutterwave_balance' || parsedPayload.action === 'check_flw_balance')) {
             try {
@@ -1040,8 +1055,10 @@ $$ language plpgsql security definer;
                     if (trfData.status !== 'success') {
                         let errMsg = trfData.message || "Bank payout rejected by Flutterwave. Your wallet was NOT charged.";
                         const lowerMsg = errMsg.toLowerCase();
-                        if (lowerMsg.includes("cannot be processed") || lowerMsg.includes("account administrator")) {
-                            errMsg = "Flutterwave Transfer Restriction: API Transfers/Payouts are blocked on your Flutterwave Merchant Account. Solution: 1) Go to Flutterwave Dashboard -> Settings -> API -> IP Whitelist (clear any IP restrictions). 2) In Settings -> Transfers, turn off OTP/2FA requirement for API Transfers. 3) If newly registered, contact Flutterwave Support or complete KYC to activate Payouts. Your wallet was NOT charged.";
+                        if (lowerMsg.includes("ip whitelist") || lowerMsg.includes("whitelisting")) {
+                            errMsg = "Flutterwave IP Whitelisting Required: Flutterwave mandates adding an IP to your Whitelist for Transfers. In Flutterwave Dashboard -> Settings -> Whitelisted IP addresses, add your server IP (or 0.0.0.0). Alternatively, switch to Paystack in Admin Settings. Your wallet was NOT charged.";
+                        } else if (lowerMsg.includes("cannot be processed") || lowerMsg.includes("account administrator")) {
+                            errMsg = "Flutterwave Transfer Restriction: API Transfers/Payouts are blocked on your Flutterwave Merchant Account. Solution: 1) Go to Flutterwave Dashboard -> Settings -> API -> IP Whitelist. 2) In Settings -> Transfers, turn off OTP/2FA requirement for API Transfers. 3) Contact Flutterwave Support or complete KYC to activate Payouts. Your wallet was NOT charged.";
                         }
                         return new Response(JSON.stringify({
                             success: false,
