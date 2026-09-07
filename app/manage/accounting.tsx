@@ -75,7 +75,7 @@ const C = {
     textMuted: '#94A3B8',
 };
 
-type TimeRange = 'today' | 'yesterday' | 'week' | 'month' | 'all';
+type TimeRange = 'today' | 'yesterday' | 'week' | 'month' | 'last30' | 'year' | 'all';
 type TabType = 'overview' | 'services' | 'expenses' | 'transactions';
 
 const getServiceMeta = (type: string) => {
@@ -161,8 +161,9 @@ function AccountingContent() {
     const [savingExpense, setSavingExpense] = useState(false);
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
-    // Service Sorting Mode
+    // Service Sorting Mode & Category Filter
     const [serviceSortMode, setServiceSortMode] = useState<'default' | 'profit' | 'margin'>('default');
+    const [serviceCategoryFilter, setServiceCategoryFilter] = useState<'all' | 'telecom' | 'identity' | 'finance' | 'utilities'>('all');
 
     // Super Admin Clearance Vault
     const [clearanceModalVisible, setClearanceModalVisible] = useState(false);
@@ -213,6 +214,12 @@ function AccountingContent() {
         } else if (range === 'month') {
             const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
             return { start, label: 'This Month' };
+        } else if (range === 'last30') {
+            const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            return { start, label: 'Last 30 Days' };
+        } else if (range === 'year') {
+            const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+            return { start, label: 'This Year' };
         }
         return { label: 'All Time' };
     };
@@ -326,14 +333,59 @@ function AccountingContent() {
         }
     };
 
-    // 7. Handle Export CSV Spreadsheet
+    // 7. Handle Export CSV Spreadsheet (Direct Auto-Download)
     const handleExportCSV = async () => {
         if (!metrics) return;
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setExportingCSV(true);
+        try {
+            const { label } = getDateRange(timeRange);
+            const success = await exportFinancialCSV(metrics, label);
+            if (success) {
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(
+                    'Spreadsheet Downloaded',
+                    `Financial spreadsheet (CSV) has been exported and saved to your device for (${label}).`
+                );
+            }
+        } catch (err: any) {
+            console.error('[Export CSV] UI error:', err);
+            Alert.alert('Notice', 'Unable to complete spreadsheet export.');
+        } finally {
+            setExportingCSV(false);
+        }
+    };
+
+    // 8. Copy Executive Financial Brief (Instant 1-Tap Copy for WhatsApp / Management)
+    const handleCopyBrief = () => {
+        if (!metrics) return;
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const { label } = getDateRange(timeRange);
-        await exportFinancialCSV(metrics, label);
-        setExportingCSV(false);
+        const isSurplus = metrics.netProfit >= 0;
+        const advisory = getFinancialHealthAdvisory(metrics);
+        const briefText = 
+`📊 *ABU MAFHAL HUB - EXECUTIVE FINANCIAL BRIEF*
+📅 *Period*: ${label}
+🕒 *Generated*: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+
+══════════════════════════
+💰 *Gross Revenue*: ${formatNaira(metrics.totalRevenue)}
+📦 *Cost of Sales*: ${formatNaira(metrics.totalCost)}
+📈 *Gross Trading Margin*: ${formatNaira(metrics.grossProfit)} (${metrics.profitMargin.toFixed(1)}%)
+📉 *Operating Expenses*: ${formatNaira(metrics.totalExpenses)}
+══════════════════════════
+💵 *NET ${isSurplus ? 'PROFIT SURPLUS' : 'DEFICIT'}*: ${formatNaira(metrics.netProfit)}
+⚡ *Orders Completed*: ${metrics.successfulTransactionsCount.toLocaleString()}
+🛡️ *Customer Balances*: ${formatNaira(metrics.userLiquidity.totalUserBalances)} (100% Backed)
+🏥 *Commercial Rating*: ${advisory.rating} (${advisory.headline})
+══════════════════════════
+_Certified by Abu Mafhal Enterprise Cloud Accounting Ledger_`;
+
+        Clipboard.setStringAsync(briefText);
+        Alert.alert(
+            'Executive Brief Copied',
+            `The financial summary for (${label}) has been copied to your clipboard. Ready to paste directly into WhatsApp or Telegram.`
+        );
     };
 
     // 8. Super Admin Clearance Vault Management
@@ -421,9 +473,20 @@ function AccountingContent() {
 
     const isNetProfitable = (metrics?.netProfit || 0) >= 0;
 
-    // Filter & sort services list based on search and sort mode
+    // Filter & sort services list based on category filter, search and sort mode
     const filteredServices = Object.values(metrics?.serviceBreakdown || {})
         .filter(serv => {
+            // Category Grouping
+            if (serviceCategoryFilter === 'telecom') {
+                if (!['data', 'airtime', 'smile', 'bulk_sms', 'recharge_pin'].includes(serv.type)) return false;
+            } else if (serviceCategoryFilter === 'identity') {
+                if (!['cac', 'nin', 'bvn'].includes(serv.type)) return false;
+            } else if (serviceCategoryFilter === 'finance') {
+                if (!['virtual_cards', 'airtime_to_cash', 'crypto', 'transfer', 'funding_fee'].includes(serv.type)) return false;
+            } else if (serviceCategoryFilter === 'utilities') {
+                if (!['electricity', 'tv', 'education', 'social_boost'].includes(serv.type)) return false;
+            }
+
             if (!serviceSearch.trim()) return true;
             const q = serviceSearch.toLowerCase().trim();
             return serv.serviceName.toLowerCase().includes(q) || serv.type.toLowerCase().includes(q);
@@ -534,12 +597,14 @@ function AccountingContent() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.timeFilterContainer}
                 >
-                    {(['today', 'yesterday', 'week', 'month', 'all'] as TimeRange[]).map((r) => {
+                    {(['today', 'yesterday', 'week', 'month', 'last30', 'year', 'all'] as TimeRange[]).map((r) => {
                         const labels: Record<TimeRange, string> = {
                             today: 'Today',
                             yesterday: 'Yesterday',
                             week: 'This Week',
                             month: 'This Month',
+                            last30: 'Last 30 Days',
+                            year: 'This Year',
                             all: 'All Time'
                         };
                         const active = timeRange === r;
@@ -642,6 +707,25 @@ function AccountingContent() {
                                     Gross Profit ({formatNaira(metrics?.grossProfit || 0)}) − Total Expenses ({formatNaira(metrics?.totalExpenses || 0)})
                                 </Text>
                             </LinearGradient>
+
+                            {/* EXECUTIVE DISPATCH & WHATSAPP BRIEF BAR */}
+                            <View style={styles.briefBar}>
+                                <View style={{ flex: 1, marginRight: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Ionicons name="document-text" size={13} color={C.navy} />
+                                        <Text style={styles.briefBarTitle}>Management Financial Brief</Text>
+                                    </View>
+                                    <Text style={styles.briefBarSub}>Instant WhatsApp & executive summary</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={handleCopyBrief}
+                                    style={styles.briefCopyBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="copy-outline" size={13} color={C.goldBright} />
+                                    <Text style={styles.briefCopyBtnText}>Copy Brief</Text>
+                                </TouchableOpacity>
+                            </View>
 
                             {/* 2. 4 SECONDARY METRIC CARDS */}
                             <View style={styles.metricsGrid}>
@@ -1002,6 +1086,33 @@ function AccountingContent() {
                                 )}
                             </View>
 
+                            {/* Category Filter Chips */}
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    {[
+                                        { id: 'all', label: 'All Services (18)' },
+                                        { id: 'telecom', label: 'Telecom & Data (5)' },
+                                        { id: 'identity', label: 'Identity & Slips (3)' },
+                                        { id: 'finance', label: 'Finance & Cards (5)' },
+                                        { id: 'utilities', label: 'Utilities & Bills (4)' },
+                                    ].map((cat) => (
+                                        <TouchableOpacity
+                                            key={cat.id}
+                                            onPress={() => {
+                                                if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                                setServiceCategoryFilter(cat.id as any);
+                                            }}
+                                            style={[styles.serviceCatChip, serviceCategoryFilter === cat.id && styles.serviceCatChipActive]}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={[styles.serviceCatChipText, serviceCategoryFilter === cat.id && styles.serviceCatChipTextActive]}>
+                                                {cat.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </ScrollView>
+
                             {/* Sorting Mode Selector */}
                             <View style={styles.sortPillsRow}>
                                 <Text style={styles.sortPillsLabel}>Sort Mode:</Text>
@@ -1337,6 +1448,33 @@ function AccountingContent() {
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
+                            <Text style={styles.inputLabel}>Quick Presets (One-Tap Autofill)</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    {[
+                                        { label: '🌐 Server Hosting', title: 'Cloud Server Hosting & Infrastructure', cat: 'server_costs' },
+                                        { label: '📶 Telecom Float', title: 'VTU & Airtime Top-up Float', cat: 'wholesale_float' },
+                                        { label: '🏢 Office & Power', title: 'Office Internet & Power Supply', cat: 'office_supplies' },
+                                        { label: '📢 Marketing & Ads', title: 'Social Media & Marketing Campaign', cat: 'marketing' },
+                                        { label: '💳 Bank / Gateway', title: 'Payment Gateway Settlement Fees', cat: 'gateway_charges' },
+                                        { label: '⚖️ Legal & CAC', title: 'Regulatory Compliance & Filing Fee', cat: 'legal_licensing' },
+                                    ].map((preset, pIdx) => (
+                                        <TouchableOpacity
+                                            key={pIdx}
+                                            onPress={() => {
+                                                if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                                setNewTitle(preset.title);
+                                                setNewCategory(preset.cat);
+                                            }}
+                                            style={styles.presetChip}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.presetChipText}>{preset.label}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </ScrollView>
+
                             <Text style={styles.inputLabel}>Expense Title / Description *</Text>
                             <TextInput
                                 style={styles.textInput}
@@ -3161,5 +3299,87 @@ const styles = StyleSheet.create({
         padding: 6,
         backgroundColor: C.goldBg,
         borderRadius: 8,
+    },
+
+    // Executive Management Brief Bar
+    briefBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 12,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(218, 165, 32, 0.35)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    briefBarTitle: {
+        color: C.navy,
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    briefBarSub: {
+        color: C.textSub,
+        fontSize: 9.5,
+        marginTop: 2,
+    },
+    briefCopyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: C.navy,
+        paddingHorizontal: 11,
+        paddingVertical: 7,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: C.goldBright,
+    },
+    briefCopyBtnText: {
+        color: C.goldBright,
+        fontSize: 10.5,
+        fontWeight: '900',
+    },
+
+    // Services Category Chips
+    serviceCatChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    serviceCatChipActive: {
+        backgroundColor: C.navy,
+        borderColor: C.navy,
+    },
+    serviceCatChipText: {
+        color: C.textSub,
+        fontSize: 10.5,
+        fontWeight: '700',
+    },
+    serviceCatChipTextActive: {
+        color: C.goldBright,
+        fontWeight: '900',
+    },
+
+    // Expense Preset Chips
+    presetChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    presetChipText: {
+        color: C.navy,
+        fontSize: 10.5,
+        fontWeight: '700',
     },
 });

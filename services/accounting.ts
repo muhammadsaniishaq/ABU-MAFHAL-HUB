@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import { Alert, Platform } from 'react-native';
 import { ABU_MAFHAL_LOGO_B64 } from '../assets/images/logoB64';
 
@@ -1498,27 +1498,92 @@ export const generateProfitLossPDF = async (
             </html>
         `;
 
-        // 1. Generate high-resolution PDF
-        const { uri } = await Print.printToFileAsync({ html, base64: false });
-
-        // 2. Direct download / local save onto phone
-        const targetUri = `${FileSystem.documentDirectory}${fileName}`;
-        await FileSystem.copyAsync({ from: uri, to: targetUri });
-
-        // 3. Web download or native share sheet
+        // 1. Web Auto-Download (Instant Automatic Download directly to phone/PC storage with ZERO print dialogs)
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            const link = document.createElement('a');
-            link.href = uri;
-            link.download = fileName;
-            link.click();
+            return new Promise<string | null>((resolve) => {
+                const triggerAutoDownload = () => {
+                    try {
+                        const container = document.createElement('div');
+                        container.innerHTML = html;
+                        container.style.position = 'fixed';
+                        container.style.top = '-9999px';
+                        container.style.left = '-9999px';
+                        container.style.width = '794px';
+                        container.style.background = '#FFFFFF';
+                        document.body.appendChild(container);
+
+                        // @ts-ignore
+                        window.html2pdf().set({
+                            margin: [8, 8, 8, 8],
+                            filename: fileName,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2, useCORS: true, logging: false },
+                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                        }).from(container).save().then(() => {
+                            document.body.removeChild(container);
+                            resolve(fileName);
+                        }).catch((err: any) => {
+                            console.error('[html2pdf] conversion error:', err);
+                            document.body.removeChild(container);
+                            fallbackBlobDownload();
+                        });
+                    } catch (err) {
+                        console.error('[html2pdf] init error:', err);
+                        fallbackBlobDownload();
+                    }
+                };
+
+                const fallbackBlobDownload = () => {
+                    try {
+                        const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = fileName.replace('.pdf', '.html');
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(url), 2000);
+                        resolve(fileName);
+                    } catch (e) {
+                        console.error('[Web Fallback] error:', e);
+                        resolve(null);
+                    }
+                };
+
+                if ((window as any).html2pdf) {
+                    triggerAutoDownload();
+                } else {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                    script.onload = triggerAutoDownload;
+                    script.onerror = () => {
+                        fallbackBlobDownload();
+                    };
+                    document.head.appendChild(script);
+                }
+            });
+        }
+
+        // 2. Native Mobile Direct Auto-Download & Share
+        const { uri } = await Print.printToFileAsync({ html, base64: false });
+        const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+        const targetUri = `${docDir}${fileName}`;
+
+        try {
+            await FileSystem.copyAsync({ from: uri, to: targetUri });
+        } catch {
+            // In case copy fails, retain uri
+        }
+
+        if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(targetUri, {
+                UTI: 'com.adobe.pdf',
+                mimeType: 'application/pdf',
+                dialogTitle: `Download Statement - ${fileName}`,
+            });
         } else {
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(targetUri, {
-                    UTI: 'com.adobe.pdf',
-                    mimeType: 'application/pdf',
-                    dialogTitle: `Download Statement - ${fileName}`,
-                });
-            }
+            Alert.alert('Download Complete', `Statement saved at: ${targetUri}`);
         }
 
         return targetUri;
@@ -1535,7 +1600,7 @@ export const generateProfitLossPDF = async (
 export const exportFinancialCSV = async (
     metrics: AccountingMetrics,
     periodLabel: string
-): Promise<void> => {
+): Promise<boolean> => {
     try {
         const dateStr = new Date().toISOString().split('T')[0];
         const rows: string[] = [];
@@ -1604,25 +1669,44 @@ export const exportFinancialCSV = async (
             });
         }
 
-        const csvContent = rows.join('\n');
+        const csvContent = '\uFEFF' + rows.join('\r\n');
         const filename = `Abu_Mafhal_Financial_Report_${dateStr}_${Date.now()}.csv`;
-        const fileUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory}${filename}`;
+
+        // 1. Web Auto-Download (Instant Direct Download, Zero Dialogs)
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            return true;
+        }
+
+        // 2. Native Mobile Direct Auto-Download & Share
+        const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+        const fileUri = `${docDir}${filename}`;
 
         await FileSystem.writeAsStringAsync(fileUri, csvContent, {
-            encoding: FileSystem.EncodingType.UTF8
+            encoding: ((FileSystem as any).EncodingType?.UTF8 || 'utf8') as any
         });
 
         if (await Sharing.isAvailableAsync()) {
             await Sharing.shareAsync(fileUri, {
                 mimeType: 'text/csv',
-                dialogTitle: 'Export Abu Mafhal Financial Spreadsheet (CSV)',
+                dialogTitle: `Download Financial Spreadsheet (CSV)`,
                 UTI: 'public.comma-separated-values-text'
             });
         } else {
-            Alert.alert('Spreadsheet Export', `File generated at: ${fileUri}`);
+            Alert.alert('Download Complete', `Spreadsheet file generated at: ${fileUri}`);
         }
+        return true;
     } catch (err: any) {
         console.error('[CSV Export] Error:', err);
         Alert.alert('CSV Export Notice', err.message || 'Failed to generate financial spreadsheet.');
+        return false;
     }
 };
