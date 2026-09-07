@@ -292,8 +292,9 @@ begin
     raise exception 'Unauthorized: You cannot transfer funds on behalf of another user';
   end if;
 
-  if amount <= 0 then
-    raise exception 'Amount must be greater than zero';
+  -- ENFORCE MINIMUM TRANSFER 100 NAIRA
+  if amount < 100 then
+    raise exception 'Minimum transfer amount is NGN 100.00. Current amount: NGN %', amount;
   end if;
 
   if target_id is not null then
@@ -359,6 +360,25 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- 2B. CREATE EXECUTE_P2P_TRANSFER AS COMPATIBILITY ALIAS
+CREATE OR REPLACE FUNCTION public.execute_p2p_transfer(
+  target_id uuid default null,
+  target_email text default null,
+  amount decimal = 0.0,
+  note text default ''
+)
+returns jsonb as $$
+begin
+  return public.execute_wallet_transfer(
+    sender_id := auth.uid(),
+    target_id := target_id,
+    target_email := target_email,
+    amount := amount,
+    note := note
+  );
+end;
+$$ language plpgsql security definer;
+
 -- 3. CREATE EXECUTE_USER_BANK_WITHDRAWAL (Bank Transfer / Outgoing)
 CREATE OR REPLACE FUNCTION public.execute_user_bank_withdrawal(
   p_amount numeric,
@@ -388,8 +408,9 @@ begin
     end if;
   end if;
 
-  if p_amount <= 0 then
-    raise exception 'Amount must be greater than zero';
+  -- ENFORCE MINIMUM TRANSFER 100 NAIRA
+  if p_amount < 100 then
+    raise exception 'Minimum transfer amount is NGN 100.00. Current amount: NGN %', p_amount;
   end if;
 
   v_total_debit := p_amount + coalesce(p_fee, 0);
@@ -927,6 +948,16 @@ $$ language plpgsql security definer;
                 return new Response(JSON.stringify({ 
                     success: false, 
                     message: "Incomplete transfer details: user authentication, amount, account number, and bank are required." 
+                }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            // ENFORCE MINIMUM TRANSFER 100 NAIRA
+            if (numAmount < 100) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: "Minimum transfer amount is ₦100.00. Transfers below ₦100 are not allowed." 
                 }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });

@@ -107,6 +107,7 @@ const DEFAULT_BANKS: BankItem[] = [
     { id: '303', code: '303', name: 'Lotus Bank', logo: VERIFIED_BANK_LOGOS['303'], color: '#0A3B32' },
 ];
 
+export const MIN_TRANSFER_AMOUNT = 100;
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000];
 const NARRATION_PRESETS = ['Support', 'Payment', 'Bill', 'Business', 'Family', 'Gift'];
 
@@ -479,7 +480,7 @@ export default function TransferScreen() {
 
     // Form Validity
     const isFormValid = useMemo(() => {
-        if (numAmount <= 0) return false;
+        if (numAmount < MIN_TRANSFER_AMOUNT) return false;
         if (userBalance > 0 && totalDebit > userBalance) return false;
         if (activeTab === 'p2p') {
             return !!matchedUser;
@@ -637,16 +638,23 @@ export default function TransferScreen() {
 
     // Initiate Transfer (Opens confirmation)
     const handleInitiateTransfer = () => {
+        if (numAmount <= 0) {
+            Alert.alert('Amount Required', 'Please enter a valid transfer amount.');
+            return;
+        }
+        if (numAmount < MIN_TRANSFER_AMOUNT) {
+            Alert.alert('Minimum Transfer Amount', `The minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+            return;
+        }
+
         if (!isFormValid) {
             if (activeTab === 'bank') {
                 if (!selectedBank) Alert.alert('Bank Required', 'Please choose destination bank.');
                 else if (accountNumber.trim().length !== 10) Alert.alert('Invalid Account', 'Enter 10-digit account number.');
                 else if (!accountName) Alert.alert('Account Unverified', 'Please wait for account name verification.');
-                else if (numAmount <= 0) Alert.alert('Amount Required', 'Please enter a valid transfer amount.');
                 else if (totalDebit > userBalance) Alert.alert('Insufficient Balance', `You need ₦${totalDebit.toLocaleString()} (including ₦${transferFee} fee).`);
             } else {
                 if (!matchedUser) Alert.alert('Recipient Required', 'Enter member phone, email, or username.');
-                else if (numAmount <= 0) Alert.alert('Amount Required', 'Please enter a valid transfer amount.');
                 else if (totalDebit > userBalance) Alert.alert('Insufficient Balance', `You have ₦${userBalance.toLocaleString()} available.`);
             }
             return;
@@ -666,13 +674,27 @@ export default function TransferScreen() {
             const currentAmount = numAmount;
             const currentNarration = note.trim();
 
+            if (currentAmount < MIN_TRANSFER_AMOUNT) {
+                throw new Error(`Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+            }
+
             if (activeTab === 'p2p') {
-                const { data, error } = await supabase.rpc('execute_p2p_transfer', {
+                let p2pResult = await supabase.rpc('execute_wallet_transfer', {
+                    sender_id: currentUserId,
                     target_id: matchedUser!.id,
                     amount: currentAmount,
                     note: currentNarration || 'Wallet transfer via Abu Mafhal Hub',
                 });
 
+                if (p2pResult.error) {
+                    p2pResult = await supabase.rpc('execute_p2p_transfer', {
+                        target_id: matchedUser!.id,
+                        amount: currentAmount,
+                        note: currentNarration || 'Wallet transfer via Abu Mafhal Hub',
+                    });
+                }
+
+                const { data, error } = p2pResult;
                 if (error) throw new Error(error.message || 'P2P transfer failed.');
                 if (data && data.success === false) throw new Error(data.message || 'P2P transfer failed.');
 
@@ -1224,6 +1246,14 @@ export default function TransferScreen() {
                                 keyboardType="decimal-pad"
                             />
                         </View>
+                        {numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Ionicons name="alert-circle" size={13} color="#DC2626" />
+                                <Text style={{ fontSize: 11.5, color: '#DC2626', fontWeight: '700' }}>
+                                    Mafi karancin transfer shine ₦{MIN_TRANSFER_AMOUNT}.00 (Minimum transfer is ₦100)
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Quick Amount Chips */}
                         <View style={s.chipRow}>
@@ -1316,7 +1346,11 @@ export default function TransferScreen() {
                                         style={{ marginRight: 6 }}
                                     />
                                     <Text style={[s.submitBtnText, !isFormValid && s.submitBtnTextDisabled]}>
-                                        {isFormValid ? `TRANSFER ₦${numAmount.toLocaleString()}` : 'ENTER TRANSFER DETAILS'}
+                                        {numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
+                                            ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
+                                            : isFormValid
+                                            ? `TRANSFER ₦${numAmount.toLocaleString()} NOW`
+                                            : 'ENTER TRANSFER DETAILS'}
                                     </Text>
                                 </>
                             )}
@@ -1407,6 +1441,14 @@ export default function TransferScreen() {
                                 keyboardType="decimal-pad"
                             />
                         </View>
+                        {numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Ionicons name="alert-circle" size={13} color="#DC2626" />
+                                <Text style={{ fontSize: 11.5, color: '#DC2626', fontWeight: '700' }}>
+                                    Mafi karancin transfer shine ₦{MIN_TRANSFER_AMOUNT}.00 (Minimum transfer is ₦100)
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Quick Chips */}
                         <View style={s.chipRow}>
@@ -1493,7 +1535,11 @@ export default function TransferScreen() {
                                         style={{ marginRight: 6 }}
                                     />
                                     <Text style={[s.submitBtnText, !isFormValid && s.submitBtnTextDisabled]}>
-                                        {isFormValid ? `SEND ₦${numAmount.toLocaleString()} TO MEMBER` : 'ENTER MEMBER DETAILS'}
+                                        {numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
+                                            ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
+                                            : isFormValid
+                                            ? `SEND ₦${numAmount.toLocaleString()} TO MEMBER`
+                                            : 'ENTER MEMBER DETAILS'}
                                     </Text>
                                 </>
                             )}
