@@ -880,293 +880,520 @@ export const generateProfitLossPDF = async (
         const fileName = `Abu_Mafhal_Financial_Statement_${dateStr}_${Date.now()}.pdf`;
         const adv = getFinancialHealthAdvisory(metrics);
 
-        // Core Inner Printable Content (Self-contained, print-safe table layout)
-        const printableContent = `
-            <!-- EXECUTIVE BRANDED HEADER -->
-            <table style="width: 100%; border-collapse: collapse; background-color: #0A1128 !important; border-radius: 12px; border-bottom: 4px solid #DAA520; margin-bottom: 14px; color: #FFFFFF;">
-                <tr>
-                    <td style="padding: 16px 18px; vertical-align: middle;">
-                        <table style="border-collapse: collapse;">
-                            <tr>
-                                <td style="width: 64px; vertical-align: middle;">
-                                    <img src="${ABU_MAFHAL_LOGO_B64}" width="58" height="58" style="width: 58px; height: 58px; border-radius: 10px; border: 2px solid #DAA520; background-color: #FFFFFF; object-fit: contain; padding: 2px; display: block;" alt="Abu Mafhal Logo" />
-                                </td>
-                                <td style="padding-left: 14px; vertical-align: middle;">
-                                    <div style="font-size: 21px; font-weight: 900; color: #FFFFFF; letter-spacing: 0.6px; line-height: 1.1;">ABU MAFHAL HUB</div>
-                                    <div style="font-size: 10.5px; font-weight: 800; color: #F59E0B; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 3px;">ABU MAFHAL ENTERPRISE LTD • RC-8979939</div>
-                                    <div style="font-size: 9.5px; color: #94A3B8; margin-top: 2px; font-weight: 500;">Executive Profit & Loss Ledger • Certified Commercial Statement</div>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                    <td style="padding: 16px 18px; vertical-align: middle; text-align: right; width: 250px;">
-                        <div style="display: inline-block; background-color: rgba(245, 158, 11, 0.22) !important; border: 1.5px solid #DAA520; border-radius: 6px; padding: 3px 9px; color: #F59E0B; font-size: 9px; font-weight: 900; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 5px;">SUPER ADMIN STRICTLY CONFIDENTIAL</div>
-                        <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Ref:</b> <span style="font-family: 'Courier New', monospace; color: #F59E0B; font-weight: 800;">${refId}</span></div>
-                        <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Period:</b> ${periodLabel}</div>
-                        <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Date:</b> ${formatAccountingDate(new Date().toISOString(), true)}</div>
-                        <div style="display: inline-block; background-color: #064E3B !important; color: #34D399; border: 1px solid #059669; border-radius: 4px; padding: 1px 6px; font-size: 8.5px; font-weight: 800; margin-top: 4px; text-transform: uppercase;">✓ 100% AUDITED & VERIFIED</div>
-                    </td>
-                </tr>
-            </table>
-
-            <!-- TITANIUM NET PROFIT / LOSS SHOWCASE -->
-            <div style="background-color: ${isNetProfitable ? '#0F172A' : '#450A0A'} !important; border-radius: 12px; border: 1.5px solid ${isNetProfitable ? '#DAA520' : '#EF4444'}; padding: 16px 20px; margin-bottom: 14px; color: #FFFFFF;">
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px;">
-                    <tr>
-                        <td style="font-size: 11px; font-weight: 900; letter-spacing: 0.8px; color: ${isNetProfitable ? '#34D399' : '#F87171'}; text-transform: uppercase; vertical-align: middle;">
-                            ${isNetProfitable ? '★ NET TRADING SURPLUS (TAKE-HOME PROFIT)' : '⚠ NET OPERATING DEFICIT'}
-                        </td>
-                        <td style="text-align: right; vertical-align: middle;">
-                            <span style="background-color: rgba(245, 158, 11, 0.25) !important; border: 1px solid #DAA520; border-radius: 6px; padding: 2px 8px; font-size: 9.5px; font-weight: 900; color: #F59E0B;">${metrics.profitMargin.toFixed(1)}% GROSS MARGIN</span>
-                        </td>
-                    </tr>
-                </table>
-                <div style="font-size: 30px; font-weight: 900; color: ${isNetProfitable ? '#10B981' : '#EF4444'}; font-family: 'Courier New', monospace; margin: 3px 0 5px 0;">
-                    ${formatNaira(metrics.netProfit)}
-                </div>
-                <div style="font-size: 10.5px; color: #94A3B8; margin-bottom: 12px;">
-                    Gross Trading Margin (${formatNaira(metrics.grossProfit)}) minus Total Logged Expenses (${formatNaira(metrics.totalExpenses)})
-                </div>
-                <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 10px;">
-                    <tr>
-                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
-                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Daily Run-Rate</div>
-                            <div style="font-size: 12px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', monospace; margin-top: 2px;">${formatNaira(metrics.dailyRunRate)}/day</div>
-                        </td>
-                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
-                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">30-Day Projection</div>
-                            <div style="font-size: 12px; font-weight: 900; color: #34D399; font-family: 'Courier New', monospace; margin-top: 2px;">${formatNaira(metrics.projectedMonthlyProfit)}</div>
-                        </td>
-                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
-                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Commercial Health</div>
-                            <div style="font-size: 11px; font-weight: 900; color: #F59E0B; margin-top: 2px;">${adv.rating} (${adv.headline})</div>
-                        </td>
-                        <td style="background-color: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; width: 25%;">
-                            <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Completed Orders</div>
-                            <div style="font-size: 12px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', monospace; margin-top: 2px;">${metrics.successfulTransactionsCount} Orders</div>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- 4 CORE FINANCIAL KPIS -->
-            <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-bottom: 14px;">
-                <tr>
-                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
-                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Gross Revenue</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #1D4ED8; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.totalRevenue)}</div>
-                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Total volume collected</div>
-                    </td>
-                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
-                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Cost of Sales</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #475569; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.totalCost)}</div>
-                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Telecom & API wholesale</div>
-                    </td>
-                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
-                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Gross Trading Profit</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #059669; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.grossProfit)}</div>
-                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Surplus before expenses</div>
-                    </td>
-                    <td style="background-color: #F8FAFC !important; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; width: 25%;">
-                        <div style="font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase;">Logged Expenses</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #DC2626; font-family: 'Courier New', monospace; margin-top: 3px;">${formatNaira(metrics.totalExpenses)}</div>
-                        <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">${metrics.expensesCount} expenses logged</div>
-                    </td>
-                </tr>
-            </table>
-
-            <!-- CUSTOMER BALANCES & LIABILITIES PORTFOLIO -->
-            <table style="width: 100%; border-collapse: collapse; background-color: #F8FAFC !important; border: 1.5px solid #CBD5E1; border-radius: 10px; margin-bottom: 14px;">
-                <tr>
-                    <td style="padding: 12px 16px; vertical-align: middle;">
-                        <div style="display: inline-block; background-color: #ECFDF5 !important; color: #059669; border: 1px solid #A7F3D0; border-radius: 5px; padding: 1px 7px; font-size: 9px; font-weight: 800; margin-bottom: 4px;">100% Guaranteed Reserve Backed</div>
-                        <div style="font-size: 18px; font-weight: 900; color: #0F172A; font-family: 'Courier New', monospace;">${formatNaira(metrics.userLiquidity.totalUserBalances)}</div>
-                        <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Total user deposits held across platform database wallets (Customer Liabilities)</div>
-                    </td>
-                    <td style="padding: 12px 16px; vertical-align: middle; text-align: right; width: 280px;">
-                        <table style="border-collapse: collapse; margin-left: auto;">
-                            <tr>
-                                <td style="text-align: center; padding: 0 10px;">
-                                    <div style="font-size: 13px; font-weight: 900; color: #0F172A; font-family: 'Courier New', monospace;">${metrics.userLiquidity.totalUserCount}</div>
-                                    <div style="font-size: 9px; color: #64748B;">Registered Users</div>
-                                </td>
-                                <td style="text-align: center; padding: 0 10px; border-left: 1px solid #E2E8F0;">
-                                    <div style="font-size: 13px; font-weight: 900; color: #059669; font-family: 'Courier New', monospace;">${metrics.userLiquidity.fundedUserCount}</div>
-                                    <div style="font-size: 9px; color: #64748B;">Funded Wallets</div>
-                                </td>
-                                <td style="text-align: center; padding: 0 10px; border-left: 1px solid #E2E8F0;">
-                                    <div style="font-size: 13px; font-weight: 900; color: #0F172A; font-family: 'Courier New', monospace;">${formatNaira(metrics.userLiquidity.averageUserBalance)}</div>
-                                    <div style="font-size: 9px; color: #64748B;">Avg Balance</div>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-
-            <!-- ALL 18 SERVICES PROFIT BREAKDOWN -->
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
-                <tr>
-                    <td style="font-size: 12px; font-weight: 900; color: #0F172A; vertical-align: middle;">Comprehensive Product & Service Performance Matrix</td>
-                    <td style="font-size: 9.5px; color: #64748B; font-weight: 800; text-align: right; vertical-align: middle;">18 Enterprise Services Tracked</td>
-                </tr>
-            </table>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 10px; background-color: #FFFFFF !important; border: 1px solid #CBD5E1; border-radius: 8px;">
-                <thead>
-                    <tr style="background-color: #0A1128 !important; color: #FFFFFF !important;">
-                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Service Name</th>
-                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Orders</th>
-                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Revenue</th>
-                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Cost of Sales</th>
-                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Gross Profit</th>
-                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Margin %</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${Object.values(metrics.serviceBreakdown)
-                        .filter(s => s.revenue > 0 || s.transactionCount > 0)
-                        .map((s, idx) => `
-                            <tr style="background-color: ${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'} !important; border-bottom: 1px solid #E2E8F0;">
-                                <td style="padding: 6px 9px; color: #0F172A; font-weight: 700;">${s.serviceName}</td>
-                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace;">${s.transactionCount}</td>
-                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace;">${formatNaira(s.revenue)}</td>
-                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace; color: #64748B;">${formatNaira(s.cost)}</td>
-                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace; color: #059669; font-weight: 800;">${formatNaira(s.profit)}</td>
-                                <td style="padding: 6px 9px; text-align: right;">
-                                    <span style="display: inline-block; background-color: #FFFBEB !important; border: 1px solid #FDE68A; color: #D97706; border-radius: 4px; padding: 1px 5px; font-size: 8.5px; font-weight: 800;">${s.marginPercent.toFixed(1)}%</span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    <tr style="background-color: #F1F5F9 !important; font-weight: 900; border-top: 2px solid #94A3B8; font-size: 10.5px;">
-                        <td style="padding: 8px 9px; color: #0A1128;"><b>PORTFOLIO TOTAL</b></td>
-                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace;">${metrics.successfulTransactionsCount}</td>
-                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace;">${formatNaira(metrics.totalRevenue)}</td>
-                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace;">${formatNaira(metrics.totalCost)}</td>
-                        <td style="padding: 8px 9px; text-align: right; font-family: 'Courier New', monospace; color: #059669;">${formatNaira(metrics.grossProfit)}</td>
-                        <td style="padding: 8px 9px; text-align: right;">
-                            <span style="display: inline-block; background-color: #FFFBEB !important; border: 1px solid #FDE68A; color: #D97706; border-radius: 4px; padding: 1px 5px; font-size: 8.5px; font-weight: 800;">${metrics.profitMargin.toFixed(1)}%</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <!-- LOGGED OPERATING EXPENDITURES -->
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
-                <tr>
-                    <td style="font-size: 12px; font-weight: 900; color: #0F172A; vertical-align: middle;">Logged Operating Expenditures</td>
-                    <td style="font-size: 9.5px; color: #64748B; font-weight: 800; text-align: right; vertical-align: middle;">${metrics.recentExpenses.length} Records</td>
-                </tr>
-            </table>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 10px; background-color: #FFFFFF !important; border: 1px solid #CBD5E1; border-radius: 8px;">
-                <thead>
-                    <tr style="background-color: #0A1128 !important; color: #FFFFFF !important;">
-                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Date</th>
-                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Description</th>
-                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Category</th>
-                        <th style="padding: 7px 9px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Payment Method</th>
-                        <th style="padding: 7px 9px; text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #FFFFFF !important;">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${metrics.recentExpenses.length > 0 
-                        ? metrics.recentExpenses.slice(0, 10).map((e, idx) => `
-                            <tr style="background-color: ${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'} !important; border-bottom: 1px solid #E2E8F0;">
-                                <td style="padding: 6px 9px; color: #64748B;">${formatAccountingDate(e.expense_date)}</td>
-                                <td style="padding: 6px 9px; color: #0F172A; font-weight: 700;">${e.title}</td>
-                                <td style="padding: 6px 9px; color: #475569;">${e.category.replace('_', ' ').toUpperCase()}</td>
-                                <td style="padding: 6px 9px; color: #64748B;">${e.payment_method.replace('_', ' ')}</td>
-                                <td style="padding: 6px 9px; text-align: right; font-family: 'Courier New', monospace; color: #DC2626; font-weight: 800;">-${formatNaira(e.amount)}</td>
-                            </tr>
-                        `).join('')
-                        : '<tr><td colspan="5" style="text-align: center; color: #94A3B8; padding: 12px;">No operating expenses recorded for this reporting period.</td></tr>'
-                    }
-                </tbody>
-            </table>
-
-            <!-- AUDIT SIGNATURES & VERIFICATION SEAL -->
-            <table style="width: 100%; border-collapse: collapse; background-color: #F8FAFC !important; border: 1.5px solid #CBD5E1; border-radius: 12px; margin-bottom: 10px;">
-                <tr>
-                    <td style="padding: 14px 18px; width: 33%; vertical-align: top;">
-                        <div style="width: 130px; height: 1px; background-color: #94A3B8; margin-top: 14px; margin-bottom: 6px;"></div>
-                        <div style="font-size: 11.5px; font-weight: 900; color: #0A1128;">Sale Abu Mafhal</div>
-                        <div style="font-size: 9.5px; color: #64748B; margin-top: 1px;">Managing Director & CEO</div>
-                        <div style="font-size: 8.5px; color: #DAA520; font-weight: 800;">Abu Mafhal Enterprise Ltd</div>
-                    </td>
-                    <td style="padding: 14px 18px; width: 34%; vertical-align: top; text-align: center;">
-                        <div style="width: 130px; height: 1px; background-color: #94A3B8; margin-top: 14px; margin-bottom: 6px; margin-left: auto; margin-right: auto;"></div>
-                        <div style="font-size: 11.5px; font-weight: 900; color: #0A1128;">Audit & Financial Control</div>
-                        <div style="font-size: 9.5px; color: #64748B; margin-top: 1px;">Certified by Cloud Accounting</div>
-                        <div style="font-size: 8.5px; color: #059669; font-weight: 800;">✓ Automated Realtime Ledger</div>
-                    </td>
-                    <td style="padding: 14px 18px; width: 33%; vertical-align: middle; text-align: right;">
-                        <table style="border-collapse: collapse; margin-left: auto;">
-                            <tr>
-                                <td style="vertical-align: middle; padding-right: 10px; text-align: right;">
-                                    <div style="font-size: 9px; font-weight: 900; color: #0A1128; letter-spacing: 0.5px;">DIGITAL AUDIT SEAL</div>
-                                    <div style="font-size: 8px; color: #64748B; font-family: 'Courier New', monospace; margin-top: 2px;">${refId}</div>
-                                    <div style="font-size: 8px; color: #059669; font-weight: 700; margin-top: 1px;">abumafhal.com.ng</div>
-                                </td>
-                                <td style="vertical-align: middle;">
-                                    <!-- INLINE CERTIFIED GOLD SEAL SVG -->
-                                    <svg width="58" height="58" viewBox="0 0 100 100" style="display: block;">
-                                        <circle cx="50" cy="50" r="46" fill="#0A1128" stroke="#DAA520" stroke-width="3" />
-                                        <circle cx="50" cy="50" r="40" fill="none" stroke="#DAA520" stroke-width="1" stroke-dasharray="3,2" />
-                                        <path d="M50 24 L64 31 V48 C64 58 50 67 50 67 C50 67 36 58 36 48 V31 Z" fill="#1E293B" stroke="#DAA520" stroke-width="1.8" />
-                                        <path d="M44 46 L48 50 L56 41" fill="none" stroke="#34D399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                                        <text x="50" y="78" font-size="6.5" font-weight="900" fill="#DAA520" text-anchor="middle" font-family="sans-serif">CERTIFIED</text>
-                                        <text x="50" y="85" font-size="5" font-weight="700" fill="#94A3B8" text-anchor="middle" font-family="monospace">AUDIT</text>
-                                    </svg>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-
-            <!-- DOCUMENT SECURITY FOOTER -->
-            <div style="text-align: center; font-size: 8.5px; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 8px;">
-                Confidential Enterprise Financial Document • Generated from Abu Mafhal Hub Super Admin Console • 
-                Secured by 256-bit Cloud Ledger Protocol • All Rights Reserved © ${new Date().getFullYear()} Abu Mafhal Ltd
-            </div>
-        `;
-
-        // Complete Standalone HTML Document
         const html = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Abu_Mafhal_Financial_Statement_${refId}</title>
-                <style>
-                    @page {
-                        size: A4 portrait;
-                        margin: 8mm 8mm 8mm 8mm;
-                    }
-                    * {
-                        box-sizing: border-box;
-                        margin: 0;
-                        padding: 0;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                        color-adjust: exact !important;
-                    }
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                        background-color: #FFFFFF !important;
-                        color: #0F172A;
-                        padding: 10px;
-                        width: 100%;
-                    }
-                </style>
-            </head>
-            <body>
-                ${printableContent}
-            </body>
-            </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abu_Mafhal_Financial_Statement_${refId}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm 8mm 10mm 8mm;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #FFFFFF;
+            color: #0F172A;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            line-height: 1.35;
+            font-size: 11px;
+        }
+        .container {
+            width: 100%;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 4px;
+            background-color: #FFFFFF;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+        tr {
+            page-break-inside: avoid;
+        }
+        thead {
+            display: table-header-group;
+        }
+        .avoid-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        /* Executive Branded Header */
+        .header-box {
+            background-color: #0A1128;
+            color: #FFFFFF;
+            border-radius: 10px;
+            border-bottom: 4px solid #DAA520;
+            margin-bottom: 14px;
+            padding: 16px 18px;
+        }
+        .brand-title {
+            font-size: 21px;
+            font-weight: 900;
+            color: #FFFFFF;
+            letter-spacing: 0.6px;
+            line-height: 1.1;
+        }
+        .brand-sub {
+            font-size: 10.5px;
+            font-weight: 800;
+            color: #F59E0B;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+        .brand-desc {
+            font-size: 9.5px;
+            color: #94A3B8;
+            margin-top: 2px;
+            font-weight: 500;
+        }
+        .conf-pill {
+            display: inline-block;
+            background-color: #1E293B;
+            border: 1.5px solid #DAA520;
+            border-radius: 6px;
+            padding: 3px 9px;
+            color: #F59E0B;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .verified-pill {
+            display: inline-block;
+            background-color: #064E3B;
+            color: #34D399;
+            border: 1px solid #059669;
+            border-radius: 4px;
+            padding: 2px 7px;
+            font-size: 8.5px;
+            font-weight: 800;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+
+        /* Net Profit Showcase */
+        .hero-box {
+            background-color: ${isNetProfitable ? '#0F172A' : '#450A0A'};
+            border-radius: 12px;
+            border: 1.5px solid ${isNetProfitable ? '#DAA520' : '#EF4444'};
+            padding: 16px 20px;
+            margin-bottom: 14px;
+            color: #FFFFFF;
+        }
+        .hero-headline {
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.8px;
+            color: ${isNetProfitable ? '#34D399' : '#F87171'};
+            text-transform: uppercase;
+        }
+        .margin-badge {
+            background-color: #1E293B;
+            border: 1px solid #DAA520;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 9.5px;
+            font-weight: 900;
+            color: #F59E0B;
+        }
+        .hero-amount {
+            font-size: 30px;
+            font-weight: 900;
+            color: ${isNetProfitable ? '#10B981' : '#EF4444'};
+            font-family: 'Courier New', Courier, monospace;
+            margin: 3px 0 5px 0;
+        }
+        .hero-subtext {
+            font-size: 10.5px;
+            color: #94A3B8;
+            margin-bottom: 12px;
+        }
+        .hero-grid-cell {
+            background-color: #1E293B;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 8px 10px;
+            width: 25%;
+        }
+
+        /* 4 KPIs */
+        .kpi-cell {
+            background-color: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            width: 25%;
+        }
+        .kpi-title {
+            font-size: 9px;
+            font-weight: 800;
+            color: #64748B;
+            text-transform: uppercase;
+        }
+        .kpi-value {
+            font-size: 15px;
+            font-weight: 900;
+            font-family: 'Courier New', Courier, monospace;
+            margin-top: 3px;
+        }
+
+        /* Customer Liabilities */
+        .liability-box {
+            background-color: #F8FAFC;
+            border: 1.5px solid #CBD5E1;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
+        }
+        .reserve-badge {
+            display: inline-block;
+            background-color: #ECFDF5;
+            color: #059669;
+            border: 1px solid #A7F3D0;
+            border-radius: 5px;
+            padding: 1px 7px;
+            font-size: 9px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        /* Tables */
+        .section-header-title {
+            font-size: 12px;
+            font-weight: 900;
+            color: #0F172A;
+        }
+        .section-header-sub {
+            font-size: 9.5px;
+            color: #64748B;
+            font-weight: 800;
+            text-align: right;
+        }
+        .styled-table {
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            background-color: #FFFFFF;
+            font-size: 10px;
+            margin-bottom: 14px;
+        }
+        .styled-table th {
+            background-color: #0A1128;
+            color: #FFFFFF;
+            padding: 7px 9px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .styled-table td {
+            padding: 6px 9px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        .row-alt {
+            background-color: #F8FAFC;
+        }
+        .styled-table tfoot td {
+            background-color: #F1F5F9;
+            font-weight: 900;
+            border-top: 2px solid #94A3B8;
+            font-size: 10.5px;
+            padding: 8px 9px;
+        }
+
+        /* Audit Signatures */
+        .audit-box {
+            background-color: #F8FAFC;
+            border: 1.5px solid #CBD5E1;
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 10px;
+        }
+        .sig-line {
+            width: 130px;
+            height: 1px;
+            background-color: #94A3B8;
+            margin-top: 14px;
+            margin-bottom: 6px;
+        }
+
+        /* Footer */
+        .footer-note {
+            text-align: center;
+            font-size: 8.5px;
+            color: #94A3B8;
+            border-top: 1px solid #E2E8F0;
+            padding-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 1. EXECUTIVE BRANDED HEADER -->
+        <table class="header-box">
+            <tr>
+                <td style="vertical-align: middle;">
+                    <table style="border-collapse: collapse; margin-bottom: 0;">
+                        <tr>
+                            <td style="width: 64px; vertical-align: middle;">
+                                <img src="${ABU_MAFHAL_LOGO_B64}" width="58" height="58" style="width: 58px; height: 58px; border-radius: 10px; border: 2px solid #DAA520; background-color: #FFFFFF; object-fit: contain; padding: 2px; display: block;" alt="Abu Mafhal Logo" />
+                            </td>
+                            <td style="padding-left: 14px; vertical-align: middle;">
+                                <div class="brand-title">ABU MAFHAL HUB</div>
+                                <div class="brand-sub">ABU MAFHAL ENTERPRISE LTD • RC-8979939</div>
+                                <div class="brand-desc">Executive Profit & Loss Ledger • Certified Commercial Statement</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                <td style="vertical-align: middle; text-align: right; width: 250px;">
+                    <div class="conf-pill">SUPER ADMIN STRICTLY CONFIDENTIAL</div>
+                    <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Ref:</b> <span style="font-family: 'Courier New', Courier, monospace; color: #F59E0B; font-weight: 800;">${refId}</span></div>
+                    <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Period:</b> ${periodLabel}</div>
+                    <div style="font-size: 10.5px; color: #E2E8F0; line-height: 1.4;"><b>Date:</b> ${formatAccountingDate(new Date().toISOString(), true)}</div>
+                    <div class="verified-pill">✓ 100% AUDITED & VERIFIED</div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- 2. TITANIUM NET PROFIT / LOSS SHOWCASE -->
+        <div class="hero-box avoid-break">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px;">
+                <tr>
+                    <td class="hero-headline" style="vertical-align: middle;">
+                        ${isNetProfitable ? '★ NET TRADING SURPLUS (TAKE-HOME PROFIT)' : '⚠ NET OPERATING DEFICIT'}
+                    </td>
+                    <td style="text-align: right; vertical-align: middle;">
+                        <span class="margin-badge">${metrics.profitMargin.toFixed(1)}% GROSS MARGIN</span>
+                    </td>
+                </tr>
+            </table>
+            <div class="hero-amount">
+                ${formatNaira(metrics.netProfit)}
+            </div>
+            <div class="hero-subtext">
+                Gross Trading Margin (${formatNaira(metrics.grossProfit)}) minus Total Logged Expenses (${formatNaira(metrics.totalExpenses)})
+            </div>
+            <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; border-top: 1px solid #334155; padding-top: 10px; margin-bottom: 0;">
+                <tr>
+                    <td class="hero-grid-cell">
+                        <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Daily Run-Rate</div>
+                        <div style="font-size: 12px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', Courier, monospace; margin-top: 2px;">${formatNaira(metrics.dailyRunRate)}/day</div>
+                    </td>
+                    <td class="hero-grid-cell">
+                        <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">30-Day Projection</div>
+                        <div style="font-size: 12px; font-weight: 900; color: #34D399; font-family: 'Courier New', Courier, monospace; margin-top: 2px;">${formatNaira(metrics.projectedMonthlyProfit)}</div>
+                    </td>
+                    <td class="hero-grid-cell">
+                        <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Commercial Health</div>
+                        <div style="font-size: 11px; font-weight: 900; color: #F59E0B; margin-top: 2px;">${adv.rating} (${adv.headline})</div>
+                    </td>
+                    <td class="hero-grid-cell">
+                        <div style="font-size: 8.5px; color: #94A3B8; font-weight: 700; text-transform: uppercase;">Completed Orders</div>
+                        <div style="font-size: 12px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', Courier, monospace; margin-top: 2px;">${metrics.successfulTransactionsCount} Orders</div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 3. 4 CORE FINANCIAL KPIS -->
+        <table class="avoid-break" style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-bottom: 14px;">
+            <tr>
+                <td class="kpi-cell">
+                    <div class="kpi-title">Gross Revenue</div>
+                    <div class="kpi-value" style="color: #1D4ED8;">${formatNaira(metrics.totalRevenue)}</div>
+                    <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Total volume collected</div>
+                </td>
+                <td class="kpi-cell">
+                    <div class="kpi-title">Cost of Sales</div>
+                    <div class="kpi-value" style="color: #475569;">${formatNaira(metrics.totalCost)}</div>
+                    <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Telecom & API wholesale</div>
+                </td>
+                <td class="kpi-cell">
+                    <div class="kpi-title">Gross Trading Profit</div>
+                    <div class="kpi-value" style="color: #059669;">${formatNaira(metrics.grossProfit)}</div>
+                    <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Surplus before expenses</div>
+                </td>
+                <td class="kpi-cell">
+                    <div class="kpi-title">Logged Expenses</div>
+                    <div class="kpi-value" style="color: #DC2626;">${formatNaira(metrics.totalExpenses)}</div>
+                    <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">${metrics.expensesCount} expenses logged</div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- 4. CUSTOMER BALANCES & LIABILITIES PORTFOLIO -->
+        <table class="liability-box avoid-break">
+            <tr>
+                <td style="padding: 12px 16px; vertical-align: middle;">
+                    <div class="reserve-badge">100% Guaranteed Reserve Backed</div>
+                    <div style="font-size: 18px; font-weight: 900; color: #0F172A; font-family: 'Courier New', Courier, monospace;">${formatNaira(metrics.userLiquidity.totalUserBalances)}</div>
+                    <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Total user deposits held across platform database wallets (Customer Liabilities)</div>
+                </td>
+                <td style="padding: 12px 16px; vertical-align: middle; text-align: right; width: 280px;">
+                    <table style="border-collapse: collapse; margin-left: auto; margin-bottom: 0;">
+                        <tr>
+                            <td style="text-align: center; padding: 0 10px;">
+                                <div style="font-size: 13px; font-weight: 900; color: #0F172A; font-family: 'Courier New', Courier, monospace;">${metrics.userLiquidity.totalUserCount}</div>
+                                <div style="font-size: 9px; color: #64748B;">Registered Users</div>
+                            </td>
+                            <td style="text-align: center; padding: 0 10px; border-left: 1px solid #CBD5E1;">
+                                <div style="font-size: 13px; font-weight: 900; color: #059669; font-family: 'Courier New', Courier, monospace;">${metrics.userLiquidity.fundedUserCount}</div>
+                                <div style="font-size: 9px; color: #64748B;">Funded Wallets</div>
+                            </td>
+                            <td style="text-align: center; padding: 0 10px; border-left: 1px solid #CBD5E1;">
+                                <div style="font-size: 13px; font-weight: 900; color: #0F172A; font-family: 'Courier New', Courier, monospace;">${formatNaira(metrics.userLiquidity.averageUserBalance)}</div>
+                                <div style="font-size: 9px; color: #64748B;">Avg Balance</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- 5. ALL 18 SERVICES PROFIT BREAKDOWN -->
+        <table style="margin-bottom: 6px;">
+            <tr>
+                <td class="section-header-title">Comprehensive Product & Service Performance Matrix</td>
+                <td class="section-header-sub">18 Enterprise Services Tracked</td>
+            </tr>
+        </table>
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Service Name</th>
+                    <th style="text-align: right;">Orders</th>
+                    <th style="text-align: right;">Revenue</th>
+                    <th style="text-align: right;">Cost of Sales</th>
+                    <th style="text-align: right;">Gross Profit</th>
+                    <th style="text-align: right;">Margin %</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Object.values(metrics.serviceBreakdown)
+                    .filter(s => s.revenue > 0 || s.transactionCount > 0)
+                    .map((s, idx) => `
+                        <tr class="${idx % 2 === 1 ? 'row-alt' : ''}">
+                            <td style="color: #0F172A; font-weight: 700;">${s.serviceName}</td>
+                            <td style="text-align: right; font-family: 'Courier New', Courier, monospace;">${s.transactionCount}</td>
+                            <td style="text-align: right; font-family: 'Courier New', Courier, monospace;">${formatNaira(s.revenue)}</td>
+                            <td style="text-align: right; font-family: 'Courier New', Courier, monospace; color: #64748B;">${formatNaira(s.cost)}</td>
+                            <td style="text-align: right; font-family: 'Courier New', Courier, monospace; color: #059669; font-weight: 800;">${formatNaira(s.profit)}</td>
+                            <td style="text-align: right;">
+                                <span style="display: inline-block; background-color: #FFFBEB; border: 1px solid #FDE68A; color: #D97706; border-radius: 4px; padding: 1px 5px; font-size: 8.5px; font-weight: 800;">${s.marginPercent.toFixed(1)}%</span>
+                            </td>
+                        </tr>
+                    `).join('')}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td style="color: #0A1128;"><b>PORTFOLIO TOTAL</b></td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace;">${metrics.successfulTransactionsCount}</td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace;">${formatNaira(metrics.totalRevenue)}</td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace;">${formatNaira(metrics.totalCost)}</td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace; color: #059669;">${formatNaira(metrics.grossProfit)}</td>
+                    <td style="text-align: right;">
+                        <span style="display: inline-block; background-color: #FFFBEB; border: 1px solid #FDE68A; color: #D97706; border-radius: 4px; padding: 1px 5px; font-size: 8.5px; font-weight: 800;">${metrics.profitMargin.toFixed(1)}%</span>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- 6. LOGGED OPERATING EXPENDITURES -->
+        <table style="margin-bottom: 6px;">
+            <tr>
+                <td class="section-header-title">Logged Operating Expenditures</td>
+                <td class="section-header-sub">${metrics.recentExpenses.length} Records</td>
+            </tr>
+        </table>
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Date</th>
+                    <th style="text-align: left;">Description</th>
+                    <th style="text-align: left;">Category</th>
+                    <th style="text-align: left;">Payment Method</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${metrics.recentExpenses.length > 0 
+                    ? metrics.recentExpenses.slice(0, 10).map((e, idx) => `
+                        <tr class="${idx % 2 === 1 ? 'row-alt' : ''}">
+                            <td style="color: #64748B;">${formatAccountingDate(e.expense_date)}</td>
+                            <td style="color: #0F172A; font-weight: 700;">${e.title}</td>
+                            <td style="color: #475569;">${e.category.replace('_', ' ').toUpperCase()}</td>
+                            <td style="color: #64748B;">${e.payment_method.replace('_', ' ')}</td>
+                            <td style="text-align: right; font-family: 'Courier New', Courier, monospace; color: #DC2626; font-weight: 800;">-${formatNaira(e.amount)}</td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="5" style="text-align: center; color: #94A3B8; padding: 12px;">No operating expenses recorded for this reporting period.</td></tr>'
+                }
+            </tbody>
+        </table>
+
+        <!-- 7. AUDIT SIGNATURES & VERIFICATION SEAL -->
+        <table class="audit-box avoid-break">
+            <tr>
+                <td style="width: 33%; vertical-align: top;">
+                    <div class="sig-line"></div>
+                    <div style="font-size: 11.5px; font-weight: 900; color: #0A1128;">Sale Abu Mafhal</div>
+                    <div style="font-size: 9.5px; color: #64748B; margin-top: 1px;">Managing Director & CEO</div>
+                    <div style="font-size: 8.5px; color: #DAA520; font-weight: 800;">Abu Mafhal Enterprise Ltd</div>
+                </td>
+                <td style="width: 34%; vertical-align: top; text-align: center;">
+                    <div class="sig-line" style="margin-left: auto; margin-right: auto;"></div>
+                    <div style="font-size: 11.5px; font-weight: 900; color: #0A1128;">Audit & Financial Control</div>
+                    <div style="font-size: 9.5px; color: #64748B; margin-top: 1px;">Certified by Cloud Accounting</div>
+                    <div style="font-size: 8.5px; color: #059669; font-weight: 800;">✓ Automated Realtime Ledger</div>
+                </td>
+                <td style="width: 33%; vertical-align: middle; text-align: right;">
+                    <table style="border-collapse: collapse; margin-left: auto; margin-bottom: 0;">
+                        <tr>
+                            <td style="vertical-align: middle; padding-right: 8px; text-align: right;">
+                                <div style="font-size: 9px; font-weight: 900; color: #0A1128; letter-spacing: 0.5px;">DIGITAL AUDIT SEAL</div>
+                                <div style="font-size: 8px; color: #64748B; font-family: 'Courier New', Courier, monospace; margin-top: 2px;">${refId}</div>
+                                <div style="font-size: 7.5px; color: #059669; font-weight: 800; margin-top: 1px;">abumafhal.com.ng</div>
+                            </td>
+                            <td style="vertical-align: middle;">
+                                <div style="width: 50px; height: 50px; border-radius: 50%; background-color: #0A1128; border: 2.5px solid #DAA520; text-align: center; display: inline-block; padding-top: 4px; box-sizing: border-box;">
+                                    <div style="font-size: 13px; color: #DAA520; line-height: 1;">★</div>
+                                    <div style="font-size: 6px; font-weight: 900; color: #DAA520; letter-spacing: 0.5px; line-height: 1.2;">AUDITED</div>
+                                    <div style="font-size: 5.5px; font-weight: 700; color: #34D399; line-height: 1.1;">VERIFIED</div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- 8. DOCUMENT SECURITY FOOTER -->
+        <div class="footer-note">
+            Confidential Enterprise Financial Document • Generated from Abu Mafhal Hub Super Admin Console • 
+            Secured by 256-bit Cloud Ledger Protocol • All Rights Reserved © ${new Date().getFullYear()} Abu Mafhal Ltd
+        </div>
+    </div>
+</body>
+</html>
         `;
 
-        // 1. Web Auto-Download (Zero Dialogs, Crisp Rendering, Immune to Blank Canvas)
+        // 1. Web Auto-Download (Direct & High-Fidelity)
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             return new Promise<string | null>((resolve) => {
                 const fallbackPrintWindow = () => {
@@ -1209,29 +1436,21 @@ export const generateProfitLossPDF = async (
                     try {
                         const container = document.createElement('div');
                         container.id = 'amh-pdf-root-container';
-                        // Render at viewport origin with negative z-index so html2canvas captures exact dimensions without blanking
-                        container.style.position = 'absolute';
+                        // Fixed positioning with low opacity (NOT negative z-index) so html2canvas renders every pixel
+                        container.style.position = 'fixed';
                         container.style.top = '0px';
                         container.style.left = '0px';
                         container.style.width = '794px';
                         container.style.backgroundColor = '#FFFFFF';
-                        container.style.zIndex = '-99999';
-                        container.style.opacity = '1';
+                        container.style.zIndex = '999999';
+                        container.style.opacity = '0.01';
                         container.style.pointerEvents = 'none';
-                        container.innerHTML = `
-                            <style>
-                                * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #FFFFFF; margin: 0; padding: 12px; }
-                            </style>
-                            <div style="padding: 12px; background: #FFFFFF;">
-                                ${printableContent}
-                            </div>
-                        `;
+                        container.innerHTML = html;
                         document.body.appendChild(container);
 
                         // @ts-ignore
                         window.html2pdf().set({
-                            margin: [6, 6, 6, 6],
+                            margin: [8, 6, 8, 6],
                             filename: fileName,
                             image: { type: 'jpeg', quality: 0.98 },
                             html2canvas: {
@@ -1240,11 +1459,6 @@ export const generateProfitLossPDF = async (
                                 allowTaint: true,
                                 logging: false,
                                 width: 794,
-                                windowWidth: 794,
-                                x: 0,
-                                y: 0,
-                                scrollX: 0,
-                                scrollY: 0,
                                 backgroundColor: '#FFFFFF',
                             },
                             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -1268,42 +1482,43 @@ export const generateProfitLossPDF = async (
                     const script = document.createElement('script');
                     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
                     script.onload = triggerAutoDownload;
-                    script.onerror = () => {
-                        fallbackPrintWindow();
-                    };
+                    script.onerror = fallbackPrintWindow;
                     document.head.appendChild(script);
                 }
             });
         }
 
-        // 2. Native Mobile Direct Auto-Download & Share (Exact A4 Dimensions: 595pt x 842pt)
+        // 2. Native Mobile Direct Auto-Download & Share (Natural A4 multi-page pagination)
         const { uri } = await Print.printToFileAsync({
             html,
-            width: 595,  // Exact standard A4 width in points
-            height: 842, // Exact standard A4 height in points
             base64: false,
         });
 
-        const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
-        const targetUri = `${docDir}${fileName}`;
-
-        try {
-            await FileSystem.copyAsync({ from: uri, to: targetUri });
-        } catch {
-            // Retain uri
+        // Store with human-readable filename in cacheDirectory so FileProvider allows sharing
+        let finalUri = uri;
+        const cacheDir = (FileSystem as any).cacheDirectory;
+        if (cacheDir) {
+            const friendlyUri = `${cacheDir}${fileName}`;
+            try {
+                await FileSystem.copyAsync({ from: uri, to: friendlyUri });
+                finalUri = friendlyUri;
+            } catch (copyErr) {
+                console.warn('[PDF Export] Friendly rename copy failed, falling back to original uri:', copyErr);
+                finalUri = uri;
+            }
         }
 
         if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(targetUri, {
+            await Sharing.shareAsync(finalUri, {
                 UTI: 'com.adobe.pdf',
                 mimeType: 'application/pdf',
                 dialogTitle: `Download Statement - ${fileName}`,
             });
         } else {
-            Alert.alert('Download Complete', `Statement saved at: ${targetUri}`);
+            Alert.alert('Download Complete', `Statement saved at: ${finalUri}`);
         }
 
-        return targetUri;
+        return finalUri;
     } catch (err: any) {
         console.error('[PDF Export] Error:', err);
         Alert.alert('PDF Export Notice', err.message || 'Failed to generate PDF document.');
