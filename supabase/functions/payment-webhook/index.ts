@@ -1038,7 +1038,11 @@ $$ language plpgsql security definer;
                     console.log("[Flutterwave Transfer] Dispatch response:", trfData);
 
                     if (trfData.status !== 'success') {
-                        const errMsg = trfData.message || "Bank payout rejected by Flutterwave. Your wallet was NOT charged.";
+                        let errMsg = trfData.message || "Bank payout rejected by Flutterwave. Your wallet was NOT charged.";
+                        const lowerMsg = errMsg.toLowerCase();
+                        if (lowerMsg.includes("cannot be processed") || lowerMsg.includes("account administrator")) {
+                            errMsg = "Flutterwave Transfer Restriction: API Transfers/Payouts are blocked on your Flutterwave Merchant Account. Solution: 1) Go to Flutterwave Dashboard -> Settings -> API -> IP Whitelist (clear any IP restrictions). 2) In Settings -> Transfers, turn off OTP/2FA requirement for API Transfers. 3) If newly registered, contact Flutterwave Support or complete KYC to activate Payouts. Your wallet was NOT charged.";
+                        }
                         return new Response(JSON.stringify({
                             success: false,
                             dispatched: false,
