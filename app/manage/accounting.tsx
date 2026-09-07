@@ -176,6 +176,9 @@ function AccountingContent() {
     // Exporting CSV State
     const [exportingCSV, setExportingCSV] = useState(false);
 
+    // Exporting PDF State
+    const [exportingPDF, setExportingPDF] = useState(false);
+
     // 1. Verify Super Admin Access Clearance
     useEffect(() => {
         let isMounted = true;
@@ -300,12 +303,27 @@ function AccountingContent() {
         );
     };
 
-    // 6. Handle Export PDF Report
+    // 6. Handle Export PDF Report (Direct Auto-Download to Phone Storage)
     const handleExport = async () => {
         if (!metrics) return;
-        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const { label } = getDateRange(timeRange);
-        await generateProfitLossPDF(metrics, label);
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setExportingPDF(true);
+        try {
+            const { label } = getDateRange(timeRange);
+            const targetUri = await generateProfitLossPDF(metrics, label);
+            if (targetUri) {
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(
+                    'Statement Saved',
+                    `Executive Financial Statement has been generated with official branding and saved to your device for (${label}).`
+                );
+            }
+        } catch (err: any) {
+            console.error('[Export PDF] UI error:', err);
+            Alert.alert('Notice', 'Unable to complete statement download.');
+        } finally {
+            setExportingPDF(false);
+        }
     };
 
     // 7. Handle Export CSV Spreadsheet
@@ -428,6 +446,7 @@ function AccountingContent() {
                 colors={[C.navyDark, C.navy]}
                 style={[styles.headerBar, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 38 : 20) + 6 }]}
             >
+                {/* TIER 1: TOP NAVIGATION & SECURITY TITLE */}
                 <View style={styles.headerTopRow}>
                     <TouchableOpacity
                         onPress={() => router.back()}
@@ -437,47 +456,76 @@ function AccountingContent() {
                         <Ionicons name="arrow-back" size={18} color={C.white} />
                     </TouchableOpacity>
 
-                    <View style={{ alignItems: 'center' }}>
+                    <View style={styles.headerTitleContainer}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Ionicons name="calculator" size={16} color={C.goldBright} />
-                            <Text style={styles.headerTitle}>Profit & Operating Expenses</Text>
+                            <Ionicons name="calculator" size={15} color={C.goldBright} />
+                            <Text style={styles.headerTitle} numberOfLines={1}>Profit & Accounting</Text>
                         </View>
-                        <Text style={styles.headerSub}>EXECUTIVE PROFIT & LOSS LEDGER</Text>
+                        <Text style={styles.headerSub} numberOfLines={1}>ABU MAFHAL ENTERPRISE</Text>
                     </View>
 
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        {/* Admin Clearance Vault */}
-                        <TouchableOpacity
-                            onPress={openClearanceVault}
-                            style={styles.exportBtn}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="key-outline" size={16} color={C.goldBright} />
-                        </TouchableOpacity>
+                    <View style={styles.headerAdminBadge}>
+                        <Ionicons name="shield-checkmark" size={11} color={C.goldBright} />
+                        <Text style={styles.headerAdminBadgeText}>SUPER ADMIN</Text>
+                    </View>
+                </View>
 
-                        {/* Export CSV / Excel */}
-                        <TouchableOpacity
-                            onPress={handleExportCSV}
-                            style={styles.exportBtn}
-                            activeOpacity={0.8}
-                            disabled={exportingCSV}
-                        >
+                {/* TIER 2: EXECUTIVE ACTIONS TOOLBAR (100% VISIBLE & SPACIOUS) */}
+                <View style={styles.execToolbar}>
+                    {/* 1. Clearance Vault */}
+                    <TouchableOpacity
+                        onPress={openClearanceVault}
+                        style={styles.execToolBtn}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.execToolIconWrap}>
+                            <Ionicons name="key" size={14} color={C.goldBright} />
+                        </View>
+                        <View style={styles.execToolTextWrap}>
+                            <Text style={styles.execToolBtnTitle} numberOfLines={1}>Access Vault</Text>
+                            <Text style={styles.execToolBtnSub} numberOfLines={1}>Admin Rights</Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    {/* 2. CSV / Excel Export */}
+                    <TouchableOpacity
+                        onPress={handleExportCSV}
+                        style={styles.execToolBtn}
+                        activeOpacity={0.8}
+                        disabled={exportingCSV}
+                    >
+                        <View style={styles.execToolIconWrap}>
                             {exportingCSV ? (
                                 <ActivityIndicator size="small" color={C.goldBright} />
                             ) : (
-                                <Ionicons name="grid-outline" size={16} color={C.goldBright} />
+                                <Ionicons name="grid" size={14} color={C.goldBright} />
                             )}
-                        </TouchableOpacity>
+                        </View>
+                        <View style={styles.execToolTextWrap}>
+                            <Text style={styles.execToolBtnTitle} numberOfLines={1}>Spreadsheet</Text>
+                            <Text style={styles.execToolBtnSub} numberOfLines={1}>{exportingCSV ? 'Exporting...' : 'Excel / CSV'}</Text>
+                        </View>
+                    </TouchableOpacity>
 
-                        {/* Export PDF */}
-                        <TouchableOpacity
-                            onPress={handleExport}
-                            style={styles.exportBtn}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="share-outline" size={16} color={C.goldBright} />
-                        </TouchableOpacity>
-                    </View>
+                    {/* 3. Statement PDF Auto-Download */}
+                    <TouchableOpacity
+                        onPress={handleExport}
+                        style={[styles.execToolBtn, styles.execToolBtnPrimary]}
+                        activeOpacity={0.8}
+                        disabled={exportingPDF}
+                    >
+                        <View style={[styles.execToolIconWrap, styles.execToolIconWrapPrimary]}>
+                            {exportingPDF ? (
+                                <ActivityIndicator size="small" color={C.navyDark} />
+                            ) : (
+                                <Ionicons name="download" size={14} color={C.navyDark} />
+                            )}
+                        </View>
+                        <View style={styles.execToolTextWrap}>
+                            <Text style={[styles.execToolBtnTitle, { color: C.white }]} numberOfLines={1}>Statement</Text>
+                            <Text style={[styles.execToolBtnSub, { color: C.goldBright }]} numberOfLines={1}>{exportingPDF ? 'Downloading...' : 'PDF Download'}</Text>
+                        </View>
+                    </TouchableOpacity>
                 </View>
 
                 {/* TIMEFRAME SELECTOR PILLS */}
@@ -1661,7 +1709,7 @@ const styles = StyleSheet.create({
 
     // Header Bar
     headerBar: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         paddingBottom: 12,
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,
@@ -1677,7 +1725,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     backButton: {
         width: 36,
@@ -1689,18 +1737,88 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.15)',
     },
+    headerTitleContainer: {
+        flex: 1,
+        alignItems: 'center',
+        paddingHorizontal: 8,
+    },
     headerTitle: {
         color: C.white,
-        fontSize: 15,
+        fontSize: 14.5,
         fontWeight: '900',
         letterSpacing: -0.2,
     },
     headerSub: {
         color: C.goldBright,
-        fontSize: 8.5,
+        fontSize: 8,
         fontWeight: '800',
-        letterSpacing: 1,
+        letterSpacing: 0.8,
         marginTop: 2,
+    },
+    headerAdminBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: C.goldBg,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.35)',
+    },
+    headerAdminBadgeText: {
+        color: C.goldBright,
+        fontSize: 8.5,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+
+    // Executive Actions Toolbar (Spacious & Responsive)
+    execToolbar: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 10,
+    },
+    execToolBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 12,
+        paddingVertical: 7,
+        paddingHorizontal: 7,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.14)',
+        gap: 6,
+    },
+    execToolBtnPrimary: {
+        backgroundColor: 'rgba(245, 158, 11, 0.18)',
+        borderColor: C.goldBright,
+    },
+    execToolIconWrap: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    execToolIconWrapPrimary: {
+        backgroundColor: C.goldBright,
+    },
+    execToolTextWrap: {
+        flex: 1,
+    },
+    execToolBtnTitle: {
+        color: C.white,
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    execToolBtnSub: {
+        color: 'rgba(255, 255, 255, 0.65)',
+        fontSize: 7.5,
+        fontWeight: '700',
+        marginTop: 1,
     },
     exportBtn: {
         width: 36,
