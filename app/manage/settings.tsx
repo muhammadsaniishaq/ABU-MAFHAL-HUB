@@ -94,6 +94,9 @@ export default function AdminSettings() {
     const [transferFeeThreshold, setTransferFeeThreshold] = useState('10000');
     const [transferFeeBelow10k, setTransferFeeBelow10k] = useState('22');
     const [transferFeeAbove10k, setTransferFeeAbove10k] = useState('62');
+    const [transferProvider, setTransferProvider] = useState<'flutterwave' | 'paystack'>('flutterwave');
+    const [checkingFlwBal, setCheckingFlwBal] = useState(false);
+    const [flwBalanceDisplay, setFlwBalanceDisplay] = useState<string | null>(null);
     const [userBulkSmsPrice, setUserBulkSmsPrice] = useState('10.00');
 
     // Comms
@@ -206,6 +209,7 @@ export default function AdminSettings() {
                     if (s.key === 'transfer_fee_threshold') setTransferFeeThreshold(s.value);
                     if (s.key === 'transfer_fee_below_10k') setTransferFeeBelow10k(s.value);
                     if (s.key === 'transfer_fee_above_10k') setTransferFeeAbove10k(s.value);
+                    if (s.key === 'transfer_provider') setTransferProvider(s.value === 'paystack' ? 'paystack' : 'flutterwave');
                     if (s.key === 'user_bulk_sms_price') setUserBulkSmsPrice(s.value);
                     
                     if (s.key === 'support_whatsapp') setSupportWhatsapp(s.value);
@@ -296,6 +300,32 @@ export default function AdminSettings() {
         }
     };
 
+    const handleCheckFlwBalance = async () => {
+        setCheckingFlwBal(true);
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        try {
+            const { data, error } = await supabase.functions.invoke('payment-webhook', {
+                body: { action: 'check_flutterwave_balance' }
+            });
+            if (error || !data?.success) {
+                Alert.alert("Flutterwave Balance Check", data?.error || error?.message || "Could not retrieve Flutterwave balance.");
+            } else {
+                const avail = typeof data.available_balance === 'number' ? data.available_balance : parseFloat(data.available_balance || '0');
+                const formatted = `₦${avail.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+                setFlwBalanceDisplay(formatted);
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(
+                    "Flutterwave Settlement Balance", 
+                    `Available NGN Balance: ${formatted}\nMode: ${data.is_live ? 'Live Mode' : 'Test Mode'}\n\nThis balance is used for instant automated user bank transfers.`
+                );
+            }
+        } catch (e: any) {
+            Alert.alert("Balance Check Error", e.message || "Failed to query Flutterwave balance");
+        } finally {
+            setCheckingFlwBal(false);
+        }
+    };
+
     const handleUpdateSettings = async () => {
         setLoading(true);
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -333,6 +363,7 @@ export default function AdminSettings() {
                 { key: 'transfer_fee_threshold', value: transferFeeThreshold },
                 { key: 'transfer_fee_below_10k', value: transferFeeBelow10k },
                 { key: 'transfer_fee_above_10k', value: transferFeeAbove10k },
+                { key: 'transfer_provider', value: transferProvider },
                 { key: 'user_bulk_sms_price', value: userBulkSmsPrice },
                 { key: 'support_whatsapp', value: supportWhatsapp },
                 { key: 'support_email', value: supportEmail },
@@ -760,8 +791,78 @@ export default function AdminSettings() {
                         </View>
                         </View>
                         
-                        <Text style={s.groupLabel}>Bank Transfer Fee Rates (Paystack Settlement)</Text>
+                        <Text style={s.groupLabel}>Bank Transfer Gateway & Fee Rates</Text>
                         <View style={s.card}>
+                            {/* Gateway Provider Selection */}
+                            <View style={{ marginBottom: 16 }}>
+                                <Text style={[s.label, { marginBottom: 8 }]}>Live Bank Transfer Provider</Text>
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setTransferProvider('flutterwave');
+                                            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        }}
+                                        style={[
+                                            s.typeBtn,
+                                            transferProvider === 'flutterwave' && { backgroundColor: '#F59E0B', borderColor: '#D97706' },
+                                            { flex: 1, paddingVertical: 10 }
+                                        ]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="flash" size={16} color={transferProvider === 'flutterwave' ? '#FFFFFF' : '#64748B'} />
+                                        <Text style={[s.typeText, transferProvider === 'flutterwave' && { color: '#FFFFFF', fontWeight: '800' }]}>
+                                            Flutterwave
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setTransferProvider('paystack');
+                                            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        }}
+                                        style={[
+                                            s.typeBtn,
+                                            transferProvider === 'paystack' && { backgroundColor: '#00C3F7', borderColor: '#0099C4' },
+                                            { flex: 1, paddingVertical: 10 }
+                                        ]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="card" size={16} color={transferProvider === 'paystack' ? '#FFFFFF' : '#64748B'} />
+                                        <Text style={[s.typeText, transferProvider === 'paystack' && { color: '#FFFFFF', fontWeight: '800' }]}>
+                                            Paystack
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Check Flutterwave Merchant Balance Button */}
+                            <TouchableOpacity
+                                onPress={handleCheckFlwBalance}
+                                disabled={checkingFlwBal}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#0F172A',
+                                    paddingVertical: 11,
+                                    paddingHorizontal: 14,
+                                    borderRadius: 12,
+                                    marginBottom: 16,
+                                    borderWidth: 1,
+                                    borderColor: '#334155',
+                                    gap: 8
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                {checkingFlwBal ? (
+                                    <ActivityIndicator size="small" color="#F59E0B" />
+                                ) : (
+                                    <Ionicons name="wallet" size={16} color="#F59E0B" />
+                                )}
+                                <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '700' }}>
+                                    {flwBalanceDisplay ? `Flutterwave Bal: ${flwBalanceDisplay}` : 'Check Flutterwave Merchant Balance'}
+                                </Text>
+                            </TouchableOpacity>
+
                             <InputRow 
                                 label="Transfer Tier Threshold" 
                                 value={transferFeeThreshold} 

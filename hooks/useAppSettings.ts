@@ -22,6 +22,7 @@ export interface AppSettings {
     transfer_fee_threshold?: string;
     transfer_fee_below_10k?: string;
     transfer_fee_above_10k?: string;
+    transfer_provider?: 'flutterwave' | 'paystack';
     [key: string]: any;
 }
 
@@ -45,6 +46,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     transfer_fee_threshold: '10000',
     transfer_fee_below_10k: '22',
     transfer_fee_above_10k: '62',
+    transfer_provider: 'flutterwave',
     company_name: 'MAFHAL SUB',
     app_logo: '',
     // Crypto Defaults

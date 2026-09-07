@@ -233,9 +233,10 @@ export default function TransferScreen() {
 
     const validationHint = useMemo(() => {
         if (activeTab === 'bank') {
+            const activeProvName = settings?.transfer_provider === 'paystack' ? 'Paystack' : 'Flutterwave';
             if (!selectedBank) return 'Step 1: Tap to choose destination bank';
             if (accountNumber.trim().length < 10) return `Step 2: Enter 10-digit account (${accountNumber.trim().length}/10)`;
-            if (isResolvingAccount) return 'Step 2: Verifying account name with Paystack...';
+            if (isResolvingAccount) return `Step 2: Verifying account name with ${activeProvName}...`;
             if (!accountName.trim()) return resolveError ? `⚠️ ${resolveError}` : 'Step 2: Awaiting verified account name';
             if (numAmount <= 0) return 'Step 3: Enter transfer amount';
             if (userBalance > 0 && totalDebit > userBalance) return `⚠️ Insufficient balance (Need: ₦${totalDebit.toLocaleString()})`;
@@ -332,6 +333,7 @@ export default function TransferScreen() {
                         action: 'resolve_bank_account',
                         account_number: cleanAcc,
                         bank_code: selectedBank.code,
+                        provider: settings?.transfer_provider || 'flutterwave',
                     }
                 });
 
@@ -470,7 +472,7 @@ export default function TransferScreen() {
                 return;
             }
             if (!accountName.trim()) {
-                Alert.alert('Unverified Account', 'Please wait for Paystack to verify the account name before proceeding.');
+                Alert.alert('Unverified Account', 'Please wait for account name verification before proceeding.');
                 return;
             }
         }
@@ -577,6 +579,7 @@ export default function TransferScreen() {
                         accountNumber: accountNumber.trim(),
                         accountName: accountName.trim(),
                         narration: note.trim() || 'Abu Mafhal Hub Bank Settlement',
+                        provider: settings?.transfer_provider || 'flutterwave',
                     }
                 });
 
@@ -793,7 +796,9 @@ export default function TransferScreen() {
                         To Bank Account
                     </Text>
                     <View style={[s.liveBadge, activeTab === 'bank' && s.liveBadgeActive]}>
-                        <Text style={[s.liveBadgeText, activeTab === 'bank' && s.liveBadgeTextActive]}>Paystack</Text>
+                        <Text style={[s.liveBadgeText, activeTab === 'bank' && s.liveBadgeTextActive]}>
+                            {settings?.transfer_provider === 'paystack' ? 'Paystack' : 'Flutterwave'}
+                        </Text>
                     </View>
                 </TouchableOpacity>
 
@@ -830,7 +835,7 @@ export default function TransferScreen() {
                 <DynamicBanners placement="transfer" />
 
                 {activeTab === 'bank' ? (
-                    // ── MODE 1: NIGERIAN BANK TRANSFER (PAYSTACK) ─────
+                    // ── MODE 1: NIGERIAN BANK TRANSFER (FLUTTERWAVE / PAYSTACK) ─────
                     <View style={s.card}>
                         <View style={s.cardHeaderRow}>
                             <View style={s.cardIconCircle}>
@@ -839,7 +844,9 @@ export default function TransferScreen() {
                             <View style={{ flex: 1 }}>
                                 <Text style={s.cardTitle}>Send Money to Bank Account</Text>
                                 <Text style={s.cardSub}>
-                                    Automated settlement to all Nigerian banks via Paystack
+                                    {settings?.transfer_provider === 'paystack'
+                                        ? 'Automated settlement to all Nigerian banks via Paystack'
+                                        : 'Automated instant settlement to all Nigerian banks via Flutterwave'}
                                 </Text>
                             </View>
                         </View>
@@ -1613,7 +1620,9 @@ export default function TransferScreen() {
                                     </View>
                                     <View style={s.receiptRow}>
                                         <Text style={s.receiptLabel}>Channel:</Text>
-                                        <Text style={s.receiptVal}>{lastTxDetails?.type === 'p2p' ? 'Abu Mafhal Wallet' : 'Paystack Settlement'}</Text>
+                                        <Text style={s.receiptVal}>
+                                            {lastTxDetails?.type === 'p2p' ? 'Abu Mafhal Wallet' : (settings?.transfer_provider === 'paystack' ? 'Paystack Settlement' : 'Flutterwave Settlement')}
+                                        </Text>
                                     </View>
                                     <View style={s.receiptRow}>
                                         <Text style={s.receiptLabel}>Reference:</Text>

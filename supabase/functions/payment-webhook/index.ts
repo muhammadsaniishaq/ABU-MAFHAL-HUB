@@ -43,6 +43,42 @@ async function getPaystackSecret(supabaseAdmin: SupabaseClient): Promise<string>
     return '';
 }
 
+async function getFlutterwaveSecret(supabaseAdmin: SupabaseClient): Promise<string> {
+    const envSecret = Deno.env.get('FLUTTERWAVE_SECRET_KEY')?.trim();
+    if (envSecret && envSecret.length > 10 && !envSecret.includes('...')) {
+        return envSecret;
+    }
+
+    try {
+        const { data: dbKeys } = await supabaseAdmin
+            .from('system_secrets')
+            .select('key, value')
+            .in('key', ['FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET', 'FLW_SECRET_KEY']);
+
+        if (dbKeys && dbKeys.length > 0) {
+            for (const k of dbKeys) {
+                if (k.value && k.value.trim().length > 10 && !k.value.includes('...')) {
+                    return k.value.trim();
+                }
+            }
+        }
+
+        const { data: appSet } = await supabaseAdmin
+            .from('app_settings')
+            .select('value')
+            .in('key', ['flutterwave_secret_key', 'FLUTTERWAVE_SECRET_KEY'])
+            .maybeSingle();
+
+        if (appSet && appSet.value && appSet.value.trim().length > 10) {
+            return appSet.value.trim();
+        }
+    } catch (e) {
+        console.warn("[getFlutterwaveSecret] Warning retrieving flutterwave secret:", e);
+    }
+
+    return '';
+}
+
 Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const timestamp = new Date().toISOString();
@@ -517,80 +553,125 @@ $$ language plpgsql security definer;
             });
         }
 
-        // --- ACTION: GET NIGERIAN BANKS (PAYSTACK) ---
+        // --- ACTION: GET NIGERIAN BANKS (FLUTTERWAVE FIRST WITH PAYSTACK FALLBACK) ---
         if (parsedPayload && parsedPayload.action === 'get_banks') {
             try {
-                const paystackSecret = await getPaystackSecret(supabaseAdmin);
-                const headers: Record<string, string> = {};
-                if (paystackSecret) {
-                    headers['Authorization'] = `Bearer ${paystackSecret}`;
+                const priorityMap: Record<string, number> = {
+                    '999992': 1,  // OPay (CBN: 999992, FLW: 100004)
+                    '100004': 1,  // OPay (FLW code)
+                    '999991': 2,  // PalmPay
+                    '100033': 2,  // PalmPay (FLW code)
+                    '50515': 3,   // Moniepoint
+                    '090405': 3,  // Moniepoint (FLW code)
+                    '50211': 4,   // Kuda
+                    '090267': 4,  // Kuda (FLW code)
+                    '058': 5,     // GTBank
+                    '057': 6,     // Zenith
+                    '044': 7,     // Access
+                    '011': 8,     // First Bank
+                    '033': 9,     // UBA
+                    '232': 10,    // Sterling
+                    '035': 11,    // Wema (ALAT)
+                    '070': 12,    // Fidelity
+                    '214': 13,    // FCMB
+                    '221': 14,    // Stanbic IBTC
+                    '032': 15,    // Union
+                    '076': 16,    // Polaris
+                    '301': 17,    // Jaiz
+                    '302': 18,    // TAJ
+                    '050': 19,    // Ecobank
+                    '082': 20,    // Keystone
+                    '303': 21,    // Lotus Bank
+                };
+
+                const logoMap: Record<string, string> = {
+                    '999992': 'paycom.png',
+                    '100004': 'paycom.png',
+                    '999991': 'palmpay.png',
+                    '100033': 'palmpay.png',
+                    '50515': 'moniepoint-mfb-ng.png',
+                    '090405': 'moniepoint-mfb-ng.png',
+                    '50211': 'kuda-bank.png',
+                    '090267': 'kuda-bank.png',
+                    '058': 'guaranty-trust-bank.png',
+                    '057': 'zenith-bank.png',
+                    '044': 'access-bank.png',
+                    '063': 'access-bank-diamond.png',
+                    '011': 'first-bank-of-nigeria.png',
+                    '033': 'united-bank-for-africa.png',
+                    '232': 'sterling-bank.png',
+                    '035': 'wema-bank.png',
+                    '035A': 'alat-by-wema.png',
+                    '070': 'fidelity-bank.png',
+                    '214': 'first-city-monument-bank.png',
+                    '032': 'union-bank-of-nigeria.png',
+                    '221': 'stanbic-ibtc-bank.png',
+                    '076': 'polaris-bank.png',
+                    '302': 'taj-bank.png',
+                    '050': 'ecobank-nigeria.png',
+                    '082': 'keystone-bank.png',
+                    '303': 'lotus-bank.png',
+                    '00103': 'globus-bank.png',
+                    '327': 'paga.png',
+                    '401': 'asosavings.png',
+                };
+
+                const flutterwaveSecret = await getFlutterwaveSecret(supabaseAdmin);
+                let banks: any[] = [];
+                let fetchedProvider = '';
+
+                // 1. Try Flutterwave first
+                if (flutterwaveSecret) {
+                    try {
+                        const flwRes = await fetch('https://api.flutterwave.com/v3/banks/NG', {
+                            headers: { Authorization: `Bearer ${flutterwaveSecret}` }
+                        });
+                        const flwData = await flwRes.json();
+                        if (flwData.status === 'success' && Array.isArray(flwData.data) && flwData.data.length > 0) {
+                            fetchedProvider = 'flutterwave';
+                            banks = flwData.data.map((b: any) => {
+                                const codeStr = String(b.code || '').trim();
+                                const logoFile = logoMap[codeStr] || 'default-image.png';
+                                return {
+                                    id: String(b.id || codeStr),
+                                    name: b.name,
+                                    code: codeStr,
+                                    slug: b.name?.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+                                    logo: `https://raw.githubusercontent.com/ichtrojan/nigerian-banks/master/logos/${logoFile}`
+                                };
+                            });
+                        }
+                    } catch (flwErr) {
+                        console.warn("[get_banks] Notice fetching from Flutterwave:", flwErr);
+                    }
                 }
-                const bRes = await fetch('https://api.paystack.co/bank?country=nigeria&perPage=300', { headers });
-                const bData = await bRes.json();
-                if (bData.status && Array.isArray(bData.data)) {
-                    // Popular Nigerian Banks prioritized at the top
-                    const priorityMap: Record<string, number> = {
-                        '999992': 1,  // OPay
-                        '999991': 2,  // PalmPay
-                        '50515': 3,   // Moniepoint
-                        '50211': 4,   // Kuda
-                        '058': 5,     // GTBank
-                        '057': 6,     // Zenith
-                        '044': 7,     // Access
-                        '011': 8,     // First Bank
-                        '033': 9,     // UBA
-                        '232': 10,    // Sterling
-                        '035': 11,    // Wema (ALAT)
-                        '070': 12,    // Fidelity
-                        '214': 13,    // FCMB
-                        '221': 14,    // Stanbic IBTC
-                        '032': 15,    // Union
-                        '076': 16,    // Polaris
-                        '301': 17,    // Jaiz
-                        '302': 18,    // TAJ
-                        '050': 19,    // Ecobank
-                        '082': 20,    // Keystone
-                    };
 
-                    const logoMap: Record<string, string> = {
-                        '999992': 'paycom.png',
-                        '999991': 'palmpay.png',
-                        '50515': 'moniepoint-mfb-ng.png',
-                        '50211': 'kuda-bank.png',
-                        '058': 'guaranty-trust-bank.png',
-                        '057': 'zenith-bank.png',
-                        '044': 'access-bank.png',
-                        '063': 'access-bank-diamond.png',
-                        '011': 'first-bank-of-nigeria.png',
-                        '033': 'united-bank-for-africa.png',
-                        '232': 'sterling-bank.png',
-                        '035': 'wema-bank.png',
-                        '035A': 'alat-by-wema.png',
-                        '070': 'fidelity-bank.png',
-                        '214': 'first-city-monument-bank.png',
-                        '032': 'union-bank-of-nigeria.png',
-                        '221': 'stanbic-ibtc-bank.png',
-                        '076': 'polaris-bank.png',
-                        '302': 'taj-bank.png',
-                        '050': 'ecobank-nigeria.png',
-                        '082': 'keystone-bank.png',
-                        '303': 'lotus-bank.png',
-                        '00103': 'globus-bank.png',
-                        '327': 'paga.png',
-                        '401': 'asosavings.png',
-                    };
+                // 2. Fallback to Paystack if Flutterwave returned empty
+                if (banks.length === 0) {
+                    const paystackSecret = await getPaystackSecret(supabaseAdmin);
+                    const headers: Record<string, string> = {};
+                    if (paystackSecret) {
+                        headers['Authorization'] = `Bearer ${paystackSecret}`;
+                    }
+                    const bRes = await fetch('https://api.paystack.co/bank?country=nigeria&perPage=300', { headers });
+                    const bData = await bRes.json();
+                    if (bData.status && Array.isArray(bData.data)) {
+                        fetchedProvider = 'paystack';
+                        banks = bData.data.map((b: any) => {
+                            const codeStr = String(b.code || '').trim();
+                            const logoFile = logoMap[codeStr] || (b.slug ? `${b.slug}.png` : 'default-image.png');
+                            return {
+                                id: String(b.id || codeStr),
+                                name: b.name,
+                                code: codeStr,
+                                slug: b.slug,
+                                logo: `https://raw.githubusercontent.com/ichtrojan/nigerian-banks/master/logos/${logoFile}`
+                            };
+                        });
+                    }
+                }
 
-                    const banks = bData.data.map((b: any) => {
-                        const logoFile = logoMap[b.code] || (b.slug ? `${b.slug}.png` : 'default-image.png');
-                        return {
-                            id: String(b.id),
-                            name: b.name,
-                            code: b.code,
-                            slug: b.slug,
-                            logo: `https://raw.githubusercontent.com/ichtrojan/nigerian-banks/master/logos/${logoFile}`
-                        };
-                    });
-
+                if (banks.length > 0) {
                     banks.sort((a: any, b: any) => {
                         const aRank = priorityMap[a.code] || 999;
                         const bRank = priorityMap[b.code] || 999;
@@ -598,11 +679,17 @@ $$ language plpgsql security definer;
                         return a.name.localeCompare(b.name);
                     });
 
-                    return new Response(JSON.stringify({ success: true, count: banks.length, banks }), {
+                    return new Response(JSON.stringify({ 
+                        success: true, 
+                        provider: fetchedProvider || 'flutterwave',
+                        count: banks.length, 
+                        banks 
+                    }), {
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
                 }
-                return new Response(JSON.stringify({ success: false, error: "Failed to fetch bank list from Paystack" }), {
+
+                return new Response(JSON.stringify({ success: false, error: "Failed to fetch bank list" }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
             } catch (err: any) {
@@ -635,7 +722,44 @@ $$ language plpgsql security definer;
             }
         }
 
-        // --- ACTION: RESOLVE NIGERIAN BANK ACCOUNT NAME (PAYSTACK) ---
+        // --- ACTION: CHECK FLUTTERWAVE BALANCE & CAPABILITIES ---
+        if (parsedPayload && (parsedPayload.action === 'check_flutterwave_balance' || parsedPayload.action === 'check_flw_balance')) {
+            try {
+                const flwSecret = await getFlutterwaveSecret(supabaseAdmin);
+                if (!flwSecret) {
+                    return new Response(JSON.stringify({ success: false, error: "No Flutterwave secret key configured" }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+                const balRes = await fetch('https://api.flutterwave.com/v3/balances/NGN', {
+                    headers: { Authorization: `Bearer ${flwSecret}` }
+                });
+                const balData = await balRes.json();
+                const availableBal = typeof balData.data?.available_balance === 'number' 
+                    ? balData.data.available_balance 
+                    : (parseFloat(String(balData.data?.available_balance || '0')) || 0);
+                const ledgerBal = typeof balData.data?.ledger_balance === 'number'
+                    ? balData.data.ledger_balance
+                    : (parseFloat(String(balData.data?.ledger_balance || '0')) || availableBal);
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    is_live: flwSecret.startsWith('FLWSECK-') && !flwSecret.includes('TEST'),
+                    currency: 'NGN',
+                    available_balance: availableBal,
+                    ledger_balance: ledgerBal,
+                    flutterwave: balData
+                }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            } catch (err: any) {
+                return new Response(JSON.stringify({ success: false, error: err.message }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+        }
+
+        // --- ACTION: RESOLVE NIGERIAN BANK ACCOUNT NAME (FLUTTERWAVE FIRST, PAYSTACK FALLBACK) ---
         if (parsedPayload && parsedPayload.action === 'resolve_bank_account') {
             const accNum = String(parsedPayload.account_number || parsedPayload.accountNumber || '').trim();
             const bankCode = String(parsedPayload.bank_code || parsedPayload.bankCode || '').trim();
@@ -652,52 +776,96 @@ $$ language plpgsql security definer;
                 });
             }
 
+            const FLW_BANK_CODE_MAP: Record<string, string[]> = {
+                '999992': ['100004', '999992'], // OPay
+                '100004': ['100004', '999992'],
+                '999991': ['100033', '999991'], // PalmPay
+                '100033': ['100033', '999991'],
+                '50515': ['090405', '50515'],   // Moniepoint
+                '090405': ['090405', '50515'],
+                '50211': ['090267', '50211'],   // Kuda
+                '090267': ['090267', '50211'],
+            };
+
+            const flutterwaveSecret = await getFlutterwaveSecret(supabaseAdmin);
             const paystackSecret = await getPaystackSecret(supabaseAdmin);
-            if (!paystackSecret) {
-                return new Response(JSON.stringify({ success: false, message: "Paystack secret key is not configured." }), {
-                    headers: { "Content-Type": "application/json", ...corsHeaders }
-                });
-            }
 
-            try {
-                const resolveUrl = `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accNum)}&bank_code=${encodeURIComponent(bankCode)}`;
-                const rRes = await fetch(resolveUrl, {
-                    headers: {
-                        Authorization: `Bearer ${paystackSecret}`,
-                        'Content-Type': 'application/json'
+            // Step 1: Try Flutterwave Account Resolution
+            if (flutterwaveSecret) {
+                const candidateCodes = FLW_BANK_CODE_MAP[bankCode] || [bankCode];
+                for (const candidateCode of candidateCodes) {
+                    try {
+                        const flwRes = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${flutterwaveSecret}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                account_number: accNum,
+                                account_bank: candidateCode
+                            })
+                        });
+
+                        const flwData = await flwRes.json();
+                        console.log(`[ResolveAccount:Flutterwave] Acc=${accNum}@${candidateCode}, Status=${flwRes.status}, FLWStatus=${flwData.status}`);
+
+                        if (flwData.status === 'success' && flwData.data?.account_name) {
+                            return new Response(JSON.stringify({
+                                success: true,
+                                account_name: flwData.data.account_name,
+                                account_number: flwData.data.account_number,
+                                bank_code: candidateCode,
+                                provider: 'flutterwave'
+                            }), {
+                                headers: { "Content-Type": "application/json", ...corsHeaders }
+                            });
+                        }
+                    } catch (flwErr) {
+                        console.warn("[ResolveAccount:Flutterwave] Exception testing code:", candidateCode, flwErr);
                     }
-                });
-
-                const rData = await rRes.json();
-                console.log(`[ResolveAccount] Query=${accNum}@${bankCode}, Status=${rRes.status}, PaystackStatus=${rData.status}`);
-
-                if (rData.status && rData.data?.account_name) {
-                    return new Response(JSON.stringify({
-                        success: true,
-                        account_name: rData.data.account_name,
-                        account_number: rData.data.account_number,
-                        bank_id: rData.data.bank_id
-                    }), {
-                        headers: { "Content-Type": "application/json", ...corsHeaders }
-                    });
-                } else {
-                    const failMsg = rData.message || "Account not found. Please verify the account number and selected bank.";
-                    return new Response(JSON.stringify({
-                        success: false,
-                        message: failMsg
-                    }), {
-                        headers: { "Content-Type": "application/json", ...corsHeaders }
-                    });
                 }
-            } catch (rErr: any) {
-                console.error("[ResolveAccount] Fetch Exception:", rErr);
-                return new Response(JSON.stringify({ success: false, message: "Error resolving bank account. Please check your network connection." }), {
-                    headers: { "Content-Type": "application/json", ...corsHeaders }
-                });
             }
+
+            // Step 2: Fallback to Paystack
+            if (paystackSecret) {
+                try {
+                    const resolveUrl = `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accNum)}&bank_code=${encodeURIComponent(bankCode)}`;
+                    const rRes = await fetch(resolveUrl, {
+                        headers: {
+                            Authorization: `Bearer ${paystackSecret}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const rData = await rRes.json();
+                    console.log(`[ResolveAccount:Paystack] Acc=${accNum}@${bankCode}, Status=${rRes.status}, PSStatus=${rData.status}`);
+
+                    if (rData.status && rData.data?.account_name) {
+                        return new Response(JSON.stringify({
+                            success: true,
+                            account_name: rData.data.account_name,
+                            account_number: rData.data.account_number,
+                            bank_id: rData.data.bank_id,
+                            provider: 'paystack'
+                        }), {
+                            headers: { "Content-Type": "application/json", ...corsHeaders }
+                        });
+                    }
+                } catch (rErr: any) {
+                    console.error("[ResolveAccount:Paystack] Fetch Exception:", rErr);
+                }
+            }
+
+            return new Response(JSON.stringify({
+                success: false,
+                message: "Could not find this bank account. Please verify the 10-digit account number and selected bank."
+            }), {
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
         }
 
-        // --- ACTION: EXECUTE LIVE BANK TRANSFER (PAYSTACK PAYOUT) ---
+        // --- ACTION: EXECUTE LIVE BANK TRANSFER (FLUTTERWAVE / PAYSTACK) ---
         if (parsedPayload && parsedPayload.action === 'execute_bank_transfer') {
             const { userId, amount, bankCode, bankName, accountNumber, accountName, narration } = parsedPayload;
             const numAmount = parseFloat(String(amount));
@@ -753,8 +921,178 @@ $$ language plpgsql security definer;
                 });
             }
 
-            // 2. Paystack Real Payout Dispatch
+            // Determine Provider: Check payload, then app_settings ('transfer_provider')
+            let provider = parsedPayload.provider ? String(parsedPayload.provider).toLowerCase() : '';
+            if (!provider) {
+                try {
+                    const { data: provSetting } = await supabaseAdmin
+                        .from('app_settings')
+                        .select('value')
+                        .eq('key', 'transfer_provider')
+                        .maybeSingle();
+                    if (provSetting && provSetting.value) {
+                        provider = provSetting.value.toLowerCase().trim();
+                    }
+                } catch (_) {}
+            }
+            if (!provider) provider = 'flutterwave';
+
+            const flutterwaveSecret = await getFlutterwaveSecret(supabaseAdmin);
             const paystackSecret = await getPaystackSecret(supabaseAdmin);
+
+            const FLW_BANK_CODE_MAP: Record<string, string[]> = {
+                '999992': ['100004', '999992'], // OPay
+                '100004': ['100004', '999992'],
+                '999991': ['100033', '999991'], // PalmPay
+                '100033': ['100033', '999991'],
+                '50515': ['090405', '50515'],   // Moniepoint
+                '090405': ['090405', '50515'],
+                '50211': ['090267', '50211'],   // Kuda
+                '090267': ['090267', '50211'],
+            };
+
+            // ROUTE A: FLUTTERWAVE TRANSFER
+            if (provider === 'flutterwave' || (!paystackSecret && flutterwaveSecret)) {
+                if (!flutterwaveSecret) {
+                    return new Response(JSON.stringify({
+                        success: false,
+                        dispatched: false,
+                        message: "Flutterwave secret key is not configured on the server."
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+
+                try {
+                    // Step A: Check Flutterwave Merchant Balance
+                    let flwNgnBalance = 0;
+                    try {
+                        const balRes = await fetch('https://api.flutterwave.com/v3/balances/NGN', {
+                            headers: { Authorization: `Bearer ${flutterwaveSecret}` }
+                        });
+                        const balData = await balRes.json();
+                        flwNgnBalance = typeof balData.data?.available_balance === 'number'
+                            ? balData.data.available_balance
+                            : (parseFloat(String(balData.data?.available_balance || '0')) || 0);
+                    } catch (balErr) {
+                        console.warn("[Flutterwave Transfer] Balance check warning:", balErr);
+                    }
+
+                    console.log(`[Flutterwave Transfer] User Wallet: ₦${currentWalletBal}, Transfer: ₦${numAmount}, Fee: ₦${transferFee}, FLW Balance: ₦${flwNgnBalance}`);
+
+                    if (flwNgnBalance > 0 && flwNgnBalance < numAmount) {
+                        return new Response(JSON.stringify({
+                            success: false,
+                            dispatched: false,
+                            message: `Automated bank transfer is currently unavailable: Flutterwave merchant payout balance is ₦${flwNgnBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}. Please top up your Flutterwave payout balance in your Flutterwave Dashboard to enable live payouts. Your wallet was NOT charged.`
+                        }), {
+                            headers: { "Content-Type": "application/json", ...corsHeaders }
+                        });
+                    }
+
+                    // Candidate code for Flutterwave
+                    const candidateCodes = FLW_BANK_CODE_MAP[bankCode] || [bankCode];
+                    const flwBankCode = candidateCodes[0];
+                    const internalRef = `WTH_FLW_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+                    // Step B: Dispatch Transfer to Flutterwave
+                    const trfRes = await fetch('https://api.flutterwave.com/v3/transfers', {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${flutterwaveSecret}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_bank: flwBankCode,
+                            account_number: String(accountNumber).trim(),
+                            amount: numAmount,
+                            narration: narration || `Transfer to ${accountName} (${bankName})`,
+                            currency: 'NGN',
+                            reference: internalRef,
+                            debit_currency: 'NGN'
+                        })
+                    });
+
+                    const trfData = await trfRes.json();
+                    console.log("[Flutterwave Transfer] Dispatch response:", trfData);
+
+                    if (trfData.status !== 'success') {
+                        const errMsg = trfData.message || "Bank payout rejected by Flutterwave. Your wallet was NOT charged.";
+                        return new Response(JSON.stringify({
+                            success: false,
+                            dispatched: false,
+                            message: errMsg
+                        }), {
+                            headers: { "Content-Type": "application/json", ...corsHeaders }
+                        });
+                    }
+
+                    // Step C: Only debit user wallet after Flutterwave confirms transfer dispatch
+                    const { data: deductData, error: deductErr } = await supabaseAdmin.rpc('execute_user_bank_withdrawal', {
+                        p_amount: numAmount,
+                        p_bank_name: bankName || 'Nigerian Bank',
+                        p_account_number: String(accountNumber).trim(),
+                        p_account_name: String(accountName || 'Valued User').trim(),
+                        p_narration: narration || 'Bank Transfer via Flutterwave',
+                        p_user_id: userId,
+                        p_fee: transferFee
+                    });
+
+                    if (deductErr) {
+                        console.error("[Flutterwave Transfer] Post-dispatch DB debit error:", deductErr);
+                    }
+
+                    const newBalance = deductData?.new_balance !== undefined
+                        ? deductData.new_balance
+                        : Math.max(0, currentWalletBal - totalDebit);
+                    const flwRef = trfData.data?.reference || trfData.data?.id || internalRef;
+
+                    // Update transaction details with provider metadata
+                    try {
+                        const txRef = deductData?.reference || internalRef;
+                        await supabaseAdmin
+                            .from('transactions')
+                            .update({
+                                details: {
+                                    provider: 'flutterwave',
+                                    flw_id: trfData.data?.id,
+                                    flw_reference: flwRef,
+                                    fee: transferFee,
+                                    total_debit: totalDebit,
+                                    bank_name: bankName,
+                                    account_number: accountNumber,
+                                    account_name: accountName
+                                }
+                            })
+                            .eq('reference', txRef);
+                    } catch (_) {}
+
+                    return new Response(JSON.stringify({
+                        success: true,
+                        dispatched: true,
+                        provider: 'flutterwave',
+                        new_balance: newBalance,
+                        reference: flwRef,
+                        fee: transferFee,
+                        total_debit: totalDebit,
+                        message: `Successfully transferred ₦${numAmount.toLocaleString()} to ${accountName} (${bankName}) via Flutterwave. Transfer fee: ₦${transferFee.toLocaleString()}.`
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+
+                } catch (flwErr: any) {
+                    console.error("[Flutterwave Transfer] Payout Exception:", flwErr);
+                    return new Response(JSON.stringify({
+                        success: false,
+                        dispatched: false,
+                        message: "Unexpected error connecting to Flutterwave payout service. Your wallet was NOT charged."
+                    }), {
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+            }
+
+            // ROUTE B: PAYSTACK TRANSFER (FALLBACK OR EXPLICIT)
             if (!paystackSecret || !paystackSecret.startsWith('sk_')) {
                 return new Response(JSON.stringify({ 
                     success: false, 
@@ -773,7 +1111,7 @@ $$ language plpgsql security definer;
                 const ngnBalObj = balData.data?.find((b: any) => b.currency === 'NGN') || balData.data?.[0];
                 const paystackNgnBalance = ngnBalObj ? (parseFloat(String(ngnBalObj.balance)) / 100) : 0;
 
-                console.log(`[BankTransfer] User Wallet: ₦${currentWalletBal}, Requested: ₦${numAmount}, Fee: ₦${transferFee}, Paystack Balance: ₦${paystackNgnBalance}`);
+                console.log(`[Paystack Transfer] User Wallet: ₦${currentWalletBal}, Requested: ₦${numAmount}, Fee: ₦${transferFee}, Paystack Balance: ₦${paystackNgnBalance}`);
 
                 if (paystackNgnBalance < numAmount) {
                     return new Response(JSON.stringify({
@@ -802,7 +1140,7 @@ $$ language plpgsql security definer;
                 });
 
                 const recData = await recRes.json();
-                console.log("[BankTransfer] Recipient response:", recData);
+                console.log("[Paystack Transfer] Recipient response:", recData);
 
                 if (!recData.status || !recData.data?.recipient_code) {
                     return new Response(JSON.stringify({
@@ -815,7 +1153,7 @@ $$ language plpgsql security definer;
                 }
 
                 const recipientCode = recData.data.recipient_code;
-                const internalRef = `WTH_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                const internalRef = `WTH_PS_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
                 // Step C: Initiate Transfer on Paystack
                 const trfRes = await fetch('https://api.paystack.co/transfer', {
@@ -834,7 +1172,7 @@ $$ language plpgsql security definer;
                 });
 
                 const trfData = await trfRes.json();
-                console.log("[BankTransfer] Transfer response:", trfData);
+                console.log("[Paystack Transfer] Transfer response:", trfData);
 
                 if (!trfData.status) {
                     return new Response(JSON.stringify({
@@ -852,13 +1190,13 @@ $$ language plpgsql security definer;
                     p_bank_name: bankName || 'Nigerian Bank',
                     p_account_number: String(accountNumber).trim(),
                     p_account_name: String(accountName || 'Valued User').trim(),
-                    p_narration: narration || 'Bank Transfer',
+                    p_narration: narration || 'Bank Transfer via Paystack',
                     p_user_id: userId,
                     p_fee: transferFee
                 });
 
                 if (deductErr) {
-                    console.error("[BankTransfer] Post-dispatch DB debit error:", deductErr);
+                    console.error("[Paystack Transfer] Post-dispatch DB debit error:", deductErr);
                 }
 
                 const newBalance = deductData?.new_balance !== undefined 
@@ -869,6 +1207,7 @@ $$ language plpgsql security definer;
                 return new Response(JSON.stringify({
                     success: true,
                     dispatched: true,
+                    provider: 'paystack',
                     new_balance: newBalance,
                     reference: paystackRef,
                     fee: transferFee,
@@ -879,7 +1218,7 @@ $$ language plpgsql security definer;
                 });
 
             } catch (payoutErr: any) {
-                console.error("[BankTransfer] Payout Exception:", payoutErr);
+                console.error("[Paystack Transfer] Payout Exception:", payoutErr);
                 return new Response(JSON.stringify({
                     success: false,
                     dispatched: false,
@@ -1296,6 +1635,51 @@ $$ language plpgsql security definer;
                     );
                 }
             }
+
+            // Transfer completed (live bank payout status update)
+            if (event.event === 'transfer.completed') {
+                const data = event.data;
+                console.log(`[Flutterwave Webhook] Transfer completed event: ID=${data?.id}, Ref=${data?.reference}, Status=${data?.status}`);
+                if (data?.status === 'FAILED') {
+                    const ref = data.reference;
+                    try {
+                        const { data: tx } = await supabaseAdmin
+                            .from('transactions')
+                            .select('id, user_id, amount, status, details')
+                            .or(`reference.eq.${ref},details->>flw_reference.eq.${ref}`)
+                            .maybeSingle();
+
+                        if (tx && tx.status !== 'failed' && tx.status !== 'refunded') {
+                            const fee = tx.details?.fee ? parseFloat(String(tx.details.fee)) : 0;
+                            const refundAmount = parseFloat(String(tx.amount || 0)) + fee;
+                            if (refundAmount > 0) {
+                                await supabaseAdmin.rpc('credit_balance', {
+                                    user_id: tx.user_id,
+                                    amount: refundAmount
+                                });
+                                await supabaseAdmin
+                                    .from('transactions')
+                                    .update({
+                                        status: 'failed',
+                                        details: {
+                                            ...(typeof tx.details === 'object' ? tx.details : {}),
+                                            failure_reason: data.complete_message || 'Payout failed by destination bank',
+                                            refunded: true,
+                                            refunded_amount: refundAmount,
+                                            refunded_at: new Date().toISOString()
+                                        }
+                                    })
+                                    .eq('id', tx.id);
+                                console.log(`[Flutterwave Webhook] Auto-refunded ₦${refundAmount} to user ${tx.user_id}`);
+                            }
+                        }
+                    } catch (refundErr) {
+                        console.error("[Flutterwave Webhook] Refund handling exception:", refundErr);
+                    }
+                }
+                return new Response("Transfer Event Processed", { status: 200, headers: corsHeaders });
+            }
+
             return new Response("Event Ignored", { status: 200, headers: corsHeaders });
         }
 
