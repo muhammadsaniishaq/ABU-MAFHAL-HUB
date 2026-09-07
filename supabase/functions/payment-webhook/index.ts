@@ -957,31 +957,35 @@ $$ language plpgsql security definer;
 
             // Step 2: Fallback to Paystack
             if (paystackSecret) {
-                try {
-                    const resolveUrl = `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accNum)}&bank_code=${encodeURIComponent(bankCode)}`;
-                    const rRes = await fetch(resolveUrl, {
-                        headers: {
-                            Authorization: `Bearer ${paystackSecret}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    const rData = await rRes.json();
-                    console.log(`[ResolveAccount:Paystack] Acc=${accNum}@${bankCode}, Status=${rRes.status}, PSStatus=${rData.status}`);
-
-                    if (rData.status && rData.data?.account_name) {
-                        return new Response(JSON.stringify({
-                            success: true,
-                            account_name: rData.data.account_name,
-                            account_number: rData.data.account_number,
-                            bank_id: rData.data.bank_id,
-                            provider: 'paystack'
-                        }), {
-                            headers: { "Content-Type": "application/json", ...corsHeaders }
+                const candidateCodes = FLW_BANK_CODE_MAP[bankCode] || [bankCode];
+                for (const candidateCode of candidateCodes) {
+                    try {
+                        const resolveUrl = `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accNum)}&bank_code=${encodeURIComponent(candidateCode)}`;
+                        const rRes = await fetch(resolveUrl, {
+                            headers: {
+                                Authorization: `Bearer ${paystackSecret}`,
+                                'Content-Type': 'application/json'
+                            }
                         });
+
+                        const rData = await rRes.json();
+                        console.log(`[ResolveAccount:Paystack] Acc=${accNum}@${candidateCode}, Status=${rRes.status}, PSStatus=${rData.status}`);
+
+                        if (rData.status && rData.data?.account_name) {
+                            return new Response(JSON.stringify({
+                                success: true,
+                                account_name: rData.data.account_name,
+                                account_number: rData.data.account_number,
+                                bank_id: rData.data.bank_id,
+                                bank_code: candidateCode,
+                                provider: 'paystack'
+                            }), {
+                                headers: { "Content-Type": "application/json", ...corsHeaders }
+                            });
+                        }
+                    } catch (rErr: any) {
+                        console.error("[ResolveAccount:Paystack] Fetch Exception:", rErr);
                     }
-                } catch (rErr: any) {
-                    console.error("[ResolveAccount:Paystack] Fetch Exception:", rErr);
                 }
             }
 

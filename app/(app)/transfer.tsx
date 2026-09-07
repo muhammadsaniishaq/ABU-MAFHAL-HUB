@@ -518,6 +518,47 @@ export default function TransferScreen() {
         }
     }, [activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
 
+    // Function to verify bank account details
+    const handleVerifyBeneficiary = async () => {
+        const cleanAcc = accountNumber.trim();
+        if (cleanAcc.length !== 10) return;
+        if (!selectedBank) {
+            setBankModalVisible(true);
+            return;
+        }
+
+        setIsResolvingAccount(true);
+        setResolveError(null);
+        setAccountName('');
+
+        try {
+            const { data, error } = await supabase.functions.invoke('payment-webhook', {
+                body: {
+                    action: 'resolve_bank_account',
+                    account_number: cleanAcc,
+                    bank_code: selectedBank.code,
+                    provider: settings?.transfer_provider || 'flutterwave',
+                },
+            });
+
+            if (error || !data?.success) {
+                const errorMsg = data?.message || "Ba a gano wannan asusun ba. Da fatan a sake duba lambar asusun da bankin da aka zaba.";
+                setResolveError(errorMsg);
+                setAccountName('');
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            } else if (data?.account_name) {
+                setAccountName(data.account_name);
+                setResolveError(null);
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+        } catch (err: any) {
+            setResolveError('Matsalar sadarwa wajen gano asusun banki. Da fatan a sake gwadawa.');
+            setAccountName('');
+        } finally {
+            setIsResolvingAccount(false);
+        }
+    };
+
     // Debounced Account Name Verification
     useEffect(() => {
         const cleanAcc = accountNumber.trim();
@@ -528,48 +569,11 @@ export default function TransferScreen() {
             return;
         }
 
-        let isMounted = true;
-        setIsResolvingAccount(true);
-        setResolveError(null);
-        setAccountName('');
+        const timer = setTimeout(() => {
+            handleVerifyBeneficiary();
+        }, 350);
 
-        const timer = setTimeout(async () => {
-            try {
-                const { data, error } = await supabase.functions.invoke('payment-webhook', {
-                    body: {
-                        action: 'resolve_bank_account',
-                        account_number: cleanAcc,
-                        bank_code: selectedBank.code,
-                        provider: settings?.transfer_provider || 'flutterwave',
-                    },
-                });
-
-                if (!isMounted) return;
-
-                if (error || !data?.success) {
-                    const errorMsg = data?.message || "Could not verify this bank account. Please check the account number and selected bank.";
-                    setResolveError(errorMsg);
-                    setAccountName('');
-                    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                } else if (data?.account_name) {
-                    setAccountName(data.account_name);
-                    setResolveError(null);
-                    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                }
-            } catch (err: any) {
-                if (isMounted) {
-                    setResolveError('Connection error resolving bank account. Please check your network.');
-                    setAccountName('');
-                }
-            } finally {
-                if (isMounted) setIsResolvingAccount(false);
-            }
-        }, 400);
-
-        return () => {
-            isMounted = false;
-            clearTimeout(timer);
-        };
+        return () => clearTimeout(timer);
     }, [accountNumber, selectedBank]);
 
     // Debounced Search for P2P Recipient
@@ -1333,41 +1337,85 @@ export default function TransferScreen() {
                             ) : null}
                         </View>
 
+                        {/* Prompt to select bank if 10 digits entered without bank */}
+                        {!selectedBank && accountNumber.trim().length === 10 && (
+                            <TouchableOpacity
+                                onPress={() => setBankModalVisible(true)}
+                                style={s.promptSelectBankCard}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.spinnerCircle}>
+                                    <Ionicons name="business" size={18} color="#D97706" />
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={s.promptSelectBankTitle}>Zaɓi Bankin da Asusun yake</Text>
+                                    <Text style={s.promptSelectBankSub}>Danna nan don zaɓar banki don gano sunan mai asusun</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color="#D97706" />
+                            </TouchableOpacity>
+                        )}
+
                         {/* Modernized Auto-Resolution Feedback Card */}
                         {isResolvingAccount && (
                             <View style={s.resolvingStatusBox}>
-                                <ActivityIndicator size="small" color="#D97706" />
-                                <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <Text style={s.resolvingStatusTitle}>Verifying Beneficiary Account...</Text>
-                                    <Text style={s.resolvingStatusSub}>Validating account name with NIBSS network</Text>
+                                <View style={s.spinnerCircle}>
+                                    <ActivityIndicator size="small" color="#D97706" />
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={s.resolvingStatusTitle}>Tantance Sunan Mai Asusu...</Text>
+                                        <View style={s.pulsingAmberDot} />
+                                    </View>
+                                    <Text style={s.resolvingStatusSub}>Ana binciko cikakken sunan asusun ta hanyar NIBSS...</Text>
                                 </View>
                             </View>
                         )}
 
                         {resolveError && (
                             <View style={s.errorAlert}>
-                                <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                                <View style={{ flex: 1, marginLeft: 6 }}>
-                                    <Text style={s.errorAlertTitle}>Account Not Found</Text>
+                                <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                                <View style={{ flex: 1, marginLeft: 8 }}>
+                                    <Text style={s.errorAlertTitle}>Ba a Gano Asusun Ba</Text>
                                     <Text style={s.errorAlertText}>{resolveError}</Text>
                                 </View>
+                                <TouchableOpacity
+                                    onPress={handleVerifyBeneficiary}
+                                    style={s.retryVerifyBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="refresh" size={13} color="#DC2626" style={{ marginRight: 3 }} />
+                                    <Text style={s.retryVerifyBtnText}>Sake Gwada</Text>
+                                </TouchableOpacity>
                             </View>
                         )}
 
                         {accountName ? (
                             <View style={s.resolvedAccountCard}>
-                                <View style={s.verifiedIconPill}>
-                                    <Ionicons name="shield-checkmark" size={16} color="#10B981" />
-                                </View>
-                                <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={s.resolvedLabel}>VERIFIED BENEFICIARY</Text>
-                                        <View style={s.activeDot} />
+                                <View style={s.verifiedAvatarWrap}>
+                                    <BankLogoBadge bank={selectedBank!} size={42} />
+                                    <View style={s.verifiedCheckBadge}>
+                                        <Ionicons name="checkmark-sharp" size={10} color="#FFFFFF" />
                                     </View>
-                                    <Text style={s.resolvedName} numberOfLines={1}>{accountName}</Text>
-                                    <Text style={s.resolvedBankSub}>
-                                        {selectedBank?.name} • Ready for transfer
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <View style={s.verifiedPillRow}>
+                                        <View style={s.verifiedTag}>
+                                            <Ionicons name="shield-checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
+                                            <Text style={s.verifiedTagText}>ASUSUN DA AKA TANTANCE</Text>
+                                        </View>
+                                        <View style={s.liveGreenDot} />
+                                    </View>
+                                    <Text style={s.resolvedName} numberOfLines={2}>
+                                        {accountName}
                                     </Text>
+                                    <View style={s.accountMetaRow}>
+                                        <Text style={s.resolvedBankSub}>
+                                            {selectedBank?.name}
+                                        </Text>
+                                        <Text style={s.accountNumberTag}>
+                                            {accountNumber}
+                                        </Text>
+                                    </View>
                                 </View>
                                 <TouchableOpacity
                                     onPress={() => {
@@ -1376,8 +1424,9 @@ export default function TransferScreen() {
                                     }}
                                     style={s.editAccountBtn}
                                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    activeOpacity={0.7}
                                 >
-                                    <Ionicons name="pencil-outline" size={14} color="#64748B" />
+                                    <Ionicons name="create-outline" size={16} color="#059669" />
                                 </TouchableOpacity>
                             </View>
                         ) : null}
@@ -1564,18 +1613,35 @@ export default function TransferScreen() {
 
                         {matchedUser && (
                             <View style={s.resolvedAccountCard}>
-                                <View style={s.verifiedIconPill}>
-                                    <Ionicons name="person" size={15} color="#10B981" />
-                                </View>
-                                <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={s.resolvedLabel}>VERIFIED MEMBER</Text>
-                                        <View style={s.activeDot} />
+                                <View style={s.verifiedAvatarWrap}>
+                                    <View style={s.p2pAvatarCircle}>
+                                        <Text style={s.p2pAvatarText}>
+                                            {(matchedUser.full_name || 'U').charAt(0).toUpperCase()}
+                                        </Text>
                                     </View>
-                                    <Text style={s.resolvedName} numberOfLines={1}>{matchedUser.full_name}</Text>
-                                    <Text style={s.resolvedBankSub}>
-                                        {matchedUser.phone || matchedUser.email}
+                                    <View style={s.verifiedCheckBadge}>
+                                        <Ionicons name="checkmark-sharp" size={10} color="#FFFFFF" />
+                                    </View>
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <View style={s.verifiedPillRow}>
+                                        <View style={s.verifiedTag}>
+                                            <Ionicons name="person-circle" size={11} color="#059669" style={{ marginRight: 3 }} />
+                                            <Text style={s.verifiedTagText}>ASUSUN DA AKA TANTANCE</Text>
+                                        </View>
+                                        <View style={s.liveGreenDot} />
+                                    </View>
+                                    <Text style={s.resolvedName} numberOfLines={2}>
+                                        {matchedUser.full_name}
                                     </Text>
+                                    <View style={s.accountMetaRow}>
+                                        <Text style={s.resolvedBankSub}>
+                                            {matchedUser.phone || matchedUser.email}
+                                        </Text>
+                                        {matchedUser.username ? (
+                                            <Text style={s.accountNumberTag}>@{matchedUser.username}</Text>
+                                        ) : null}
+                                    </View>
                                 </View>
                             </View>
                         )}
@@ -2644,91 +2710,210 @@ const s = StyleSheet.create({
     resolvingStatusBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FEF3C7',
-        borderWidth: 1,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1.5,
         borderColor: '#FDE68A',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        marginTop: 5,
+        borderRadius: 12,
+        padding: 10,
+        marginTop: 8,
+    },
+    spinnerCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FEF3C7',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     resolvingStatusTitle: {
         color: '#92400E',
-        fontSize: 10.5,
+        fontSize: 11.5,
         fontWeight: '800',
     },
     resolvingStatusSub: {
         color: '#B45309',
-        fontSize: 9,
-        fontWeight: '500',
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 1,
+    },
+    pulsingAmberDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#D97706',
+    },
+    promptSelectBankCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1.5,
+        borderColor: '#FDE68A',
+        borderRadius: 12,
+        padding: 10,
+        marginTop: 8,
+    },
+    promptSelectBankTitle: {
+        color: '#B45309',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    promptSelectBankSub: {
+        color: '#92400E',
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 2,
     },
     errorAlert: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FEF2F2',
         borderColor: '#FECACA',
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        marginTop: 5,
+        borderWidth: 1.5,
+        borderRadius: 12,
+        padding: 10,
+        marginTop: 8,
     },
     errorAlertTitle: {
         color: '#DC2626',
-        fontSize: 10.5,
+        fontSize: 11.5,
         fontWeight: '900',
     },
     errorAlertText: {
         color: '#B91C1C',
-        fontSize: 9.5,
+        fontSize: 10,
         fontWeight: '600',
+        marginTop: 2,
+    },
+    retryVerifyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEE2E2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 6,
+        marginLeft: 6,
+    },
+    retryVerifyBtnText: {
+        color: '#DC2626',
+        fontSize: 10.5,
+        fontWeight: '800',
     },
     resolvedAccountCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#ECFDF5',
-        borderWidth: 1,
-        borderColor: '#A7F3D0',
-        borderRadius: 10,
-        padding: 8,
-        marginTop: 6,
-    },
-    verifiedIconPill: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: '#D1FAE5',
-        borderWidth: 1,
+        backgroundColor: '#F0FDF4',
+        borderWidth: 1.5,
         borderColor: '#10B981',
+        borderRadius: 14,
+        padding: 12,
+        marginTop: 8,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    verifiedAvatarWrap: {
+        position: 'relative',
+        width: 44,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    activeDot: {
+    verifiedCheckBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        backgroundColor: '#059669',
+        width: 17,
+        height: 17,
+        borderRadius: 8.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+    },
+    p2pAvatarCircle: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: '#059669',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    p2pAvatarText: {
+        color: '#FFFFFF',
+        fontSize: 17,
+        fontWeight: '900',
+    },
+    verifiedPillRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 2,
+    },
+    verifiedTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#DCFCE7',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    verifiedTagText: {
+        color: '#059669',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 0.6,
+    },
+    liveGreenDot: {
         width: 6,
         height: 6,
         borderRadius: 3,
         backgroundColor: '#10B981',
     },
-    resolvedLabel: {
-        color: '#059669',
-        fontSize: 8.5,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
     resolvedName: {
-        color: '#0F172A',
-        fontSize: 12.5,
+        color: '#064E3B',
+        fontSize: 15.5,
         fontWeight: '900',
-        marginTop: 1,
+        lineHeight: 20,
+        letterSpacing: 0.2,
+        marginTop: 2,
+    },
+    accountMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginTop: 4,
     },
     resolvedBankSub: {
-        color: '#64748B',
-        fontSize: 9.5,
-        fontWeight: '600',
-        marginTop: 1,
+        color: '#047857',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    accountNumberTag: {
+        color: '#334155',
+        fontSize: 11,
+        fontWeight: '800',
+        backgroundColor: '#E2E8F0',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+        letterSpacing: 0.5,
     },
     editAccountBtn: {
-        padding: 4,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#DCFCE7',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        marginLeft: 8,
     },
     amountInputBox: {
         flexDirection: 'row',
