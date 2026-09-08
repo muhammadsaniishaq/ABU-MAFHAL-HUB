@@ -6,19 +6,59 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
+import { ABU_MAFHAL_LOGO_B64 } from '../../assets/images/logoB64';
+import { formatMoniepointDate, shareReceiptFile, downloadReceiptAsPDF } from '../../services/receiptGenerator';
 
 const { width } = Dimensions.get('window');
 
-// Brand Colors
-const NAVY = '#0d1b3e';
-const GOLD = '#f5a623';
+function parseTransactionDetails(tx: any) {
+    let beneficiary = 'Abu Mafhal Member';
+    let bankName = 'Abu Mafhal Hub Wallet';
+    let narration = tx.description || 'Abu Mafhal Instant Settlement';
+
+    if (tx.description) {
+        const desc = String(tx.description);
+        const parenMatch = desc.match(/\((.*?)\)/);
+        if (parenMatch) {
+            const inner = parenMatch[1];
+            if (inner.includes('-')) {
+                const parts = inner.split('-');
+                bankName = parts[0].trim();
+            } else {
+                bankName = inner.trim();
+            }
+        }
+
+        const toMatch = desc.match(/to\s+([^(]+)/i);
+        if (toMatch && toMatch[1]) {
+            beneficiary = toMatch[1].trim();
+        } else {
+            beneficiary = desc.replace(/^Transfer\s+/i, '').trim();
+        }
+    }
+
+    if (tx.type === 'deposit') {
+        beneficiary = 'Wallet Funding';
+        bankName = 'Virtual Account Deposit';
+    } else if (tx.type === 'withdrawal') {
+        if (!bankName || bankName === 'Abu Mafhal Hub Wallet') {
+            bankName = 'Bank Settlement';
+        }
+    }
+
+    return { beneficiary, bankName, narration };
+}
 
 export default function ReceiptScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const [transaction, setTransaction] = useState<any>(null);
-    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [senderProfile, setSenderProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [copiedRef, setCopiedRef] = useState(false);
+    const [isSharingWhatsApp, setIsSharingWhatsApp] = useState(false);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const viewShotRef = useRef<any>(null);
 
     useEffect(() => {
@@ -38,52 +78,100 @@ export default function ReceiptScreen() {
                 .eq('id', id)
                 .single();
 
-            if (txData) setTransaction(txData);
+            if (txData) {
+                setTransaction(txData);
 
-            // Fetch dynamic logo
-            const { data: settingsData } = await supabase
-                .from('app_settings')
-                .select('key, value');
-            
-            if (settingsData) {
-                const iconSetting = settingsData.find(s => s.key === 'app_logo_icon');
-                if (iconSetting?.value?.url) {
-                    setLogoUrl(iconSetting.value.url);
-                } else {
-                    const logoSetting = settingsData.find(s => s.key === 'app_logo');
-                    if (logoSetting?.value?.url) {
-                        setLogoUrl(logoSetting.value.url);
-                    }
+                // Fetch sender name from profiles
+                if (txData.user_id) {
+                    const { data: prof } = await supabase
+                        .from('profiles')
+                        .select('full_name, phone_number, email')
+                        .eq('id', txData.user_id)
+                        .single();
+                    if (prof) setSenderProfile(prof);
                 }
             }
         } catch (error) {
-            console.error('Error fetching data:', error);
+            console.error('Error fetching receipt data:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const shareReceipt = async () => {
+    const handleCopyReference = async (refStr: string) => {
+        if (!refStr) return;
         try {
-            if (viewShotRef.current) {
-                const uri = await viewShotRef.current.capture();
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(uri, {
-                        mimeType: 'image/png',
-                        dialogTitle: 'Share Receipt',
-                        UTI: 'public.png'
-                    });
-                }
+            await Clipboard.setStringAsync(refStr);
+            setCopiedRef(true);
+            setTimeout(() => setCopiedRef(false), 2200);
+        } catch (_) {}
+    };
+
+    const handleShareWhatsApp = async () => {
+        if (!transaction) return;
+        setIsSharingWhatsApp(true);
+        try {
+            let customUri = '';
+            if (viewShotRef.current?.capture) {
+                try {
+                    customUri = await viewShotRef.current.capture();
+                } catch (_) {}
             }
-        } catch (error) {
-            console.error('Error capturing receipt:', error);
+
+            const { beneficiary, bankName, narration } = parseTransactionDetails(transaction);
+            await shareReceiptFile(
+                {
+                    reference: transaction.reference || transaction.id.substring(0, 12).toUpperCase(),
+                    type: transaction.type,
+                    description: transaction.description || '',
+                    amount: transaction.amount,
+                    status: transaction.status,
+                    date: transaction.created_at,
+                    beneficiary,
+                    recipientName: beneficiary,
+                    bankName,
+                    senderName: senderProfile?.full_name || 'Abu Mafhal User',
+                    notes: narration,
+                },
+                customUri ? 'png' : 'pdf',
+                customUri
+            );
+        } catch (err) {
+            console.error('WhatsApp share error:', err);
+        } finally {
+            setIsSharingWhatsApp(false);
+        }
+    };
+
+    const handleDownloadPdf = async () => {
+        if (!transaction) return;
+        setIsDownloadingPdf(true);
+        try {
+            const { beneficiary, bankName, narration } = parseTransactionDetails(transaction);
+            await downloadReceiptAsPDF({
+                reference: transaction.reference || transaction.id.substring(0, 12).toUpperCase(),
+                type: transaction.type,
+                description: transaction.description || '',
+                amount: transaction.amount,
+                status: transaction.status,
+                date: transaction.created_at,
+                beneficiary,
+                recipientName: beneficiary,
+                bankName,
+                senderName: senderProfile?.full_name || 'Abu Mafhal User',
+                notes: narration,
+            });
+        } catch (err) {
+            console.error('Download PDF error:', err);
+        } finally {
+            setIsDownloadingPdf(false);
         }
     };
 
     if (loading) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color={NAVY} />
+                <ActivityIndicator size="large" color="#0056D2" />
             </SafeAreaView>
         );
     }
@@ -91,134 +179,206 @@ export default function ReceiptScreen() {
     if (!transaction) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <Ionicons name="warning-outline" size={40} color={GOLD} style={{marginBottom: 16}} />
+                <Ionicons name="warning-outline" size={42} color="#F59E0B" style={{ marginBottom: 16 }} />
                 <Text style={s.notFoundText}>Transaction not found</Text>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-                    <Text style={s.backBtnText}>Return</Text>
+                    <Text style={s.backBtnText}>Return to Previous</Text>
                 </TouchableOpacity>
             </SafeAreaView>
         );
     }
 
-    const amount = parseFloat(transaction.amount.toString());
-    const isIncome = transaction.type === 'deposit' || amount > 0;
-    const absAmount = Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
-    
-    const formattedDate = new Date(transaction.created_at).toLocaleDateString([], { 
-        year: 'numeric', month: 'short', day: 'numeric' 
-    });
-    const formattedTime = new Date(transaction.created_at).toLocaleTimeString([], { 
-        hour: '2-digit', minute: '2-digit' 
-    });
-
-    const receiptNo = transaction.reference || transaction.id.substring(0, 10).toUpperCase();
-    const isSuccess = transaction.status === 'success';
+    const amountNum = parseFloat(transaction.amount?.toString() || '0');
+    const isDebit = transaction.type !== 'deposit' && amountNum <= 0;
+    const absAmount = Math.abs(amountNum).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const receiptNo = transaction.reference || transaction.id.substring(0, 12).toUpperCase();
+    const { beneficiary, bankName, narration } = parseTransactionDetails(transaction);
 
     return (
         <SafeAreaView style={s.container} edges={['top', 'bottom']}>
             <Stack.Screen options={{ headerShown: false }} />
             
+            {/* Top Navigation Bar */}
             <View style={s.appHeader}>
-                <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="close" size={24} color={NAVY} />
+                <TouchableOpacity onPress={() => router.back()} style={s.iconButton} activeOpacity={0.7}>
+                    <Ionicons name="arrow-back" size={22} color="#0F172A" />
                 </TouchableOpacity>
-                <Text style={s.appHeaderTitle}>E-Receipt</Text>
-                <TouchableOpacity onPress={shareReceipt} style={s.iconButton}>
-                    <Ionicons name="share-outline" size={22} color={NAVY} />
+                <Text style={s.appHeaderTitle}>Transaction Receipt</Text>
+                <TouchableOpacity onPress={handleShareWhatsApp} style={s.iconButton} activeOpacity={0.7}>
+                    <Ionicons name="share-social-outline" size={20} color="#0F172A" />
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-                <View style={s.receiptWrapper}>
-                    <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={s.viewShot}>
-                        
-                        {/* The Main Receipt Card */}
-                        <View style={s.receiptCard}>
-                            
-                            {/* Logo Badge overlapping the top */}
-                            <View style={s.logoBadgeContainer}>
-                                <View style={s.logoCircle}>
-                                    {logoUrl ? (
-                                        <Image source={{ uri: logoUrl }} style={s.dynamicLogo} resizeMode="contain" />
-                                    ) : (
-                                        <Image source={require('../../assets/images/logo-icon.png')} style={s.dynamicLogo} resizeMode="contain" />
-                                    )}
-                                </View>
+                {/* Moniepoint-Style Capture Container */}
+                <ViewShot
+                    ref={viewShotRef}
+                    options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}
+                    style={s.mpReceiptCaptureWrap}
+                >
+                    {/* Centered Brand Capsule Pill */}
+                    <View style={s.mpOuterHeader}>
+                        <View style={s.mpBrandCapsule}>
+                            <Image source={{ uri: ABU_MAFHAL_LOGO_B64 }} style={s.mpBrandMiniLogo} />
+                            <Text style={s.mpBrandCapsuleText}>Abu Mafhal Hub</Text>
+                        </View>
+                    </View>
+
+                    {/* White Ticket Card */}
+                    <View style={s.mpTicketCard}>
+                        {/* Ticket Header Row: DEBIT Badge & Brand Icon */}
+                        <View style={s.mpTicketHeaderRow}>
+                            <View style={[s.mpDebitBadge, !isDebit && { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+                                <Text style={[s.mpDebitBadgeText, !isDebit && { color: '#059669' }]}>
+                                    {isDebit ? 'DEBIT' : 'CREDIT'}
+                                </Text>
                             </View>
-
-                            <View style={s.receiptInner}>
-                                
-                                {/* Status Icon */}
-                                <View style={s.statusIconContainer}>
-                                    <Ionicons 
-                                        name={isSuccess ? "checkmark-circle" : "time"} 
-                                        size={28} 
-                                        color={isSuccess ? "#107C10" : GOLD} 
-                                    />
-                                    <Text style={[s.statusText, {color: isSuccess ? "#107C10" : GOLD}]}>
-                                        {isSuccess ? 'Payment Successful' : 'Payment Pending'}
-                                    </Text>
-                                </View>
-
-                                {/* Amount Section */}
-                                <Text style={s.amountLabel}>Total Amount</Text>
-                                <Text style={s.amountValue}>₦{absAmount}</Text>
-
-                                {/* Dashed Divider */}
-                                <View style={s.dashedDividerWrapper}>
-                                    <View style={s.cutoutLeft} />
-                                    <View style={s.dashedLine} />
-                                    <View style={s.cutoutRight} />
-                                </View>
-
-                                {/* Details Section */}
-                                <View style={s.detailsContainer}>
-                                    
-                                    <DetailRow label="Transaction Type" value={transaction.type.toUpperCase()} />
-                                    <DetailRow label="Description" value={transaction.description || 'N/A'} />
-                                    <DetailRow label="Reference No." value={receiptNo} />
-                                    <DetailRow label="Date" value={formattedDate} />
-                                    <DetailRow label="Time" value={formattedTime} />
-                                    <DetailRow label="User ID" value={transaction.user_id.substring(0,8)} noBorder />
-                                    
-                                </View>
-
-                                {/* Footer Logo / Watermark area */}
-                                <View style={s.footerArea}>
-                                    <Text style={s.footerBrandText}>ABU MAFHAL HUB</Text>
-                                    <Text style={s.footerMotto}>Reliable Digital Services</Text>
-                                </View>
-
+                            <View style={s.mpBrandAvatarCircle}>
+                                <Text style={s.mpBrandAvatarLetter}>M</Text>
                             </View>
                         </View>
-                    </ViewShot>
+
+                        {/* Amount Hero */}
+                        <Text style={s.mpAmountHeroText}>₦{absAmount}</Text>
+
+                        {/* Hairline Divider */}
+                        <View style={s.mpDividerLine} />
+
+                        {/* Ticket Details Inner Card (Label on top, Value directly beneath) */}
+                        <View style={s.mpDetailsBox}>
+                            {/* 1. Transaction Type */}
+                            <View style={s.mpFieldBlock}>
+                                <Text style={s.mpFieldLabel}>Transaction Type</Text>
+                                <View style={s.mpTypeTag}>
+                                    <Text style={s.mpTypeTagText}>
+                                        {transaction.type === 'p2p' ? 'Wallet Transfer' : (transaction.type ? transaction.type.toUpperCase() : 'TRANSFER')}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* 2. Sender Name */}
+                            <View style={s.mpFieldBlock}>
+                                <Text style={s.mpFieldLabel}>Sender Name</Text>
+                                <Text style={s.mpFieldValue}>{senderProfile?.full_name || 'Abu Mafhal User'}</Text>
+                            </View>
+
+                            {/* 3. Source Institution */}
+                            <View style={s.mpFieldBlock}>
+                                <Text style={s.mpFieldLabel}>Source Institution</Text>
+                                <Text style={s.mpFieldValue}>Abu Mafhal Hub Wallet</Text>
+                            </View>
+
+                            {/* 4. Beneficiary */}
+                            <View style={s.mpFieldBlock}>
+                                <Text style={s.mpFieldLabel}>Beneficiary</Text>
+                                <Text style={[s.mpFieldValue, { textTransform: 'uppercase' }]}>
+                                    {beneficiary}
+                                </Text>
+                            </View>
+
+                            {/* 5. Beneficiary Institution */}
+                            <View style={s.mpFieldBlock}>
+                                <Text style={s.mpFieldLabel}>Beneficiary Institution</Text>
+                                <Text style={s.mpFieldValue}>{bankName}</Text>
+                            </View>
+
+                            {/* 6. Transaction Date */}
+                            <View style={s.mpFieldBlock}>
+                                <Text style={s.mpFieldLabel}>Transaction Date</Text>
+                                <Text style={s.mpFieldValue}>{formatMoniepointDate(transaction.created_at)}</Text>
+                            </View>
+
+                            {/* 7. Transaction Reference */}
+                            <View style={s.mpFieldBlock}>
+                                <Text style={s.mpFieldLabel}>Transaction Reference</Text>
+                                <TouchableOpacity
+                                    onPress={() => handleCopyReference(receiptNo)}
+                                    style={s.mpRefCopyRow}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={s.mpRefText} numberOfLines={1}>
+                                        TRF|{receiptNo}
+                                    </Text>
+                                    <Ionicons name={copiedRef ? "checkmark-circle" : "copy-outline"} size={13} color="#0056D2" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* 8. Business Name / Narration */}
+                            <View style={[s.mpFieldBlock, { marginBottom: 0 }]}>
+                                <Text style={s.mpFieldLabel}>Business Name</Text>
+                                <Text style={s.mpFieldValue}>{narration}</Text>
+                            </View>
+                        </View>
+
+                        {/* Scalloped Perforated Ticket Teeth Cut at the Bottom */}
+                        <View style={s.scallopsWrapper}>
+                            {Array.from({ length: 18 }).map((_, idx) => (
+                                <View key={idx} style={s.scallopCircle} />
+                            ))}
+                        </View>
+                    </View>
+                </ViewShot>
+
+                {/* Action Buttons Column */}
+                <View style={s.actionsCol}>
+                    <TouchableOpacity
+                        onPress={handleDownloadPdf}
+                        style={s.pdfReceiptBtn}
+                        activeOpacity={0.85}
+                        disabled={isDownloadingPdf}
+                    >
+                        {isDownloadingPdf ? (
+                            <ActivityIndicator size="small" color="#0F172A" />
+                        ) : (
+                            <>
+                                <Ionicons name="download-outline" size={16} color="#0F172A" />
+                                <Text style={s.pdfReceiptBtnText}>Download Official Receipt (PDF / PNG)</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={handleShareWhatsApp}
+                        style={s.whatsappSupportBtn}
+                        activeOpacity={0.85}
+                        disabled={isSharingWhatsApp}
+                    >
+                        {isSharingWhatsApp ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                            <>
+                                <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                                <Text style={s.whatsappSupportBtnText}>Share on WhatsApp (PDF / PNG File)</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => handleCopyReference(receiptNo)}
+                        style={s.copyRefBtn}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name={copiedRef ? "checkmark-circle" : "copy-outline"} size={15} color="#0F172A" />
+                        <Text style={s.copyRefBtnText}>{copiedRef ? 'Reference Copied!' : 'Copy Transaction Reference'}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={s.closeSheetBtn}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={s.closeSheetBtnText}>Back to Transactions</Text>
+                    </TouchableOpacity>
                 </View>
-
-                {/* Bottom Action */}
-                <TouchableOpacity style={s.downloadBtn} onPress={shareReceipt} activeOpacity={0.8}>
-                    <Ionicons name="download-outline" size={20} color="#ffffff" style={{marginRight: 8}} />
-                    <Text style={s.downloadBtnText}>Save Receipt</Text>
-                </TouchableOpacity>
-
             </ScrollView>
         </SafeAreaView>
-    );
-}
-
-// Helper component for rows
-function DetailRow({ label, value, noBorder = false }: { label: string, value: string, noBorder?: boolean }) {
-    return (
-        <View style={[s.detailRow, !noBorder && s.detailRowBorder]}>
-            <Text style={s.detailLabel}>{label}</Text>
-            <Text style={s.detailValue}>{value}</Text>
-        </View>
     );
 }
 
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F1F5F9',
     },
     centerContainer: {
         flex: 1,
@@ -228,225 +388,287 @@ const s = StyleSheet.create({
     },
     notFoundText: {
         fontSize: 16,
-        color: NAVY,
-        fontWeight: '600',
+        color: '#0F172A',
+        fontWeight: '700',
         marginBottom: 16,
     },
     backBtn: {
         paddingVertical: 10,
         paddingHorizontal: 24,
-        backgroundColor: '#E2E8F0',
+        backgroundColor: '#0056D2',
         borderRadius: 12,
     },
     backBtnText: {
-        color: NAVY,
+        color: '#FFFFFF',
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     appHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 10,
-        backgroundColor: '#F8FAFC',
+        paddingVertical: 12,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
     },
     iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        backgroundColor: '#F8FAFC',
     },
     appHeaderTitle: {
-        fontSize: 17,
-        fontWeight: '800',
-        color: NAVY,
+        fontSize: 16,
+        fontWeight: '900',
+        color: '#0F172A',
     },
     scrollContent: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
         paddingBottom: 40,
     },
-    receiptWrapper: {
-        paddingHorizontal: 20,
-        paddingTop: 30, // Extra padding for the floating logo
-        paddingBottom: 20,
-    },
-    viewShot: {
-        backgroundColor: '#F8FAFC', 
-    },
-    receiptCard: {
-        backgroundColor: '#FFFFFF',
-        width: '100%',
-        borderRadius: 24,
-        marginTop: 30, // Push card down so logo can overlap
-        paddingBottom: 24,
-        shadowColor: NAVY,
-        shadowOffset: { width: 0, height: 16 },
-        shadowOpacity: 0.08,
-        shadowRadius: 32,
-        elevation: 8,
-    },
-    logoBadgeContainer: {
-        alignItems: 'center',
-        marginTop: -36, // Pull logo up halfway out of the card
-        marginBottom: 20,
-        zIndex: 10,
-    },
-    logoCircle: {
-        width: 72,
-        height: 72,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 36,
-        padding: 4,
-        borderWidth: 2,
-        borderColor: '#F8FAFC', // faint border
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    dynamicLogo: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 32,
-    },
-    receiptInner: {
-        paddingHorizontal: 24,
-        alignItems: 'center',
-    },
-    statusIconContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-        backgroundColor: '#F8FAFC',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+
+    /* Moniepoint Ticket Card Styles */
+    mpReceiptCaptureWrap: {
+        backgroundColor: '#0056D2',
         borderRadius: 20,
+        paddingTop: 16,
+        paddingHorizontal: 12,
+        paddingBottom: 10,
+        marginBottom: 14,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        elevation: 4,
     },
-    statusText: {
-        fontSize: 14,
-        fontWeight: '700',
-        marginLeft: 8,
+    mpOuterHeader: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
     },
-    amountLabel: {
-        fontSize: 13,
-        color: '#64748B',
-        fontWeight: '500',
-        marginBottom: 4,
-    },
-    amountValue: {
-        fontSize: 36,
-        fontWeight: '900',
-        color: NAVY,
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-        letterSpacing: -1,
-    },
-    dashedDividerWrapper: {
+    mpBrandCapsule: {
         flexDirection: 'row',
         alignItems: 'center',
-        width: '100%',
-        marginVertical: 30,
-        position: 'relative',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
     },
-    cutoutLeft: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#F8FAFC',
-        position: 'absolute',
-        left: -36, // pulls it to the very edge of the card
-        zIndex: 2,
+    mpBrandMiniLogo: {
+        width: 18,
+        height: 18,
+        borderRadius: 4,
     },
-    cutoutRight: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#F8FAFC',
-        position: 'absolute',
-        right: -36,
-        zIndex: 2,
+    mpBrandCapsuleText: {
+        color: '#0056D2',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.3,
     },
-    dashedLine: {
-        flex: 1,
-        height: 1,
+    mpTicketCard: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
+        paddingTop: 18,
+        paddingHorizontal: 16,
+        paddingBottom: 8,
+    },
+    mpTicketHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    mpDebitBadge: {
+        backgroundColor: '#EFF6FF',
         borderWidth: 1,
+        borderColor: '#BFDBFE',
+        paddingHorizontal: 10,
+        paddingVertical: 3.5,
+        borderRadius: 6,
+    },
+    mpDebitBadgeText: {
+        color: '#1D4ED8',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.6,
+    },
+    mpBrandAvatarCircle: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#0056D2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mpBrandAvatarLetter: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '900',
+    },
+    mpAmountHeroText: {
+        fontSize: 28,
+        fontWeight: '900',
+        color: '#000000',
+        letterSpacing: -0.5,
+        marginBottom: 12,
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    mpDividerLine: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+        marginBottom: 14,
+    },
+    mpDetailsBox: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 0.5,
         borderColor: '#E2E8F0',
-        borderStyle: 'dashed',
     },
-    detailsContainer: {
-        width: '100%',
+    mpFieldBlock: {
+        marginBottom: 13,
     },
-    detailRow: {
+    mpFieldLabel: {
+        fontSize: 11,
+        color: '#8E9BAE',
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    mpFieldValue: {
+        fontSize: 13,
+        color: '#0F172A',
+        fontWeight: '800',
+    },
+    mpTypeTag: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#E0F2FE',
+        paddingHorizontal: 10,
+        paddingVertical: 3.5,
+        borderRadius: 6,
+        marginTop: 2,
+    },
+    mpTypeTagText: {
+        color: '#0284C7',
+        fontSize: 11.5,
+        fontWeight: '800',
+    },
+    mpRefCopyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 6,
+        borderWidth: 0.5,
+        borderColor: '#CBD5E1',
+        marginTop: 2,
+    },
+    mpRefText: {
+        color: '#0F172A',
+        fontSize: 10.5,
+        fontWeight: '800',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        flex: 1,
+        marginRight: 6,
+    },
+    scallopsWrapper: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 14,
+        marginTop: 12,
+        marginBottom: -8,
+        marginHorizontal: -16,
+        overflow: 'hidden',
     },
-    detailRowBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+    scallopCircle: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: '#0056D2',
     },
-    detailLabel: {
-        fontSize: 13,
-        color: '#64748B',
-        fontWeight: '500',
+
+    /* Action Buttons */
+    actionsCol: {
+        gap: 8,
+        marginTop: 2,
+        marginBottom: 20,
     },
-    detailValue: {
-        fontSize: 13,
-        color: NAVY,
-        fontWeight: '700',
-        textAlign: 'right',
-        flex: 1,
-        marginLeft: 20,
-    },
-    footerArea: {
-        marginTop: 40,
-        alignItems: 'center',
-    },
-    footerBrandText: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: NAVY,
-        letterSpacing: 1,
-    },
-    footerMotto: {
-        fontSize: 10,
-        color: GOLD,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        marginTop: 4,
-        letterSpacing: 2,
-    },
-    downloadBtn: {
+    pdfReceiptBtn: {
+        backgroundColor: '#FFD700',
+        height: 42,
+        borderRadius: 10,
         flexDirection: 'row',
-        backgroundColor: NAVY,
-        marginHorizontal: 20,
-        marginTop: 10,
-        paddingVertical: 16,
-        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: NAVY,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 6,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#DAA520',
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
     },
-    downloadBtnText: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: '700',
-    }
+    pdfReceiptBtnText: {
+        color: '#0F172A',
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.2,
+    },
+    copyRefBtn: {
+        backgroundColor: '#FFFFFF',
+        height: 40,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    copyRefBtnText: {
+        color: '#0F172A',
+        fontSize: 11.5,
+        fontWeight: '800',
+    },
+    whatsappSupportBtn: {
+        backgroundColor: '#0F172A',
+        borderColor: '#25D366',
+        borderWidth: 1,
+        height: 40,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    whatsappSupportBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11.5,
+        fontWeight: '900',
+    },
+    closeSheetBtn: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E2E8F0',
+        borderWidth: 1,
+        height: 38,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    closeSheetBtnText: {
+        color: '#64748B',
+        fontSize: 11.5,
+        fontWeight: '800',
+    },
 });

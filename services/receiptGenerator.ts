@@ -26,13 +26,50 @@ export interface ReceiptData {
   notes?: string;
 }
 
+// Formats dates to authentic Moniepoint format: "Monday, January 20th | 7:53 PM"
+export function formatMoniepointDate(rawDate?: any): string {
+  if (!rawDate) return 'Today';
+  let d = new Date(rawDate);
+  if (isNaN(d.getTime())) {
+    d = new Date();
+  }
+
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const dayName = days[d.getDay()];
+  const monthName = months[d.getMonth()];
+  const dateNum = d.getDate();
+
+  const suffix = (n: number) => {
+    if (n >= 11 && n <= 13) return `${n}th`;
+    switch (n % 10) {
+      case 1: return `${n}st`;
+      case 2: return `${n}nd`;
+      case 3: return `${n}rd`;
+      default: return `${n}th`;
+    }
+  };
+
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minStr = minutes < 10 ? `0${minutes}` : `${minutes}`;
+
+  return `${dayName}, ${monthName} ${dateNum}${suffix(dateNum)} | ${hours}:${minStr} ${ampm}`;
+}
+
 /**
- * Generate ultra-luxurious full-bleed A5 HTML template for ABU MAFHAL SUB (ABU MAFHAL LTD - RC-8979939)
- * Formatted edge-to-edge with prominent amount hero, two-tier information hierarchy, and cryptographic verification.
+ * Generate authentic Moniepoint ticket style A5 HTML receipt for Abu Mafhal Hub
  */
 export function generateModernReceiptHTML(data: ReceiptData): string {
   const ref = String(data.reference || `TXN-${Date.now()}`);
-  const dateStr = typeof data.date === 'string' ? data.date : (data.date ? new Date(data.date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString());
+  const formattedDate = formatMoniepointDate(data.date);
   
   // Amount computations
   const numTotalDebit = typeof data.totalDebit === 'number'
@@ -41,21 +78,13 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
   const numAmount = typeof data.amount === 'number'
     ? data.amount
     : parseFloat(String(data.amount).replace(/[^0-9.]/g, '')) || 0;
-  const numTransferAmount = typeof data.transferAmount === 'number'
-    ? data.transferAmount
-    : (data.transferAmount ? parseFloat(String(data.transferAmount).replace(/[^0-9.]/g, '')) : null);
-  const numFee = typeof data.fee === 'number'
-    ? data.fee
-    : (data.fee !== undefined && data.fee !== null ? parseFloat(String(data.fee).replace(/[^0-9.]/g, '')) : null);
 
   const displayTotalAmount = numTotalDebit ?? numAmount;
   const formattedTotal = `₦${displayTotalAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   
-  const statusUpper = (data.status || 'SUCCESSFUL').toUpperCase();
-  const isSuccess = statusUpper === 'SUCCESS' || statusUpper === 'SUCCESSFUL' || statusUpper === 'COMPLETED';
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://abumafhal.com.ng/verify?ref=${ref}`)}`;
-
+  const isDebit = data.type !== 'deposit';
   const recipientDisplay = data.recipientName || data.beneficiary || 'Beneficiary';
+  const fullRefText = data.sessionId ? `TRF|${ref}|${data.sessionId}` : `TRF|${ref}`;
 
   return `
 <!DOCTYPE html>
@@ -80,7 +109,7 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
     
     html, body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #FFFFFF;
+      background-color: #0056D2;
       color: #0F172A;
       margin: 0;
       padding: 0;
@@ -90,482 +119,310 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
       print-color-adjust: exact;
     }
     
-    #receipt-card {
+    #receipt-page {
       width: 100%;
       min-height: 100%;
-      background: #FFFFFF;
-      margin: 0;
-      padding: 0;
+      background: #0056D2;
+      padding: 24px 20px 20px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      align-items: center;
       box-sizing: border-box;
-    }
-    
-    /* Header Gradient */
-    .receipt-header {
-      background: linear-gradient(135deg, #020617 0%, #0F172A 48%, #1E293B 100%);
-      color: #FFFFFF;
-      padding: 22px 22px 18px;
       position: relative;
-      border-bottom: 3.5px solid #DAA520;
+      overflow: hidden;
+    }
+
+    /* Decorative Moniepoint Background Gold Accents */
+    .bg-accent-1 {
+      position: absolute;
+      top: -60px;
+      right: -60px;
+      width: 180px;
+      height: 180px;
+      border: 8px solid #F59E0B;
+      border-radius: 50%;
+      opacity: 0.25;
+      pointer-events: none;
+    }
+    .bg-accent-2 {
+      position: absolute;
+      bottom: -40px;
+      left: -40px;
+      width: 160px;
+      height: 160px;
+      border: 8px solid #F59E0B;
+      border-radius: 50%;
+      opacity: 0.25;
+      pointer-events: none;
     }
     
-    .brand-row {
+    /* Moniepoint Pill Header */
+    .mp-brand-capsule {
+      background: #FFFFFF;
+      border-radius: 30px;
+      padding: 6px 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      z-index: 2;
+    }
+    
+    .mp-brand-logo {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      object-fit: cover;
+    }
+    
+    .mp-brand-title {
+      font-size: 14px;
+      font-weight: 900;
+      color: #0056D2;
+      letter-spacing: 0.3px;
+    }
+    
+    /* White Ticket Paper Card */
+    .mp-ticket-card {
+      background: #FFFFFF;
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+      width: 100%;
+      max-width: 380px;
+      padding: 20px 20px 0;
+      box-sizing: border-box;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Header Row: DEBIT pill & 'M' avatar */
+    .mp-ticket-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    
+    .mp-debit-badge {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1D4ED8;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    
+    .mp-avatar-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      background: #0056D2;
+      color: #FFFFFF;
+      font-size: 19px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 8px rgba(0, 86, 210, 0.3);
+    }
+    
+    /* Amount Hero */
+    .mp-amount-hero {
+      font-size: 32px;
+      font-weight: 900;
+      color: #000000;
+      letter-spacing: -0.8px;
+      margin-bottom: 14px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    
+    /* Divider */
+    .mp-divider {
+      height: 1px;
+      background: #F1F5F9;
+      width: 100%;
       margin-bottom: 14px;
     }
     
-    .brand-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .brand-logo-img {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      object-fit: cover;
-      border: 1.5px solid #DAA520;
-      background: #FFFFFF;
-      padding: 2px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    
-    .brand-titles {
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .brand-name {
-      font-size: 17px;
-      font-weight: 900;
-      letter-spacing: 0.5px;
-      color: #FFFFFF;
-      text-transform: uppercase;
-    }
-    
-    .brand-sub {
-      font-size: 9px;
-      color: #FFD700;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      margin-top: 1px;
-    }
-    
-    .company-reg {
-      font-size: 8px;
-      color: #94A3B8;
-      font-weight: 600;
-      margin-top: 1px;
-    }
-    
-    .seal-badge {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid #10B981;
-      padding: 4px 10px;
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .seal-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #10B981;
-      box-shadow: 0 0 8px #10B981;
-    }
-    
-    .seal-text {
-      font-size: 8.5px;
-      font-weight: 800;
-      color: #10B981;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-    }
-    
-    /* Amount Hero Banner */
-    .amount-hero {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1.5px solid rgba(218, 165, 32, 0.35);
+    /* Inner Details Container (Label Above, Value Below) */
+    .mp-details-box {
+      background: #F8FAFC;
       border-radius: 14px;
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      backdrop-filter: blur(10px);
+      padding: 16px;
+      border: 1px solid #E2E8F0;
     }
     
-    .amount-label {
-      font-size: 9px;
-      font-weight: 800;
-      color: #CBD5E1;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
+    .mp-field-block {
+      margin-bottom: 13px;
+    }
+    
+    .mp-field-block:last-child {
+      margin-bottom: 0;
+    }
+    
+    .mp-field-label {
+      font-size: 11px;
+      color: #8E9BAE;
+      font-weight: 600;
       margin-bottom: 2px;
     }
     
-    .amount-val {
-      font-size: 28px;
-      font-weight: 900;
-      color: #FFFFFF;
-      letter-spacing: -0.5px;
-      font-family: 'JetBrains Mono', monospace;
-      line-height: 1.1;
-    }
-    
-    .amount-breakdown {
-      font-size: 8.5px;
-      color: #94A3B8;
-      font-weight: 600;
-      margin-top: 3px;
-    }
-    
-    .status-pill {
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    
-    .status-success {
-      background: #10B981;
-      color: #FFFFFF;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
-    }
-    
-    .status-other {
-      background: #F59E0B;
-      color: #FFFFFF;
-      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
-    }
-    
-    /* Body Details */
-    .receipt-body {
-      padding: 16px 22px 10px;
-      flex: 1;
-    }
-    
-    .section-title {
-      font-size: 9.5px;
-      font-weight: 800;
-      color: #64748B;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-top: 10px;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .section-title:first-child {
-      margin-top: 0;
-    }
-    
-    .section-title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: #E2E8F0;
-    }
-    
-    .details-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 6px;
-    }
-    
-    .details-table tr {
-      border-bottom: 1px solid #F1F5F9;
-    }
-    
-    .details-table tr:last-child {
-      border-bottom: none;
-    }
-    
-    .details-table td {
-      padding: 6.5px 0;
-      font-size: 10.5px;
-      vertical-align: middle;
-    }
-    
-    .td-label {
-      color: #64748B;
-      font-weight: 600;
-      width: 40%;
-    }
-    
-    .td-value {
+    .mp-field-value {
+      font-size: 13px;
       color: #0F172A;
-      font-weight: 700;
-      text-align: right;
-      width: 60%;
+      font-weight: 800;
       word-break: break-word;
     }
     
-    .mono-val {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: #0F172A;
+    .mp-type-pill {
+      background: #E0F2FE;
+      color: #0284C7;
+      font-size: 11.5px;
       font-weight: 800;
-    }
-    
-    .highlight-val {
-      color: #B45309;
-      font-weight: 900;
-      font-size: 11px;
-    }
-    
-    .badge-mono {
-      background: #F1F5F9;
-      border: 1px solid #E2E8F0;
-      padding: 2px 7px;
-      border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 9.5px;
-      font-weight: 700;
-      color: #0F172A;
+      padding: 3px 10px;
+      border-radius: 5px;
       display: inline-block;
+      margin-top: 2px;
     }
     
-    /* Security Verification Card */
-    .qr-card {
-      background: #F8FAFC;
-      border: 1px dashed #CBD5E1;
-      border-radius: 12px;
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 8px;
-    }
-    
-    .qr-left {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      max-width: 72%;
-    }
-    
-    .qr-title {
-      font-size: 10px;
-      font-weight: 800;
-      color: #0F172A;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    
-    .qr-desc {
-      font-size: 8px;
-      color: #64748B;
-      line-height: 11.5px;
-    }
-    
-    .qr-badges {
-      display: flex;
-      gap: 6px;
-      margin-top: 3px;
-    }
-    
-    .qr-chip {
-      font-size: 7.5px;
+    .mp-ref-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
       font-weight: 700;
-      color: #047857;
-      background: #ECFDF5;
-      padding: 1.5px 6px;
-      border-radius: 4px;
-      border: 0.5px solid #A7F3D0;
-    }
-    
-    .qr-img {
-      width: 54px;
-      height: 54px;
-      border-radius: 6px;
-      border: 1px solid #E2E8F0;
-      background: #FFFFFF;
-      padding: 2px;
-    }
-    
-    /* Footer */
-    .receipt-footer {
-      background: #F8FAFC;
-      border-top: 1px solid #E2E8F0;
-      padding: 12px 22px 14px;
-      text-align: center;
-    }
-    
-    .footer-company {
-      font-size: 9.5px;
-      font-weight: 800;
       color: #0F172A;
-      margin-bottom: 2px;
+      background: #F1F5F9;
+      padding: 4px 8px;
+      border-radius: 5px;
+      border: 1px solid #CBD5E1;
+      display: inline-block;
+      margin-top: 2px;
     }
     
-    .footer-company span {
-      color: #B45309;
+    /* Perforated Scalloped Ticket Bottom Teeth */
+    .mp-scallops-wrapper {
+      display: flex;
+      justify-content: space-between;
+      width: calc(100% + 40px);
+      margin-left: -20px;
+      margin-top: 14px;
+      margin-bottom: -10px;
+      overflow: hidden;
     }
     
-    .footer-note {
-      font-size: 8px;
-      color: #94A3B8;
-      line-height: 12px;
+    .mp-scallop-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #0056D2;
+      flex-shrink: 0;
+    }
+    
+    /* Footer Security */
+    .mp-footer {
+      margin-top: 18px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 9px;
+      font-weight: 600;
+      line-height: 14px;
+      z-index: 2;
+    }
+    .mp-footer b {
+      color: #FFFFFF;
     }
   </style>
 </head>
 <body>
-  <div id="receipt-card">
-    <!-- Header -->
-    <div class="receipt-header">
-      <div class="brand-row">
-        <div class="brand-left">
-          <img class="brand-logo-img" src="${ABU_MAFHAL_LOGO_B64}" alt="Abu Mafhal Logo" />
-          <div class="brand-titles">
-            <div class="brand-name">ABU MAFHAL SUB</div>
-            <div class="brand-sub">Premium Digital Infrastructure</div>
-            <div class="company-reg">ABU MAFHAL LTD • RC-8979939</div>
-          </div>
-        </div>
-        <div class="seal-badge">
-          <div class="seal-dot"></div>
-          <div class="seal-text">${isSuccess ? 'VERIFIED' : 'PENDING'}</div>
-        </div>
-      </div>
-      
-      <div class="amount-hero">
-        <div>
-          <div class="amount-label">Total Amount Debited</div>
-          <div class="amount-val">${formattedTotal}</div>
-          ${numTransferAmount !== null && numFee !== null && numFee > 0 ? `
-          <div class="amount-breakdown">
-            Transfer: ₦${numTransferAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} • Fee: ₦${numFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
-          </div>
-          ` : ''}
-        </div>
-        <div class="status-pill ${isSuccess ? 'status-success' : 'status-other'}">
-          ${statusUpper}
-        </div>
-      </div>
-    </div>
-    
-    <!-- Body Details -->
-    <div class="receipt-body">
-      <!-- Section 1: Transfer & Beneficiary Details -->
-      <div class="section-title">Transfer & Beneficiary Details</div>
-      <table class="details-table">
-        <tr>
-          <td class="td-label">Beneficiary / Recipient</td>
-          <td class="td-value" style="font-weight: 800;">${recipientDisplay}</td>
-        </tr>
-        ${data.bankName ? `
-        <tr>
-          <td class="td-label">Destination Bank</td>
-          <td class="td-value">${data.bankName}</td>
-        </tr>
-        ` : ''}
-        ${data.accountNumber ? `
-        <tr>
-          <td class="td-label">Account Number</td>
-          <td class="td-value"><span class="badge-mono">${data.accountNumber}</span></td>
-        </tr>
-        ` : ''}
-        ${numTransferAmount !== null ? `
-        <tr>
-          <td class="td-label">Transfer Amount</td>
-          <td class="td-value">₦${numTransferAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</td>
-        </tr>
-        ` : ''}
-        ${numFee !== null ? `
-        <tr>
-          <td class="td-label">Transfer Fee</td>
-          <td class="td-value">${numFee === 0 ? '₦0.00 (FREE)' : `₦${numFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}</td>
-        </tr>
-        ` : ''}
-        <tr>
-          <td class="td-label">Total Debited</td>
-          <td class="td-value highlight-val">${formattedTotal}</td>
-        </tr>
-      </table>
+  <div id="receipt-page">
+    <div class="bg-accent-1"></div>
+    <div class="bg-accent-2"></div>
 
-      <!-- Section 2: Audit & Settlement Details -->
-      <div class="section-title">Audit & Settlement Details</div>
-      <table class="details-table">
-        <tr>
-          <td class="td-label">Transaction Reference</td>
-          <td class="td-value"><span class="badge-mono">${ref}</span></td>
-        </tr>
-        ${data.sessionId ? `
-        <tr>
-          <td class="td-label">NIP Session ID</td>
-          <td class="td-value"><span class="badge-mono" style="font-size: 8.5px;">${data.sessionId}</span></td>
-        </tr>
-        ` : ''}
-        <tr>
-          <td class="td-label">Service Description</td>
-          <td class="td-value">${data.description || data.type}</td>
-        </tr>
-        <tr>
-          <td class="td-label">Payment Channel</td>
-          <td class="td-value">${data.paymentMethod || 'Wallet Balance'}</td>
-        </tr>
-        ${data.senderName ? `
-        <tr>
-          <td class="td-label">Sender / Originator</td>
-          <td class="td-value">${data.senderName}</td>
-        </tr>
-        ` : ''}
-        <tr>
-          <td class="td-label">Payment Date & Time</td>
-          <td class="td-value">${dateStr}</td>
-        </tr>
-        ${data.notes ? `
-        <tr>
-          <td class="td-label">Remark / Narration</td>
-          <td class="td-value">${data.notes}</td>
-        </tr>
-        ` : ''}
-      </table>
-      
-      <!-- Security Verification -->
-      <div class="qr-card">
-        <div class="qr-left">
-          <div class="qr-title">
-            <span>🛡️</span> Official Cryptographic Verification
-          </div>
-          <div class="qr-desc">
-            Tamper-proof financial record audited on the Abu Mafhal ledger. Scan the QR code to verify validity directly with Central Bank & NIBSS settlement networks.
-          </div>
-          <div class="qr-badges">
-            <span class="qr-chip">✓ NIBSS Certified</span>
-            <span class="qr-chip">✓ 256-Bit Encrypted</span>
-            <span class="qr-chip">✓ Official Proof</span>
-          </div>
+    <!-- Centered Brand Capsule -->
+    <div class="mp-brand-capsule">
+      <img src="${ABU_MAFHAL_LOGO_B64}" class="mp-brand-logo" alt="Logo" />
+      <span class="mp-brand-title">Abu Mafhal Hub</span>
+    </div>
+
+    <!-- White Ticket Paper Card -->
+    <div class="mp-ticket-card">
+      <!-- Header Row: DEBIT pill & 'M' avatar -->
+      <div class="mp-ticket-header">
+        <div class="mp-debit-badge">${isDebit ? 'DEBIT' : 'CREDIT'}</div>
+        <div class="mp-avatar-circle">M</div>
+      </div>
+
+      <!-- Amount Hero -->
+      <div class="mp-amount-hero">${formattedTotal}</div>
+
+      <!-- Hairline Divider -->
+      <div class="mp-divider"></div>
+
+      <!-- Inner Details Card (Label on top, Value below) -->
+      <div class="mp-details-box">
+        <!-- 1. Transaction Type -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Transaction Type</div>
+          <div><span class="mp-type-pill">${data.type === 'p2p' ? 'Wallet Transfer' : 'Transfer'}</span></div>
         </div>
-        <img class="qr-img" src="${qrUrl}" alt="QR Verification" />
+
+        <!-- 2. Sender Name -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Sender Name</div>
+          <div class="mp-field-value">${data.senderName || 'Abu Mafhal User'}</div>
+        </div>
+
+        <!-- 3. Source Institution -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Source Institution</div>
+          <div class="mp-field-value">Abu Mafhal Hub Wallet</div>
+        </div>
+
+        <!-- 4. Beneficiary -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Beneficiary</div>
+          <div class="mp-field-value" style="text-transform: uppercase;">${recipientDisplay}</div>
+        </div>
+
+        <!-- 5. Beneficiary Institution -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Beneficiary Institution</div>
+          <div class="mp-field-value">${data.bankName || 'Abu Mafhal Wallet Member'}</div>
+        </div>
+
+        <!-- 6. Transaction Date -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Transaction Date</div>
+          <div class="mp-field-value">${formattedDate}</div>
+        </div>
+
+        <!-- 7. Transaction Reference -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Transaction Reference</div>
+          <div><span class="mp-ref-text">${fullRefText}</span></div>
+        </div>
+
+        <!-- 8. Business Name -->
+        <div class="mp-field-block">
+          <div class="mp-field-label">Business Name</div>
+          <div class="mp-field-value">${data.notes || data.senderName || 'Abu Mafhal Instant Settlement'}</div>
+        </div>
+      </div>
+
+      <!-- Scalloped Perforated Ticket Teeth Cut at the Bottom -->
+      <div class="mp-scallops-wrapper">
+        ${Array.from({ length: 18 }).map(() => '<div class="mp-scallop-dot"></div>').join('')}
       </div>
     </div>
-    
-    <!-- Footer -->
-    <div class="receipt-footer">
-      <div class="footer-company">
-        Issued by <span>ABU MAFHAL LTD</span> (CAC: RC-8979939)
-      </div>
-      <div class="footer-note">
-        This document serves as an authentic electronic proof of payment issued by ABU MAFHAL SUB.<br/>
-        Support Hotline: support@abumafhal.com.ng • https://abumafhal.com.ng
-      </div>
+
+    <!-- Official Footer Note -->
+    <div class="mp-footer">
+      <b>Official Proof of Payment</b> • Issued by <b>ABU MAFHAL LTD</b> (RC-8979939)<br/>
+      Support: help@abumafhal.com • https://abumafhal.com.ng
     </div>
   </div>
 </body>
@@ -660,9 +517,8 @@ export async function downloadReceiptAsPNG(data: ReceiptData): Promise<string | 
           container.style.left = '-9999px';
           container.style.top = '0';
           container.style.width = '420px';
-          container.style.minHeight = '595px';
           container.innerHTML = html;
-          const element = container.querySelector('#receipt-card') as HTMLElement || container;
+          const element = (container.querySelector('#receipt-page') || container.querySelector('#receipt-card') || container) as HTMLElement;
           document.body.appendChild(container);
 
           (window as any).html2canvas(element, {
