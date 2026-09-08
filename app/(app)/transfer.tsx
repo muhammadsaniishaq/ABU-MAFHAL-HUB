@@ -344,6 +344,8 @@ export default function TransferScreen() {
     const [accountName, setAccountName] = useState('');
     const [isResolvingAccount, setIsResolvingAccount] = useState(false);
     const [resolveError, setResolveError] = useState<string | null>(null);
+    const [copiedAcc, setCopiedAcc] = useState(false);
+    const [isSavedFavorite, setIsSavedFavorite] = useState(false);
 
     // Recent Beneficiaries
     const [recentBeneficiaries, setRecentBeneficiaries] = useState<RecentBeneficiary[]>([]);
@@ -538,7 +540,7 @@ export default function TransferScreen() {
             });
 
             if (error || !data?.success) {
-                const errorMsg = data?.message || "Ba a gano wannan asusun ba. Da fatan a sake duba lambar asusun da bankin da aka zaba.";
+                const errorMsg = data?.message || "Could not find this bank account. Please check the 10-digit account number and selected bank.";
                 setResolveError(errorMsg);
                 setAccountName('');
                 if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -548,10 +550,28 @@ export default function TransferScreen() {
                 if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
         } catch (err: any) {
-            setResolveError('Matsalar sadarwa wajen gano asusun banki. Da fatan a sake gwadawa.');
+            setResolveError('Connection error resolving bank account. Please tap Retry.');
             setAccountName('');
         } finally {
             setIsResolvingAccount(false);
+        }
+    };
+
+    const handleCopyAccountNumber = async (acc: string) => {
+        if (!acc) return;
+        await Clipboard.setStringAsync(acc);
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setCopiedAcc(true);
+        setTimeout(() => setCopiedAcc(false), 2000);
+    };
+
+    const handleToggleFavoriteBeneficiary = async () => {
+        if (!accountNumber || !selectedBank) return;
+        const next = !isSavedFavorite;
+        setIsSavedFavorite(next);
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (next) {
+            await saveRecentBeneficiary(accountNumber.trim(), accountName.trim(), selectedBank.code, selectedBank.name);
         }
     };
 
@@ -676,30 +696,30 @@ export default function TransferScreen() {
     // Initiate Transfer (Opens confirmation)
     const handleInitiateTransfer = () => {
         if (numAmount <= 0) {
-            setErrorModalMessage('Da fatan za a shigar da adadin kuɗin da za a tura (Please enter transfer amount).');
+            setErrorModalMessage('Please enter a valid transfer amount.');
             return;
         }
         if (numAmount < MIN_TRANSFER_AMOUNT) {
-            setErrorModalMessage(`Mafi ƙarancin transfer shine ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Minimum transfer amount is ₦100.00).`);
+            setErrorModalMessage(`Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
             return;
         }
 
         if (!isFormValid) {
             if (activeTab === 'bank') {
                 if (!selectedBank) {
-                    setErrorModalMessage('Da fatan za a zaɓi bankin da za a tura kuɗin (Please select destination bank).');
+                    setErrorModalMessage('Please select destination bank.');
                 } else if (accountNumber.trim().length !== 10) {
-                    setErrorModalMessage('Lambar asusu dole ne ta kasance lamba 10 cif (Enter a valid 10-digit account number).');
+                    setErrorModalMessage('Please enter a valid 10-digit account number.');
                 } else if (!accountName) {
-                    setErrorModalMessage('Ana kan tantance sunan mai asusu, da fatan a dakata kaɗan (Please wait for account name verification).');
+                    setErrorModalMessage('Please wait for account name verification to complete.');
                 } else if (totalDebit > userBalance) {
-                    setErrorModalMessage(`Kuɗin aljihunka bai isa ba (Insufficient Balance). Ana buƙatar ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (ciki har da kuɗin sabis ₦${transferFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}), amma kuna da ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+                    setErrorModalMessage(`Insufficient wallet balance. You need ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Transfer: ₦${numAmount.toLocaleString()} + Fee: ₦${transferFee.toLocaleString()}), but you have ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`);
                 }
             } else {
                 if (!matchedUser) {
-                    setErrorModalMessage('Da fatan za a shigar da lambar waya, imel ko sunan memba (Enter recipient phone, email or username).');
+                    setErrorModalMessage('Please enter recipient phone number, email or username.');
                 } else if (totalDebit > userBalance) {
-                    setErrorModalMessage(`Kuɗin aljihunka bai isa ba (Insufficient Balance). Ana buƙatar ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}, amma kuna da ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+                    setErrorModalMessage(`Insufficient wallet balance. You need ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}, but you have ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`);
                 }
             }
             return;
@@ -1012,8 +1032,8 @@ export default function TransferScreen() {
             await MediaLibrary.saveToLibraryAsync(uri);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert(
-                'An Ajiye a Gallery! 📸',
-                'An yi nasarar ajiye hoton official receipt din a cikin Photos/Gallery na wayarka.'
+                'Saved to Gallery! 📸',
+                'The official transaction receipt has been saved to your device Photos/Gallery.'
             );
         } catch (err: any) {
             console.warn('Save to gallery error:', err);
@@ -1369,8 +1389,8 @@ export default function TransferScreen() {
                                     <Ionicons name="business" size={18} color="#D97706" />
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
-                                    <Text style={s.promptSelectBankTitle}>Zaɓi Bankin da Asusun yake</Text>
-                                    <Text style={s.promptSelectBankSub}>Danna nan don zaɓar banki don gano sunan mai asusun</Text>
+                                    <Text style={s.promptSelectBankTitle}>Select Destination Bank</Text>
+                                    <Text style={s.promptSelectBankSub}>Tap to choose bank and verify account holder</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={18} color="#D97706" />
                             </TouchableOpacity>
@@ -1384,19 +1404,19 @@ export default function TransferScreen() {
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={s.resolvingStatusTitle}>Tantance Sunan Mai Asusu...</Text>
+                                        <Text style={s.resolvingStatusTitle}>Verifying Account Holder...</Text>
                                         <View style={s.pulsingAmberDot} />
                                     </View>
-                                    <Text style={s.resolvingStatusSub}>Ana binciko cikakken sunan asusun ta hanyar NIBSS...</Text>
+                                    <Text style={s.resolvingStatusSub}>Resolving official beneficiary name via NIBSS network...</Text>
                                 </View>
                             </View>
                         )}
 
                         {resolveError && (
                             <View style={s.errorAlert}>
-                                <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                                <Ionicons name="alert-circle" size={18} color="#DC2626" />
                                 <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <Text style={s.errorAlertTitle}>Ba a Gano Asusun Ba</Text>
+                                    <Text style={s.errorAlertTitle}>Account Verification Failed</Text>
                                     <Text style={s.errorAlertText}>{resolveError}</Text>
                                 </View>
                                 <TouchableOpacity
@@ -1404,52 +1424,83 @@ export default function TransferScreen() {
                                     style={s.retryVerifyBtn}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="refresh" size={13} color="#DC2626" style={{ marginRight: 3 }} />
-                                    <Text style={s.retryVerifyBtnText}>Sake Gwada</Text>
+                                    <Ionicons name="refresh" size={12} color="#DC2626" style={{ marginRight: 3 }} />
+                                    <Text style={s.retryVerifyBtnText}>Retry</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
 
                         {accountName ? (
-                            <View style={s.resolvedAccountCard}>
+                            <LinearGradient
+                                colors={['#0F172A', '#1E293B']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={s.resolvedAccountCard}
+                            >
                                 <View style={s.verifiedAvatarWrap}>
-                                    <BankLogoBadge bank={selectedBank!} size={42} />
+                                    <BankLogoBadge bank={selectedBank!} size={38} />
                                     <View style={s.verifiedCheckBadge}>
-                                        <Ionicons name="checkmark-sharp" size={10} color="#FFFFFF" />
+                                        <Ionicons name="checkmark-sharp" size={9} color="#FFFFFF" />
                                     </View>
                                 </View>
-                                <View style={{ flex: 1, marginLeft: 12 }}>
+
+                                <View style={{ flex: 1, marginLeft: 10 }}>
                                     <View style={s.verifiedPillRow}>
                                         <View style={s.verifiedTag}>
-                                            <Ionicons name="shield-checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
-                                            <Text style={s.verifiedTagText}>ASUSUN DA AKA TANTANCE</Text>
+                                            <Ionicons name="shield-checkmark" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                            <Text style={s.verifiedTagText}>VERIFIED BENEFICIARY</Text>
                                         </View>
-                                        <View style={s.liveGreenDot} />
-                                    </View>
-                                    <Text style={s.resolvedName} numberOfLines={2}>
-                                        {accountName}
-                                    </Text>
-                                    <View style={s.accountMetaRow}>
-                                        <Text style={s.resolvedBankSub}>
+                                        <Text style={s.resolvedBankSub} numberOfLines={1}>
                                             {selectedBank?.name}
                                         </Text>
+                                    </View>
+
+                                    <Text style={s.resolvedName} numberOfLines={1}>
+                                        {accountName}
+                                    </Text>
+
+                                    <View style={s.accountMetaRow}>
                                         <Text style={s.accountNumberTag}>
                                             {accountNumber}
                                         </Text>
+                                        <View style={s.nibssPill}>
+                                            <Text style={s.nibssPillText}>NIBSS INSTANT</Text>
+                                        </View>
                                     </View>
                                 </View>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setAccountNumber('');
-                                        setAccountName('');
-                                    }}
-                                    style={s.editAccountBtn}
-                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="create-outline" size={16} color="#059669" />
-                                </TouchableOpacity>
-                            </View>
+
+                                <View style={s.cardActionGroup}>
+                                    <TouchableOpacity
+                                        onPress={() => handleCopyAccountNumber(accountNumber)}
+                                        style={[s.cardFeatureBtn, copiedAcc && { backgroundColor: '#0284C7' }]}
+                                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name={copiedAcc ? "checkmark" : "copy-outline"} size={13} color={copiedAcc ? "#FFFFFF" : "#94A3B8"} />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={handleToggleFavoriteBeneficiary}
+                                        style={[s.cardFeatureBtn, isSavedFavorite && { backgroundColor: '#78350F', borderColor: '#F59E0B' }]}
+                                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name={isSavedFavorite ? "star" : "star-outline"} size={13} color={isSavedFavorite ? "#F59E0B" : "#94A3B8"} />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setAccountNumber('');
+                                            setAccountName('');
+                                        }}
+                                        style={[s.cardFeatureBtn, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: 'rgba(239, 68, 68, 0.25)' }]}
+                                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="close" size={14} color="#EF4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
                         ) : null}
 
                         {/* Step 3: Transfer Amount */}
@@ -1472,7 +1523,7 @@ export default function TransferScreen() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                 <Ionicons name="alert-circle" size={13} color="#DC2626" />
                                 <Text style={{ fontSize: 11.5, color: '#DC2626', fontWeight: '700' }}>
-                                    Mafi karancin transfer shine ₦{MIN_TRANSFER_AMOUNT}.00 (Minimum transfer is ₦100)
+                                    Minimum transfer amount is ₦{MIN_TRANSFER_AMOUNT}.00
                                 </Text>
                             </View>
                         )}
@@ -1484,9 +1535,9 @@ export default function TransferScreen() {
                                     <Ionicons name="wallet-outline" size={17} color="#DC2626" />
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
-                                    <Text style={s.insufficientTitle}>Kuɗin Aljihunka Bai Isa Ba</Text>
+                                    <Text style={s.insufficientTitle}>Insufficient Wallet Balance</Text>
                                     <Text style={s.insufficientText}>
-                                        Kuna da <Text style={{ fontWeight: '800' }}>₦{userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>, amma ana buƙatar <Text style={{ fontWeight: '800', color: '#DC2626' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text> (ciki har da kuɗin sabis ₦{transferFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}).
+                                        Available: <Text style={{ fontWeight: '800' }}>₦{userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>, Required: <Text style={{ fontWeight: '800', color: '#DC2626' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text> (Transfer: ₦{numAmount.toLocaleString()} + Fee: ₦{transferFee.toLocaleString()}).
                                     </Text>
                                 </View>
                                 <TouchableOpacity
@@ -1495,7 +1546,7 @@ export default function TransferScreen() {
                                     activeOpacity={0.8}
                                 >
                                     <Ionicons name="add-circle" size={14} color="#FFFFFF" style={{ marginRight: 3 }} />
-                                    <Text style={s.topupSmallBtnText}>Sanya Kuɗi</Text>
+                                    <Text style={s.topupSmallBtnText}>Add Money</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -1656,7 +1707,12 @@ export default function TransferScreen() {
                         )}
 
                         {matchedUser && (
-                            <View style={s.resolvedAccountCard}>
+                            <LinearGradient
+                                colors={['#0F172A', '#1E293B']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={s.resolvedAccountCard}
+                            >
                                 <View style={s.verifiedAvatarWrap}>
                                     <View style={s.p2pAvatarCircle}>
                                         <Text style={s.p2pAvatarText}>
@@ -1664,30 +1720,55 @@ export default function TransferScreen() {
                                         </Text>
                                     </View>
                                     <View style={s.verifiedCheckBadge}>
-                                        <Ionicons name="checkmark-sharp" size={10} color="#FFFFFF" />
+                                        <Ionicons name="checkmark-sharp" size={9} color="#FFFFFF" />
                                     </View>
                                 </View>
-                                <View style={{ flex: 1, marginLeft: 12 }}>
+
+                                <View style={{ flex: 1, marginLeft: 10 }}>
                                     <View style={s.verifiedPillRow}>
                                         <View style={s.verifiedTag}>
-                                            <Ionicons name="person-circle" size={11} color="#059669" style={{ marginRight: 3 }} />
-                                            <Text style={s.verifiedTagText}>ASUSUN DA AKA TANTANCE</Text>
+                                            <Ionicons name="person-circle" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                            <Text style={s.verifiedTagText}>VERIFIED MEMBER</Text>
                                         </View>
-                                        <View style={s.liveGreenDot} />
-                                    </View>
-                                    <Text style={s.resolvedName} numberOfLines={2}>
-                                        {matchedUser.full_name}
-                                    </Text>
-                                    <View style={s.accountMetaRow}>
-                                        <Text style={s.resolvedBankSub}>
-                                            {matchedUser.phone || matchedUser.email}
-                                        </Text>
                                         {matchedUser.username ? (
-                                            <Text style={s.accountNumberTag}>@{matchedUser.username}</Text>
+                                            <Text style={s.resolvedBankSub}>@{matchedUser.username}</Text>
                                         ) : null}
                                     </View>
+
+                                    <Text style={s.resolvedName} numberOfLines={1}>
+                                        {matchedUser.full_name}
+                                    </Text>
+
+                                    <View style={s.accountMetaRow}>
+                                        <Text style={s.accountNumberTag}>
+                                            {matchedUser.phone || matchedUser.email}
+                                        </Text>
+                                        <View style={s.nibssPill}>
+                                            <Text style={s.nibssPillText}>WALLET P2P</Text>
+                                        </View>
+                                    </View>
                                 </View>
-                            </View>
+
+                                <View style={s.cardActionGroup}>
+                                    <TouchableOpacity
+                                        onPress={() => handleCopyAccountNumber(matchedUser.phone || matchedUser.email)}
+                                        style={[s.cardFeatureBtn, copiedAcc && { backgroundColor: '#0284C7' }]}
+                                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name={copiedAcc ? "checkmark" : "copy-outline"} size={13} color={copiedAcc ? "#FFFFFF" : "#94A3B8"} />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setMatchedUser(null)}
+                                        style={[s.cardFeatureBtn, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: 'rgba(239, 68, 68, 0.25)' }]}
+                                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="close" size={14} color="#EF4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
                         )}
 
                         {/* Amount Input */}
@@ -1707,7 +1788,7 @@ export default function TransferScreen() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                 <Ionicons name="alert-circle" size={13} color="#DC2626" />
                                 <Text style={{ fontSize: 11.5, color: '#DC2626', fontWeight: '700' }}>
-                                    Mafi karancin transfer shine ₦{MIN_TRANSFER_AMOUNT}.00 (Minimum transfer is ₦100)
+                                    Minimum transfer amount is ₦{MIN_TRANSFER_AMOUNT}.00
                                 </Text>
                             </View>
                         )}
@@ -1719,9 +1800,9 @@ export default function TransferScreen() {
                                     <Ionicons name="wallet-outline" size={17} color="#DC2626" />
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
-                                    <Text style={s.insufficientTitle}>Kuɗin Aljihunka Bai Isa Ba</Text>
+                                    <Text style={s.insufficientTitle}>Insufficient Wallet Balance</Text>
                                     <Text style={s.insufficientText}>
-                                        Kuna da <Text style={{ fontWeight: '800' }}>₦{userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>, amma ana buƙatar <Text style={{ fontWeight: '800', color: '#DC2626' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>.
+                                        Available: <Text style={{ fontWeight: '800' }}>₦{userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>, Required: <Text style={{ fontWeight: '800', color: '#DC2626' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>.
                                     </Text>
                                 </View>
                                 <TouchableOpacity
@@ -1730,7 +1811,7 @@ export default function TransferScreen() {
                                     activeOpacity={0.8}
                                 >
                                     <Ionicons name="add-circle" size={14} color="#FFFFFF" style={{ marginRight: 3 }} />
-                                    <Text style={s.topupSmallBtnText}>Sanya Kuɗi</Text>
+                                    <Text style={s.topupSmallBtnText}>Add Money</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -2106,32 +2187,32 @@ export default function TransferScreen() {
                     <View style={s.errorModalCard}>
                         <View style={[
                             s.errorModalIconCircle,
-                            (errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
+                            (errorModalMessage?.toLowerCase().includes('insufficient')) && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
                         ]}>
                             <Ionicons
-                                name={(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) ? "wallet-outline" : "alert-circle"}
+                                name={(errorModalMessage?.toLowerCase().includes('insufficient')) ? "wallet-outline" : "alert-circle"}
                                 size={28}
                                 color="#DC2626"
                             />
                         </View>
                         <Text style={s.errorModalTitle}>
-                            {(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) ? 'Kuɗin Aljihu Bai Isa Ba' : 'Sanarwar Canja Wuri'}
+                            {(errorModalMessage?.toLowerCase().includes('insufficient')) ? 'Insufficient Wallet Balance' : 'Transfer Notice'}
                         </Text>
                         <Text style={s.errorModalMessage}>{errorModalMessage}</Text>
                         
                         <View style={{ width: '100%', gap: 8 }}>
-                            {(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && (
+                            {(errorModalMessage?.toLowerCase().includes('insufficient')) && (
                                 <TouchableOpacity
                                     onPress={() => {
                                         setErrorModalMessage(null);
                                         router.push('/(app)/wallet');
                                     }}
-                                    style={[s.errorModalBtn, { backgroundColor: '#059669' }]}
+                                    style={[s.errorModalBtn, { backgroundColor: '#0F172A' }]}
                                     activeOpacity={0.85}
                                 >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="card" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
-                                        <Text style={s.errorModalBtnText}>SANYA KUƊI (ADD MONEY)</Text>
+                                        <Ionicons name="card" size={15} color="#F59E0B" style={{ marginRight: 6 }} />
+                                        <Text style={s.errorModalBtnText}>TOP UP / ADD MONEY</Text>
                                     </View>
                                 </TouchableOpacity>
                             )}
@@ -2139,15 +2220,15 @@ export default function TransferScreen() {
                                 onPress={() => setErrorModalMessage(null)}
                                 style={[
                                     s.errorModalBtn,
-                                    (errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 }
+                                    (errorModalMessage?.toLowerCase().includes('insufficient')) && { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 }
                                 ]}
                                 activeOpacity={0.85}
                             >
                                 <Text style={[
                                     s.errorModalBtnText,
-                                    (errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) && { color: '#475569' }
+                                    (errorModalMessage?.toLowerCase().includes('insufficient')) && { color: '#475569' }
                                 ]}>
-                                    {(errorModalMessage?.toLowerCase().includes('insufficient') || errorModalMessage?.toLowerCase().includes('bai isa ba')) ? 'RUFE (CLOSE)' : 'TO, NA FAHIMTA'}
+                                    {(errorModalMessage?.toLowerCase().includes('insufficient')) ? 'CLOSE' : 'OK, GOT IT'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -2390,7 +2471,7 @@ export default function TransferScreen() {
                                 style={s.closeReceiptBtn}
                                 activeOpacity={0.8}
                             >
-                                <Text style={s.closeReceiptBtnText}>CLOSE / KAMMALA ✕</Text>
+                                <Text style={s.closeReceiptBtnText}>CLOSE RECEIPT ✕</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -2905,22 +2986,22 @@ const s = StyleSheet.create({
     resolvedAccountCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F0FDF4',
-        borderWidth: 1.5,
-        borderColor: '#10B981',
         borderRadius: 14,
-        padding: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
         marginTop: 8,
-        shadowColor: '#10B981',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
+        borderWidth: 1,
+        borderColor: '#334155',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
         shadowRadius: 6,
-        elevation: 2,
+        elevation: 3,
     },
     verifiedAvatarWrap: {
         position: 'relative',
-        width: 44,
-        height: 44,
+        width: 38,
+        height: 38,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -2928,26 +3009,28 @@ const s = StyleSheet.create({
         position: 'absolute',
         bottom: -2,
         right: -2,
-        backgroundColor: '#059669',
-        width: 17,
-        height: 17,
-        borderRadius: 8.5,
+        backgroundColor: '#2563EB',
+        width: 15,
+        height: 15,
+        borderRadius: 7.5,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#0F172A',
     },
     p2pAvatarCircle: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        backgroundColor: '#059669',
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#2563EB',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#38BDF8',
     },
     p2pAvatarText: {
         color: '#FFFFFF',
-        fontSize: 17,
+        fontSize: 15,
         fontWeight: '900',
     },
     verifiedPillRow: {
@@ -2959,63 +3042,92 @@ const s = StyleSheet.create({
     verifiedTag: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#DCFCE7',
-        paddingHorizontal: 7,
+        backgroundColor: 'rgba(56, 189, 248, 0.12)',
+        paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 6,
+        borderRadius: 5,
+        borderWidth: 0.8,
+        borderColor: 'rgba(56, 189, 248, 0.3)',
     },
     verifiedTagText: {
-        color: '#059669',
-        fontSize: 9,
+        color: '#38BDF8',
+        fontSize: 8.5,
         fontWeight: '900',
-        letterSpacing: 0.6,
+        letterSpacing: 0.5,
     },
     liveGreenDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#10B981',
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#38BDF8',
     },
     resolvedName: {
-        color: '#064E3B',
-        fontSize: 15.5,
+        color: '#FFFFFF',
+        fontSize: 14,
         fontWeight: '900',
-        lineHeight: 20,
+        lineHeight: 18,
         letterSpacing: 0.2,
-        marginTop: 2,
+        marginTop: 1,
     },
     accountMetaRow: {
         flexDirection: 'row',
         alignItems: 'center',
         flexWrap: 'wrap',
         gap: 6,
-        marginTop: 4,
+        marginTop: 2,
     },
     resolvedBankSub: {
-        color: '#047857',
-        fontSize: 11,
+        color: '#94A3B8',
+        fontSize: 10.5,
         fontWeight: '700',
     },
     accountNumberTag: {
-        color: '#334155',
+        color: '#CBD5E1',
         fontSize: 11,
-        fontWeight: '800',
-        backgroundColor: '#E2E8F0',
-        paddingHorizontal: 6,
-        paddingVertical: 1,
-        borderRadius: 4,
+        fontWeight: '700',
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
         letterSpacing: 0.5,
     },
-    editAccountBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#DCFCE7',
+    nibssPill: {
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 0.6,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    nibssPillText: {
+        color: '#F59E0B',
+        fontSize: 8,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    cardActionGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        marginLeft: 8,
+    },
+    cardFeatureBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 7,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#A7F3D0',
-        marginLeft: 8,
+        borderWidth: 0.8,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    editAccountBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 7,
+        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 0.8,
+        borderColor: 'rgba(239, 68, 68, 0.25)',
+        marginLeft: 6,
     },
     amountInputBox: {
         flexDirection: 'row',
