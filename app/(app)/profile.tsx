@@ -745,9 +745,9 @@ export default function UserProfileScreen() {
                                     Account & Security Center
                                 </Text>
 
-                                {/* 1. Profile Details */}
+                                {/* 1. Profile Details (View Details Directly) */}
                                 <TouchableOpacity 
-                                    onPress={() => router.push('/edit-profile')} 
+                                    onPress={() => router.push('/profile-details')} 
                                     style={{ 
                                         flexDirection: 'row', 
                                         alignItems: 'center', 
@@ -763,7 +763,7 @@ export default function UserProfileScreen() {
                                         </View>
                                         <View>
                                             <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Profile Details</Text>
-                                            <Text style={{ color: L.textMuted, fontSize: 8.5 }}>Full name, username, phone & email address</Text>
+                                            <Text style={{ color: L.textMuted, fontSize: 8.5 }}>View verified account details & credentials</Text>
                                         </View>
                                     </View>
                                     <Ionicons name="chevron-forward" size={13} color={L.textMuted} />
