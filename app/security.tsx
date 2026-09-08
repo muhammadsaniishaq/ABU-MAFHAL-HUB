@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
     View, 
     Text, 
@@ -13,11 +13,12 @@ import {
     Image,
     Linking 
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -109,9 +110,11 @@ export default function SecurityScreen() {
     // Audit & Diagnostic Modal State
     const [auditModalVisible, setAuditModalVisible] = useState<boolean>(false);
 
-    useEffect(() => {
-        loadSecurityOverview();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            loadSecurityOverview();
+        }, [])
+    );
 
     const showToast = (msg: string) => {
         setToastMsg(msg);
@@ -124,8 +127,10 @@ export default function SecurityScreen() {
             setLoadingData(true);
 
             // A. Supabase Session & Profile
+            let activeUserId: string | null = null;
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+                activeUserId = user.id;
                 if (user.email) setUserEmail(user.email);
                 if (user.last_sign_in_at) {
                     try {
@@ -135,20 +140,57 @@ export default function SecurityScreen() {
                         setLastSignInTime('Active');
                     }
                 }
-
-                // Check Transaction PIN in Profiles
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('transaction_pin')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                if (profile?.transaction_pin && String(profile.transaction_pin).length >= 4) {
-                    setHasPinConfigured(true);
-                } else {
-                    setHasPinConfigured(false);
+            } else {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    activeUserId = session.user.id;
+                    if (session.user.email) setUserEmail(session.user.email);
                 }
             }
+
+            // Check Transaction PIN (Multi-layer: Supabase Profile -> SecureStore -> AsyncStorage)
+            let pinFound = false;
+            if (activeUserId) {
+                try {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('transaction_pin')
+                        .eq('id', activeUserId)
+                        .maybeSingle();
+
+                    if (profile?.transaction_pin && String(profile.transaction_pin).length >= 4) {
+                        pinFound = true;
+                    }
+                } catch (dbErr) {
+                    console.warn("Profile PIN query error:", dbErr);
+                }
+            }
+
+            if (!pinFound) {
+                try {
+                    let localPin: string | null = null;
+                    if (Platform.OS === 'web') {
+                        localPin = await AsyncStorage.getItem('user_transaction_pin');
+                        if (!localPin && activeUserId) {
+                            localPin = await AsyncStorage.getItem(`user_transaction_pin_${activeUserId}`);
+                        }
+                    } else {
+                        localPin = await SecureStore.getItemAsync('user_transaction_pin');
+                        if (!localPin && activeUserId) {
+                            localPin = await SecureStore.getItemAsync(`user_transaction_pin_${activeUserId}`);
+                        }
+                        if (!localPin) {
+                            localPin = await AsyncStorage.getItem('user_transaction_pin');
+                        }
+                    }
+                    if (localPin && String(localPin).length >= 4) {
+                        pinFound = true;
+                    }
+                } catch (storeErr) {
+                    console.warn("Storage PIN query error:", storeErr);
+                }
+            }
+            setHasPinConfigured(pinFound);
 
             // B. Hardware Biometrics Detection & Key Harmonization
             if (Platform.OS !== 'web') {
@@ -233,6 +275,11 @@ export default function SecurityScreen() {
     const handleToggleEmailAlerts = async (val: boolean) => {
         setLoginEmailAlerts(val);
         await AsyncStorage.setItem('login_email_alerts', val ? 'true' : 'false');
+        try {
+            await supabase.auth.updateUser({
+                data: { login_email_alerts: val }
+            });
+        } catch (_) {}
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         showToast(val ? "Sign-in email security alerts active! 🔔" : "Sign-in alerts turned off.");
     };
@@ -253,25 +300,69 @@ export default function SecurityScreen() {
         setProcessingFreeze(true);
         try {
             // Verify PIN against Supabase or local storage
+            let activeUserId: string | null = null;
             const { data: { user } } = await supabase.auth.getUser();
-            let correctPin = null;
             if (user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('transaction_pin')
-                    .eq('id', user.id)
-                    .maybeSingle();
-                correctPin = profile?.transaction_pin;
-            }
-            if (!correctPin) {
-                correctPin = await AsyncStorage.getItem('user_transaction_pin');
+                activeUserId = user.id;
+            } else {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) activeUserId = session.user.id;
             }
 
-            if (correctPin && String(correctPin) !== freezePin.trim()) {
+            let correctPin: string | null = null;
+            if (activeUserId) {
+                try {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('transaction_pin')
+                        .eq('id', activeUserId)
+                        .maybeSingle();
+                    if (profile?.transaction_pin) {
+                        correctPin = String(profile.transaction_pin);
+                    }
+                } catch (_) {}
+            }
+
+            if (!correctPin) {
+                try {
+                    if (Platform.OS === 'web') {
+                        correctPin = await AsyncStorage.getItem('user_transaction_pin');
+                        if (!correctPin && activeUserId) {
+                            correctPin = await AsyncStorage.getItem(`user_transaction_pin_${activeUserId}`);
+                        }
+                    } else {
+                        correctPin = await SecureStore.getItemAsync('user_transaction_pin');
+                        if (!correctPin && activeUserId) {
+                            correctPin = await SecureStore.getItemAsync(`user_transaction_pin_${activeUserId}`);
+                        }
+                        if (!correctPin) {
+                            correctPin = await AsyncStorage.getItem('user_transaction_pin');
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            // Verify entered PIN against retrieved PIN
+            if (correctPin && String(correctPin).trim() !== freezePin.trim()) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
                 Alert.alert("Incorrect PIN", "The 4-digit transaction PIN you entered is incorrect.");
                 setProcessingFreeze(false);
                 return;
+            }
+
+            // If user had no PIN configured previously, establish entered PIN as active PIN
+            if (!correctPin && freezePin.length === 4) {
+                if (Platform.OS === 'web') {
+                    await AsyncStorage.setItem('user_transaction_pin', freezePin.trim());
+                    if (activeUserId) await AsyncStorage.setItem(`user_transaction_pin_${activeUserId}`, freezePin.trim());
+                } else {
+                    await SecureStore.setItemAsync('user_transaction_pin', freezePin.trim());
+                    if (activeUserId) await SecureStore.setItemAsync(`user_transaction_pin_${activeUserId}`, freezePin.trim());
+                }
+                if (activeUserId) {
+                    await supabase.from('profiles').update({ transaction_pin: freezePin.trim() }).eq('id', activeUserId);
+                }
+                setHasPinConfigured(true);
             }
 
             if (freezeActionType === 'freeze') {
@@ -305,6 +396,7 @@ export default function SecurityScreen() {
     const handleToggleTransferMfa = async (val: boolean) => {
         setMfaForTransfers(val);
         await AsyncStorage.setItem('mfa_required_for_transfers', val ? 'true' : 'false');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         showToast(val ? "Transfer 2FA Protection Active! 🛡️" : "Transfer 2FA turned off (PIN only).");
     };
 
@@ -544,6 +636,9 @@ export default function SecurityScreen() {
                 "Your account is now 100% protected by Google Authenticator. Keep your authenticator app safe as it will be required when logging in."
             );
         } catch (err: any) {
+            setOtpDigits(['', '', '', '', '', '']);
+            otpInputRefs.current[0]?.focus();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
             Alert.alert("Verification Failed ❌", err.message || "Invalid 6-digit code. Please verify the code in your Authenticator app and ensure your phone time is accurate.");
         } finally {
             setVerifying(false);
@@ -553,16 +648,20 @@ export default function SecurityScreen() {
     // 6. 1-Tap Open Directly in Authenticator App (Seamless Mobile UX)
     const handleOpenInAuthenticator = async () => {
         if (!enrollData?.totp?.uri) return;
+        // Always copy secret key to clipboard as a high-reliability fallback
+        await handleCopySecret();
         try {
             await Linking.openURL(enrollData.totp.uri).catch(async () => {
-                await handleCopySecret();
                 Alert.alert(
                     "Setup Key Copied 📋", 
                     "Please open Google Authenticator or Authy, choose 'Enter a setup key', and paste the copied secret key."
                 );
             });
         } catch {
-            await handleCopySecret();
+            Alert.alert(
+                "Setup Key Copied 📋", 
+                "Please open Google Authenticator or Authy, choose 'Enter a setup key', and paste the copied secret key."
+            );
         }
     };
 
@@ -858,7 +957,7 @@ export default function SecurityScreen() {
 
                             {/* Transaction PIN */}
                             <TouchableOpacity
-                                onPress={() => router.push('/(auth)/pin-setup')}
+                                onPress={() => router.push(`/(auth)/pin-setup?action=${hasPinConfigured ? 'reset' : 'setup'}` as any)}
                                 activeOpacity={0.7}
                                 style={{ 
                                     flexDirection: 'row', 
