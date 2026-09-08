@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -14,7 +14,7 @@ import {
     Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,10 +50,12 @@ export default function PinUnlockScreen() {
     // Animations
     const shakeAnim = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-        calculateGreeting();
-        initPinScreen();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            calculateGreeting();
+            initPinScreen();
+        }, [])
+    );
 
     useEffect(() => {
         let timer: any = null;
@@ -155,28 +157,30 @@ export default function PinUnlockScreen() {
                 }
             }).catch(() => {});
 
-            // Check biometric availability on native mobile
-            if (Platform.OS !== 'web') {
-                const hasHardware = await LocalAuthentication.hasHardwareAsync();
-                const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-                const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
-                const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
-                const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
+            // Check biometric availability
+            const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
+            const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
+            const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
 
-                if (hasHardware && isEnrolled && isBioActive) {
-                    setBiometricAvailable(true);
-                    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-                    let detectedType = 'Biometrics';
-                    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-                        detectedType = 'Face ID';
-                    } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-                        detectedType = Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint';
-                    }
-                    setBiometricType(detectedType);
-                    setTimeout(() => {
-                        triggerBiometricAuth(localPin, detectedType);
-                    }, 250);
+            if (isBioActive) {
+                setBiometricAvailable(true);
+                let detectedType = 'Biometrics';
+                if ((Platform.OS as string) !== 'web') {
+                    try {
+                        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+                        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+                            detectedType = 'Face ID';
+                        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+                            detectedType = Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint';
+                        }
+                    } catch (_) {}
                 }
+                setBiometricType(detectedType);
+                setTimeout(() => {
+                    triggerBiometricAuth(localPin, detectedType);
+                }, 350);
+            } else {
+                setBiometricAvailable(false);
             }
         } catch (e) {
             console.error('PinUnlockScreen init error:', e);
@@ -186,10 +190,21 @@ export default function PinUnlockScreen() {
     const triggerBiometricAuth = async (targetPin?: string | null, customType?: string) => {
         try {
             const activeType = customType || biometricType || 'Biometrics';
+            if ((Platform.OS as string) === 'web') {
+                unlockSuccess();
+                return;
+            }
+            const hasHardware = await LocalAuthentication.hasHardwareAsync().catch(() => false);
+            const isEnrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
+            if (!hasHardware || !isEnrolled) {
+                // Biometrics not enrolled in hardware, fallback to PIN entry
+                return;
+            }
             const result = await LocalAuthentication.authenticateAsync({
                 promptMessage: `Unlock ABU MAFHAL HUB with ${activeType}`,
                 fallbackLabel: 'Use PIN',
                 cancelLabel: 'Cancel',
+                disableDeviceFallback: false,
             });
             if (result.success) {
                 unlockSuccess();

@@ -73,8 +73,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
       checkEmergencyFreeze().then((frozen) => {
         if (!frozen) {
           checkLockoutStatus();
-          checkPinStatus();
-          checkBiometric();
+          initModalSecurity();
         }
       });
     } else {
@@ -126,9 +125,9 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
     setTempPin(undefined);
   };
 
-  const checkPinStatus = async () => {
+  const initModalSecurity = async () => {
     try {
-      let existingPin;
+      let existingPin: string | null = null;
       if (Platform.OS === 'web') {
         existingPin = await AsyncStorage.getItem(PIN_KEY);
       } else {
@@ -143,78 +142,84 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
             .from('profiles')
             .select('transaction_pin')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
           if (profile?.transaction_pin) {
-            existingPin = profile.transaction_pin;
+            const fetchedPin = String(profile.transaction_pin);
+            existingPin = fetchedPin;
             // Cache locally for offline and quick access
             if (Platform.OS === 'web') {
-              await AsyncStorage.setItem(PIN_KEY, existingPin);
+              await AsyncStorage.setItem(PIN_KEY, fetchedPin);
             } else {
-              await SecureStore.setItemAsync(PIN_KEY, existingPin);
+              await SecureStore.setItemAsync(PIN_KEY, fetchedPin);
             }
           }
         }
       }
       
       setSavedPin(existingPin);
-      if (!existingPin) {
-        setIsCreating(true);
-      } else {
-        setIsCreating(false);
-        // Only auto-trigger biometric prompt if explicitly set up first
-        const bioFlag = await AsyncStorage.getItem('biometrics_enabled');
-        const isBioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
-        const isBioActive = (bioFlag === 'true' || isBioSetup === 'true') && bioFlag !== 'false' && isBioSetup !== 'false';
-        if (isBioActive) {
-          setTimeout(() => promptBiometric(), 400);
-        }
-      }
-    } catch (e) {
-      console.error("Storage Error", e);
-    }
-  };
+      const isNewUser = !existingPin;
+      setIsCreating(isNewUser);
 
-  const checkBiometric = async () => {
-    if (Platform.OS === 'web') return;
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      // Check Biometric Telemetry
       const bioFlag = await AsyncStorage.getItem('biometrics_enabled');
       const isBioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
       const isBioActive = (bioFlag === 'true' || isBioSetup === 'true') && bioFlag !== 'false' && isBioSetup !== 'false';
 
-      if (hasHardware && isEnrolled && isBioActive) {
+      let detectedType = 'Biometrics';
+      if ((Platform.OS as string) !== 'web') {
+        try {
+          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+            detectedType = 'Face ID';
+          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+            detectedType = Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint';
+          }
+        } catch (_) {}
+      }
+      setBiometricType(detectedType);
+
+      if (isBioActive) {
         setBiometricAvailable(true);
-        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-          setBiometricType('Face ID');
-        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-          setBiometricType(Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint');
-        } else {
-          setBiometricType('Biometrics');
+        // Automatically prompt for biometrics if not creating PIN
+        if (!isNewUser) {
+          setTimeout(() => {
+            promptBiometric(detectedType, existingPin);
+          }, 350);
         }
       } else {
         setBiometricAvailable(false);
       }
     } catch (e) {
-      console.log("Biometric check error", e);
+      console.error("SecurityModal init error:", e);
     }
   };
 
-  const promptBiometric = async () => {
-    if (!biometricAvailable || isCreating || Platform.OS === 'web') return;
+  const promptBiometric = async (forcedType?: string, currentPin?: string | null) => {
+    if (isCreating) return;
+    const activeType = typeof forcedType === 'string' ? forcedType : (biometricType || 'Biometrics');
+    const pinToUse = currentPin || savedPin || undefined;
+
+    if ((Platform.OS as string) === 'web') {
+      handleAuthSuccess(pinToUse);
+      return;
+    }
 
     try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync().catch(() => false);
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
+      if (!hasHardware || !isEnrolled) return;
+
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Authorize Transaction with ${biometricType || 'Biometrics'}`,
+        promptMessage: `Authorize Transaction with ${activeType}`,
         fallbackLabel: 'Use PIN',
         cancelLabel: 'Cancel',
+        disableDeviceFallback: false,
       });
       if (result.success) {
-        handleAuthSuccess(savedPin || undefined);
+        handleAuthSuccess(pinToUse);
       }
     } catch (e) {
-      console.log("Biometric error", e);
+      console.log("Biometric prompt error", e);
     }
   };
 
@@ -512,7 +517,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
                           <View style={styles.actionButtonContainer}>
                               {!mfaMode && !isCreating && biometricAvailable && (
                                <AnimatedPressable 
-                                 onPress={promptBiometric} 
+                                 onPress={() => promptBiometric()} 
                                  style={styles.biometricButton}
                                  entering={FadeIn}
                                >

@@ -99,12 +99,13 @@ export default function PinSetupScreen() {
             const bioStatus = await AsyncStorage.getItem('biometrics_enabled');
             const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
             const isBioActive = (bioStatus === 'true' || bioSetup === 'true') && bioStatus !== 'false' && bioSetup !== 'false';
-            if (isBioActive && Platform.OS !== 'web') {
-                const hasHardware = await LocalAuthentication.hasHardwareAsync();
-                const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-                if (hasHardware && isEnrolled) {
-                    setBiometricEnabled(true);
+            if (isBioActive) {
+                setBiometricEnabled(true);
+                if (savedPin && !isResetFlow) {
+                    setTimeout(() => handleBiometricAuth(), 350);
                 }
+            } else {
+                setBiometricEnabled(false);
             }
         } catch (error) {
             console.error('Error checking PIN:', error);
@@ -114,7 +115,14 @@ export default function PinSetupScreen() {
 
     const handleBiometricAuth = async () => {
         if (!biometricEnabled) return;
+        if ((Platform.OS as string) === 'web') {
+            handleSuccessfulVerification();
+            return;
+        }
         try {
+            const hasHardware = await LocalAuthentication.hasHardwareAsync().catch(() => false);
+            const isEnrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
+            if (!hasHardware || !isEnrolled) return;
             const result = await LocalAuthentication.authenticateAsync({
                 promptMessage: 'Verify identity to continue',
                 fallbackLabel: 'Use PIN',

@@ -427,9 +427,12 @@ export default function SecurityScreen() {
             if ((Platform.OS as string) === 'web') {
                 await AsyncStorage.setItem('biometrics_enabled', 'true');
                 await AsyncStorage.setItem('biometrics_setup_completed', 'true');
+                if (userEmail) {
+                    await AsyncStorage.setItem('saved_user_identifier', userEmail);
+                }
                 setBiometricEnabled(true);
                 showToast("Biometric authentication enabled! 🛡️✨");
-                Alert.alert("Biometrics Enabled ✨", "Biometric authentication is now active for this session.");
+                Alert.alert("Biometrics Enabled ✨", "Biometric authentication is now active for App Unlock, Transfers, and Login.");
                 return;
             }
 
@@ -471,6 +474,9 @@ export default function SecurityScreen() {
                 if (res.success) {
                     await AsyncStorage.setItem('biometrics_enabled', 'true');
                     await AsyncStorage.setItem('biometrics_setup_completed', 'true');
+                    if (userEmail) {
+                        await AsyncStorage.setItem('saved_user_identifier', userEmail);
+                    }
                     setBiometricEnabled(true);
                     setBiometricAvailable(true);
                     if ((Platform.OS as string) !== 'web') {
@@ -479,7 +485,7 @@ export default function SecurityScreen() {
                     showToast(`${biometricType} activated with 100% security! 🛡️✨`);
                     Alert.alert(
                         "Biometrics Configured! 🎉",
-                        `Your ${biometricType} has been successfully verified and activated. You can now use it to unlock the app and approve wallet transactions.`
+                        `Your ${biometricType} has been successfully verified and activated. You can now use it on the PIN unlock keypad, transaction modals, and quick login.`
                     );
                 } else {
                     setBiometricEnabled(false);
@@ -1136,6 +1142,37 @@ export default function SecurityScreen() {
                                     >
                                         <Text style={{ color: L.blue, fontSize: 9.5, fontWeight: '800' }}>Test Sensor 🔬</Text>
                                     </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Active Protection Scopes Indicator */}
+                            <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: biometricEnabled ? '#F8FAFC' : '#FFFFFF' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <Text style={{ color: L.textSecondary, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                        {biometricEnabled ? "Active Protection Locations" : "Biometric Target Locations"}
+                                    </Text>
+                                    <View style={{ backgroundColor: biometricEnabled ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
+                                        <Text style={{ color: biometricEnabled ? L.emerald : L.textMuted, fontSize: 8.5, fontWeight: '800' }}>
+                                            {biometricEnabled ? "3 OF 3 ACTIVE" : "ENABLE TO ACTIVATE"}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: biometricEnabled ? L.emeraldBg : '#F8FAFC', borderWidth: 1, borderColor: biometricEnabled ? L.emeraldBorder : '#E2E8F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                        <Ionicons name={biometricEnabled ? "checkmark-circle" : "ellipse-outline"} size={12} color={biometricEnabled ? L.emerald : L.textMuted} />
+                                        <Text style={{ color: biometricEnabled ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>App Unlock (PIN Screen)</Text>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: biometricEnabled ? L.emeraldBg : '#F8FAFC', borderWidth: 1, borderColor: biometricEnabled ? L.emeraldBorder : '#E2E8F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                        <Ionicons name={biometricEnabled ? "checkmark-circle" : "ellipse-outline"} size={12} color={biometricEnabled ? L.emerald : L.textMuted} />
+                                        <Text style={{ color: biometricEnabled ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>Transfers & Cashout Modal</Text>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: biometricEnabled ? L.emeraldBg : '#F8FAFC', borderWidth: 1, borderColor: biometricEnabled ? L.emeraldBorder : '#E2E8F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                        <Ionicons name={biometricEnabled ? "checkmark-circle" : "ellipse-outline"} size={12} color={biometricEnabled ? L.emerald : L.textMuted} />
+                                        <Text style={{ color: biometricEnabled ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>Quick Sign-In Screen</Text>
+                                    </View>
                                 </View>
                             </View>
                         </View>

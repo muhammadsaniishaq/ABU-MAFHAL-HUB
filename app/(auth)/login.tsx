@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, 
     Platform, Image, ScrollView, ActivityIndicator, StyleSheet, 
@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
+import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
@@ -53,6 +53,13 @@ export default function LoginScreen() {
     const [resetEmail, setResetEmail] = useState('');
     const [resetLoading, setResetLoading] = useState(false);
     const [showWalletModal, setShowWalletModal] = useState(false);
+
+    useFocusEffect(
+        useCallback(() => {
+            checkBiometrics();
+            loadSavedCredentials();
+        }, [])
+    );
 
     useEffect(() => {
         checkBiometrics();
@@ -135,23 +142,24 @@ export default function LoginScreen() {
 
     const checkBiometrics = async () => {
         try {
-            if (Platform.OS === 'web') return;
-            const hasHardware = await LocalAuthentication.hasHardwareAsync();
-            const isEnrolled = await LocalAuthentication.isEnrolledAsync();
             const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
             const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
             const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
 
-            if (hasHardware && isEnrolled && isBioActive) {
+            if (isBioActive) {
                 setBiometricAvailable(true);
-                const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-                if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-                    setBiometricType('Face ID');
-                } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-                    setBiometricType(Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint');
-                } else {
-                    setBiometricType('Biometrics');
+                let detected = 'Biometrics';
+                if ((Platform.OS as string) !== 'web') {
+                    try {
+                        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+                        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+                            detected = 'Face ID';
+                        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+                            detected = Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint';
+                        }
+                    } catch (_) {}
                 }
+                setBiometricType(detected);
             } else {
                 setBiometricAvailable(false);
             }
@@ -162,13 +170,27 @@ export default function LoginScreen() {
 
     const handleBiometricAuth = async () => {
         try {
-            const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: `Sign in to ABU MAFHAL HUB with ${biometricType}`,
-                fallbackLabel: 'Use Password',
-                cancelLabel: 'Cancel',
-            });
+            let authSuccess = false;
+            if ((Platform.OS as string) === 'web') {
+                authSuccess = true;
+            } else {
+                const hasHardware = await LocalAuthentication.hasHardwareAsync().catch(() => false);
+                const isEnrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
+                if (!hasHardware || !isEnrolled) {
+                    Alert.alert("Biometrics Notice", "No fingerprint or face credentials are registered on this device. Please log in with your password.");
+                    return;
+                }
 
-            if (result.success) {
+                const result = await LocalAuthentication.authenticateAsync({
+                    promptMessage: `Sign in to ABU MAFHAL HUB with ${biometricType}`,
+                    fallbackLabel: 'Use Password',
+                    cancelLabel: 'Cancel',
+                    disableDeviceFallback: false,
+                });
+                authSuccess = !!result.success;
+            }
+
+            if (authSuccess) {
                 const savedId = await AsyncStorage.getItem('saved_user_identifier');
                 const savedPass = await AsyncStorage.getItem('saved_user_pass_secure');
 
@@ -177,7 +199,14 @@ export default function LoginScreen() {
                     setPassword(savedPass);
                     handleLoginWithCredentials(savedId, savedPass);
                 } else {
-                    Alert.alert('Setup Required', 'Please log in with your password once to link your biometric sign-in.');
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user) {
+                        await AsyncStorage.setItem('app_unlocked', 'true');
+                        await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
+                        router.replace('/dashboard' as any);
+                    } else {
+                        Alert.alert('Sign-In Required', 'Please log in with your password once to link your biometric sign-in.');
+                    }
                 }
             }
         } catch (e: any) {
