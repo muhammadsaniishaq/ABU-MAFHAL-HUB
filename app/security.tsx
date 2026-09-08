@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
@@ -72,6 +73,8 @@ export default function SecurityScreen() {
     const [biometricAvailable, setBiometricAvailable] = useState<boolean>(false);
     const [biometricType, setBiometricType] = useState<string>('Biometrics');
     const [biometricEnabled, setBiometricEnabled] = useState<boolean>(false);
+    const [hardwareDetected, setHardwareDetected] = useState<boolean>(false);
+    const [hardwareEnrolled, setHardwareEnrolled] = useState<boolean>(false);
 
     // 2FA / TOTP Authenticator States
     const [isMfaActive, setIsMfaActive] = useState<boolean>(false);
@@ -132,24 +135,35 @@ export default function SecurityScreen() {
                 }
             }
 
-            // B. Hardware Biometrics Detection
-            const hasHw = await LocalAuthentication.hasHardwareAsync();
-            const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-            if (hasHw && isEnrolled) {
-                setBiometricAvailable(true);
-                const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-                if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-                    setBiometricType('Face ID');
-                } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-                    setBiometricType('Fingerprint');
-                } else {
-                    setBiometricType('Biometrics');
-                }
+            // B. Hardware Biometrics Detection & Key Harmonization
+            if (Platform.OS !== 'web') {
+                const hasHw = await LocalAuthentication.hasHardwareAsync();
+                const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+                setHardwareDetected(hasHw);
+                setHardwareEnrolled(isEnrolled);
 
-                const bioFlag = await AsyncStorage.getItem('biometrics_enabled');
-                const bioCompleted = await AsyncStorage.getItem('biometrics_setup_completed');
-                setBiometricEnabled(bioFlag === 'true' || bioCompleted === 'true');
+                if (hasHw && isEnrolled) {
+                    setBiometricAvailable(true);
+                    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+                    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+                        setBiometricType('Face ID');
+                    } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+                        setBiometricType(Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint');
+                    } else {
+                        setBiometricType('Biometrics');
+                    }
+
+                    const bioFlag = await AsyncStorage.getItem('biometrics_enabled');
+                    const bioCompleted = await AsyncStorage.getItem('biometrics_setup_completed');
+                    const isBioActive = (bioFlag === 'true' || bioCompleted === 'true') && bioFlag !== 'false' && bioCompleted !== 'false';
+                    setBiometricEnabled(isBioActive);
+                } else {
+                    setBiometricAvailable(false);
+                    setBiometricEnabled(false);
+                }
             } else {
+                setHardwareDetected(false);
+                setHardwareEnrolled(false);
                 setBiometricAvailable(false);
                 setBiometricEnabled(false);
             }
@@ -187,12 +201,12 @@ export default function SecurityScreen() {
         }
     };
 
-    // 2. Hardware Biometrics Toggle (Face ID / Fingerprint)
+    // 2. Hardware Biometrics Toggle (Face ID / Fingerprint / Touch ID)
     const handleBiometricToggle = async (val: boolean) => {
         if (!biometricAvailable) {
             Alert.alert(
                 "Biometrics Unavailable", 
-                "Biometric hardware (Face ID / Fingerprint) is not supported or not enrolled on this device."
+                "Biometric hardware (Face ID / Fingerprint) is not supported or not enrolled on this device. Please register your fingerprint or face in device Settings."
             );
             return;
         }
@@ -200,7 +214,7 @@ export default function SecurityScreen() {
         if (val) {
             try {
                 const res = await LocalAuthentication.authenticateAsync({
-                    promptMessage: `Authorize ${biometricType} Login`,
+                    promptMessage: `Authorize ${biometricType} Security`,
                     fallbackLabel: 'Use PIN / Password',
                     cancelLabel: 'Cancel'
                 });
@@ -209,7 +223,10 @@ export default function SecurityScreen() {
                     await AsyncStorage.setItem('biometrics_enabled', 'true');
                     await AsyncStorage.setItem('biometrics_setup_completed', 'true');
                     setBiometricEnabled(true);
-                    showToast(`${biometricType} enabled successfully! ✨`);
+                    if (Platform.OS !== 'web') {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }
+                    showToast(`${biometricType} enabled with 100% security! 🛡️✨`);
                 } else {
                     setBiometricEnabled(false);
                 }
@@ -221,7 +238,46 @@ export default function SecurityScreen() {
             await AsyncStorage.setItem('biometrics_enabled', 'false');
             await AsyncStorage.setItem('biometrics_setup_completed', 'false');
             setBiometricEnabled(false);
+            if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }
             showToast(`${biometricType} disabled.`);
+        }
+    };
+
+    // Live Biometric Sensor Test
+    const handleTestBiometric = async () => {
+        if (Platform.OS === 'web') {
+            Alert.alert("Biometrics Notice", "Hardware biometrics are supported on native Android and iOS devices.");
+            return;
+        }
+        if (!biometricAvailable) {
+            Alert.alert(
+                "Sensor Not Available",
+                "Hardware biometric sensors are either not present or no face/fingerprint credentials are registered in your device settings."
+            );
+            return;
+        }
+
+        try {
+            const res = await LocalAuthentication.authenticateAsync({
+                promptMessage: `Test ${biometricType} Sensor`,
+                fallbackLabel: 'Use PIN',
+                cancelLabel: 'Cancel'
+            });
+
+            if (res.success) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                Alert.alert(
+                    "Biometrics 100% Active! ✨",
+                    `An tabbatar da ${biometricType} dinka cikin nasara! Na'urar tana aiki 100% da tsaro mai karfi (Bank-Grade Secure Enclave).`
+                );
+                showToast(`${biometricType} Tested & 100% Verified! 🛡️`);
+            } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+            }
+        } catch (err: any) {
+            Alert.alert("Biometric Test Error", err.message || "An error occurred during biometric test.");
         }
     };
 
@@ -818,30 +874,30 @@ export default function SecurityScreen() {
                         </View>
                     </View>
 
-                    {/* SECTION 3: HARDWARE BIOMETRIC LOGIN */}
+                    {/* SECTION 3: HARDWARE BIOMETRIC SECURITY (FACE ID / FINGERPRINT / TOUCH ID) */}
                     <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: biometricEnabled ? L.blueBorder : L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                                 <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', borderWidth: 1, borderColor: biometricEnabled ? L.blue : '#CBD5E1', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons 
-                                        name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} 
-                                        size={21} 
+                                    <MaterialCommunityIcons 
+                                        name={biometricType === 'Face ID' ? "face-recognition" : "fingerprint"} 
+                                        size={22} 
                                         color={biometricEnabled ? L.blue : L.textMuted} 
                                     />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Text style={{ color: L.textPrimary, fontSize: 13, fontWeight: '800' }}>
-                                            {biometricType} Unlock
+                                            {biometricType} Authentication
                                         </Text>
                                         <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 0.8, borderColor: biometricEnabled ? L.blueBorder : '#CBD5E1' }}>
                                             <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 8, fontWeight: '900' }}>
-                                                {biometricEnabled ? 'ENABLED' : 'OFF'}
+                                                {biometricEnabled ? 'ACTIVE & VERIFIED' : biometricAvailable ? 'READY' : 'UNAVAILABLE'}
                                             </Text>
                                         </View>
                                     </View>
                                     <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, lineHeight: 13.5 }}>
-                                        Instant 1-tap sign in using your device's built-in secure enclave biometric sensors.
+                                        Bank-grade biometric authentication using device Secure Enclave / KeyStore.
                                     </Text>
                                 </View>
                             </View>
@@ -856,14 +912,139 @@ export default function SecurityScreen() {
                             />
                         </View>
 
-                        {!biometricAvailable && (
-                            <View style={{ marginTop: 10, backgroundColor: '#F8FAFC', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name="alert-circle-outline" size={13} color={L.textMuted} />
-                                <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '500' }}>
-                                    Hardware biometrics are not registered on this device.
+                        {/* Action Strip: Sensor Diagnostics & Test Button */}
+                        <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ flex: 1, backgroundColor: biometricEnabled ? L.blueBg : '#F8FAFC', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name={biometricAvailable ? "shield-checkmark" : "information-circle-outline"} size={13} color={biometricAvailable ? L.blue : L.textMuted} />
+                                <Text style={{ color: biometricAvailable ? L.blue : L.textMuted, fontSize: 9.5, fontWeight: '700' }}>
+                                    {biometricEnabled 
+                                        ? `Protected with ${biometricType} 🛡️` 
+                                        : biometricAvailable 
+                                            ? `Sensor ready (${biometricType})` 
+                                            : 'No biometric hardware enrolled'}
                                 </Text>
                             </View>
-                        )}
+                            {biometricAvailable && (
+                                <TouchableOpacity 
+                                    onPress={handleTestBiometric}
+                                    style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: L.cardBorder, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                >
+                                    <MaterialCommunityIcons name={biometricType === 'Face ID' ? "face-recognition" : "fingerprint"} size={13} color={L.blue} />
+                                    <Text style={{ color: L.blue, fontSize: 9.5, fontWeight: '800' }}>Test Sensor 👆</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* SECTION 4: TSARIN AIKIN BIOMETRICS (WHERE BIOMETRICS WORKS & ARCHITECTURE) */}
+                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <MaterialCommunityIcons name="fingerprint" size={16} color={L.navyHeader} />
+                                <Text style={{ color: L.navyHeader, fontSize: 11.5, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    Tsarin Aikin Biometrics (Where It Works)
+                                </Text>
+                            </View>
+                            <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
+                                <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 8, fontWeight: '900' }}>
+                                    {biometricEnabled ? 'ENABLED (100%)' : 'OFF'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 9.5, marginBottom: 12, lineHeight: 13.5 }}>
+                            Shafuka da hanyoyin da {biometricType} ke ba da tsaro da saukin aiki a cikin manhajar Abu Mafhal Hub:
+                        </Text>
+
+                        {/* Feature 1: Shiga Manhaja (Instant App Unlock) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.blueBg, borderWidth: 1, borderColor: L.blueBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="phone-portrait-outline" size={17} color={L.blue} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Buɗe Manhaja (App Unlock)</Text>
+                                        <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
+                                                {biometricEnabled ? 'ACTIVE' : 'OFF'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
+                                        Buɗe manhaja kai-tsaye ba tare da rubuta 4-digit PIN ba a lokacin da ka dawo.
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="checkmark-circle" size={18} color={biometricEnabled ? L.blue : '#CBD5E1'} />
+                        </View>
+
+                        {/* Feature 2: Biyan Kuɗi a SecurityModal (Transaction PIN Fast-Pass) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.goldBg, borderWidth: 1, borderColor: L.goldBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="card-outline" size={17} color={L.goldDk} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Amincewa da Ma'amala (SecurityModal)</Text>
+                                        <View style={{ backgroundColor: biometricEnabled ? L.goldBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: biometricEnabled ? L.goldAmber : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
+                                                {biometricEnabled ? 'FAST-PASS' : 'PIN ONLY'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
+                                        Tura kuɗi ko sayen data da yatsa/fuska a kan allon PIN na SecurityModal.
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="checkmark-circle" size={18} color={biometricEnabled ? L.goldDk : '#CBD5E1'} />
+                        </View>
+
+                        {/* Feature 3: Shiga Asusu Cikin Sauri (1-Tap Quick Login) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.purpleBg, borderWidth: 1, borderColor: L.purpleBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="finger-print" size={17} color={L.purple} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Shiga Asusu Cikin Sauri (1-Tap Login)</Text>
+                                        <View style={{ backgroundColor: biometricEnabled ? L.purpleBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: biometricEnabled ? L.purple : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
+                                                {biometricEnabled ? 'READY' : 'OFF'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
+                                        Shiga asusunka kai-tsaye a shafin Login ba tare da sake rubuta kalmar sirri ba.
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="checkmark-circle" size={18} color={biometricEnabled ? L.purple : '#CBD5E1'} />
+                        </View>
+
+                        {/* Feature 4: Tsaron Hardware (Hardware Enclave Isolation) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.emeraldBg, borderWidth: 1, borderColor: L.emeraldBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <MaterialCommunityIcons name="shield-lock-outline" size={17} color={L.emerald} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Tsaron Na'ura (Secure Enclave)</Text>
+                                        <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: L.emerald, fontSize: 7.5, fontWeight: '900' }}>100% PRIVATE</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
+                                        Babu wani bayanin yatsa ko fuska da ke barin wayarka; na'urar ce kadai ke sarrafa shi.
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="shield-checkmark" size={18} color={L.emerald} />
+                        </View>
                     </View>
 
                     {/* SECTION 3: TRANSACTION PIN & CREDENTIAL PASSCODES */}

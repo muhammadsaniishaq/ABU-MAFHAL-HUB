@@ -97,7 +97,9 @@ export default function PinSetupScreen() {
             }
 
             const bioStatus = await AsyncStorage.getItem('biometrics_enabled');
-            if (bioStatus === 'true' && Platform.OS !== 'web') {
+            const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
+            const isBioActive = (bioStatus === 'true' || bioSetup === 'true') && bioStatus !== 'false' && bioSetup !== 'false';
+            if (isBioActive && Platform.OS !== 'web') {
                 const hasHardware = await LocalAuthentication.hasHardwareAsync();
                 const isEnrolled = await LocalAuthentication.isEnrolledAsync();
                 if (hasHardware && isEnrolled) {

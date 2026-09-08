@@ -35,6 +35,7 @@ export default function PinUnlockScreen() {
     const [loading, setLoading] = useState(false);
     const [verifying, setVerifying] = useState(false);
     const [biometricAvailable, setBiometricAvailable] = useState(false);
+    const [biometricType, setBiometricType] = useState<string>('Biometrics');
     const [userEmail, setUserEmail] = useState<string>('');
     const [userName, setUserName] = useState<string>('');
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
@@ -159,11 +160,22 @@ export default function PinUnlockScreen() {
                 const hasHardware = await LocalAuthentication.hasHardwareAsync();
                 const isEnrolled = await LocalAuthentication.isEnrolledAsync();
                 const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
-                if (hasHardware && isEnrolled && bioEnabled === 'true') {
+                const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
+                const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
+
+                if (hasHardware && isEnrolled && isBioActive) {
                     setBiometricAvailable(true);
+                    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+                    let detectedType = 'Biometrics';
+                    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+                        detectedType = 'Face ID';
+                    } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+                        detectedType = Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint';
+                    }
+                    setBiometricType(detectedType);
                     setTimeout(() => {
-                        triggerBiometricAuth(localPin);
-                    }, 200);
+                        triggerBiometricAuth(localPin, detectedType);
+                    }, 250);
                 }
             }
         } catch (e) {
@@ -171,10 +183,11 @@ export default function PinUnlockScreen() {
         }
     };
 
-    const triggerBiometricAuth = async (targetPin?: string | null) => {
+    const triggerBiometricAuth = async (targetPin?: string | null, customType?: string) => {
         try {
+            const activeType = customType || biometricType || 'Biometrics';
             const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Unlock ABU MAFHAL SUB',
+                promptMessage: `Unlock ABU MAFHAL HUB with ${activeType}`,
                 fallbackLabel: 'Use PIN',
                 cancelLabel: 'Cancel',
             });
@@ -486,7 +499,7 @@ export default function PinUnlockScreen() {
                                     disabled={lockoutSeconds > 0}
                                 >
                                     <MaterialCommunityIcons
-                                        name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'}
+                                        name={biometricType === 'Face ID' ? 'face-recognition' : 'fingerprint'}
                                         size={26}
                                         color="#F59E0B"
                                     />

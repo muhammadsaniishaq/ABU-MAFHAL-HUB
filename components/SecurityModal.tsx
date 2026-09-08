@@ -38,6 +38,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
   const [isCreating, setIsCreating] = useState(false);
   const [savedPin, setSavedPin] = useState<string | null>(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState<string>('Biometrics');
   const [successMode, setSuccessMode] = useState(false);
   
   // Brute-force Protection & Lockout States
@@ -142,8 +143,10 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
       } else {
         setIsCreating(false);
         // Only auto-trigger biometric prompt if explicitly set up first
+        const bioFlag = await AsyncStorage.getItem('biometrics_enabled');
         const isBioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
-        if (isBioSetup === 'true') {
+        const isBioActive = (bioFlag === 'true' || isBioSetup === 'true') && bioFlag !== 'false' && isBioSetup !== 'false';
+        if (isBioActive) {
           setTimeout(() => promptBiometric(), 400);
         }
       }
@@ -157,9 +160,20 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const bioFlag = await AsyncStorage.getItem('biometrics_enabled');
       const isBioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
-      if (hasHardware && isEnrolled && isBioSetup === 'true') {
+      const isBioActive = (bioFlag === 'true' || isBioSetup === 'true') && bioFlag !== 'false' && isBioSetup !== 'false';
+
+      if (hasHardware && isEnrolled && isBioActive) {
         setBiometricAvailable(true);
+        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+          setBiometricType('Face ID');
+        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+          setBiometricType(Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint');
+        } else {
+          setBiometricType('Biometrics');
+        }
       } else {
         setBiometricAvailable(false);
       }
@@ -173,8 +187,9 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
 
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Verify identity',
+        promptMessage: `Authorize Transaction with ${biometricType || 'Biometrics'}`,
         fallbackLabel: 'Use PIN',
+        cancelLabel: 'Cancel',
       });
       if (result.success) {
         handleAuthSuccess(savedPin || undefined);
@@ -482,7 +497,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
                                  style={styles.biometricButton}
                                  entering={FadeIn}
                                >
-                                 <MaterialCommunityIcons name={Platform.OS === 'ios' ? "face-recognition" : "fingerprint"} size={20} color="#f5a623" />
+                                 <MaterialCommunityIcons name={biometricType === 'Face ID' ? "face-recognition" : "fingerprint"} size={20} color="#f5a623" />
                                </AnimatedPressable>
                             )}
                           </View>

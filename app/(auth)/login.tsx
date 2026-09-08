@@ -135,16 +135,25 @@ export default function LoginScreen() {
 
     const checkBiometrics = async () => {
         try {
+            if (Platform.OS === 'web') return;
             const hasHardware = await LocalAuthentication.hasHardwareAsync();
             const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-            if (hasHardware && isEnrolled) {
+            const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
+            const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
+            const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
+
+            if (hasHardware && isEnrolled && isBioActive) {
                 setBiometricAvailable(true);
                 const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
                 if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
                     setBiometricType('Face ID');
                 } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-                    setBiometricType('Fingerprint');
+                    setBiometricType(Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint');
+                } else {
+                    setBiometricType('Biometrics');
                 }
+            } else {
+                setBiometricAvailable(false);
             }
         } catch (e) {
             console.warn('Biometric check error', e);
@@ -154,7 +163,7 @@ export default function LoginScreen() {
     const handleBiometricAuth = async () => {
         try {
             const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: `Sign in to ABUMAFHAL with ${biometricType}`,
+                promptMessage: `Sign in to ABU MAFHAL HUB with ${biometricType}`,
                 fallbackLabel: 'Use Password',
                 cancelLabel: 'Cancel',
             });
@@ -168,7 +177,7 @@ export default function LoginScreen() {
                     setPassword(savedPass);
                     handleLoginWithCredentials(savedId, savedPass);
                 } else {
-                    Alert.alert('Setup Required', 'Please log in with your email and password once to enable quick biometric sign in.');
+                    Alert.alert('Setup Required', 'Please log in with your password once to link your biometric sign-in.');
                 }
             }
         } catch (e: any) {
@@ -263,7 +272,11 @@ export default function LoginScreen() {
             }
 
             if (data?.user) {
-                if (rememberMe) {
+                const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
+                const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
+                const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
+
+                if (rememberMe || isBioActive) {
                     await AsyncStorage.setItem('saved_user_identifier', cleanIdent);
                     await AsyncStorage.setItem('saved_user_pass_secure', userPass);
                 }
