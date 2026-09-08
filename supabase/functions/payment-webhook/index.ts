@@ -375,24 +375,34 @@ BEFORE UPDATE ON public.profiles
 FOR EACH ROW
 EXECUTE FUNCTION public.prevent_unauthorized_profile_updates();
 
--- 2. UPDATE EXECUTE_WALLET_TRANSFER (P2P Transfer)
+-- 2. HARDENED EXECUTE_WALLET_TRANSFER (Enforces Tier 2+ KYC, Transaction PIN, Status, and Daily Limits)
+DROP FUNCTION IF EXISTS public.execute_wallet_transfer(uuid, uuid, text, decimal, text);
+DROP FUNCTION IF EXISTS public.execute_wallet_transfer(uuid, uuid, text, decimal, text, text);
+DROP FUNCTION IF EXISTS public.execute_wallet_transfer;
+
 CREATE OR REPLACE FUNCTION public.execute_wallet_transfer(
   sender_id uuid,
   target_id uuid default null,
   target_email text default null,
   amount decimal = 0.0,
-  note text default ''
+  note text default '',
+  p_pin text default null
 )
 returns jsonb as $$
 declare
   v_sender_id uuid;
   sender_bal decimal;
   sender_name text;
+  sender_tier integer;
+  sender_status text;
+  sender_pin text;
   recipient_id uuid;
   recipient_name text;
   recipient_email text;
   reference text;
-  result jsonb;
+  v_used_today numeric;
+  v_max_single numeric;
+  v_daily_limit numeric;
 begin
   v_sender_id := auth.uid();
   if v_sender_id is null then
@@ -408,6 +418,53 @@ begin
     raise exception 'Minimum transfer amount is NGN 100.00. Current amount: NGN %', amount;
   end if;
 
+  -- 1. Lock and check sender profile, status, pin, and KYC Tier
+  select balance, full_name, coalesce(kyc_tier, 1), coalesce(status, 'active'), transaction_pin
+  into sender_bal, sender_name, sender_tier, sender_status, sender_pin
+  from public.profiles
+  where id = v_sender_id for update;
+
+  if sender_bal is null then
+    raise exception 'Sender profile not found';
+  end if;
+
+  -- Check Account Status
+  if sender_status in ('suspended', 'banned', 'frozen', 'restricted') then
+    raise exception 'Your account is currently restricted. Transfers are disabled. Please contact customer support.';
+  end if;
+
+  -- STRICT TIER 2+ ENFORCEMENT (Transfer is locked for Tier 1 users)
+  if sender_tier < 2 then
+    raise exception 'Transfer locked: In compliance with financial regulations, you must upgrade your account to Tier 2 (verify BVN or NIN) before you can transfer funds.';
+  end if;
+
+  -- VERIFY TRANSACTION PIN
+  if sender_pin is not null and sender_pin != '' then
+    if p_pin is null or trim(p_pin) != trim(sender_pin) then
+      raise exception 'Invalid transaction PIN. Transfer authorization failed.';
+    end if;
+  end if;
+
+  -- DAILY TRANSFER LIMIT CHECK FOR P2P
+  v_max_single := case when sender_tier >= 3 then 5000000 else 500000 end;
+  v_daily_limit := case when sender_tier >= 3 then 10000000 else 2000000 end;
+
+  if amount > v_max_single then
+    raise exception 'Amount exceeds maximum single transfer limit of NGN % for Tier %', v_max_single, sender_tier;
+  end if;
+
+  select coalesce(sum(t.amount), 0) into v_used_today
+  from public.transactions t
+  where t.user_id = v_sender_id
+    and t.type in ('withdrawal', 'transfer')
+    and t.status in ('success', 'pending', 'processing')
+    and t.created_at >= (now() - interval '24 hours');
+
+  if (v_used_today + amount) > v_daily_limit then
+    raise exception 'Daily transfer limit of NGN % exceeded. You have used NGN % today.', v_daily_limit, v_used_today;
+  end if;
+
+  -- 2. Find recipient ID and info
   if target_id is not null then
     select id, full_name, email into recipient_id, recipient_name, recipient_email
     from public.profiles
@@ -428,55 +485,93 @@ begin
     raise exception 'You cannot transfer money to yourself';
   end if;
 
-  select balance, full_name into sender_bal, sender_name
-  from public.profiles
-  where id = v_sender_id for update;
-
-  if sender_bal is null then
-    raise exception 'Sender profile not found';
-  end if;
-
   if sender_bal < amount then
     raise exception 'Insufficient balance. Available balance is NGN %', sender_bal;
   end if;
 
+  -- 3. ENABLE BYPASS FOR THIS TRUSTED TRANSACTION
   PERFORM set_config('app.bypass_profile_lock', 'true', true);
 
+  -- 4. Deduct from sender
   update public.profiles
   set balance = balance - amount
   where id = v_sender_id;
 
+  -- 5. Credit recipient
   update public.profiles
   set balance = balance + amount
   where id = recipient_id;
 
-  reference := 'TRF-' || extract(epoch from now())::text || '-' || floor(random() * 1000)::text;
+  -- 6. Generate Reference
+  reference := 'P2P-' || extract(epoch from now())::text || '-' || floor(random() * 1000)::text;
 
-  insert into public.transactions (user_id, type, amount, status, description, reference)
-  values (v_sender_id, 'transfer', amount, 'success', coalesce(note, 'Transfer to ' || recipient_name), reference || '-OUT');
-
-  insert into public.transactions (user_id, type, amount, status, description, reference)
-  values (recipient_id, 'deposit', amount, 'success', coalesce(note, 'Transfer received from ' || sender_name), reference || '-IN');
-
-  result := jsonb_build_object(
-    'success', true,
-    'recipient_name', recipient_name,
-    'recipient_email', recipient_email,
-    'recipient_id', recipient_id,
-    'new_balance', sender_bal - amount,
-    'reference', reference
+  -- 7. Insert sender transaction
+  insert into public.transactions (user_id, type, amount, status, description, reference, details)
+  values (
+    v_sender_id,
+    'transfer',
+    amount,
+    'success',
+    'Transfer to ' || coalesce(recipient_name, recipient_email, 'Member') || case when note != '' then ' (' || note || ')' else '' end,
+    reference,
+    jsonb_build_object(
+      'recipient_id', recipient_id,
+      'recipient_name', recipient_name,
+      'recipient_email', recipient_email,
+      'note', note,
+      'direction', 'outgoing'
+    )
   );
-  
-  return result;
+
+  -- 8. Insert recipient transaction
+  insert into public.transactions (user_id, type, amount, status, description, reference, details)
+  values (
+    recipient_id,
+    'transfer',
+    amount,
+    'success',
+    'Received from ' || coalesce(sender_name, 'Member') || case when note != '' then ' (' || note || ')' else '' end,
+    reference || '-IN',
+    jsonb_build_object(
+      'sender_id', v_sender_id,
+      'sender_name', sender_name,
+      'note', note,
+      'direction', 'incoming'
+    )
+  );
+
+  -- 9. Notify recipient (populate body, message, and massage for complete schema resilience)
+  insert into public.notifications (user_id, title, body, message, massage, type)
+  values (
+    recipient_id,
+    'Money Received!',
+    'You received NGN ' || amount::text || ' from ' || coalesce(sender_name, 'a member') || '.',
+    'You received NGN ' || amount::text || ' from ' || coalesce(sender_name, 'a member') || '.',
+    'You received NGN ' || amount::text || ' from ' || coalesce(sender_name, 'a member') || '.',
+    'credit'
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'new_balance', (sender_bal - amount),
+    'reference', reference,
+    'recipient', coalesce(recipient_name, recipient_email),
+    'amount', amount
+  );
 end;
 $$ language plpgsql security definer;
 
 -- 2B. CREATE EXECUTE_P2P_TRANSFER AS COMPATIBILITY ALIAS
+DROP FUNCTION IF EXISTS public.execute_p2p_transfer(uuid, text, decimal, text);
+DROP FUNCTION IF EXISTS public.execute_p2p_transfer(uuid, text, decimal, text, text);
+DROP FUNCTION IF EXISTS public.execute_p2p_transfer;
+
 CREATE OR REPLACE FUNCTION public.execute_p2p_transfer(
   target_id uuid default null,
   target_email text default null,
   amount decimal = 0.0,
-  note text default ''
+  note text default '',
+  p_pin text default null
 )
 returns jsonb as $$
 begin
@@ -485,12 +580,13 @@ begin
     target_id := target_id,
     target_email := target_email,
     amount := amount,
-    note := note
+    note := note,
+    p_pin := p_pin
   );
 end;
 $$ language plpgsql security definer;
 
--- 3. DROP OVERLOADED SIGNATURES AND RECREATE EXECUTE_USER_BANK_WITHDRAWAL
+-- 3. DROP OVERLOADED SIGNATURES AND RECREATE EXECUTE_USER_BANK_WITHDRAWAL (Tier 2+ & Status Check)
 DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid);
 DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid, numeric);
 DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal;
@@ -508,6 +604,8 @@ returns jsonb as $$
 declare
   v_user_id uuid;
   v_current_bal numeric;
+  v_user_tier integer;
+  v_user_status text;
   v_new_bal numeric;
   v_total_debit numeric;
   v_ref text;
@@ -533,9 +631,20 @@ begin
 
   v_total_debit := p_amount + coalesce(p_fee, 0);
 
-  select balance into v_current_bal
+  -- Lock user profile row and verify KYC Tier + Status
+  select balance, coalesce(kyc_tier, 1), coalesce(status, 'active')
+  into v_current_bal, v_user_tier, v_user_status
   from public.profiles
   where id = v_user_id for update;
+
+  if v_user_status in ('suspended', 'banned', 'frozen', 'restricted') then
+    raise exception 'Your account is currently restricted. Withdrawals and transfers are disabled.';
+  end if;
+
+  -- STRICT TIER 2+ ENFORCEMENT
+  if v_user_tier < 2 then
+    raise exception 'Withdrawal locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can withdraw or transfer funds.';
+  end if;
 
   if v_current_bal is null or v_current_bal < v_total_debit then
     raise exception 'Insufficient balance. Available balance: NGN %, Required: NGN %', coalesce(v_current_bal, 0), v_total_debit;
@@ -551,14 +660,22 @@ begin
 
   v_ref := 'WTH-' || extract(epoch from now())::text || '-' || floor(random() * 1000)::text;
 
-  insert into public.transactions (user_id, type, amount, status, description, reference)
+  insert into public.transactions (user_id, type, amount, status, description, reference, details)
   values (
     v_user_id, 
     'withdrawal', 
-    v_total_debit, 
+    p_amount, 
     'success', 
     coalesce(p_narration, 'Transfer to ' || p_bank_name || ' (' || p_account_number || ')') || ' - ' || p_account_name || case when coalesce(p_fee, 0) > 0 then ' (Fee: NGN ' || p_fee::text || ')' else '' end,
-    v_ref
+    v_ref,
+    jsonb_build_object(
+      'fee', coalesce(p_fee, 0),
+      'total_debit', v_total_debit,
+      'bank_name', p_bank_name,
+      'account_number', p_account_number,
+      'account_name', p_account_name,
+      'provider', 'flutterwave'
+    )
   );
 
   return jsonb_build_object(
@@ -1115,17 +1232,122 @@ $$ language plpgsql security definer;
                 ? parsedPayload.totalDebit 
                 : (typeof parsedPayload.total_debit === 'number' ? parsedPayload.total_debit : (numAmount + transferFee));
 
-            // 1. Verify user wallet balance in DB first without debiting yet
+            // 1. Verify user wallet balance, status, transaction PIN, and KYC Tier
             const { data: userProfile, error: profileErr } = await supabaseAdmin
                 .from('profiles')
-                .select('balance')
+                .select('balance, transaction_pin, kyc_tier, status, email, full_name')
                 .eq('id', userId)
                 .maybeSingle();
 
             if (profileErr || !userProfile) {
                 return new Response(JSON.stringify({ success: false, message: "User account not found." }), {
+                    status: 404,
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
+            }
+
+            // A. Check Account Status (Anti-Fraud / Restriction)
+            const accStatus = String(userProfile.status || 'active').toLowerCase();
+            if (accStatus === 'suspended' || accStatus === 'banned' || accStatus === 'frozen' || accStatus === 'restricted') {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: "Your account is currently restricted. Transfers are disabled. Please contact customer support." 
+                }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            // B. STRICT KYC TIER 2+ ENFORCEMENT (Transfer is locked for Tier 1 users)
+            const userTier = Number(userProfile.kyc_tier || 1);
+            if (userTier < 2) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: "Transfer Feature Locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can transfer or withdraw funds. Please verify your identity." 
+                }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            // C. SERVER-SIDE TRANSACTION PIN VERIFICATION
+            const inputPin = String(parsedPayload.pin || parsedPayload.transaction_pin || '').trim();
+            if (!userProfile.transaction_pin) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: "Transaction PIN not set up. Please create your 4-digit PIN in Security Settings before making transfers." 
+                }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+            if (!inputPin || inputPin !== String(userProfile.transaction_pin).trim()) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: "Invalid transaction PIN. Transfer authorization denied." 
+                }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            // D. PREVENT SELF-TRANSFER TO USER'S RESERVED VIRTUAL ACCOUNT
+            try {
+                const { data: userVA } = await supabaseAdmin
+                    .from('virtual_accounts')
+                    .select('account_number')
+                    .eq('user_id', userId)
+                    .maybeSingle();
+
+                if (userVA && userVA.account_number && userVA.account_number.trim() === accountNumber) {
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        message: "Invalid recipient: Cannot transfer funds to your own deposit virtual account." 
+                    }), {
+                        status: 400,
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+            } catch (_) {}
+
+            // E. TIER-BASED TRANSACTION & 24-HOUR LIMITS
+            const maxSingle = userTier >= 3 ? 5000000 : 500000;
+            const dailyLimit = userTier >= 3 ? 10000000 : 2000000;
+
+            if (numAmount > maxSingle) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: `Transfer amount exceeds maximum single transfer limit of ₦${maxSingle.toLocaleString('en-NG')} for Tier ${userTier}.` 
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            try {
+                const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+                const { data: past24hTxs } = await supabaseAdmin
+                    .from('transactions')
+                    .select('amount')
+                    .eq('user_id', userId)
+                    .in('type', ['withdrawal', 'transfer'])
+                    .in('status', ['success', 'pending', 'processing'])
+                    .gte('created_at', since24h);
+
+                const usedToday = (past24hTxs || []).reduce((acc: number, tx: any) => acc + (parseFloat(tx.amount) || 0), 0);
+
+                if ((usedToday + numAmount) > dailyLimit) {
+                    const remaining = Math.max(0, dailyLimit - usedToday);
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        message: `Daily transfer limit of ₦${dailyLimit.toLocaleString('en-NG')} exceeded. You have transferred ₦${usedToday.toLocaleString('en-NG')} in the last 24 hours. Remaining limit today: ₦${remaining.toLocaleString('en-NG')}.` 
+                    }), {
+                        status: 400,
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+            } catch (limitErr) {
+                console.warn("[execute_bank_transfer] Daily limit calculation note:", limitErr);
             }
 
             const currentWalletBal = parseFloat(String(userProfile.balance || 0));

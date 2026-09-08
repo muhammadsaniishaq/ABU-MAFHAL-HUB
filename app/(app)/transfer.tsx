@@ -380,6 +380,10 @@ export default function TransferScreen() {
     const [transferError, setTransferError] = useState<string | null>(null);
     const [copiedRef, setCopiedRef] = useState(false);
 
+    // KYC Tier & Account Status States
+    const [userKycTier, setUserKycTier] = useState<number>(1);
+    const [userStatus, setUserStatus] = useState<string>('active');
+
     // Success Receipt Modal
     const [successModalVisible, setSuccessModalVisible] = useState(false);
     const [lastTxDetails, setLastTxDetails] = useState<{
@@ -465,12 +469,14 @@ export default function TransferScreen() {
                 setCurrentUserId(user.id);
                 const { data } = await supabase
                     .from('profiles')
-                    .select('balance, full_name')
+                    .select('balance, full_name, kyc_tier, status')
                     .eq('id', user.id)
                     .single();
                 if (data) {
                     setUserBalance(Number(data.balance) || 0);
                     if (data.full_name) setCurrentUserName(data.full_name);
+                    setUserKycTier(Number(data.kyc_tier) || 1);
+                    setUserStatus(data.status || 'active');
                 }
                 fetchTransferHistory(user.id);
             }
@@ -521,8 +527,9 @@ export default function TransferScreen() {
         return () => { isMounted = false; };
     }, []);
 
-    // Form Validity
+    // Form Validity (Enforces Tier 2+ KYC Requirement)
     const isFormValid = useMemo(() => {
+        if (userKycTier < 2) return false;
         if (numAmount < MIN_TRANSFER_AMOUNT) return false;
         if (userBalance > 0 && totalDebit > userBalance) return false;
         if (activeTab === 'p2p') {
@@ -530,7 +537,7 @@ export default function TransferScreen() {
         } else {
             return !!selectedBank && accountNumber.trim().length === 10 && !!accountName.trim();
         }
-    }, [activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
+    }, [userKycTier, activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
 
     // Function to verify bank account details
     const handleVerifyBeneficiary = async () => {
@@ -729,6 +736,24 @@ export default function TransferScreen() {
 
     // Initiate Transfer (Opens confirmation)
     const handleInitiateTransfer = () => {
+        if (userKycTier < 2) {
+            showTransferNotice(
+                'Tier 2 Verification Required 🔒',
+                'Transfer Feature Locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can transfer funds. Tap Upgrade below to verify now.',
+                false
+            );
+            return;
+        }
+
+        if (userStatus && userStatus !== 'active') {
+            showTransferNotice(
+                'Account Restricted ⚠️',
+                'Your account is currently restricted. Transfers are disabled. Please contact customer support.',
+                false
+            );
+            return;
+        }
+
         if (numAmount <= 0) {
             showTransferNotice('Amount Required', 'Please enter a valid transfer amount.', false);
             return;
@@ -772,11 +797,19 @@ export default function TransferScreen() {
     };
 
     // Execute Confirmed Transfer via Edge Function
-    const handleExecuteConfirmedTransfer = async () => {
+    const handleExecuteConfirmedTransfer = async (authPin?: string) => {
         setIsSubmitting(true);
         setTransferError(null);
 
         try {
+            if (userKycTier < 2) {
+                throw new Error("Transfer Feature Locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can transfer funds.");
+            }
+
+            if (userStatus && userStatus !== 'active') {
+                throw new Error("Your account is currently restricted. Transfers are disabled. Please contact customer support.");
+            }
+
             const currentTotalDebit = totalDebit;
             const currentAmount = numAmount;
             const currentNarration = note.trim();
@@ -791,6 +824,7 @@ export default function TransferScreen() {
                     target_id: matchedUser!.id,
                     amount: currentAmount,
                     note: currentNarration || 'Wallet transfer via Abu Mafhal Hub',
+                    p_pin: authPin || '',
                 });
 
                 if (p2pResult.error) {
@@ -798,6 +832,7 @@ export default function TransferScreen() {
                         target_id: matchedUser!.id,
                         amount: currentAmount,
                         note: currentNarration || 'Wallet transfer via Abu Mafhal Hub',
+                        p_pin: authPin || '',
                     });
                 }
 
@@ -873,6 +908,7 @@ export default function TransferScreen() {
                         total_debit: currentTotalDebit,
                         narration: currentNarration || `Transfer to ${accountName.trim()}`,
                         provider: settings?.transfer_provider || 'flutterwave',
+                        pin: authPin || '',
                     },
                 });
 
@@ -1223,6 +1259,37 @@ export default function TransferScreen() {
                                 </Text>
                             </View>
                         </View>
+
+                        {/* Tier 1 Strict Lock Warning Card */}
+                        {userKycTier < 2 && (
+                            <View style={s.tierLockCard}>
+                                <View style={s.tierLockHeaderRow}>
+                                    <View style={s.tierLockIconBox}>
+                                        <Ionicons name="lock-closed" size={18} color="#EF4444" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={s.tierLockTitle}>Transfer Feature Locked</Text>
+                                            <View style={s.tier1Badge}>
+                                                <Text style={s.tier1BadgeText}>TIER 1</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.tierLockSubtitle}>
+                                            In compliance with security policies, transfers require Tier 2 identity verification (BVN / NIN).
+                                        </Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => router.push('/kyc')}
+                                    style={s.tierUpgradeBtn}
+                                    activeOpacity={0.85}
+                                >
+                                    <Ionicons name="shield-checkmark" size={14} color="#020617" />
+                                    <Text style={s.tierUpgradeBtnText}>UPGRADE TO TIER 2 TO UNLOCK</Text>
+                                    <Ionicons name="arrow-forward" size={13} color="#020617" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         {/* Inline Error Alert */}
                         {transferError ? (
@@ -1701,12 +1768,13 @@ export default function TransferScreen() {
 
                         {/* Submit Button */}
                         <TouchableOpacity
-                            onPress={handleInitiateTransfer}
+                            onPress={userKycTier < 2 ? () => router.push('/kyc') : handleInitiateTransfer}
                             style={[
                                 s.submitBtn,
-                                !isFormValid ? s.submitBtnDisabled : s.submitBtnActive,
+                                (!isFormValid && userKycTier >= 2) ? s.submitBtnDisabled : s.submitBtnActive,
+                                userKycTier < 2 && { backgroundColor: '#B45309' }
                             ]}
-                            disabled={!isFormValid || isSubmitting}
+                            disabled={isSubmitting}
                             activeOpacity={0.85}
                         >
                             {isSubmitting ? (
@@ -1714,17 +1782,20 @@ export default function TransferScreen() {
                             ) : (
                                 <>
                                     <Ionicons
-                                        name="arrow-up-circle"
+                                        name={userKycTier < 2 ? "lock-closed" : "arrow-up-circle"}
                                         size={18}
-                                        color={!isFormValid ? '#64748B' : '#F59E0B'}
+                                        color={userKycTier < 2 ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
                                         style={{ marginRight: 6 }}
                                     />
-                                    <Text style={[s.submitBtnText, !isFormValid && s.submitBtnTextDisabled]}>
-                                        {numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
-                                            ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
-                                            : isFormValid
-                                            ? `TRANSFER ₦${numAmount.toLocaleString()} NOW`
-                                            : 'ENTER TRANSFER DETAILS'}
+                                    <Text style={[s.submitBtnText, (!isFormValid && userKycTier >= 2) && s.submitBtnTextDisabled]}>
+                                        {userKycTier < 2
+                                            ? '🔒 UPGRADE TO TIER 2 TO TRANSFER'
+                                            : (numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
+                                                ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
+                                                : isFormValid
+                                                ? `PROCEED WITH ₦${numAmount.toLocaleString('en-NG')}`
+                                                : 'ENTER TRANSFER DETAILS')
+                                        }
                                     </Text>
                                 </>
                             )}
@@ -1744,6 +1815,37 @@ export default function TransferScreen() {
                                 </Text>
                             </View>
                         </View>
+
+                        {/* Tier 1 Strict Lock Warning Card */}
+                        {userKycTier < 2 && (
+                            <View style={s.tierLockCard}>
+                                <View style={s.tierLockHeaderRow}>
+                                    <View style={s.tierLockIconBox}>
+                                        <Ionicons name="lock-closed" size={18} color="#EF4444" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={s.tierLockTitle}>Transfer Feature Locked</Text>
+                                            <View style={s.tier1Badge}>
+                                                <Text style={s.tier1BadgeText}>TIER 1</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.tierLockSubtitle}>
+                                            In compliance with security policies, transfers require Tier 2 identity verification (BVN / NIN).
+                                        </Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => router.push('/kyc')}
+                                    style={s.tierUpgradeBtn}
+                                    activeOpacity={0.85}
+                                >
+                                    <Ionicons name="shield-checkmark" size={14} color="#020617" />
+                                    <Text style={s.tierUpgradeBtnText}>UPGRADE TO TIER 2 TO UNLOCK</Text>
+                                    <Ionicons name="arrow-forward" size={13} color="#020617" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         {/* Inline Error Alert */}
                         {transferError ? (
@@ -2080,12 +2182,13 @@ export default function TransferScreen() {
 
                         {/* P2P Submit Button */}
                         <TouchableOpacity
-                            onPress={handleInitiateTransfer}
+                            onPress={userKycTier < 2 ? () => router.push('/kyc') : handleInitiateTransfer}
                             style={[
                                 s.submitBtn,
-                                !isFormValid ? s.submitBtnDisabled : s.submitBtnActive,
+                                (!isFormValid && userKycTier >= 2) ? s.submitBtnDisabled : s.submitBtnActive,
+                                userKycTier < 2 && { backgroundColor: '#B45309' }
                             ]}
-                            disabled={!isFormValid || isSubmitting}
+                            disabled={isSubmitting}
                             activeOpacity={0.85}
                         >
                             {isSubmitting ? (
@@ -2093,17 +2196,20 @@ export default function TransferScreen() {
                             ) : (
                                 <>
                                     <Ionicons
-                                        name="paper-plane"
+                                        name={userKycTier < 2 ? "lock-closed" : "paper-plane"}
                                         size={17}
-                                        color={!isFormValid ? '#64748B' : '#F59E0B'}
+                                        color={userKycTier < 2 ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
                                         style={{ marginRight: 6 }}
                                     />
-                                    <Text style={[s.submitBtnText, !isFormValid && s.submitBtnTextDisabled]}>
-                                        {numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
-                                            ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
-                                            : isFormValid
-                                            ? `SEND ₦${numAmount.toLocaleString()} TO MEMBER`
-                                            : 'ENTER MEMBER DETAILS'}
+                                    <Text style={[s.submitBtnText, (!isFormValid && userKycTier >= 2) && s.submitBtnTextDisabled]}>
+                                        {userKycTier < 2
+                                            ? '🔒 UPGRADE TO TIER 2 TO TRANSFER'
+                                            : (numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
+                                                ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
+                                                : isFormValid
+                                                ? `SEND ₦${numAmount.toLocaleString()} TO MEMBER`
+                                                : 'ENTER MEMBER DETAILS')
+                                        }
                                     </Text>
                                 </>
                             )}
@@ -2351,10 +2457,10 @@ export default function TransferScreen() {
             <SecurityModal
                 visible={securityModalVisible}
                 onClose={() => setSecurityModalVisible(false)}
-                onSuccess={() => {
+                onSuccess={(pin) => {
                     setSecurityModalVisible(false);
                     setTimeout(() => {
-                        handleExecuteConfirmedTransfer();
+                        handleExecuteConfirmedTransfer(pin);
                     }, 300);
                 }}
                 title="Security PIN"
@@ -4381,5 +4487,65 @@ const s = StyleSheet.create({
         color: '#64748B',
         fontSize: 11,
         fontWeight: '800',
+    },
+    tierLockCard: {
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
+        borderWidth: 1.5,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 12,
+    },
+    tierLockHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    tierLockIconBox: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#FEE2E2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tierLockTitle: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: '#991B1B',
+    },
+    tier1Badge: {
+        backgroundColor: '#DC2626',
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 4,
+    },
+    tier1BadgeText: {
+        color: '#FFFFFF',
+        fontSize: 8.5,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    tierLockSubtitle: {
+        fontSize: 10.5,
+        color: '#7F1D1D',
+        marginTop: 3,
+        lineHeight: 14.5,
+    },
+    tierUpgradeBtn: {
+        backgroundColor: '#F59E0B',
+        height: 36,
+        borderRadius: 9,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 10,
+    },
+    tierUpgradeBtnText: {
+        color: '#020617',
+        fontSize: 11,
+        fontWeight: '900',
+        letterSpacing: 0.3,
     },
 });

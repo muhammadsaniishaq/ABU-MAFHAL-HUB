@@ -24,7 +24,7 @@ const PIN_KEY = 'user_transaction_pin';
 interface SecurityModalProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (pin?: string) => void;
   title?: string;
   description?: string;
   requiredFor?: string;
@@ -40,6 +40,9 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [successMode, setSuccessMode] = useState(false);
   
+  // Brute-force Protection & Lockout States
+  const [remainingLockSeconds, setRemainingLockSeconds] = useState<number>(0);
+
   // Google 2FA States
   const [mfaMode, setMfaMode] = useState(false);
   const [mfaCode, setMfaCode] = useState<string[]>([]);
@@ -50,12 +53,47 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
   useEffect(() => {
     if (visible) {
       setSuccessMode(false);
+      checkLockoutStatus();
       checkPinStatus();
       checkBiometric();
     } else {
       resetState();
     }
   }, [visible]);
+
+  // Lockout Countdown Timer
+  useEffect(() => {
+    if (remainingLockSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setRemainingLockSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          AsyncStorage.removeItem('pin_locked_until').catch(() => {});
+          AsyncStorage.removeItem('pin_failed_attempts').catch(() => {});
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [remainingLockSeconds]);
+
+  const checkLockoutStatus = async () => {
+    try {
+      const rawLock = await AsyncStorage.getItem('pin_locked_until');
+      if (rawLock) {
+        const lockUntil = Number(rawLock);
+        const diffSeconds = Math.ceil((lockUntil - Date.now()) / 1000);
+        if (diffSeconds > 0) {
+          setRemainingLockSeconds(diffSeconds);
+        } else {
+          await AsyncStorage.removeItem('pin_locked_until');
+          await AsyncStorage.removeItem('pin_failed_attempts');
+          setRemainingLockSeconds(0);
+        }
+      }
+    } catch (_) {}
+  };
 
   const resetState = () => {
     setPin([]);
@@ -137,7 +175,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
         fallbackLabel: 'Use PIN',
       });
       if (result.success) {
-        handleAuthSuccess();
+        handleAuthSuccess(savedPin || undefined);
       }
     } catch (e) {
       console.log("Biometric error", e);
@@ -203,7 +241,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
     }
   };
 
-  const handleAuthSuccess = async () => {
+  const handleAuthSuccess = async (authenticatedPin?: string) => {
     // Check if account has Google Authenticator 2FA (MFA) enabled and requires level upgrade
     try {
       const { data: levelData, error: levelError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -222,7 +260,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
     triggerHaptic('success');
     setSuccessMode(true);
     setTimeout(() => {
-      onSuccess();
+      onSuccess(authenticatedPin || savedPin || undefined);
     }, 800);
   };
 
@@ -253,7 +291,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
 
             setSavedPin(inputPin);
             setIsCreating(false);
-            handleAuthSuccess();
+            handleAuthSuccess(inputPin);
           } catch (e) {
             Alert.alert("Error", "Failed to save PIN");
           }
@@ -265,9 +303,31 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
       }
     } else {
       if (inputPin === savedPin) {
-        handleAuthSuccess();
+        AsyncStorage.removeItem('pin_failed_attempts').catch(() => {});
+        AsyncStorage.removeItem('pin_locked_until').catch(() => {});
+        handleAuthSuccess(inputPin);
       } else {
         triggerShake();
+        try {
+          const rawAttempts = await AsyncStorage.getItem('pin_failed_attempts');
+          const attempts = (Number(rawAttempts) || 0) + 1;
+          await AsyncStorage.setItem('pin_failed_attempts', String(attempts));
+
+          if (attempts >= 3) {
+            const lockUntil = Date.now() + 15 * 60 * 1000;
+            await AsyncStorage.setItem('pin_locked_until', String(lockUntil));
+            setRemainingLockSeconds(15 * 60);
+            Alert.alert(
+              "Security Lockout 🔒",
+              "Too many incorrect PIN attempts. For your account protection, transactions are locked for 15 minutes."
+            );
+          } else {
+            Alert.alert(
+              "Incorrect PIN",
+              `Invalid transaction PIN. You have ${3 - attempts} attempt(s) remaining before a 15-minute security lockout.`
+            );
+          }
+        } catch (_) {}
       }
     }
   };
@@ -366,52 +426,71 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
                     </View>
                   </View>
 
-                  {/* Enhanced PIN/MFA Dots */}
-                  <Animated.View style={[styles.dotsContainer, animatedShakeStyle]}>
-                    {mfaMode ? (
-                      [0, 1, 2, 3, 4, 5].map((i) => (
-                        <PinDot key={i} filled={i < mfaCode.length} error={shake.value !== 0} />
-                      ))
-                    ) : (
-                      [0, 1, 2, 3].map((i) => (
-                        <PinDot key={i} filled={i < pin.length} error={shake.value !== 0} />
-                      ))
-                    )}
-                  </Animated.View>
-
-                  {/* Compact Modern Keypad */}
-                  <View style={styles.keypadGrid}>
-                    <View style={styles.keypadRow}>
-                      {[1, 2, 3].map(n => <KeypadButton key={n} number={n} onPress={() => handlePress(n.toString())} />)}
+                  {/* Lockout Box or Keypad */}
+                  {remainingLockSeconds > 0 ? (
+                    <View style={styles.lockoutBox}>
+                      <Ionicons name="lock-closed" size={34} color="#EF4444" />
+                      <Text style={styles.lockoutTitle}>Security Lockout</Text>
+                      <Text style={styles.lockoutSub}>
+                        Too many incorrect attempts. For account security, transfers are locked temporarily.
+                      </Text>
+                      <View style={styles.countdownPill}>
+                        <Ionicons name="time-outline" size={15} color="#F59E0B" />
+                        <Text style={styles.countdownText}>
+                          Wait {Math.floor(remainingLockSeconds / 60).toString().padStart(2, '0')}:{(remainingLockSeconds % 60).toString().padStart(2, '0')}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.keypadRow}>
-                      {[4, 5, 6].map(n => <KeypadButton key={n} number={n} onPress={() => handlePress(n.toString())} />)}
-                    </View>
-                    <View style={styles.keypadRow}>
-                      {[7, 8, 9].map(n => <KeypadButton key={n} number={n} onPress={() => handlePress(n.toString())} />)}
-                    </View>
-                    <View style={styles.keypadRow}>
-                      <View style={styles.actionButtonContainer}>
-                          {!mfaMode && !isCreating && biometricAvailable && (
-                           <AnimatedPressable 
-                             onPress={promptBiometric} 
-                             style={styles.biometricButton}
-                             entering={FadeIn}
-                           >
-                             <MaterialCommunityIcons name={Platform.OS === 'ios' ? "face-recognition" : "fingerprint"} size={20} color="#f5a623" />
-                           </AnimatedPressable>
+                  ) : (
+                    <>
+                      {/* Enhanced PIN/MFA Dots */}
+                      <Animated.View style={[styles.dotsContainer, animatedShakeStyle]}>
+                        {mfaMode ? (
+                          [0, 1, 2, 3, 4, 5].map((i) => (
+                            <PinDot key={i} filled={i < mfaCode.length} error={shake.value !== 0} />
+                          ))
+                        ) : (
+                          [0, 1, 2, 3].map((i) => (
+                            <PinDot key={i} filled={i < pin.length} error={shake.value !== 0} />
+                          ))
                         )}
+                      </Animated.View>
+
+                      {/* Compact Modern Keypad */}
+                      <View style={styles.keypadGrid}>
+                        <View style={styles.keypadRow}>
+                          {[1, 2, 3].map(n => <KeypadButton key={n} number={n} onPress={() => handlePress(n.toString())} />)}
+                        </View>
+                        <View style={styles.keypadRow}>
+                          {[4, 5, 6].map(n => <KeypadButton key={n} number={n} onPress={() => handlePress(n.toString())} />)}
+                        </View>
+                        <View style={styles.keypadRow}>
+                          {[7, 8, 9].map(n => <KeypadButton key={n} number={n} onPress={() => handlePress(n.toString())} />)}
+                        </View>
+                        <View style={styles.keypadRow}>
+                          <View style={styles.actionButtonContainer}>
+                              {!mfaMode && !isCreating && biometricAvailable && (
+                               <AnimatedPressable 
+                                 onPress={promptBiometric} 
+                                 style={styles.biometricButton}
+                                 entering={FadeIn}
+                               >
+                                 <MaterialCommunityIcons name={Platform.OS === 'ios' ? "face-recognition" : "fingerprint"} size={20} color="#f5a623" />
+                               </AnimatedPressable>
+                            )}
+                          </View>
+                          
+                          <KeypadButton number={0} onPress={() => handlePress('0')} />
+                          
+                          <View style={styles.actionButtonContainer}>
+                            <TouchableOpacity onPress={handleDelete} hitSlop={{top:15,bottom:15,left:15,right:15}}>
+                                <Ionicons name="backspace-outline" size={22} color="#f5a623" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       </View>
-                      
-                      <KeypadButton number={0} onPress={() => handlePress('0')} />
-                      
-                      <View style={styles.actionButtonContainer}>
-                        <TouchableOpacity onPress={handleDelete} hitSlop={{top:15,bottom:15,left:15,right:15}}>
-                            <Ionicons name="backspace-outline" size={22} color="#f5a623" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
+                    </>
+                  )}
 
                   <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
                     <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -619,5 +698,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  lockoutBox: {
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 12,
+    width: '100%',
+    maxWidth: 240,
+  },
+  lockoutTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#991B1B',
+    marginTop: 6,
+    textTransform: 'uppercase',
+  },
+  lockoutSub: {
+    fontSize: 11,
+    color: '#7F1D1D',
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  countdownPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 5,
+    marginTop: 10,
+  },
+  countdownText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#B45309',
   }
 });
