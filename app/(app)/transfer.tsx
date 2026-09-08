@@ -1271,66 +1271,82 @@ export default function TransferScreen() {
 
                         {accountName ? (
                             <LinearGradient
-                                colors={['#0F172A', '#1E293B']}
+                                colors={['#090D16', '#111827', '#0F172A']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={s.resolvedAccountCard}
                             >
-                                <View style={s.verifiedCardGoldLine} />
+                                {/* Multi-Color Metallic Accent Hairline */}
+                                <LinearGradient
+                                    colors={['#D97706', '#F59E0B', '#38BDF8', '#10B981', '#F59E0B']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={s.verifiedAccentBar}
+                                />
 
-                                <View style={s.verifiedTopRow}>
+                                {/* Micro-Header Security & Routing Status */}
+                                <View style={s.verifiedHeaderBar}>
+                                    <View style={s.verifiedHeaderLeft}>
+                                        <View style={s.liveGreenDot} />
+                                        <Ionicons name="shield-checkmark" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedHeaderTitle}>NIBSS & CBN DIRECT VERIFIED</Text>
+                                    </View>
+                                    <View style={s.verifiedHeaderRight}>
+                                        <Ionicons name="flash" size={8.5} color="#F59E0B" style={{ marginRight: 2 }} />
+                                        <Text style={s.verifiedHeaderSub}>INSTANT ROUTING</Text>
+                                    </View>
+                                </View>
+
+                                {/* Identity & Beneficiary Details */}
+                                <View style={s.verifiedIdentityRow}>
+                                    {/* Bank Logo in Gold Bezel */}
                                     <View style={s.verifiedAvatarWrap}>
-                                        <BankLogoBadge bank={selectedBank!} size={34} />
+                                        <BankLogoBadge bank={selectedBank!} size={36} />
                                         <View style={s.verifiedCheckBadge}>
                                             <Ionicons name="checkmark-sharp" size={8} color="#FFFFFF" />
                                         </View>
                                     </View>
 
-                                    <View style={{ flex: 1, marginLeft: 8 }}>
-                                        <View style={s.verifiedPillRow}>
-                                            <View style={s.verifiedTag}>
-                                                <Ionicons name="shield-checkmark" size={9} color="#38BDF8" style={{ marginRight: 3 }} />
-                                                <Text style={s.verifiedTagText}>VERIFIED BENEFICIARY</Text>
-                                            </View>
-                                            <Text style={s.resolvedBankSub} numberOfLines={1}>
-                                                {selectedBank?.name}
-                                            </Text>
-                                        </View>
-
+                                    {/* Name, Bank & Monospaced Copyable Account Number */}
+                                    <View style={s.verifiedIdentityTextWrap}>
                                         <Text style={s.resolvedName} numberOfLines={1}>
                                             {accountName}
                                         </Text>
 
-                                        <View style={s.accountMetaRow}>
-                                            <Text style={s.accountNumberTag}>
-                                                {accountNumber}
-                                            </Text>
-                                            <View style={s.nibssPill}>
-                                                <Text style={s.nibssPillText}>NIBSS INSTANT</Text>
-                                            </View>
-                                            <View style={s.zeroRiskPill}>
-                                                <Text style={s.zeroRiskPillText}>✓ 0% ROUTING RISK</Text>
-                                            </View>
+                                        <Text style={s.resolvedBankSub} numberOfLines={1}>
+                                            {selectedBank?.name}
+                                        </Text>
+
+                                        <View style={s.accountNumberRow}>
+                                            <TouchableOpacity
+                                                onPress={() => handleCopyAccountNumber(accountNumber)}
+                                                style={[s.accountNumberChip, copiedAcc && s.accountNumberChipCopied]}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={[s.accountNumberChipText, copiedAcc && { color: '#10B981' }]}>
+                                                    {accountNumber}
+                                                </Text>
+                                                <Ionicons
+                                                    name={copiedAcc ? "checkmark-circle" : "copy-outline"}
+                                                    size={10}
+                                                    color={copiedAcc ? "#10B981" : "#38BDF8"}
+                                                />
+                                                <Text style={[s.accountNumberCopyLabel, copiedAcc && { color: '#10B981' }]}>
+                                                    {copiedAcc ? 'Copied' : 'Copy'}
+                                                </Text>
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
 
+                                    {/* Quick Action Toolbelt */}
                                     <View style={s.cardActionGroup}>
                                         <TouchableOpacity
-                                            onPress={() => handleCopyAccountNumber(accountNumber)}
-                                            style={[s.cardFeatureBtn, copiedAcc && { backgroundColor: '#0284C7' }]}
-                                            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons name={copiedAcc ? "checkmark" : "copy-outline"} size={11} color={copiedAcc ? "#FFFFFF" : "#94A3B8"} />
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
                                             onPress={handleToggleFavoriteBeneficiary}
-                                            style={[s.cardFeatureBtn, isSavedFavorite && { backgroundColor: '#78350F', borderColor: '#F59E0B' }]}
+                                            style={[s.cardFeatureBtn, isSavedFavorite && s.cardFeatureBtnActive]}
                                             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name={isSavedFavorite ? "star" : "star-outline"} size={11} color={isSavedFavorite ? "#F59E0B" : "#94A3B8"} />
+                                            <Ionicons name={isSavedFavorite ? "star" : "star-outline"} size={12} color={isSavedFavorite ? "#F59E0B" : "#94A3B8"} />
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
@@ -1339,43 +1355,70 @@ export default function TransferScreen() {
                                             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="share-social-outline" size={11} color="#94A3B8" />
+                                            <Ionicons name="share-social-outline" size={12} color="#94A3B8" />
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
                                             onPress={() => {
                                                 setAccountNumber('');
                                                 setAccountName('');
+                                                setResolveError(null);
                                             }}
-                                            style={[s.cardFeatureBtn, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: 'rgba(239, 68, 68, 0.25)' }]}
+                                            style={[s.cardFeatureBtn, s.cardFeatureBtnClose]}
                                             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="close" size={12} color="#EF4444" />
+                                            <Ionicons name="close" size={13} color="#EF4444" />
                                         </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Micro-Specs Guarantee Strip (Speed / Fee / Risk) */}
+                                <View style={s.verifiedSpecsStrip}>
+                                    <View style={s.verifiedSpecItem}>
+                                        <Ionicons name="speedometer-outline" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedSpecLabel}>Speed: </Text>
+                                        <Text style={s.verifiedSpecValue}>Instant (&lt;15s)</Text>
+                                    </View>
+                                    <View style={s.verifiedSpecDivider} />
+                                    <View style={s.verifiedSpecItem}>
+                                        <Ionicons name="pricetag-outline" size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedSpecLabel}>Fee: </Text>
+                                        <Text style={s.verifiedSpecValue}>₦{transferFee.toFixed(2)}</Text>
+                                    </View>
+                                    <View style={s.verifiedSpecDivider} />
+                                    <View style={s.verifiedSpecItem}>
+                                        <Ionicons name="shield-outline" size={10} color="#10B981" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedSpecLabel}>Safety: </Text>
+                                        <Text style={s.verifiedSpecValue}>100% Insured</Text>
                                     </View>
                                 </View>
 
                                 {/* Decorative Subtle Divider Line */}
                                 <View style={s.verifiedCardDivider} />
 
-                                {/* Quick Amount Shortcuts Row */}
+                                {/* Quick Amount Shortcuts Row with Active Highlight */}
                                 <View style={s.quickAmountRow}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 2 }}>
-                                        <Ionicons name="flash" size={9} color="#F59E0B" />
+                                    <View style={s.quickAmountHeader}>
+                                        <Ionicons name="flash" size={10} color="#F59E0B" />
                                         <Text style={s.quickAmountLabel}>Quick Amount:</Text>
                                     </View>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickAmountChipsScroll}>
-                                        {[2000, 5000, 10000, 20000, 50000].map((amtVal) => (
-                                            <TouchableOpacity
-                                                key={amtVal}
-                                                onPress={() => handleQuickAmountSelect(amtVal)}
-                                                style={s.quickAmountChip}
-                                                activeOpacity={0.7}
-                                            >
-                                                <Text style={s.quickAmountChipText}>₦{amtVal.toLocaleString()}</Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                        {[1000, 2000, 5000, 10000, 20000, 50000].map((amtVal) => {
+                                            const isSelected = numAmount === amtVal;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={amtVal}
+                                                    onPress={() => handleQuickAmountSelect(amtVal)}
+                                                    style={[s.quickAmountChip, isSelected && s.quickAmountChipActive]}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={[s.quickAmountChipText, isSelected && s.quickAmountChipTextActive]}>
+                                                        ₦{amtVal.toLocaleString()}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
                                         <TouchableOpacity
                                             onPress={() => handleQuickAmountSelect('max')}
                                             style={[s.quickAmountChip, s.quickAmountChipMax]}
@@ -1385,6 +1428,29 @@ export default function TransferScreen() {
                                         </TouchableOpacity>
                                     </ScrollView>
                                 </View>
+
+                                {/* Live Calculation & Balance Preview inside card */}
+                                {numAmount > 0 && (
+                                    <View style={s.verifiedLiveCalcRow}>
+                                        <Text style={s.verifiedLiveCalcText}>
+                                            Debit: <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>₦{numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                            {` + ₦${transferFee.toFixed(2)} Fee`}
+                                            {' = '}
+                                            <Text style={{ color: '#FFD700', fontWeight: '900' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                        </Text>
+                                        {totalDebit <= userBalance ? (
+                                            <View style={s.verifiedBalanceOkBadge}>
+                                                <Ionicons name="checkmark-circle" size={10} color="#10B981" />
+                                                <Text style={s.verifiedBalanceOkText}>Balance OK</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={s.verifiedBalanceLowBadge}>
+                                                <Ionicons name="alert-circle" size={10} color="#EF4444" />
+                                                <Text style={s.verifiedBalanceLowText}>Low Balance</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
                             </LinearGradient>
                         ) : null}
 
@@ -1593,103 +1659,155 @@ export default function TransferScreen() {
 
                         {matchedUser && (
                             <LinearGradient
-                                colors={['#0F172A', '#1E293B']}
+                                colors={['#090D16', '#111827', '#0F172A']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={s.resolvedAccountCard}
                             >
-                                <View style={s.verifiedCardGoldLine} />
+                                {/* Multi-Color Metallic Accent Hairline */}
+                                <LinearGradient
+                                    colors={['#38BDF8', '#818CF8', '#C084FC', '#38BDF8']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={s.verifiedAccentBar}
+                                />
 
-                                <View style={s.verifiedTopRow}>
+                                {/* Micro-Header Security & Status */}
+                                <View style={s.verifiedHeaderBar}>
+                                    <View style={s.verifiedHeaderLeft}>
+                                        <View style={s.liveGreenDot} />
+                                        <Ionicons name="person-circle" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedHeaderTitle}>ABU MAFHAL P2P VERIFIED</Text>
+                                    </View>
+                                    <View style={s.verifiedHeaderRight}>
+                                        <Ionicons name="flash" size={8.5} color="#10B981" style={{ marginRight: 2 }} />
+                                        <Text style={[s.verifiedHeaderSub, { color: '#10B981' }]}>0% FEE • INSTANT</Text>
+                                    </View>
+                                </View>
+
+                                {/* Identity & Beneficiary Details */}
+                                <View style={s.verifiedIdentityRow}>
+                                    {/* Avatar in Metallic Frame */}
                                     <View style={s.verifiedAvatarWrap}>
                                         <View style={s.p2pAvatarCircle}>
                                             <Text style={s.p2pAvatarText}>
                                                 {(matchedUser.full_name || 'U').charAt(0).toUpperCase()}
                                             </Text>
                                         </View>
-                                        <View style={s.verifiedCheckBadge}>
-                                            <Ionicons name="checkmark-sharp" size={8} color="#FFFFFF" />
+                                        <View style={[s.verifiedCheckBadge, { backgroundColor: '#38BDF8' }]}>
+                                            <Ionicons name="checkmark-sharp" size={8} color="#090D16" />
                                         </View>
                                     </View>
 
-                                    <View style={{ flex: 1, marginLeft: 8 }}>
-                                        <View style={s.verifiedPillRow}>
-                                            <View style={s.verifiedTag}>
-                                                <Ionicons name="person-circle" size={9} color="#38BDF8" style={{ marginRight: 3 }} />
-                                                <Text style={s.verifiedTagText}>VERIFIED MEMBER</Text>
-                                            </View>
-                                            {matchedUser.username ? (
-                                                <Text style={s.resolvedBankSub} numberOfLines={1}>@{matchedUser.username}</Text>
-                                            ) : null}
-                                        </View>
-
+                                    {/* Name, Handle & Copyable Contact */}
+                                    <View style={s.verifiedIdentityTextWrap}>
                                         <Text style={s.resolvedName} numberOfLines={1}>
                                             {matchedUser.full_name}
                                         </Text>
 
-                                        <View style={s.accountMetaRow}>
-                                            <Text style={s.accountNumberTag}>
-                                                {matchedUser.phone || matchedUser.email}
+                                        {matchedUser.username ? (
+                                            <Text style={s.resolvedBankSub} numberOfLines={1}>
+                                                @{matchedUser.username} • Abu Mafhal Member
                                             </Text>
-                                            <View style={s.nibssPill}>
-                                                <Text style={s.nibssPillText}>WALLET P2P</Text>
-                                            </View>
-                                            <View style={s.zeroRiskPill}>
-                                                <Text style={s.zeroRiskPillText}>✓ 0-FEE INSTANT</Text>
-                                            </View>
+                                        ) : (
+                                            <Text style={s.resolvedBankSub} numberOfLines={1}>
+                                                Abu Mafhal Wallet Member
+                                            </Text>
+                                        )}
+
+                                        <View style={s.accountNumberRow}>
+                                            <TouchableOpacity
+                                                onPress={() => handleCopyAccountNumber(matchedUser.phone || matchedUser.email)}
+                                                style={[s.accountNumberChip, copiedAcc && s.accountNumberChipCopied]}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={[s.accountNumberChipText, copiedAcc && { color: '#10B981' }]}>
+                                                    {matchedUser.phone || matchedUser.email}
+                                                </Text>
+                                                <Ionicons
+                                                    name={copiedAcc ? "checkmark-circle" : "copy-outline"}
+                                                    size={10}
+                                                    color={copiedAcc ? "#10B981" : "#38BDF8"}
+                                                />
+                                                <Text style={[s.accountNumberCopyLabel, copiedAcc && { color: '#10B981' }]}>
+                                                    {copiedAcc ? 'Copied' : 'Copy'}
+                                                </Text>
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
 
+                                    {/* Quick Action Toolbelt */}
                                     <View style={s.cardActionGroup}>
-                                        <TouchableOpacity
-                                            onPress={() => handleCopyAccountNumber(matchedUser.phone || matchedUser.email)}
-                                            style={[s.cardFeatureBtn, copiedAcc && { backgroundColor: '#0284C7' }]}
-                                            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons name={copiedAcc ? "checkmark" : "copy-outline"} size={11} color={copiedAcc ? "#FFFFFF" : "#94A3B8"} />
-                                        </TouchableOpacity>
-
                                         <TouchableOpacity
                                             onPress={() => handleShareBeneficiaryDetails(matchedUser.phone || matchedUser.email, 'Abu Mafhal Wallet', matchedUser.full_name)}
                                             style={s.cardFeatureBtn}
                                             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="share-social-outline" size={11} color="#94A3B8" />
+                                            <Ionicons name="share-social-outline" size={12} color="#94A3B8" />
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
-                                            onPress={() => setMatchedUser(null)}
-                                            style={[s.cardFeatureBtn, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: 'rgba(239, 68, 68, 0.25)' }]}
+                                            onPress={() => {
+                                                setMatchedUser(null);
+                                                setRecipientQuery('');
+                                                setUserSearchError(null);
+                                            }}
+                                            style={[s.cardFeatureBtn, s.cardFeatureBtnClose]}
                                             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="close" size={12} color="#EF4444" />
+                                            <Ionicons name="close" size={13} color="#EF4444" />
                                         </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Micro-Specs Guarantee Strip (Speed / Fee / Routing) */}
+                                <View style={s.verifiedSpecsStrip}>
+                                    <View style={s.verifiedSpecItem}>
+                                        <Ionicons name="speedometer-outline" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedSpecLabel}>Speed: </Text>
+                                        <Text style={s.verifiedSpecValue}>Real-Time 0s</Text>
+                                    </View>
+                                    <View style={s.verifiedSpecDivider} />
+                                    <View style={s.verifiedSpecItem}>
+                                        <Ionicons name="sparkles-outline" size={10} color="#10B981" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedSpecLabel}>Fee: </Text>
+                                        <Text style={[s.verifiedSpecValue, { color: '#10B981' }]}>FREE ₦0.00</Text>
+                                    </View>
+                                    <View style={s.verifiedSpecDivider} />
+                                    <View style={s.verifiedSpecItem}>
+                                        <Ionicons name="lock-closed-outline" size={10} color="#818CF8" style={{ marginRight: 3 }} />
+                                        <Text style={s.verifiedSpecLabel}>Transfer: </Text>
+                                        <Text style={s.verifiedSpecValue}>Direct Wallet</Text>
                                     </View>
                                 </View>
 
                                 {/* Decorative Subtle Divider Line */}
                                 <View style={s.verifiedCardDivider} />
 
-                                {/* Quick Amount Shortcuts Row */}
+                                {/* Quick Amount Shortcuts Row with Active Highlight */}
                                 <View style={s.quickAmountRow}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 2 }}>
-                                        <Ionicons name="flash" size={9} color="#F59E0B" />
+                                    <View style={s.quickAmountHeader}>
+                                        <Ionicons name="flash" size={10} color="#F59E0B" />
                                         <Text style={s.quickAmountLabel}>Quick Amount:</Text>
                                     </View>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickAmountChipsScroll}>
-                                        {[1000, 2000, 5000, 10000, 20000].map((amtVal) => (
-                                            <TouchableOpacity
-                                                key={amtVal}
-                                                onPress={() => handleQuickAmountSelect(amtVal)}
-                                                style={s.quickAmountChip}
-                                                activeOpacity={0.7}
-                                            >
-                                                <Text style={s.quickAmountChipText}>₦{amtVal.toLocaleString()}</Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                        {[500, 1000, 2000, 5000, 10000, 20000].map((amtVal) => {
+                                            const isSelected = numAmount === amtVal;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={amtVal}
+                                                    onPress={() => handleQuickAmountSelect(amtVal)}
+                                                    style={[s.quickAmountChip, isSelected && s.quickAmountChipActive]}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={[s.quickAmountChipText, isSelected && s.quickAmountChipTextActive]}>
+                                                        ₦{amtVal.toLocaleString()}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
                                         <TouchableOpacity
                                             onPress={() => handleQuickAmountSelect('max')}
                                             style={[s.quickAmountChip, s.quickAmountChipMax]}
@@ -1699,6 +1817,28 @@ export default function TransferScreen() {
                                         </TouchableOpacity>
                                     </ScrollView>
                                 </View>
+
+                                {/* Live Calculation & Balance Preview inside card */}
+                                {numAmount > 0 && (
+                                    <View style={s.verifiedLiveCalcRow}>
+                                        <Text style={s.verifiedLiveCalcText}>
+                                            Debit: <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>₦{numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                            {' (0 Fee) = '}
+                                            <Text style={{ color: '#FFD700', fontWeight: '900' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                        </Text>
+                                        {totalDebit <= userBalance ? (
+                                            <View style={s.verifiedBalanceOkBadge}>
+                                                <Ionicons name="checkmark-circle" size={10} color="#10B981" />
+                                                <Text style={s.verifiedBalanceOkText}>Balance OK</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={s.verifiedBalanceLowBadge}>
+                                                <Ionicons name="alert-circle" size={10} color="#EF4444" />
+                                                <Text style={s.verifiedBalanceLowText}>Low Balance</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
                             </LinearGradient>
                         )}
 
@@ -2932,155 +3072,170 @@ const s = StyleSheet.create({
     },
     resolvedAccountCard: {
         flexDirection: 'column',
-        borderRadius: 14,
-        paddingVertical: 10,
+        borderRadius: 15,
+        paddingTop: 10,
+        paddingBottom: 11,
         paddingHorizontal: 12,
         marginTop: 8,
         borderWidth: 1.2,
-        borderColor: 'rgba(218, 165, 32, 0.45)',
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 3,
+        borderColor: 'rgba(217, 119, 6, 0.45)',
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 4,
         overflow: 'hidden',
     },
-    verifiedCardGoldLine: {
-        height: 2,
-        backgroundColor: '#D97706',
+    verifiedAccentBar: {
+        height: 2.5,
         marginHorizontal: -12,
         marginTop: -10,
         marginBottom: 8,
     },
-    verifiedTopRow: {
+    verifiedHeaderBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+        paddingBottom: 6,
+        borderBottomWidth: 0.8,
+        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    verifiedHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    liveGreenDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#10B981',
+        marginRight: 2,
+    },
+    verifiedHeaderTitle: {
+        color: '#38BDF8',
+        fontSize: 8,
+        fontWeight: '900',
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
+    },
+    verifiedHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        paddingHorizontal: 5,
+        paddingVertical: 1.5,
+        borderRadius: 4,
+        borderWidth: 0.6,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    verifiedHeaderSub: {
+        color: '#F59E0B',
+        fontSize: 7.5,
+        fontWeight: '900',
+        letterSpacing: 0.4,
+    },
+    verifiedIdentityRow: {
         flexDirection: 'row',
         alignItems: 'center',
         width: '100%',
     },
     verifiedAvatarWrap: {
         position: 'relative',
-        width: 34,
-        height: 34,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        borderWidth: 1.5,
+        borderColor: '#F59E0B',
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: '#0F172A',
     },
     verifiedCheckBadge: {
         position: 'absolute',
         bottom: -2,
         right: -2,
-        backgroundColor: '#2563EB',
+        backgroundColor: '#0284C7',
         width: 13,
         height: 13,
         borderRadius: 6.5,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
-        borderColor: '#0F172A',
+        borderColor: '#090D16',
     },
     p2pAvatarCircle: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: '#2563EB',
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#1E293B',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#38BDF8',
     },
     p2pAvatarText: {
         color: '#FFFFFF',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '900',
     },
-    verifiedPillRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        marginBottom: 1,
-    },
-    verifiedTag: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(56, 189, 248, 0.12)',
-        paddingHorizontal: 5,
-        paddingVertical: 1.5,
-        borderRadius: 4,
-        borderWidth: 0.8,
-        borderColor: 'rgba(56, 189, 248, 0.3)',
-    },
-    verifiedTagText: {
-        color: '#38BDF8',
-        fontSize: 7.5,
-        fontWeight: '900',
-        letterSpacing: 0.4,
-    },
-    liveGreenDot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#38BDF8',
+    verifiedIdentityTextWrap: {
+        flex: 1,
+        marginLeft: 9,
+        marginRight: 6,
     },
     resolvedName: {
         color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '800',
-        lineHeight: 16,
         letterSpacing: 0.2,
-        marginTop: 1,
-    },
-    accountMetaRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 5,
-        marginTop: 2,
+        lineHeight: 16,
     },
     resolvedBankSub: {
         color: '#94A3B8',
         fontSize: 9.5,
-        fontWeight: '700',
-        maxWidth: 130,
+        fontWeight: '600',
+        marginTop: 1,
     },
-    accountNumberTag: {
+    accountNumberRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 3,
+    },
+    accountNumberChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        borderWidth: 0.8,
+        borderColor: 'rgba(56, 189, 248, 0.3)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 5,
+        gap: 4,
+    },
+    accountNumberChipCopied: {
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        borderColor: '#10B981',
+    },
+    accountNumberChipText: {
         color: '#38BDF8',
         fontSize: 10,
         fontWeight: '800',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-        letterSpacing: 0.5,
+        letterSpacing: 0.6,
     },
-    nibssPill: {
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
-        paddingHorizontal: 5,
-        paddingVertical: 1,
-        borderRadius: 4,
-        borderWidth: 0.6,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
-    },
-    nibssPillText: {
-        color: '#F59E0B',
-        fontSize: 7.5,
-        fontWeight: '900',
-        letterSpacing: 0.4,
-    },
-    zeroRiskPill: {
-        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-        paddingHorizontal: 5,
-        paddingVertical: 1,
-        borderRadius: 4,
-        borderWidth: 0.6,
-        borderColor: 'rgba(16, 185, 129, 0.3)',
-    },
-    zeroRiskPillText: {
-        color: '#10B981',
-        fontSize: 7.5,
-        fontWeight: '900',
-        letterSpacing: 0.4,
+    accountNumberCopyLabel: {
+        color: '#38BDF8',
+        fontSize: 8,
+        fontWeight: '800',
+        textTransform: 'uppercase',
     },
     cardActionGroup: {
-        flexDirection: 'row',
+        flexDirection: 'column',
         alignItems: 'center',
-        gap: 4,
-        marginLeft: 6,
+        gap: 5,
     },
     cardFeatureBtn: {
         width: 26,
@@ -3092,9 +3247,48 @@ const s = StyleSheet.create({
         borderWidth: 0.8,
         borderColor: 'rgba(255, 255, 255, 0.14)',
     },
+    cardFeatureBtnActive: {
+        backgroundColor: 'rgba(245, 158, 11, 0.22)',
+        borderColor: '#F59E0B',
+    },
+    cardFeatureBtnClose: {
+        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+        borderColor: 'rgba(239, 68, 68, 0.25)',
+    },
+    verifiedSpecsStrip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderRadius: 7,
+        paddingVertical: 4.5,
+        paddingHorizontal: 8,
+        marginTop: 8,
+        borderWidth: 0.6,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    verifiedSpecItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    verifiedSpecLabel: {
+        color: '#64748B',
+        fontSize: 8,
+        fontWeight: '700',
+    },
+    verifiedSpecValue: {
+        color: '#E2E8F0',
+        fontSize: 8.5,
+        fontWeight: '800',
+    },
+    verifiedSpecDivider: {
+        width: 1,
+        height: 9,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
     verifiedCardDivider: {
         height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(255, 255, 255, 0.07)',
         width: '100%',
         marginVertical: 7,
     },
@@ -3102,6 +3296,12 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         width: '100%',
+    },
+    quickAmountHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        marginRight: 4,
     },
     quickAmountLabel: {
         color: '#94A3B8',
@@ -3119,14 +3319,21 @@ const s = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.07)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.14)',
-        paddingHorizontal: 6,
+        paddingHorizontal: 6.5,
         paddingVertical: 2.5,
         borderRadius: 6,
     },
+    quickAmountChipActive: {
+        backgroundColor: 'rgba(245, 158, 11, 0.22)',
+        borderColor: '#F59E0B',
+    },
     quickAmountChipText: {
-        color: '#FFD700',
+        color: '#CBD5E1',
         fontSize: 9,
         fontWeight: '800',
+    },
+    quickAmountChipTextActive: {
+        color: '#FFD700',
     },
     quickAmountChipMax: {
         backgroundColor: 'rgba(217, 119, 6, 0.25)',
@@ -3134,6 +3341,51 @@ const s = StyleSheet.create({
     },
     quickAmountChipMaxText: {
         color: '#F59E0B',
+    },
+    verifiedLiveCalcRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 3.5,
+        marginTop: 6,
+        borderWidth: 0.8,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    verifiedLiveCalcText: {
+        color: '#94A3B8',
+        fontSize: 8.5,
+        fontWeight: '700',
+    },
+    verifiedBalanceOkBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    verifiedBalanceOkText: {
+        color: '#10B981',
+        fontSize: 8,
+        fontWeight: '800',
+    },
+    verifiedBalanceLowBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    verifiedBalanceLowText: {
+        color: '#EF4444',
+        fontSize: 8,
+        fontWeight: '800',
     },
     amountInputBox: {
         flexDirection: 'row',
