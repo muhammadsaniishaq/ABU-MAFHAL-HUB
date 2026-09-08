@@ -1,6 +1,14 @@
 -- Migration: 20260907120000_add_fee_and_flutterwave_to_withdrawal.sql
 -- Description: Update execute_user_bank_withdrawal to handle p_fee, debit total (amount + fee), and support Flutterwave metadata
 
+-- 0. Ensure details and metadata columns exist on public.transactions
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS details JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS fee NUMERIC DEFAULT 0;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS bank_name TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS account_number TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS session_id TEXT;
+
 CREATE OR REPLACE FUNCTION public.execute_user_bank_withdrawal(
   p_amount numeric,
   p_bank_name text,

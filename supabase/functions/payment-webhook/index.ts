@@ -289,7 +289,15 @@ Deno.serve(async (req: Request) => {
                 const sql = postgres(dbUrl, { ssl: 'require' });
                 
                 await sql.unsafe(`
--- 0. ADD EXPO_PUSH_TOKEN COLUMN IF NOT EXISTS
+-- 0. ADD DETAILS AND METADATA COLUMNS TO TRANSACTIONS IF NOT EXISTS
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS details JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS fee NUMERIC DEFAULT 0;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS bank_name TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS account_number TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS session_id TEXT;
+
+-- 0b. ADD EXPO_PUSH_TOKEN COLUMN IF NOT EXISTS
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS expo_push_token text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS push_token text;
 

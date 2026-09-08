@@ -42,6 +42,12 @@ create table public.transactions (
   status text default 'pending', -- 'pending', 'success', 'failed'
   reference text unique,
   description text,
+  details jsonb default '{}'::jsonb,
+  metadata jsonb default '{}'::jsonb,
+  fee decimal(12,2) default 0.00,
+  bank_name text,
+  account_number text,
+  session_id text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

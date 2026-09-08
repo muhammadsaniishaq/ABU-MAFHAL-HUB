@@ -1,6 +1,14 @@
 -- Migration: 20260907230000_enforce_minimum_transfer_100.sql
 -- Description: Enforce strict minimum transfer of NGN 100 on bank withdrawals and P2P transfers
 
+-- 0. Ensure details and metadata columns exist on public.transactions
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS details JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS fee NUMERIC DEFAULT 0;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS bank_name TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS account_number TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS session_id TEXT;
+
 -- 1. Drop overloaded signatures and enforce minimum NGN 100 on execute_user_bank_withdrawal
 DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid);
 DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid, numeric);
