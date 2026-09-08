@@ -351,11 +351,11 @@ export default function UserProfileScreen() {
                     end={{ x: 1, y: 1 }}
                     style={{ 
                         paddingTop: insets.top + 4, 
-                        paddingBottom: 14, 
+                        paddingBottom: 12, 
                         paddingHorizontal: 16, 
-                        borderBottomLeftRadius: 24, 
-                        borderBottomRightRadius: 24, 
-                        borderBottomWidth: 1.8, 
+                        borderBottomLeftRadius: 22, 
+                        borderBottomRightRadius: 22, 
+                        borderBottomWidth: 1.6, 
                         borderColor: L.goldBorder,
                         shadowColor: '#060B1E',
                         shadowOffset: { width: 0, height: 4 },
@@ -366,13 +366,13 @@ export default function UserProfileScreen() {
                     }}
                 >
                     {/* Header Navigation Bar */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                         <TouchableOpacity 
                             onPress={() => router.back()} 
                             style={{ 
-                                width: 34, 
-                                height: 34, 
-                                borderRadius: 10, 
+                                width: 32, 
+                                height: 32, 
+                                borderRadius: 9, 
                                 backgroundColor: 'rgba(255,255,255,0.08)', 
                                 borderWidth: 1, 
                                 borderColor: L.goldBorder, 
@@ -381,23 +381,23 @@ export default function UserProfileScreen() {
                             }}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                            <Ionicons name="arrow-back" size={17} color={L.gold} />
+                            <Ionicons name="arrow-back" size={16} color={L.gold} />
                         </TouchableOpacity>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <MaterialCommunityIcons name="shield-crown" size={17} color={L.gold} />
-                            <Text style={{ fontSize: 13.5, fontWeight: '900', color: L.gold, letterSpacing: 1, textTransform: 'uppercase' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                            <MaterialCommunityIcons name="shield-crown" size={15} color={L.gold} />
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: L.gold, letterSpacing: 0.8, textTransform: 'uppercase' }}>
                                 Profile Hub
                             </Text>
                         </View>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <TouchableOpacity 
                                 onPress={() => router.push('/notifications')} 
                                 style={{ 
-                                    width: 34, 
-                                    height: 34, 
-                                    borderRadius: 10, 
+                                    width: 32, 
+                                    height: 32, 
+                                    borderRadius: 9, 
                                     backgroundColor: 'rgba(255,255,255,0.08)', 
                                     alignItems: 'center', 
                                     justifyContent: 'center', 
@@ -406,18 +406,18 @@ export default function UserProfileScreen() {
                                 }}
                                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             >
-                                <Ionicons name="notifications-outline" size={17} color="#FFFFFF" />
+                                <Ionicons name="notifications-outline" size={16} color="#FFFFFF" />
                                 {unreadCount > 0 && (
-                                    <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: L.gold, width: 8, height: 8, borderRadius: 4 }} />
+                                    <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: L.gold, width: 7, height: 7, borderRadius: 3.5 }} />
                                 )}
                             </TouchableOpacity>
 
                             <TouchableOpacity 
                                 onPress={() => router.push('/edit-profile')} 
                                 style={{ 
-                                    width: 34, 
-                                    height: 34, 
-                                    borderRadius: 10, 
+                                    width: 32, 
+                                    height: 32, 
+                                    borderRadius: 9, 
                                     backgroundColor: 'rgba(255,255,255,0.08)', 
                                     alignItems: 'center', 
                                     justifyContent: 'center', 
@@ -426,24 +426,24 @@ export default function UserProfileScreen() {
                                 }}
                                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             >
-                                <Ionicons name="pencil" size={15} color={L.gold} />
+                                <Ionicons name="pencil" size={14} color={L.gold} />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* User Identity Hero Row */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <View style={{ position: 'relative' }}>
                             <LinearGradient
                                 colors={[L.goldLight, L.gold, L.goldDk]}
-                                style={{ width: 58, height: 58, borderRadius: 29, padding: 2, alignItems: 'center', justifyContent: 'center' }}
+                                style={{ width: 54, height: 54, borderRadius: 27, padding: 2, alignItems: 'center', justifyContent: 'center' }}
                             >
-                                <View style={{ width: 54, height: 54, borderRadius: 27, overflow: 'hidden', backgroundColor: L.navyHeader }}>
+                                <View style={{ width: 50, height: 50, borderRadius: 25, overflow: 'hidden', backgroundColor: L.navyHeader }}>
                                     {profile?.avatar_url && typeof profile.avatar_url === 'string' && profile.avatar_url.trim().length > 5 ? (
                                         <Image source={{ uri: profile.avatar_url }} style={{ width: '100%', height: '100%' }} />
                                     ) : (
                                         <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: L.navyMid }}>
-                                            <Text style={{ fontSize: 20, fontWeight: '900', color: L.gold }}>
+                                            <Text style={{ fontSize: 18, fontWeight: '800', color: L.gold }}>
                                                 {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
                                             </Text>
                                         </View>
@@ -458,9 +458,9 @@ export default function UserProfileScreen() {
                                     bottom: -2, 
                                     right: -2, 
                                     backgroundColor: L.gold, 
-                                    width: 20, 
-                                    height: 20, 
-                                    borderRadius: 10, 
+                                    width: 19, 
+                                    height: 19, 
+                                    borderRadius: 9.5, 
                                     alignItems: 'center', 
                                     justifyContent: 'center', 
                                     borderWidth: 1.5, 
@@ -471,45 +471,45 @@ export default function UserProfileScreen() {
                                 {uploading ? (
                                     <ActivityIndicator size="small" color={L.navyHeader} />
                                 ) : (
-                                    <Ionicons name="camera" size={10.5} color={L.navyHeader} />
+                                    <Ionicons name="camera" size={10} color={L.navyHeader} />
                                 )}
                             </TouchableOpacity>
                         </View>
 
                         <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }} numberOfLines={1}>
+                                <Text style={{ color: '#FFFFFF', fontSize: 14.5, fontWeight: '800' }} numberOfLines={1}>
                                     {profile?.full_name || 'System User'}
                                 </Text>
                                 {profile?.role === 'admin' ? (
                                     <View style={{ backgroundColor: L.gold, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4 }}>
-                                        <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 7.5, fontWeight: '900' }}>ADMIN</Text>
                                     </View>
                                 ) : (
-                                    <Ionicons name="checkmark-circle" size={15} color={L.emerald} />
+                                    <Ionicons name="checkmark-circle" size={14} color={L.emerald} />
                                 )}
                             </View>
 
-                            <Text style={{ color: '#CBD5E1', fontSize: 11, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
+                            <Text style={{ color: '#CBD5E1', fontSize: 10, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
                                 {profile?.email || 'No Email Set'} {profile?.phone ? `• ${profile.phone}` : ''}
                             </Text>
 
                             {/* Copyable ID & KYC Pill Row */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 5 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
                                 <TouchableOpacity 
                                     onPress={() => copyToClipboard(profile?.custom_id || profile?.username, 'User ID')} 
                                     style={{ 
                                         backgroundColor: 'rgba(255,255,255,0.12)', 
-                                        paddingHorizontal: 7, 
-                                        paddingVertical: 2.5, 
+                                        paddingHorizontal: 6.5, 
+                                        paddingVertical: 2, 
                                         borderRadius: 5, 
                                         flexDirection: 'row', 
                                         alignItems: 'center', 
-                                        gap: 3.5 
+                                        gap: 3 
                                     }}
                                 >
-                                    <Ionicons name="copy-outline" size={10} color={L.gold} />
-                                    <Text style={{ color: L.gold, fontSize: 9.5, fontWeight: '800' }}>
+                                    <Ionicons name="copy-outline" size={9.5} color={L.gold} />
+                                    <Text style={{ color: L.gold, fontSize: 8.5, fontWeight: '800' }}>
                                         ID: {profile?.custom_id || profile?.username || 'AM-USER'}
                                     </Text>
                                 </TouchableOpacity>
@@ -518,22 +518,22 @@ export default function UserProfileScreen() {
                                     onPress={() => router.push('/kyc')} 
                                     style={{ 
                                         backgroundColor: Number(profile?.kyc_tier || 0) >= 2 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 166, 35, 0.2)', 
-                                        paddingHorizontal: 7, 
-                                        paddingVertical: 2.5, 
+                                        paddingHorizontal: 6.5, 
+                                        paddingVertical: 2, 
                                         borderRadius: 5, 
                                         borderWidth: 1, 
                                         borderColor: Number(profile?.kyc_tier || 0) >= 2 ? L.emeraldBorder : L.goldBorder,
                                         flexDirection: 'row',
                                         alignItems: 'center',
-                                        gap: 3.5
+                                        gap: 3
                                     }}
                                 >
                                     <Ionicons 
                                         name={Number(profile?.kyc_tier || 0) >= 2 ? "shield-checkmark" : "shield-outline"} 
-                                        size={10} 
+                                        size={9.5} 
                                         color={Number(profile?.kyc_tier || 0) >= 2 ? L.emerald : L.gold} 
                                     />
-                                    <Text style={{ color: Number(profile?.kyc_tier || 0) >= 2 ? L.emerald : L.gold, fontSize: 9.5, fontWeight: '900' }}>
+                                    <Text style={{ color: Number(profile?.kyc_tier || 0) >= 2 ? L.emerald : L.gold, fontSize: 8.5, fontWeight: '800' }}>
                                         {tierLimitText(profile?.kyc_tier)}
                                     </Text>
                                 </TouchableOpacity>

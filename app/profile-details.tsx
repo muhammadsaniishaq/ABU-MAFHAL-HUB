@@ -170,8 +170,8 @@ export default function ProfileDetailsScreen() {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={{ 
-                        paddingTop: insets.top + 6, 
-                        paddingBottom: 14, 
+                        paddingTop: insets.top + 4, 
+                        paddingBottom: 12, 
                         paddingHorizontal: 16, 
                         borderBottomLeftRadius: 20, 
                         borderBottomRightRadius: 20, 
@@ -183,9 +183,9 @@ export default function ProfileDetailsScreen() {
                         <TouchableOpacity 
                             onPress={() => router.back()} 
                             style={{ 
-                                width: 34, 
-                                height: 34, 
-                                borderRadius: 10, 
+                                width: 32, 
+                                height: 32, 
+                                borderRadius: 9, 
                                 backgroundColor: 'rgba(255,255,255,0.08)', 
                                 borderWidth: 1, 
                                 borderColor: L.goldBorder, 
@@ -194,22 +194,22 @@ export default function ProfileDetailsScreen() {
                             }}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                            <Ionicons name="arrow-back" size={18} color={L.gold} />
+                            <Ionicons name="arrow-back" size={16} color={L.gold} />
                         </TouchableOpacity>
 
                         <View style={{ alignItems: 'center' }}>
-                            <Text style={{ fontSize: 14, fontWeight: '900', color: L.gold, letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: L.gold, letterSpacing: 0.6, textTransform: 'uppercase' }}>
                                 Personal Profile Details
                             </Text>
-                            <Text style={{ fontSize: 9.5, color: '#94A3B8', fontWeight: '600' }}>Verified Account Information</Text>
+                            <Text style={{ fontSize: 9, color: '#94A3B8', fontWeight: '600' }}>Verified Account Information</Text>
                         </View>
 
                         <TouchableOpacity 
                             onPress={() => router.push('/edit-profile')} 
                             style={{ 
-                                width: 34, 
-                                height: 34, 
-                                borderRadius: 10, 
+                                width: 32, 
+                                height: 32, 
+                                borderRadius: 9, 
                                 backgroundColor: 'rgba(255,255,255,0.08)', 
                                 borderWidth: 1, 
                                 borderColor: L.goldBorder, 
@@ -218,19 +218,19 @@ export default function ProfileDetailsScreen() {
                             }}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                            <Ionicons name="pencil" size={16} color={L.gold} />
+                            <Ionicons name="pencil" size={15} color={L.gold} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Profile Identity Card */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14 }}>
-                        <View style={{ width: 62, height: 62, borderRadius: 31, padding: 2, backgroundColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
-                            <View style={{ width: 58, height: 58, borderRadius: 29, overflow: 'hidden', backgroundColor: L.navyHeader }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                        <View style={{ width: 54, height: 54, borderRadius: 27, padding: 2, backgroundColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                            <View style={{ width: 50, height: 50, borderRadius: 25, overflow: 'hidden', backgroundColor: L.navyHeader }}>
                                 {profile?.avatar_url && typeof profile.avatar_url === 'string' && profile.avatar_url.trim().length > 5 ? (
                                     <Image source={{ uri: profile.avatar_url }} style={{ width: '100%', height: '100%' }} />
                                 ) : (
                                     <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: L.navyMid }}>
-                                        <Text style={{ fontSize: 22, fontWeight: '900', color: L.gold }}>
+                                        <Text style={{ fontSize: 18, fontWeight: '800', color: L.gold }}>
                                             {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
                                         </Text>
                                     </View>
@@ -240,25 +240,25 @@ export default function ProfileDetailsScreen() {
 
                         <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }} numberOfLines={1}>
+                                <Text style={{ color: '#FFFFFF', fontSize: 14.5, fontWeight: '800' }} numberOfLines={1}>
                                     {profile?.full_name || 'System User'}
                                 </Text>
                                 {profile?.role === 'admin' ? (
                                     <View style={{ backgroundColor: L.gold, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4 }}>
-                                        <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 7.5, fontWeight: '900' }}>ADMIN</Text>
                                     </View>
                                 ) : (
-                                    <Ionicons name="checkmark-circle" size={15} color={L.emerald} />
+                                    <Ionicons name="checkmark-circle" size={14} color={L.emerald} />
                                 )}
                             </View>
 
-                            <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
+                            <Text style={{ color: '#94A3B8', fontSize: 10, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
                                 {profile?.username ? `@${profile.username}` : profile?.email}
                             </Text>
 
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                                <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, borderWidth: 0.8, borderColor: L.emeraldBorder }}>
-                                    <Text style={{ color: L.emerald, fontSize: 9.5, fontWeight: '800' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 6.5, paddingVertical: 2, borderRadius: 5, borderWidth: 0.8, borderColor: L.emeraldBorder }}>
+                                    <Text style={{ color: L.emerald, fontSize: 8.5, fontWeight: '800' }}>
                                         {tierLabel(profile?.kyc_tier)}
                                     </Text>
                                 </View>
