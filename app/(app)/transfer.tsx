@@ -23,17 +23,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import * as Print from 'expo-print';
 import * as Clipboard from 'expo-clipboard';
-import * as MediaLibrary from 'expo-media-library';
 
 import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import SecurityModal from '../../components/SecurityModal';
 import DynamicBanners from '../../components/DynamicBanners';
 import { createAppNotification } from '../../services/notificationsHelper';
+import { ReceiptData } from '../../services/receiptGenerator';
+import ReceiptExportModal from '../../components/ReceiptExportModal';
 
 export interface BankItem {
     id: string;
@@ -162,136 +161,22 @@ function BankLogoBadge({ bank, size = 24 }: { bank: BankItem; size?: number }) {
     );
 }
 
-// Generate Official Bank E-Receipt HTML for PDF
-const generateReceiptHtml = (tx: {
-    amount: number;
-    fee?: number;
-    totalDebit?: number;
-    recipient: string;
-    bankName?: string;
-    accountNumber?: string;
-    type: 'p2p' | 'bank';
-    reference: string;
-    sessionId?: string;
-    status?: string;
-    date: string;
-    newBalance: number;
-    narration?: string;
-}) => {
-    const isSuccess = !tx.status || tx.status.toUpperCase() === 'SUCCESSFUL' || tx.status.toUpperCase() === 'SUCCESS' || tx.status.toUpperCase() === 'COMPLETED';
-    const feeDisplay = tx.type === 'p2p' ? '₦0.00 (FREE)' : `₦${(tx.fee ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    const totalDebitDisplay = `₦${(tx.totalDebit ?? tx.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    const amountDisplay = `₦${tx.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    const newBalDisplay = `₦${tx.newBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    const channelDisplay = tx.type === 'p2p' ? 'Abu Mafhal Wallet (P2P Transfer)' : 'Direct Bank Settlement (NIBSS Network)';
-    const statusText = isSuccess ? 'TRANSACTION SUCCESSFUL' : 'TRANSACTION PROCESSING / PENDING';
-    const statusColor = isSuccess ? '#059669' : '#D97706';
-    const statusBg = isSuccess ? '#D1FAE5' : '#FEF3C7';
-    const statusBorder = isSuccess ? '#A7F3D0' : '#FDE68A';
-
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Receipt - ${tx.reference}</title>
-        <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F1F5F9; color: #0F172A; padding: 24px; }
-            .receipt-card { max-width: 480px; margin: 0 auto; background: #FFFFFF; border-radius: 20px; border: 1.5px solid #E2E8F0; overflow: hidden; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08); }
-            .header-banner { background: #0F172A; padding: 22px 20px; text-align: center; border-bottom: 3px solid #D97706; }
-            .brand-name { color: #F59E0B; font-size: 20px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
-            .brand-sub { color: #94A3B8; font-size: 9.5px; font-weight: 700; letter-spacing: 1.5px; margin-top: 4px; text-transform: uppercase; }
-            .amount-box { padding: 22px 20px; text-align: center; background: #FFFBEB; border-bottom: 1px dashed #FDE68A; }
-            .amount-label { color: #B45309; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-            .amount-val { color: #0F172A; font-size: 30px; font-weight: 900; margin: 6px 0; }
-            .status-badge { display: inline-block; background: ${statusBg}; color: ${statusColor}; padding: 5px 16px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; border: 1px solid ${statusBorder}; }
-            .details-list { padding: 18px 22px; }
-            .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #F1F5F9; font-size: 11.5px; }
-            .detail-row:last-child { border-bottom: none; }
-            .detail-label { color: #64748B; font-weight: 600; }
-            .detail-val { color: #0F172A; font-weight: 800; text-align: right; max-width: 60%; word-break: break-word; }
-            .highlight-gold { color: #D97706; }
-            .highlight-green { color: #059669; }
-            .barcode-box { background: #0F172A; padding: 18px 20px; text-align: center; border-top: 1px dashed #334155; }
-            .seal-text { color: #F59E0B; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
-            .disclaimer { color: #94A3B8; font-size: 8.5px; margin-top: 6px; line-height: 14px; }
-            @media print {
-                body { background: #FFFFFF; padding: 0; }
-                .receipt-card { box-shadow: none; border: 1px solid #CBD5E1; }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="receipt-card">
-            <div class="header-banner">
-                <div class="brand-name">ABU MAFHAL HUB</div>
-                <div class="brand-sub">Official Electronic Transaction Receipt</div>
-            </div>
-            <div class="amount-box">
-                <div class="amount-label">Transfer Amount</div>
-                <div class="amount-val">${amountDisplay}</div>
-                <div class="status-badge">${statusText}</div>
-            </div>
-            <div class="details-list">
-                <div class="detail-row">
-                    <span class="detail-label">Beneficiary Name</span>
-                    <span class="detail-val">${tx.recipient}</span>
-                </div>
-                ${tx.bankName ? `
-                <div class="detail-row">
-                    <span class="detail-label">Destination Bank</span>
-                    <span class="detail-val">${tx.bankName}</span>
-                </div>` : ''}
-                ${tx.accountNumber ? `
-                <div class="detail-row">
-                    <span class="detail-label">Account Number</span>
-                    <span class="detail-val">${tx.accountNumber}</span>
-                </div>` : ''}
-                <div class="detail-row">
-                    <span class="detail-label">Transfer Fee</span>
-                    <span class="detail-val">${feeDisplay}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Total Amount Debited</span>
-                    <span class="detail-val highlight-gold">${totalDebitDisplay}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Transaction Status</span>
-                    <span class="detail-val" style="color: ${statusColor};">${tx.status || (isSuccess ? 'SUCCESSFUL' : 'PENDING')}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Payment Channel</span>
-                    <span class="detail-val">${channelDisplay}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Transaction Reference</span>
-                    <span class="detail-val" style="font-family: monospace; font-size: 10.5px;">${tx.reference}</span>
-                </div>
-                ${tx.sessionId ? `
-                <div class="detail-row">
-                    <span class="detail-label">Session ID / NIP Ref</span>
-                    <span class="detail-val" style="font-family: monospace; font-size: 10px;">${tx.sessionId}</span>
-                </div>` : ''}
-                <div class="detail-row">
-                    <span class="detail-label">Date & Time</span>
-                    <span class="detail-val">${tx.date}</span>
-                </div>
-                ${tx.narration ? `
-                <div class="detail-row">
-                    <span class="detail-label">Narration / Remark</span>
-                    <span class="detail-val">${tx.narration}</span>
-                </div>` : ''}
-            </div>
-            <div class="barcode-box">
-                <div class="seal-text">&#128274; Authentic Electronic Receipt</div>
-                <div class="disclaimer">This receipt confirms a transaction processed via Abu Mafhal Hub Core Financial Network. Valid for audit and verification purposes. Support: help@abumafhal.com</div>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
+// Convert Transfer details to official ReceiptData for PDF & PNG download
+const buildExportReceiptData = (tx: any, senderName?: string): ReceiptData => {
+    const isP2P = tx.type === 'p2p';
+    const amountVal = tx.totalDebit ?? tx.amount ?? 0;
+    return {
+        reference: tx.reference || `TXN-${Date.now()}`,
+        type: isP2P ? 'P2P Wallet Transfer' : 'Bank Account Settlement',
+        description: tx.narration || `Transfer to ${tx.recipient} (${tx.bankName || 'Abu Mafhal Wallet'})`,
+        amount: amountVal,
+        status: tx.status || 'SUCCESSFUL',
+        date: tx.date || new Date().toLocaleString(),
+        beneficiary: `${tx.recipient}${tx.accountNumber ? ' • ' + tx.accountNumber : ''} (${tx.bankName || (isP2P ? 'Member' : 'Bank')})`,
+        senderName: senderName || 'Abu Mafhal User',
+        paymentMethod: isP2P ? 'Abu Mafhal Wallet (P2P)' : 'Direct Bank Settlement (NIBSS Network)',
+        notes: tx.narration || undefined,
+    };
 };
 
 // Formatted Receipt Plaintext (Guaranteed WhatsApp and System Share fallback)
@@ -321,7 +206,6 @@ export default function TransferScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { settings } = useAppSettings();
-    const viewShotRef = useRef<any>(null);
 
     // Mode: 'bank' = Bank Account Settlement | 'p2p' = Member-to-Member
     const [activeTab, setActiveTab] = useState<'bank' | 'p2p'>('bank');
@@ -372,9 +256,6 @@ export default function TransferScreen() {
     const [securityModalVisible, setSecurityModalVisible] = useState(false);
     const [confirmModalVisible, setConfirmModalVisible] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
-    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-    const [isSavingGallery, setIsSavingGallery] = useState(false);
     const [transferError, setTransferError] = useState<string | null>(null);
     const [copiedRef, setCopiedRef] = useState(false);
 
@@ -395,6 +276,10 @@ export default function TransferScreen() {
         date: string;
         narration?: string;
     } | null>(null);
+
+    // Dual-Format Receipt Export Modal States (PDF / PNG - Identical to History)
+    const [exportModalVisible, setExportModalVisible] = useState(false);
+    const [exportReceiptData, setExportReceiptData] = useState<ReceiptData | null>(null);
 
     // Fee calculation
     const feeThreshold = parseFloat(settings?.transfer_fee_threshold || '10000');
@@ -962,122 +847,13 @@ export default function TransferScreen() {
         }
     };
 
-    // 2. Share Receipt as Image (PNG)
-    const handleShareImageReceipt = async () => {
+    // 2. Open Official Dual-Format Receipt Export Modal (PDF / PNG) - Identical to History
+    const handleOpenExportModal = () => {
         if (!lastTxDetails) return;
-        setIsGeneratingReceipt(true);
-        try {
-            let uri: string | null = null;
-            if (viewShotRef.current) {
-                uri = viewShotRef.current.capture
-                    ? await viewShotRef.current.capture()
-                    : await captureRef(viewShotRef, { format: 'png', quality: 1.0 });
-            }
-            if (uri) {
-                const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
-                if (isAvailable) {
-                    await Sharing.shareAsync(uri, {
-                        mimeType: 'image/png',
-                        dialogTitle: 'Share Transfer Receipt Image (PNG)',
-                    });
-                    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    setIsGeneratingReceipt(false);
-                    return;
-                }
-            }
-        } catch (captureErr) {
-            console.warn('View capture notice:', captureErr);
-        }
-
-        // Universal Fallback: Native Share Sheet with formatted text
-        try {
-            const text = formatReceiptSummaryText(lastTxDetails);
-            await Share.share({
-                message: text,
-                title: 'Abu Mafhal Transfer Receipt',
-            });
-        } catch (e) {
-            console.warn('Fallback share error:', e);
-        } finally {
-            setIsGeneratingReceipt(false);
-        }
-    };
-
-    // 2b. Save Receipt Directly to Phone Gallery
-    const handleSaveImageToGallery = async () => {
-        if (!lastTxDetails) return;
-        setIsSavingGallery(true);
-        try {
-            let uri: string | null = null;
-            if (viewShotRef.current) {
-                uri = viewShotRef.current.capture
-                    ? await viewShotRef.current.capture()
-                    : await captureRef(viewShotRef, { format: 'png', quality: 1.0 });
-            }
-
-            if (!uri) {
-                Alert.alert('Notice', 'Unable to capture receipt image right now. Please try again.');
-                return;
-            }
-
-            const permission = await MediaLibrary.requestPermissionsAsync();
-            if (permission.status !== 'granted') {
-                Alert.alert(
-                    'Permission Required',
-                    'Please allow storage / photo permission to save receipts to your phone gallery.'
-                );
-                return;
-            }
-
-            await MediaLibrary.saveToLibraryAsync(uri);
-            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert(
-                'Saved to Gallery! 📸',
-                'The official transaction receipt has been saved to your device Photos/Gallery.'
-            );
-        } catch (err: any) {
-            console.warn('Save to gallery error:', err);
-            Alert.alert('Save Failed', err.message || 'Could not save receipt image to gallery.');
-        } finally {
-            setIsSavingGallery(false);
-        }
-    };
-
-    // 3. Share Receipt as PDF Document
-    const handleSharePdfReceipt = async () => {
-        if (!lastTxDetails) return;
-        setIsGeneratingPdf(true);
-        try {
-            const html = generateReceiptHtml({
-                ...lastTxDetails,
-                narration: lastTxDetails.narration || (lastTxDetails.type === 'p2p' ? 'Wallet Transfer' : 'Direct Bank Settlement'),
-            });
-            const { uri } = await Print.printToFileAsync({ html });
-            const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
-            if (isAvailable) {
-                await Sharing.shareAsync(uri, {
-                    mimeType: 'application/pdf',
-                    dialogTitle: 'Share Official Transfer Receipt (PDF)',
-                });
-                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } else {
-                await Print.printAsync({ html });
-            }
-        } catch (pdfErr: any) {
-            console.warn('PDF generation error, trying print fallback:', pdfErr);
-            try {
-                const html = generateReceiptHtml({
-                    ...lastTxDetails,
-                    narration: lastTxDetails.narration || (lastTxDetails.type === 'p2p' ? 'Wallet Transfer' : 'Direct Bank Settlement'),
-                });
-                await Print.printAsync({ html });
-            } catch (_) {
-                const text = formatReceiptSummaryText(lastTxDetails);
-                await Share.share({ message: text, title: 'Abu Mafhal Transfer Receipt' });
-            }
-        } finally {
-            setIsGeneratingPdf(false);
-        }
+        const exportData = buildExportReceiptData(lastTxDetails, currentUserName);
+        setExportReceiptData(exportData);
+        setExportModalVisible(true);
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
     // Copy Reference Code
@@ -2236,247 +2012,224 @@ export default function TransferScreen() {
                 </View>
             </Modal>
 
-            {/* ── HIGH DEFINITION MODERNIZED RECEIPT MODAL ───────── */}
+            {/* ── TRANSACTION RECEIPT MODAL (IDENTICAL TO HISTORY) ───────── */}
             <Modal
                 visible={successModalVisible}
-                animationType="fade"
+                animationType="slide"
                 transparent={true}
-                onRequestClose={() => setSuccessModalVisible(false)}
+                onRequestClose={() => {
+                    setSuccessModalVisible(false);
+                    fetchUserData();
+                }}
             >
-                <View style={s.modalBackdrop}>
-                    <View style={s.successCard}>
-                        {/* Printable / Capturable Receipt Area via ViewShot */}
-                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={s.receiptSheet}>
-                            {/* Navy Header Banner with Gold Shield */}
-                            <View style={s.receiptHeaderBanner}>
-                                <View style={s.receiptLogoCircle}>
-                                    <Ionicons name="shield-checkmark" size={16} color="#F59E0B" />
-                                </View>
-                                <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <Text style={s.receiptBrandTitle}>ABU MAFHAL HUB</Text>
-                                    <Text style={s.receiptBrandSub}>OFFICIAL TRANSACTION RECEIPT</Text>
-                                </View>
-                                {(!lastTxDetails?.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS') ? (
-                                    <View style={s.receiptSuccessMiniPill}>
-                                        <Ionicons name="checkmark-circle" size={11} color="#10B981" />
-                                        <Text style={s.receiptSuccessMiniText}>SUCCESS</Text>
-                                    </View>
-                                ) : (
-                                    <View style={[s.receiptSuccessMiniPill, { backgroundColor: '#78350F', borderColor: '#F59E0B' }]}>
-                                        <Ionicons name="time" size={11} color="#FBBF24" />
-                                        <Text style={[s.receiptSuccessMiniText, { color: '#FDE68A' }]}>PROCESSING</Text>
-                                    </View>
-                                )}
-                            </View>
+                <TouchableOpacity
+                    style={s.receiptModalBackdrop}
+                    activeOpacity={1}
+                    onPress={() => {
+                        setSuccessModalVisible(false);
+                        fetchUserData();
+                    }}
+                >
+                    <View style={s.receiptModalSheet} onStartShouldSetResponder={() => true}>
+                        {/* Drag Bar */}
+                        <View style={s.receiptModalDragBar} />
 
-                            {/* Amount Box */}
-                            <View style={s.receiptAmountBox}>
-                                <Text style={s.receiptAmountLabel}>TRANSFER AMOUNT</Text>
-                                <Text style={s.receiptAmount}>
-                                    ₦{lastTxDetails ? lastTxDetails.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 }) : '0.00'}
-                                </Text>
-                                {(!lastTxDetails?.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS') ? (
-                                    <View style={s.receiptStatusBadge}>
-                                        <Ionicons name="checkmark-circle" size={11} color="#059669" />
-                                        <Text style={s.receiptStatusText}>TRANSACTION COMPLETED</Text>
-                                    </View>
-                                ) : (
-                                    <View style={[s.receiptStatusBadge, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
-                                        <Ionicons name="time" size={11} color="#D97706" />
-                                        <Text style={[s.receiptStatusText, { color: '#B45309' }]}>PROCESSING / PENDING</Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Details Table */}
-                            <View style={s.receiptDetailsTable}>
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Beneficiary:</Text>
-                                    <Text style={[s.receiptVal, { fontWeight: '900', color: '#0F172A' }]} numberOfLines={1}>
-                                        {lastTxDetails?.recipient}
-                                    </Text>
-                                </View>
-                                {lastTxDetails?.bankName && (
-                                    <View style={s.receiptRow}>
-                                        <Text style={s.receiptLabel}>Destination Bank:</Text>
-                                        <Text style={s.receiptVal} numberOfLines={1}>{lastTxDetails.bankName}</Text>
-                                    </View>
-                                )}
-                                {lastTxDetails?.accountNumber && (
-                                    <View style={s.receiptRow}>
-                                        <Text style={s.receiptLabel}>Account Number:</Text>
-                                        <Text style={[s.receiptVal, { letterSpacing: 0.5 }]}>{lastTxDetails.accountNumber}</Text>
-                                    </View>
-                                )}
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Transfer Fee:</Text>
-                                    <Text style={s.receiptVal}>
-                                        {lastTxDetails?.type === 'p2p' ? '₦0.00 (FREE)' : `₦${(lastTxDetails?.fee ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}
-                                    </Text>
-                                </View>
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Total Debited:</Text>
-                                    <Text style={[s.receiptVal, { color: '#D97706', fontWeight: '900' }]}>
-                                        ₦{(lastTxDetails?.totalDebit ?? lastTxDetails?.amount ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
-                                    </Text>
-                                </View>
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Status:</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (!lastTxDetails?.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS') ? '#10B981' : '#F59E0B' }} />
-                                        <Text style={[s.receiptVal, { color: (!lastTxDetails?.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS') ? '#059669' : '#D97706', fontWeight: '900' }]}>
-                                            {lastTxDetails?.status || 'SUCCESSFUL'}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Payment Channel:</Text>
-                                    <Text style={s.receiptVal}>
-                                        {lastTxDetails?.type === 'p2p' ? 'Abu Mafhal Wallet (P2P)' : 'Direct Bank Settlement (NIBSS)'}
-                                    </Text>
-                                </View>
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Reference:</Text>
-                                    <TouchableOpacity
-                                        onPress={() => lastTxDetails && handleCopyReference(lastTxDetails.reference)}
-                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={[s.receiptVal, { color: '#D97706', fontSize: 9.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
-                                            {lastTxDetails?.reference}
-                                        </Text>
-                                        <Ionicons name={copiedRef ? "checkmark-done" : "copy-outline"} size={12} color="#D97706" />
-                                    </TouchableOpacity>
-                                </View>
-                                {lastTxDetails?.sessionId ? (
-                                    <View style={s.receiptRow}>
-                                        <Text style={s.receiptLabel}>Session ID / NIP:</Text>
-                                        <TouchableOpacity
-                                            onPress={() => lastTxDetails.sessionId && handleCopyReference(lastTxDetails.sessionId)}
-                                            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={[s.receiptVal, { color: '#64748B', fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]} numberOfLines={1}>
-                                                {lastTxDetails.sessionId}
-                                            </Text>
-                                            <Ionicons name="copy-outline" size={11} color="#64748B" />
-                                        </TouchableOpacity>
-                                    </View>
-                                ) : null}
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Date & Time:</Text>
-                                    <Text style={s.receiptVal}>{lastTxDetails?.date}</Text>
-                                </View>
-                                {lastTxDetails?.narration ? (
-                                    <View style={s.receiptRow}>
-                                        <Text style={s.receiptLabel}>Narration:</Text>
-                                        <Text style={s.receiptVal} numberOfLines={1}>{lastTxDetails.narration}</Text>
-                                    </View>
-                                ) : null}
-                                <View style={s.receiptRow}>
-                                    <Text style={s.receiptLabel}>Verification:</Text>
-                                    <Text style={[s.receiptVal, { color: '#059669', fontWeight: '800' }]}>
-                                        Secured via NIBSS Network ✓
-                                    </Text>
-                                </View>
-                            </View>
-
-                            {/* Security Barcode Simulation Footer */}
-                            <View style={s.receiptSecurityFooter}>
-                                <View style={s.receiptBarcodeSim}>
-                                    <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center', justifyContent: 'center' }}>
-                                        {[14, 20, 12, 24, 16, 22, 10, 24, 18, 14, 22, 12, 24, 16, 20, 12, 24, 18, 14, 20, 16, 22, 12].map((h, i) => (
-                                            <View key={i} style={{ width: (i % 3 === 0) ? 2.5 : 1.2, height: h, backgroundColor: '#94A3B8' }} />
-                                        ))}
-                                    </View>
-                                    <Text style={s.receiptBarcodeText}>{lastTxDetails?.sessionId || lastTxDetails?.reference || 'ABU-MAFHAL-PAY'}</Text>
-                                </View>
-                                <Text style={s.receiptDisclaimer}>
-                                    Authentic electronic transaction receipt generated by Abu Mafhal Hub.
-                                </Text>
-                            </View>
-                        </ViewShot>
-
-                        {/* Modernized Sharing Action Buttons */}
-                        <View style={s.receiptActionsBox}>
-                            {/* Primary Row: WhatsApp & Save to Gallery */}
-                            <View style={s.shareButtonsRow}>
-                                <TouchableOpacity
-                                    onPress={handleShareWhatsApp}
-                                    style={s.shareWhatsAppBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="logo-whatsapp" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                                    <Text style={s.shareWhatsAppBtnText}>WhatsApp 💬</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    onPress={handleSaveImageToGallery}
-                                    style={s.saveGalleryBtn}
-                                    activeOpacity={0.8}
-                                    disabled={isSavingGallery || isGeneratingReceipt || isGeneratingPdf}
-                                >
-                                    {isSavingGallery ? (
-                                        <ActivityIndicator size="small" color="#FFFFFF" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="download-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                                            <Text style={s.saveGalleryBtnText}>Save Gallery 📸</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Secondary Row: Share PNG & PDF */}
-                            <View style={s.shareButtonsRow}>
-                                <TouchableOpacity
-                                    onPress={handleShareImageReceipt}
-                                    style={s.shareImageBtn}
-                                    activeOpacity={0.8}
-                                    disabled={isSavingGallery || isGeneratingReceipt || isGeneratingPdf}
-                                >
-                                    {isGeneratingReceipt ? (
-                                        <ActivityIndicator size="small" color="#FFFFFF" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="image-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                                            <Text style={s.shareImageBtnText}>Share PNG 🖼️</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    onPress={handleSharePdfReceipt}
-                                    style={s.sharePdfBtn}
-                                    activeOpacity={0.8}
-                                    disabled={isSavingGallery || isGeneratingReceipt || isGeneratingPdf}
-                                >
-                                    {isGeneratingPdf ? (
-                                        <ActivityIndicator size="small" color="#0F172A" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="document-text-outline" size={14} color="#0F172A" style={{ marginRight: 4 }} />
-                                            <Text style={s.sharePdfBtnText}>Print / PDF 📄</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Tertiary Row: Done Button */}
+                        {/* Header */}
+                        <View style={s.receiptModalHeader}>
+                            <Text style={s.receiptModalHeaderTitle}>Transaction Receipt</Text>
                             <TouchableOpacity
                                 onPress={() => {
                                     setSuccessModalVisible(false);
                                     fetchUserData();
                                 }}
-                                style={s.closeReceiptBtn}
-                                activeOpacity={0.8}
+                                style={s.receiptModalCloseBtn}
+                                activeOpacity={0.7}
                             >
-                                <Text style={s.closeReceiptBtnText}>CLOSE RECEIPT ✕</Text>
+                                <Ionicons name="close" size={18} color="#0F172A" />
                             </TouchableOpacity>
                         </View>
+
+                        {lastTxDetails && (
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+                                {/* Amount Card */}
+                                <View style={s.detailAmountCard}>
+                                    <Text style={s.detailAmountText}>
+                                        -₦{(lastTxDetails.totalDebit ?? lastTxDetails.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                                    </Text>
+                                    <View style={[
+                                        s.detailStatusPill,
+                                        (!lastTxDetails.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS' || lastTxDetails.status === 'COMPLETED')
+                                            ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1 }
+                                            : { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', borderWidth: 1 }
+                                    ]}>
+                                        <Ionicons
+                                            name={(!lastTxDetails.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS' || lastTxDetails.status === 'COMPLETED') ? "checkmark-circle" : "time"}
+                                            size={12}
+                                            color={(!lastTxDetails.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS' || lastTxDetails.status === 'COMPLETED') ? "#10B981" : "#D97706"}
+                                        />
+                                        <Text style={[
+                                            s.detailStatusPillText,
+                                            { color: (!lastTxDetails.status || lastTxDetails.status === 'SUCCESSFUL' || lastTxDetails.status === 'SUCCESS' || lastTxDetails.status === 'COMPLETED') ? "#059669" : "#B45309" }
+                                        ]}>
+                                            {(lastTxDetails.status || 'SUCCESSFUL').toUpperCase()}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Info Card */}
+                                <View style={s.detailInfoCard}>
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Service Description</Text>
+                                        <Text style={s.infoValue}>
+                                            {lastTxDetails.type === 'p2p' ? 'P2P Wallet Transfer' : 'Bank Account Settlement'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Category</Text>
+                                        <Text style={s.infoValue}>Transfers</Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Beneficiary Name</Text>
+                                        <Text style={s.infoValue} numberOfLines={1}>{lastTxDetails.recipient}</Text>
+                                    </View>
+
+                                    {lastTxDetails.bankName ? (
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabel}>Destination Bank</Text>
+                                            <Text style={s.infoValue} numberOfLines={1}>{lastTxDetails.bankName}</Text>
+                                        </View>
+                                    ) : null}
+
+                                    {lastTxDetails.accountNumber ? (
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabel}>Account Number</Text>
+                                            <Text style={[s.infoValue, { letterSpacing: 0.5, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                                                {lastTxDetails.accountNumber}
+                                            </Text>
+                                        </View>
+                                    ) : null}
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Transfer Amount</Text>
+                                        <Text style={s.infoValue}>
+                                            ₦{lastTxDetails.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Transfer Fee</Text>
+                                        <Text style={s.infoValue}>
+                                            {lastTxDetails.type === 'p2p' ? '₦0.00 (FREE)' : `₦${(lastTxDetails.fee ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Total Amount Debited</Text>
+                                        <Text style={[s.infoValue, { color: '#D97706', fontWeight: '900' }]}>
+                                            ₦{(lastTxDetails.totalDebit ?? lastTxDetails.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Payment Channel</Text>
+                                        <Text style={s.infoValue}>
+                                            {lastTxDetails.type === 'p2p' ? 'Abu Mafhal Wallet (P2P)' : 'Direct Bank Settlement (NIBSS)'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Transaction Date</Text>
+                                        <Text style={s.infoValue}>{lastTxDetails.date}</Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Reference Code</Text>
+                                        <TouchableOpacity
+                                            onPress={() => handleCopyReference(lastTxDetails.reference)}
+                                            style={s.refCopyRow}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={s.refText}>{lastTxDetails.reference}</Text>
+                                            <Ionicons name={copiedRef ? "checkmark-done" : "copy-outline"} size={13} color="#D97706" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {lastTxDetails.sessionId ? (
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabel}>Session ID / NIP</Text>
+                                            <TouchableOpacity
+                                                onPress={() => handleCopyReference(lastTxDetails.sessionId!)}
+                                                style={s.refCopyRow}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={s.refText} numberOfLines={1}>{lastTxDetails.sessionId}</Text>
+                                                <Ionicons name="copy-outline" size={12} color="#64748B" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : null}
+
+                                    {lastTxDetails.narration ? (
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabel}>Remark / Narration</Text>
+                                            <Text style={s.infoValue} numberOfLines={1}>{lastTxDetails.narration}</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
+
+                                {/* Action Buttons Column - Identical to History */}
+                                <View style={s.modalActionsCol}>
+                                    <TouchableOpacity
+                                        onPress={handleOpenExportModal}
+                                        style={s.pdfReceiptBtn}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Ionicons name="download-outline" size={16} color="#0F172A" />
+                                        <Text style={s.pdfReceiptBtnText}>Download Receipt (PDF / PNG)</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => handleCopyReference(lastTxDetails.reference)}
+                                        style={s.copyRefBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name={copiedRef ? "checkmark-circle" : "copy-outline"} size={15} color="#0F172A" />
+                                        <Text style={s.copyRefBtnText}>{copiedRef ? 'Reference Copied!' : 'Copy Transaction Reference'}</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={handleShareWhatsApp}
+                                        style={s.whatsappSupportBtn}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                                        <Text style={s.whatsappSupportBtnText}>Share on WhatsApp</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setSuccessModalVisible(false);
+                                            fetchUserData();
+                                        }}
+                                        style={s.closeSheetBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={s.closeSheetBtnText}>Close Receipt</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </ScrollView>
+                        )}
                     </View>
-                </View>
+                </TouchableOpacity>
             </Modal>
+
+            {/* ── DUAL-FORMAT RECEIPT EXPORT MODAL (PDF / PNG) ─── */}
+            <ReceiptExportModal
+                visible={exportModalVisible}
+                onClose={() => setExportModalVisible(false)}
+                receiptData={exportReceiptData}
+            />
         </View>
     );
 }
@@ -3664,252 +3417,185 @@ const s = StyleSheet.create({
         fontSize: 10.5,
         fontWeight: '900',
     },
-    successCard: {
+    receiptModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(2, 6, 23, 0.65)',
+        justifyContent: 'flex-end',
+    },
+    receiptModalSheet: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 14,
+        borderTopWidth: 2,
+        borderColor: '#D97706',
+        maxHeight: '85%',
+        maxWidth: 550,
         width: '100%',
-        maxWidth: 370,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 18,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 8,
+        alignSelf: 'center',
     },
-    receiptSheet: {
-        backgroundColor: '#FFFFFF',
+    receiptModalDragBar: {
+        width: 32,
+        height: 3.5,
+        backgroundColor: '#CBD5E1',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 10,
     },
-    receiptHeaderBanner: {
+    receiptModalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#0F172A',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderBottomWidth: 2,
-        borderColor: '#D97706',
+        justifyContent: 'space-between',
+        marginBottom: 12,
     },
-    receiptLogoCircle: {
+    receiptModalHeaderTitle: {
+        color: '#0F172A',
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    receiptModalCloseBtn: {
         width: 26,
         height: 26,
         borderRadius: 13,
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
-        borderWidth: 1,
-        borderColor: '#F59E0B',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    receiptBrandTitle: {
-        color: '#F59E0B',
-        fontSize: 12.5,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    receiptBrandSub: {
-        color: '#94A3B8',
-        fontSize: 8,
-        fontWeight: '700',
-        letterSpacing: 1,
-    },
-    receiptSuccessMiniPill: {
-        flexDirection: 'row',
+    detailAmountCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 12,
         alignItems: 'center',
-        gap: 3,
-        backgroundColor: '#064E3B',
         borderWidth: 1,
-        borderColor: '#10B981',
-        borderRadius: 10,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+        borderColor: '#E2E8F0',
+        marginBottom: 10,
     },
-    receiptSuccessMiniText: {
-        color: '#A7F3D0',
-        fontSize: 8,
-        fontWeight: '900',
-    },
-    receiptAmountBox: {
-        backgroundColor: '#FFFBEB',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#FDE68A',
-        borderStyle: 'dashed',
-    },
-    receiptAmountLabel: {
-        color: '#B45309',
-        fontSize: 9,
-        fontWeight: '800',
-        letterSpacing: 0.8,
-    },
-    receiptAmount: {
-        color: '#0F172A',
+    detailAmountText: {
         fontSize: 22,
         fontWeight: '900',
-        marginVertical: 2,
+        color: '#0F172A',
+        letterSpacing: -0.3,
+        marginBottom: 4,
     },
-    receiptStatusBadge: {
+    detailStatusPill: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        backgroundColor: '#D1FAE5',
-        borderWidth: 1,
-        borderColor: '#A7F3D0',
-        borderRadius: 12,
         paddingHorizontal: 8,
-        paddingVertical: 2,
+        paddingVertical: 2.5,
+        borderRadius: 8,
     },
-    receiptStatusText: {
-        color: '#065F46',
-        fontSize: 8.5,
+    detailStatusPillText: {
+        fontSize: 9,
         fontWeight: '900',
     },
-    receiptDetailsTable: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+    detailInfoCard: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E2E8F0',
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        marginBottom: 10,
     },
-    receiptRow: {
+    infoRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 4.5,
+        justifyContent: 'space-between',
+        paddingVertical: 7.5,
         borderBottomWidth: 1,
-        borderColor: '#F8FAFC',
+        borderBottomColor: '#F1F5F9',
     },
-    receiptLabel: {
+    infoLabel: {
         color: '#64748B',
         fontSize: 10,
-        fontWeight: '600',
+        fontWeight: '700',
     },
-    receiptVal: {
+    infoValue: {
+        color: '#0F172A',
+        fontSize: 10.5,
+        fontWeight: '800',
+        maxWidth: 220,
+        textAlign: 'right',
+    },
+    refCopyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    refText: {
         color: '#0F172A',
         fontSize: 10,
         fontWeight: '800',
-        maxWidth: '65%',
-        textAlign: 'right',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
-    receiptSecurityFooter: {
-        backgroundColor: '#0F172A',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderColor: '#334155',
-        borderStyle: 'dashed',
-    },
-    receiptBarcodeSim: {
-        alignItems: 'center',
-        gap: 2,
-    },
-    receiptBarcodeText: {
-        color: '#F59E0B',
-        fontSize: 8,
-        fontWeight: '800',
-        letterSpacing: 1.2,
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    },
-    receiptDisclaimer: {
-        color: '#94A3B8',
-        fontSize: 7.5,
-        textAlign: 'center',
-        marginTop: 3,
-    },
-    receiptActionsBox: {
-        backgroundColor: '#FFFFFF',
-        padding: 10,
-        borderTopWidth: 1,
-        borderColor: '#E2E8F0',
+    modalActionsCol: {
         gap: 6,
+        marginTop: 4,
+        marginBottom: 10,
     },
-    shareButtonsRow: {
+    pdfReceiptBtn: {
+        backgroundColor: '#FFD700',
+        height: 40,
+        borderRadius: 10,
         flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
         gap: 6,
-    },
-    shareWhatsAppBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#25D366',
-        height: 38,
-        borderRadius: 10,
-        shadowColor: '#25D366',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    shareWhatsAppBtnText: {
-        color: '#FFFFFF',
-        fontSize: 11,
-        fontWeight: '900',
-    },
-    saveGalleryBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#059669',
-        height: 38,
-        borderRadius: 10,
-        shadowColor: '#059669',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    saveGalleryBtnText: {
-        color: '#FFFFFF',
-        fontSize: 11,
-        fontWeight: '900',
-    },
-    shareImageBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#0284C7',
-        height: 38,
-        borderRadius: 10,
-        shadowColor: '#0284C7',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    shareImageBtnText: {
-        color: '#FFFFFF',
-        fontSize: 11,
-        fontWeight: '800',
-    },
-    sharePdfBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#FEF3C7',
         borderWidth: 1,
-        borderColor: '#F59E0B',
-        height: 36,
-        borderRadius: 10,
+        borderColor: '#DAA520',
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
     },
-    sharePdfBtnText: {
+    pdfReceiptBtnText: {
+        color: '#0F172A',
+        fontSize: 11.5,
+        fontWeight: '900',
+        letterSpacing: 0.2,
+    },
+    copyRefBtn: {
+        backgroundColor: '#F1F5F9',
+        height: 38,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+    },
+    copyRefBtnText: {
         color: '#0F172A',
         fontSize: 11,
         fontWeight: '800',
     },
-    closeReceiptBtn: {
-        flex: 1,
+    whatsappSupportBtn: {
+        backgroundColor: '#0F172A',
+        borderColor: '#25D366',
+        borderWidth: 1,
+        height: 38,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+    },
+    whatsappSupportBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    closeSheetBtn: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E2E8F0',
+        borderWidth: 1,
         height: 36,
         borderRadius: 10,
-        backgroundColor: '#0F172A',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    closeReceiptBtnText: {
-        color: '#F59E0B',
-        fontSize: 10.5,
-        fontWeight: '900',
-        letterSpacing: 0.5,
+    closeSheetBtnText: {
+        color: '#64748B',
+        fontSize: 11,
+        fontWeight: '800',
     },
 });

@@ -406,10 +406,22 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
           <td class="td-value mono-val">${data.beneficiary}</td>
         </tr>
         ` : ''}
+        ${data.senderName ? `
+        <tr>
+          <td class="td-label">Sender / Originator</td>
+          <td class="td-value">${data.senderName}</td>
+        </tr>
+        ` : ''}
         ${data.customerPhone ? `
         <tr>
           <td class="td-label">Customer Phone</td>
           <td class="td-value">${data.customerPhone}</td>
+        </tr>
+        ` : ''}
+        ${data.notes ? `
+        <tr>
+          <td class="td-label">Remark / Narration</td>
+          <td class="td-value">${data.notes}</td>
         </tr>
         ` : ''}
       </table>
