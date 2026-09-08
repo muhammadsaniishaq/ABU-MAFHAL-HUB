@@ -65,7 +65,8 @@ export function formatMoniepointDate(rawDate?: any): string {
 }
 
 /**
- * Generate authentic Moniepoint ticket style A5 HTML receipt for Abu Mafhal Hub
+ * Generate ultra-luxurious full-bleed A5 HTML receipt for Abu Mafhal Hub (ABU MAFHAL LTD - RC-8979939)
+ * Features Abu Mafhal brand colors (Obsidian Midnight, Luxury Gold, Emerald Seal) with the 8-field vertical information hierarchy.
  */
 export function generateModernReceiptHTML(data: ReceiptData): string {
   const ref = String(data.reference || `TXN-${Date.now()}`);
@@ -78,6 +79,9 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
   const numAmount = typeof data.amount === 'number'
     ? data.amount
     : parseFloat(String(data.amount).replace(/[^0-9.]/g, '')) || 0;
+  const numFee = typeof data.fee === 'number'
+    ? data.fee
+    : (data.fee !== undefined && data.fee !== null ? parseFloat(String(data.fee).replace(/[^0-9.]/g, '')) : null);
 
   const displayTotalAmount = numTotalDebit ?? numAmount;
   const formattedTotal = `₦${displayTotalAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -85,6 +89,7 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
   const isDebit = data.type !== 'deposit';
   const recipientDisplay = data.recipientName || data.beneficiary || 'Beneficiary';
   const fullRefText = data.sessionId ? `TRF|${ref}|${data.sessionId}` : `TRF|${ref}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`https://abumafhal.com.ng/verify?ref=${ref}`)}`;
 
   return `
 <!DOCTYPE html>
@@ -109,7 +114,7 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
     
     html, body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #0056D2;
+      background-color: #FFFFFF;
       color: #0F172A;
       margin: 0;
       padding: 0;
@@ -122,307 +127,424 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
     #receipt-page {
       width: 100%;
       min-height: 100%;
-      background: #0056D2;
-      padding: 24px 20px 20px;
+      background: #FFFFFF;
+      margin: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      justify-content: space-between;
       box-sizing: border-box;
-      position: relative;
-      overflow: hidden;
     }
 
-    /* Decorative Moniepoint Background Gold Accents */
-    .bg-accent-1 {
-      position: absolute;
-      top: -60px;
-      right: -60px;
-      width: 180px;
-      height: 180px;
-      border: 8px solid #F59E0B;
-      border-radius: 50%;
-      opacity: 0.25;
-      pointer-events: none;
-    }
-    .bg-accent-2 {
-      position: absolute;
-      bottom: -40px;
-      left: -40px;
-      width: 160px;
-      height: 160px;
-      border: 8px solid #F59E0B;
-      border-radius: 50%;
-      opacity: 0.25;
-      pointer-events: none;
-    }
-    
-    /* Moniepoint Pill Header */
-    .mp-brand-capsule {
-      background: #FFFFFF;
-      border-radius: 30px;
-      padding: 6px 18px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-      z-index: 2;
-    }
-    
-    .mp-brand-logo {
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      object-fit: cover;
-    }
-    
-    .mp-brand-title {
-      font-size: 14px;
-      font-weight: 900;
-      color: #0056D2;
-      letter-spacing: 0.3px;
-    }
-    
-    /* White Ticket Paper Card */
-    .mp-ticket-card {
-      background: #FFFFFF;
-      border-top-left-radius: 20px;
-      border-top-right-radius: 20px;
-      width: 100%;
-      max-width: 380px;
-      padding: 20px 20px 0;
-      box-sizing: border-box;
+    /* Luxury Header with Midnight Obsidian & Gold Trim */
+    .receipt-header {
+      background: linear-gradient(135deg, #020617 0%, #0F172A 48%, #1E293B 100%);
+      color: #FFFFFF;
+      padding: 22px 22px 18px;
       position: relative;
-      z-index: 2;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      border-bottom: 3px solid #DAA520;
     }
     
-    /* Header Row: DEBIT pill & 'M' avatar */
-    .mp-ticket-header {
+    .brand-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
     
-    .mp-debit-badge {
-      background: #EFF6FF;
-      border: 1px solid #BFDBFE;
-      color: #1D4ED8;
-      font-size: 11px;
+    .brand-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .brand-logo-img {
+      width: 42px;
+      height: 42px;
+      border-radius: 9px;
+      object-fit: cover;
+      border: 1.5px solid #DAA520;
+      background: #FFFFFF;
+      padding: 2px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    
+    .brand-titles {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .brand-name {
+      font-size: 16px;
       font-weight: 900;
-      letter-spacing: 0.8px;
-      padding: 4px 10px;
-      border-radius: 6px;
+      letter-spacing: 0.5px;
+      color: #FFFFFF;
       text-transform: uppercase;
     }
     
-    .mp-avatar-circle {
-      width: 36px;
-      height: 36px;
-      border-radius: 18px;
-      background: #0056D2;
-      color: #FFFFFF;
-      font-size: 19px;
-      font-weight: 900;
+    .brand-sub {
+      font-size: 8.5px;
+      color: #FFD700;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+    
+    .company-reg {
+      font-size: 8px;
+      color: #94A3B8;
+      font-weight: 600;
+      margin-top: 1px;
+    }
+    
+    .seal-badge {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid #10B981;
+      padding: 4px 10px;
+      border-radius: 20px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      box-shadow: 0 3px 8px rgba(0, 86, 210, 0.3);
+      gap: 6px;
     }
     
-    /* Amount Hero */
-    .mp-amount-hero {
-      font-size: 32px;
-      font-weight: 900;
-      color: #000000;
-      letter-spacing: -0.8px;
-      margin-bottom: 14px;
-      font-family: 'Plus Jakarta Sans', sans-serif;
+    .seal-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
     }
     
-    /* Divider */
-    .mp-divider {
-      height: 1px;
-      background: #F1F5F9;
-      width: 100%;
-      margin-bottom: 14px;
+    .seal-text {
+      font-size: 8.5px;
+      font-weight: 800;
+      color: #10B981;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
     }
     
-    /* Inner Details Container (Label Above, Value Below) */
-    .mp-details-box {
-      background: #F8FAFC;
+    /* Hero Amount Card */
+    .amount-hero {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1.5px solid rgba(218, 165, 32, 0.35);
       border-radius: 14px;
-      padding: 16px;
-      border: 1px solid #E2E8F0;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(10px);
     }
     
-    .mp-field-block {
-      margin-bottom: 13px;
-    }
-    
-    .mp-field-block:last-child {
-      margin-bottom: 0;
-    }
-    
-    .mp-field-label {
-      font-size: 11px;
-      color: #8E9BAE;
-      font-weight: 600;
+    .amount-label {
+      font-size: 9px;
+      font-weight: 800;
+      color: #CBD5E1;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
       margin-bottom: 2px;
     }
     
-    .mp-field-value {
-      font-size: 13px;
-      color: #0F172A;
+    .amount-val {
+      font-size: 28px;
+      font-weight: 900;
+      color: #FFFFFF;
+      letter-spacing: -0.5px;
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.1;
+    }
+    
+    .amount-breakdown {
+      font-size: 8.5px;
+      color: #94A3B8;
+      font-weight: 600;
+      margin-top: 3px;
+    }
+    
+    .status-pill {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 9.5px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #10B981;
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
+
+    /* Body Details (Vertical Label-above, Value-below Structure) */
+    .receipt-body {
+      padding: 16px 22px 10px;
+      flex: 1;
+    }
+
+    .details-box {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+      margin-bottom: 12px;
+    }
+
+    .field-block {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .field-block.full-width {
+      grid-column: span 2;
+    }
+
+    .field-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .field-value {
+      font-size: 12.5px;
       font-weight: 800;
+      color: #0F172A;
       word-break: break-word;
     }
-    
-    .mp-type-pill {
-      background: #E0F2FE;
-      color: #0284C7;
-      font-size: 11.5px;
+
+    .type-pill {
+      background: #FEF3C7;
+      border: 1px solid #FDE68A;
+      color: #B45309;
+      font-size: 11px;
       font-weight: 800;
-      padding: 3px 10px;
+      padding: 2.5px 9px;
       border-radius: 5px;
       display: inline-block;
-      margin-top: 2px;
+      margin-top: 1px;
+      width: fit-content;
     }
-    
-    .mp-ref-text {
+
+    .ref-badge {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 10.5px;
+      font-weight: 800;
       color: #0F172A;
       background: #F1F5F9;
-      padding: 4px 8px;
-      border-radius: 5px;
       border: 1px solid #CBD5E1;
+      padding: 3px 8px;
+      border-radius: 5px;
       display: inline-block;
+      margin-top: 1px;
+      width: fit-content;
+    }
+
+    /* Official Cryptographic Verification Card */
+    .qr-card {
+      background: #F8FAFC;
+      border: 1px dashed #CBD5E1;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .qr-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-width: 72%;
+    }
+
+    .qr-title {
+      font-size: 10px;
+      font-weight: 800;
+      color: #0F172A;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .qr-desc {
+      font-size: 8px;
+      color: #64748B;
+      line-height: 12px;
+    }
+
+    .qr-badges {
+      display: flex;
+      gap: 6px;
       margin-top: 2px;
     }
-    
-    /* Perforated Scalloped Ticket Bottom Teeth */
-    .mp-scallops-wrapper {
-      display: flex;
-      justify-content: space-between;
-      width: calc(100% + 40px);
-      margin-left: -20px;
-      margin-top: 14px;
-      margin-bottom: -10px;
-      overflow: hidden;
+
+    .qr-chip {
+      font-size: 7.5px;
+      font-weight: 700;
+      color: #047857;
+      background: #ECFDF5;
+      padding: 1.5px 6px;
+      border-radius: 4px;
+      border: 0.5px solid #A7F3D0;
     }
-    
-    .mp-scallop-dot {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #0056D2;
-      flex-shrink: 0;
+
+    .qr-img {
+      width: 52px;
+      height: 52px;
+      border-radius: 6px;
+      border: 1px solid #E2E8F0;
+      background: #FFFFFF;
+      padding: 2px;
     }
-    
-    /* Footer Security */
-    .mp-footer {
-      margin-top: 18px;
+
+    /* Footer */
+    .receipt-footer {
+      background: #F8FAFC;
+      border-top: 1px solid #E2E8F0;
+      padding: 10px 22px 12px;
       text-align: center;
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 9px;
-      font-weight: 600;
-      line-height: 14px;
-      z-index: 2;
     }
-    .mp-footer b {
-      color: #FFFFFF;
+
+    .footer-company {
+      font-size: 9.5px;
+      font-weight: 800;
+      color: #0F172A;
+      margin-bottom: 2px;
+    }
+
+    .footer-company span {
+      color: #D97706;
+    }
+
+    .footer-note {
+      font-size: 8px;
+      color: #94A3B8;
+      line-height: 12px;
     }
   </style>
 </head>
 <body>
   <div id="receipt-page">
-    <div class="bg-accent-1"></div>
-    <div class="bg-accent-2"></div>
-
-    <!-- Centered Brand Capsule -->
-    <div class="mp-brand-capsule">
-      <img src="${ABU_MAFHAL_LOGO_B64}" class="mp-brand-logo" alt="Logo" />
-      <span class="mp-brand-title">Abu Mafhal Hub</span>
-    </div>
-
-    <!-- White Ticket Paper Card -->
-    <div class="mp-ticket-card">
-      <!-- Header Row: DEBIT pill & 'M' avatar -->
-      <div class="mp-ticket-header">
-        <div class="mp-debit-badge">${isDebit ? 'DEBIT' : 'CREDIT'}</div>
-        <div class="mp-avatar-circle">M</div>
+    <!-- Header with Abu Mafhal Luxury Obsidian & Gold -->
+    <div class="receipt-header">
+      <div class="brand-row">
+        <div class="brand-left">
+          <img class="brand-logo-img" src="${ABU_MAFHAL_LOGO_B64}" alt="Abu Mafhal Logo" />
+          <div class="brand-titles">
+            <div class="brand-name">ABU MAFHAL HUB</div>
+            <div class="brand-sub">Premium Digital Infrastructure</div>
+            <div class="company-reg">ABU MAFHAL LTD • RC-8979939</div>
+          </div>
+        </div>
+        <div class="seal-badge">
+          <div class="seal-dot"></div>
+          <div class="seal-text">VERIFIED</div>
+        </div>
       </div>
 
       <!-- Amount Hero -->
-      <div class="mp-amount-hero">${formattedTotal}</div>
-
-      <!-- Hairline Divider -->
-      <div class="mp-divider"></div>
-
-      <!-- Inner Details Card (Label on top, Value below) -->
-      <div class="mp-details-box">
-        <!-- 1. Transaction Type -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Transaction Type</div>
-          <div><span class="mp-type-pill">${data.type === 'p2p' ? 'Wallet Transfer' : 'Transfer'}</span></div>
+      <div class="amount-hero">
+        <div>
+          <div class="amount-label">Total Amount Debited</div>
+          <div class="amount-val">${formattedTotal}</div>
+          ${numFee !== null ? `
+          <div class="amount-breakdown">
+            Settled via NIBSS Direct • Fee: ₦${numFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+          </div>
+          ` : ''}
         </div>
-
-        <!-- 2. Sender Name -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Sender Name</div>
-          <div class="mp-field-value">${data.senderName || 'Abu Mafhal User'}</div>
+        <div class="status-pill">
+          ${isDebit ? 'DEBIT SUCCESS' : 'CREDIT SUCCESS'}
         </div>
-
-        <!-- 3. Source Institution -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Source Institution</div>
-          <div class="mp-field-value">Abu Mafhal Hub Wallet</div>
-        </div>
-
-        <!-- 4. Beneficiary -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Beneficiary</div>
-          <div class="mp-field-value" style="text-transform: uppercase;">${recipientDisplay}</div>
-        </div>
-
-        <!-- 5. Beneficiary Institution -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Beneficiary Institution</div>
-          <div class="mp-field-value">${data.bankName || 'Abu Mafhal Wallet Member'}</div>
-        </div>
-
-        <!-- 6. Transaction Date -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Transaction Date</div>
-          <div class="mp-field-value">${formattedDate}</div>
-        </div>
-
-        <!-- 7. Transaction Reference -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Transaction Reference</div>
-          <div><span class="mp-ref-text">${fullRefText}</span></div>
-        </div>
-
-        <!-- 8. Business Name -->
-        <div class="mp-field-block">
-          <div class="mp-field-label">Business Name</div>
-          <div class="mp-field-value">${data.notes || data.senderName || 'Abu Mafhal Instant Settlement'}</div>
-        </div>
-      </div>
-
-      <!-- Scalloped Perforated Ticket Teeth Cut at the Bottom -->
-      <div class="mp-scallops-wrapper">
-        ${Array.from({ length: 18 }).map(() => '<div class="mp-scallop-dot"></div>').join('')}
       </div>
     </div>
 
-    <!-- Official Footer Note -->
-    <div class="mp-footer">
-      <b>Official Proof of Payment</b> • Issued by <b>ABU MAFHAL LTD</b> (RC-8979939)<br/>
-      Support: help@abumafhal.com • https://abumafhal.com.ng
+    <!-- Body Details (Vertical Label-above, Value-below Format) -->
+    <div class="receipt-body">
+      <div class="details-box">
+        <!-- 1. Transaction Type -->
+        <div class="field-block">
+          <div class="field-label">Transaction Type</div>
+          <div><span class="type-pill">${data.type === 'p2p' ? 'P2P Wallet Transfer' : (data.type || 'Bank Settlement')}</span></div>
+        </div>
+
+        <!-- 2. Sender Name -->
+        <div class="field-block">
+          <div class="field-label">Sender Name</div>
+          <div class="field-value">${data.senderName || 'Abu Mafhal User'}</div>
+        </div>
+
+        <!-- 3. Source Institution -->
+        <div class="field-block">
+          <div class="field-label">Source Institution</div>
+          <div class="field-value">Abu Mafhal Hub Wallet</div>
+        </div>
+
+        <!-- 4. Beneficiary -->
+        <div class="field-block">
+          <div class="field-label">Beneficiary</div>
+          <div class="field-value" style="text-transform: uppercase;">${recipientDisplay}</div>
+        </div>
+
+        <!-- 5. Beneficiary Institution -->
+        <div class="field-block">
+          <div class="field-label">Beneficiary Institution</div>
+          <div class="field-value">${data.bankName || 'Abu Mafhal Wallet Member'}</div>
+        </div>
+
+        <!-- 6. Transaction Date -->
+        <div class="field-block">
+          <div class="field-label">Transaction Date</div>
+          <div class="field-value">${formattedDate}</div>
+        </div>
+
+        <!-- 7. Transaction Reference -->
+        <div class="field-block full-width">
+          <div class="field-label">Transaction Reference</div>
+          <div><span class="ref-badge">${fullRefText}</span></div>
+        </div>
+
+        <!-- 8. Business Name / Narration -->
+        <div class="field-block full-width">
+          <div class="field-label">Business Name / Narration</div>
+          <div class="field-value">${data.notes || data.senderName || 'Abu Mafhal Instant Settlement'}</div>
+        </div>
+      </div>
+
+      <!-- Security Verification -->
+      <div class="qr-card">
+        <div class="qr-left">
+          <div class="qr-title">
+            <span>🛡️</span> Official Cryptographic Verification
+          </div>
+          <div class="qr-desc">
+            Tamper-proof financial record audited on the Abu Mafhal ledger. Scan the QR code to verify validity directly with Central Bank & NIBSS settlement networks.
+          </div>
+          <div class="qr-badges">
+            <span class="qr-chip">✓ NIBSS Certified</span>
+            <span class="qr-chip">✓ 256-Bit Encrypted</span>
+            <span class="qr-chip">✓ Official Proof</span>
+          </div>
+        </div>
+        <img class="qr-img" src="${qrUrl}" alt="QR Verification" />
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="receipt-footer">
+      <div class="footer-company">
+        Issued by <span>ABU MAFHAL LTD</span> (CAC: RC-8979939)
+      </div>
+      <div class="footer-note">
+        This document serves as an authentic electronic proof of payment issued by ABU MAFHAL HUB.<br/>
+        Support Hotline: support@abumafhal.com.ng • https://abumafhal.com.ng
+      </div>
     </div>
   </div>
 </body>

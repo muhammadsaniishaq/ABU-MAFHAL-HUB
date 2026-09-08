@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import ViewShot from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import { ABU_MAFHAL_LOGO_B64 } from '../../assets/images/logoB64';
 import { formatMoniepointDate, shareReceiptFile, downloadReceiptAsPDF } from '../../services/receiptGenerator';
@@ -171,7 +170,7 @@ export default function ReceiptScreen() {
     if (loading) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#0056D2" />
+                <ActivityIndicator size="large" color="#D97706" />
             </SafeAreaView>
         );
     }
@@ -210,112 +209,118 @@ export default function ReceiptScreen() {
             </View>
 
             <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Moniepoint-Style Capture Container */}
+                {/* Abu Mafhal Luxury Receipt Container */}
                 <ViewShot
                     ref={viewShotRef}
                     options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}
-                    style={s.mpReceiptCaptureWrap}
+                    style={s.receiptCaptureWrap}
                 >
-                    {/* Centered Brand Capsule Pill */}
-                    <View style={s.mpOuterHeader}>
-                        <View style={s.mpBrandCapsule}>
-                            <Image source={{ uri: ABU_MAFHAL_LOGO_B64 }} style={s.mpBrandMiniLogo} />
-                            <Text style={s.mpBrandCapsuleText}>Abu Mafhal Hub</Text>
+                    {/* Brand Header */}
+                    <View style={s.receiptHeaderBrand}>
+                        <View style={s.receiptBrandLeft}>
+                            <Image source={{ uri: ABU_MAFHAL_LOGO_B64 }} style={s.receiptLogoImg} />
+                            <View>
+                                <Text style={s.receiptBrandTitle}>ABU MAFHAL HUB</Text>
+                                <Text style={s.receiptBrandSub}>PREMIUM DIGITAL INFRASTRUCTURE</Text>
+                            </View>
+                        </View>
+                        <View style={s.receiptVerifiedSeal}>
+                            <View style={s.sealGreenDot} />
+                            <Text style={s.receiptVerifiedSealText}>VERIFIED</Text>
                         </View>
                     </View>
 
-                    {/* White Ticket Card */}
-                    <View style={s.mpTicketCard}>
-                        {/* Ticket Header Row: DEBIT Badge & Brand Icon */}
-                        <View style={s.mpTicketHeaderRow}>
-                            <View style={[s.mpDebitBadge, !isDebit && { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                                <Text style={[s.mpDebitBadgeText, !isDebit && { color: '#059669' }]}>
+                    {/* Midnight Obsidian Amount Card */}
+                    <View style={s.detailAmountCard}>
+                        <View style={s.amountCardTopRow}>
+                            <View style={[s.debitPillTag, !isDebit && { backgroundColor: 'rgba(16, 185, 129, 0.2)', borderColor: 'rgba(16, 185, 129, 0.5)' }]}>
+                                <Text style={[s.debitPillText, !isDebit && { color: '#34D399' }]}>
                                     {isDebit ? 'DEBIT' : 'CREDIT'}
                                 </Text>
                             </View>
-                            <View style={s.mpBrandAvatarCircle}>
-                                <Text style={s.mpBrandAvatarLetter}>M</Text>
+                            <View style={s.statusSuccessTag}>
+                                <Ionicons name="checkmark-circle" size={11} color="#10B981" />
+                                <Text style={s.statusSuccessText}>SUCCESSFUL</Text>
                             </View>
                         </View>
 
                         {/* Amount Hero */}
-                        <Text style={s.mpAmountHeroText}>₦{absAmount}</Text>
+                        <Text style={s.detailAmountText}>₦{absAmount}</Text>
+                        <Text style={s.detailAmountSubBreakdown}>Audited Electronic Settlement • 100% Guaranteed</Text>
+                    </View>
 
-                        {/* Hairline Divider */}
-                        <View style={s.mpDividerLine} />
-
-                        {/* Ticket Details Inner Card (Label on top, Value directly beneath) */}
-                        <View style={s.mpDetailsBox}>
-                            {/* 1. Transaction Type */}
-                            <View style={s.mpFieldBlock}>
-                                <Text style={s.mpFieldLabel}>Transaction Type</Text>
-                                <View style={s.mpTypeTag}>
-                                    <Text style={s.mpTypeTagText}>
-                                        {transaction.type === 'p2p' ? 'Wallet Transfer' : (transaction.type ? transaction.type.toUpperCase() : 'TRANSFER')}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            {/* 2. Sender Name */}
-                            <View style={s.mpFieldBlock}>
-                                <Text style={s.mpFieldLabel}>Sender Name</Text>
-                                <Text style={s.mpFieldValue}>{senderProfile?.full_name || 'Abu Mafhal User'}</Text>
-                            </View>
-
-                            {/* 3. Source Institution */}
-                            <View style={s.mpFieldBlock}>
-                                <Text style={s.mpFieldLabel}>Source Institution</Text>
-                                <Text style={s.mpFieldValue}>Abu Mafhal Hub Wallet</Text>
-                            </View>
-
-                            {/* 4. Beneficiary */}
-                            <View style={s.mpFieldBlock}>
-                                <Text style={s.mpFieldLabel}>Beneficiary</Text>
-                                <Text style={[s.mpFieldValue, { textTransform: 'uppercase' }]}>
-                                    {beneficiary}
+                    {/* Details Information Card (Label on top, Bold Value directly beneath) */}
+                    <View style={s.detailInfoCard}>
+                        {/* 1. Transaction Type */}
+                        <View style={s.fieldBlock}>
+                            <Text style={s.fieldLabel}>Transaction Type</Text>
+                            <View style={s.typeTagPill}>
+                                <Text style={s.typeTagText}>
+                                    {transaction.type === 'p2p' ? 'P2P Wallet Transfer' : (transaction.type ? transaction.type.toUpperCase() : 'TRANSFER')}
                                 </Text>
                             </View>
-
-                            {/* 5. Beneficiary Institution */}
-                            <View style={s.mpFieldBlock}>
-                                <Text style={s.mpFieldLabel}>Beneficiary Institution</Text>
-                                <Text style={s.mpFieldValue}>{bankName}</Text>
-                            </View>
-
-                            {/* 6. Transaction Date */}
-                            <View style={s.mpFieldBlock}>
-                                <Text style={s.mpFieldLabel}>Transaction Date</Text>
-                                <Text style={s.mpFieldValue}>{formatMoniepointDate(transaction.created_at)}</Text>
-                            </View>
-
-                            {/* 7. Transaction Reference */}
-                            <View style={s.mpFieldBlock}>
-                                <Text style={s.mpFieldLabel}>Transaction Reference</Text>
-                                <TouchableOpacity
-                                    onPress={() => handleCopyReference(receiptNo)}
-                                    style={s.mpRefCopyRow}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={s.mpRefText} numberOfLines={1}>
-                                        TRF|{receiptNo}
-                                    </Text>
-                                    <Ionicons name={copiedRef ? "checkmark-circle" : "copy-outline"} size={13} color="#0056D2" />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* 8. Business Name / Narration */}
-                            <View style={[s.mpFieldBlock, { marginBottom: 0 }]}>
-                                <Text style={s.mpFieldLabel}>Business Name</Text>
-                                <Text style={s.mpFieldValue}>{narration}</Text>
-                            </View>
                         </View>
 
-                        {/* Scalloped Perforated Ticket Teeth Cut at the Bottom */}
-                        <View style={s.scallopsWrapper}>
-                            {Array.from({ length: 18 }).map((_, idx) => (
-                                <View key={idx} style={s.scallopCircle} />
-                            ))}
+                        {/* 2. Sender Name */}
+                        <View style={s.fieldBlock}>
+                            <Text style={s.fieldLabel}>Sender Name</Text>
+                            <Text style={s.fieldValue}>{senderProfile?.full_name || 'Abu Mafhal User'}</Text>
                         </View>
+
+                        {/* 3. Source Institution */}
+                        <View style={s.fieldBlock}>
+                            <Text style={s.fieldLabel}>Source Institution</Text>
+                            <Text style={s.fieldValue}>Abu Mafhal Hub Wallet</Text>
+                        </View>
+
+                        {/* 4. Beneficiary */}
+                        <View style={s.fieldBlock}>
+                            <Text style={s.fieldLabel}>Beneficiary</Text>
+                            <Text style={[s.fieldValue, { textTransform: 'uppercase' }]}>
+                                {beneficiary}
+                            </Text>
+                        </View>
+
+                        {/* 5. Beneficiary Institution */}
+                        <View style={s.fieldBlock}>
+                            <Text style={s.fieldLabel}>Beneficiary Institution</Text>
+                            <Text style={s.fieldValue}>{bankName}</Text>
+                        </View>
+
+                        {/* 6. Transaction Date */}
+                        <View style={s.fieldBlock}>
+                            <Text style={s.fieldLabel}>Transaction Date</Text>
+                            <Text style={s.fieldValue}>{formatMoniepointDate(transaction.created_at)}</Text>
+                        </View>
+
+                        {/* 7. Transaction Reference */}
+                        <View style={s.fieldBlock}>
+                            <Text style={s.fieldLabel}>Transaction Reference</Text>
+                            <TouchableOpacity
+                                onPress={() => handleCopyReference(receiptNo)}
+                                style={s.refCopyRow}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={s.refText} numberOfLines={1}>
+                                    TRF|{receiptNo}
+                                </Text>
+                                <Ionicons name={copiedRef ? "checkmark-circle" : "copy-outline"} size={13} color="#D97706" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* 8. Business Name / Narration */}
+                        <View style={[s.fieldBlock, { marginBottom: 0 }]}>
+                            <Text style={s.fieldLabel}>Business Name / Narration</Text>
+                            <Text style={s.fieldValue}>{narration}</Text>
+                        </View>
+                    </View>
+
+                    {/* Security Notice Row */}
+                    <View style={s.securityNoticeRow}>
+                        <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+                        <Text style={s.securityNoticeText}>
+                            Audited Proof of Payment • ABU MAFHAL LTD (RC-8979939)
+                        </Text>
                     </View>
                 </ViewShot>
 
@@ -378,7 +383,7 @@ export default function ReceiptScreen() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: '#F8FAFC',
     },
     centerContainer: {
         flex: 1,
@@ -395,8 +400,10 @@ const s = StyleSheet.create({
     backBtn: {
         paddingVertical: 10,
         paddingHorizontal: 24,
-        backgroundColor: '#0056D2',
+        backgroundColor: '#0F172A',
         borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#DAA520',
     },
     backBtnText: {
         color: '#FFFFFF',
@@ -432,150 +439,189 @@ const s = StyleSheet.create({
         paddingBottom: 40,
     },
 
-    /* Moniepoint Ticket Card Styles */
-    mpReceiptCaptureWrap: {
-        backgroundColor: '#0056D2',
-        borderRadius: 20,
-        paddingTop: 16,
-        paddingHorizontal: 12,
-        paddingBottom: 10,
-        marginBottom: 14,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOpacity: 0.12,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    mpOuterHeader: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 14,
-    },
-    mpBrandCapsule: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    /* Abu Mafhal Luxury Receipt Card Styles */
+    receiptCaptureWrap: {
         backgroundColor: '#FFFFFF',
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 20,
-        gap: 6,
+        borderRadius: 16,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 14,
         shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 3,
     },
-    mpBrandMiniLogo: {
-        width: 18,
-        height: 18,
-        borderRadius: 4,
-    },
-    mpBrandCapsuleText: {
-        color: '#0056D2',
-        fontSize: 13,
-        fontWeight: '900',
-        letterSpacing: 0.3,
-    },
-    mpTicketCard: {
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 18,
-        borderTopRightRadius: 18,
-        paddingTop: 18,
-        paddingHorizontal: 16,
-        paddingBottom: 8,
-    },
-    mpTicketHeaderRow: {
+    receiptHeaderBrand: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 2,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
         marginBottom: 10,
     },
-    mpDebitBadge: {
-        backgroundColor: '#EFF6FF',
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
-        paddingHorizontal: 10,
-        paddingVertical: 3.5,
-        borderRadius: 6,
-    },
-    mpDebitBadgeText: {
-        color: '#1D4ED8',
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 0.6,
-    },
-    mpBrandAvatarCircle: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: '#0056D2',
+    receiptBrandLeft: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 8,
     },
-    mpBrandAvatarLetter: {
-        color: '#FFFFFF',
-        fontSize: 18,
+    receiptLogoImg: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#DAA520',
+    },
+    receiptBrandTitle: {
+        fontSize: 11,
         fontWeight: '900',
+        color: '#0F172A',
+        letterSpacing: 0.5,
     },
-    mpAmountHeroText: {
-        fontSize: 28,
+    receiptBrandSub: {
+        fontSize: 8,
+        fontWeight: '800',
+        color: '#D97706',
+        letterSpacing: 0.5,
+        marginTop: 1,
+    },
+    receiptVerifiedSeal: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 8,
+        paddingVertical: 3.5,
+        borderRadius: 12,
+        borderWidth: 0.5,
+        borderColor: '#A7F3D0',
+    },
+    sealGreenDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#10B981',
+    },
+    receiptVerifiedSealText: {
+        fontSize: 8.5,
         fontWeight: '900',
-        color: '#000000',
-        letterSpacing: -0.5,
-        marginBottom: 12,
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        color: '#059669',
+        letterSpacing: 0.5,
     },
-    mpDividerLine: {
-        height: 1,
-        backgroundColor: '#F1F5F9',
-        marginBottom: 14,
-    },
-    mpDetailsBox: {
-        backgroundColor: '#F8FAFC',
+    detailAmountCard: {
+        backgroundColor: '#0F172A',
         borderRadius: 14,
         padding: 14,
-        borderWidth: 0.5,
-        borderColor: '#E2E8F0',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(218, 165, 32, 0.45)',
+        marginBottom: 10,
     },
-    mpFieldBlock: {
-        marginBottom: 13,
+    amountCardTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginBottom: 6,
     },
-    mpFieldLabel: {
-        fontSize: 11,
-        color: '#8E9BAE',
-        fontWeight: '600',
-        marginBottom: 2,
-    },
-    mpFieldValue: {
-        fontSize: 13,
-        color: '#0F172A',
-        fontWeight: '800',
-    },
-    mpTypeTag: {
-        alignSelf: 'flex-start',
-        backgroundColor: '#E0F2FE',
-        paddingHorizontal: 10,
-        paddingVertical: 3.5,
+    debitPillTag: {
+        backgroundColor: 'rgba(217, 119, 6, 0.2)',
+        borderWidth: 0.8,
+        borderColor: 'rgba(245, 158, 11, 0.5)',
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
         borderRadius: 6,
+    },
+    debitPillText: {
+        color: '#F59E0B',
+        fontSize: 9.5,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+    },
+    statusSuccessTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        borderWidth: 0.8,
+        borderColor: 'rgba(16, 185, 129, 0.4)',
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
+        borderRadius: 12,
+    },
+    statusSuccessText: {
+        color: '#34D399',
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    detailAmountText: {
+        fontSize: 28,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        letterSpacing: -0.5,
+        marginBottom: 2,
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    detailAmountSubBreakdown: {
+        fontSize: 9,
+        color: '#CBD5E1',
+        fontWeight: '600',
         marginTop: 2,
     },
-    mpTypeTagText: {
-        color: '#0284C7',
-        fontSize: 11.5,
+    detailInfoCard: {
+        backgroundColor: '#F8FAFC',
+        borderColor: '#E2E8F0',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+    },
+    fieldBlock: {
+        marginBottom: 10,
+    },
+    fieldLabel: {
+        color: '#64748B',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+        marginBottom: 2,
+    },
+    fieldValue: {
+        color: '#0F172A',
+        fontSize: 12.5,
         fontWeight: '800',
     },
-    mpRefCopyRow: {
+    typeTagPill: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#FEF3C7',
+        borderWidth: 0.5,
+        borderColor: '#FDE68A',
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
+        borderRadius: 5,
+        marginTop: 2,
+    },
+    typeTagText: {
+        color: '#B45309',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    refCopyRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         backgroundColor: '#F1F5F9',
         paddingHorizontal: 8,
-        paddingVertical: 5,
+        paddingVertical: 4.5,
         borderRadius: 6,
         borderWidth: 0.5,
         borderColor: '#CBD5E1',
         marginTop: 2,
     },
-    mpRefText: {
+    refText: {
         color: '#0F172A',
         fontSize: 10.5,
         fontWeight: '800',
@@ -583,19 +629,22 @@ const s = StyleSheet.create({
         flex: 1,
         marginRight: 6,
     },
-    scallopsWrapper: {
+    securityNoticeRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 12,
-        marginBottom: -8,
-        marginHorizontal: -16,
-        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        paddingVertical: 6,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        marginTop: 2,
+        borderWidth: 0.5,
+        borderColor: '#E2E8F0',
     },
-    scallopCircle: {
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: '#0056D2',
+    securityNoticeText: {
+        fontSize: 8.5,
+        fontWeight: '700',
+        color: '#64748B',
     },
 
     /* Action Buttons */
