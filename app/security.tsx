@@ -213,10 +213,10 @@ export default function SecurityScreen() {
         await AsyncStorage.setItem('app_auto_lock_interval', val);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         const labels: Record<string, string> = {
-            '0': 'Immediately (Nan Take) ⚡',
-            '60': 'After 1 Minute ⏱️',
-            '300': 'After 5 Minutes ⏱️',
-            '900': 'After 15 Minutes ⏱️',
+            '0': 'Immediately',
+            '60': 'After 1 Minute',
+            '300': 'After 5 Minutes',
+            '900': 'After 15 Minutes',
         };
         showToast(`Auto-Lock set to ${labels[val] || val}`);
     };
@@ -392,10 +392,10 @@ export default function SecurityScreen() {
             if (res.success) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                 Alert.alert(
-                    "Biometrics 100% Active! ✨",
-                    `An tabbatar da ${biometricType} dinka cikin nasara! Na'urar tana aiki 100% da tsaro mai karfi (Bank-Grade Secure Enclave).`
+                    "Biometrics Active! ✨",
+                    `Your ${biometricType} sensor was tested successfully. Hardware Secure Enclave is fully operational.`
                 );
-                showToast(`${biometricType} Tested & 100% Verified! 🛡️`);
+                showToast(`${biometricType} Tested & Verified! 🛡️`);
             } else {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
             }
@@ -785,8 +785,8 @@ export default function SecurityScreen() {
                                     <Ionicons name="shield-checkmark" size={18} color={L.goldDk} />
                                 </View>
                                 <View>
-                                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Overall Security Health</Text>
-                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '500' }}>{userEmail || 'Shielded Account Engine'}</Text>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Account Security Rating</Text>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '500' }}>{userEmail || 'Active Protected Session'}</Text>
                                 </View>
                             </View>
 
@@ -799,13 +799,13 @@ export default function SecurityScreen() {
                                 borderColor: securityScore >= 75 ? L.emeraldBorder : L.goldBorder 
                             }}>
                                 <Text style={{ color: securityScore >= 75 ? L.emerald : L.gold, fontSize: 10, fontWeight: '900' }}>
-                                    {securityScore}% {securityScore === 100 ? 'MAXIMUM' : securityScore >= 75 ? 'HIGH' : 'FAIR'}
+                                    {securityScore}% {securityScore === 100 ? 'OPTIMAL' : securityScore >= 75 ? 'STRONG' : 'BASIC'}
                                 </Text>
                             </View>
                         </View>
 
                         {/* Visual Security Progress Bar */}
-                        <View style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
+                        <View style={{ width: '100%', height: 4, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden' }}>
                             <LinearGradient
                                 colors={securityScore >= 75 ? [L.emerald, '#059669'] : [L.gold, L.goldDk]}
                                 start={{ x: 0, y: 0 }}
@@ -813,710 +813,418 @@ export default function SecurityScreen() {
                                 style={{ width: `${securityScore}%`, height: '100%' }}
                             />
                         </View>
-
-                        {/* Quick 4-Pillar Security Checklist */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 6, borderTopWidth: 0.8, borderColor: 'rgba(255,255,255,0.08)' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Ionicons name="checkmark-circle" size={11} color={L.emerald} />
-                                <Text style={{ color: '#CBD5E1', fontSize: 8.5, fontWeight: '700' }}>Password</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Ionicons name={hasPinConfigured ? "checkmark-circle" : "ellipse-outline"} size={11} color={hasPinConfigured ? L.emerald : '#64748B'} />
-                                <Text style={{ color: hasPinConfigured ? '#CBD5E1' : '#64748B', fontSize: 8.5, fontWeight: '700' }}>PIN</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Ionicons name={biometricEnabled ? "checkmark-circle" : "ellipse-outline"} size={11} color={biometricEnabled ? L.emerald : '#64748B'} />
-                                <Text style={{ color: biometricEnabled ? '#CBD5E1' : '#64748B', fontSize: 8.5, fontWeight: '700' }}>Biometrics</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Ionicons name={isMfaActive ? "checkmark-circle" : "ellipse-outline"} size={11} color={isMfaActive ? L.emerald : '#64748B'} />
-                                <Text style={{ color: isMfaActive ? '#CBD5E1' : '#64748B', fontSize: 8.5, fontWeight: '700' }}>2FA</Text>
-                            </View>
-                        </View>
                     </View>
                 </LinearGradient>
 
-                {/* 2. BODY CONTENT (Light Mode Background `#F4F6FB` with Pure White Cards) */}
+                {/* 2. BODY CONTENT (Clean, Minimalist, 100% English & 100% Real Interactive Settings) */}
                 <ScrollView 
                     style={{ flex: 1 }} 
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 50 }}
+                    contentContainerStyle={{ padding: 14, gap: 14, paddingBottom: 40 }}
                 >
-                    {/* SECTION 1: TWO-FACTOR AUTHENTICATION (2FA / TOTP) */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: isMfaActive ? L.emeraldBorder : L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, borderWidth: 1, borderColor: isMfaActive ? L.emerald : L.gold, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="qr-code" size={21} color={isMfaActive ? L.emerald : L.goldDk} />
+                    {/* SECTION 1: CREDENTIALS & PASSCODES */}
+                    <View>
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, marginLeft: 4 }}>
+                            Credentials & Passcodes
+                        </Text>
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, overflow: 'hidden' }}>
+                            {/* Login Password */}
+                            <TouchableOpacity
+                                onPress={() => router.push('/change-password')}
+                                activeOpacity={0.7}
+                                style={{ 
+                                    flexDirection: 'row', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between', 
+                                    padding: 14, 
+                                    borderBottomWidth: 1, 
+                                    borderColor: '#F1F5F9' 
+                                }}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="lock-closed-outline" size={18} color={L.navyHeader} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '800' }}>Login Password</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>Change your account login password</Text>
+                                    </View>
                                 </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 13, fontWeight: '800' }}>Google Authenticator (2FA)</Text>
-                                        <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 0.8, borderColor: isMfaActive ? L.emeraldBorder : L.goldBorder }}>
-                                            <Text style={{ color: isMfaActive ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: '900' }}>
-                                                {isMfaActive ? 'ACTIVE & VERIFIED' : 'RECOMMENDED'}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Text style={{ color: L.blue, fontSize: 11, fontWeight: '700' }}>Update</Text>
+                                    <Ionicons name="chevron-forward" size={15} color="#94A3B8" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Transaction PIN */}
+                            <TouchableOpacity
+                                onPress={() => router.push('/(auth)/pin-setup')}
+                                activeOpacity={0.7}
+                                style={{ 
+                                    flexDirection: 'row', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between', 
+                                    padding: 14 
+                                }}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: L.goldBg, borderWidth: 1, borderColor: L.goldBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="keypad-outline" size={18} color={L.goldDk} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '800' }}>4-Digit Transaction PIN</Text>
+                                            <View style={{ backgroundColor: hasPinConfigured ? L.emeraldBg : L.goldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                                <Text style={{ color: hasPinConfigured ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: '900' }}>
+                                                    {hasPinConfigured ? 'CONFIGURED' : 'NOT SET'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>Required for transfers, withdrawals, and orders</Text>
+                                    </View>
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Text style={{ color: L.goldDk, fontSize: 11, fontWeight: '700' }}>{hasPinConfigured ? 'Change' : 'Set Up'}</Text>
+                                    <Ionicons name="chevron-forward" size={15} color="#94A3B8" />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* SECTION 2: BIOMETRIC AUTHENTICATION */}
+                    <View>
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, marginLeft: 4 }}>
+                            Biometrics
+                        </Text>
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, overflow: 'hidden' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
+                                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', borderWidth: 1, borderColor: biometricEnabled ? L.blueBorder : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                                        <MaterialCommunityIcons 
+                                            name={biometricType === 'Face ID' ? "face-recognition" : "fingerprint"} 
+                                            size={20} 
+                                            color={biometricEnabled ? L.blue : L.textMuted} 
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '800' }}>{biometricType}</Text>
+                                            <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                                <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 8, fontWeight: '900' }}>
+                                                    {biometricEnabled ? 'ENABLED' : biometricAvailable ? 'AVAILABLE' : 'OFF'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>
+                                            Unlock the app and approve transactions with {biometricType}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <Switch
+                                    trackColor={{ false: '#E2E8F0', true: '#2563EB' }}
+                                    thumbColor={biometricEnabled ? '#FFFFFF' : '#94A3B8'}
+                                    onValueChange={handleBiometricToggle}
+                                    value={biometricEnabled}
+                                    disabled={!biometricAvailable}
+                                    style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+                                />
+                            </View>
+
+                            {biometricAvailable && (
+                                <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC' }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 10 }}>Hardware Secure Enclave active</Text>
+                                    <TouchableOpacity 
+                                        onPress={handleTestBiometric}
+                                        style={{ backgroundColor: L.blueBg, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, borderWidth: 0.8, borderColor: L.blueBorder }}
+                                    >
+                                        <Text style={{ color: L.blue, fontSize: 9.5, fontWeight: '800' }}>Test Sensor</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* SECTION 3: TWO-FACTOR AUTHENTICATION */}
+                    <View>
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, marginLeft: 4 }}>
+                            Two-Factor Authentication (2FA)
+                        </Text>
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, overflow: 'hidden' }}>
+                            {/* Main 2FA Switch */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
+                                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, borderWidth: 1, borderColor: isMfaActive ? L.emeraldBorder : L.goldBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="qr-code-outline" size={18} color={isMfaActive ? L.emerald : L.goldDk} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '800' }}>Google Authenticator</Text>
+                                            <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                                <Text style={{ color: isMfaActive ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: '900' }}>
+                                                    {isMfaActive ? 'ACTIVE' : 'RECOMMENDED'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>
+                                            Generate 6-digit TOTP verification codes
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {mfaLoading ? (
+                                    <ActivityIndicator size="small" color={L.gold} />
+                                ) : (
+                                    <Switch
+                                        trackColor={{ false: '#E2E8F0', true: '#10B981' }}
+                                        thumbColor={isMfaActive ? '#FFFFFF' : '#94A3B8'}
+                                        onValueChange={handleToggleMfa}
+                                        value={isMfaActive}
+                                        style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+                                    />
+                                )}
+                            </View>
+
+                            {/* Additional 2FA Settings (Only when active) */}
+                            {isMfaActive && (
+                                <>
+                                    {/* Transfer Protection Toggle */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderTopWidth: 1, borderColor: '#F1F5F9' }}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '700' }}>Require 2FA for Transfers</Text>
+                                            <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 1 }}>
+                                                Prompt for 6-digit code before completing payouts and transfers
                                             </Text>
                                         </View>
+                                        <Switch
+                                            trackColor={{ false: '#E2E8F0', true: '#10B981' }}
+                                            thumbColor={mfaForTransfers ? '#FFFFFF' : '#94A3B8'}
+                                            onValueChange={handleToggleTransferMfa}
+                                            value={mfaForTransfers}
+                                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                        />
                                     </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, lineHeight: 13.5 }}>
-                                        Generates time-sensitive 6-digit TOTP codes for uncrackable sign-in security.
+
+                                    {/* Test Code Action Strip */}
+                                    <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC' }}>
+                                        <Text style={{ color: L.textMuted, fontSize: 10 }}>Sync & verify Authenticator clock</Text>
+                                        <TouchableOpacity 
+                                            onPress={() => setTestModalVisible(true)}
+                                            style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: L.cardBorder }}
+                                        >
+                                            <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Test Code</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* SECTION 4: APP LOCK & PRIVACY */}
+                    <View>
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, marginLeft: 4 }}>
+                            App Lock & Privacy
+                        </Text>
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, padding: 14 }}>
+                            {/* Auto-Lock Interval */}
+                            <View style={{ marginBottom: 14 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '700' }}>Auto-Lock Inactivity Timeout</Text>
+                                    <Text style={{ color: L.goldDk, fontSize: 10.5, fontWeight: '800' }}>
+                                        {autoLockInterval === '0' ? 'Immediately' : autoLockInterval === '60' ? '1 Min' : autoLockInterval === '300' ? '5 Mins' : '15 Mins'}
                                     </Text>
+                                </View>
+                                <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 8 }}>
+                                    Lock app automatically when minimized or inactive
+                                </Text>
+
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    {[
+                                        { key: '0', label: 'Immediately' },
+                                        { key: '60', label: '1 Min' },
+                                        { key: '300', label: '5 Mins' },
+                                        { key: '900', label: '15 Mins' },
+                                    ].map((item) => {
+                                        const active = autoLockInterval === item.key;
+                                        return (
+                                            <TouchableOpacity
+                                                key={item.key}
+                                                onPress={() => handleChangeAutoLock(item.key)}
+                                                style={{
+                                                    flex: 1,
+                                                    paddingVertical: 8,
+                                                    borderRadius: 8,
+                                                    backgroundColor: active ? L.navyHeader : '#F8FAFC',
+                                                    borderWidth: 1,
+                                                    borderColor: active ? L.navyHeader : '#E2E8F0',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                                activeOpacity={0.75}
+                                            >
+                                                <Text style={{ color: active ? '#FFFFFF' : L.textPrimary, fontSize: 10, fontWeight: active ? '800' : '600' }}>
+                                                    {item.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
                                 </View>
                             </View>
 
-                            {mfaLoading ? (
-                                <ActivityIndicator size="small" color={L.gold} />
-                            ) : (
+                            {/* Privacy Mode (Mask Balance) */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+                                <View style={{ flex: 1, paddingRight: 8 }}>
+                                    <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '700' }}>Privacy Mode</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>
+                                        Hide wallet balance by default on launch
+                                    </Text>
+                                </View>
                                 <Switch
                                     trackColor={{ false: '#E2E8F0', true: '#10B981' }}
-                                    thumbColor={isMfaActive ? '#FFFFFF' : '#94A3B8'}
-                                    onValueChange={handleToggleMfa}
-                                    value={isMfaActive}
-                                    style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
+                                    thumbColor={hideBalanceByDefault ? '#FFFFFF' : '#94A3B8'}
+                                    onValueChange={handleToggleHideBalance}
+                                    value={hideBalanceByDefault}
+                                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                 />
-                            )}
-                        </View>
+                            </View>
 
-                        {/* 2FA Action Strip: Test Authenticator Code or Setup Notice */}
-                        {isMfaActive ? (
-                            <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ flex: 1, backgroundColor: L.emeraldBg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="shield-checkmark" size={13} color={L.emerald} />
-                                    <Text style={{ color: '#065F46', fontSize: 9.5, fontWeight: '700' }}>
-                                        Protected on every new sign-in
+                            {/* Sign-In Alerts */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10 }}>
+                                <View style={{ flex: 1, paddingRight: 8 }}>
+                                    <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '700' }}>Sign-In Email Alerts</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>
+                                        Receive email notifications when account is accessed on a new device
                                     </Text>
                                 </View>
-                                <TouchableOpacity 
-                                    onPress={() => setTestModalVisible(true)}
-                                    style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: L.cardBorder, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                                >
-                                    <Ionicons name="flask-outline" size={12} color={L.navyMid} />
-                                    <Text style={{ color: L.navyMid, fontSize: 9.5, fontWeight: '800' }}>Test Code 🧪</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View style={{ marginTop: 10, backgroundColor: L.goldBg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name="information-circle" size={13} color={L.goldAmber} />
-                                <Text style={{ color: L.goldAmber, fontSize: 9.5, fontWeight: '600', flex: 1 }}>
-                                    Switch toggle ON to link Google Authenticator, Microsoft Authenticator, or Authy.
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* SECTION 2: INDA 2FA ZAI BAYYANA (2FA PROTECTION SCOPE & WHERE IT APPEARS) */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <MaterialCommunityIcons name="shield-airplane" size={16} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontSize: 11.5, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    Inda 2FA Zai Bayyana (Where It Appears)
-                                </Text>
-                            </View>
-                            <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
-                                <Text style={{ color: isMfaActive ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: '900' }}>
-                                    {isMfaActive ? 'ACTIVE SHIELD' : 'SETUP REQUIRED'}
-                                </Text>
+                                <Switch
+                                    trackColor={{ false: '#E2E8F0', true: '#2563EB' }}
+                                    thumbColor={loginEmailAlerts ? '#FFFFFF' : '#94A3B8'}
+                                    onValueChange={handleToggleEmailAlerts}
+                                    value={loginEmailAlerts}
+                                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                />
                             </View>
                         </View>
+                    </View>
 
-                        <Text style={{ color: L.textMuted, fontSize: 9.5, marginBottom: 12, lineHeight: 13.5 }}>
-                            Shafuka da ayyukan da lambobin 2FA za su bayyana don kare asusunka daga fashi ko shiga ba tare da izini ba:
+                    {/* SECTION 5: EMERGENCY PROTECTION */}
+                    <View>
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, marginLeft: 4 }}>
+                            Emergency Protection
                         </Text>
-
-                        {/* Location 1: Shiga Asusu (Login / Sign-In) */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.blueBg, borderWidth: 1, borderColor: L.blueBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="log-in-outline" size={17} color={L.blue} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Shiga Asusu (Login)</Text>
-                                        <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: isMfaActive ? L.emerald : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
-                                                {isMfaActive ? 'KOYAUSHE' : 'OFF'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
-                                        Yana bayyana kai-tsaye a shafin Login bayan Email & Password.
+                        <View style={{ backgroundColor: isAccountFrozen ? '#FFF1F2' : L.card, borderRadius: 14, borderWidth: 1, borderColor: isAccountFrozen ? L.roseBorder : L.cardBorder, padding: 14 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <MaterialCommunityIcons name={isAccountFrozen ? "shield-alert" : "shield-lock-outline"} size={16} color={isAccountFrozen ? L.rose : L.navyHeader} />
+                                    <Text style={{ color: isAccountFrozen ? L.rose : L.navyHeader, fontSize: 12, fontWeight: '800' }}>
+                                        Emergency Account Freeze
                                     </Text>
                                 </View>
-                            </View>
-                            <Ionicons name="shield-checkmark" size={18} color={isMfaActive ? L.emerald : '#CBD5E1'} />
-                        </View>
-
-                        {/* Location 2: Tura Kuɗi & Cire Kuɗi (Wallet Transfers & Bank Payouts) */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.emeraldBg, borderWidth: 1, borderColor: L.emeraldBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="paper-plane-outline" size={17} color={L.emerald} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Tura Kuɗi (Transfers)</Text>
-                                        <View style={{ backgroundColor: (isMfaActive && mfaForTransfers) ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: (isMfaActive && mfaForTransfers) ? L.emerald : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
-                                                {(isMfaActive && mfaForTransfers) ? 'PIN + 2FA' : 'PIN ONLY'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
-                                        Yana bayyana a SecurityModal bayan 4-digit PIN kafin kudi su fita.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Switch
-                                trackColor={{ false: '#E2E8F0', true: '#10B981' }}
-                                thumbColor={(isMfaActive && mfaForTransfers) ? '#FFFFFF' : '#94A3B8'}
-                                onValueChange={handleToggleTransferMfa}
-                                value={isMfaActive && mfaForTransfers}
-                                disabled={!isMfaActive}
-                                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-                            />
-                        </View>
-
-                        {/* Location 3: Sauya Kalmar Sirri & PIN */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.purpleBg, borderWidth: 1, borderColor: L.purpleBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="key-outline" size={17} color={L.purple} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Canza PIN & Password</Text>
-                                        <View style={{ backgroundColor: L.purpleBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: L.purple, fontSize: 7.5, fontWeight: '900' }}>PROTECTED</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
-                                        Yana kare canza lambar asiri da transaction PIN ta yadda ba za a taba sace su ba.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Ionicons name="checkmark-circle" size={18} color={isMfaActive ? L.purple : '#CBD5E1'} />
-                        </View>
-                    </View>
-
-                    {/* SECTION 3: HARDWARE BIOMETRIC SECURITY (FACE ID / FINGERPRINT / TOUCH ID) */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: biometricEnabled ? L.blueBorder : L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', borderWidth: 1, borderColor: biometricEnabled ? L.blue : '#CBD5E1', alignItems: 'center', justifyContent: 'center' }}>
-                                    <MaterialCommunityIcons 
-                                        name={biometricType === 'Face ID' ? "face-recognition" : "fingerprint"} 
-                                        size={22} 
-                                        color={biometricEnabled ? L.blue : L.textMuted} 
-                                    />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 13, fontWeight: '800' }}>
-                                            {biometricType} Authentication
-                                        </Text>
-                                        <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 0.8, borderColor: biometricEnabled ? L.blueBorder : '#CBD5E1' }}>
-                                            <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 8, fontWeight: '900' }}>
-                                                {biometricEnabled ? 'ACTIVE & VERIFIED' : biometricAvailable ? 'READY' : 'UNAVAILABLE'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, lineHeight: 13.5 }}>
-                                        Bank-grade biometric authentication using device Secure Enclave / KeyStore.
+                                <View style={{ backgroundColor: isAccountFrozen ? '#FEE2E2' : L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
+                                    <Text style={{ color: isAccountFrozen ? L.rose : L.emerald, fontSize: 8, fontWeight: '900' }}>
+                                        {isAccountFrozen ? 'FROZEN' : 'ACTIVE'}
                                     </Text>
                                 </View>
                             </View>
 
-                            <Switch
-                                trackColor={{ false: '#E2E8F0', true: '#2563EB' }}
-                                thumbColor={biometricEnabled ? '#FFFFFF' : '#94A3B8'}
-                                onValueChange={handleBiometricToggle}
-                                value={biometricEnabled}
-                                disabled={!biometricAvailable}
-                                style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
-                            />
-                        </View>
-
-                        {/* Action Strip: Sensor Diagnostics & Test Button */}
-                        <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <View style={{ flex: 1, backgroundColor: biometricEnabled ? L.blueBg : '#F8FAFC', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name={biometricAvailable ? "shield-checkmark" : "information-circle-outline"} size={13} color={biometricAvailable ? L.blue : L.textMuted} />
-                                <Text style={{ color: biometricAvailable ? L.blue : L.textMuted, fontSize: 9.5, fontWeight: '700' }}>
-                                    {biometricEnabled 
-                                        ? `Protected with ${biometricType} 🛡️` 
-                                        : biometricAvailable 
-                                            ? `Sensor ready (${biometricType})` 
-                                            : 'No biometric hardware enrolled'}
-                                </Text>
-                            </View>
-                            {biometricAvailable && (
-                                <TouchableOpacity 
-                                    onPress={handleTestBiometric}
-                                    style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: L.cardBorder, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                                >
-                                    <MaterialCommunityIcons name={biometricType === 'Face ID' ? "face-recognition" : "fingerprint"} size={13} color={L.blue} />
-                                    <Text style={{ color: L.blue, fontSize: 9.5, fontWeight: '800' }}>Test Sensor 👆</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                    </View>
-
-                    {/* SECTION 4: TSARIN AIKIN BIOMETRICS (WHERE BIOMETRICS WORKS & ARCHITECTURE) */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <MaterialCommunityIcons name="fingerprint" size={16} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontSize: 11.5, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    Tsarin Aikin Biometrics (Where It Works)
-                                </Text>
-                            </View>
-                            <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
-                                <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 8, fontWeight: '900' }}>
-                                    {biometricEnabled ? 'ENABLED (100%)' : 'OFF'}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <Text style={{ color: L.textMuted, fontSize: 9.5, marginBottom: 12, lineHeight: 13.5 }}>
-                            Shafuka da hanyoyin da {biometricType} ke ba da tsaro da saukin aiki a cikin manhajar Abu Mafhal Hub:
-                        </Text>
-
-                        {/* Feature 1: Shiga Manhaja (Instant App Unlock) */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.blueBg, borderWidth: 1, borderColor: L.blueBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="phone-portrait-outline" size={17} color={L.blue} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Buɗe Manhaja (App Unlock)</Text>
-                                        <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
-                                                {biometricEnabled ? 'ACTIVE' : 'OFF'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
-                                        Buɗe manhaja kai-tsaye ba tare da rubuta 4-digit PIN ba a lokacin da ka dawo.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Ionicons name="checkmark-circle" size={18} color={biometricEnabled ? L.blue : '#CBD5E1'} />
-                        </View>
-
-                        {/* Feature 2: Biyan Kuɗi a SecurityModal (Transaction PIN Fast-Pass) */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.goldBg, borderWidth: 1, borderColor: L.goldBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="card-outline" size={17} color={L.goldDk} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Amincewa da Ma'amala (SecurityModal)</Text>
-                                        <View style={{ backgroundColor: biometricEnabled ? L.goldBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: biometricEnabled ? L.goldAmber : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
-                                                {biometricEnabled ? 'FAST-PASS' : 'PIN ONLY'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
-                                        Tura kuɗi ko sayen data da yatsa/fuska a kan allon PIN na SecurityModal.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Ionicons name="checkmark-circle" size={18} color={biometricEnabled ? L.goldDk : '#CBD5E1'} />
-                        </View>
-
-                        {/* Feature 3: Shiga Asusu Cikin Sauri (1-Tap Quick Login) */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.purpleBg, borderWidth: 1, borderColor: L.purpleBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="finger-print" size={17} color={L.purple} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Shiga Asusu Cikin Sauri (1-Tap Login)</Text>
-                                        <View style={{ backgroundColor: biometricEnabled ? L.purpleBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: biometricEnabled ? L.purple : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
-                                                {biometricEnabled ? 'READY' : 'OFF'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
-                                        Shiga asusunka kai-tsaye a shafin Login ba tare da sake rubuta kalmar sirri ba.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Ionicons name="checkmark-circle" size={18} color={biometricEnabled ? L.purple : '#CBD5E1'} />
-                        </View>
-
-                        {/* Feature 4: Tsaron Hardware (Hardware Enclave Isolation) */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.emeraldBg, borderWidth: 1, borderColor: L.emeraldBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                    <MaterialCommunityIcons name="shield-lock-outline" size={17} color={L.emerald} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Tsaron Na'ura (Secure Enclave)</Text>
-                                        <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: L.emerald, fontSize: 7.5, fontWeight: '900' }}>100% PRIVATE</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
-                                        Babu wani bayanin yatsa ko fuska da ke barin wayarka; na'urar ce kadai ke sarrafa shi.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Ionicons name="shield-checkmark" size={18} color={L.emerald} />
-                        </View>
-                    </View>
-
-                    {/* SECTION 3: TRANSACTION PIN & CREDENTIAL PASSCODES */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 }}>
-                            🔑 Passcodes & Credentials
-                        </Text>
-
-                        {/* Option A: 4-Digit Transaction PIN */}
-                        <TouchableOpacity
-                            onPress={() => router.push('/(auth)/pin-setup')}
-                            activeOpacity={0.7}
-                            style={{ 
-                                flexDirection: 'row', 
-                                alignItems: 'center', 
-                                justifyContent: 'space-between', 
-                                paddingVertical: 10, 
-                                borderBottomWidth: 1, 
-                                borderColor: '#F1F5F9' 
-                            }}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: L.goldBg, borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="keypad" size={17} color={L.goldDk} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '800' }}>4-Digit Transaction PIN</Text>
-                                        <View style={{ backgroundColor: hasPinConfigured ? L.emeraldBg : L.goldBg, paddingHorizontal: 5.5, paddingVertical: 1.5, borderRadius: 5, borderWidth: 0.8, borderColor: hasPinConfigured ? L.emeraldBorder : L.goldBorder }}>
-                                            <Text style={{ color: hasPinConfigured ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: '900' }}>
-                                                {hasPinConfigured ? 'CONFIGURED' : 'SET UP'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 1 }}>
-                                        Required to authorize wallet transfers, airtime, and data orders.
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <Text style={{ color: L.goldDk, fontSize: 10, fontWeight: '800' }}>Change</Text>
-                                <Ionicons name="chevron-forward" size={15} color={L.goldDk} />
-                            </View>
-                        </TouchableOpacity>
-
-                        {/* Option B: Account Login Password */}
-                        <TouchableOpacity
-                            onPress={() => router.push('/change-password')}
-                            activeOpacity={0.7}
-                            style={{ 
-                                flexDirection: 'row', 
-                                alignItems: 'center', 
-                                justifyContent: 'space-between', 
-                                paddingVertical: 10 
-                            }}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="lock-closed" size={17} color={L.navyMid} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '800' }}>Account Login Password</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 1 }}>
-                                        Primary password used for sign-in across mobile and web.
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <Text style={{ color: L.blue, fontSize: 10, fontWeight: '800' }}>Update</Text>
-                                <Ionicons name="chevron-forward" size={15} color={L.blue} />
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* SECTION 6: APP LOCK & PRIVACY SHIELD */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name="timer-outline" size={17} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontSize: 11.5, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    Kulle Manhaja & Sirri (App Lock & Privacy)
-                                </Text>
-                            </View>
-                            <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
-                                <Text style={{ color: L.goldAmber, fontSize: 8, fontWeight: '900' }}>
-                                    CONFIGURABLE
-                                </Text>
-                            </View>
-                        </View>
-
-                        {/* Setting 1: Auto-Lock Inactivity Timeout */}
-                        <View style={{ marginBottom: 12 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>
-                                    Lokacin Kulle Manhaja (Auto-Lock Timeout)
-                                </Text>
-                                <Text style={{ color: L.goldDk, fontSize: 10, fontWeight: '800' }}>
-                                    {autoLockInterval === '0' ? 'Immediately' : autoLockInterval === '60' ? '1 Min' : autoLockInterval === '300' ? '5 Mins' : '15 Mins'}
-                                </Text>
-                            </View>
-                            <Text style={{ color: L.textMuted, fontSize: 9.5, marginBottom: 8, lineHeight: 13.5 }}>
-                                Zabi tsawon lokacin da manhaja za ta kulle kanta idan an ajiye waya ko fita zuwa wani app:
+                            <Text style={{ color: L.textMuted, fontSize: 10, lineHeight: 14, marginBottom: 12 }}>
+                                {isAccountFrozen 
+                                    ? 'All outgoing transfers and orders are temporarily suspended. Your wallet balance remains 100% secure.'
+                                    : 'Instantly pause all outgoing transfers and withdrawals if your phone is lost or credentials compromised.'}
                             </Text>
 
-                            {/* 4-Pill Segmented Selector */}
-                            <View style={{ flexDirection: 'row', gap: 6 }}>
-                                {[
-                                    { key: '0', label: 'Nan Take ⚡', sub: 'Immediately' },
-                                    { key: '60', label: '1 Min ⏱️', sub: 'Default' },
-                                    { key: '300', label: '5 Mins ⏱️', sub: 'Balanced' },
-                                    { key: '900', label: '15 Mins ⏱️', sub: 'Extended' },
-                                ].map((item) => {
-                                    const active = autoLockInterval === item.key;
-                                    return (
-                                        <TouchableOpacity
-                                            key={item.key}
-                                            onPress={() => handleChangeAutoLock(item.key)}
-                                            style={{
-                                                flex: 1,
-                                                paddingVertical: 7,
-                                                paddingHorizontal: 4,
-                                                borderRadius: 8,
-                                                backgroundColor: active ? L.navyHeader : '#F8FAFC',
-                                                borderWidth: 1,
-                                                borderColor: active ? L.gold : '#E2E8F0',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}
-                                            activeOpacity={0.75}
-                                        >
-                                            <Text style={{ color: active ? L.gold : L.textPrimary, fontSize: 10, fontWeight: active ? '900' : '700' }}>
-                                                {item.label}
-                                            </Text>
-                                            <Text style={{ color: active ? '#94A3B8' : '#94A3B8', fontSize: 7.5, fontWeight: '600', marginTop: 1 }}>
-                                                {item.sub}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
-                        </View>
-
-                        {/* Setting 2: Privacy Mode - Hide Balance on Startup */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: hideBalanceByDefault ? L.emeraldBg : '#F1F5F9', borderWidth: 1, borderColor: hideBalanceByDefault ? L.emeraldBorder : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name={hideBalanceByDefault ? "eye-off" : "eye-outline"} size={17} color={hideBalanceByDefault ? L.emerald : L.textMuted} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Boye Ma'aunin Kuɗi (Privacy Mode)</Text>
-                                        <View style={{ backgroundColor: hideBalanceByDefault ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: hideBalanceByDefault ? L.emerald : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
-                                                {hideBalanceByDefault ? 'MASKED' : 'OFF'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1, lineHeight: 12.5 }}>
-                                        Yana ɓoye kuɗin wallet ɗinka (₦••••••) a lokacin buɗe manhaja don kare sirrinka a bainar jama'a.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Switch
-                                trackColor={{ false: '#E2E8F0', true: '#10B981' }}
-                                thumbColor={hideBalanceByDefault ? '#FFFFFF' : '#94A3B8'}
-                                onValueChange={handleToggleHideBalance}
-                                value={hideBalanceByDefault}
-                                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-                            />
-                        </View>
-
-                        {/* Setting 3: Sign-In Security Email Alerts */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: loginEmailAlerts ? L.blueBg : '#F1F5F9', borderWidth: 1, borderColor: loginEmailAlerts ? L.blueBorder : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="notifications-outline" size={17} color={loginEmailAlerts ? L.blue : L.textMuted} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Sanarwar Shiga Asusu (Email Alerts)</Text>
-                                        <View style={{ backgroundColor: loginEmailAlerts ? L.blueBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ color: loginEmailAlerts ? L.blue : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
-                                                {loginEmailAlerts ? 'ACTIVE' : 'OFF'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1, lineHeight: 12.5 }}>
-                                        Aika sanarwa ta email nan take duk lokacin da aka yi nasarar shiga asusunka daga sabuwar na'ura.
-                                    </Text>
-                                </View>
-                            </View>
-                            <Switch
-                                trackColor={{ false: '#E2E8F0', true: '#2563EB' }}
-                                thumbColor={loginEmailAlerts ? '#FFFFFF' : '#94A3B8'}
-                                onValueChange={handleToggleEmailAlerts}
-                                value={loginEmailAlerts}
-                                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-                            />
-                        </View>
-                    </View>
-
-                    {/* SECTION 7: EMERGENCY ACCOUNT FREEZE (PANIC SECURITY MODE) */}
-                    <View style={{ backgroundColor: isAccountFrozen ? '#FFF1F2' : L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: isAccountFrozen ? L.roseBorder : L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <MaterialCommunityIcons name={isAccountFrozen ? "shield-alert" : "shield-lock"} size={16} color={isAccountFrozen ? L.rose : L.navyHeader} />
-                                <Text style={{ color: isAccountFrozen ? L.rose : L.navyHeader, fontSize: 11.5, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    Kulle Asusu Na Gaggawa (Emergency Freeze)
-                                </Text>
-                            </View>
-                            <View style={{ backgroundColor: isAccountFrozen ? '#FEE2E2' : L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
-                                <Text style={{ color: isAccountFrozen ? L.rose : L.emerald, fontSize: 8, fontWeight: '900' }}>
-                                    {isAccountFrozen ? 'TRANSFERS FROZEN 🛡️' : 'NORMAL & ACTIVE'}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <Text style={{ color: L.textMuted, fontSize: 9.5, marginBottom: 12, lineHeight: 13.5 }}>
-                            Idan wayarka ta ɓace, aka sace ta, ko kuma kana zargin an sami lambar sirrinka, zaka iya daskare duk wata hada-hadar fitar kuɗi nan take don kare dukiyarka:
-                        </Text>
-
-                        {isAccountFrozen ? (
-                            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: L.roseBorder, marginBottom: 4 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                    <Ionicons name="lock-closed" size={16} color={L.rose} />
-                                    <Text style={{ color: L.rose, fontSize: 11.5, fontWeight: '900' }}>Asusunka Yana Cikin Kariyar Kulle (Frozen)</Text>
-                                </View>
-                                <Text style={{ color: L.textSecondary, fontSize: 9.5, lineHeight: 13 }}>
-                                    An dakatar da duk wata fitar kuɗi, canja kuɗi, da sayen data. Duk kuɗin da ke ciki suna nan daram. Zaka iya buɗewa a kowane lokaci ta amfani da Transaction PIN ɗinka.
-                                </Text>
-
+                            {isAccountFrozen ? (
                                 <TouchableOpacity
                                     onPress={() => handleOpenFreezeModal('unfreeze')}
                                     style={{
-                                        marginTop: 10,
                                         backgroundColor: L.emerald,
-                                        borderRadius: 9,
-                                        paddingVertical: 9,
+                                        borderRadius: 10,
+                                        paddingVertical: 10,
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexDirection: 'row',
-                                        gap: 6
+                                        justifyContent: 'center'
                                     }}
                                     activeOpacity={0.85}
                                 >
-                                    <Ionicons name="lock-open-outline" size={14} color="#FFFFFF" />
-                                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>
-                                        Buɗe Asusu Yanzu (Unfreeze Account) 🔓
+                                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>
+                                        Unfreeze Account Now 🔓
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    onPress={() => handleOpenFreezeModal('freeze')}
+                                    style={{
+                                        backgroundColor: '#FFF1F2',
+                                        borderWidth: 1,
+                                        borderColor: L.roseBorder,
+                                        borderRadius: 10,
+                                        paddingVertical: 9,
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    activeOpacity={0.85}
+                                >
+                                    <Text style={{ color: L.rose, fontSize: 11, fontWeight: '800' }}>
+                                        Freeze Outgoing Transfers 🚨
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* SECTION 6: SESSIONS & AUDIT */}
+                    <View>
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, marginLeft: 4 }}>
+                            Sessions & Audit
+                        </Text>
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, padding: 14, gap: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Text style={{ color: L.textMuted, fontSize: 10.5 }}>Current Device</Text>
+                                <Text style={{ color: L.textPrimary, fontSize: 10.5, fontWeight: '700' }}>{Platform.OS.toUpperCase()} Native Client</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Text style={{ color: L.textMuted, fontSize: 10.5 }}>Last Verified Sign-In</Text>
+                                <Text style={{ color: L.textSecondary, fontSize: 10.5, fontWeight: '700' }}>{lastSignInTime}</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                                <TouchableOpacity
+                                    onPress={() => setAuditModalVisible(true)}
+                                    style={{ 
+                                        flex: 1, 
+                                        backgroundColor: '#F8FAFC', 
+                                        borderWidth: 1, 
+                                        borderColor: L.cardBorder, 
+                                        borderRadius: 9, 
+                                        paddingVertical: 9, 
+                                        alignItems: 'center' 
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>
+                                        Diagnostics Report 📋
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={handleTerminateOtherSessions}
+                                    style={{ 
+                                        flex: 1, 
+                                        backgroundColor: '#FFF1F2', 
+                                        borderWidth: 1, 
+                                        borderColor: L.roseBorder, 
+                                        borderRadius: 9, 
+                                        paddingVertical: 9, 
+                                        alignItems: 'center' 
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={{ color: L.rose, fontSize: 10, fontWeight: '800' }}>
+                                        Log Out Other Devices 🚪
                                     </Text>
                                 </TouchableOpacity>
                             </View>
-                        ) : (
-                            <TouchableOpacity
-                                onPress={() => handleOpenFreezeModal('freeze')}
-                                style={{
-                                    backgroundColor: '#FFF1F2',
-                                    borderWidth: 1.2,
-                                    borderColor: L.roseBorder,
-                                    borderRadius: 10,
-                                    paddingVertical: 10,
-                                    paddingHorizontal: 12,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexDirection: 'row',
-                                    gap: 6
-                                }}
-                                activeOpacity={0.85}
-                            >
-                                <MaterialCommunityIcons name="alert-octagon-outline" size={15} color={L.rose} />
-                                <Text style={{ color: L.rose, fontSize: 11, fontWeight: '900' }}>
-                                    Kulle Fitar Kuɗi Na Gaggawa (Emergency Freeze) 🚨
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-
-                    {/* SECTION 8: ACTIVE SESSION & DEVICE INTEGRITY */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
-                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 }}>
-                            🛡️ Session & Device Audit
-                        </Text>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '600' }}>Current Platform</Text>
-                            <Text style={{ color: L.textPrimary, fontSize: 10.5, fontWeight: '800' }}>{Platform.OS.toUpperCase()} Native Client</Text>
                         </View>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-                            <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '600' }}>Encryption Standard</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <Ionicons name="shield-checkmark" size={12} color={L.emerald} />
-                                <Text style={{ color: L.emerald, fontSize: 10, fontWeight: '800' }}>TLS 1.3 / AES-256</Text>
-                            </View>
-                        </View>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-                            <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '600' }}>Last Session Refresh</Text>
-                            <Text style={{ color: L.textSecondary, fontSize: 10.5, fontWeight: '700' }}>{lastSignInTime}</Text>
-                        </View>
-
-                        {/* Security Audit & Diagnostic Report Trigger */}
-                        <TouchableOpacity
-                            onPress={() => setAuditModalVisible(true)}
-                            style={{ 
-                                marginTop: 10, 
-                                backgroundColor: L.blueBg, 
-                                borderWidth: 1, 
-                                borderColor: L.blueBorder, 
-                                borderRadius: 10, 
-                                paddingVertical: 9, 
-                                alignItems: 'center', 
-                                flexDirection: 'row', 
-                                justifyContent: 'center', 
-                                gap: 6 
-                            }}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="document-text-outline" size={14} color={L.blue} />
-                            <Text style={{ color: L.blue, fontSize: 10.5, fontWeight: '800' }}>
-                                View Full Security Diagnostics & Audit 📋
-                            </Text>
-                        </TouchableOpacity>
-
-                        {/* Terminate Other Sessions Action */}
-                        <TouchableOpacity
-                            onPress={handleTerminateOtherSessions}
-                            style={{ 
-                                marginTop: 8, 
-                                backgroundColor: '#FFF1F2', 
-                                borderWidth: 1, 
-                                borderColor: L.roseBorder, 
-                                borderRadius: 10, 
-                                paddingVertical: 9, 
-                                alignItems: 'center', 
-                                flexDirection: 'row', 
-                                justifyContent: 'center', 
-                                gap: 6 
-                            }}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="exit-outline" size={14} color={L.rose} />
-                            <Text style={{ color: L.rose, fontSize: 10.5, fontWeight: '800' }}>
-                                Terminate All Other Device Sessions
-                            </Text>
-                        </TouchableOpacity>
                     </View>
                 </ScrollView>
             </View>
@@ -1803,7 +1511,7 @@ export default function SecurityScreen() {
                                 </View>
                                 <View>
                                     <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>
-                                        {freezeActionType === 'freeze' ? 'Kulle Asusu Na Gaggawa' : 'Buɗe Asusu (Unfreeze)'}
+                                        {freezeActionType === 'freeze' ? 'Emergency Account Freeze' : 'Unfreeze Account'}
                                     </Text>
                                     <Text style={{ color: L.textMuted, fontSize: 9.5, fontWeight: '600' }}>
                                         {freezeActionType === 'freeze' ? 'Emergency Panic Protection' : 'Restore Full Account Operations'}
@@ -1830,14 +1538,14 @@ export default function SecurityScreen() {
                         }}>
                             <Text style={{ color: freezeActionType === 'freeze' ? L.rose : L.emerald, fontSize: 10.5, lineHeight: 14.5, fontWeight: '600' }}>
                                 {freezeActionType === 'freeze' 
-                                    ? '🚨 GARGADI: Da zaran ka daskare asusunka, ba za a iya fitar da ko sisi ba ta hanyar transfer, cire kuɗi, ko sayen data har sai ka buɗe da kanka ta PIN ɗinka. Kuɗinka na nan a ajiye lafiya.'
-                                    : '✨ Kariya: Shigar da 4-digit Transaction PIN ɗinka don tabbatar da kai ne mai asusun domin mayar da damar tura kuɗi da sayayya.'}
+                                    ? 'WARNING: Once your account is frozen, all outgoing transfers, withdrawals, and purchases will be paused immediately. Your wallet funds remain 100% safe. You can unfreeze at any time using your transaction PIN.'
+                                    : 'Enter your 4-digit transaction PIN to confirm account ownership and restore full account operations.'}
                             </Text>
                         </View>
 
                         {/* PIN Entry Field */}
                         <Text style={{ color: L.textSecondary, fontSize: 10.5, fontWeight: '800', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                            Shigar da 4-Digit Transaction PIN:
+                            Enter 4-Digit Transaction PIN:
                         </Text>
 
                         <TextInput
@@ -1900,7 +1608,7 @@ export default function SecurityScreen() {
                                     <ActivityIndicator size="small" color="#FFFFFF" />
                                 ) : (
                                     <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>
-                                        {freezeActionType === 'freeze' ? 'Kulle Asusu (Freeze) 🛡️' : 'Buɗe Asusu (Unfreeze) ✨'}
+                                        {freezeActionType === 'freeze' ? 'Freeze Account 🛡️' : 'Unfreeze Account ✨'}
                                     </Text>
                                 )}
                             </TouchableOpacity>
@@ -1947,7 +1655,7 @@ export default function SecurityScreen() {
                                         Security Diagnostics & Audit
                                     </Text>
                                     <Text style={{ color: L.textMuted, fontSize: 9.5, fontWeight: '600' }}>
-                                        Binciken Na'ura, Cryptography & Session Integrity
+                                        Device Hardware, Cryptography & Session Integrity
                                     </Text>
                                 </View>
                             </View>
@@ -2127,7 +1835,7 @@ export default function SecurityScreen() {
                                 }}
                             >
                                 <Text style={{ color: '#FFFFFF', fontSize: 11.5, fontWeight: '900' }}>
-                                    Rufe Bincike (Close Audit)
+                                    Close Diagnostics
                                 </Text>
                             </TouchableOpacity>
                         </ScrollView>
