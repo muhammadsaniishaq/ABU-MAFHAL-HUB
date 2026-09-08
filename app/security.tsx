@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     View, 
     Text, 
@@ -10,7 +10,8 @@ import {
     Modal, 
     TextInput, 
     ActivityIndicator, 
-    Image 
+    Image,
+    Linking 
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,12 +23,12 @@ import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
 
-// Executive Modern Light Theme Palette (Clean, Bright, 24K Gold & Emerald)
+// Executive Ultra-Modern Light Theme Palette (Clean, Bright, 24K Gold & Emerald)
 const L = {
-    bg: '#F4F6FB',              // Crisp, bright light-mode executive background
+    bg: '#F4F6FB',              // Crisp, bright light executive background
     card: '#FFFFFF',            // Pure white card surfaces
     cardBorder: '#E2E8F0',      // Clean hairline card borders
-    cardElevated: '#FFFFFF',
+    cardSubtle: '#F8FAFC',      // Soft elevated container
     navyHeader: '#060B1E',      // Royal Midnight navy header gradient
     navyMid: '#0D1636',
     navyLight: '#142258',
@@ -80,8 +81,14 @@ export default function SecurityScreen() {
     // 2FA Setup Modal States
     const [setupModalVisible, setSetupModalVisible] = useState<boolean>(false);
     const [enrollData, setEnrollData] = useState<any>(null);
-    const [verificationCode, setVerificationCode] = useState<string>('');
+    const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
     const [verifying, setVerifying] = useState<boolean>(false);
+    const otpInputRefs = useRef<Array<TextInput | null>>([]);
+
+    // 2FA Live Test Modal States
+    const [testModalVisible, setTestModalVisible] = useState<boolean>(false);
+    const [testCode, setTestCode] = useState<string>('');
+    const [testingCode, setTestingCode] = useState<boolean>(false);
 
     useEffect(() => {
         loadSecurityOverview();
@@ -92,7 +99,7 @@ export default function SecurityScreen() {
         setTimeout(() => setToastMsg(null), 2500);
     };
 
-    // 1. Load Complete Security State from Supabase & Hardware
+    // 1. Load Complete Security Telemetry
     const loadSecurityOverview = async () => {
         try {
             setLoadingData(true);
@@ -171,7 +178,7 @@ export default function SecurityScreen() {
         }
     };
 
-    // 2. Toggle Biometrics (FaceID / Fingerprint)
+    // 2. Hardware Biometrics Toggle (Face ID / Fingerprint)
     const handleBiometricToggle = async (val: boolean) => {
         if (!biometricAvailable) {
             Alert.alert(
@@ -209,15 +216,29 @@ export default function SecurityScreen() {
         }
     };
 
-    // 3. Toggle Google Authenticator (2FA / TOTP)
+    // 3. Toggle Google Authenticator (2FA / TOTP) with Clean-Slate Guarantee
     const handleToggleMfa = async (val: boolean) => {
         if (val) {
-            // Enroll new TOTP Factor
             setMfaLoading(true);
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) throw new Error("Active session not found. Please log in again.");
 
+                // Prune any previous unverified factors to guarantee 100% reliable enrollment
+                try {
+                    const { data: factors } = await supabase.auth.mfa.listFactors();
+                    if (factors?.totp) {
+                        for (const factor of factors.totp) {
+                            if ((factor as any).status !== 'verified') {
+                                await supabase.auth.mfa.unenroll({ factorId: factor.id });
+                            }
+                        }
+                    }
+                } catch (cleanupErr) {
+                    console.log("MFA pre-cleanup notice:", cleanupErr);
+                }
+
+                // Enroll fresh TOTP factor
                 const { data, error } = await supabase.auth.mfa.enroll({
                     factorType: 'totp',
                     issuer: 'ABU MAFHAL HUB',
@@ -227,7 +248,7 @@ export default function SecurityScreen() {
                 if (error) throw error;
 
                 setEnrollData(data);
-                setVerificationCode('');
+                setOtpDigits(['', '', '', '', '', '']);
                 setSetupModalVisible(true);
             } catch (err: any) {
                 Alert.alert("2FA Setup Failed", err.message || "Could not initialize Google Authenticator.");
@@ -268,17 +289,49 @@ export default function SecurityScreen() {
         }
     };
 
-    // 4. Verify 6-digit TOTP Code
-    const handleVerifyTotp = async () => {
-        const clean = verificationCode.trim();
-        if (clean.length !== 6) {
+    // 4. Handle 6-Digit Code Input & Auto-Submit
+    const handleOtpChange = (text: string, index: number) => {
+        const clean = text.replace(/[^0-9]/g, '');
+        
+        // Handle full 6-digit paste
+        if (clean.length === 6) {
+            const pasted = clean.split('');
+            setOtpDigits(pasted);
+            handleVerifyTotp(clean);
+            return;
+        }
+
+        const newDigits = [...otpDigits];
+        newDigits[index] = clean.slice(-1);
+        setOtpDigits(newDigits);
+
+        if (clean && index < 5) {
+            otpInputRefs.current[index + 1]?.focus();
+        }
+
+        // Auto verify when 6th digit entered
+        if (newDigits.every(d => d !== '') && newDigits.join('').length === 6) {
+            handleVerifyTotp(newDigits.join(''));
+        }
+    };
+
+    const handleOtpKeyPress = (e: any, index: number) => {
+        if (e.nativeEvent.key === 'Backspace' && !otpDigits[index] && index > 0) {
+            otpInputRefs.current[index - 1]?.focus();
+        }
+    };
+
+    // 5. Verify & Activate 2FA TOTP Code
+    const handleVerifyTotp = async (overrideCode?: string) => {
+        const codeToVerify = (overrideCode || otpDigits.join('')).trim();
+        if (codeToVerify.length !== 6) {
             Alert.alert("Invalid Code", "Please enter the complete 6-digit code from Google Authenticator.");
             return;
         }
 
         setVerifying(true);
         try {
-            // Step A: Create Challenge
+            // Step A: Challenge Factor
             const { data: chal, error: chalErr } = await supabase.auth.mfa.challenge({
                 factorId: enrollData.id
             });
@@ -288,20 +341,40 @@ export default function SecurityScreen() {
             const { error: verifyErr } = await supabase.auth.mfa.verify({
                 factorId: enrollData.id,
                 challengeId: chal.id,
-                code: clean
+                code: codeToVerify
             });
             if (verifyErr) throw verifyErr;
 
             await AsyncStorage.setItem('mfa_verified_session', 'true');
             setSetupModalVisible(false);
-            setVerificationCode('');
+            setOtpDigits(['', '', '', '', '', '']);
             setEnrollData(null);
             await checkMfaStatus();
             showToast("Google Authenticator activated! 🛡️");
+            Alert.alert(
+                "2FA Activated Successfully! 🎉",
+                "Your account is now 100% protected by Google Authenticator. Keep your authenticator app safe as it will be required when logging in."
+            );
         } catch (err: any) {
-            Alert.alert("Verification Failed ❌", err.message || "Invalid 6-digit code. Please verify the code in your Authenticator app and try again.");
+            Alert.alert("Verification Failed ❌", err.message || "Invalid 6-digit code. Please verify the code in your Authenticator app and ensure your phone time is accurate.");
         } finally {
             setVerifying(false);
+        }
+    };
+
+    // 6. 1-Tap Open Directly in Authenticator App (Seamless Mobile UX)
+    const handleOpenInAuthenticator = async () => {
+        if (!enrollData?.totp?.uri) return;
+        try {
+            await Linking.openURL(enrollData.totp.uri).catch(async () => {
+                await handleCopySecret();
+                Alert.alert(
+                    "Setup Key Copied 📋", 
+                    "Please open Google Authenticator or Authy, choose 'Enter a setup key', and paste the copied secret key."
+                );
+            });
+        } catch {
+            await handleCopySecret();
         }
     };
 
@@ -313,7 +386,7 @@ export default function SecurityScreen() {
             } catch {}
         }
         setSetupModalVisible(false);
-        setVerificationCode('');
+        setOtpDigits(['', '', '', '', '', '']);
         setEnrollData(null);
     };
 
@@ -328,7 +401,34 @@ export default function SecurityScreen() {
         }
     };
 
-    // 5. Terminate All Other Sessions
+    // 7. Live 2FA Code Test (Confirm Authenticator is in Sync)
+    const handleTestCode = async () => {
+        if (testCode.trim().length !== 6 || !mfaFactor) return;
+        setTestingCode(true);
+        try {
+            const { data: chal, error: chalErr } = await supabase.auth.mfa.challenge({
+                factorId: mfaFactor.id
+            });
+            if (chalErr) throw chalErr;
+
+            const { error: verifyErr } = await supabase.auth.mfa.verify({
+                factorId: mfaFactor.id,
+                challengeId: chal.id,
+                code: testCode.trim()
+            });
+            if (verifyErr) throw verifyErr;
+
+            setTestModalVisible(false);
+            setTestCode('');
+            Alert.alert("2FA Synchronized! ✅", "Your Google Authenticator code is 100% active, valid, and working smoothly.");
+        } catch (err: any) {
+            Alert.alert("Code Verification Failed ❌", "The code was not accepted. Please ensure your device clock is set to automatic time and try again.");
+        } finally {
+            setTestingCode(false);
+        }
+    };
+
+    // 8. Terminate All Other Sessions
     const handleTerminateOtherSessions = () => {
         Alert.alert(
             "Device Security Audit",
@@ -341,7 +441,6 @@ export default function SecurityScreen() {
                     onPress: async () => {
                         try {
                             setLoadingData(true);
-                            // Revoke all sessions other than current
                             await supabase.auth.signOut({ scope: 'others' });
                             showToast("All other device sessions terminated! 🔒");
                         } catch (e: any) {
@@ -353,6 +452,12 @@ export default function SecurityScreen() {
                 }
             ]
         );
+    };
+
+    // Format Secret Key into 4-character chunks for readability
+    const formatSecret = (secret?: string) => {
+        if (!secret) return 'Generating Secret...';
+        return secret.match(/.{1,4}/g)?.join(' ') || secret;
     };
 
     // Calculate Comprehensive Security Rating (0 to 100%)
@@ -367,7 +472,7 @@ export default function SecurityScreen() {
     const securityScore = calculateSecurityScore();
 
     const qrUrl = enrollData?.totp?.uri
-        ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(enrollData.totp.uri)}`
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(enrollData.totp.uri)}`
         : '';
 
     return (
@@ -403,7 +508,7 @@ export default function SecurityScreen() {
                 </View>
             )}
 
-            {/* Mobile Viewport Container (Max 520px on Web/Tablet, 100% on Mobile) */}
+            {/* Mobile Viewport Shell (Max 520px on Web/Tablet, 100% on Mobile) */}
             <View style={{ flex: 1, width: '100%', maxWidth: 520, backgroundColor: L.bg }}>
                 
                 {/* 1. ROYAL MIDNIGHT & 24K GOLD HEADER (Executive Finish with Refined Text Sizing) */}
@@ -541,7 +646,7 @@ export default function SecurityScreen() {
                     </View>
                 </LinearGradient>
 
-                {/* 2. BODY CONTENT (Light Mode Background `#F4F6FB` with Crisp White Cards) */}
+                {/* 2. BODY CONTENT (Light Mode Background `#F4F6FB` with Pure White Cards) */}
                 <ScrollView 
                     style={{ flex: 1 }} 
                     showsVerticalScrollIndicator={false}
@@ -551,20 +656,20 @@ export default function SecurityScreen() {
                     <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: isMfaActive ? L.emeraldBorder : L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, borderWidth: 1, borderColor: isMfaActive ? L.emerald : L.gold, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="qr-code" size={20} color={isMfaActive ? L.emerald : L.goldDk} />
+                                <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, borderWidth: 1, borderColor: isMfaActive ? L.emerald : L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="qr-code" size={21} color={isMfaActive ? L.emerald : L.goldDk} />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Text style={{ color: L.textPrimary, fontSize: 13, fontWeight: '800' }}>Google Authenticator (2FA)</Text>
-                                        <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : L.roseBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 0.8, borderColor: isMfaActive ? L.emeraldBorder : L.roseBorder }}>
-                                            <Text style={{ color: isMfaActive ? L.emerald : L.rose, fontSize: 8, fontWeight: '900' }}>
-                                                {isMfaActive ? 'ACTIVE' : 'DISABLED'}
+                                        <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 0.8, borderColor: isMfaActive ? L.emeraldBorder : L.goldBorder }}>
+                                            <Text style={{ color: isMfaActive ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: '900' }}>
+                                                {isMfaActive ? 'ACTIVE & VERIFIED' : 'RECOMMENDED'}
                                             </Text>
                                         </View>
                                     </View>
                                     <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, lineHeight: 13.5 }}>
-                                        Requires a 6-digit TOTP code generated by Google Authenticator or Authy.
+                                        Generates time-sensitive 6-digit TOTP codes for uncrackable sign-in security.
                                     </Text>
                                 </View>
                             </View>
@@ -582,45 +687,48 @@ export default function SecurityScreen() {
                             )}
                         </View>
 
-                        {/* Dynamic Informational Strip */}
-                        <View style={{ 
-                            marginTop: 10, 
-                            backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, 
-                            borderRadius: 8, 
-                            paddingHorizontal: 10, 
-                            paddingVertical: 7, 
-                            flexDirection: 'row', 
-                            alignItems: 'center', 
-                            gap: 7 
-                        }}>
-                            <Ionicons 
-                                name={isMfaActive ? "shield-checkmark" : "information-circle"} 
-                                size={14} 
-                                color={isMfaActive ? L.emerald : L.goldAmber} 
-                            />
-                            <Text style={{ color: isMfaActive ? '#065F46' : L.goldAmber, fontSize: 9.5, fontWeight: '600', flex: 1 }}>
-                                {isMfaActive 
-                                    ? "Your account is protected by 2FA verification on every new login." 
-                                    : "Recommended: Enable 2FA to block unauthorized sign-ins and withdrawals."}
-                            </Text>
-                        </View>
+                        {/* 2FA Action Strip: Test Authenticator Code or Setup Notice */}
+                        {isMfaActive ? (
+                            <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{ flex: 1, backgroundColor: L.emeraldBg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="shield-checkmark" size={13} color={L.emerald} />
+                                    <Text style={{ color: '#065F46', fontSize: 9.5, fontWeight: '700' }}>
+                                        Protected on every new sign-in
+                                    </Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => setTestModalVisible(true)}
+                                    style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: L.cardBorder, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                >
+                                    <Ionicons name="flask-outline" size={12} color={L.navyMid} />
+                                    <Text style={{ color: L.navyMid, fontSize: 9.5, fontWeight: '800' }}>Test Code 🧪</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View style={{ marginTop: 10, backgroundColor: L.goldBg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="information-circle" size={13} color={L.goldAmber} />
+                                <Text style={{ color: L.goldAmber, fontSize: 9.5, fontWeight: '600', flex: 1 }}>
+                                    Switch toggle ON to link Google Authenticator, Microsoft Authenticator, or Authy.
+                                </Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* SECTION 2: HARDWARE BIOMETRIC LOGIN */}
                     <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: biometricEnabled ? L.blueBorder : L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', borderWidth: 1, borderColor: biometricEnabled ? L.blue : '#CBD5E1', alignItems: 'center', justifyContent: 'center' }}>
+                                <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', borderWidth: 1, borderColor: biometricEnabled ? L.blue : '#CBD5E1', alignItems: 'center', justifyContent: 'center' }}>
                                     <Ionicons 
                                         name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} 
-                                        size={20} 
+                                        size={21} 
                                         color={biometricEnabled ? L.blue : L.textMuted} 
                                     />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Text style={{ color: L.textPrimary, fontSize: 13, fontWeight: '800' }}>
-                                            {biometricType} Authentication
+                                            {biometricType} Unlock
                                         </Text>
                                         <View style={{ backgroundColor: biometricEnabled ? L.blueBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 0.8, borderColor: biometricEnabled ? L.blueBorder : '#CBD5E1' }}>
                                             <Text style={{ color: biometricEnabled ? L.blue : L.textMuted, fontSize: 8, fontWeight: '900' }}>
@@ -629,7 +737,7 @@ export default function SecurityScreen() {
                                         </View>
                                     </View>
                                     <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, lineHeight: 13.5 }}>
-                                        Fast, secure 1-tap sign in using device hardware sensors.
+                                        Instant 1-tap sign in using your device's built-in secure enclave biometric sensors.
                                     </Text>
                                 </View>
                             </View>
@@ -778,7 +886,7 @@ export default function SecurityScreen() {
                 </ScrollView>
             </View>
 
-            {/* 3. GOOGLE AUTHENTICATOR SETUP MODAL (Crisp Executive Light Design) */}
+            {/* 3. GOOGLE AUTHENTICATOR SETUP MODAL (Executive Light Design with QR, Deep Link & 6-Box Code Input) */}
             <Modal
                 visible={setupModalVisible}
                 animationType="slide"
@@ -790,23 +898,25 @@ export default function SecurityScreen() {
                         width: '100%', 
                         maxWidth: 440, 
                         backgroundColor: '#FFFFFF', 
-                        borderRadius: 20, 
+                        borderRadius: 22, 
                         borderWidth: 1.5, 
                         borderColor: L.gold, 
                         padding: 18, 
-                        maxHeight: '92%',
+                        maxHeight: '94%',
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 6 },
                         shadowOpacity: 0.2,
-                        shadowRadius: 12,
+                        shadowRadius: 14,
                         elevation: 10
                     }}>
                         <ScrollView showsVerticalScrollIndicator={false}>
                             {/* Modal Header */}
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottomWidth: 1, borderColor: '#F1F5F9', paddingBottom: 10 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                                    <Ionicons name="shield-checkmark" size={20} color={L.goldDk} />
-                                    <Text style={{ color: L.navyHeader, fontSize: 14, fontWeight: '900' }}>
+                                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.goldBg, borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="shield-checkmark" size={16} color={L.goldDk} />
+                                    </View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 13.5, fontWeight: '900' }}>
                                         Set Up Google Authenticator
                                     </Text>
                                 </View>
@@ -815,19 +925,44 @@ export default function SecurityScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Step 1: Scan QR Code */}
+                            {/* Step 1: 1-Tap Mobile Deep Link or Scan QR */}
                             <Text style={{ color: L.goldAmber, fontSize: 11, fontWeight: '900', marginBottom: 4 }}>
-                                Step 1: Scan QR Code in Authenticator 📷
+                                Step 1: Link With Your Authenticator App
                             </Text>
-                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 10, lineHeight: 14 }}>
-                                Open Google Authenticator or Authy and scan the barcode below:
+                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 8, lineHeight: 14 }}>
+                                If you are on this phone, tap the button below to add it automatically. Otherwise, scan the barcode from another device.
                             </Text>
 
+                            {/* 1-Tap Mobile Link Button */}
+                            <TouchableOpacity
+                                onPress={handleOpenInAuthenticator}
+                                style={{
+                                    backgroundColor: L.navyHeader,
+                                    borderRadius: 11,
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 12,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 7,
+                                    marginBottom: 12,
+                                    borderWidth: 1,
+                                    borderColor: L.goldBorder
+                                }}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="phone-portrait-outline" size={16} color={L.gold} />
+                                <Text style={{ color: L.gold, fontSize: 11, fontWeight: '900' }}>
+                                    Open in Authenticator App 📲
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* High-Resolution QR Container */}
                             <View style={{ 
                                 alignItems: 'center', 
                                 justifyContent: 'center', 
                                 backgroundColor: '#FFFFFF', 
-                                padding: 12, 
+                                padding: 10, 
                                 borderRadius: 16, 
                                 alignSelf: 'center', 
                                 marginBottom: 12,
@@ -840,13 +975,13 @@ export default function SecurityScreen() {
                             }}>
                                 {qrUrl ? (
                                     <>
-                                        <Image source={{ uri: qrUrl }} style={{ width: 180, height: 180 }} resizeMode="contain" />
+                                        <Image source={{ uri: qrUrl }} style={{ width: 170, height: 170 }} resizeMode="contain" />
                                         <View style={{ marginTop: 6, backgroundColor: L.goldBg, paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 6, borderWidth: 0.8, borderColor: L.goldBorder }}>
-                                            <Text style={{ color: L.goldAmber, fontSize: 8.5, fontWeight: '900' }}>📱 SCAN WITH GOOGLE AUTHENTICATOR</Text>
+                                            <Text style={{ color: L.goldAmber, fontSize: 8.5, fontWeight: '900' }}>📷 SCAN WITH CAMERA</Text>
                                         </View>
                                     </>
                                 ) : (
-                                    <View style={{ width: 180, height: 180, alignItems: 'center', justifyContent: 'center' }}>
+                                    <View style={{ width: 170, height: 170, alignItems: 'center', justifyContent: 'center' }}>
                                         <ActivityIndicator size="large" color={L.gold} />
                                         <Text style={{ color: L.textMuted, fontSize: 10, fontWeight: '600', marginTop: 6 }}>Generating QR Code...</Text>
                                     </View>
@@ -857,9 +992,6 @@ export default function SecurityScreen() {
                             <Text style={{ color: L.goldAmber, fontSize: 11, fontWeight: '900', marginBottom: 4 }}>
                                 Step 2: Or Enter Secret Key Manually
                             </Text>
-                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 6, lineHeight: 14 }}>
-                                If you cannot scan the QR code, copy and paste this key into your Authenticator app:
-                            </Text>
 
                             <View style={{ 
                                 flexDirection: 'row', 
@@ -869,10 +1001,10 @@ export default function SecurityScreen() {
                                 borderWidth: 1, 
                                 borderColor: '#CBD5E1', 
                                 padding: 8, 
-                                marginBottom: 12 
+                                marginBottom: 14 
                             }}>
-                                <Text style={{ flex: 1, color: L.textPrimary, fontSize: 11.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '800' }} numberOfLines={1}>
-                                    {enrollData?.totp?.secret || 'Generating Secret Key...'}
+                                <Text style={{ flex: 1, color: L.textPrimary, fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '800' }} numberOfLines={1}>
+                                    {formatSecret(enrollData?.totp?.secret)}
                                 </Text>
                                 <TouchableOpacity 
                                     onPress={handleCopySecret}
@@ -882,36 +1014,39 @@ export default function SecurityScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Step 3: Enter 6-digit TOTP Code */}
+                            {/* Step 3: Enter 6-digit Code (6 Distinct Digit Boxes) */}
                             <Text style={{ color: L.goldAmber, fontSize: 11, fontWeight: '900', marginBottom: 4 }}>
-                                Step 3: Enter 6-Digit Confirmation Code
+                                Step 3: Enter 6-Digit Verification Code
                             </Text>
-                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 8 }}>
-                                Type the 6-digit code currently shown on your Google Authenticator:
+                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 10 }}>
+                                Type the 6-digit code currently shown in your Authenticator app:
                             </Text>
 
-                            <TextInput
-                                style={{ 
-                                    backgroundColor: '#F8FAFC', 
-                                    borderWidth: 1.5, 
-                                    borderColor: verificationCode.length === 6 ? L.emerald : L.gold, 
-                                    borderRadius: 12, 
-                                    paddingVertical: 10, 
-                                    paddingHorizontal: 12,
-                                    color: L.textPrimary, 
-                                    fontSize: 20, 
-                                    fontWeight: '900', 
-                                    textAlign: 'center', 
-                                    letterSpacing: 6,
-                                    marginBottom: 14 
-                                }}
-                                placeholder="000000"
-                                placeholderTextColor="#94A3B8"
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                value={verificationCode}
-                                onChangeText={setVerificationCode}
-                            />
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                                {otpDigits.map((digit, idx) => (
+                                    <TextInput
+                                        key={idx}
+                                        ref={(ref) => { otpInputRefs.current[idx] = ref; }}
+                                        style={{ 
+                                            width: 42, 
+                                            height: 48, 
+                                            backgroundColor: '#F8FAFC', 
+                                            borderWidth: 1.5, 
+                                            borderColor: digit ? L.emerald : L.cardBorder, 
+                                            borderRadius: 10, 
+                                            textAlign: 'center', 
+                                            fontSize: 20, 
+                                            fontWeight: '900', 
+                                            color: L.textPrimary 
+                                        }}
+                                        keyboardType="number-pad"
+                                        maxLength={1}
+                                        value={digit}
+                                        onChangeText={(val) => handleOtpChange(val, idx)}
+                                        onKeyPress={(e) => handleOtpKeyPress(e, idx)}
+                                    />
+                                ))}
+                            </View>
 
                             {/* Modal Action Buttons */}
                             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -923,7 +1058,7 @@ export default function SecurityScreen() {
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    onPress={handleVerifyTotp}
+                                    onPress={() => handleVerifyTotp()}
                                     disabled={verifying}
                                     style={{ flex: 1.5, backgroundColor: L.gold, borderRadius: 12, paddingVertical: 11, alignItems: 'center', justifyContent: 'center' }}
                                 >
@@ -937,6 +1072,75 @@ export default function SecurityScreen() {
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* 4. LIVE 2FA TEST MODAL */}
+            <Modal
+                visible={testModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setTestModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                    <View style={{ width: '100%', maxWidth: 380, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1.5, borderColor: L.emeraldBorder, padding: 18 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                                <Ionicons name="flask" size={18} color={L.emerald} />
+                                <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>Test Authenticator Code</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setTestModalVisible(false)}>
+                                <Ionicons name="close" size={20} color={L.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, marginBottom: 12, lineHeight: 14.5 }}>
+                            Enter the 6-digit code currently visible in Google Authenticator to confirm it is 100% active and in sync:
+                        </Text>
+
+                        <TextInput
+                            style={{ 
+                                backgroundColor: '#F8FAFC', 
+                                borderWidth: 1.5, 
+                                borderColor: testCode.length === 6 ? L.emerald : L.cardBorder, 
+                                borderRadius: 12, 
+                                paddingVertical: 10, 
+                                textAlign: 'center', 
+                                fontSize: 22, 
+                                fontWeight: '900', 
+                                letterSpacing: 6,
+                                color: L.textPrimary,
+                                marginBottom: 14 
+                            }}
+                            keyboardType="number-pad"
+                            maxLength={6}
+                            placeholder="000000"
+                            placeholderTextColor="#94A3B8"
+                            value={testCode}
+                            onChangeText={setTestCode}
+                        />
+
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity
+                                onPress={() => setTestModalVisible(false)}
+                                style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+                            >
+                                <Text style={{ color: L.textSecondary, fontSize: 11, fontWeight: '700' }}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleTestCode}
+                                disabled={testingCode || testCode.length !== 6}
+                                style={{ flex: 1.5, backgroundColor: testCode.length === 6 ? L.emerald : '#CBD5E1', borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                {testingCode ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>Verify Code ✅</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
