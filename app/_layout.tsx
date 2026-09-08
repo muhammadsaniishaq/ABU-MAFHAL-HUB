@@ -235,7 +235,7 @@ export default function RootLayout() {
 
         let backgroundTimestamp = 0;
 
-        const subscription = AppState.addEventListener('change', (nextAppState) => {
+        const subscription = AppState.addEventListener('change', async (nextAppState) => {
             // NEVER lock on 'inactive'! (Happens on permission prompts, notifications, Face ID, system pickers)
             if (nextAppState === 'background') {
                 if (isSystemPickerActive()) {
@@ -249,11 +249,14 @@ export default function RootLayout() {
                     return;
                 }
 
-                // If minimized to background for more than 60 seconds, prompt PIN unlock
+                // If minimized to background for more than configured interval, prompt PIN unlock
                 const elapsedSeconds = backgroundTimestamp > 0 ? (Date.now() - backgroundTimestamp) / 1000 : 0;
                 backgroundTimestamp = 0;
 
-                if (elapsedSeconds > 60) {
+                const savedInterval = await AsyncStorage.getItem('app_auto_lock_interval');
+                const lockThreshold = savedInterval !== null ? Number(savedInterval) : 60;
+
+                if (elapsedSeconds >= lockThreshold) {
                     AsyncStorage.removeItem('app_unlocked').catch(() => {});
                     AsyncStorage.getItem('has_active_session').then(async (hasActive) => {
                         if (hasActive === 'true') {

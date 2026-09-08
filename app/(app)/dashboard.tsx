@@ -43,13 +43,18 @@ AsyncStorage.getItem('@app_hidden_features_cache').then(s => {
 export default function Dashboard() {
   const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string; avatar_url?: string; kyc_tier?: number; bvn?: string | null } | null>(null);
   const { settings, loading: settingsLoading } = useAppSettings();
-  const [showBalance, setShowBalance] = useState(!settings?.hide_user_balances);
+  const [showBalance, setShowBalance] = useState(false);
 
   useEffect(() => {
-    if (!settingsLoading) {
-      setShowBalance(!settings.hide_user_balances);
-    }
-  }, [settingsLoading, settings.hide_user_balances]);
+    (async () => {
+      const userHidePref = await AsyncStorage.getItem('hide_balance_by_default');
+      if (userHidePref === 'true') {
+        setShowBalance(false);
+      } else if (!settingsLoading) {
+        setShowBalance(!settings?.hide_user_balances);
+      }
+    })();
+  }, [settingsLoading, settings?.hide_user_balances]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

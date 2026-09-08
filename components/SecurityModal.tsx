@@ -52,12 +52,31 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
 
   const shake = useSharedValue(0);
 
+  const checkEmergencyFreeze = async (): Promise<boolean> => {
+    try {
+      const isFrozen = await AsyncStorage.getItem('account_emergency_freeze');
+      if (isFrozen === 'true') {
+        Alert.alert(
+          "Account Transfers Frozen 🛡️",
+          "Your account is currently in Emergency Freeze mode to protect your funds. Outgoing transactions are paused. Go to Security & Credentials to unfreeze your account."
+        );
+        onClose();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  };
+
   useEffect(() => {
     if (visible) {
       setSuccessMode(false);
-      checkLockoutStatus();
-      checkPinStatus();
-      checkBiometric();
+      checkEmergencyFreeze().then((frozen) => {
+        if (!frozen) {
+          checkLockoutStatus();
+          checkPinStatus();
+          checkBiometric();
+        }
+      });
     } else {
       resetState();
     }
