@@ -278,3 +278,23 @@ alter table public.data_plans enable row level security;
 
 create policy "Admins can manage data plans" on public.data_plans for all using (public.is_admin());
 create policy "Users can view active data plans" on public.data_plans for select using (is_active = true);
+
+-- 14. NOTIFICATIONS
+create table if not exists public.notifications (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  title text not null,
+  body text not null,
+  message text,
+  massage text,
+  data jsonb default '{}'::jsonb,
+  type text default 'general',
+  priority text default 'normal',
+  is_read boolean default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.notifications enable row level security;
+create policy "Users can view own notifications" on public.notifications for select using (auth.uid() = user_id);
+create policy "Admins/ServiceRole can insert notifications" on public.notifications for insert with check (true);
+create index if not exists idx_notifications_user_id on public.notifications(user_id);

@@ -34,6 +34,8 @@ export const createAppNotification = async (
             user_id: userId,
             title,
             body,
+            message: body,
+            massage: body,
             type: category,
             priority: priority,
             is_read: false,

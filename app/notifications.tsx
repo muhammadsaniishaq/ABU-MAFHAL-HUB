@@ -276,7 +276,8 @@ export default function NotificationsScreen() {
                             {
                                 text: 'Copy Text',
                                 onPress: async () => {
-                                    await Clipboard.setStringAsync(item.body);
+                                    const copyTxt = item.body || item.message || item.massage || '';
+                                    await Clipboard.setStringAsync(copyTxt);
                                     Alert.alert('Copied!');
                                 },
                             },
@@ -331,7 +332,7 @@ export default function NotificationsScreen() {
                         )}
 
                         <Text style={s.cardBodyText} numberOfLines={2}>
-                            {item.body}
+                            {item.body || item.message || item.massage}
                         </Text>
 
                         <View style={s.cardFooterRow}>
@@ -550,14 +551,15 @@ export default function NotificationsScreen() {
                         </Text>
 
                         <View style={s.modalBodyBox}>
-                            <Text style={s.modalBodyContent}>{selectedItem?.body}</Text>
+                            <Text style={s.modalBodyContent}>{selectedItem?.body || selectedItem?.message || selectedItem?.massage}</Text>
                         </View>
 
                         <View style={s.modalActionsRow}>
                             <TouchableOpacity
                                 onPress={async () => {
-                                    if (selectedItem?.body) {
-                                        await Clipboard.setStringAsync(selectedItem.body);
+                                    const modalTxt = selectedItem?.body || selectedItem?.message || selectedItem?.massage;
+                                    if (modalTxt) {
+                                        await Clipboard.setStringAsync(modalTxt);
                                         Alert.alert('Copied!', 'Notification text copied to clipboard.');
                                     }
                                 }}

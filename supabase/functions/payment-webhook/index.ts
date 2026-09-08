@@ -115,6 +115,8 @@ async function dispatchUserPushNotification(
             user_id: userId,
             title,
             body,
+            message: body,
+            massage: body,
             type,
             priority: 'high',
             is_read: false,
@@ -300,6 +302,49 @@ ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS session_id TEXT;
 -- 0b. ADD EXPO_PUSH_TOKEN COLUMN IF NOT EXISTS
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS expo_push_token text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS push_token text;
+
+-- 0c. ENSURE NOTIFICATIONS TABLE AND MESSAGE/MASSAGE/BODY COLUMNS EXIST
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    body TEXT,
+    message TEXT,
+    massage TEXT,
+    data JSONB DEFAULT '{}'::jsonb,
+    type TEXT DEFAULT 'general',
+    priority TEXT DEFAULT 'normal',
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS body text;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS message text;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS massage text;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS type text DEFAULT 'general';
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS priority text DEFAULT 'normal';
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS is_read boolean DEFAULT false;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS data jsonb DEFAULT '{}'::jsonb;
+
+UPDATE public.notifications SET message = body WHERE message IS NULL AND body IS NOT NULL;
+UPDATE public.notifications SET massage = COALESCE(message, body) WHERE massage IS NULL;
+UPDATE public.notifications SET body = message WHERE body IS NULL AND message IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.sync_notifications_content()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.body := COALESCE(NEW.body, NEW.message, NEW.massage, '');
+    NEW.message := COALESCE(NEW.message, NEW.body, NEW.massage, '');
+    NEW.massage := COALESCE(NEW.massage, NEW.message, NEW.body, '');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tr_sync_notifications_content ON public.notifications;
+CREATE TRIGGER tr_sync_notifications_content
+BEFORE INSERT OR UPDATE ON public.notifications
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_notifications_content();
 
 -- 1. UPDATE TRIGGER FUNCTION (With robust service_role and bypass detection)
 CREATE OR REPLACE FUNCTION public.prevent_unauthorized_profile_updates()
@@ -2393,6 +2438,8 @@ async function handleFundWallet(
                 user_id: profile.id,
                 title: notifTitle,
                 body: notifBody,
+                message: notifBody,
+                massage: notifBody,
                 type: 'funding',
                 priority: 'high',
                 is_read: false,

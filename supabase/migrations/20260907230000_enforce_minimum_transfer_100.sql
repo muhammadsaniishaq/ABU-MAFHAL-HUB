@@ -9,6 +9,33 @@ ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS bank_name TEXT;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS account_number TEXT;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS session_id TEXT;
 
+-- 0b. Ensure body, message, and massage columns exist on public.notifications
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS body text;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS message text;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS massage text;
+
+-- Backfill and synchronize existing notification rows
+UPDATE public.notifications SET message = body WHERE message IS NULL AND body IS NOT NULL;
+UPDATE public.notifications SET massage = COALESCE(message, body) WHERE massage IS NULL;
+UPDATE public.notifications SET body = message WHERE body IS NULL AND message IS NOT NULL;
+
+-- Automatically synchronize body, message, and massage on all future notifications
+CREATE OR REPLACE FUNCTION public.sync_notifications_content()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.body := COALESCE(NEW.body, NEW.message, NEW.massage, '');
+    NEW.message := COALESCE(NEW.message, NEW.body, NEW.massage, '');
+    NEW.massage := COALESCE(NEW.massage, NEW.message, NEW.body, '');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tr_sync_notifications_content ON public.notifications;
+CREATE TRIGGER tr_sync_notifications_content
+BEFORE INSERT OR UPDATE ON public.notifications
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_notifications_content();
+
 -- 1. Drop overloaded signatures and enforce minimum NGN 100 on execute_user_bank_withdrawal
 DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid);
 DROP FUNCTION IF EXISTS public.execute_user_bank_withdrawal(numeric, text, text, text, text, uuid, numeric);
@@ -226,11 +253,12 @@ begin
     )
   );
 
-  -- 9. Notify recipient
-  insert into public.notifications (user_id, title, message, type)
+  -- 9. Notify recipient (populate both body and message for complete schema resilience)
+  insert into public.notifications (user_id, title, body, message, type)
   values (
     recipient_id,
     'Money Received!',
+    'You received NGN ' || amount::text || ' from ' || coalesce(sender_name, 'a member') || '.',
     'You received NGN ' || amount::text || ' from ' || coalesce(sender_name, 'a member') || '.',
     'credit'
   );
