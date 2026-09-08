@@ -251,6 +251,78 @@ export function formatMoniepointDate(rawDate?: any): string {
     return `${dayName}, ${monthName} ${suffix(dateNum)} | ${hours}:${minStr} ${ampm}`;
 }
 
+// User-Facing Error Sanitizer: Protects admin privacy, hides provider balances, and guarantees professional banking tone
+function formatUserFacingTransferError(
+    rawMsg: string,
+    totalDebit?: number,
+    userBalance?: number
+): { title: string; message: string; isUserBalance: boolean } {
+    const lower = String(rawMsg || '').toLowerCase();
+
+    // 1. NEVER leak provider names, API secrets, merchant balances, or dashboard setup instructions
+    if (
+        lower.includes('flutterwave') ||
+        lower.includes('paystack') ||
+        lower.includes('payout balance') ||
+        lower.includes('merchant payout') ||
+        lower.includes('merchant balance') ||
+        lower.includes('dashboard') ||
+        lower.includes('whitelisting') ||
+        lower.includes('whitelist') ||
+        lower.includes('secret key') ||
+        lower.includes('api key') ||
+        lower.includes('settlement_channel_maintenance')
+    ) {
+        return {
+            title: 'Interbank Network Notice',
+            message: 'Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged.',
+            isUserBalance: false,
+        };
+    }
+
+    // 2. Genuine User Insufficient Balance (ONLY when it is the user's personal wallet)
+    if (
+        (lower.includes('insufficient') && (lower.includes('wallet') || lower.includes('you have') || lower.includes('you need'))) ||
+        lower.includes('insufficient balance. available balance is ngn') ||
+        lower.includes('insufficient wallet balance')
+    ) {
+        const debitStr = totalDebit !== undefined ? `₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}` : 'the required amount';
+        const balStr = userBalance !== undefined ? `₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}` : 'your current balance';
+        return {
+            title: 'Insufficient Wallet Balance',
+            message: `You need ${debitStr}, but you currently have ${balStr} in your wallet. Please top up your wallet to proceed with this transfer.`,
+            isUserBalance: true,
+        };
+    }
+
+    // 3. Minimum transfer amount
+    if (lower.includes('minimum transfer amount') || lower.includes('minimum transfer')) {
+        return {
+            title: 'Transfer Limit Notice',
+            message: rawMsg,
+            isUserBalance: false,
+        };
+    }
+
+    // 4. Account validation
+    if (lower.includes('account') && (lower.includes('invalid') || lower.includes('not found') || lower.includes('validation') || lower.includes('validated') || lower.includes('recipient'))) {
+        return {
+            title: 'Account Verification Notice',
+            message: 'Destination account could not be validated by recipient bank. Please check the account number and destination bank, then try again.',
+            isUserBalance: false,
+        };
+    }
+
+    // 5. Default safe professional message
+    return {
+        title: 'Interbank Transfer Notice',
+        message: rawMsg.length > 5 && !lower.includes('error') && !lower.includes('failed') && !lower.includes('rpc')
+            ? rawMsg
+            : 'Interbank settlement service is temporarily busy due to high network traffic. Please try again shortly. Your wallet was NOT charged.',
+        isUserBalance: false,
+    };
+}
+
 export default function TransferScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -343,6 +415,14 @@ export default function TransferScreen() {
 
     // Error Notice Modal state
     const [errorModalMessage, setErrorModalMessage] = useState<string | null>(null);
+    const [errorModalTitle, setErrorModalTitle] = useState<string>('Transfer Notice');
+    const [isUserInsufficientBalance, setIsUserInsufficientBalance] = useState<boolean>(false);
+
+    const showTransferNotice = (title: string, message: string, isUserBal: boolean = false) => {
+        setErrorModalTitle(title);
+        setErrorModalMessage(message);
+        setIsUserInsufficientBalance(isUserBal);
+    };
 
     // Load recent beneficiaries and history
     useEffect(() => {
@@ -650,30 +730,38 @@ export default function TransferScreen() {
     // Initiate Transfer (Opens confirmation)
     const handleInitiateTransfer = () => {
         if (numAmount <= 0) {
-            setErrorModalMessage('Please enter a valid transfer amount.');
+            showTransferNotice('Amount Required', 'Please enter a valid transfer amount.', false);
             return;
         }
         if (numAmount < MIN_TRANSFER_AMOUNT) {
-            setErrorModalMessage(`Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`);
+            showTransferNotice('Transfer Limit', `Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`, false);
             return;
         }
 
         if (!isFormValid) {
             if (activeTab === 'bank') {
                 if (!selectedBank) {
-                    setErrorModalMessage('Please select destination bank.');
+                    showTransferNotice('Select Bank', 'Please select destination bank.', false);
                 } else if (accountNumber.trim().length !== 10) {
-                    setErrorModalMessage('Please enter a valid 10-digit account number.');
+                    showTransferNotice('Account Number', 'Please enter a valid 10-digit account number.', false);
                 } else if (!accountName) {
-                    setErrorModalMessage('Please wait for account name verification to complete.');
+                    showTransferNotice('Verifying Account', 'Please wait for account name verification to complete.', false);
                 } else if (totalDebit > userBalance) {
-                    setErrorModalMessage(`Insufficient wallet balance. You need ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Transfer: ₦${numAmount.toLocaleString()} + Fee: ₦${transferFee.toLocaleString()}), but you have ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`);
+                    showTransferNotice(
+                        'Insufficient Wallet Balance',
+                        `Insufficient wallet balance. You need ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })} (Transfer: ₦${numAmount.toLocaleString()} + Fee: ₦${transferFee.toLocaleString()}), but you have ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`,
+                        true
+                    );
                 }
             } else {
                 if (!matchedUser) {
-                    setErrorModalMessage('Please enter recipient phone number, email or username.');
+                    showTransferNotice('Recipient Required', 'Please enter recipient phone number, email or username.', false);
                 } else if (totalDebit > userBalance) {
-                    setErrorModalMessage(`Insufficient wallet balance. You need ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}, but you have ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`);
+                    showTransferNotice(
+                        'Insufficient Wallet Balance',
+                        `Insufficient wallet balance. You need ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}, but you have ₦${userBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })} available.`,
+                        true
+                    );
                 }
             }
             return;
@@ -873,8 +961,9 @@ export default function TransferScreen() {
             }, 250);
         } catch (err: any) {
             console.error('Transfer execution error:', err);
-            const errMsg = err.message || 'Unable to complete transfer. Your wallet balance was NOT charged.';
-            setTransferError(errMsg);
+            const rawMsg = err.message || 'Unable to complete transfer. Your wallet balance was NOT charged.';
+            const notice = formatUserFacingTransferError(rawMsg, totalDebit, userBalance);
+            setTransferError(notice.message);
             setIsSubmitting(false);
 
             // Immediately re-sync user balance from DB to verify untouched funds
@@ -888,7 +977,7 @@ export default function TransferScreen() {
             }
 
             setTimeout(() => {
-                setErrorModalMessage(errMsg);
+                showTransferNotice(notice.title, notice.message, notice.isUserBalance);
             }, 150);
         } finally {
             setIsSubmitting(false);
@@ -2294,52 +2383,81 @@ export default function TransferScreen() {
             >
                 <View style={s.modalBackdrop}>
                     <View style={s.errorModalCard}>
+                        {/* Status Icon Circle */}
                         <View style={[
                             s.errorModalIconCircle,
-                            (errorModalMessage?.toLowerCase().includes('insufficient')) && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
+                            isUserInsufficientBalance
+                                ? { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
+                                : { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }
                         ]}>
                             <Ionicons
-                                name={(errorModalMessage?.toLowerCase().includes('insufficient')) ? "wallet-outline" : "alert-circle"}
+                                name={isUserInsufficientBalance ? "wallet-outline" : "shield-outline"}
                                 size={28}
-                                color="#DC2626"
+                                color={isUserInsufficientBalance ? "#DC2626" : "#D97706"}
                             />
                         </View>
-                        <Text style={s.errorModalTitle}>
-                            {(errorModalMessage?.toLowerCase().includes('insufficient')) ? 'Insufficient Wallet Balance' : 'Transfer Notice'}
+
+                        {/* Title */}
+                        <Text style={[
+                            s.errorModalTitle,
+                            !isUserInsufficientBalance && { color: '#0F172A' }
+                        ]}>
+                            {errorModalTitle}
                         </Text>
+
+                        {/* Message */}
                         <Text style={s.errorModalMessage}>{errorModalMessage}</Text>
+
+                        {/* Safe Funds Guarantee Strip for Network Notices */}
+                        {!isUserInsufficientBalance && (
+                            <View style={s.safeGuaranteePill}>
+                                <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+                                <Text style={s.safeGuaranteeText}>
+                                    Your wallet was NOT charged • Funds are 100% safe
+                                </Text>
+                            </View>
+                        )}
                         
                         <View style={{ width: '100%', gap: 8 }}>
-                            {(errorModalMessage?.toLowerCase().includes('insufficient')) && (
+                            {isUserInsufficientBalance ? (
+                                <>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setErrorModalMessage(null);
+                                            router.push('/(app)/wallet');
+                                        }}
+                                        style={[s.errorModalBtn, { backgroundColor: '#0F172A', borderWidth: 1, borderColor: '#D97706' }]}
+                                        activeOpacity={0.85}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="card" size={15} color="#F59E0B" style={{ marginRight: 6 }} />
+                                            <Text style={s.errorModalBtnText}>TOP UP / ADD MONEY</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => setErrorModalMessage(null)}
+                                        style={[
+                                            s.errorModalBtn,
+                                            { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 }
+                                        ]}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Text style={[s.errorModalBtnText, { color: '#475569' }]}>
+                                            CLOSE
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : (
                                 <TouchableOpacity
-                                    onPress={() => {
-                                        setErrorModalMessage(null);
-                                        router.push('/(app)/wallet');
-                                    }}
+                                    onPress={() => setErrorModalMessage(null)}
                                     style={[s.errorModalBtn, { backgroundColor: '#0F172A' }]}
                                     activeOpacity={0.85}
                                 >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="card" size={15} color="#F59E0B" style={{ marginRight: 6 }} />
-                                        <Text style={s.errorModalBtnText}>TOP UP / ADD MONEY</Text>
-                                    </View>
+                                    <Text style={s.errorModalBtnText}>
+                                        OK, UNDERSTOOD
+                                    </Text>
                                 </TouchableOpacity>
                             )}
-                            <TouchableOpacity
-                                onPress={() => setErrorModalMessage(null)}
-                                style={[
-                                    s.errorModalBtn,
-                                    (errorModalMessage?.toLowerCase().includes('insufficient')) && { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 }
-                                ]}
-                                activeOpacity={0.85}
-                            >
-                                <Text style={[
-                                    s.errorModalBtnText,
-                                    (errorModalMessage?.toLowerCase().includes('insufficient')) && { color: '#475569' }
-                                ]}>
-                                    {(errorModalMessage?.toLowerCase().includes('insufficient')) ? 'CLOSE' : 'OK, GOT IT'}
-                                </Text>
-                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
@@ -3837,18 +3955,23 @@ const s = StyleSheet.create({
         maxWidth: 340,
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        padding: 16,
+        padding: 18,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#FECACA',
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 6,
     },
     errorModalIconCircle: {
         width: 46,
         height: 46,
         borderRadius: 23,
-        backgroundColor: '#FEE2E2',
+        backgroundColor: '#FEF3C7',
         borderWidth: 1,
-        borderColor: '#FCA5A5',
+        borderColor: '#FDE68A',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 10,
@@ -3858,13 +3981,32 @@ const s = StyleSheet.create({
         fontSize: 14,
         fontWeight: '900',
         marginBottom: 4,
+        textAlign: 'center',
     },
     errorModalMessage: {
         color: '#475569',
         fontSize: 11,
         textAlign: 'center',
         lineHeight: 16,
-        marginBottom: 14,
+        marginBottom: 10,
+    },
+    safeGuaranteePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        marginBottom: 12,
+        gap: 6,
+    },
+    safeGuaranteeText: {
+        color: '#065F46',
+        fontSize: 10,
+        fontWeight: '700',
     },
     errorModalBtn: {
         width: '100%',

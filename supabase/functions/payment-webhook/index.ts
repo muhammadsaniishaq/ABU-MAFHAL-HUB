@@ -1144,61 +1144,76 @@ $$ language plpgsql security definer;
 
                     console.log(`[Flutterwave Transfer] User Wallet: ₦${currentWalletBal}, Transfer: ₦${numAmount}, Fee: ₦${transferFee}, FLW Balance: ₦${flwNgnBalance}`);
 
+                    let flwLiquidityOk = flwNgnBalance >= numAmount || flwNgnBalance === 0;
                     if (flwNgnBalance > 0 && flwNgnBalance < numAmount) {
-                        return new Response(JSON.stringify({
-                            success: false,
-                            dispatched: false,
-                            message: `Automated bank transfer is currently unavailable: Flutterwave merchant payout balance is ₦${flwNgnBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}. Please top up your Flutterwave payout balance in your Flutterwave Dashboard to enable live payouts. Your wallet was NOT charged.`
-                        }), {
-                            headers: { "Content-Type": "application/json", ...corsHeaders }
-                        });
+                        console.error(`[PAYOUT_LIQUIDITY_ALERT] Low Flutterwave merchant payout liquidity (Available: ₦${flwNgnBalance}, Required: ₦${numAmount}). Safe abort.`);
+                        flwLiquidityOk = false;
                     }
 
-                    // Candidate code for Flutterwave
-                    const candidateCodes = FLW_BANK_CODE_MAP[bankCode] || [bankCode];
-                    const flwBankCode = candidateCodes[0];
-                    const internalRef = `WTH_FLW_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                    let isFlwDispatched = false;
+                    let trfData: any = null;
 
-                    // Step B: Dispatch Transfer to Flutterwave
-                    const trfRes = await fetch('https://api.flutterwave.com/v3/transfers', {
-                        method: 'POST',
-                        headers: {
-                            Authorization: `Bearer ${flutterwaveSecret}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            account_bank: flwBankCode,
-                            account_number: String(accountNumber).trim(),
-                            amount: numAmount,
-                            narration: narration || `Transfer to ${accountName} (${bankName})`,
-                            currency: 'NGN',
-                            reference: internalRef,
-                            debit_currency: 'NGN'
-                        })
-                    });
+                    if (flwLiquidityOk) {
+                        // Candidate code for Flutterwave
+                        const candidateCodes = FLW_BANK_CODE_MAP[bankCode] || [bankCode];
+                        const flwBankCode = candidateCodes[0];
+                        const internalRef = `WTH_FLW_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-                    const trfData = await trfRes.json();
-                    console.log("[Flutterwave Transfer] Dispatch response:", trfData);
+                        // Step B: Dispatch Transfer to Flutterwave
+                        const trfRes = await fetch('https://api.flutterwave.com/v3/transfers', {
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${flutterwaveSecret}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                account_bank: flwBankCode,
+                                account_number: String(accountNumber).trim(),
+                                amount: numAmount,
+                                narration: narration || `Transfer to ${accountName} (${bankName})`,
+                                currency: 'NGN',
+                                reference: internalRef,
+                                debit_currency: 'NGN'
+                            })
+                        });
 
-                    // VERIFY THAT FLUTTERWAVE TRULY ACCEPTED AND DISPATCHED THE TRANSFER
-                    const isFlwDispatched = trfRes.ok && trfData.status === 'success' && trfData.data && trfData.data.id && String(trfData.data.status || '').toUpperCase() !== 'FAILED' && String(trfData.data.status || '').toUpperCase() !== 'REJECTED';
+                        trfData = await trfRes.json();
+                        console.log("[Flutterwave Transfer] Dispatch response:", trfData);
+
+                        // VERIFY THAT FLUTTERWAVE TRULY ACCEPTED AND DISPATCHED THE TRANSFER
+                        isFlwDispatched = trfRes.ok && trfData.status === 'success' && trfData.data && trfData.data.id && String(trfData.data.status || '').toUpperCase() !== 'FAILED' && String(trfData.data.status || '').toUpperCase() !== 'REJECTED';
+                    }
 
                     if (!isFlwDispatched) {
-                        let errMsg = trfData.message || trfData.data?.complete_message || "Bank payout rejected by Flutterwave. Your wallet was NOT charged.";
-                        const lowerMsg = errMsg.toLowerCase();
-                        if (lowerMsg.includes("ip whitelist") || lowerMsg.includes("whitelisting")) {
-                            errMsg = "Flutterwave IP Whitelisting Required: Flutterwave mandates adding an IP to your Whitelist for Transfers. In Flutterwave Dashboard -> Settings -> Whitelisted IP addresses, add your server IP (or 0.0.0.0). Alternatively, switch to Paystack in Admin Settings. Your wallet was NOT charged.";
-                        } else if (lowerMsg.includes("cannot be processed") || lowerMsg.includes("account administrator")) {
-                            errMsg = "Flutterwave Transfer Restriction: API Transfers/Payouts are blocked on your Flutterwave Merchant Account. Solution: 1) Go to Flutterwave Dashboard -> Settings -> API -> IP Whitelist. 2) In Settings -> Transfers, turn off OTP/2FA requirement for API Transfers. 3) Contact Flutterwave Support or complete KYC to activate Payouts. Your wallet was NOT charged.";
-                        }
-                        return new Response(JSON.stringify({
-                            success: false,
-                            dispatched: false,
-                            message: errMsg
-                        }), {
-                            headers: { "Content-Type": "application/json", ...corsHeaders }
+                        const rawFlwErr = trfData?.message || trfData?.data?.complete_message || "Bank payout rejected by Flutterwave.";
+                        console.error("[Flutterwave Transfer] Transfer not dispatched via Flutterwave:", {
+                            rawError: rawFlwErr,
+                            flwLiquidityOk,
+                            flwNgnBalance,
+                            amount: numAmount
                         });
-                    }
+
+                        // If Paystack is available, attempt seamless automatic failover
+                        if (paystackSecret && paystackSecret.startsWith('sk_')) {
+                            console.log("[Flutterwave Transfer] Flutterwave transfer not dispatched, initiating automatic failover to Paystack...");
+                            // Fall through to ROUTE B below
+                        } else {
+                            // User-safe sanitized message - NEVER expose internal secrets or merchant balance
+                            let userSafeMsg = "Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged.";
+                            const lower = rawFlwErr.toLowerCase();
+                            if (lower.includes("account") && (lower.includes("invalid") || lower.includes("not found") || lower.includes("destination") || lower.includes("recipient") || lower.includes("nuban"))) {
+                                userSafeMsg = "Recipient account details could not be validated by destination bank. Please check account number and bank, then try again. Your wallet was NOT charged.";
+                            }
+                            return new Response(JSON.stringify({
+                                success: false,
+                                dispatched: false,
+                                error_code: "SETTLEMENT_CHANNEL_MAINTENANCE",
+                                message: userSafeMsg
+                            }), {
+                                headers: { "Content-Type": "application/json", ...corsHeaders }
+                            });
+                        }
+                    } else {
 
                     // Step C: Guaranteed debit user wallet after Flutterwave confirms transfer dispatch
                     let newBalance = Math.max(0, currentWalletBal - totalDebit);
@@ -1324,24 +1339,33 @@ $$ language plpgsql security definer;
                     }), {
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
+                } // End of else (isFlwDispatched)
 
                 } catch (flwErr: any) {
                     console.error("[Flutterwave Transfer] Payout Exception:", flwErr);
-                    return new Response(JSON.stringify({
-                        success: false,
-                        dispatched: false,
-                        message: "Unexpected error connecting to Flutterwave payout service. Your wallet was NOT charged."
-                    }), {
-                        headers: { "Content-Type": "application/json", ...corsHeaders }
-                    });
+                    if (paystackSecret && paystackSecret.startsWith('sk_')) {
+                        console.log("[Flutterwave Transfer] Payout exception caught, initiating failover to Paystack...");
+                    } else {
+                        return new Response(JSON.stringify({
+                            success: false,
+                            dispatched: false,
+                            error_code: "SETTLEMENT_CHANNEL_MAINTENANCE",
+                            message: "Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged."
+                        }), {
+                            headers: { "Content-Type": "application/json", ...corsHeaders }
+                        });
+                    }
                 }
             }
 
             // ROUTE B: PAYSTACK TRANSFER (FALLBACK OR EXPLICIT)
             if (!paystackSecret || !paystackSecret.startsWith('sk_')) {
+                console.error("[Transfer Error] Neither Flutterwave nor Paystack could disburse. Transfer safely stopped.");
                 return new Response(JSON.stringify({ 
                     success: false, 
-                    message: "Paystack live secret key is not configured on the server." 
+                    dispatched: false,
+                    error_code: "SETTLEMENT_CHANNEL_MAINTENANCE",
+                    message: "Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged." 
                 }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
@@ -1359,10 +1383,12 @@ $$ language plpgsql security definer;
                 console.log(`[Paystack Transfer] User Wallet: ₦${currentWalletBal}, Requested: ₦${numAmount}, Fee: ₦${transferFee}, Paystack Balance: ₦${paystackNgnBalance}`);
 
                 if (paystackNgnBalance < numAmount) {
+                    console.error(`[PAYOUT_LIQUIDITY_ALERT] Low Paystack merchant payout liquidity (Available: ₦${paystackNgnBalance}, Required: ₦${numAmount}). Safe abort.`);
                     return new Response(JSON.stringify({
                         success: false,
                         dispatched: false,
-                        message: `Automated bank transfer is currently unavailable: Paystack merchant payout balance is ₦${paystackNgnBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}. Please top up your Paystack balance in the Paystack Dashboard (Transfers section) to enable live payouts. Your wallet was NOT charged.`
+                        error_code: "SETTLEMENT_CHANNEL_MAINTENANCE",
+                        message: "Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged."
                     }), {
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
@@ -1388,10 +1414,17 @@ $$ language plpgsql security definer;
                 console.log("[Paystack Transfer] Recipient response:", recData);
 
                 if (!recData.status || !recData.data?.recipient_code) {
+                    console.error("[Paystack Transfer] Recipient registration failed:", recData);
+                    let userSafeMsg = "Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged.";
+                    const rawMsg = String(recData.message || '').toLowerCase();
+                    if (rawMsg.includes("account") || rawMsg.includes("nuban") || rawMsg.includes("resolve")) {
+                        userSafeMsg = "Recipient account details could not be validated by destination bank. Please check account number and bank, then try again. Your wallet was NOT charged.";
+                    }
                     return new Response(JSON.stringify({
                         success: false,
                         dispatched: false,
-                        message: recData.message || "Failed to register recipient bank with Paystack. Your wallet was NOT charged."
+                        error_code: "SETTLEMENT_CHANNEL_MAINTENANCE",
+                        message: userSafeMsg
                     }), {
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
@@ -1423,10 +1456,17 @@ $$ language plpgsql security definer;
                 const isPaystackDispatched = trfRes.ok && trfData.status === true && trfData.data && String(trfData.data.status || '').toLowerCase() !== 'failed' && String(trfData.data.status || '').toLowerCase() !== 'rejected';
 
                 if (!isPaystackDispatched) {
+                    console.error("[Paystack Transfer] Paystack transfer rejected:", trfData);
+                    let userSafeMsg = "Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged.";
+                    const rawMsg = String(trfData.message || '').toLowerCase();
+                    if (rawMsg.includes("account") || rawMsg.includes("nuban")) {
+                        userSafeMsg = "Recipient account details could not be validated by destination bank. Please check account number and bank, then try again. Your wallet was NOT charged.";
+                    }
                     return new Response(JSON.stringify({
                         success: false,
                         dispatched: false,
-                        message: trfData.message || "Bank payout rejected by Paystack. Your wallet was NOT charged."
+                        error_code: "SETTLEMENT_CHANNEL_MAINTENANCE",
+                        message: userSafeMsg
                     }), {
                         headers: { "Content-Type": "application/json", ...corsHeaders }
                     });
@@ -1562,7 +1602,8 @@ $$ language plpgsql security definer;
                 return new Response(JSON.stringify({
                     success: false,
                     dispatched: false,
-                    message: "Unexpected error connecting to Paystack payout service. Your wallet was NOT charged."
+                    error_code: "SETTLEMENT_CHANNEL_MAINTENANCE",
+                    message: "Interbank settlement service is temporarily undergoing routine channel maintenance. Please try again in a few moments. Your wallet was NOT charged."
                 }), {
                     headers: { "Content-Type": "application/json", ...corsHeaders }
                 });
