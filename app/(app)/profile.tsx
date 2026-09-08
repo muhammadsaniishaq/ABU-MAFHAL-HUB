@@ -14,18 +14,17 @@ import * as Clipboard from 'expo-clipboard';
 import { decode } from 'base64-arraybuffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import InstallAppButton from '../../components/InstallAppButton';
 
-const CACHE_KEY = '@profile_data_v9';
+const CACHE_KEY = '@profile_data_v10';
 
-// Executive Royal Navy & 24K Gold Design System
+// Executive Royal Navy & Gold Design Tokens
 const L = {
-    bg: '#F3F5FA',
+    bg: '#F1F4F9',
     card: '#FFFFFF',
-    cardBorder: 'rgba(226, 232, 240, 0.9)',
+    cardBorder: '#E2E8F0',
     navyHeader: '#070E24',
-    navyMid: '#121F45',
-    navyLight: '#1E3264',
+    navyMid: '#0F1A3B',
+    navyLight: '#16285A',
     gold: '#F5A623',
     goldLight: '#FCD34D',
     goldDk: '#D97706',
@@ -295,10 +294,10 @@ export default function UserProfileScreen() {
 
     const tierLimitText = (tier?: number) => {
         switch (tier) {
-            case 1: return 'Tier 1 (₦100k)';
-            case 2: return 'Tier 2 (₦500k)';
-            case 3: return 'Tier 3 (₦5M)';
-            case 4: return 'Tier 4 (VIP)';
+            case 1: return 'Tier 1 (₦100k Limit)';
+            case 2: return 'Tier 2 (₦500k Limit)';
+            case 3: return 'Tier 3 (₦5M Limit)';
+            case 4: return 'Tier 4 (VIP Unlimited)';
             default: return 'Tier 0 (Unverified)';
         }
     };
@@ -310,38 +309,38 @@ export default function UserProfileScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Mobile-First Shell (100% on Mobile, Max 500px on Web/Tablet) */}
-            <View style={{ flex: 1, width: '100%', maxWidth: 500, backgroundColor: L.bg }}>
+            {/* Mobile Container (100% on Mobile, Max 520px on Web/Tablet) */}
+            <View style={{ flex: 1, width: '100%', maxWidth: 520, backgroundColor: L.bg }}>
                 
                 {/* Micro Toast */}
                 {toastMsg && (
                     <View style={{ 
                         position: 'absolute', 
-                        top: insets.top + 6, 
-                        left: 14, 
-                        right: 14, 
+                        top: insets.top + 8, 
+                        left: 16, 
+                        right: 16, 
                         zIndex: 99, 
                         backgroundColor: L.navyHeader, 
                         borderColor: L.gold, 
                         borderWidth: 1, 
-                        borderRadius: 10, 
-                        paddingHorizontal: 12, 
-                        paddingVertical: 7, 
+                        borderRadius: 12, 
+                        paddingHorizontal: 14, 
+                        paddingVertical: 8, 
                         flexDirection: 'row', 
                         alignItems: 'center', 
-                        gap: 6, 
+                        gap: 8, 
                         shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
+                        shadowOffset: { width: 0, height: 3 },
                         shadowOpacity: 0.2,
-                        shadowRadius: 4,
+                        shadowRadius: 5,
                         elevation: 10 
                     }}>
-                        <Ionicons name="sparkles" size={13} color={L.gold} />
-                        <Text style={{ color: L.goldBg, fontWeight: '700', fontSize: 11, flex: 1 }}>{toastMsg}</Text>
+                        <Ionicons name="sparkles" size={15} color={L.gold} />
+                        <Text style={{ color: L.goldBg, fontWeight: '700', fontSize: 12, flex: 1 }}>{toastMsg}</Text>
                     </View>
                 )}
 
-                {/* SINGLE SCREEN CONTAINER (CIF A SHAFI DAYA - Zero Overflow, Ends Exactly Above Bottom Bar) */}
+                {/* SINGLE SCREEN CONTAINER (Fills screen comfortably, ends precisely above floating bottom bar) */}
                 <ScrollView 
                     style={{ flex: 1 }} 
                     bounces={false}
@@ -349,7 +348,7 @@ export default function UserProfileScreen() {
                     contentContainerStyle={{ 
                         flexGrow: 1, 
                         justifyContent: 'space-between',
-                        paddingBottom: Platform.OS === 'ios' ? 94 : 84 
+                        paddingBottom: Platform.OS === 'ios' ? 95 : 85 
                     }}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={L.gold} />
@@ -357,34 +356,34 @@ export default function UserProfileScreen() {
                 >
                     <View style={{ width: '100%' }}>
                         
-                        {/* 1. LUXURY ROYAL NAVY & GOLD DECORATIVE HEADER */}
+                        {/* 1. LUXURY ROYAL NAVY & GOLD HEADER (Comfortable size & rich decorations) */}
                         <LinearGradient
-                            colors={['#050B1A', '#0B132B', '#142258']}
+                            colors={['#070E24', '#0F1A3B', '#16285A']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={{ 
-                                paddingTop: insets.top + 2, 
-                                paddingBottom: 10, 
-                                paddingHorizontal: 12, 
-                                borderBottomLeftRadius: 20, 
-                                borderBottomRightRadius: 20, 
-                                borderBottomWidth: 1.5, 
+                                paddingTop: insets.top + 6, 
+                                paddingBottom: 14, 
+                                paddingHorizontal: 16, 
+                                borderBottomLeftRadius: 22, 
+                                borderBottomRightRadius: 22, 
+                                borderBottomWidth: 2, 
                                 borderColor: L.goldBorder,
                                 shadowColor: '#070E24',
                                 shadowOffset: { width: 0, height: 4 },
-                                shadowOpacity: 0.15,
-                                shadowRadius: 8,
-                                elevation: 6
+                                shadowOpacity: 0.18,
+                                shadowRadius: 10,
+                                elevation: 8
                             }}
                         >
-                            {/* Header Bar */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            {/* Top Header Navigation Bar */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <TouchableOpacity 
                                     onPress={() => router.back()} 
                                     style={{ 
-                                        width: 30, 
-                                        height: 30, 
-                                        borderRadius: 9, 
+                                        width: 34, 
+                                        height: 34, 
+                                        borderRadius: 10, 
                                         backgroundColor: 'rgba(255,255,255,0.08)', 
                                         borderWidth: 1, 
                                         borderColor: L.goldBorder, 
@@ -393,43 +392,43 @@ export default function UserProfileScreen() {
                                     }}
                                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                 >
-                                    <Ionicons name="arrow-back" size={15} color={L.gold} />
+                                    <Ionicons name="arrow-back" size={17} color={L.gold} />
                                 </TouchableOpacity>
 
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <MaterialCommunityIcons name="shield-crown" size={14} color={L.gold} />
-                                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: L.gold, letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <MaterialCommunityIcons name="shield-crown" size={17} color={L.gold} />
+                                    <Text style={{ fontSize: 14, fontWeight: '900', color: L.gold, letterSpacing: 0.8, textTransform: 'uppercase' }}>
                                         Profile Hub
                                     </Text>
                                 </View>
 
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                                     <TouchableOpacity 
                                         onPress={() => router.push('/notifications')} 
                                         style={{ 
-                                            width: 30, 
-                                            height: 30, 
-                                            borderRadius: 9, 
+                                            width: 34, 
+                                            height: 34, 
+                                            borderRadius: 10, 
                                             backgroundColor: 'rgba(255,255,255,0.08)', 
                                             alignItems: 'center', 
                                             justifyContent: 'center', 
                                             borderWidth: 1, 
-                                            borderColor: 'rgba(255,255,255,0.15)' 
+                                            borderColor: 'rgba(255,255,255,0.18)' 
                                         }}
                                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
-                                        <Ionicons name="notifications-outline" size={15} color="#FFFFFF" />
+                                        <Ionicons name="notifications-outline" size={17} color="#FFFFFF" />
                                         {unreadCount > 0 && (
-                                            <View style={{ position: 'absolute', top: 3, right: 3, backgroundColor: L.gold, width: 7, height: 7, borderRadius: 3.5 }} />
+                                            <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: L.gold, width: 8, height: 8, borderRadius: 4 }} />
                                         )}
                                     </TouchableOpacity>
 
                                     <TouchableOpacity 
                                         onPress={() => router.push('/edit-profile')} 
                                         style={{ 
-                                            width: 30, 
-                                            height: 30, 
-                                            borderRadius: 9, 
+                                            width: 34, 
+                                            height: 34, 
+                                            borderRadius: 10, 
                                             backgroundColor: 'rgba(255,255,255,0.08)', 
                                             alignItems: 'center', 
                                             justifyContent: 'center', 
@@ -438,24 +437,24 @@ export default function UserProfileScreen() {
                                         }}
                                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
-                                        <Ionicons name="pencil" size={13} color={L.gold} />
+                                        <Ionicons name="pencil" size={15} color={L.gold} />
                                     </TouchableOpacity>
                                 </View>
                             </View>
 
-                            {/* User Identity Row with Double Gold Rim Avatar */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            {/* User Identity Row (Generous, Clear, Non-cramped) */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                                 <View style={{ position: 'relative' }}>
                                     <LinearGradient
                                         colors={[L.goldLight, L.gold, L.goldDk]}
-                                        style={{ width: 48, height: 48, borderRadius: 24, padding: 1.5, alignItems: 'center', justifyContent: 'center' }}
+                                        style={{ width: 56, height: 56, borderRadius: 28, padding: 2, alignItems: 'center', justifyContent: 'center' }}
                                     >
-                                        <View style={{ width: 45, height: 45, borderRadius: 22.5, overflow: 'hidden', backgroundColor: L.navyHeader }}>
+                                        <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: L.navyHeader }}>
                                             {profile?.avatar_url && typeof profile.avatar_url === 'string' && profile.avatar_url.trim().length > 5 ? (
                                                 <Image source={{ uri: profile.avatar_url }} style={{ width: '100%', height: '100%' }} />
                                             ) : (
                                                 <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: L.navyMid }}>
-                                                    <Text style={{ fontSize: 17, fontWeight: '900', color: L.gold }}>
+                                                    <Text style={{ fontSize: 20, fontWeight: '900', color: L.gold }}>
                                                         {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
                                                     </Text>
                                                 </View>
@@ -467,15 +466,15 @@ export default function UserProfileScreen() {
                                         onPress={pickImage} 
                                         style={{ 
                                             position: 'absolute', 
-                                            bottom: -1, 
-                                            right: -1, 
+                                            bottom: -2, 
+                                            right: -2, 
                                             backgroundColor: L.gold, 
-                                            width: 16, 
-                                            height: 16, 
-                                            borderRadius: 8, 
+                                            width: 19, 
+                                            height: 19, 
+                                            borderRadius: 9.5, 
                                             alignItems: 'center', 
                                             justifyContent: 'center', 
-                                            borderWidth: 1, 
+                                            borderWidth: 1.5, 
                                             borderColor: L.navyHeader 
                                         }}
                                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -483,45 +482,45 @@ export default function UserProfileScreen() {
                                         {uploading ? (
                                             <ActivityIndicator size="small" color={L.navyHeader} />
                                         ) : (
-                                            <Ionicons name="camera" size={8.5} color={L.navyHeader} />
+                                            <Ionicons name="camera" size={10} color={L.navyHeader} />
                                         )}
                                     </TouchableOpacity>
                                 </View>
 
                                 <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900' }} numberOfLines={1}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={{ color: '#FFFFFF', fontSize: 15.5, fontWeight: '900' }} numberOfLines={1}>
                                             {profile?.full_name || 'System User'}
                                         </Text>
                                         {profile?.role === 'admin' ? (
-                                            <View style={{ backgroundColor: L.gold, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 }}>
-                                                <Text style={{ color: L.navyHeader, fontSize: 7, fontWeight: '900' }}>ADMIN</Text>
+                                            <View style={{ backgroundColor: L.gold, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4 }}>
+                                                <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
                                             </View>
                                         ) : (
-                                            <Ionicons name="checkmark-circle" size={12} color={L.emerald} />
+                                            <Ionicons name="checkmark-circle" size={14} color={L.emerald} />
                                         )}
                                     </View>
 
-                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '600', marginTop: 0.5 }} numberOfLines={1}>
+                                    <Text style={{ color: '#CBD5E1', fontSize: 11, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
                                         {profile?.email || 'No Email Set'} {profile?.phone ? `• ${profile.phone}` : ''}
                                     </Text>
 
                                     {/* Copyable ID & KYC Pill Row */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 5 }}>
                                         <TouchableOpacity 
                                             onPress={() => copyToClipboard(profile?.custom_id || profile?.username, 'User ID')} 
                                             style={{ 
-                                                backgroundColor: 'rgba(255,255,255,0.09)', 
-                                                paddingHorizontal: 5, 
-                                                paddingVertical: 1.5, 
-                                                borderRadius: 4, 
+                                                backgroundColor: 'rgba(255,255,255,0.12)', 
+                                                paddingHorizontal: 7, 
+                                                paddingVertical: 2.5, 
+                                                borderRadius: 5, 
                                                 flexDirection: 'row', 
                                                 alignItems: 'center', 
-                                                gap: 2.5 
+                                                gap: 3.5 
                                             }}
                                         >
-                                            <Ionicons name="copy-outline" size={8} color={L.gold} />
-                                            <Text style={{ color: L.gold, fontSize: 8, fontWeight: '800' }}>
+                                            <Ionicons name="copy-outline" size={10} color={L.gold} />
+                                            <Text style={{ color: L.gold, fontSize: 9.5, fontWeight: '800' }}>
                                                 ID: {profile?.custom_id || profile?.username || 'AM-USER'}
                                             </Text>
                                         </TouchableOpacity>
@@ -529,23 +528,23 @@ export default function UserProfileScreen() {
                                         <TouchableOpacity 
                                             onPress={() => router.push('/kyc')} 
                                             style={{ 
-                                                backgroundColor: Number(profile?.kyc_tier || 0) >= 2 ? 'rgba(16, 185, 129, 0.18)' : 'rgba(245, 166, 35, 0.18)', 
-                                                paddingHorizontal: 5, 
-                                                paddingVertical: 1.5, 
-                                                borderRadius: 4, 
-                                                borderWidth: 0.8, 
+                                                backgroundColor: Number(profile?.kyc_tier || 0) >= 2 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 166, 35, 0.2)', 
+                                                paddingHorizontal: 7, 
+                                                paddingVertical: 2.5, 
+                                                borderRadius: 5, 
+                                                borderWidth: 1, 
                                                 borderColor: Number(profile?.kyc_tier || 0) >= 2 ? L.emeraldBorder : L.goldBorder,
                                                 flexDirection: 'row',
                                                 alignItems: 'center',
-                                                gap: 2.5
+                                                gap: 3.5
                                             }}
                                         >
                                             <Ionicons 
                                                 name={Number(profile?.kyc_tier || 0) >= 2 ? "shield-checkmark" : "shield-outline"} 
-                                                size={8} 
+                                                size={10} 
                                                 color={Number(profile?.kyc_tier || 0) >= 2 ? L.emerald : L.gold} 
                                             />
-                                            <Text style={{ color: Number(profile?.kyc_tier || 0) >= 2 ? L.emerald : L.gold, fontSize: 8, fontWeight: '900' }}>
+                                            <Text style={{ color: Number(profile?.kyc_tier || 0) >= 2 ? L.emerald : L.gold, fontSize: 9.5, fontWeight: '900' }}>
                                                 {tierLimitText(profile?.kyc_tier)}
                                             </Text>
                                         </TouchableOpacity>
@@ -554,56 +553,56 @@ export default function UserProfileScreen() {
                             </View>
                         </LinearGradient>
 
-                        {/* 2. BODY PANELS (Clustered & Neatly Unified - YA TSUKE A WAJE DAYA) */}
-                        <View style={{ paddingHorizontal: 10, paddingTop: 6, gap: 6 }}>
+                        {/* 2. BODY CONTENT (Evenly Distributed & Proportioned) */}
+                        <View style={{ paddingHorizontal: 12, paddingTop: 10, gap: 9 }}>
 
                             {/* PANEL A: UNIFIED FINANCIAL & VIRTUAL BANK ACCOUNT CARD */}
                             <View style={{ 
                                 backgroundColor: L.card, 
-                                borderRadius: 12, 
-                                padding: 8, 
+                                borderRadius: 14, 
+                                padding: 12, 
                                 borderWidth: 1, 
                                 borderColor: L.goldBorder,
                                 shadowColor: '#070E24',
-                                shadowOffset: { width: 0, height: 1.5 },
+                                shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.06,
-                                shadowRadius: 3,
+                                shadowRadius: 4,
                                 elevation: 2 
                             }}>
                                 {/* Top Half: Mini Stats (Balance, Tx Count, Status) */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingBottom: 6, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingBottom: 10, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
                                     <View style={{ alignItems: 'center', flex: 1 }}>
-                                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>Wallet Balance</Text>
-                                        <Text style={{ color: L.navyHeader, fontSize: 12.5, fontWeight: '900', marginTop: 1 }}>
+                                        <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Wallet Balance</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 15, fontWeight: '900', marginTop: 2 }}>
                                             ₦{Number(profile?.balance || 0).toLocaleString()}
                                         </Text>
                                     </View>
-                                    <View style={{ width: 1, height: 16, backgroundColor: '#E2E8F0' }} />
+                                    <View style={{ width: 1, height: 22, backgroundColor: '#E2E8F0' }} />
                                     <View style={{ alignItems: 'center', flex: 1 }}>
-                                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>Transactions</Text>
-                                        <Text style={{ color: L.navyHeader, fontSize: 12.5, fontWeight: '900', marginTop: 1 }}>
+                                        <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Transactions</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 15, fontWeight: '900', marginTop: 2 }}>
                                             {txCount}
                                         </Text>
                                     </View>
-                                    <View style={{ width: 1, height: 16, backgroundColor: '#E2E8F0' }} />
+                                    <View style={{ width: 1, height: 22, backgroundColor: '#E2E8F0' }} />
                                     <View style={{ alignItems: 'center', flex: 1 }}>
-                                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>Account Status</Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                                            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: L.emerald }} />
-                                            <Text style={{ color: L.emerald, fontSize: 10.5, fontWeight: '900' }}>Active</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Account Status</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: L.emerald }} />
+                                            <Text style={{ color: L.emerald, fontSize: 12, fontWeight: '900' }}>Active</Text>
                                         </View>
                                     </View>
                                 </View>
 
                                 {/* Bottom Half: Dedicated Virtual Bank Deposit Account */}
-                                <View style={{ paddingTop: 5 }}>
+                                <View style={{ paddingTop: 8 }}>
                                     {virtualAcc ? (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#EDF2F7' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#EDF2F7' }}>
                                             <View>
-                                                <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '900', letterSpacing: 1, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                                <Text style={{ color: L.navyHeader, fontSize: 14, fontWeight: '900', letterSpacing: 1.2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
                                                     {virtualAcc.account_number}
                                                 </Text>
-                                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '700' }}>
+                                                <Text style={{ color: L.textMuted, fontSize: 9.5, fontWeight: '700', marginTop: 1 }}>
                                                     {virtualAcc.bank_name || 'Wema Bank / Payvessel'} • {virtualAcc.account_name || profile.full_name}
                                                 </Text>
                                             </View>
@@ -611,48 +610,50 @@ export default function UserProfileScreen() {
                                                 onPress={() => copyToClipboard(virtualAcc.account_number, 'Account Number')} 
                                                 style={{ 
                                                     backgroundColor: L.navyHeader, 
-                                                    paddingHorizontal: 7, 
-                                                    paddingVertical: 3, 
-                                                    borderRadius: 4, 
-                                                    borderWidth: 0.8, 
+                                                    paddingHorizontal: 10, 
+                                                    paddingVertical: 4.5, 
+                                                    borderRadius: 6, 
+                                                    borderWidth: 1, 
                                                     borderColor: L.gold 
                                                 }}
                                             >
-                                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 8 }}>COPY</Text>
+                                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9.5 }}>COPY</Text>
                                             </TouchableOpacity>
                                         </View>
                                     ) : (
                                         <TouchableOpacity 
                                             onPress={() => router.push('/kyc')} 
-                                            style={{ backgroundColor: L.goldBg, paddingVertical: 4, paddingHorizontal: 7, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                                            style={{ backgroundColor: L.goldBg, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
                                         >
-                                            <Text style={{ color: L.goldAmber, fontWeight: '800', fontSize: 9 }}>
-                                                Verify Tier 2 (BVN/NIN) to activate instant virtual account
-                                            </Text>
-                                            <Ionicons name="arrow-forward" size={11} color={L.goldAmber} />
+                                            <View>
+                                                <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 11 }}>Activate Virtual Bank Account</Text>
+                                                <Text style={{ color: L.textSecondary, fontSize: 9, marginTop: 1 }}>Verify Tier 2 (BVN/NIN) to receive automatic account</Text>
+                                            </View>
+                                            <Ionicons name="arrow-forward" size={14} color={L.goldAmber} />
                                         </TouchableOpacity>
                                     )}
                                 </View>
                             </View>
 
-                            {/* PANEL B: 4 BALANCED QUICK TOUCH ACTION CHIPS */}
-                            <View style={{ flexDirection: 'row', gap: 5 }}>
+                            {/* PANEL B: 4 QUICK TOUCH ACTION CHIPS (Substantial, comfortable to tap) */}
+                            <View style={{ flexDirection: 'row', gap: 7 }}>
                                 <TouchableOpacity 
                                     onPress={() => router.push('/profile-details')} 
                                     style={{ 
                                         flex: 1, 
                                         backgroundColor: L.card, 
-                                        paddingVertical: 6, 
-                                        borderRadius: 8, 
+                                        paddingVertical: 10, 
+                                        borderRadius: 10, 
                                         borderWidth: 1, 
                                         borderColor: L.cardBorder, 
                                         alignItems: 'center', 
                                         justifyContent: 'center',
-                                        gap: 1.5 
+                                        gap: 3,
+                                        elevation: 1 
                                     }}
                                 >
-                                    <Ionicons name="person-circle-outline" size={15} color={L.navyHeader} />
-                                    <Text style={{ color: L.navyHeader, fontSize: 8.5, fontWeight: '800' }}>Profile Info</Text>
+                                    <Ionicons name="person-circle-outline" size={18} color={L.navyHeader} />
+                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Profile Info</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -660,17 +661,18 @@ export default function UserProfileScreen() {
                                     style={{ 
                                         flex: 1, 
                                         backgroundColor: L.card, 
-                                        paddingVertical: 6, 
-                                        borderRadius: 8, 
+                                        paddingVertical: 10, 
+                                        borderRadius: 10, 
                                         borderWidth: 1, 
                                         borderColor: L.cardBorder, 
                                         alignItems: 'center', 
                                         justifyContent: 'center',
-                                        gap: 1.5 
+                                        gap: 3,
+                                        elevation: 1 
                                     }}
                                 >
-                                    <Ionicons name="shield-checkmark" size={15} color={L.goldAmber} />
-                                    <Text style={{ color: L.navyHeader, fontSize: 8.5, fontWeight: '800' }}>KYC Level</Text>
+                                    <Ionicons name="shield-checkmark" size={18} color={L.goldAmber} />
+                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>KYC Level</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -678,17 +680,18 @@ export default function UserProfileScreen() {
                                     style={{ 
                                         flex: 1, 
                                         backgroundColor: L.card, 
-                                        paddingVertical: 6, 
-                                        borderRadius: 8, 
+                                        paddingVertical: 10, 
+                                        borderRadius: 10, 
                                         borderWidth: 1, 
                                         borderColor: L.cardBorder, 
                                         alignItems: 'center', 
                                         justifyContent: 'center',
-                                        gap: 1.5 
+                                        gap: 3,
+                                        elevation: 1 
                                     }}
                                 >
-                                    <Ionicons name="gift-outline" size={15} color={L.emerald} />
-                                    <Text style={{ color: L.navyHeader, fontSize: 8.5, fontWeight: '800' }}>Earn ₦500</Text>
+                                    <Ionicons name="gift-outline" size={18} color={L.emerald} />
+                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Earn ₦500</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -696,31 +699,32 @@ export default function UserProfileScreen() {
                                     style={{ 
                                         flex: 1, 
                                         backgroundColor: L.card, 
-                                        paddingVertical: 6, 
-                                        borderRadius: 8, 
+                                        paddingVertical: 10, 
+                                        borderRadius: 10, 
                                         borderWidth: 1, 
                                         borderColor: L.cardBorder, 
                                         alignItems: 'center', 
                                         justifyContent: 'center',
-                                        gap: 1.5 
+                                        gap: 3,
+                                        elevation: 1 
                                     }}
                                 >
-                                    <Ionicons name="chatbubbles-outline" size={15} color={L.blue} />
-                                    <Text style={{ color: L.navyHeader, fontSize: 8.5, fontWeight: '800' }}>Support</Text>
+                                    <Ionicons name="chatbubbles-outline" size={18} color={L.blue} />
+                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Support</Text>
                                 </TouchableOpacity>
                             </View>
 
                             {/* PANEL C: UNIFIED SETTINGS & SECURITY CARD */}
                             <View style={{ 
                                 backgroundColor: L.card, 
-                                borderRadius: 12, 
-                                paddingHorizontal: 10, 
-                                paddingVertical: 3, 
+                                borderRadius: 14, 
+                                paddingHorizontal: 12, 
+                                paddingVertical: 6, 
                                 borderWidth: 1, 
                                 borderColor: L.cardBorder, 
                                 elevation: 1 
                             }}>
-                                <Text style={{ color: L.navyHeader, fontSize: 8.5, fontWeight: '900', textTransform: 'uppercase', marginTop: 4, marginBottom: 1, letterSpacing: 0.3 }}>
+                                <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginTop: 4, marginBottom: 2, letterSpacing: 0.4 }}>
                                     Account & Credentials
                                 </Text>
 
@@ -731,21 +735,21 @@ export default function UserProfileScreen() {
                                         flexDirection: 'row', 
                                         alignItems: 'center', 
                                         justifyContent: 'space-between', 
-                                        paddingVertical: 7, 
+                                        paddingVertical: 10, 
                                         borderBottomWidth: 1, 
                                         borderColor: '#F1F5F9' 
                                     }}
                                 >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <View style={{ width: 26, height: 26, borderRadius: 7, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name="person-outline" size={13} color={L.navyHeader} />
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="person-outline" size={15} color={L.navyHeader} />
                                         </View>
                                         <View>
-                                            <Text style={{ color: L.navyHeader, fontSize: 10.5, fontWeight: '800' }}>Profile Details</Text>
-                                            <Text style={{ color: L.textMuted, fontSize: 8 }}>View verified credentials & account data</Text>
+                                            <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '800' }}>Profile Details</Text>
+                                            <Text style={{ color: L.textMuted, fontSize: 9.5 }}>View verified credentials & account data</Text>
                                         </View>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
+                                    <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
                                 </TouchableOpacity>
 
                                 {/* 2. Consolidated Security Center (PIN, Password, Biometrics & 2FA) */}
@@ -755,77 +759,74 @@ export default function UserProfileScreen() {
                                         flexDirection: 'row', 
                                         alignItems: 'center', 
                                         justifyContent: 'space-between', 
-                                        paddingVertical: 7 
+                                        paddingVertical: 10 
                                     }}
                                 >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <View style={{ width: 26, height: 26, borderRadius: 7, backgroundColor: L.emeraldBg, borderWidth: 1, borderColor: L.emeraldBorder, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name="shield-checkmark" size={13} color={L.emerald} />
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: L.emeraldBg, borderWidth: 1, borderColor: L.emeraldBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="shield-checkmark" size={15} color={L.emerald} />
                                         </View>
                                         <View>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                <Text style={{ color: L.navyHeader, fontSize: 10.5, fontWeight: '800' }}>Security & Credentials</Text>
-                                                <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 3.5, paddingVertical: 0.8, borderRadius: 2.5 }}>
-                                                    <Text style={{ color: L.emerald, fontSize: 7, fontWeight: '900' }}>PROTECTED</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '800' }}>Security & Credentials</Text>
+                                                <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>
+                                                    <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>PROTECTED</Text>
                                                 </View>
                                             </View>
-                                            <Text style={{ color: L.textMuted, fontSize: 8 }}>4-digit PIN, login password, 2FA & biometrics</Text>
+                                            <Text style={{ color: L.textMuted, fontSize: 9.5 }}>4-digit PIN, login password, 2FA & biometrics</Text>
                                         </View>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
+                                    <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
                                 </TouchableOpacity>
                             </View>
 
-                            {/* PANEL D: REFERRAL PROGRAM COMPACT STRIP */}
+                            {/* PANEL D: REFERRAL REWARDS STRIP (NO InstallAppButton!) */}
                             <View style={{ 
                                 backgroundColor: L.card, 
-                                borderRadius: 10, 
-                                paddingVertical: 4.5, 
-                                paddingHorizontal: 8, 
+                                borderRadius: 12, 
+                                paddingVertical: 7, 
+                                paddingHorizontal: 10, 
                                 borderWidth: 1, 
                                 borderColor: L.cardBorder, 
                                 elevation: 1 
                             }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                        <Ionicons name="gift" size={11} color={L.emerald} />
-                                        <Text style={{ color: L.navyHeader, fontSize: 8.5, fontWeight: '900' }}>
-                                            Referral Link <Text style={{ color: L.goldAmber }}>(Earn ₦500)</Text>
-                                        </Text>
-                                    </View>
-                                    {Platform.OS === 'web' && <InstallAppButton />}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                    <Ionicons name="gift" size={13} color={L.emerald} />
+                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900' }}>
+                                        Referral Rewards <Text style={{ color: L.goldAmber }}>(Earn ₦500 Cash)</Text>
+                                    </Text>
                                 </View>
                                 
-                                <View style={{ marginTop: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, borderWidth: 0.8, borderColor: '#E2E8F0' }}>
-                                    <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '700', flex: 1 }} numberOfLines={1}>
+                                <View style={{ marginTop: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', paddingHorizontal: 8, paddingVertical: 4.5, borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '700', flex: 1 }} numberOfLines={1}>
                                         {refLink}
                                     </Text>
                                     <TouchableOpacity 
                                         onPress={() => copyToClipboard(refLink, 'Referral Link')}
-                                        style={{ backgroundColor: L.navyHeader, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3, marginLeft: 4 }}
+                                        style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, marginLeft: 6 }}
                                     >
-                                        <Text style={{ color: L.gold, fontSize: 7.5, fontWeight: '900' }}>COPY</Text>
+                                        <Text style={{ color: L.gold, fontSize: 8.5, fontWeight: '900' }}>COPY</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
 
-                            {/* PANEL E: EXECUTIVE LOG OUT BUTTON (Sitting cleanly right above bottom bar) */}
+                            {/* PANEL E: EXECUTIVE LOG OUT BUTTON (Comfortable 44px button sitting cleanly right above bottom bar) */}
                             <TouchableOpacity 
                                 onPress={handleLogout}
                                 style={{ 
                                     backgroundColor: L.roseBg, 
-                                    borderRadius: 9, 
-                                    paddingVertical: 7.5, 
+                                    borderRadius: 12, 
+                                    paddingVertical: 10, 
                                     alignItems: 'center', 
                                     justifyContent: 'center', 
                                     flexDirection: 'row', 
-                                    gap: 4, 
+                                    gap: 6, 
                                     borderWidth: 1, 
                                     borderColor: L.roseBorder 
                                 }}
                             >
-                                <Ionicons name="log-out-outline" size={13} color={L.rose} />
-                                <Text style={{ color: L.rose, fontWeight: '900', fontSize: 9.5, textTransform: 'uppercase' }}>
+                                <Ionicons name="log-out-outline" size={15} color={L.rose} />
+                                <Text style={{ color: L.rose, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>
                                     Log Out Account
                                 </Text>
                             </TouchableOpacity>
