@@ -47,6 +47,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
   const [mfaMode, setMfaMode] = useState(false);
   const [mfaCode, setMfaCode] = useState<string[]>([]);
   const [verifyingMfa, setVerifyingMfa] = useState(false);
+  const [tempPin, setTempPin] = useState<string | undefined>(undefined);
 
   const shake = useSharedValue(0);
 
@@ -102,6 +103,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
     setMfaMode(false);
     setMfaCode([]);
     setVerifyingMfa(false);
+    setTempPin(undefined);
   };
 
   const checkPinStatus = async () => {
@@ -242,19 +244,24 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
   };
 
   const handleAuthSuccess = async (authenticatedPin?: string) => {
-    // Check if account has Google Authenticator 2FA (MFA) enabled and requires level upgrade
+    // Check if account has Google Authenticator 2FA (MFA) enabled and user has it required for transfers
     try {
-      const { data: levelData, error: levelError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (!levelError && levelData) {
-        if (levelData.nextLevel === 'aal2' && levelData.currentLevel === 'aal1') {
-          // Admin has 2FA enabled, transition modal to 2FA verification mode
-          setMfaMode(true);
-          setPin([]); // Clear PIN
-          return;
+      const requireTransferMfa = await AsyncStorage.getItem('mfa_required_for_transfers');
+      if (requireTransferMfa !== 'false') {
+        const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+        if (!listError && factors?.totp) {
+          const activeFactor = factors.totp.find(f => f.status === 'verified');
+          if (activeFactor) {
+            // User has active 2FA, retain authenticated PIN and transition modal to 2FA verification!
+            setTempPin(authenticatedPin || savedPin || undefined);
+            setMfaMode(true);
+            setPin([]);
+            return;
+          }
         }
       }
     } catch (e) {
-      console.log("MFA check failed during verification:", e);
+      console.log("MFA check notice during transfer verification:", e);
     }
 
     triggerHaptic('success');
@@ -358,7 +365,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
       triggerHaptic('success');
       setSuccessMode(true);
       setTimeout(() => {
-        onSuccess();
+        onSuccess(tempPin || savedPin || undefined);
       }, 800);
     } catch (err: any) {
       triggerShake();

@@ -77,6 +77,7 @@ export default function SecurityScreen() {
     const [isMfaActive, setIsMfaActive] = useState<boolean>(false);
     const [mfaFactor, setMfaFactor] = useState<any>(null);
     const [mfaLoading, setMfaLoading] = useState<boolean>(false);
+    const [mfaForTransfers, setMfaForTransfers] = useState<boolean>(true);
     
     // 2FA Setup Modal States
     const [setupModalVisible, setSetupModalVisible] = useState<boolean>(false);
@@ -153,13 +154,21 @@ export default function SecurityScreen() {
                 setBiometricEnabled(false);
             }
 
-            // C. Google Authenticator 2FA Verification
+            // C. Google Authenticator 2FA Verification & Transfer Scope
+            const savedTransferMfa = await AsyncStorage.getItem('mfa_required_for_transfers');
+            setMfaForTransfers(savedTransferMfa !== 'false');
             await checkMfaStatus();
         } catch (e) {
             console.warn("loadSecurityOverview error:", e);
         } finally {
             setLoadingData(false);
         }
+    };
+
+    const handleToggleTransferMfa = async (val: boolean) => {
+        setMfaForTransfers(val);
+        await AsyncStorage.setItem('mfa_required_for_transfers', val ? 'true' : 'false');
+        showToast(val ? "Transfer 2FA Protection Active! 🛡️" : "Transfer 2FA turned off (PIN only).");
     };
 
     const checkMfaStatus = async () => {
@@ -714,7 +723,102 @@ export default function SecurityScreen() {
                         )}
                     </View>
 
-                    {/* SECTION 2: HARDWARE BIOMETRIC LOGIN */}
+                    {/* SECTION 2: INDA 2FA ZAI BAYYANA (2FA PROTECTION SCOPE & WHERE IT APPEARS) */}
+                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <MaterialCommunityIcons name="shield-airplane" size={16} color={L.navyHeader} />
+                                <Text style={{ color: L.navyHeader, fontSize: 11.5, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    Inda 2FA Zai Bayyana (Where It Appears)
+                                </Text>
+                            </View>
+                            <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
+                                <Text style={{ color: isMfaActive ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: '900' }}>
+                                    {isMfaActive ? 'ACTIVE SHIELD' : 'SETUP REQUIRED'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 9.5, marginBottom: 12, lineHeight: 13.5 }}>
+                            Shafuka da ayyukan da lambobin 2FA za su bayyana don kare asusunka daga fashi ko shiga ba tare da izini ba:
+                        </Text>
+
+                        {/* Location 1: Shiga Asusu (Login / Sign-In) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.blueBg, borderWidth: 1, borderColor: L.blueBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="log-in-outline" size={17} color={L.blue} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Shiga Asusu (Login)</Text>
+                                        <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: isMfaActive ? L.emerald : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
+                                                {isMfaActive ? 'KOYAUSHE' : 'OFF'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
+                                        Yana bayyana kai-tsaye a shafin Login bayan Email & Password.
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="shield-checkmark" size={18} color={isMfaActive ? L.emerald : '#CBD5E1'} />
+                        </View>
+
+                        {/* Location 2: Tura Kuɗi & Cire Kuɗi (Wallet Transfers & Bank Payouts) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.emeraldBg, borderWidth: 1, borderColor: L.emeraldBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="paper-plane-outline" size={17} color={L.emerald} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Tura Kuɗi (Transfers)</Text>
+                                        <View style={{ backgroundColor: (isMfaActive && mfaForTransfers) ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: (isMfaActive && mfaForTransfers) ? L.emerald : L.textMuted, fontSize: 7.5, fontWeight: '900' }}>
+                                                {(isMfaActive && mfaForTransfers) ? 'PIN + 2FA' : 'PIN ONLY'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
+                                        Yana bayyana a SecurityModal bayan 4-digit PIN kafin kudi su fita.
+                                    </Text>
+                                </View>
+                            </View>
+                            <Switch
+                                trackColor={{ false: '#E2E8F0', true: '#10B981' }}
+                                thumbColor={(isMfaActive && mfaForTransfers) ? '#FFFFFF' : '#94A3B8'}
+                                onValueChange={handleToggleTransferMfa}
+                                value={isMfaActive && mfaForTransfers}
+                                disabled={!isMfaActive}
+                                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+                            />
+                        </View>
+
+                        {/* Location 3: Sauya Kalmar Sirri & PIN */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: L.purpleBg, borderWidth: 1, borderColor: L.purpleBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="key-outline" size={17} color={L.purple} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '800' }}>Canza PIN & Password</Text>
+                                        <View style={{ backgroundColor: L.purpleBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: L.purple, fontSize: 7.5, fontWeight: '900' }}>PROTECTED</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>
+                                        Yana kare canza lambar asiri da transaction PIN ta yadda ba za a taba sace su ba.
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="checkmark-circle" size={18} color={isMfaActive ? L.purple : '#CBD5E1'} />
+                        </View>
+                    </View>
+
+                    {/* SECTION 3: HARDWARE BIOMETRIC LOGIN */}
                     <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: biometricEnabled ? L.blueBorder : L.cardBorder, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
