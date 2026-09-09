@@ -197,8 +197,7 @@ export default function ModernContentManager() {
         setCropOffsetX(0);
         setCropOffsetY(0);
         setCropFitMode('contain');
-        // Automatically open crop modal right after picking photo!
-        setShowCropModal(true);
+        // Do NOT force crop modal! Keep original photo directly with 100% quality
       }
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to pick image");
@@ -970,20 +969,13 @@ export default function ModernContentManager() {
                 style={[
                   s.imagePickerBox, 
                   (selectedImage || existingImageUrl) 
-                    ? { aspectRatio: Math.max(2.5, Math.min(pickedRatio, 5.2)), height: undefined } 
-                    : { height: 64 }
+                    ? { aspectRatio: Math.max(2.5, Math.min(pickedRatio, 5.5)), height: undefined } 
+                    : { height: 54 }
                 ]} 
                 activeOpacity={0.85}
               >
                 {selectedImage || existingImageUrl ? (
                   <View style={s.modalImageContainer}>
-                    {/* Blurred sides so no black appears */}
-                    <Image 
-                      source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
-                      style={StyleSheet.absoluteFillObject} 
-                      blurRadius={24}
-                      resizeMode="cover" 
-                    />
                     <Image 
                       source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
                       style={s.modalImagePreview} 
@@ -1149,28 +1141,20 @@ export default function ModernContentManager() {
               <View style={[s.cropCorner, s.cropCornerBR]} />
 
               {(selectedImage || existingImageUrl) && (
-                <>
-                  <Image
-                    source={{ uri: selectedImage?.uri || existingImageUrl! }}
-                    style={StyleSheet.absoluteFillObject}
-                    blurRadius={24}
-                    resizeMode="cover"
-                  />
-                  <Image
-                    source={{ uri: selectedImage?.uri || existingImageUrl! }}
-                    style={[
-                      s.cropViewfinderImg,
-                      cropFitMode === 'cover' && {
-                        transform: [
-                          { scale: cropZoom },
-                          { translateX: cropOffsetX },
-                          { translateY: cropOffsetY },
-                        ],
-                      },
-                    ]}
-                    resizeMode={cropFitMode}
-                  />
-                </>
+                <Image
+                  source={{ uri: selectedImage?.uri || existingImageUrl! }}
+                  style={[
+                    s.cropViewfinderImg,
+                    cropFitMode === 'cover' && {
+                      transform: [
+                        { scale: cropZoom },
+                        { translateX: cropOffsetX },
+                        { translateY: cropOffsetY },
+                      ],
+                    },
+                  ]}
+                  resizeMode={cropFitMode}
+                />
               )}
 
               {/* Grid Guides */}
@@ -1802,10 +1786,10 @@ const s = StyleSheet.create({
     color: L.textPrimary,
   },
   imagePickerBox: {
-    backgroundColor: '#070E1E',
-    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: '#E2E8F0',
     overflow: 'hidden',
     marginBottom: 10,
     width: '100%',
@@ -1814,7 +1798,9 @@ const s = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'relative',
-    backgroundColor: '#070E1E',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalImagePreview: {
     width: '100%',
@@ -1837,12 +1823,12 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   imagePickerTitle: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 11,
     fontWeight: '800',
   },
   imagePickerSubtitle: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 9,
     fontWeight: '500',
   },
@@ -2052,10 +2038,10 @@ const s = StyleSheet.create({
   },
   cropViewfinderFrame: {
     width: '100%',
-    height: 64,
-    backgroundColor: '#070E1E',
-    borderRadius: 10,
-    borderWidth: 2,
+    height: 54,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1.5,
     borderColor: '#F59E0B',
     overflow: 'hidden',
     position: 'relative',

@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 24, 460);
-const BANNER_HEIGHT = 64; // Ultra-slim, sleek 64px executive ribbon
+const BANNER_HEIGHT = 54; // Ultra-slim, sleek 54px banner strip
 const BANNER_MARGIN = 8;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
@@ -117,13 +117,6 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
             >
               {hasImage ? (
                 <View style={styles.imageContainer}>
-                  {/* Blurred backdrop of the image itself so there is NEVER black on the sides */}
-                  <Image 
-                    source={{ uri: item.image_url }} 
-                    style={StyleSheet.absoluteFillObject} 
-                    blurRadius={24}
-                    resizeMode="cover" 
-                  />
                   {/* Clean 100% full original banner with zero cutoff */}
                   <Image 
                     source={{ uri: item.image_url }} 
@@ -190,22 +183,19 @@ const styles = StyleSheet.create({
     width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
     marginRight: BANNER_MARGIN,
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#070E1E',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   imageContainer: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#070E1E',
+    backgroundColor: 'transparent',
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bannerImage: {
     width: '100%',
