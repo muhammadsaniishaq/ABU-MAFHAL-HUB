@@ -449,9 +449,9 @@ export default function OTP() {
                     inputRefs.current[nextIdx]?.focus();
                 }
             } else {
-                const msg = 'Ba a sami lambobi 6 a clipboard ba. Da fatan za a kwafi lambar daga Google Authenticator sannan a danna Paste Code.';
+                const msg = 'No valid 6-digit code found on clipboard. Please copy your code from Google Authenticator and tap Paste Code.';
                 if (Platform.OS === 'web') alert(msg);
-                else Alert.alert('Clipboard Empty / Babu Lamba 📋', msg);
+                else Alert.alert('Clipboard Empty 📋', msg);
             }
         } catch (err: any) {
             console.log('Paste error in OTP:', err);
@@ -566,7 +566,7 @@ export default function OTP() {
                             </Text>
                         )}
 
-                        {/* Paste Code Button (Fanna / Manna Code) */}
+                        {/* Paste Code Button */}
                         <TouchableOpacity
                             onPress={handlePasteCode}
                             style={s.pasteBtn}
@@ -575,7 +575,7 @@ export default function OTP() {
                             <View style={s.pasteIconWrapper}>
                                 <Ionicons name="clipboard-outline" size={15} color="#D97706" />
                             </View>
-                            <Text style={s.pasteBtnText}>Paste Code (Fanna Code) 📋</Text>
+                            <Text style={s.pasteBtnText}>Paste 6-Digit Code 📋</Text>
                             <View style={s.pasteHintBadge}>
                                 <Text style={s.pasteHintText}>1-Tap</Text>
                             </View>
