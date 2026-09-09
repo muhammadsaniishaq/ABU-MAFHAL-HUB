@@ -432,7 +432,7 @@ export default function SecurityScreen() {
                 }
                 setBiometricEnabled(true);
                 showToast("Biometric authentication enabled! 🛡️✨");
-                Alert.alert("Biometrics Enabled ✨", "Biometric authentication is now active for App Unlock, Transfers, and Login.");
+                Alert.alert("Biometrics Enabled ✨", "Biometric authentication is now active for PIN App Unlock and Transfers.");
                 return;
             }
 
@@ -485,7 +485,7 @@ export default function SecurityScreen() {
                     showToast(`${biometricType} activated with 100% security! 🛡️✨`);
                     Alert.alert(
                         "Biometrics Configured! 🎉",
-                        `Your ${biometricType} has been successfully verified and activated. You can now use it on the PIN unlock keypad, transaction modals, and quick login.`
+                        `Your ${biometricType} has been successfully verified and activated. You can now use it on the PIN unlock keypad and transaction modals.`
                     );
                 } else {
                     setBiometricEnabled(false);
@@ -1153,7 +1153,7 @@ export default function SecurityScreen() {
                                     </Text>
                                     <View style={{ backgroundColor: biometricEnabled ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
                                         <Text style={{ color: biometricEnabled ? L.emerald : L.textMuted, fontSize: 8.5, fontWeight: '800' }}>
-                                            {biometricEnabled ? "3 OF 3 ACTIVE" : "ENABLE TO ACTIVATE"}
+                                            {biometricEnabled ? "2 OF 2 ACTIVE" : "ENABLE TO ACTIVATE"}
                                         </Text>
                                     </View>
                                 </View>
@@ -1167,11 +1167,6 @@ export default function SecurityScreen() {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: biometricEnabled ? L.emeraldBg : '#F8FAFC', borderWidth: 1, borderColor: biometricEnabled ? L.emeraldBorder : '#E2E8F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
                                         <Ionicons name={biometricEnabled ? "checkmark-circle" : "ellipse-outline"} size={12} color={biometricEnabled ? L.emerald : L.textMuted} />
                                         <Text style={{ color: biometricEnabled ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>Transfers & Cashout Modal</Text>
-                                    </View>
-
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: biometricEnabled ? L.emeraldBg : '#F8FAFC', borderWidth: 1, borderColor: biometricEnabled ? L.emeraldBorder : '#E2E8F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                                        <Ionicons name={biometricEnabled ? "checkmark-circle" : "ellipse-outline"} size={12} color={biometricEnabled ? L.emerald : L.textMuted} />
-                                        <Text style={{ color: biometricEnabled ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>Quick Sign-In Screen</Text>
                                     </View>
                                 </View>
                             </View>

@@ -12,7 +12,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
-import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
@@ -45,8 +44,6 @@ export default function LoginScreen() {
     // Processing & Social Loading States
     const [loading, setLoading] = useState(false);
     const [socialLoading, setSocialLoading] = useState<string | null>(null);
-    const [biometricAvailable, setBiometricAvailable] = useState(false);
-    const [biometricType, setBiometricType] = useState<string>('Biometrics');
 
     // Forgot Password & Wallet Modal States
     const [showForgotModal, setShowForgotModal] = useState(false);
@@ -56,13 +53,11 @@ export default function LoginScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            checkBiometrics();
             loadSavedCredentials();
         }, [])
     );
 
     useEffect(() => {
-        checkBiometrics();
         loadSavedCredentials();
 
         // Listen for Google OAuth returns & error responses in web URL query/hash params
@@ -137,80 +132,6 @@ export default function LoginScreen() {
             }
         } catch (e) {
             console.warn('Failed loading saved credentials', e);
-        }
-    };
-
-    const checkBiometrics = async () => {
-        try {
-            const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
-            const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
-            const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
-
-            if (isBioActive) {
-                setBiometricAvailable(true);
-                let detected = 'Biometrics';
-                if ((Platform.OS as string) !== 'web') {
-                    try {
-                        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-                        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-                            detected = 'Face ID';
-                        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-                            detected = Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint';
-                        }
-                    } catch (_) {}
-                }
-                setBiometricType(detected);
-            } else {
-                setBiometricAvailable(false);
-            }
-        } catch (e) {
-            console.warn('Biometric check error', e);
-        }
-    };
-
-    const handleBiometricAuth = async () => {
-        try {
-            let authSuccess = false;
-            if ((Platform.OS as string) === 'web') {
-                authSuccess = true;
-            } else {
-                const hasHardware = await LocalAuthentication.hasHardwareAsync().catch(() => false);
-                const isEnrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
-                if (!hasHardware || !isEnrolled) {
-                    Alert.alert("Biometrics Notice", "No fingerprint or face credentials are registered on this device. Please log in with your password.");
-                    return;
-                }
-
-                const result = await LocalAuthentication.authenticateAsync({
-                    promptMessage: `Sign in to ABU MAFHAL HUB with ${biometricType}`,
-                    fallbackLabel: 'Use Password',
-                    cancelLabel: 'Cancel',
-                    disableDeviceFallback: false,
-                });
-                authSuccess = !!result.success;
-            }
-
-            if (authSuccess) {
-                const savedId = await AsyncStorage.getItem('saved_user_identifier');
-                const savedPass = await AsyncStorage.getItem('saved_user_pass_secure');
-
-                if (savedId && savedPass) {
-                    setIdentifier(savedId);
-                    setPassword(savedPass);
-                    handleLoginWithCredentials(savedId, savedPass);
-                } else {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session?.user) {
-                        await AsyncStorage.setItem('app_unlocked', 'true');
-                        await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
-                        router.replace('/dashboard' as any);
-                    } else {
-                        Alert.alert('Sign-In Required', 'Please log in with your password once to link your biometric sign-in.');
-                    }
-                }
-            }
-        } catch (e: any) {
-            Alert.alert('Biometric Authentication Error', e.message || 'Could not authenticate.');
         }
     };
 
@@ -842,20 +763,6 @@ export default function LoginScreen() {
                                         )}
                                     </LinearGradient>
                                 </TouchableOpacity>
-
-                                {/* Quick Biometrics Button */}
-                                {biometricAvailable && (
-                                    <TouchableOpacity 
-                                        onPress={handleBiometricAuth}
-                                        style={[styles.biometricBtn, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', borderColor: '#F59E0B' }]}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={17} color="#F59E0B" style={{ marginRight: 6 }} />
-                                        <Text style={[styles.biometricBtnText, { color: isDark ? '#FDE047' : '#92400E' }]} numberOfLines={1}>
-                                            Sign In with {biometricType}
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
 
                                 {/* Social Login Divider */}
                                 <View style={styles.dividerRow}>
