@@ -57,6 +57,8 @@ export default function ModernContentManager() {
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const [pickedRatio, setPickedRatio] = useState<number>(2.0);
+  const [bannerRatios, setBannerRatios] = useState<{ [id: string]: number }>({});
   const [uploadMode, setUploadMode] = useState<'original' | 'freeform'>('original');
   const [bannerFitMode, setBannerFitMode] = useState<'contain' | 'cover'>('cover');
 
@@ -129,7 +131,24 @@ export default function ModernContentManager() {
     setLoading(true);
     try {
       const { data } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
-      if (data) setBanners(data);
+      if (data) {
+        setBanners(data);
+        data.forEach((b: any) => {
+          if (b.image_url) {
+            Image.getSize(
+              b.image_url,
+              (w, h) => {
+                if (w > 0 && h > 0) {
+                  setBannerRatios(prev => ({ ...prev, [b.id]: w / h }));
+                }
+              },
+              () => {
+                setBannerRatios(prev => ({ ...prev, [b.id]: 2.0 }));
+              }
+            );
+          }
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -150,7 +169,11 @@ export default function ModernContentManager() {
       }));
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setSelectedImage(result.assets[0]);
+        const asset = result.assets[0];
+        setSelectedImage(asset);
+        if (asset.width && asset.height) {
+          setPickedRatio(asset.width / asset.height);
+        }
         setCropZoom(1.0);
         setCropOffsetX(0);
         setCropOffsetY(0);
@@ -443,6 +466,13 @@ export default function ModernContentManager() {
     setNewPlacements(banner.placement ? banner.placement.split(',') : ['dashboard']);
     setExistingImageUrl(banner.image_url);
     setSelectedImage(null);
+    if (banner.image_url) {
+      Image.getSize(banner.image_url, (w, h) => {
+        if (w > 0 && h > 0) setPickedRatio(w / h);
+      });
+    } else {
+      setPickedRatio(2.0);
+    }
     setShowModal(true);
   };
 
@@ -636,8 +666,8 @@ export default function ModernContentManager() {
               ) : (
                 banners.map(b => (
                   <View key={b.id} style={s.card}>
-                    <View style={s.bannerPreviewContainer}>
-                      <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="cover" />
+                    <View style={[s.bannerPreviewContainer, { aspectRatio: Math.max(1.6, Math.min(bannerRatios[b.id] || 2.0, 3.2)) }]}>
+                      <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
                     </View>
                     <View style={s.cardBody}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -852,18 +882,27 @@ export default function ModernContentManager() {
                 </View>
 
                 <Text style={s.sizeGuideNote}>
-                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Pro Tip:</Text> Designing banners at <Text style={{ fontWeight: '800', color: '#0F172A' }}>1200 × 300 px</Text> (4:1 ratio) ensures optimal edge-to-edge display with zero letterboxing or clipping!
+                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Pro Tip:</Text> Supports 2:1 (e.g. 1200 × 600 px), 16:9, and widescreen flyers in original quality with zero auto-zoom and zero auto-crop!
                 </Text>
               </View>
 
               {/* Image Preview & Picker */}
-              <TouchableOpacity onPress={pickImage} style={s.imagePickerBox} activeOpacity={0.85}>
+              <TouchableOpacity 
+                onPress={pickImage} 
+                style={[
+                  s.imagePickerBox, 
+                  (selectedImage || existingImageUrl) 
+                    ? { aspectRatio: Math.max(1.6, Math.min(pickedRatio, 3.2)), height: undefined } 
+                    : { height: 110 }
+                ]} 
+                activeOpacity={0.85}
+              >
                 {selectedImage || existingImageUrl ? (
                   <View style={s.modalImageContainer}>
                     <Image 
                       source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
                       style={s.modalImagePreview} 
-                      resizeMode="cover" 
+                      resizeMode="contain" 
                     />
                   </View>
                 ) : (
@@ -873,7 +912,7 @@ export default function ModernContentManager() {
                     </View>
                     <View>
                       <Text style={s.imagePickerTitle}>Select Banner Image</Text>
-                      <Text style={s.imagePickerSubtitle}>📐 Ideal: 1200 × 300 px (4:1) • Fills Edge-to-Edge</Text>
+                      <Text style={s.imagePickerSubtitle}>📐 Full Original Quality • Zero Auto Zoom • Zero Auto Crop</Text>
                     </View>
                   </View>
                 )}
@@ -1321,14 +1360,13 @@ const s = StyleSheet.create({
   },
   bannerPreviewContainer: {
     width: '100%',
-    height: 86,
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: '#0F172A',
   },
   bannerImagePreview: {
     width: '100%',
-    height: 86,
+    height: '100%',
   },
   cardBody: {
     padding: 10,
@@ -1618,13 +1656,13 @@ const s = StyleSheet.create({
     color: L.textPrimary,
   },
   imagePickerBox: {
-    height: 86,
     backgroundColor: '#0F172A',
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     overflow: 'hidden',
     marginBottom: 10,
+    width: '100%',
   },
   modalImageContainer: {
     width: '100%',
