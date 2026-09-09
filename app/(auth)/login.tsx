@@ -97,7 +97,7 @@ export default function LoginScreen() {
                         }
 
                         if (!localPin) {
-                            router.replace('/pin-setup' as any);
+                            router.replace('/(auth)/pin-setup' as any);
                         } else {
                             router.replace('/dashboard' as any);
                         }
@@ -475,7 +475,7 @@ export default function LoginScreen() {
                         }
 
                         if (!localPin) {
-                            router.replace('/pin-setup' as any);
+                            router.replace('/(auth)/pin-setup' as any);
                         } else {
                             router.replace('/dashboard' as any);
                         }

@@ -267,7 +267,7 @@ export default function RootLayout() {
                                     // Save the active route path so PIN unlock returns here
                                     const fullPath = segments.length > 0 ? '/' + segments.join('/') : '/dashboard';
                                     await AsyncStorage.setItem('pin_return_path', fullPath).catch(() => {});
-                                    router.replace('/pin' as any);
+                                    router.replace('/(auth)/pin' as any);
                                 }
                             }
                         }
@@ -309,11 +309,11 @@ export default function RootLayout() {
                                 const validPin = String(data.transaction_pin);
                                 if (Platform.OS === 'web') await AsyncStorage.setItem(`user_transaction_pin_${userId}`, validPin);
                                 else await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
-                                if (unlocked !== 'true') router.replace('/pin' as any);
+                                if (unlocked !== 'true') router.replace('/(auth)/pin' as any);
                                 else router.replace('/dashboard' as any);
                             } else {
                                 if (currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
-                                    router.replace('/pin-setup' as any);
+                                    router.replace('/(auth)/pin-setup' as any);
                                 }
                             }
                         } catch (err) {}
@@ -324,7 +324,7 @@ export default function RootLayout() {
                 // 2. User has PIN, but app is LOCKED -> Prompt PIN unlock
                 if (unlocked !== 'true') {
                     if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'login') {
-                        router.replace('/pin' as any);
+                        router.replace('/(auth)/pin' as any);
                     }
                     return;
                 }

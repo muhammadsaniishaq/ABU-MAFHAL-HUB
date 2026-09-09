@@ -22,7 +22,7 @@ export default function NotFoundScreen() {
                     if (unlocked === 'true') {
                         if (isMounted) router.replace('/dashboard' as any);
                     } else {
-                        if (isMounted) router.replace('/pin' as any);
+                        if (isMounted) router.replace('/(auth)/pin' as any);
                     }
                 } else {
                     if (isMounted) router.replace('/');

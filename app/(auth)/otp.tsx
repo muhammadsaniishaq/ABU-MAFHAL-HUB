@@ -216,6 +216,7 @@ export default function OTP() {
                 // 2FA Verified! Mark session verified
                 await AsyncStorage.setItem('mfa_verified_session', 'true');
                 await AsyncStorage.removeItem('app_unlocked');
+                await AsyncStorage.setItem('app_unlocked', 'false');
 
                 // Determine if user has a transaction PIN configured
                 let userPin = Platform.OS === 'web'
@@ -227,6 +228,16 @@ export default function OTP() {
                     const { data: prof } = await supabase.from('profiles').select('transaction_pin').eq('id', user.id).maybeSingle();
                     if (prof?.transaction_pin) {
                         userPin = String(prof.transaction_pin);
+                    }
+                }
+
+                if (user?.id && userPin) {
+                    if (Platform.OS === 'web') {
+                        await AsyncStorage.setItem(`user_transaction_pin_${user.id}`, userPin);
+                        await AsyncStorage.setItem('user_transaction_pin', userPin);
+                    } else {
+                        await SecureStore.setItemAsync(`user_transaction_pin_${user.id}`, userPin);
+                        await SecureStore.setItemAsync('user_transaction_pin', userPin);
                     }
                 }
 

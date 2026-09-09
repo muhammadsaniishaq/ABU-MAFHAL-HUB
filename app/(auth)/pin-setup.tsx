@@ -101,9 +101,6 @@ export default function PinSetupScreen() {
             const isBioActive = (bioStatus === 'true' || bioSetup === 'true') && bioStatus !== 'false' && bioSetup !== 'false';
             if (isBioActive) {
                 setBiometricEnabled(true);
-                if (savedPin && !isResetFlow) {
-                    setTimeout(() => handleBiometricAuth(), 350);
-                }
             } else {
                 setBiometricEnabled(false);
             }
@@ -116,7 +113,7 @@ export default function PinSetupScreen() {
     const handleBiometricAuth = async () => {
         if (!biometricEnabled) return;
         if ((Platform.OS as string) === 'web') {
-            handleSuccessfulVerification();
+            Alert.alert("Biometrics Notice", "Biometric authentication is supported on mobile devices. Please enter your 4-digit PIN.");
             return;
         }
         try {

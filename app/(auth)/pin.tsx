@@ -176,9 +176,6 @@ export default function PinUnlockScreen() {
                     } catch (_) {}
                 }
                 setBiometricType(detectedType);
-                setTimeout(() => {
-                    triggerBiometricAuth(localPin, detectedType);
-                }, 350);
             } else {
                 setBiometricAvailable(false);
             }
@@ -191,13 +188,13 @@ export default function PinUnlockScreen() {
         try {
             const activeType = customType || biometricType || 'Biometrics';
             if ((Platform.OS as string) === 'web') {
-                unlockSuccess();
+                Alert.alert("Biometrics Notice", "Hardware biometric authentication is supported on mobile devices. Please enter your 4-digit transaction PIN.");
                 return;
             }
             const hasHardware = await LocalAuthentication.hasHardwareAsync().catch(() => false);
             const isEnrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
             if (!hasHardware || !isEnrolled) {
-                // Biometrics not enrolled in hardware, fallback to PIN entry
+                Alert.alert("Biometrics Not Set Up", "Please register fingerprint or Face ID in your device Settings first.");
                 return;
             }
             const result = await LocalAuthentication.authenticateAsync({

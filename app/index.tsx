@@ -1255,7 +1255,7 @@ export default function SplashScreen() {
       const unlocked = await AsyncStorage.getItem('app_unlocked');
       if (session?.user) {
         setTimeout(
-          () => router.replace(unlocked === 'true' ? ('/dashboard' as any) : ('/pin' as any)),
+          () => router.replace(unlocked === 'true' ? ('/dashboard' as any) : ('/(auth)/pin' as any)),
           500
         );
       } else {
