@@ -545,7 +545,8 @@ export default function ModernContentManager() {
           text: announcementText,
           mediaUrl: announcementUrl,
           mediaType: announcementType,
-          isActive: announcementActive
+          isActive: announcementActive,
+          fitMode: 'contain',
         },
         description: 'Global Popup Announcement'
       }, { onConflict: 'key' });
@@ -763,12 +764,12 @@ export default function ModernContentManager() {
               </View>
 
               {announcementUrl ? (
-                <View style={[s.announcementPreviewBox, (announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4')) && { minHeight: 160, maxHeight: 280, height: undefined, backgroundColor: '#000000' }]}>
+                <View style={[s.announcementPreviewBox, (announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4')) && { aspectRatio: 16 / 9, maxHeight: 240, height: undefined, backgroundColor: '#000000' }]}>
                   {announcementType === 'video' || announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm') ? (
                     <Video 
                       source={{ uri: announcementUrl }} 
-                      style={[s.announcementPreviewImg, Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : null]} 
-                      videoStyle={Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : undefined}
+                      style={[s.announcementPreviewImg, { width: '100%', height: '100%', backgroundColor: '#000000' }]} 
+                      videoStyle={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', ...(Platform.OS === 'web' ? { objectFit: 'contain' as any } : {}) }}
                       resizeMode={ResizeMode.CONTAIN} 
                       shouldPlay 
                       isLooping 
@@ -777,7 +778,7 @@ export default function ModernContentManager() {
                   ) : (
                     <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="contain" />
                   )}
-                  <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()} • ORIGINAL HD (NO ZOOM)</Text>
+                  <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()} • ORIGINAL HD (ZERO ZOOM)</Text>
                 </View>
               ) : null}
 

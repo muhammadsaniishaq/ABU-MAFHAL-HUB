@@ -96,9 +96,13 @@ export default function GlobalAnnouncementModal() {
     // Helper to safely extract natural aspect ratio from video events on all platforms
     const updateDimensionsFromEvent = (event: any) => {
         setIsVideoLoading(false);
-        const natural = event?.naturalSize || event?.nativeEvent?.naturalSize;
+        const natural = event?.naturalSize || event?.nativeEvent?.naturalSize || event?.status?.naturalSize;
         if (natural && natural.width > 0 && natural.height > 0) {
-            setMediaRatio(natural.width / natural.height);
+            if (natural.orientation === 'portrait' && natural.width > natural.height) {
+                setMediaRatio(natural.height / natural.width);
+            } else {
+                setMediaRatio(natural.width / natural.height);
+            }
             return;
         }
         const target = event?.target as any;
@@ -251,33 +255,45 @@ export default function GlobalAnnouncementModal() {
                     {/* Banner Image / Video Container (100% Original Natural Size & Zero Zoom/Crop) */}
                     {config.mediaUrl ? (
                         <View style={styles.mediaStage}>
+                            {Platform.OS === 'web' && (
+                                <style dangerouslySetInnerHTML={{ __html: `
+                                    video {
+                                        object-fit: contain !important;
+                                        width: 100% !important;
+                                        height: 100% !important;
+                                        max-width: 100% !important;
+                                        max-height: 100% !important;
+                                    }
+                                `}} />
+                            )}
                             {isVideo ? (
                                 <View 
                                     style={[
                                         styles.videoBox, 
                                         mediaRatio ? { aspectRatio: mediaRatio } : { aspectRatio: 16 / 9 },
-                                        { maxHeight: Math.min(Math.round(height * 0.48), 420) }
+                                        { maxHeight: Math.min(Math.round(height * 0.52), 440) }
                                     ]}
                                 >
                                     <Video
                                         ref={videoRef}
                                         source={{ uri: config.mediaUrl }}
-                                        style={[
-                                            styles.media,
-                                            Platform.OS === 'web' ? ({ objectFit: 'contain', width: '100%', height: '100%' } as any) : null
-                                        ]}
-                                        videoStyle={Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : undefined}
+                                        style={styles.media}
+                                        videoStyle={styles.videoElement}
                                         resizeMode={ResizeMode.CONTAIN} // STRICTLY CONTAIN: Zero zoom, 100% original full frame!
                                         shouldPlay={isVideoPlaying}
                                         isLooping
                                         isMuted={isMuted}
                                         onPlaybackStatusUpdate={(status: any) => {
                                             setPlaybackStatus(status);
-                                            if (status?.isLoaded && !mediaRatio) {
+                                            if (status?.isLoaded) {
                                                 const nat = status.naturalSize;
-                                                if (nat?.width > 0 && nat?.height > 0) {
-                                                    setMediaRatio(nat.width / nat.height);
-                                                } else if (Platform.OS === 'web' && videoRef.current) {
+                                                if (nat?.width > 0 && nat?.height > 0 && (!mediaRatio || mediaRatio === 16 / 9)) {
+                                                    if (nat.orientation === 'portrait' && nat.width > nat.height) {
+                                                        setMediaRatio(nat.height / nat.width);
+                                                    } else {
+                                                        setMediaRatio(nat.width / nat.height);
+                                                    }
+                                                } else if (Platform.OS === 'web' && videoRef.current && !mediaRatio) {
                                                     const el = (videoRef.current as any)?.getVideoElement?.() || (videoRef.current as any)?._video;
                                                     if (el?.videoWidth > 0 && el?.videoHeight > 0) {
                                                         setMediaRatio(el.videoWidth / el.videoHeight);
@@ -290,7 +306,11 @@ export default function GlobalAnnouncementModal() {
                                             setIsVideoLoading(false);
                                             const nat = status?.naturalSize;
                                             if (nat?.width > 0 && nat?.height > 0) {
-                                                setMediaRatio(nat.width / nat.height);
+                                                if (nat.orientation === 'portrait' && nat.width > nat.height) {
+                                                    setMediaRatio(nat.height / nat.width);
+                                                } else {
+                                                    setMediaRatio(nat.width / nat.height);
+                                                }
                                             } else {
                                                 updateDimensionsFromEvent(status);
                                             }
@@ -457,7 +477,18 @@ const styles = StyleSheet.create({
     },
     media: {
         width: '100%',
-        height: '100%'
+        height: '100%',
+        backgroundColor: '#000000',
+    },
+    videoElement: {
+        width: '100%',
+        height: '100%',
+        maxWidth: '100%',
+        maxHeight: '100%',
+        backgroundColor: '#000000',
+        ...(Platform.OS === 'web' ? {
+            objectFit: 'contain' as any,
+        } : {}),
     },
     textContainer: {
         padding: 20,

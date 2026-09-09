@@ -659,12 +659,12 @@ export default function AdminSettings() {
                             {/* LIVE INTERACTIVE BANNER PREVIEW IN ADMIN SETTINGS */}
                             {announcementUrl ? (
                                 <View style={{ marginTop: 14, backgroundColor: '#070D1E', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
-                                    <View style={{ width: '100%', minHeight: 180, maxHeight: 280, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                    <View style={{ width: '100%', aspectRatio: 16 / 9, maxHeight: 260, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                                         {announcementType === 'video' || (announcementUrl && (announcementUrl.toLowerCase().includes('.mp4') || announcementUrl.toLowerCase().includes('.mov') || announcementUrl.toLowerCase().includes('.webm'))) ? (
                                             <Video 
                                                 source={{ uri: announcementUrl }} 
-                                                style={[{ width: '100%', height: '100%' }, Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : null]} 
-                                                videoStyle={Platform.OS === 'web' ? ({ objectFit: 'contain' } as any) : undefined}
+                                                style={{ width: '100%', height: '100%', backgroundColor: '#000000' }} 
+                                                videoStyle={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', ...(Platform.OS === 'web' ? { objectFit: 'contain' as any } : {}) }}
                                                 resizeMode={ResizeMode.CONTAIN} // Zero zoom, original full frame
                                                 shouldPlay
                                                 isLooping
@@ -675,7 +675,7 @@ export default function AdminSettings() {
                                             <Image 
                                                 source={{ uri: announcementUrl }} 
                                                 style={{ width: '100%', height: '100%' }} 
-                                                resizeMode={announcementFitMode === 'cover' ? "cover" : "contain"} 
+                                                resizeMode="contain" 
                                             />
                                         )}
                                     </View>

@@ -29,6 +29,11 @@ export default function HTML({ children }: PropsWithChildren) {
             -webkit-text-size-adjust: 100% !important;
             overflow-x: hidden !important;
           }
+          video {
+            object-fit: contain !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+          }
           @media screen and (max-width: 768px) {
             input, select, textarea, [role="textbox"], [contenteditable="true"] {
               font-size: 16px !important;
