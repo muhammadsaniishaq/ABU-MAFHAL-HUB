@@ -81,7 +81,9 @@ export default function SecurityScreen() {
     const [isMfaActive, setIsMfaActive] = useState<boolean>(false);
     const [mfaFactor, setMfaFactor] = useState<any>(null);
     const [mfaLoading, setMfaLoading] = useState<boolean>(false);
+    const [mfaForLogin, setMfaForLogin] = useState<boolean>(true);
     const [mfaForTransfers, setMfaForTransfers] = useState<boolean>(true);
+    const [mfaForSecurityChanges, setMfaForSecurityChanges] = useState<boolean>(true);
     
     // 2FA Setup Modal States
     const [setupModalVisible, setSetupModalVisible] = useState<boolean>(false);
@@ -94,6 +96,7 @@ export default function SecurityScreen() {
     const [testModalVisible, setTestModalVisible] = useState<boolean>(false);
     const [testCode, setTestCode] = useState<string>('');
     const [testingCode, setTestingCode] = useState<boolean>(false);
+    const [pendingActionAfter2fa, setPendingActionAfter2fa] = useState<string | null>(null);
 
     // App Lock & Privacy States
     const [autoLockInterval, setAutoLockInterval] = useState<string>('60'); // '0' | '60' | '300' | '900'
@@ -227,9 +230,16 @@ export default function SecurityScreen() {
                 setBiometricAvailable(true);
             }
 
-            // C. Google Authenticator 2FA Verification & Transfer Scope
+            // C. Google Authenticator 2FA Verification & Protection Scopes
+            const savedLoginMfa = await AsyncStorage.getItem('mfa_required_for_login');
+            setMfaForLogin(savedLoginMfa !== 'false');
+
             const savedTransferMfa = await AsyncStorage.getItem('mfa_required_for_transfers');
             setMfaForTransfers(savedTransferMfa !== 'false');
+
+            const savedSecurityMfa = await AsyncStorage.getItem('mfa_required_for_security_changes');
+            setMfaForSecurityChanges(savedSecurityMfa !== 'false');
+
             await checkMfaStatus();
 
             // D. App Lock, Privacy Shield & Emergency Freeze Preferences
@@ -395,11 +405,25 @@ export default function SecurityScreen() {
         }
     };
 
+    const handleToggleLoginMfa = async (val: boolean) => {
+        setMfaForLogin(val);
+        await AsyncStorage.setItem('mfa_required_for_login', val ? 'true' : 'false');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        showToast(val ? "Login 2FA Protection Active! 🛡️" : "Login 2FA turned off.");
+    };
+
     const handleToggleTransferMfa = async (val: boolean) => {
         setMfaForTransfers(val);
         await AsyncStorage.setItem('mfa_required_for_transfers', val ? 'true' : 'false');
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         showToast(val ? "Transfer 2FA Protection Active! 🛡️" : "Transfer 2FA turned off (PIN only).");
+    };
+
+    const handleToggleSecurityMfa = async (val: boolean) => {
+        setMfaForSecurityChanges(val);
+        await AsyncStorage.setItem('mfa_required_for_security_changes', val ? 'true' : 'false');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        showToast(val ? "Security Changes 2FA Active! 🛡️" : "Security Changes 2FA turned off.");
     };
 
     const checkMfaStatus = async () => {
@@ -784,12 +808,44 @@ export default function SecurityScreen() {
 
             setTestModalVisible(false);
             setTestCode('');
-            Alert.alert("2FA Synchronized! ✅", "Your Google Authenticator code is 100% active, valid, and working smoothly.");
+            const targetAction = pendingActionAfter2fa;
+            setPendingActionAfter2fa(null);
+
+            if (targetAction === 'pin_change') {
+                showToast("2FA Verified! Proceeding to PIN change... 🛡️");
+                router.push(`/(auth)/pin-setup?action=${hasPinConfigured ? 'reset' : 'setup'}` as any);
+            } else if (targetAction === 'password_change') {
+                showToast("2FA Verified! Proceeding to Password change... 🛡️");
+                router.push('/(auth)/reset-password' as any);
+            } else {
+                Alert.alert("2FA Synchronized! ✅", "Your Google Authenticator code is 100% active, valid, and working smoothly.");
+            }
         } catch (err: any) {
             Alert.alert("Code Verification Failed ❌", "The code was not accepted. Please ensure your device clock is set to automatic time and try again.");
         } finally {
             setTestingCode(false);
         }
+    };
+
+    // Initiators that protect PIN and Password changes with 2FA
+    const handleInitiatePinChange = () => {
+        if (hasPinConfigured && isMfaActive && mfaForSecurityChanges) {
+            setPendingActionAfter2fa('pin_change');
+            setTestModalVisible(true);
+            showToast("Verify 2FA code to change Transaction PIN 🛡️");
+            return;
+        }
+        router.push(`/(auth)/pin-setup?action=${hasPinConfigured ? 'reset' : 'setup'}` as any);
+    };
+
+    const handleInitiatePasswordChange = () => {
+        if (isMfaActive && mfaForSecurityChanges) {
+            setPendingActionAfter2fa('password_change');
+            setTestModalVisible(true);
+            showToast("Verify 2FA code to update Login Password 🛡️");
+            return;
+        }
+        router.push('/(auth)/reset-password' as any);
     };
 
     // 8. Terminate All Other Sessions
@@ -836,6 +892,10 @@ export default function SecurityScreen() {
     };
 
     const securityScore = calculateSecurityScore();
+
+    const active2faLocationsCount = isMfaActive
+        ? (mfaForLogin ? 1 : 0) + (mfaForTransfers ? 1 : 0) + (mfaForSecurityChanges ? 1 : 0)
+        : 0;
 
     const qrUrl = enrollData?.totp?.uri
         ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(enrollData.totp.uri)}`
@@ -1006,7 +1066,7 @@ export default function SecurityScreen() {
                         <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, overflow: 'hidden' }}>
                             {/* Login Password */}
                             <TouchableOpacity
-                                onPress={() => router.push('/change-password')}
+                                onPress={handleInitiatePasswordChange}
                                 activeOpacity={0.7}
                                 style={{ 
                                     flexDirection: 'row', 
@@ -1034,7 +1094,7 @@ export default function SecurityScreen() {
 
                             {/* Transaction PIN */}
                             <TouchableOpacity
-                                onPress={() => router.push(`/(auth)/pin-setup?action=${hasPinConfigured ? 'reset' : 'setup'}` as any)}
+                                onPress={handleInitiatePinChange}
                                 activeOpacity={0.7}
                                 style={{ 
                                     flexDirection: 'row', 
@@ -1173,14 +1233,18 @@ export default function SecurityScreen() {
                         </View>
                     </View>
 
-                    {/* SECTION 3: TWO-FACTOR AUTHENTICATION */}
+                    {/* SECTION 3: TWO-FACTOR AUTHENTICATION (2FA) */}
                     <View>
                         <Text style={{ color: L.textMuted, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, marginLeft: 4 }}>
                             Two-Factor Authentication (2FA)
                         </Text>
                         <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, overflow: 'hidden' }}>
-                            {/* Main 2FA Switch */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+                            {/* Main 2FA Switch Row */}
+                            <TouchableOpacity
+                                onPress={() => handleToggleMfa(!isMfaActive)}
+                                activeOpacity={0.7}
+                                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}
+                            >
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
                                     <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isMfaActive ? L.emeraldBg : L.goldBg, borderWidth: 1, borderColor: isMfaActive ? L.emeraldBorder : L.goldBorder, alignItems: 'center', justifyContent: 'center' }}>
                                         <Ionicons name="qr-code-outline" size={18} color={isMfaActive ? L.emerald : L.goldDk} />
@@ -1195,7 +1259,9 @@ export default function SecurityScreen() {
                                             </View>
                                         </View>
                                         <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>
-                                            Generate 6-digit TOTP verification codes
+                                            {isMfaActive 
+                                                ? "6-digit dynamic TOTP codes active across 3 security layers" 
+                                                : "Protect logins, payouts, and security with Google Authenticator"}
                                         </Text>
                                     </View>
                                 </View>
@@ -1211,17 +1277,152 @@ export default function SecurityScreen() {
                                         style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
                                     />
                                 )}
+                            </TouchableOpacity>
+
+                            {/* Action Buttons Strip */}
+                            <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                    <Ionicons name="time-outline" size={13} color={isMfaActive ? L.emerald : L.textMuted} />
+                                    <Text style={{ color: isMfaActive ? '#065F46' : L.textMuted, fontSize: 9.5, fontWeight: isMfaActive ? '700' : '500' }}>
+                                        {isMfaActive ? '30s Dynamic TOTP Synced' : 'Authenticator Ready for Setup'}
+                                    </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    {!isMfaActive && (
+                                        <TouchableOpacity 
+                                            onPress={() => handleToggleMfa(true)}
+                                            style={{ backgroundColor: L.emerald, paddingHorizontal: 10, paddingVertical: 4.5, borderRadius: 6 }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={{ color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' }}>Enable 2FA ⚡</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {isMfaActive && (
+                                        <TouchableOpacity 
+                                            onPress={() => setTestModalVisible(true)}
+                                            style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 9, paddingVertical: 4.5, borderRadius: 6, borderWidth: 0.8, borderColor: L.emeraldBorder }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={{ color: L.emerald, fontSize: 9.5, fontWeight: '800' }}>Test Code 🔬</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
 
-                            {/* Additional 2FA Settings (Only when active) */}
+                            {/* Active 2FA Protection Scopes Indicator */}
+                            <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: isMfaActive ? '#F8FAFC' : '#FFFFFF' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <Text style={{ color: L.textSecondary, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                        {isMfaActive ? "Active 2FA Protection Locations" : "2FA Target Locations"}
+                                    </Text>
+                                    <View style={{ backgroundColor: isMfaActive ? L.emeraldBg : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
+                                        <Text style={{ color: isMfaActive ? L.emerald : L.textMuted, fontSize: 8.5, fontWeight: '800' }}>
+                                            {isMfaActive ? `${active2faLocationsCount} OF 3 ACTIVE` : "ENABLE 2FA TO ACTIVATE"}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                    {/* Location 1: Account Login */}
+                                    <View style={{ 
+                                        flexDirection: 'row', 
+                                        alignItems: 'center', 
+                                        gap: 4, 
+                                        backgroundColor: (isMfaActive && mfaForLogin) ? L.emeraldBg : '#F8FAFC', 
+                                        borderWidth: 1, 
+                                        borderColor: (isMfaActive && mfaForLogin) ? L.emeraldBorder : '#E2E8F0', 
+                                        paddingHorizontal: 8, 
+                                        paddingVertical: 4, 
+                                        borderRadius: 6 
+                                    }}>
+                                        <Ionicons 
+                                            name={(isMfaActive && mfaForLogin) ? "checkmark-circle" : "ellipse-outline"} 
+                                            size={12} 
+                                            color={(isMfaActive && mfaForLogin) ? L.emerald : L.textMuted} 
+                                        />
+                                        <Text style={{ color: (isMfaActive && mfaForLogin) ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>
+                                            Account Login Sign-In
+                                        </Text>
+                                    </View>
+
+                                    {/* Location 2: Transfers & Payouts */}
+                                    <View style={{ 
+                                        flexDirection: 'row', 
+                                        alignItems: 'center', 
+                                        gap: 4, 
+                                        backgroundColor: (isMfaActive && mfaForTransfers) ? L.emeraldBg : '#F8FAFC', 
+                                        borderWidth: 1, 
+                                        borderColor: (isMfaActive && mfaForTransfers) ? L.emeraldBorder : '#E2E8F0', 
+                                        paddingHorizontal: 8, 
+                                        paddingVertical: 4, 
+                                        borderRadius: 6 
+                                    }}>
+                                        <Ionicons 
+                                            name={(isMfaActive && mfaForTransfers) ? "checkmark-circle" : "ellipse-outline"} 
+                                            size={12} 
+                                            color={(isMfaActive && mfaForTransfers) ? L.emerald : L.textMuted} 
+                                        />
+                                        <Text style={{ color: (isMfaActive && mfaForTransfers) ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>
+                                            Transfers & Cashout Modal
+                                        </Text>
+                                    </View>
+
+                                    {/* Location 3: Security & PIN Changes */}
+                                    <View style={{ 
+                                        flexDirection: 'row', 
+                                        alignItems: 'center', 
+                                        gap: 4, 
+                                        backgroundColor: (isMfaActive && mfaForSecurityChanges) ? L.emeraldBg : '#F8FAFC', 
+                                        borderWidth: 1, 
+                                        borderColor: (isMfaActive && mfaForSecurityChanges) ? L.emeraldBorder : '#E2E8F0', 
+                                        paddingHorizontal: 8, 
+                                        paddingVertical: 4, 
+                                        borderRadius: 6 
+                                    }}>
+                                        <Ionicons 
+                                            name={(isMfaActive && mfaForSecurityChanges) ? "checkmark-circle" : "ellipse-outline"} 
+                                            size={12} 
+                                            color={(isMfaActive && mfaForSecurityChanges) ? L.emerald : L.textMuted} 
+                                        />
+                                        <Text style={{ color: (isMfaActive && mfaForSecurityChanges) ? '#065F46' : L.textSecondary, fontSize: 9.5, fontWeight: '700' }}>
+                                            PIN Resets & Security Changes
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Granular 2FA Location Configuration Switches (When 2FA is Active) */}
                             {isMfaActive && (
-                                <>
-                                    {/* Transfer Protection Toggle */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderTopWidth: 1, borderColor: '#F1F5F9' }}>
+                                <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9' }}>
+                                    {/* Scope 1: Login Toggle */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F8FAFC' }}>
                                         <View style={{ flex: 1, paddingRight: 8 }}>
-                                            <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '700' }}>Require 2FA for Transfers</Text>
-                                            <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 1 }}>
-                                                Prompt for 6-digit code before completing payouts and transfers
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                <Ionicons name="log-in-outline" size={14} color={L.emerald} />
+                                                <Text style={{ color: L.textPrimary, fontSize: 11.5, fontWeight: '700' }}>Require 2FA on Account Login</Text>
+                                            </View>
+                                            <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, paddingLeft: 19 }}>
+                                                Prompt for 6-digit Authenticator code when signing into your account
+                                            </Text>
+                                        </View>
+                                        <Switch
+                                            trackColor={{ false: '#E2E8F0', true: '#10B981' }}
+                                            thumbColor={mfaForLogin ? '#FFFFFF' : '#94A3B8'}
+                                            onValueChange={handleToggleLoginMfa}
+                                            value={mfaForLogin}
+                                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                        />
+                                    </View>
+
+                                    {/* Scope 2: Transfer Protection Toggle */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F8FAFC' }}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                <Ionicons name="paper-plane-outline" size={14} color={L.emerald} />
+                                                <Text style={{ color: L.textPrimary, fontSize: 11.5, fontWeight: '700' }}>Require 2FA for Transfers & Payouts</Text>
+                                            </View>
+                                            <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, paddingLeft: 19 }}>
+                                                Prompt for 6-digit code before completing payouts and money transfers
                                             </Text>
                                         </View>
                                         <Switch
@@ -1233,17 +1434,26 @@ export default function SecurityScreen() {
                                         />
                                     </View>
 
-                                    {/* Test Code Action Strip */}
-                                    <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC' }}>
-                                        <Text style={{ color: L.textMuted, fontSize: 10 }}>Sync & verify Authenticator clock</Text>
-                                        <TouchableOpacity 
-                                            onPress={() => setTestModalVisible(true)}
-                                            style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: L.cardBorder }}
-                                        >
-                                            <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Test Code</Text>
-                                        </TouchableOpacity>
+                                    {/* Scope 3: Security & PIN Changes Toggle */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 }}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                <Ionicons name="shield-checkmark-outline" size={14} color={L.emerald} />
+                                                <Text style={{ color: L.textPrimary, fontSize: 11.5, fontWeight: '700' }}>Require 2FA for PIN & Security Changes</Text>
+                                            </View>
+                                            <Text style={{ color: L.textMuted, fontSize: 9.5, marginTop: 2, paddingLeft: 19 }}>
+                                                Prompt for 6-digit code before resetting PIN, altering password or security settings
+                                            </Text>
+                                        </View>
+                                        <Switch
+                                            trackColor={{ false: '#E2E8F0', true: '#10B981' }}
+                                            thumbColor={mfaForSecurityChanges ? '#FFFFFF' : '#94A3B8'}
+                                            onValueChange={handleToggleSecurityMfa}
+                                            value={mfaForSecurityChanges}
+                                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                        />
                                     </View>
-                                </>
+                                </View>
                             )}
                         </View>
                     </View>
@@ -1647,27 +1857,37 @@ export default function SecurityScreen() {
                 </View>
             </Modal>
 
-            {/* 4. LIVE 2FA TEST MODAL */}
+            {/* 4. LIVE 2FA TEST & SECURITY CHALLENGE MODAL */}
             <Modal
                 visible={testModalVisible}
                 animationType="fade"
                 transparent={true}
-                onRequestClose={() => setTestModalVisible(false)}
+                onRequestClose={() => {
+                    setTestModalVisible(false);
+                    setPendingActionAfter2fa(null);
+                }}
             >
                 <View style={{ flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
                     <View style={{ width: '100%', maxWidth: 380, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1.5, borderColor: L.emeraldBorder, padding: 18 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                                <Ionicons name="flask" size={18} color={L.emerald} />
-                                <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>Test Authenticator Code</Text>
+                                <Ionicons name={pendingActionAfter2fa ? "shield-checkmark" : "flask"} size={18} color={L.emerald} />
+                                <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>
+                                    {pendingActionAfter2fa ? "Verify 2FA for Security Action" : "Test Authenticator Code"}
+                                </Text>
                             </View>
-                            <TouchableOpacity onPress={() => setTestModalVisible(false)}>
+                            <TouchableOpacity onPress={() => {
+                                setTestModalVisible(false);
+                                setPendingActionAfter2fa(null);
+                            }}>
                                 <Ionicons name="close" size={20} color={L.textMuted} />
                             </TouchableOpacity>
                         </View>
 
                         <Text style={{ color: L.textMuted, fontSize: 10.5, marginBottom: 12, lineHeight: 14.5 }}>
-                            Enter the 6-digit code currently visible in Google Authenticator to confirm it is 100% active and in sync:
+                            {pendingActionAfter2fa 
+                                ? "Enter the 6-digit code from Google Authenticator to authorize this security change:" 
+                                : "Enter the 6-digit code currently visible in Google Authenticator to confirm it is 100% active and in sync:"}
                         </Text>
 
                         <TextInput
@@ -1694,7 +1914,10 @@ export default function SecurityScreen() {
 
                         <View style={{ flexDirection: 'row', gap: 10 }}>
                             <TouchableOpacity
-                                onPress={() => setTestModalVisible(false)}
+                                onPress={() => {
+                                    setTestModalVisible(false);
+                                    setPendingActionAfter2fa(null);
+                                }}
                                 style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
                             >
                                 <Text style={{ color: L.textSecondary, fontSize: 11, fontWeight: '700' }}>Cancel</Text>

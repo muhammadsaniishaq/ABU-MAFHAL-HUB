@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 
@@ -48,6 +49,10 @@ export default function OTP() {
     const initialEmailSentRef = useRef(false);
 
     useEffect(() => {
+        if (params.type === '2fa') {
+            // Google Authenticator 2FA: dynamic TOTP codes are generated on-device, do NOT dispatch email!
+            return;
+        }
         if (!targetEmail) {
             fetchActiveUserEmail();
         } else if (!initialEmailSentRef.current) {
@@ -88,6 +93,7 @@ export default function OTP() {
     };
 
     const checkAndSendOtpEmail = async (emailToSend: string) => {
+        if (params.type === '2fa') return;
         const isFromSignup = params.type === 'signup' || params.mode === 'signup' || params.source === 'registration' || params.source === 'login_unconfirmed';
         // If coming directly from Signup or Unconfirmed Login, Supabase Auth ALREADY dispatched the code!
         // Do NOT send a duplicate email!
@@ -169,23 +175,52 @@ export default function OTP() {
         setLoading(true);
 
         // Google Authenticator 2FA TOTP Verification Flow
-        if (params.type === '2fa' && params.factorId) {
+        if (params.type === '2fa') {
             try {
+                let factorId = params.factorId;
+                if (!factorId) {
+                    const { data: mfaData } = await supabase.auth.mfa.listFactors();
+                    const activeTotp = mfaData?.totp?.find((f: any) => f.status === 'verified');
+                    factorId = activeTotp?.id;
+                }
+                if (!factorId) {
+                    throw new Error('No active Google Authenticator factor found on this account.');
+                }
+
                 const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-                    factorId: params.factorId
+                    factorId
                 });
                 if (challengeError) throw challengeError;
 
                 const { error: verifyError } = await supabase.auth.mfa.verify({
-                    factorId: params.factorId,
+                    factorId,
                     challengeId: challengeData.id,
                     code: codeToken
                 });
                 if (verifyError) throw verifyError;
 
-                // 2FA Verified! Lock app & route to PIN unlock screen
+                // 2FA Verified! Mark session verified
+                await AsyncStorage.setItem('mfa_verified_session', 'true');
                 await AsyncStorage.removeItem('app_unlocked');
-                router.replace('/(auth)/pin' as any);
+
+                // Determine if user has a transaction PIN configured
+                let userPin = Platform.OS === 'web'
+                    ? await AsyncStorage.getItem('user_transaction_pin')
+                    : await SecureStore.getItemAsync('user_transaction_pin');
+
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!userPin && user?.id) {
+                    const { data: prof } = await supabase.from('profiles').select('transaction_pin').eq('id', user.id).maybeSingle();
+                    if (prof?.transaction_pin) {
+                        userPin = String(prof.transaction_pin);
+                    }
+                }
+
+                if (userPin) {
+                    router.replace('/(auth)/pin' as any);
+                } else {
+                    router.replace('/(auth)/pin-setup' as any);
+                }
                 return;
             } catch (err: any) {
                 setLoading(false);
@@ -416,8 +451,10 @@ export default function OTP() {
                         </TouchableOpacity>
 
                         <View style={s.securityBadge}>
-                            <Ionicons name="shield-checkmark" size={12} color="#F59E0B" />
-                            <Text style={s.securityBadgeText}>ENCRYPTED OTP</Text>
+                            <Ionicons name="shield-checkmark" size={12} color={params.type === '2fa' ? "#10B981" : "#F59E0B"} />
+                            <Text style={[s.securityBadgeText, params.type === '2fa' && { color: "#10B981" }]}>
+                                {params.type === '2fa' ? "2FA AUTHENTICATOR" : "ENCRYPTED OTP"}
+                            </Text>
                         </View>
 
                         <View style={{ width: 32 }} />
@@ -427,7 +464,7 @@ export default function OTP() {
                     <View style={s.card}>
                         {/* Compact Avatar / Logo Badge */}
                         <View style={s.avatarWrapper}>
-                            <LinearGradient colors={['#F59E0B', '#D97706', '#78350F']} style={s.avatarBorderRing}>
+                            <LinearGradient colors={params.type === '2fa' ? ['#10B981', '#059669', '#064E3B'] : ['#F59E0B', '#D97706', '#78350F']} style={s.avatarBorderRing}>
                                 {userAvatar ? (
                                     <Image source={{ uri: userAvatar }} style={s.avatarImage} />
                                 ) : (
@@ -436,15 +473,23 @@ export default function OTP() {
                                     </View>
                                 )}
                             </LinearGradient>
-                            <View style={s.activeBadge}>
-                                <Ionicons name="mail" size={11} color="#020617" />
+                            <View style={[s.activeBadge, params.type === '2fa' && { backgroundColor: '#10B981' }]}>
+                                <Ionicons name={params.type === '2fa' ? "key" : "mail"} size={11} color="#020617" />
                             </View>
                         </View>
 
                         {/* Title & Subtitle */}
-                        <Text style={s.titleText}>Verify Email Code</Text>
-                        <Text style={s.subtitleText}>Enter the 6-digit code sent to</Text>
-                        <Text style={s.emailHighlightText}>{targetEmail || 'your registered email'}</Text>
+                        <Text style={s.titleText}>{params.type === '2fa' ? "Google Authenticator" : "Verify Email Code"}</Text>
+                        <Text style={s.subtitleText}>
+                            {params.type === '2fa' 
+                                ? "Enter the 6-digit code from Google Authenticator or Authy" 
+                                : "Enter the 6-digit code sent to"}
+                        </Text>
+                        <Text style={[s.emailHighlightText, params.type === '2fa' && { color: '#10B981' }]}>
+                            {params.type === '2fa' 
+                                ? "Codes refresh automatically every 30 seconds ⏱️" 
+                                : (targetEmail || 'your registered email')}
+                        </Text>
 
                         {/* Compact 6-Digit OTP Box Row */}
                         <View style={s.otpRow}>
@@ -466,7 +511,7 @@ export default function OTP() {
                                         value={digit}
                                         onChangeText={(value) => handleOtpChange(value, index)}
                                         onKeyPress={(e) => handleKeyPress(e, index)}
-                                        selectionColor="#F59E0B"
+                                        selectionColor={params.type === '2fa' ? "#10B981" : "#F59E0B"}
                                     />
                                 </View>
                             ))}
@@ -480,7 +525,7 @@ export default function OTP() {
                             style={s.verifyBtnWrapper}
                         >
                             <LinearGradient
-                                colors={['#F59E0B', '#D97706']}
+                                colors={params.type === '2fa' ? ['#10B981', '#059669'] : ['#F59E0B', '#D97706']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={s.verifyBtnGradient}
@@ -490,37 +535,49 @@ export default function OTP() {
                                 ) : (
                                     <View style={s.verifyBtnContent}>
                                         <Ionicons name="checkmark-circle" size={18} color="#020617" />
-                                        <Text style={s.verifyBtnText}>Verify Code</Text>
+                                        <Text style={s.verifyBtnText}>{params.type === '2fa' ? "Verify 2FA Code" : "Verify Code"}</Text>
                                     </View>
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
 
-                        {/* Resend Section */}
-                        <View style={s.resendContainer}>
-                            <Text style={s.resendLabel}>Didn't receive the email?</Text>
-                            <TouchableOpacity
-                                disabled={counter > 0 || resending}
-                                onPress={handleResend}
-                                style={s.resendBtn}
-                                activeOpacity={0.7}
-                            >
-                                <Text
-                                    style={[
-                                        s.resendBtnText,
-                                        counter > 0 ? s.resendBtnDisabled : s.resendBtnActive,
-                                    ]}
-                                >
-                                    Resend Code
+                        {/* Resend Section or 2FA Synchronized Badge */}
+                        {params.type === '2fa' ? (
+                            <View style={{ alignItems: 'center', marginTop: 16, paddingHorizontal: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.25)' }}>
+                                    <Ionicons name="time-outline" size={13} color="#10B981" />
+                                    <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>Dynamic Time-Based Token</Text>
+                                </View>
+                                <Text style={{ color: '#64748B', fontSize: 10.5, textAlign: 'center', marginTop: 6 }}>
+                                    Ensure your device clock is synchronized with network time.
                                 </Text>
-                                {counter > 0 && (
-                                    <View style={s.counterBadge}>
-                                        <Text style={s.counterText}>{counter}s</Text>
-                                    </View>
-                                )}
-                                {resending && <ActivityIndicator size="small" color="#F59E0B" style={{ marginLeft: 6 }} />}
-                            </TouchableOpacity>
-                        </View>
+                            </View>
+                        ) : (
+                            <View style={s.resendContainer}>
+                                <Text style={s.resendLabel}>Didn't receive the email?</Text>
+                                <TouchableOpacity
+                                    disabled={counter > 0 || resending}
+                                    onPress={handleResend}
+                                    style={s.resendBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text
+                                        style={[
+                                            s.resendBtnText,
+                                            counter > 0 ? s.resendBtnDisabled : s.resendBtnActive,
+                                        ]}
+                                    >
+                                        Resend Code
+                                    </Text>
+                                    {counter > 0 && (
+                                        <View style={s.counterBadge}>
+                                            <Text style={s.counterText}>{counter}s</Text>
+                                        </View>
+                                    )}
+                                    {resending && <ActivityIndicator size="small" color="#F59E0B" style={{ marginLeft: 6 }} />}
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>

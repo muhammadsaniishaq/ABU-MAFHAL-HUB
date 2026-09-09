@@ -330,15 +330,18 @@ export default function LoginScreen() {
 
                 // Check 2FA Google Authenticator status
                 try {
-                    const { data: mfaData } = await supabase.auth.mfa.listFactors();
-                    const activeTotp = mfaData?.totp?.find((f: any) => f.status === 'verified');
-                    if (activeTotp) {
-                        // 2FA is enabled -> Route to 2FA OTP verification!
-                        router.replace({
-                            pathname: '/(auth)/otp' as any,
-                            params: { email: userEmail, type: '2fa', factorId: activeTotp.id }
-                        });
-                        return;
+                    const mfaLoginPref = await AsyncStorage.getItem('mfa_required_for_login');
+                    if (mfaLoginPref !== 'false') {
+                        const { data: mfaData } = await supabase.auth.mfa.listFactors();
+                        const activeTotp = mfaData?.totp?.find((f: any) => f.status === 'verified');
+                        if (activeTotp) {
+                            // 2FA is enabled -> Route to 2FA OTP verification!
+                            router.replace({
+                                pathname: '/(auth)/otp' as any,
+                                params: { email: userEmail, type: '2fa', factorId: activeTotp.id }
+                            });
+                            return;
+                        }
                     }
                 } catch (mfaErr) {
                     console.log('Login MFA check notice:', mfaErr);
