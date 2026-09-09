@@ -6,13 +6,12 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 24, 460);
-const BANNER_HEIGHT = 86; // 4:1 Golden Standard Banner Ratio (1200 x 300 px)
+const BANNER_HEIGHT = Math.round(BANNER_WIDTH / 3.0); // 3:1 Executive Standard Banner Ratio (1200 x 400 px)
 const BANNER_MARGIN = 8;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
 export default function DynamicBanners({ placement = 'dashboard' }: { placement?: string }) {
   const [activeBanners, setActiveBanners] = useState<any[]>([]);
-  const [bannerRatios, setBannerRatios] = useState<{ [id: string]: number }>({});
   const bannerRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const isUserTouching = useRef(false);
@@ -21,34 +20,6 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
   useEffect(() => {
     fetchActiveBanners();
   }, [placement]);
-
-  // Dynamically detect natural aspect ratio for zero zoom and zero crop
-  useEffect(() => {
-    activeBanners.forEach((b: any) => {
-      if (b?.image_url && typeof b.image_url === 'string' && !bannerRatios[b.id]) {
-        Image.getSize(
-          b.image_url,
-          (w, h) => {
-            if (w > 0 && h > 0) {
-              setBannerRatios((prev) => ({ ...prev, [b.id]: w / h }));
-            }
-          },
-          () => {
-            setBannerRatios((prev) => ({ ...prev, [b.id]: 2.0 }));
-          }
-        );
-      }
-    });
-  }, [activeBanners]);
-
-  const getBannerHeight = (banner: any) => {
-    const hasImage = Boolean(banner?.image_url && typeof banner.image_url === 'string' && banner.image_url.trim().length > 0);
-    if (!hasImage) return 100;
-    const ratio = (banner?.id && bannerRatios[banner.id]) ? bannerRatios[banner.id] : 2.0;
-    // Bound ratio between 1.6 (widescreen) and 3.2 (ultra-wide)
-    const clampedRatio = Math.max(1.6, Math.min(ratio, 3.2));
-    return Math.round(BANNER_WIDTH / clampedRatio);
-  };
 
   // Robust Auto-Scroll Timer running smoothly across all devices
   useEffect(() => {
@@ -138,20 +109,19 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
         onTouchEnd={() => { setTimeout(() => { isUserTouching.current = false; }, 2500); }}
         renderItem={({ item }) => {
           const hasImage = Boolean(item?.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0);
-          const cardHeight = getBannerHeight(item);
           return (
             <TouchableOpacity 
               onPress={() => handleBannerClick(item)}
               activeOpacity={0.92}
-              style={[styles.bannerCard, { height: cardHeight }]}
+              style={styles.bannerCard}
             >
               {hasImage ? (
-                <View style={[styles.imageContainer, { height: cardHeight }]}>
-                  {/* Clean full original banner with zero auto-zoom and zero auto-crop */}
+                <View style={styles.imageContainer}>
+                  {/* Clean 3:1 executive standard banner */}
                   <Image 
                     source={{ uri: item.image_url }} 
-                    style={{ width: '100%', height: '100%' }} 
-                    resizeMode="contain" 
+                    style={styles.bannerImage} 
+                    resizeMode="cover" 
                   />
                 </View>
               ) : (
@@ -211,8 +181,9 @@ const styles = StyleSheet.create({
   },
   bannerCard: {
     width: BANNER_WIDTH,
+    height: BANNER_HEIGHT,
     marginRight: BANNER_MARGIN,
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#0F172A',
     borderWidth: 1,

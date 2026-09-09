@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Image, Switch, ActivityIndicator,
-  Modal, TextInput, Alert, ScrollView, StyleSheet, Platform, Dimensions, StatusBar
+  Modal, TextInput, Alert, ScrollView, StyleSheet, Platform, Dimensions, StatusBar,
+  PanResponder
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Video, ResizeMode } from 'expo-av';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
@@ -68,6 +70,22 @@ export default function ModernContentManager() {
   const [cropOffsetY, setCropOffsetY] = useState(0);
   const [cropOffsetX, setCropOffsetX] = useState(0);
   const [cropApplying, setCropApplying] = useState(false);
+
+  // Interactive Touch Pan Responder for direct drag-to-position cropping
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        panStartRef.current = { x: cropOffsetX, y: cropOffsetY };
+      },
+      onPanResponderMove: (_, gestureState) => {
+        setCropOffsetX(Math.round(panStartRef.current.x + gestureState.dx));
+        setCropOffsetY(Math.round(panStartRef.current.y + gestureState.dy));
+      },
+    })
+  ).current;
 
   // Partner modal state
   const [showPartnerModal, setShowPartnerModal] = useState(false);
@@ -177,6 +195,8 @@ export default function ModernContentManager() {
         setCropZoom(1.0);
         setCropOffsetX(0);
         setCropOffsetY(0);
+        // Automatically open crop modal right after picking photo!
+        setShowCropModal(true);
       }
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to pick image");
@@ -189,12 +209,12 @@ export default function ModernContentManager() {
 
     setCropApplying(true);
     try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const outWidth = 1200;
-        const outHeight = 300;
-        const frameW = 340;
-        const frameH = 85; // 4:1 ratio standard
+      const outWidth = 1200;
+      const outHeight = 400; // 3:1 Standard Executive Banner
+      const frameW = 330;
+      const frameH = 110; // 3:1 Viewfinder frame
 
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const img = new (window as any).Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
@@ -204,7 +224,6 @@ export default function ModernContentManager() {
             canvas.height = outHeight;
             const ctx = canvas.getContext('2d');
             if (ctx) {
-              // Cover scaling: ensure image fully covers the canvas with zero black bars
               const baseScale = Math.max(frameW / (img.width || 1), frameH / (img.height || 1));
               const scale = baseScale * cropZoom;
               const drawW = img.width * scale;
@@ -233,7 +252,7 @@ export default function ModernContentManager() {
               } as any);
 
               setShowCropModal(false);
-              Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 300 px (4:1)!");
+              Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 400 px (3:1)!");
             }
           } catch (e: any) {
             console.warn("Canvas crop error:", e);
@@ -248,10 +267,61 @@ export default function ModernContentManager() {
         };
         img.src = currentUri;
       } else {
-        // Native platform handles transforms directly
+        // Native mobile cropping using ImageManipulator
+        const imgW = selectedImage?.width || 1200;
+        const imgH = selectedImage?.height || 600;
+        const frameAspect = frameW / frameH; // 3.0
+        const imgAspect = imgW / imgH;
+
+        let visibleW: number;
+        let visibleH: number;
+        if (imgAspect > frameAspect) {
+          visibleH = imgH / cropZoom;
+          visibleW = visibleH * frameAspect;
+        } else {
+          visibleW = imgW / cropZoom;
+          visibleH = visibleW / frameAspect;
+        }
+
+        const pxPerFrameW = visibleW / frameW;
+        const pxPerFrameH = visibleH / frameH;
+
+        const originX = Math.max(0, Math.min(imgW - visibleW, (imgW - visibleW) / 2 - cropOffsetX * pxPerFrameW));
+        const originY = Math.max(0, Math.min(imgH - visibleH, (imgH - visibleH) / 2 - cropOffsetY * pxPerFrameH));
+        const cropW = Math.min(visibleW, imgW - originX);
+        const cropH = Math.min(visibleH, imgH - originY);
+
+        const manipulated = await ImageManipulator.manipulateAsync(
+          currentUri,
+          [
+            {
+              crop: {
+                originX: Math.round(originX),
+                originY: Math.round(originY),
+                width: Math.round(cropW),
+                height: Math.round(cropH),
+              },
+            },
+            {
+              resize: {
+                width: outWidth,
+                height: outHeight,
+              },
+            },
+          ],
+          { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+
+        setSelectedImage({
+          uri: manipulated.uri,
+          base64: manipulated.base64,
+          width: outWidth,
+          height: outHeight,
+        } as any);
+
         setShowCropModal(false);
         setCropApplying(false);
-        Alert.alert("Success 🎉", "Banner image adjusted successfully!");
+        Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 400 px (3:1)!");
       }
     } catch (e: any) {
       Alert.alert("Notice", e.message || "Crop finished");
@@ -1022,12 +1092,12 @@ export default function ModernContentManager() {
             <View style={s.cropNoticePill}>
               <Ionicons name="information-circle" size={13} color="#B45309" />
               <Text style={s.cropNoticeText}>
-                4:1 Banner Frame (1200 × 300 px). Adjust zoom and position to frame perfectly:
+                3:1 Banner Frame (1200 × 400 px). Drag photo to position or use zoom:
               </Text>
             </View>
 
-            {/* CROP VIEWFINDER FRAME (4:1 Ratio) */}
-            <View style={s.cropViewfinderFrame}>
+            {/* CROP VIEWFINDER FRAME (3:1 Ratio) */}
+            <View style={s.cropViewfinderFrame} {...panResponder.panHandlers}>
               <View style={[s.cropCorner, s.cropCornerTL]} />
               <View style={[s.cropCorner, s.cropCornerTR]} />
               <View style={[s.cropCorner, s.cropCornerBL]} />
@@ -1158,7 +1228,7 @@ export default function ModernContentManager() {
                 {cropApplying ? (
                   <ActivityIndicator size="small" color="#0F172A" />
                 ) : (
-                  <Text style={s.cropApplyBtnText}>✓ Apply Crop (1200×300)</Text>
+                  <Text style={s.cropApplyBtnText}>✓ Apply Crop (1200 × 400 px)</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1906,7 +1976,7 @@ const s = StyleSheet.create({
   },
   cropViewfinderFrame: {
     width: '100%',
-    height: 86,
+    height: 110,
     backgroundColor: '#0F172A',
     borderRadius: 10,
     borderWidth: 2,
