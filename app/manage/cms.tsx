@@ -218,9 +218,9 @@ export default function ModernContentManager() {
     setCropApplying(true);
     try {
       const outWidth = 1200;
-      const outHeight = 400; // 3:1 Standard Executive Banner
+      const outHeight = 276; // 4.35:1 Ultra-Slim Executive Ratio (76px)
       const frameW = 330;
-      const frameH = 110; // 3:1 Viewfinder frame
+      const frameH = 76; // Ultra-slim Viewfinder frame
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const img = new (window as any).Image();
@@ -260,7 +260,7 @@ export default function ModernContentManager() {
               } as any);
 
               setShowCropModal(false);
-              Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 400 px (3:1)!");
+              Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 276 px (Ultra-Slim)!");
             }
           } catch (e: any) {
             console.warn("Canvas crop error:", e);
@@ -329,7 +329,7 @@ export default function ModernContentManager() {
 
         setShowCropModal(false);
         setCropApplying(false);
-        Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 400 px (3:1)!");
+        Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 276 px (Ultra-Slim)!");
       }
     } catch (e: any) {
       Alert.alert("Notice", e.message || "Crop finished");
@@ -970,19 +970,13 @@ export default function ModernContentManager() {
                 style={[
                   s.imagePickerBox, 
                   (selectedImage || existingImageUrl) 
-                    ? { aspectRatio: Math.max(1.6, Math.min(pickedRatio, 3.2)), height: undefined } 
-                    : { height: 110 }
+                    ? { aspectRatio: Math.max(2.5, Math.min(pickedRatio, 4.8)), height: undefined } 
+                    : { height: 76 }
                 ]} 
                 activeOpacity={0.85}
               >
                 {selectedImage || existingImageUrl ? (
                   <View style={s.modalImageContainer}>
-                    <Image 
-                      source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
-                      style={[StyleSheet.absoluteFillObject, { opacity: 0.35 }]} 
-                      blurRadius={16}
-                      resizeMode="cover" 
-                    />
                     <Image 
                       source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
                       style={s.modalImagePreview} 
@@ -1107,7 +1101,7 @@ export default function ModernContentManager() {
               <Ionicons name="information-circle" size={13} color="#B45309" />
               <Text style={s.cropNoticeText}>
                 {cropFitMode === 'contain' 
-                  ? 'Cikakken Hoto: 100% ba tare da an yanke komai ba. Babban banner mai siriri.' 
+                  ? 'Cikakken Hoto: Siriri ne sosai mai kyan gani, ba tare da an yanke komai ba.' 
                   : 'Yankan Zaɓi: Zaka iya ja da zoom don cire wani gefe.'}
               </Text>
             </View>
@@ -1148,30 +1142,20 @@ export default function ModernContentManager() {
               <View style={[s.cropCorner, s.cropCornerBR]} />
 
               {(selectedImage || existingImageUrl) && (
-                <>
-                  {cropFitMode === 'contain' && (
-                    <Image
-                      source={{ uri: selectedImage?.uri || existingImageUrl! }}
-                      style={[StyleSheet.absoluteFillObject, { opacity: 0.35 }]}
-                      blurRadius={16}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <Image
-                    source={{ uri: selectedImage?.uri || existingImageUrl! }}
-                    style={[
-                      s.cropViewfinderImg,
-                      cropFitMode === 'cover' && {
-                        transform: [
-                          { scale: cropZoom },
-                          { translateX: cropOffsetX },
-                          { translateY: cropOffsetY },
-                        ],
-                      },
-                    ]}
-                    resizeMode={cropFitMode}
-                  />
-                </>
+                <Image
+                  source={{ uri: selectedImage?.uri || existingImageUrl! }}
+                  style={[
+                    s.cropViewfinderImg,
+                    cropFitMode === 'cover' && {
+                      transform: [
+                        { scale: cropZoom },
+                        { translateX: cropOffsetX },
+                        { translateY: cropOffsetY },
+                      ],
+                    },
+                  ]}
+                  resizeMode={cropFitMode}
+                />
               )}
 
               {/* Grid Guides */}
@@ -1803,7 +1787,7 @@ const s = StyleSheet.create({
     color: L.textPrimary,
   },
   imagePickerBox: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#070E1E',
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
@@ -1815,7 +1799,7 @@ const s = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'relative',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#070E1E',
   },
   modalImagePreview: {
     width: '100%',
@@ -2053,8 +2037,8 @@ const s = StyleSheet.create({
   },
   cropViewfinderFrame: {
     width: '100%',
-    height: 110,
-    backgroundColor: '#0F172A',
+    height: 76,
+    backgroundColor: '#070E1E',
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#F59E0B',

@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 24, 460);
-const BANNER_HEIGHT = Math.min(105, Math.round(BANNER_WIDTH / 3.4)); // Slim, sleek executive banner (~96-104px)
+const BANNER_HEIGHT = 76; // Ultra-slim, sleek executive banner strip (76px)
 const BANNER_MARGIN = 8;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
@@ -117,14 +117,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
             >
               {hasImage ? (
                 <View style={styles.imageContainer}>
-                  {/* Subtle ambient backdrop to prevent empty gaps while keeping true colors */}
-                  <Image 
-                    source={{ uri: item.image_url }} 
-                    style={[StyleSheet.absoluteFillObject, { opacity: 0.35 }]} 
-                    blurRadius={18}
-                    resizeMode="cover" 
-                  />
-                  {/* 100% Full Original Banner with ZERO Cutoff & ZERO Crop */}
+                  {/* Clean 100% full original banner with zero cutoff */}
                   <Image 
                     source={{ uri: item.image_url }} 
                     style={styles.bannerImage} 
@@ -190,21 +183,21 @@ const styles = StyleSheet.create({
     width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
     marginRight: BANNER_MARGIN,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#070E1E',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: 'rgba(245, 158, 11, 0.22)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
   },
   imageContainer: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#070E1E',
     overflow: 'hidden',
   },
   bannerImage: {
