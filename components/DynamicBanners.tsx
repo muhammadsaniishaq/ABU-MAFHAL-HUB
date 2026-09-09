@@ -16,12 +16,12 @@ import { supabase } from '../services/supabase';
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 const { width: SCREEN_W } = Dimensions.get('window');
-const H_PADDING   = 16;                              // Side padding (card style)
-const BANNER_W    = SCREEN_W - H_PADDING * 2;        // Width with padding
-const BANNER_H    = 112;                             // Slim height
-const GAP         = 12;                              // Space between banners
+const H_PADDING   = 14;                              // Side padding
+const BANNER_W    = SCREEN_W - H_PADDING * 2;        // Full width minus padding
+const BANNER_H    = 64;                              // Ultra-slim height
+const GAP         = 10;                              // Gap between banners
 const STRIDE      = BANNER_W + GAP;
-const RADIUS      = 14;                              // Card border radius
+const RADIUS      = 10;                              // Subtle border radius
 const AUTO_MS     = 4000;
 
 interface Banner {
@@ -167,7 +167,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
                 <Image
                   source={{ uri: item.image_url }}
                   style={s.img}
-                  resizeMode="cover"
+                  resizeMode="contain"
                   onError={() =>
                     setImgErrors(prev => ({ ...prev, [item.id]: true }))
                   }
@@ -239,65 +239,65 @@ const s = StyleSheet.create({
     gap: GAP,                        // Space between slides
   },
 
-  // Banner card — slim, rounded, shadowed
+  // Banner card — ultra-slim, clean
   card: {
     width: BANNER_W,
     height: BANNER_H,
     borderRadius: RADIUS,
     overflow: 'hidden',
-    backgroundColor: '#0B1437',
-    // Premium shadow
+    backgroundColor: 'transparent',
+    // Subtle shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 3,
   },
 
-  // ── Pure image — fills card completely, no overlays ──
+  // Pure image — zero overlays, contain = full image shown
   img: {
     width: '100%',
     height: '100%',
   },
 
-  // ── Fallback gradient ──
+  // Fallback gradient — compact for slim height
   fallback: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     overflow: 'hidden',
   },
   orb: {
     position: 'absolute',
-    right: -30,
-    top: -30,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    right: -20,
+    top: -20,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: 'rgba(245,166,35,0.07)',
   },
   fbLeft: {
     flex: 1,
-    paddingRight: 12,
+    paddingRight: 8,
   },
   fbTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.1,
-    marginBottom: 5,
+    marginBottom: 2,
   },
   fbSub: {
     color: 'rgba(148,163,184,0.85)',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 9.5,
+    lineHeight: 13,
     fontWeight: '500',
   },
   fbArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: 'rgba(245,166,35,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(245,166,35,0.3)',
