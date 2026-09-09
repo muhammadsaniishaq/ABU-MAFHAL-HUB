@@ -62,7 +62,7 @@ export default function Dashboard() {
   const [showAllActions, setShowAllActions] = useState(false);
   const [featureFlags, setFeatureFlags] = useState<Record<string, any>>({});
   const [unreadCount, setUnreadCount] = useState(0);
-  const [activeBanners, setActiveBanners] = useState<any[]>([]);
+
   const [activePartners, setActivePartners] = useState<any[]>([]);
   const [serviceCustoms, setServiceCustoms] = useState<Record<string, any>>(inMemoryServiceCustoms);
   const [hiddenFeatures, setHiddenFeatures] = useState<string[]>(inMemoryHiddenFeatures);
@@ -253,7 +253,6 @@ export default function Dashboard() {
         fetchFeatureFlags(),
         fetchAppSettings(),
         fetchUnreadCount(user.id),
-        fetchActiveBanners(),
         fetchActivePartners()
       ]);
     } catch (error) {
@@ -275,26 +274,11 @@ export default function Dashboard() {
     } catch (e) { console.warn("Error fetching unread count", e); }
   };
 
-  const fetchActiveBanners = async () => {
-    try {
-      const { data } = await supabase.from('banners').select('*').eq('is_active', true)
-        .or('placement.ilike.*dashboard*,placement.is.null').order('created_at', { ascending: false });
-      if (data) setActiveBanners(data);
-    } catch (e) { console.warn("Error fetching banners", e); }
-  };
-
   const fetchActivePartners = async () => {
     try {
       const { data } = await supabase.from('partners').select('*').eq('is_active', true).order('sort_order', { ascending: true });
       if (data) { setActivePartners(data); saveCache({ activePartners: data }); }
     } catch (e) { console.warn("Error fetching partners", e); }
-  };
-
-  const handleBannerClick = async (banner: any) => {
-    supabase.rpc('increment_banner_click', { banner_id: banner.id }).then(({ error }) => {
-      if (error) console.log('Banner click track error:', error);
-    });
-    if (banner.target_url) router.push(banner.target_url);
   };
 
   const fetchAppSettings = async () => {
