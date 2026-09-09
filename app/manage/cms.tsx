@@ -743,7 +743,7 @@ export default function ModernContentManager() {
               ) : (
                 banners.map(b => (
                   <View key={b.id} style={s.card}>
-                    <View style={[s.bannerPreviewContainer, { aspectRatio: Math.max(1.6, Math.min(bannerRatios[b.id] || 2.0, 3.2)) }]}>
+                    <View style={[s.bannerPreviewContainer, { aspectRatio: Math.max(3.0, Math.min(bannerRatios[b.id] || 5.5, 7.5)) }]}>
                       <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
                     </View>
                     <View style={s.cardBody}>
@@ -939,27 +939,27 @@ export default function ModernContentManager() {
               <View style={s.sizeGuideCard}>
                 <View style={s.sizeGuideHeader}>
                   <Ionicons name="sparkles" size={13} color={L.goldDk} />
-                  <Text style={s.sizeGuideTitle}>Recommended Banner Size (No Crop Needed)</Text>
+                  <Text style={s.sizeGuideTitle}>Recommended Banner Size</Text>
                   <View style={s.sizeRatioBadge}>
-                    <Text style={s.sizeRatioBadgeText}>4 : 1</Text>
+                    <Text style={s.sizeRatioBadgeText}>5.5 : 1</Text>
                   </View>
                 </View>
 
                 <View style={s.sizePillRow}>
                   <View style={s.sizePillActive}>
-                    <Text style={s.sizePillTextBold}>1200 × 300 px</Text>
-                    <Text style={s.sizePillSub}>(Standard • 100% Fit)</Text>
+                    <Text style={s.sizePillTextBold}>1200 × 220 px</Text>
+                    <Text style={s.sizePillSub}>(Perfect Fit ✅)</Text>
                   </View>
                   <View style={s.sizePill}>
-                    <Text style={s.sizePillText}>1000 × 250 px</Text>
+                    <Text style={s.sizePillText}>1000 × 182 px</Text>
                   </View>
                   <View style={s.sizePill}>
-                    <Text style={s.sizePillText}>1600 × 400 px</Text>
+                    <Text style={s.sizePillText}>1600 × 290 px</Text>
                   </View>
                 </View>
 
                 <Text style={s.sizeGuideNote}>
-                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Pro Tip:</Text> Supports 2:1 (e.g. 1200 × 600 px), 16:9, and widescreen flyers in original quality with zero auto-zoom and zero auto-crop!
+                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Pro Tip:</Text> Hoto kowane girma ya kamata — banner zai nuna cikakke ba tare da yanke ba. Amma don 100% fit ba tare da bars ba, yi amfani da 1200 × 220 px.
                 </Text>
               </View>
 
@@ -969,7 +969,7 @@ export default function ModernContentManager() {
                 style={[
                   s.imagePickerBox, 
                   (selectedImage || existingImageUrl) 
-                    ? { aspectRatio: Math.max(2.5, Math.min(pickedRatio, 5.5)), height: undefined } 
+                    ? { aspectRatio: Math.max(3.0, Math.min(pickedRatio, 7.5)), height: undefined } 
                     : { height: 54 }
                 ]} 
                 activeOpacity={0.85}

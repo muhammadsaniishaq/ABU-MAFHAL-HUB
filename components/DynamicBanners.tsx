@@ -244,9 +244,8 @@ const s = StyleSheet.create({
     width: BANNER_W,
     height: BANNER_H,
     borderRadius: RADIUS,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-    // Subtle shadow
+    overflow: 'hidden',              // ✅ Image NEVER overflows this card
+    backgroundColor: '#0B1437',     // ✅ Dark bg for clean letterbox bars
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.10,
@@ -254,7 +253,7 @@ const s = StyleSheet.create({
     elevation: 3,
   },
 
-  // Pure image — zero overlays, contain = full image shown
+  // Pure image — zero overlays, contain = full image, shape intact
   img: {
     width: '100%',
     height: '100%',
