@@ -168,9 +168,9 @@ export default function ModernContentManager() {
     try {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const outWidth = 1200;
-        const outHeight = 240;
+        const outHeight = 300;
         const frameW = 340;
-        const frameH = 68; // 5:1 ratio
+        const frameH = 85; // 4:1 ratio standard
 
         const img = new (window as any).Image();
         img.crossOrigin = 'anonymous';
@@ -181,20 +181,11 @@ export default function ModernContentManager() {
             canvas.height = outHeight;
             const ctx = canvas.getContext('2d');
             if (ctx) {
-              ctx.fillStyle = '#0F172A';
-              ctx.fillRect(0, 0, outWidth, outHeight);
-
-              const imgAspect = img.width / img.height;
-              const frameAspect = frameW / frameH;
-
-              let drawW, drawH;
-              if (imgAspect > frameAspect) {
-                drawH = frameH * cropZoom;
-                drawW = drawH * imgAspect;
-              } else {
-                drawW = frameW * cropZoom;
-                drawH = drawW / imgAspect;
-              }
+              // Cover scaling: ensure image fully covers the canvas with zero black bars
+              const baseScale = Math.max(frameW / (img.width || 1), frameH / (img.height || 1));
+              const scale = baseScale * cropZoom;
+              const drawW = img.width * scale;
+              const drawH = img.height * scale;
 
               const centerOffsetX = (frameW - drawW) / 2 + cropOffsetX;
               const centerOffsetY = (frameH - drawH) / 2 + cropOffsetY;
@@ -219,7 +210,7 @@ export default function ModernContentManager() {
               } as any);
 
               setShowCropModal(false);
-              Alert.alert("Success 🎉", "Hoton ya yanku daidai 1200 × 240 px (5:1)!");
+              Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 300 px (4:1)!");
             }
           } catch (e: any) {
             console.warn("Canvas crop error:", e);
@@ -237,7 +228,7 @@ export default function ModernContentManager() {
         // Native platform handles transforms directly
         setShowCropModal(false);
         setCropApplying(false);
-        Alert.alert("Success 🎉", "An saita hoton daidai!");
+        Alert.alert("Success 🎉", "Banner image adjusted successfully!");
       }
     } catch (e: any) {
       Alert.alert("Notice", e.message || "Crop finished");
@@ -646,9 +637,7 @@ export default function ModernContentManager() {
                 banners.map(b => (
                   <View key={b.id} style={s.card}>
                     <View style={s.bannerPreviewContainer}>
-                      <Image source={{ uri: b.image_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" blurRadius={14} />
-                      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
-                      <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
+                      <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="cover" />
                     </View>
                     <View style={s.cardBody}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -776,7 +765,7 @@ export default function ModernContentManager() {
                       isMuted 
                     />
                   ) : (
-                    <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="contain" />
+                    <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="cover" />
                   )}
                   <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()} • ORIGINAL HD (ZERO ZOOM)</Text>
                 </View>
@@ -863,7 +852,7 @@ export default function ModernContentManager() {
                 </View>
 
                 <Text style={s.sizeGuideNote}>
-                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Tukwici:</Text> Idan ka zana hotonka a girman <Text style={{ fontWeight: '800', color: '#0F172A' }}>1200 × 300 px</Text>, zai cika dukkan allon cif ba tare da wani gefe ya bar space ba kuma ba tare da an yanke komai ba!
+                  💡 <Text style={{ fontWeight: '800', color: L.goldDk }}>Pro Tip:</Text> Designing banners at <Text style={{ fontWeight: '800', color: '#0F172A' }}>1200 × 300 px</Text> (4:1 ratio) ensures optimal edge-to-edge display with zero letterboxing or clipping!
                 </Text>
               </View>
 
@@ -873,15 +862,8 @@ export default function ModernContentManager() {
                   <View style={s.modalImageContainer}>
                     <Image 
                       source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
-                      style={StyleSheet.absoluteFillObject} 
-                      resizeMode="cover" 
-                      blurRadius={14} 
-                    />
-                    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
-                    <Image 
-                      source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
                       style={s.modalImagePreview} 
-                      resizeMode="contain" 
+                      resizeMode="cover" 
                     />
                   </View>
                 ) : (
@@ -1001,11 +983,11 @@ export default function ModernContentManager() {
             <View style={s.cropNoticePill}>
               <Ionicons name="information-circle" size={13} color="#B45309" />
               <Text style={s.cropNoticeText}>
-                5:1 Ratio Frame (1200 × 240 px). Saita hoton yadda kake so ya fita:
+                4:1 Banner Frame (1200 × 300 px). Adjust zoom and position to frame perfectly:
               </Text>
             </View>
 
-            {/* CROP VIEWFINDER FRAME (5:1 Ratio) */}
+            {/* CROP VIEWFINDER FRAME (4:1 Ratio) */}
             <View style={s.cropViewfinderFrame}>
               <View style={[s.cropCorner, s.cropCornerTL]} />
               <View style={[s.cropCorner, s.cropCornerTR]} />
@@ -1064,7 +1046,7 @@ export default function ModernContentManager() {
 
               {/* Vertical Position Adjuster */}
               <View style={s.cropControlRow}>
-                <Text style={s.cropControlLabel}>Matsayi (Up / Down):</Text>
+                <Text style={s.cropControlLabel}>Position (Up / Down):</Text>
                 <View style={s.cropBtnGroup}>
                   <TouchableOpacity
                     onPress={() => setCropOffsetY(cropOffsetY - 12)}
@@ -1089,7 +1071,7 @@ export default function ModernContentManager() {
 
               {/* Horizontal Position Adjuster */}
               <View style={s.cropControlRow}>
-                <Text style={s.cropControlLabel}>Matsayi (Left / Right):</Text>
+                <Text style={s.cropControlLabel}>Position (Left / Right):</Text>
                 <View style={s.cropBtnGroup}>
                   <TouchableOpacity
                     onPress={() => setCropOffsetX(cropOffsetX - 12)}
@@ -1137,7 +1119,7 @@ export default function ModernContentManager() {
                 {cropApplying ? (
                   <ActivityIndicator size="small" color="#0F172A" />
                 ) : (
-                  <Text style={s.cropApplyBtnText}>✓ Apply Crop (1200×240)</Text>
+                  <Text style={s.cropApplyBtnText}>✓ Apply Crop (1200×300)</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1342,7 +1324,7 @@ const s = StyleSheet.create({
     height: 86,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#070D1E',
+    backgroundColor: '#0F172A',
   },
   bannerImagePreview: {
     width: '100%',
@@ -1637,7 +1619,7 @@ const s = StyleSheet.create({
   },
   imagePickerBox: {
     height: 86,
-    backgroundColor: '#070D1E',
+    backgroundColor: '#0F172A',
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
@@ -1648,7 +1630,7 @@ const s = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'relative',
-    backgroundColor: '#070D1E',
+    backgroundColor: '#0F172A',
   },
   modalImagePreview: {
     width: '100%',

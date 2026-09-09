@@ -389,7 +389,7 @@ export default function GlobalAnnouncementModal() {
                                     <Image 
                                         source={{ uri: config.mediaUrl }} 
                                         style={styles.media} 
-                                        resizeMode="contain" 
+                                        resizeMode="cover" 
                                     />
                                 </View>
                             )}
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     media: {
         width: '100%',
         height: '100%',
-        backgroundColor: '#000000',
+        backgroundColor: '#0F172A',
     },
     videoElement: {
         width: '100%',

@@ -117,20 +117,11 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
             >
               {hasImage ? (
                 <View style={styles.imageContainer}>
-                  {/* Full-bleed ambient blurred backdrop */}
-                  <Image 
-                    source={{ uri: item.image_url }} 
-                    style={StyleSheet.absoluteFillObject} 
-                    resizeMode="cover" 
-                    blurRadius={14} 
-                  />
-                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(7, 13, 30, 0.35)' }]} />
-
-                  {/* Crisp foreground banner */}
+                  {/* Clean full-bleed banner filling edge-to-edge without letterbox black bars */}
                   <Image 
                     source={{ uri: item.image_url }} 
                     style={styles.bannerImage} 
-                    resizeMode="contain" 
+                    resizeMode="cover" 
                   />
                 </View>
               ) : (
@@ -206,9 +197,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#070D1E',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#0F172A',
     overflow: 'hidden',
   },
   bannerImage: {
