@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 24, 460);
-const BANNER_HEIGHT = Math.round(BANNER_WIDTH / 3.0); // 3:1 Executive Standard Banner Ratio (1200 x 400 px)
+const BANNER_HEIGHT = Math.min(105, Math.round(BANNER_WIDTH / 3.4)); // Slim, sleek executive banner (~96-104px)
 const BANNER_MARGIN = 8;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
@@ -117,11 +117,18 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
             >
               {hasImage ? (
                 <View style={styles.imageContainer}>
-                  {/* Clean 3:1 executive standard banner */}
+                  {/* Subtle ambient backdrop to prevent empty gaps while keeping true colors */}
+                  <Image 
+                    source={{ uri: item.image_url }} 
+                    style={[StyleSheet.absoluteFillObject, { opacity: 0.35 }]} 
+                    blurRadius={18}
+                    resizeMode="cover" 
+                  />
+                  {/* 100% Full Original Banner with ZERO Cutoff & ZERO Crop */}
                   <Image 
                     source={{ uri: item.image_url }} 
                     style={styles.bannerImage} 
-                    resizeMode="cover" 
+                    resizeMode="contain" 
                   />
                 </View>
               ) : (

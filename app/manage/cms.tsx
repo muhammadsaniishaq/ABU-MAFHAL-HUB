@@ -64,8 +64,9 @@ export default function ModernContentManager() {
   const [uploadMode, setUploadMode] = useState<'original' | 'freeform'>('original');
   const [bannerFitMode, setBannerFitMode] = useState<'contain' | 'cover'>('cover');
 
-  // Manual Cropper state (5:1 Aspect Ratio)
+  // Manual Cropper state (3:1 Standard Executive Ratio: 1200 × 400 px)
   const [showCropModal, setShowCropModal] = useState(false);
+  const [cropFitMode, setCropFitMode] = useState<'contain' | 'cover'>('contain');
   const [cropZoom, setCropZoom] = useState(1.0);
   const [cropOffsetY, setCropOffsetY] = useState(0);
   const [cropOffsetX, setCropOffsetX] = useState(0);
@@ -195,6 +196,7 @@ export default function ModernContentManager() {
         setCropZoom(1.0);
         setCropOffsetX(0);
         setCropOffsetY(0);
+        setCropFitMode('contain');
         // Automatically open crop modal right after picking photo!
         setShowCropModal(true);
       }
@@ -206,6 +208,12 @@ export default function ModernContentManager() {
   const applyManualCrop = async () => {
     const currentUri = selectedImage?.uri || existingImageUrl;
     if (!currentUri) return;
+
+    if (cropFitMode === 'contain') {
+      setShowCropModal(false);
+      Alert.alert("Cikakken Hoto 🎉", "An adana cikakken hotonka 100% ba tare da an yanke komai ba.");
+      return;
+    }
 
     setCropApplying(true);
     try {
@@ -971,6 +979,12 @@ export default function ModernContentManager() {
                   <View style={s.modalImageContainer}>
                     <Image 
                       source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
+                      style={[StyleSheet.absoluteFillObject, { opacity: 0.35 }]} 
+                      blurRadius={16}
+                      resizeMode="cover" 
+                    />
+                    <Image 
+                      source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
                       style={s.modalImagePreview} 
                       resizeMode="contain" 
                     />
@@ -1092,145 +1106,208 @@ export default function ModernContentManager() {
             <View style={s.cropNoticePill}>
               <Ionicons name="information-circle" size={13} color="#B45309" />
               <Text style={s.cropNoticeText}>
-                3:1 Banner Frame (1200 × 400 px). Drag photo to position or use zoom:
+                {cropFitMode === 'contain' 
+                  ? 'Cikakken Hoto: 100% ba tare da an yanke komai ba. Babban banner mai siriri.' 
+                  : 'Yankan Zaɓi: Zaka iya ja da zoom don cire wani gefe.'}
               </Text>
             </View>
 
-            {/* CROP VIEWFINDER FRAME (3:1 Ratio) */}
-            <View style={s.cropViewfinderFrame} {...panResponder.panHandlers}>
+            {/* Mode Switcher Tabs */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setCropFitMode('contain');
+                  setCropZoom(1.0);
+                  setCropOffsetX(0);
+                  setCropOffsetY(0);
+                }}
+                style={[s.cropModeTab, cropFitMode === 'contain' && s.cropModeTabActive]}
+              >
+                <Ionicons name="image" size={13} color={cropFitMode === 'contain' ? '#92400E' : '#64748B'} />
+                <Text style={[s.cropModeTabText, cropFitMode === 'contain' && s.cropModeTabTextActive]}>
+                  Full Uncut (Kar a Yanke)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setCropFitMode('cover')}
+                style={[s.cropModeTab, cropFitMode === 'cover' && s.cropModeTabActive]}
+              >
+                <Ionicons name="crop" size={13} color={cropFitMode === 'cover' ? '#92400E' : '#64748B'} />
+                <Text style={[s.cropModeTabText, cropFitMode === 'cover' && s.cropModeTabTextActive]}>
+                  Custom Crop / Fill
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* CROP VIEWFINDER FRAME */}
+            <View style={s.cropViewfinderFrame} {...(cropFitMode === 'cover' ? panResponder.panHandlers : {})}>
               <View style={[s.cropCorner, s.cropCornerTL]} />
               <View style={[s.cropCorner, s.cropCornerTR]} />
               <View style={[s.cropCorner, s.cropCornerBL]} />
               <View style={[s.cropCorner, s.cropCornerBR]} />
 
               {(selectedImage || existingImageUrl) && (
-                <Image
-                  source={{ uri: selectedImage?.uri || existingImageUrl! }}
-                  style={[
-                    s.cropViewfinderImg,
-                    {
-                      transform: [
-                        { scale: cropZoom },
-                        { translateX: cropOffsetX },
-                        { translateY: cropOffsetY },
-                      ],
-                    },
-                  ]}
-                  resizeMode="cover"
-                />
+                <>
+                  {cropFitMode === 'contain' && (
+                    <Image
+                      source={{ uri: selectedImage?.uri || existingImageUrl! }}
+                      style={[StyleSheet.absoluteFillObject, { opacity: 0.35 }]}
+                      blurRadius={16}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <Image
+                    source={{ uri: selectedImage?.uri || existingImageUrl! }}
+                    style={[
+                      s.cropViewfinderImg,
+                      cropFitMode === 'cover' && {
+                        transform: [
+                          { scale: cropZoom },
+                          { translateX: cropOffsetX },
+                          { translateY: cropOffsetY },
+                        ],
+                      },
+                    ]}
+                    resizeMode={cropFitMode}
+                  />
+                </>
               )}
 
               {/* Grid Guides */}
-              <View style={s.cropGridLineH} />
-              <View style={s.cropGridLineV1} />
-              <View style={s.cropGridLineV2} />
+              {cropFitMode === 'cover' && (
+                <>
+                  <View style={s.cropGridLineH} />
+                  <View style={s.cropGridLineV1} />
+                  <View style={s.cropGridLineV2} />
+                </>
+              )}
             </View>
 
-            {/* CONTROLS: ZOOM & POSITION */}
-            <View style={s.cropControlsContainer}>
-              {/* Zoom Controls */}
-              <View style={s.cropControlRow}>
-                <Text style={s.cropControlLabel}>Zoom ({cropZoom.toFixed(1)}x):</Text>
-                <View style={s.cropBtnGroup}>
-                  <TouchableOpacity
-                    onPress={() => setCropZoom(Math.max(0.8, cropZoom - 0.2))}
-                    style={s.cropMiniBtn}
-                  >
-                    <Ionicons name="remove" size={14} color="#0F172A" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setCropZoom(1.0)}
-                    style={s.cropMiniBtnTextWrap}
-                  >
-                    <Text style={s.cropMiniBtnText}>1.0x</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setCropZoom(Math.min(3.0, cropZoom + 0.2))}
-                    style={s.cropMiniBtn}
-                  >
-                    <Ionicons name="add" size={14} color="#0F172A" />
-                  </TouchableOpacity>
+            {/* CONTROLS: ZOOM & POSITION (Shown when in Custom Crop mode) */}
+            {cropFitMode === 'cover' && (
+              <View style={s.cropControlsContainer}>
+                {/* Zoom Controls */}
+                <View style={s.cropControlRow}>
+                  <Text style={s.cropControlLabel}>Zoom ({cropZoom.toFixed(1)}x):</Text>
+                  <View style={s.cropBtnGroup}>
+                    <TouchableOpacity
+                      onPress={() => setCropZoom(Math.max(0.5, Number((cropZoom - 0.2).toFixed(1))))}
+                      style={s.cropMiniBtn}
+                    >
+                      <Ionicons name="remove" size={14} color="#0F172A" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setCropZoom(1.0)}
+                      style={s.cropMiniBtnTextWrap}
+                    >
+                      <Text style={s.cropMiniBtnText}>1.0x</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setCropZoom(Math.min(3.0, Number((cropZoom + 0.2).toFixed(1))))}
+                      style={s.cropMiniBtn}
+                    >
+                      <Ionicons name="add" size={14} color="#0F172A" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
 
-              {/* Vertical Position Adjuster */}
-              <View style={s.cropControlRow}>
-                <Text style={s.cropControlLabel}>Position (Up / Down):</Text>
-                <View style={s.cropBtnGroup}>
-                  <TouchableOpacity
-                    onPress={() => setCropOffsetY(cropOffsetY - 12)}
-                    style={s.cropMiniBtn}
-                  >
-                    <Ionicons name="arrow-up" size={13} color="#0F172A" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => { setCropOffsetY(0); setCropOffsetX(0); }}
-                    style={s.cropMiniBtnTextWrap}
-                  >
-                    <Text style={s.cropMiniBtnText}>Center</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setCropOffsetY(cropOffsetY + 12)}
-                    style={s.cropMiniBtn}
-                  >
-                    <Ionicons name="arrow-down" size={13} color="#0F172A" />
-                  </TouchableOpacity>
+                {/* Vertical Position Adjuster */}
+                <View style={s.cropControlRow}>
+                  <Text style={s.cropControlLabel}>Position (Up / Down):</Text>
+                  <View style={s.cropBtnGroup}>
+                    <TouchableOpacity
+                      onPress={() => setCropOffsetY(cropOffsetY - 12)}
+                      style={s.cropMiniBtn}
+                    >
+                      <Ionicons name="arrow-up" size={13} color="#0F172A" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => { setCropOffsetY(0); setCropOffsetX(0); }}
+                      style={s.cropMiniBtnTextWrap}
+                    >
+                      <Text style={s.cropMiniBtnText}>Center</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setCropOffsetY(cropOffsetY + 12)}
+                      style={s.cropMiniBtn}
+                    >
+                      <Ionicons name="arrow-down" size={13} color="#0F172A" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
 
-              {/* Horizontal Position Adjuster */}
-              <View style={s.cropControlRow}>
-                <Text style={s.cropControlLabel}>Position (Left / Right):</Text>
-                <View style={s.cropBtnGroup}>
-                  <TouchableOpacity
-                    onPress={() => setCropOffsetX(cropOffsetX - 12)}
-                    style={s.cropMiniBtn}
-                  >
-                    <Ionicons name="arrow-back" size={13} color="#0F172A" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setCropOffsetX(0)}
-                    style={s.cropMiniBtnTextWrap}
-                  >
-                    <Text style={s.cropMiniBtnText}>0</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setCropOffsetX(cropOffsetX + 12)}
-                    style={s.cropMiniBtn}
-                  >
-                    <Ionicons name="arrow-forward" size={13} color="#0F172A" />
-                  </TouchableOpacity>
+                {/* Horizontal Position Adjuster */}
+                <View style={s.cropControlRow}>
+                  <Text style={s.cropControlLabel}>Position (Left / Right):</Text>
+                  <View style={s.cropBtnGroup}>
+                    <TouchableOpacity
+                      onPress={() => setCropOffsetX(cropOffsetX - 12)}
+                      style={s.cropMiniBtn}
+                    >
+                      <Ionicons name="arrow-back" size={13} color="#0F172A" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setCropOffsetX(0)}
+                      style={s.cropMiniBtnTextWrap}
+                    >
+                      <Text style={s.cropMiniBtnText}>0</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setCropOffsetX(cropOffsetX + 12)}
+                      style={s.cropMiniBtn}
+                    >
+                      <Ionicons name="arrow-forward" size={13} color="#0F172A" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
+            )}
 
             {/* MODAL ACTION BUTTONS */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+            <View style={{ gap: 8, marginTop: 14 }}>
+              {/* PRIMARY ACTION: Use Full Photo without Cutting Anything */}
               <TouchableOpacity
                 onPress={() => {
-                  setCropZoom(1.0);
-                  setCropOffsetX(0);
-                  setCropOffsetY(0);
                   setShowCropModal(false);
+                  Alert.alert("Cikakken Hoto 🎉", "An rike cikakken hotonka 100% ba tare da an yanke komai ba.");
                 }}
-                style={s.cropCancelBtn}
-                activeOpacity={0.8}
-              >
-                <Text style={s.cropCancelBtnText}>Cancel / Original</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={applyManualCrop}
-                disabled={cropApplying}
-                style={s.cropApplyBtn}
+                style={s.keepOriginalBtn}
                 activeOpacity={0.85}
               >
-                {cropApplying ? (
-                  <ActivityIndicator size="small" color="#0F172A" />
-                ) : (
-                  <Text style={s.cropApplyBtnText}>✓ Apply Crop (1200 × 400 px)</Text>
-                )}
+                <Ionicons name="checkmark-circle" size={16} color="#0F172A" />
+                <Text style={s.keepOriginalBtnText}>✓ Use Full Photo (Kada a Yanke Komai)</Text>
               </TouchableOpacity>
+
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setCropZoom(1.0);
+                    setCropOffsetX(0);
+                    setCropOffsetY(0);
+                    setShowCropModal(false);
+                  }}
+                  style={s.cropCancelBtn}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.cropCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                {cropFitMode === 'cover' && (
+                  <TouchableOpacity
+                    onPress={applyManualCrop}
+                    disabled={cropApplying}
+                    style={s.cropApplyBtn}
+                    activeOpacity={0.85}
+                  >
+                    {cropApplying ? (
+                      <ActivityIndicator size="small" color="#0F172A" />
+                    ) : (
+                      <Text style={s.cropApplyBtnText}>✓ Apply Custom Crop</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
         </View>
@@ -2093,6 +2170,45 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   cropApplyBtnText: {
+    color: '#0F172A',
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+  cropModeTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cropModeTabActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  cropModeTabText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  cropModeTabTextActive: {
+    color: '#92400E',
+    fontWeight: '800',
+  },
+  keepOriginalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F59E0B',
+    paddingVertical: 11,
+    borderRadius: 8,
+  },
+  keepOriginalBtnText: {
     color: '#0F172A',
     fontSize: 11.5,
     fontWeight: '900',
