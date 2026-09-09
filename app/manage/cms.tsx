@@ -218,9 +218,9 @@ export default function ModernContentManager() {
     setCropApplying(true);
     try {
       const outWidth = 1200;
-      const outHeight = 276; // 4.35:1 Ultra-Slim Executive Ratio (76px)
+      const outHeight = 232; // ~5.17:1 Ultra-Slim 64px Ribbon
       const frameW = 330;
-      const frameH = 76; // Ultra-slim Viewfinder frame
+      const frameH = 64; // Ultra-slim 64px Viewfinder frame
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const img = new (window as any).Image();
@@ -260,7 +260,7 @@ export default function ModernContentManager() {
               } as any);
 
               setShowCropModal(false);
-              Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 276 px (Ultra-Slim)!");
+              Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 232 px (Ultra-Slim 64px)!");
             }
           } catch (e: any) {
             console.warn("Canvas crop error:", e);
@@ -329,7 +329,7 @@ export default function ModernContentManager() {
 
         setShowCropModal(false);
         setCropApplying(false);
-        Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 276 px (Ultra-Slim)!");
+        Alert.alert("Success 🎉", "Banner cropped successfully to 1200 × 232 px (Ultra-Slim 64px)!");
       }
     } catch (e: any) {
       Alert.alert("Notice", e.message || "Crop finished");
@@ -970,13 +970,20 @@ export default function ModernContentManager() {
                 style={[
                   s.imagePickerBox, 
                   (selectedImage || existingImageUrl) 
-                    ? { aspectRatio: Math.max(2.5, Math.min(pickedRatio, 4.8)), height: undefined } 
-                    : { height: 76 }
+                    ? { aspectRatio: Math.max(2.5, Math.min(pickedRatio, 5.2)), height: undefined } 
+                    : { height: 64 }
                 ]} 
                 activeOpacity={0.85}
               >
                 {selectedImage || existingImageUrl ? (
                   <View style={s.modalImageContainer}>
+                    {/* Blurred sides so no black appears */}
+                    <Image 
+                      source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
+                      style={StyleSheet.absoluteFillObject} 
+                      blurRadius={24}
+                      resizeMode="cover" 
+                    />
                     <Image 
                       source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl! }} 
                       style={s.modalImagePreview} 
@@ -1142,20 +1149,28 @@ export default function ModernContentManager() {
               <View style={[s.cropCorner, s.cropCornerBR]} />
 
               {(selectedImage || existingImageUrl) && (
-                <Image
-                  source={{ uri: selectedImage?.uri || existingImageUrl! }}
-                  style={[
-                    s.cropViewfinderImg,
-                    cropFitMode === 'cover' && {
-                      transform: [
-                        { scale: cropZoom },
-                        { translateX: cropOffsetX },
-                        { translateY: cropOffsetY },
-                      ],
-                    },
-                  ]}
-                  resizeMode={cropFitMode}
-                />
+                <>
+                  <Image
+                    source={{ uri: selectedImage?.uri || existingImageUrl! }}
+                    style={StyleSheet.absoluteFillObject}
+                    blurRadius={24}
+                    resizeMode="cover"
+                  />
+                  <Image
+                    source={{ uri: selectedImage?.uri || existingImageUrl! }}
+                    style={[
+                      s.cropViewfinderImg,
+                      cropFitMode === 'cover' && {
+                        transform: [
+                          { scale: cropZoom },
+                          { translateX: cropOffsetX },
+                          { translateY: cropOffsetY },
+                        ],
+                      },
+                    ]}
+                    resizeMode={cropFitMode}
+                  />
+                </>
               )}
 
               {/* Grid Guides */}
@@ -2037,7 +2052,7 @@ const s = StyleSheet.create({
   },
   cropViewfinderFrame: {
     width: '100%',
-    height: 76,
+    height: 64,
     backgroundColor: '#070E1E',
     borderRadius: 10,
     borderWidth: 2,

@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(W - 24, 460);
-const BANNER_HEIGHT = 76; // Ultra-slim, sleek executive banner strip (76px)
+const BANNER_HEIGHT = 64; // Ultra-slim, sleek 64px executive ribbon
 const BANNER_MARGIN = 8;
 const ITEM_STRIDE = BANNER_WIDTH + BANNER_MARGIN;
 
@@ -117,6 +117,13 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
             >
               {hasImage ? (
                 <View style={styles.imageContainer}>
+                  {/* Blurred backdrop of the image itself so there is NEVER black on the sides */}
+                  <Image 
+                    source={{ uri: item.image_url }} 
+                    style={StyleSheet.absoluteFillObject} 
+                    blurRadius={24}
+                    resizeMode="cover" 
+                  />
                   {/* Clean 100% full original banner with zero cutoff */}
                   <Image 
                     source={{ uri: item.image_url }} 
@@ -183,11 +190,11 @@ const styles = StyleSheet.create({
     width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
     marginRight: BANNER_MARGIN,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#070E1E',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.22)',
+    borderColor: 'rgba(245, 158, 11, 0.25)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.12,
