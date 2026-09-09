@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 
@@ -147,8 +149,20 @@ export default function OTP() {
     };
 
     const handleOtpChange = (text: string, index: number) => {
-        // Sanitize input to only numeric characters
-        const value = text.replace(/[^0-9]/g, '');
+        const numeric = text.replace(/[^0-9]/g, '');
+        if (numeric.length >= 6) {
+            const digits = numeric.slice(0, 6).split('');
+            setOtp(digits);
+            if (Platform.OS !== 'web') {
+                try {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                } catch (e) {}
+            }
+            handleVerifyWithDigits(numeric.slice(0, 6));
+            return;
+        }
+
+        const value = numeric.slice(-1);
         const newOtp = [...otp];
         newOtp[index] = value;
         setOtp(newOtp);
@@ -399,6 +413,51 @@ export default function OTP() {
         handleVerifyWithDigits(otp.join(''));
     };
 
+    const handlePasteCode = async () => {
+        try {
+            let text = '';
+            if (Platform.OS === 'web') {
+                if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+                    text = await navigator.clipboard.readText();
+                }
+            } else {
+                text = await Clipboard.getStringAsync();
+            }
+
+            const cleaned = (text || '').replace(/[^0-9]/g, '').trim();
+
+            if (cleaned.length >= 6) {
+                const digits = cleaned.slice(0, 6).split('');
+                setOtp(digits);
+                if (Platform.OS !== 'web') {
+                    try {
+                        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    } catch (e) {}
+                }
+                // Automatically verify with 1 tap!
+                handleVerifyWithDigits(cleaned.slice(0, 6));
+            } else if (cleaned.length > 0) {
+                const digits = [...otp];
+                for (let i = 0; i < cleaned.length && i < 6; i++) {
+                    digits[i] = cleaned[i];
+                }
+                setOtp(digits);
+                if (digits.every((d) => d !== '') && digits.join('').length === 6) {
+                    handleVerifyWithDigits(digits.join(''));
+                } else {
+                    const nextIdx = Math.min(cleaned.length, 5);
+                    inputRefs.current[nextIdx]?.focus();
+                }
+            } else {
+                const msg = 'Ba a sami lambobi 6 a clipboard ba. Da fatan za a kwafi lambar daga Google Authenticator sannan a danna Paste Code.';
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Clipboard Empty / Babu Lamba 📋', msg);
+            }
+        } catch (err: any) {
+            console.log('Paste error in OTP:', err);
+        }
+    };
+
     const handleResend = async () => {
         if (!targetEmail) {
             const msg = 'Email address is missing. Please log in again.';
@@ -423,14 +482,17 @@ export default function OTP() {
     return (
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
 
-            {/* Deep Royal Mesh Gradient */}
-            <LinearGradient colors={['#020617', '#0F172A', '#020617']} style={StyleSheet.absoluteFillObject} />
+            {/* Subtle Luxury Executive Light Mesh Background */}
+            <LinearGradient
+                colors={['#F4F6FB', '#EDF2F7', '#F8FAFC']}
+                style={StyleSheet.absoluteFillObject}
+            />
 
-            {/* Glowing Ambient Lights */}
-            <View style={s.topGlow} />
-            <View style={s.bottomGlow} />
+            {/* Decorative Navy and Gold Glow Rings */}
+            <View style={s.topGoldAura} />
+            <View style={s.topNavyAura} />
 
             <SafeAreaView style={s.safeArea}>
                 <KeyboardAvoidingView
@@ -442,56 +504,84 @@ export default function OTP() {
                         <TouchableOpacity
                             onPress={() => {
                                 if (router.canGoBack()) router.back();
-                                else router.replace('/(auth)/pin' as any);
+                                else router.replace('/(auth)/login' as any);
                             }}
                             style={s.backBtn}
                             activeOpacity={0.7}
                         >
-                            <Ionicons name="arrow-back" size={18} color="#F59E0B" />
+                            <Ionicons name="arrow-back" size={18} color="#060B1E" />
                         </TouchableOpacity>
 
                         <View style={s.securityBadge}>
-                            <Ionicons name="shield-checkmark" size={12} color={params.type === '2fa' ? "#10B981" : "#F59E0B"} />
-                            <Text style={[s.securityBadgeText, params.type === '2fa' && { color: "#10B981" }]}>
-                                {params.type === '2fa' ? "2FA AUTHENTICATOR" : "ENCRYPTED OTP"}
+                            <Ionicons name="shield-checkmark" size={13} color="#D97706" />
+                            <Text style={s.securityBadgeText}>
+                                {params.type === '2fa' ? "2FA VERIFICATION" : "SECURE OTP"}
                             </Text>
                         </View>
 
-                        <View style={{ width: 32 }} />
+                        <View style={{ width: 36 }} />
                     </View>
 
-                    {/* Compact Card Content */}
+                    {/* Non-Scrolling Executive Card */}
                     <View style={s.card}>
-                        {/* Compact Avatar / Logo Badge */}
+                        {/* Avatar / 2FA Emblem */}
                         <View style={s.avatarWrapper}>
-                            <LinearGradient colors={params.type === '2fa' ? ['#10B981', '#059669', '#064E3B'] : ['#F59E0B', '#D97706', '#78350F']} style={s.avatarBorderRing}>
-                                {userAvatar ? (
-                                    <Image source={{ uri: userAvatar }} style={s.avatarImage} />
-                                ) : (
-                                    <View style={s.avatarFallback}>
+                            <LinearGradient
+                                colors={['#F5A623', '#D97706', '#B45309']}
+                                style={s.avatarBorderRing}
+                            >
+                                <View style={s.avatarInner}>
+                                    {params.type === '2fa' ? (
+                                        <Ionicons name="key" size={26} color="#F5A623" />
+                                    ) : userAvatar ? (
+                                        <Image source={{ uri: userAvatar }} style={s.avatarImage} />
+                                    ) : (
                                         <Text style={s.avatarInitialText}>{getUserInitial()}</Text>
-                                    </View>
-                                )}
+                                    )}
+                                </View>
                             </LinearGradient>
-                            <View style={[s.activeBadge, params.type === '2fa' && { backgroundColor: '#10B981' }]}>
-                                <Ionicons name={params.type === '2fa' ? "key" : "mail"} size={11} color="#020617" />
+                            <View style={s.lockBadge}>
+                                <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
                             </View>
                         </View>
 
                         {/* Title & Subtitle */}
-                        <Text style={s.titleText}>{params.type === '2fa' ? "Google Authenticator" : "Verify Email Code"}</Text>
-                        <Text style={s.subtitleText}>
-                            {params.type === '2fa' 
-                                ? "Enter the 6-digit code from Google Authenticator or Authy" 
-                                : "Enter the 6-digit code sent to"}
+                        <Text style={s.titleText}>
+                            {params.type === '2fa' ? "2-Factor Authentication" : "Enter Verification Code"}
                         </Text>
-                        <Text style={[s.emailHighlightText, params.type === '2fa' && { color: '#10B981' }]}>
-                            {params.type === '2fa' 
-                                ? "Codes refresh automatically every 30 seconds ⏱️" 
-                                : (targetEmail || 'your registered email')}
+                        <Text style={s.subtitleText}>
+                            {params.type === '2fa'
+                                ? "Enter the 6-digit dynamic code generated by your Authenticator app (Google Authenticator / Authy)"
+                                : "Enter the 6-digit verification code sent to:"}
                         </Text>
 
-                        {/* Compact 6-Digit OTP Box Row */}
+                        {params.type === '2fa' ? (
+                            <View style={s.timerPill}>
+                                <Ionicons name="timer-outline" size={13} color="#B45309" />
+                                <Text style={s.timerPillText}>Codes refresh every 30 seconds ⏱️</Text>
+                            </View>
+                        ) : (
+                            <Text style={s.emailHighlightText}>
+                                {targetEmail || 'your registered email'}
+                            </Text>
+                        )}
+
+                        {/* Paste Code Button (Fanna / Manna Code) */}
+                        <TouchableOpacity
+                            onPress={handlePasteCode}
+                            style={s.pasteBtn}
+                            activeOpacity={0.8}
+                        >
+                            <View style={s.pasteIconWrapper}>
+                                <Ionicons name="clipboard-outline" size={15} color="#D97706" />
+                            </View>
+                            <Text style={s.pasteBtnText}>Paste Code (Fanna Code) 📋</Text>
+                            <View style={s.pasteHintBadge}>
+                                <Text style={s.pasteHintText}>1-Tap</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        {/* 6-Digit OTP Box Row */}
                         <View style={s.otpRow}>
                             {otp.map((digit, index) => (
                                 <View
@@ -507,49 +597,48 @@ export default function OTP() {
                                         }}
                                         style={s.otpInput}
                                         keyboardType="number-pad"
-                                        maxLength={1}
+                                        maxLength={6}
                                         value={digit}
                                         onChangeText={(value) => handleOtpChange(value, index)}
                                         onKeyPress={(e) => handleKeyPress(e, index)}
-                                        selectionColor={params.type === '2fa' ? "#10B981" : "#F59E0B"}
+                                        selectionColor="#D97706"
                                     />
                                 </View>
                             ))}
                         </View>
 
-                        {/* Verify Code Button */}
+                        {/* Royal Navy & 24K Gold Verify Button */}
                         <TouchableOpacity
                             onPress={handleVerify}
                             disabled={loading}
-                            activeOpacity={0.8}
+                            activeOpacity={0.85}
                             style={s.verifyBtnWrapper}
                         >
                             <LinearGradient
-                                colors={params.type === '2fa' ? ['#10B981', '#059669'] : ['#F59E0B', '#D97706']}
+                                colors={['#060B1E', '#0D1636', '#142258']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={s.verifyBtnGradient}
                             >
                                 {loading ? (
-                                    <ActivityIndicator color="#020617" size="small" />
+                                    <ActivityIndicator color="#F5A623" size="small" />
                                 ) : (
                                     <View style={s.verifyBtnContent}>
-                                        <Ionicons name="checkmark-circle" size={18} color="#020617" />
-                                        <Text style={s.verifyBtnText}>{params.type === '2fa' ? "Verify 2FA Code" : "Verify Code"}</Text>
+                                        <Ionicons name="shield-checkmark" size={18} color="#F5A623" />
+                                        <Text style={s.verifyBtnText}>
+                                            {params.type === '2fa' ? "Verify 2FA Token" : "Confirm Verification"}
+                                        </Text>
                                     </View>
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
 
-                        {/* Resend Section or 2FA Synchronized Badge */}
+                        {/* Footer & Resend Section */}
                         {params.type === '2fa' ? (
-                            <View style={{ alignItems: 'center', marginTop: 16, paddingHorizontal: 12 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.25)' }}>
-                                    <Ionicons name="time-outline" size={13} color="#10B981" />
-                                    <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>Dynamic Time-Based Token</Text>
-                                </View>
-                                <Text style={{ color: '#64748B', fontSize: 10.5, textAlign: 'center', marginTop: 6 }}>
-                                    Ensure your device clock is synchronized with network time.
+                            <View style={s.syncFooter}>
+                                <Ionicons name="shield-outline" size={13} color="#64748B" />
+                                <Text style={s.syncFooterText}>
+                                    Protected by Time-based One-Time Password (RFC 6238)
                                 </Text>
                             </View>
                         ) : (
@@ -574,7 +663,7 @@ export default function OTP() {
                                             <Text style={s.counterText}>{counter}s</Text>
                                         </View>
                                     )}
-                                    {resending && <ActivityIndicator size="small" color="#F59E0B" style={{ marginLeft: 6 }} />}
+                                    {resending && <ActivityIndicator size="small" color="#D97706" style={{ marginLeft: 6 }} />}
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -588,25 +677,25 @@ export default function OTP() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#020617',
+        backgroundColor: '#F4F6FB',
     },
-    topGlow: {
+    topGoldAura: {
         position: 'absolute',
-        top: -80,
-        alignSelf: 'center',
-        width: 280,
-        height: 280,
-        borderRadius: 140,
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        top: -90,
+        right: -50,
+        width: 240,
+        height: 240,
+        borderRadius: 120,
+        backgroundColor: 'rgba(245, 166, 35, 0.08)',
     },
-    bottomGlow: {
+    topNavyAura: {
         position: 'absolute',
-        bottom: -80,
-        alignSelf: 'center',
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        top: -60,
+        left: -60,
+        width: 220,
+        height: 220,
+        borderRadius: 110,
+        backgroundColor: 'rgba(6, 11, 30, 0.05)',
     },
     safeArea: {
         flex: 1,
@@ -618,181 +707,281 @@ const s = StyleSheet.create({
         paddingBottom: 16,
         alignSelf: 'center',
         width: '100%',
-        maxWidth: 340,
+        maxWidth: 380,
     },
     topBar: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 6,
+        paddingTop: 8,
+        paddingBottom: 4,
     },
     backBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderColor: 'rgba(245, 158, 11, 0.3)',
-        borderWidth: 1,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E2E8F0',
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 2,
     },
     securityBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        gap: 5,
+        backgroundColor: '#FFFBEB',
+        borderColor: 'rgba(245, 166, 35, 0.5)',
         borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 16,
+        paddingHorizontal: 10,
+        paddingVertical: 4.5,
+        borderRadius: 20,
     },
     securityBadgeText: {
-        color: '#F59E0B',
-        fontSize: 9,
-        fontWeight: '800',
-        letterSpacing: 0.5,
+        color: '#B45309',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.6,
     },
     card: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 18,
+        paddingVertical: 20,
+        marginVertical: 10,
+        shadowColor: '#060B1E',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 20,
+        elevation: 5,
     },
     avatarWrapper: {
         position: 'relative',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     avatarBorderRing: {
-        width: 58,
-        height: 58,
-        borderRadius: 29,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         padding: 2.5,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
         elevation: 6,
     },
-    avatarImage: {
-        width: 53,
-        height: 53,
-        borderRadius: 26.5,
-        backgroundColor: '#0F172A',
-    },
-    avatarFallback: {
-        width: 53,
-        height: 53,
-        borderRadius: 26.5,
-        backgroundColor: '#0F172A',
+    avatarInner: {
+        width: 55,
+        height: 55,
+        borderRadius: 27.5,
+        backgroundColor: '#060B1E',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    avatarImage: {
+        width: 55,
+        height: 55,
+        borderRadius: 27.5,
     },
     avatarInitialText: {
-        color: '#F59E0B',
+        color: '#F5A623',
         fontSize: 22,
         fontWeight: '900',
     },
-    activeBadge: {
+    lockBadge: {
         position: 'absolute',
-        bottom: 1,
-        right: 1,
-        backgroundColor: '#F59E0B',
-        borderRadius: 8,
-        width: 16,
-        height: 16,
+        bottom: -2,
+        right: -2,
+        backgroundColor: '#D97706',
+        borderRadius: 10,
+        width: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+    },
+    titleText: {
+        color: '#060B1E',
+        fontSize: 19,
+        fontWeight: '900',
+        letterSpacing: -0.4,
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    subtitleText: {
+        color: '#475569',
+        fontSize: 11.5,
+        fontWeight: '500',
+        lineHeight: 16,
+        textAlign: 'center',
+        paddingHorizontal: 4,
+    },
+    timerPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#FFFBEB',
+        borderColor: '#FDE68A',
+        borderWidth: 1,
+        borderRadius: 16,
+        paddingHorizontal: 10,
+        paddingVertical: 3.5,
+        marginTop: 6,
+        marginBottom: 14,
+    },
+    timerPillText: {
+        color: '#B45309',
+        fontSize: 10.5,
+        fontWeight: '700',
+    },
+    emailHighlightText: {
+        color: '#D97706',
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 4,
+        marginBottom: 14,
+        textAlign: 'center',
+    },
+    pasteBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 7,
+        backgroundColor: '#FFFBEB',
+        borderColor: '#F5A623',
+        borderWidth: 1.5,
+        borderRadius: 20,
+        paddingVertical: 6.5,
+        paddingHorizontal: 14,
+        marginBottom: 16,
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    pasteIconWrapper: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: 'rgba(245, 166, 35, 0.25)',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    titleText: {
-        color: '#FFFFFF',
-        fontSize: 18,
+    pasteBtnText: {
+        color: '#060B1E',
+        fontSize: 11.5,
         fontWeight: '800',
-        letterSpacing: -0.3,
-        marginBottom: 3,
     },
-    subtitleText: {
-        color: '#94A3B8',
-        fontSize: 11,
-        fontWeight: '500',
-        textAlign: 'center',
+    pasteHintBadge: {
+        backgroundColor: '#060B1E',
+        borderRadius: 8,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
     },
-    emailHighlightText: {
-        color: '#F59E0B',
-        fontSize: 12,
-        fontWeight: '700',
-        marginTop: 1,
-        marginBottom: 18,
+    pasteHintText: {
+        color: '#F5A623',
+        fontSize: 9,
+        fontWeight: '900',
     },
     otpRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         width: '100%',
-        gap: 6,
-        marginBottom: 20,
+        gap: 5,
+        marginBottom: 18,
     },
     otpBox: {
-        width: 44,
-        height: 44,
-        borderRadius: 10,
+        width: 42,
+        height: 48,
+        borderRadius: 11,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.2,
+        borderWidth: 1.5,
     },
     otpBoxEmpty: {
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: '#FFFFFF',
+        borderColor: '#CBD5E1',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 2,
+        elevation: 1,
     },
     otpBoxFilled: {
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
-        borderColor: '#F59E0B',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
+        backgroundColor: '#FFFDF5',
+        borderColor: '#D97706',
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
         shadowRadius: 5,
         elevation: 3,
     },
     otpInput: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '800',
+        color: '#060B1E',
+        fontSize: 20,
+        fontWeight: '900',
         width: '100%',
         textAlign: 'center',
     },
     verifyBtnWrapper: {
         width: '100%',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     verifyBtnGradient: {
-        height: 44,
-        borderRadius: 12,
+        height: 46,
+        borderRadius: 13,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
+        borderWidth: 1.5,
+        borderColor: '#F5A623',
+        shadowColor: '#060B1E',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
         shadowRadius: 8,
-        elevation: 5,
+        elevation: 4,
     },
     verifyBtnContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
     },
     verifyBtnText: {
-        color: '#020617',
+        color: '#F5A623',
         fontSize: 14,
-        fontWeight: '800',
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
+    syncFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 6,
+    },
+    syncFooterText: {
+        color: '#64748B',
+        fontSize: 10,
+        fontWeight: '500',
+        textAlign: 'center',
     },
     resendContainer: {
         alignItems: 'center',
     },
     resendLabel: {
-        color: '#94A3B8',
+        color: '#64748B',
         fontSize: 11,
         fontWeight: '500',
         marginBottom: 4,
@@ -803,26 +992,27 @@ const s = StyleSheet.create({
     },
     resendBtnText: {
         fontSize: 12,
-        fontWeight: '700',
+        fontWeight: '800',
     },
     resendBtnActive: {
-        color: '#F59E0B',
+        color: '#D97706',
     },
     resendBtnDisabled: {
-        color: '#64748B',
+        color: '#94A3B8',
     },
     counterBadge: {
-        marginLeft: 5,
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
-        paddingHorizontal: 6,
+        marginLeft: 6,
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 7,
         paddingVertical: 2,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderColor: 'rgba(245, 166, 35, 0.4)',
     },
     counterText: {
-        color: '#F59E0B',
+        color: '#D97706',
         fontSize: 10,
-        fontWeight: '800',
+        fontWeight: '900',
     },
 });
+

@@ -790,8 +790,9 @@ export default function SecurityScreen() {
     };
 
     // 7. Live 2FA Code Test (Confirm Authenticator is in Sync)
-    const handleTestCode = async () => {
-        if (testCode.trim().length !== 6 || !mfaFactor) return;
+    const handleTestCode = async (overrideCode?: string | any) => {
+        const code = (typeof overrideCode === 'string' ? overrideCode : testCode).trim();
+        if (code.length !== 6 || !mfaFactor) return;
         setTestingCode(true);
         try {
             const { data: chal, error: chalErr } = await supabase.auth.mfa.challenge({
@@ -802,7 +803,7 @@ export default function SecurityScreen() {
             const { error: verifyErr } = await supabase.auth.mfa.verify({
                 factorId: mfaFactor.id,
                 challengeId: chal.id,
-                code: testCode.trim()
+                code: code
             });
             if (verifyErr) throw verifyErr;
 
@@ -824,6 +825,79 @@ export default function SecurityScreen() {
             Alert.alert("Code Verification Failed ❌", "The code was not accepted. Please ensure your device clock is set to automatic time and try again.");
         } finally {
             setTestingCode(false);
+        }
+    };
+
+    const handlePasteSetupCode = async () => {
+        try {
+            let text = '';
+            if (Platform.OS === 'web') {
+                if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+                    text = await navigator.clipboard.readText();
+                }
+            } else {
+                text = await Clipboard.getStringAsync();
+            }
+
+            const clean = (text || '').replace(/[^0-9]/g, '').trim();
+            if (clean.length >= 6) {
+                const digits = clean.slice(0, 6).split('');
+                setOtpDigits(digits);
+                if ((Platform.OS as string) !== 'web') {
+                    try {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    } catch (e) {}
+                }
+                handleVerifyTotp(clean.slice(0, 6));
+            } else if (clean.length > 0) {
+                const digits = [...otpDigits];
+                for (let i = 0; i < clean.length && i < 6; i++) {
+                    digits[i] = clean[i];
+                }
+                setOtpDigits(digits);
+                if (digits.every(d => d !== '') && digits.join('').length === 6) {
+                    handleVerifyTotp(digits.join(''));
+                } else {
+                    otpInputRefs.current[Math.min(clean.length, 5)]?.focus();
+                }
+            } else {
+                Alert.alert("Clipboard Empty 📋", "No 6-digit code found on clipboard. Copy code from Google Authenticator first.");
+            }
+        } catch (e) {
+            console.log("Paste setup code notice:", e);
+        }
+    };
+
+    const handlePasteTestCode = async (autoSubmit: boolean = true) => {
+        try {
+            let text = '';
+            if (Platform.OS === 'web') {
+                if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+                    text = await navigator.clipboard.readText();
+                }
+            } else {
+                text = await Clipboard.getStringAsync();
+            }
+
+            const clean = (text || '').replace(/[^0-9]/g, '').trim();
+            if (clean.length >= 6) {
+                const code = clean.slice(0, 6);
+                setTestCode(code);
+                if ((Platform.OS as string) !== 'web') {
+                    try {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    } catch (e) {}
+                }
+                if (autoSubmit) {
+                    handleTestCode(code);
+                }
+            } else if (clean.length > 0) {
+                setTestCode(clean);
+            } else {
+                Alert.alert("Clipboard Empty 📋", "No 6-digit code found on clipboard.");
+            }
+        } catch (e) {
+            console.log("Paste test code notice:", e);
         }
     };
 
@@ -1796,11 +1870,31 @@ export default function SecurityScreen() {
                             </View>
 
                             {/* Step 3: Enter 6-digit Code (6 Distinct Digit Boxes) */}
-                            <Text style={{ color: L.goldAmber, fontSize: 11, fontWeight: '900', marginBottom: 4 }}>
-                                Step 3: Enter 6-Digit Verification Code
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <Text style={{ color: L.goldAmber, fontSize: 11, fontWeight: '900' }}>
+                                    Step 3: Enter 6-Digit Code
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={handlePasteSetupCode}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        backgroundColor: L.goldBg,
+                                        borderColor: L.gold,
+                                        borderWidth: 1,
+                                        borderRadius: 14,
+                                        paddingHorizontal: 9,
+                                        paddingVertical: 3.5
+                                    }}
+                                    activeOpacity={0.75}
+                                >
+                                    <Ionicons name="clipboard-outline" size={12} color={L.goldAmber} />
+                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Paste Code 📋</Text>
+                                </TouchableOpacity>
+                            </View>
                             <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 10 }}>
-                                Type the 6-digit code currently shown in your Authenticator app:
+                                Type or paste the 6-digit code currently shown in your Authenticator app:
                             </Text>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -1890,6 +1984,30 @@ export default function SecurityScreen() {
                                 : "Enter the 6-digit code currently visible in Google Authenticator to confirm it is 100% active and in sync:"}
                         </Text>
 
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <Text style={{ color: L.textSecondary, fontSize: 10.5, fontWeight: '800' }}>
+                                6-Digit Token:
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => handlePasteTestCode(true)}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    backgroundColor: L.goldBg,
+                                    borderColor: L.gold,
+                                    borderWidth: 1,
+                                    borderRadius: 14,
+                                    paddingHorizontal: 9,
+                                    paddingVertical: 3.5
+                                }}
+                                activeOpacity={0.75}
+                            >
+                                <Ionicons name="clipboard-outline" size={12} color={L.goldAmber} />
+                                <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Paste Code 📋</Text>
+                            </TouchableOpacity>
+                        </View>
+
                         <TextInput
                             style={{ 
                                 backgroundColor: '#F8FAFC', 
@@ -1924,7 +2042,7 @@ export default function SecurityScreen() {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={handleTestCode}
+                                onPress={() => handleTestCode()}
                                 disabled={testingCode || testCode.length !== 6}
                                 style={{ flex: 1.5, backgroundColor: testCode.length === 6 ? L.emerald : '#CBD5E1', borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' }}
                             >
