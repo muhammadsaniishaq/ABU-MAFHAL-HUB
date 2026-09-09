@@ -8,21 +8,22 @@ import {
   Dimensions,
   StyleSheet,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../services/supabase';
 
-// ─── Full-bleed layout: zero padding, zero cropping ───────────────────────────
-const SCREEN_WIDTH    = Dimensions.get('window').width;
-const BANNER_WIDTH    = SCREEN_WIDTH;          // 100% screen — no side gaps
-const BANNER_HEIGHT   = 160;                   // Comfortable height for all images
-const ITEM_STRIDE     = SCREEN_WIDTH;          // Exact stride — no inter-item gaps
-const AUTO_INTERVAL   = 3800;
+// ─── Layout ───────────────────────────────────────────────────────────────────
+const { width: SCREEN_W } = Dimensions.get('window');
+const H_PADDING   = 16;                              // Side padding (card style)
+const BANNER_W    = SCREEN_W - H_PADDING * 2;        // Width with padding
+const BANNER_H    = 112;                             // Slim height
+const GAP         = 12;                              // Space between banners
+const STRIDE      = BANNER_W + GAP;
+const RADIUS      = 14;                              // Card border radius
+const AUTO_MS     = 4000;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface Banner {
   id: string;
   title?: string;
@@ -32,193 +33,170 @@ interface Banner {
   target_url?: string;
   is_active: boolean;
   placement?: string;
-  clicks?: number;
-  created_at?: string;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function DynamicBanners({ placement = 'dashboard' }: { placement?: string }) {
-  const [banners, setBanners]         = useState<Banner[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading]     = useState(true);
-  const [imgErrors, setImgErrors]     = useState<Record<string, boolean>>({});
+  const [banners, setBanners]             = useState<Banner[]>([]);
+  const [index, setIndex]                 = useState(0);
+  const [loading, setLoading]             = useState(true);
+  const [imgErrors, setImgErrors]         = useState<Record<string, boolean>>({});
 
-  const listRef        = useRef<FlatList>(null);
-  const userTouching   = useRef(false);
-  const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const router         = useRouter();
+  const listRef      = useRef<FlatList>(null);
+  const touching     = useRef(false);
+  const timer        = useRef<ReturnType<typeof setInterval> | null>(null);
+  const router       = useRouter();
 
-  // ─── Fetch banners ──────────────────────────────────────────────────────────
+  // ─── Fetch ────────────────────────────────────────────────────────────────
   const fetchBanners = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       const { data, error } = await supabase
         .from('banners')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) { console.warn('DynamicBanners:', error.message); return; }
+      if (error || !data?.length) { setBanners([]); return; }
 
-      if (data && data.length > 0) {
-        const matched = data.filter((b: Banner) => {
-          const p = String(b.placement || '').toLowerCase().trim();
-          if (!p || p.includes('all') || p.includes('dashboard')) return true;
-          return placement && p.includes(String(placement).toLowerCase());
-        });
-        setBanners(matched.length > 0 ? matched : data);
-      } else {
-        setBanners([]);
-      }
+      const filtered = data.filter((b: Banner) => {
+        const p = String(b.placement || '').toLowerCase().trim();
+        if (!p || p.includes('all') || p.includes('dashboard')) return true;
+        return placement && p.includes(placement.toLowerCase());
+      });
+      setBanners(filtered.length ? filtered : data);
     } catch (e) {
-      console.warn('DynamicBanners exception:', e);
+      console.warn('DynamicBanners:', e);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, [placement]);
 
   useEffect(() => { fetchBanners(); }, [fetchBanners]);
 
-  // ─── Auto-scroll ────────────────────────────────────────────────────────────
+  // ─── Auto-scroll ──────────────────────────────────────────────────────────
   const startTimer = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      if (userTouching.current || banners.length <= 1) return;
-      setCurrentIndex(prev => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(() => {
+      if (touching.current) return;
+      setIndex(prev => {
         const next = (prev + 1) % banners.length;
         try {
-          listRef.current?.scrollToOffset({ offset: next * ITEM_STRIDE, animated: true });
+          listRef.current?.scrollToOffset({ offset: next * STRIDE, animated: true });
         } catch (_) {}
         return next;
       });
-    }, AUTO_INTERVAL);
+    }, AUTO_MS);
   }, [banners.length]);
 
   useEffect(() => {
     if (banners.length > 1) startTimer();
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => { if (timer.current) clearInterval(timer.current); };
   }, [banners.length, startTimer]);
 
-  // ─── Scroll sync ────────────────────────────────────────────────────────────
   const onScrollEnd = useCallback((e: any) => {
-    const x = e.nativeEvent?.contentOffset?.x ?? 0;
-    const idx = Math.round(x / ITEM_STRIDE);
-    if (idx >= 0 && idx < banners.length) setCurrentIndex(idx);
+    const x   = e.nativeEvent?.contentOffset?.x ?? 0;
+    const idx = Math.round(x / STRIDE);
+    if (idx >= 0 && idx < banners.length) setIndex(idx);
   }, [banners.length]);
 
-  // ─── Banner click ───────────────────────────────────────────────────────────
-  const onBannerPress = useCallback((banner: Banner) => {
-    if (!banner?.id) return;
-    supabase.rpc('increment_banner_click', { banner_id: banner.id })
-      .then(({ error }) => { if (error) console.log('Banner click:', error); });
-    if (banner.target_url) {
-      try { router.push(banner.target_url as any); } catch (_) {}
+  const onPress = useCallback((b: Banner) => {
+    supabase.rpc('increment_banner_click', { banner_id: b.id }).then(({ error }) => {
+      if (error) console.log('Banner click track:', error);
+    });
+    if (b.target_url) {
+      try { router.push(b.target_url as any); } catch (_) {}
     }
   }, [router]);
 
-  // ─── Guard: Loading ─────────────────────────────────────────────────────────
-  if (isLoading) {
+  // ─── Guards ───────────────────────────────────────────────────────────────
+  if (loading) {
     return (
-      <View style={styles.loadingBox}>
-        <ActivityIndicator size="small" color="#F59E0B" />
+      <View style={s.loadingWrap}>
+        <View style={s.loadingCard}>
+          <ActivityIndicator size="small" color="#F59E0B" />
+        </View>
       </View>
     );
   }
+  if (!banners.length) return null;
 
-  if (!banners || banners.length === 0) return null;
-
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <View style={styles.wrapper}>
+    <View style={s.root}>
       <FlatList
         ref={listRef}
         data={banners}
         horizontal
-        pagingEnabled                          // ✅ Snap to each banner exactly
         showsHorizontalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
-        keyExtractor={(item, i) => item?.id ? String(item.id) : String(i)}
-        // ✅ NO padding at all — full bleed
-        contentContainerStyle={styles.flatListContent}
-        getItemLayout={(_, index) => ({
-          length: ITEM_STRIDE,
-          offset: ITEM_STRIDE * index,
-          index,
-        })}
+        decelerationRate="fast"
+        snapToInterval={STRIDE}
+        snapToAlignment="start"
+        keyExtractor={(item, i) => item?.id ?? String(i)}
+        contentContainerStyle={s.listContent}
+        getItemLayout={(_, i) => ({ length: STRIDE, offset: STRIDE * i, index: i })}
         onMomentumScrollEnd={onScrollEnd}
         onScrollBeginDrag={() => {
-          userTouching.current = true;
-          if (timerRef.current) clearInterval(timerRef.current);
+          touching.current = true;
+          if (timer.current) clearInterval(timer.current);
         }}
         onScrollEndDrag={() => {
           setTimeout(() => {
-            userTouching.current = false;
+            touching.current = false;
             if (banners.length > 1) startTimer();
-          }, 2500);
+          }, 2000);
         }}
         renderItem={({ item }) => {
-          const hasImage =
+          const hasImg =
             typeof item?.image_url === 'string' &&
             item.image_url.trim().length > 0 &&
             !imgErrors[item.id];
 
           return (
             <TouchableOpacity
-              onPress={() => onBannerPress(item)}
-              activeOpacity={item.target_url ? 0.92 : 1}
-              style={styles.bannerItem}
+              onPress={() => onPress(item)}
+              activeOpacity={item.target_url ? 0.9 : 1}
+              style={s.card}
               accessible
               accessibilityRole="button"
-              accessibilityLabel={item.title || 'Promotional banner'}
+              accessibilityLabel={item.title || 'Banner'}
             >
-              {hasImage ? (
-                // ── Image Banner: ZERO crop, ZERO padding ─────────────────────
-                <View style={styles.imageWrap}>
-                  <Image
-                    source={{ uri: item.image_url }}
-                    style={styles.bannerImage}
-                    resizeMode="contain"     // ✅ NEVER crops — full image always shown
-                    onError={() =>
-                      setImgErrors(prev => ({ ...prev, [item.id]: true }))
-                    }
-                  />
-                </View>
+              {hasImg ? (
+                // ── Pure Image — ZERO overlays, ZERO text on top ────────────
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={s.img}
+                  resizeMode="cover"
+                  onError={() =>
+                    setImgErrors(prev => ({ ...prev, [item.id]: true }))
+                  }
+                />
               ) : (
-                // ── Fallback Gradient Banner ──────────────────────────────────
+                // ── Fallback: Premium gradient (no image) ───────────────────
                 <LinearGradient
-                  colors={['#060D1F', '#0D1B3E', '#112060']}
+                  colors={['#0B1437', '#112060', '#0B1437']}
                   start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.fallback}
+                  end={{ x: 1, y: 0 }}
+                  style={s.fallback}
                 >
-                  {/* Gold left accent strip */}
-                  <View style={styles.accentStrip} />
+                  {/* Subtle glow orb */}
+                  <View style={s.orb} pointerEvents="none" />
 
-                  {/* Content */}
-                  <View style={styles.fallbackBody}>
-                    <View style={styles.pillRow}>
-                      <View style={styles.pill}>
-                        <Text style={styles.pillText}>🔥 SPECIAL OFFER</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.fallbackTitle} numberOfLines={2}>
-                      {item.title || 'Exclusive Offer — Limited Time'}
+                  <View style={s.fbLeft}>
+                    <Text style={s.fbTitle} numberOfLines={1}>
+                      {item.title || 'Special Offer'}
                     </Text>
-                    <Text style={styles.fallbackSub} numberOfLines={2}>
-                      {item.subtitle || item.description || 'Tap to explore and claim now.'}
+                    <Text style={s.fbSub} numberOfLines={2}>
+                      {item.subtitle || item.description || 'Tap to explore.'}
                     </Text>
                   </View>
 
-                  {/* CTA */}
                   {item.target_url ? (
-                    <View style={styles.cta}>
-                      <Ionicons name="arrow-forward-circle" size={22} color="#F59E0B" />
+                    <View style={s.fbArrow}>
+                      <Ionicons name="chevron-forward" size={18} color="#F59E0B" />
                     </View>
                   ) : null}
-
-                  {/* Decorative orb */}
-                  <View style={styles.decorOrb} pointerEvents="none" />
                 </LinearGradient>
               )}
             </TouchableOpacity>
@@ -226,29 +204,21 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
         }}
       />
 
-      {/* ── Pagination Dots ─────────────────────────────────────────────────── */}
+      {/* Pagination dots */}
       {banners.length > 1 && (
-        <View style={styles.dotsRow} pointerEvents="box-none">
-          {banners.map((_, idx) => (
+        <View style={s.dots}>
+          {banners.map((_, i) => (
             <TouchableOpacity
-              key={idx}
+              key={i}
               hitSlop={{ top: 8, bottom: 8, left: 5, right: 5 }}
               onPress={() => {
-                setCurrentIndex(idx);
+                setIndex(i);
                 try {
-                  listRef.current?.scrollToOffset({
-                    offset: idx * ITEM_STRIDE,
-                    animated: true,
-                  });
+                  listRef.current?.scrollToOffset({ offset: i * STRIDE, animated: true });
                 } catch (_) {}
               }}
             >
-              <View
-                style={[
-                  styles.dot,
-                  currentIndex === idx ? styles.dotActive : styles.dotIdle,
-                ]}
-              />
+              <View style={[s.dot, i === index ? s.dotOn : s.dotOff]} />
             </TouchableOpacity>
           ))}
         </View>
@@ -258,137 +228,116 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  // Outer wrapper — no margin, no padding
-  wrapper: {
-    width: SCREEN_WIDTH,        // ✅ Full screen width
-    marginLeft: 0,
-    marginRight: 0,
-    backgroundColor: 'transparent',
+const s = StyleSheet.create({
+  root: {
+    marginTop: 10,
+    marginBottom: 2,
   },
 
-  // Loading placeholder
-  loadingBox: {
-    width: SCREEN_WIDTH,
-    height: BANNER_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
+  listContent: {
+    paddingHorizontal: H_PADDING,   // ✅ Clean card padding on both sides
+    gap: GAP,                        // Space between slides
   },
 
-  // FlatList content — NO horizontal padding
-  flatListContent: {
-    paddingHorizontal: 0,       // ✅ Zero padding — edge to edge
-  },
-
-  // Each banner slide
-  bannerItem: {
-    width: BANNER_WIDTH,        // ✅ Exactly screen width — no gaps
-    height: BANNER_HEIGHT,
+  // Banner card — slim, rounded, shadowed
+  card: {
+    width: BANNER_W,
+    height: BANNER_H,
+    borderRadius: RADIUS,
     overflow: 'hidden',
-    backgroundColor: '#000',
+    backgroundColor: '#0B1437',
+    // Premium shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 6,
   },
 
-  // Image container — fills 100%
-  imageWrap: {
+  // ── Pure image — fills card completely, no overlays ──
+  img: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#000',   // Black letterbox (clean) when image doesn't fill
   },
 
-  // Image — full container, no crop
-  bannerImage: {
-    width: '100%',
-    height: '100%',            // ✅ resizeMode="contain" — ZERO cropping
-  },
-
-  // Fallback gradient banner
+  // ── Fallback gradient ──
   fallback: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 18,
     overflow: 'hidden',
   },
-  accentStrip: {
+  orb: {
     position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: '#F59E0B',
+    right: -30,
+    top: -30,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(245,166,35,0.07)',
   },
-  decorOrb: {
-    position: 'absolute',
-    right: -40,
-    top: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(245, 166, 35, 0.06)',
-  },
-  fallbackBody: {
+  fbLeft: {
     flex: 1,
-    paddingLeft: 8,
+    paddingRight: 12,
   },
-  pillRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  pill: {
-    backgroundColor: 'rgba(245, 159, 11, 0.15)',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  pillText: {
-    color: '#F59E0B',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  fallbackTitle: {
+  fbTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
-    lineHeight: 22,
-    marginBottom: 6,
     letterSpacing: 0.1,
+    marginBottom: 5,
   },
-  fallbackSub: {
-    color: 'rgba(148,163,184,0.9)',
+  fbSub: {
+    color: 'rgba(148,163,184,0.85)',
     fontSize: 11,
-    lineHeight: 16,
+    lineHeight: 15,
     fontWeight: '500',
   },
-  cta: {
-    marginLeft: 12,
+  fbArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(245,166,35,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,166,35,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Pagination dots
-  dotsRow: {
+  // Loading skeleton
+  loadingWrap: {
+    paddingHorizontal: H_PADDING,
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  loadingCard: {
+    width: BANNER_W,
+    height: BANNER_H,
+    borderRadius: RADIUS,
+    backgroundColor: '#E8ECF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Pagination
+  dots: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 7,
+    paddingTop: 7,
     gap: 5,
   },
   dot: {
-    height: 4,
+    height: 3.5,
     borderRadius: 2,
   },
-  dotActive: {
-    width: 22,
+  dotOn: {
+    width: 18,
     backgroundColor: '#F59E0B',
   },
-  dotIdle: {
-    width: 5,
-    backgroundColor: 'rgba(148,163,184,0.3)',
+  dotOff: {
+    width: 4.5,
+    backgroundColor: 'rgba(148,163,184,0.28)',
   },
 });
