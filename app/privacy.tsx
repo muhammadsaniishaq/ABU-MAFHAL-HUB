@@ -43,7 +43,7 @@ const PRIVACY_SECTIONS = [
         id: 'user_rights',
         icon: 'key-outline',
         title: '5. Your Rights & Data Erasure',
-        content: `Under the Nigeria Data Protection Act (NDPA):\n\n• Access & Correction: You have the right to request a copy of your personal data or update incorrect account information.\n• Account Deletion: You may request account deletion or data erasure by contacting our Data Protection Officer at privacy@abumafhal.ng.`
+        content: `Under the Nigeria Data Protection Act (NDPA):\n\n• Access & Correction: You have the right to request a copy of your personal data or update incorrect account information.\n• Account Deletion: You may request account deletion or data erasure by contacting our Data Protection Officer at admin@abumafhal.com.ng.`
     },
     {
         id: 'cookies',
@@ -164,15 +164,15 @@ export default function PrivacyScreen() {
                     <View style={[styles.supportBox, { backgroundColor: isDark ? '#0A1424' : '#F1F5F9', borderColor: theme.borderPrimary }]}>
                         <Ionicons name="mail-unread" size={24} color="#08E4C7" style={{ marginRight: 12 }} />
                         <View style={{ flex: 1 }}>
-                            <Text style={[styles.supportTitle, { color: theme.textPrimary }]}>Data Privacy Officer</Text>
+                            <Text style={[styles.supportTitle, { color: theme.textPrimary }]}>Abu Mafhal Ltd (RC-8979939)</Text>
                             <Text style={[styles.supportSubText, { color: theme.textSecondary }]}>
-                                For data inquiries or account deletion: privacy@abumafhal.ng
+                                No. 1 Abu Mafhal Ltd Goni Aji Street, Yobe State, Nigeria. • Email: admin@abumafhal.com.ng
                             </Text>
                         </View>
                     </View>
 
                     <Text style={[styles.effectiveDate, { color: theme.textMuted }]}>
-                        Effective Date: January 1, 2026 • ABUMAFHAL Digital Hub
+                        Effective Date: January 1, 2026 • Abu Mafhal Ltd (RC-8979939)
                     </Text>
 
                 </ScrollView>

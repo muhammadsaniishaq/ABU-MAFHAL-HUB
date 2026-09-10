@@ -1,4 +1,5 @@
 # Static Pages
+/           /landing.html   200
 /landing    /landing.html   200
 /about      /about.html     200
 /contact    /contact.html   200

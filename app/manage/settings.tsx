@@ -552,7 +552,7 @@ export default function AdminSettings() {
                             <InputRow label="Facebook Link" value={supportFacebook} onChangeText={setSupportFacebook} placeholder="https://facebook.com/..." keyboardType="url" />
                             <InputRow label="Twitter (X) Link" value={supportTwitter} onChangeText={setSupportTwitter} placeholder="https://twitter.com/..." keyboardType="url" />
                             <InputRow label="Instagram Link" value={supportInstagram} onChangeText={setSupportInstagram} placeholder="https://instagram.com/..." keyboardType="url" />
-                            <InputRow label="Office Address" value={supportOfficeAddress} onChangeText={setSupportOfficeAddress} placeholder="No 1. Abu Mafhal Hub Plaza..." />
+                            <InputRow label="Office Address" value={supportOfficeAddress} onChangeText={setSupportOfficeAddress} placeholder="No. 1 Abu Mafhal Ltd Goni Aji Street, Yobe State..." />
                         </View>
 
                         <Text style={s.groupLabel}>Global Announcement</Text>

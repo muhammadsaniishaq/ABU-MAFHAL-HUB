@@ -56,7 +56,7 @@ const TERMS_SECTIONS = [
         id: 'dispute_resolution',
         icon: 'chatbubbles-outline',
         title: '7. Dispute Resolution & Support Contact',
-        content: `For any inquiries, transaction disputes, or data clarification, please reach out to our official support team:\n\n• Support Email: support@abumafhal.ng\n• Phone / WhatsApp: +234 801 234 5678\n• Office: ABUMAFHAL Hub, Digital Identity Center, Nigeria.`
+        content: `For any inquiries, transaction disputes, or data clarification, please reach out to our official support team:\n\n• Company: Abu Mafhal Ltd (RC-8979939)\n• Support Email: admin@abumafhal.com.ng\n• Phone / WhatsApp: +234 814 585 3539\n• Office: No. 1 Abu Mafhal Ltd Goni Aji Street, Yobe State, Nigeria.`
     }
 ];
 
@@ -95,8 +95,8 @@ export default function TermsScreen() {
     const handleShare = async () => {
         try {
             await Share.share({ 
-                title: 'ABUMAFHAL Terms of Agreement',
-                message: 'ABUMAFHAL Terms of Agreement & Service Policy: https://abumafhal.ng/terms' 
+                title: 'Abu Mafhal Ltd Terms of Agreement',
+                message: 'Abu Mafhal Ltd Terms of Agreement & Service Policy: https://abumafhal.com.ng/terms' 
             });
         } catch (error) {}
     };
@@ -238,7 +238,7 @@ export default function TermsScreen() {
                     </TouchableOpacity>
 
                     <Text style={[styles.effectiveDate, { color: theme.textMuted }]}>
-                        Effective Date: January 1, 2026 • ABUMAFHAL Digital Hub
+                        Effective Date: January 1, 2026 • Abu Mafhal Ltd (RC-8979939)
                     </Text>
 
                 </ScrollView>

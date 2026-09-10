@@ -1261,11 +1261,25 @@ export default function SplashScreen() {
       } else {
         await AsyncStorage.removeItem('has_active_session');
         await AsyncStorage.removeItem('app_unlocked');
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const pathname = window.location.pathname;
+          if (pathname === '/' || pathname === '' || pathname === '/index.html') {
+            window.location.replace('/landing.html');
+            return;
+          }
+        }
         setChecking(false);
       }
     } catch {
       await AsyncStorage.removeItem('has_active_session');
       await AsyncStorage.removeItem('app_unlocked');
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const pathname = window.location.pathname;
+        if (pathname === '/' || pathname === '' || pathname === '/index.html') {
+          window.location.replace('/landing.html');
+          return;
+        }
+      }
       setChecking(false);
     }
   };

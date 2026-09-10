@@ -191,7 +191,7 @@ export default function AboutScreen() {
                         Made with love in Nigeria
                     </Text>
                     <Text className="text-slate-400 font-medium text-[9px] text-center uppercase tracking-widest">
-                        © {new Date().getFullYear()} Abu Mafhal Hub. All rights reserved.
+                        © {new Date().getFullYear()} Abu Mafhal Ltd (RC-8979939). All rights reserved.
                     </Text>
                 </View>
 

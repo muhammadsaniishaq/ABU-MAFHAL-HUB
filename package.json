@@ -10,8 +10,8 @@
     "web": "expo start --web",
     "login": "npx supabase login",
     "deploy:functions": "npx supabase functions deploy",
-    "build": "npx expo export -p web",
-    "vercel-build": "npx expo export -p web",
+    "build": "npx expo export -p web && node scripts/copy-public.js",
+    "vercel-build": "npx expo export -p web && node scripts/copy-public.js",
     "postinstall": "node scripts/patch-css-interop.js"
   },
   "dependencies": {
