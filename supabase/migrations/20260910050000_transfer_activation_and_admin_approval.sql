@@ -9,15 +9,17 @@ ADD COLUMN IF NOT EXISTS transfer_approved_at timestamp with time zone,
 ADD COLUMN IF NOT EXISTS transfer_unlock_at timestamp with time zone,
 ADD COLUMN IF NOT EXISTS transfer_rejection_reason text;
 
--- Auto-approve existing super_admin and admin roles so staff are not blocked
+-- Strict requirement: Every user (including Tier 3 users) must submit an application request
+-- and be approved by an Admin before transfers can be activated.
 UPDATE public.profiles
 SET 
-  kyc_tier = 3,
-  transfer_status = 'approved',
-  transfer_approved = true,
-  transfer_approved_at = now(),
-  transfer_unlock_at = now()
-WHERE role IN ('admin', 'super_admin');
+  transfer_status = 'not_applied',
+  transfer_approved = false,
+  transfer_approved_at = null,
+  transfer_unlock_at = null
+WHERE id NOT IN (
+  SELECT user_id FROM public.transfer_activation_requests WHERE status = 'approved'
+);
 
 -- 2. CREATE DEDICATED TRANSFER ACTIVATION REQUESTS TABLE
 CREATE TABLE IF NOT EXISTS public.transfer_activation_requests (

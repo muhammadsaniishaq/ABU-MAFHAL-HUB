@@ -427,11 +427,11 @@ export default function TransferScreen() {
     const isStaff = userRole === 'admin' || userRole === 'super_admin';
     const isKycLoading = userKycTier === null;
     const isTier3Qualified = (userKycTier !== null && userKycTier >= 3) || isStaff;
-    const isTransferUnlocked = (isTier3Qualified && transferStatus === 'approved' && transferApproved === true && cooldownRemainingSeconds <= 0) || (isStaff && transferApproved === true);
-    const isTransferCooldownActive = !isStaff && isTier3Qualified && transferStatus === 'approved' && cooldownRemainingSeconds > 0;
+    const isTransferUnlocked = isTier3Qualified && transferStatus === 'approved' && transferApproved === true && cooldownRemainingSeconds <= 0;
+    const isTransferCooldownActive = isTier3Qualified && transferStatus === 'approved' && cooldownRemainingSeconds > 0;
     const isTransferPending = isTier3Qualified && transferStatus === 'pending';
     const isTransferRejected = isTier3Qualified && transferStatus === 'rejected';
-    const isTransferNotApplied = !isTransferPending && !isTransferRejected && !isTransferCooldownActive && !isTransferUnlocked;
+    const isTransferNotApplied = isTier3Qualified && !isTransferPending && !isTransferRejected && !isTransferCooldownActive && !isTransferUnlocked;
 
     // Device 2FA Authorization States (New Device Guard)
     const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null);
@@ -1831,7 +1831,10 @@ export default function TransferScreen() {
                         </View>
 
                         {/* Transfer Compliance Security Gate */}
-                        {renderTransferComplianceGate()}
+                        {!isTransferUnlocked ? (
+                            renderTransferComplianceGate()
+                        ) : (
+                            <>
 
                         {/* Inline Error Alert */}
                         {transferError ? (
@@ -2310,6 +2313,8 @@ export default function TransferScreen() {
 
                         {/* Submit Button */}
                         {renderSubmitButton('bank')}
+                            </>
+                        )}
                     </View>
                 ) : (
                     // ── MODE 2: P2P MEMBER TRANSFER ─────
@@ -2327,7 +2332,10 @@ export default function TransferScreen() {
                         </View>
 
                         {/* Transfer Compliance Security Gate */}
-                        {renderTransferComplianceGate()}
+                        {!isTransferUnlocked ? (
+                            renderTransferComplianceGate()
+                        ) : (
+                            <>
 
                         {/* Inline Error Alert */}
                         {transferError ? (
@@ -2664,6 +2672,8 @@ export default function TransferScreen() {
 
                         {/* P2P Submit Button */}
                         {renderSubmitButton('p2p')}
+                            </>
+                        )}
                     </View>
                 )}
 
