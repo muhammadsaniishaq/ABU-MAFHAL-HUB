@@ -10,6 +10,7 @@ export interface AppSettings {
     min_app_version?: string;
     latest_app_version?: string;
     play_store_url?: string;
+    app_store_url?: string;
     apk_download_url?: string;
     app_update_message?: string;
     allow_biometrics: boolean;
@@ -39,6 +40,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     min_app_version: '1.0.4',
     latest_app_version: '1.0.4',
     play_store_url: 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub',
+    app_store_url: 'https://apps.apple.com/app/abu-mafhal-sub',
     apk_download_url: '',
     app_update_message: 'This update includes AI-optimized transaction routing, faster 0.4s processing, and enhanced account security. Please update to the latest version to continue.',
     allow_biometrics: true,

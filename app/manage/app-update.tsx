@@ -104,6 +104,7 @@ export default function AdminAppUpdate() {
   const [minAppVersion, setMinAppVersion] = useState('1.0.4');
   const [forceAppUpdate, setForceAppUpdate] = useState(false);
   const [playStoreUrl, setPlayStoreUrl] = useState(DEFAULT_PLAY_STORE_URL);
+  const [appStoreUrl, setAppStoreUrl] = useState('https://apps.apple.com/app/abu-mafhal-sub');
   const [apkDownloadUrl, setApkDownloadUrl] = useState('');
   const [appUpdateMessage, setAppUpdateMessage] = useState(AI_RELEASE_PRESETS[0].notes);
 
@@ -133,6 +134,7 @@ export default function AdminAppUpdate() {
           if (s.key === 'min_app_version') setMinAppVersion(s.value || '1.0.4');
           if (s.key === 'force_app_update') setForceAppUpdate(s.value === 'true');
           if (s.key === 'play_store_url') setPlayStoreUrl(s.value || DEFAULT_PLAY_STORE_URL);
+          if (s.key === 'app_store_url') setAppStoreUrl(s.value || 'https://apps.apple.com/app/abu-mafhal-sub');
           if (s.key === 'apk_download_url') setApkDownloadUrl(s.value || '');
           if (s.key === 'app_update_message' && s.value) setAppUpdateMessage(s.value);
         });
@@ -241,6 +243,7 @@ export default function AdminAppUpdate() {
         { key: 'min_app_version', value: minAppVersion.trim() },
         { key: 'force_app_update', value: String(forceAppUpdate) },
         { key: 'play_store_url', value: playStoreUrl.trim() },
+        { key: 'app_store_url', value: appStoreUrl.trim() },
         { key: 'apk_download_url', value: apkDownloadUrl.trim() },
         { key: 'app_update_message', value: appUpdateMessage.trim() },
       ];
@@ -527,6 +530,21 @@ export default function AdminAppUpdate() {
           </View>
 
           <View style={s.inputGroup}>
+            <Text style={s.label}>Apple App Store URL (iOS Devices)</Text>
+            <View style={s.inputWithIcon}>
+              <Ionicons name="logo-apple" size={18} color={C.navy} style={s.inputIcon} />
+              <TextInput
+                value={appStoreUrl}
+                onChangeText={setAppStoreUrl}
+                style={[s.input, { paddingLeft: 40 }]}
+                placeholder="https://apps.apple.com/app/abu-mafhal-sub"
+                placeholderTextColor={C.muted}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          <View style={s.inputGroup}>
             <Text style={s.label}>Direct APK Download Link (Optional)</Text>
             <View style={s.inputWithIcon}>
               <Ionicons name="link-outline" size={18} color={C.cyan} style={s.inputIcon} />
@@ -723,6 +741,7 @@ export default function AdminAppUpdate() {
             currentVersion={installedAppVersion}
             latestVersion={latestAppVersion}
             playStoreUrl={playStoreUrl}
+            appStoreUrl={appStoreUrl}
             apkDownloadUrl={apkDownloadUrl}
             message={appUpdateMessage}
             isForced={forceAppUpdate}

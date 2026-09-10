@@ -384,6 +384,7 @@ export default function RootLayout() {
                 currentVersion={currentAppVersion}
                 latestVersion={latestAvailableVersion}
                 playStoreUrl={settings?.play_store_url}
+                appStoreUrl={settings?.app_store_url}
                 apkDownloadUrl={settings?.apk_download_url}
                 message={settings?.app_update_message}
                 isForced={Boolean(settings?.force_app_update || isBelowMinimum)}

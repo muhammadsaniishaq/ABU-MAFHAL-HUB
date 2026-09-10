@@ -18,6 +18,7 @@ interface UpdateScreenProps {
   currentVersion?: string;
   latestVersion?: string;
   playStoreUrl?: string;
+  appStoreUrl?: string;
   apkDownloadUrl?: string;
   message?: string;
   isForced?: boolean;
@@ -26,17 +27,23 @@ interface UpdateScreenProps {
 
 const DEFAULT_PLAY_STORE_URL =
   'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub';
+const DEFAULT_APP_STORE_URL =
+  'https://apps.apple.com/app/abu-mafhal-sub';
 const ANDROID_PACKAGE_NAME = 'com.muhammmadsaniishaq.abumafhalsub';
 
 export default function UpdateScreen({
   currentVersion = '1.0.4',
   latestVersion = '1.0.5',
   playStoreUrl = DEFAULT_PLAY_STORE_URL,
+  appStoreUrl = DEFAULT_APP_STORE_URL,
   apkDownloadUrl,
   message,
   isForced = true,
   onDismiss,
 }: UpdateScreenProps) {
+  const isIOS = Platform.OS === 'ios';
+  const isAndroid = Platform.OS === 'android';
+
   const handleUpdate = async () => {
     if (Platform.OS !== 'web') {
       try {
@@ -44,9 +51,20 @@ export default function UpdateScreen({
       } catch {}
     }
 
-    const targetUrl = playStoreUrl || DEFAULT_PLAY_STORE_URL;
+    // 1. iOS App Store
+    if (isIOS) {
+      const targetUrl = appStoreUrl || DEFAULT_APP_STORE_URL;
+      try {
+        await Linking.openURL(targetUrl);
+        return;
+      } catch {
+        Linking.openURL('https://abumafhal.com.ng');
+        return;
+      }
+    }
 
-    if (Platform.OS === 'android') {
+    // 2. Android Google Play Store
+    if (isAndroid) {
       const marketUrl = `market://details?id=${ANDROID_PACKAGE_NAME}`;
       try {
         const canOpen = await Linking.canOpenURL(marketUrl);
@@ -57,8 +75,13 @@ export default function UpdateScreen({
       } catch {}
     }
 
+    // 3. Fallback / Web
+    const fallbackUrl = isIOS
+      ? (appStoreUrl || DEFAULT_APP_STORE_URL)
+      : (playStoreUrl || DEFAULT_PLAY_STORE_URL);
+
     try {
-      await Linking.openURL(targetUrl);
+      await Linking.openURL(fallbackUrl);
     } catch {
       Linking.openURL('https://abumafhal.com.ng');
     }
@@ -86,7 +109,7 @@ export default function UpdateScreen({
       } catch {}
     }
     const text = encodeURIComponent(
-      `Hello Abu Mafhal Support, I need help updating the app to the latest version (v${latestVersion}).`
+      `Hello Abu Mafhal Support, I need assistance updating the app to v${latestVersion}.`
     );
     Linking.openURL(`https://wa.me/2348145853539?text=${text}`).catch(() => {});
   };
@@ -94,13 +117,13 @@ export default function UpdateScreen({
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
-        colors={['#070D1E', '#0A1226', '#0F1A36']}
+        colors={['#060B18', '#0A1224', '#0D1832']}
         style={StyleSheet.absoluteFillObject}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
 
-      {/* Subtle Background Glow */}
+      {/* Subtle Ambient Radial Glow */}
       <View style={styles.ambientGlow} />
 
       <ScrollView
@@ -108,8 +131,9 @@ export default function UpdateScreen({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* App Icon */}
-        <View style={styles.iconContainer}>
+        {/* Compact Card Container */}
+        <View style={styles.cardContainer}>
+          {/* App Icon */}
           <View style={styles.iconFrame}>
             <Image
               source={require('../assets/images/logo-icon.png')}
@@ -117,136 +141,131 @@ export default function UpdateScreen({
               resizeMode="contain"
             />
           </View>
-        </View>
 
-        {/* Status Pill */}
-        <View style={styles.badgePill}>
-          <View style={styles.pulsingDot} />
-          <Text style={styles.badgeText}>
-            {isForced ? 'MANDATORY UPDATE' : 'UPDATE AVAILABLE'}
+          {/* Status Pill */}
+          <View style={styles.badgePill}>
+            <View style={styles.pulsingDot} />
+            <Text style={styles.badgeText}>
+              {isForced ? 'MANDATORY UPDATE' : 'NEW VERSION AVAILABLE'}
+            </Text>
+          </View>
+
+          {/* Headline & Subtitle */}
+          <Text style={styles.title}>
+            {isForced ? 'Update Required' : 'New Version Available'}
           </Text>
-        </View>
+          <Text style={styles.subtitle}>
+            {isIOS
+              ? 'A new version with performance & security updates is available on the App Store.'
+              : 'A new version with performance & security updates is available on Google Play.'}
+          </Text>
 
-        {/* Heading & Subtitle */}
-        <Text style={styles.title}>
-          {isForced ? 'Update Required' : 'New Version Available'}
-        </Text>
-        <Text style={styles.subtitle}>
-          A new version of Abu Mafhal Sub is now available on Google Play with enhanced performance and security upgrades.
-        </Text>
-
-        {/* Version Compare Card */}
-        <View style={styles.versionCard}>
-          <View style={styles.versionColumn}>
-            <Text style={styles.versionLabel}>Installed</Text>
-            <Text style={styles.versionOldValue}>v{currentVersion}</Text>
-          </View>
-
-          <View style={styles.arrowBox}>
-            <Ionicons name="arrow-forward" size={16} color="#D97706" />
-          </View>
-
-          <View style={styles.versionColumn}>
-            <Text style={styles.versionLabel}>Latest</Text>
-            <Text style={styles.versionNewValue}>v{latestVersion}</Text>
-          </View>
-        </View>
-
-        {/* Highlights List */}
-        <View style={styles.featuresCard}>
-          <View style={styles.featureRow}>
-            <View style={[styles.featureIcon, { backgroundColor: 'rgba(217, 119, 6, 0.15)' }]}>
-              <Ionicons name="flash" size={16} color="#F59E0B" />
+          {/* Compact Version Diff */}
+          <View style={styles.versionBar}>
+            <View style={styles.versionCol}>
+              <Text style={styles.versionLabel}>Current</Text>
+              <Text style={styles.versionOldVal}>v{currentVersion}</Text>
             </View>
-            <View style={styles.featureTextCol}>
-              <Text style={styles.featureTitle}>AI Smart Dispatch</Text>
-              <Text style={styles.featureDesc}>Sub-second 0.4s transaction processing across all networks.</Text>
+
+            <View style={styles.versionArrow}>
+              <Ionicons name="arrow-forward" size={14} color="#D97706" />
+            </View>
+
+            <View style={styles.versionCol}>
+              <Text style={styles.versionLabel}>Latest</Text>
+              <Text style={styles.versionNewVal}>v{latestVersion}</Text>
             </View>
           </View>
 
-          <View style={styles.featureRow}>
-            <View style={[styles.featureIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-              <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+          {/* 3 Compact Feature Pills */}
+          <View style={styles.featurePillsRow}>
+            <View style={styles.featurePill}>
+              <Ionicons name="flash" size={11} color="#F59E0B" />
+              <Text style={styles.featurePillText}>0.4s Turbo Speed</Text>
             </View>
-            <View style={styles.featureTextCol}>
-              <Text style={styles.featureTitle}>Advanced 2FA Security</Text>
-              <Text style={styles.featureDesc}>Bank-grade 256-bit encryption with biometric authentication.</Text>
+            <View style={styles.featurePill}>
+              <Ionicons name="shield-checkmark" size={11} color="#10B981" />
+              <Text style={styles.featurePillText}>2FA Security</Text>
             </View>
-          </View>
-
-          <View style={[styles.featureRow, { marginBottom: 0 }]}>
-            <View style={[styles.featureIcon, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
-              <Ionicons name="hardware-chip" size={16} color="#38BDF8" />
-            </View>
-            <View style={styles.featureTextCol}>
-              <Text style={styles.featureTitle}>System Stability & Fixes</Text>
-              <Text style={styles.featureDesc}>Optimized user interface with automatic status sync.</Text>
+            <View style={styles.featurePill}>
+              <Ionicons name="git-network" size={11} color="#38BDF8" />
+              <Text style={styles.featurePillText}>AI Smart Route</Text>
             </View>
           </View>
-        </View>
 
-        {/* Optional Custom Release Note from Admin */}
-        {message ? (
-          <View style={styles.notesCard}>
-            <View style={styles.notesHeader}>
-              <Ionicons name="document-text-outline" size={15} color="#D97706" />
-              <Text style={styles.notesTitle}>Release Notes</Text>
+          {/* Optional Message from Admin */}
+          {message ? (
+            <View style={styles.messageBox}>
+              <Ionicons name="information-circle-outline" size={14} color="#D97706" style={{ marginTop: 1 }} />
+              <Text style={styles.messageText} numberOfLines={3}>
+                {message}
+              </Text>
             </View>
-            <Text style={styles.notesBody}>{message}</Text>
-          </View>
-        ) : null}
+          ) : null}
 
-        {/* Primary Action Button: Google Play Store */}
-        <TouchableOpacity
-          style={styles.primaryButton}
-          activeOpacity={0.9}
-          onPress={handleUpdate}
-        >
-          <LinearGradient
-            colors={['#D97706', '#B45309']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.primaryGradient}
-          >
-            <Ionicons name="logo-google-playstore" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-            <Text style={styles.primaryButtonText}>UPDATE ON GOOGLE PLAY</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Optional Secondary Action: Direct APK */}
-        {apkDownloadUrl ? (
+          {/* Primary Platform Button: App Store for iOS vs Google Play for Android */}
           <TouchableOpacity
-            style={styles.secondaryButton}
-            activeOpacity={0.8}
-            onPress={handleDownloadApk}
+            style={styles.primaryButton}
+            activeOpacity={0.88}
+            onPress={handleUpdate}
           >
-            <Ionicons name="download-outline" size={18} color="#38BDF8" style={{ marginRight: 8 }} />
-            <Text style={styles.secondaryButtonText}>Direct APK Download</Text>
+            <LinearGradient
+              colors={['#D97706', '#B45309']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.primaryGradient}
+            >
+              {isIOS ? (
+                <Ionicons name="logo-apple" size={19} color="#FFFFFF" style={{ marginRight: 8 }} />
+              ) : (
+                <Ionicons name="logo-google-playstore" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+              )}
+              <Text style={styles.primaryButtonText}>
+                {isIOS ? 'UPDATE ON APP STORE' : 'UPDATE ON GOOGLE PLAY'}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
-        ) : null}
 
-        {/* WhatsApp Support Link */}
-        <TouchableOpacity
-          style={styles.supportButton}
-          activeOpacity={0.75}
-          onPress={handleSupport}
-        >
-          <Ionicons name="logo-whatsapp" size={16} color="#25D366" style={{ marginRight: 6 }} />
-          <Text style={styles.supportButtonText}>Need Help? Contact Support</Text>
-        </TouchableOpacity>
+          {/* Direct APK Download for Android/Web if provided */}
+          {!isIOS && apkDownloadUrl ? (
+            <TouchableOpacity
+              style={styles.apkButton}
+              activeOpacity={0.8}
+              onPress={handleDownloadApk}
+            >
+              <Ionicons name="download-outline" size={15} color="#38BDF8" style={{ marginRight: 6 }} />
+              <Text style={styles.apkButtonText}>Direct APK Download (.apk)</Text>
+            </TouchableOpacity>
+          ) : null}
 
-        {/* Optional Dismiss if update is not forced */}
-        {!isForced && onDismiss && (
-          <TouchableOpacity style={styles.laterButton} onPress={onDismiss} activeOpacity={0.7}>
-            <Text style={styles.laterButtonText}>Remind Me Later</Text>
-          </TouchableOpacity>
-        )}
+          {/* Bottom Action Row: WhatsApp Support & Later */}
+          <View style={styles.bottomLinksRow}>
+            <TouchableOpacity
+              style={styles.supportLink}
+              activeOpacity={0.7}
+              onPress={handleSupport}
+            >
+              <Ionicons name="logo-whatsapp" size={14} color="#25D366" style={{ marginRight: 4 }} />
+              <Text style={styles.supportLinkText}>WhatsApp Support</Text>
+            </TouchableOpacity>
 
-        {/* Verified Footer */}
+            {!isForced && onDismiss && (
+              <TouchableOpacity
+                style={styles.laterLink}
+                activeOpacity={0.7}
+                onPress={onDismiss}
+              >
+                <Text style={styles.laterLinkText}>Remind Later</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Discreet Footer */}
         <View style={styles.footerWrap}>
-          <Ionicons name="shield-checkmark" size={12} color="#64748B" style={{ marginRight: 5 }} />
+          <Ionicons name="shield-checkmark" size={11} color="#64748B" style={{ marginRight: 4 }} />
           <Text style={styles.footerText}>
-            Abu Mafhal Ltd (RC-8979939) • Official Release
+            Abu Mafhal Ltd (RC-8979939) • Verified Release
           </Text>
         </View>
       </ScrollView>
@@ -257,259 +276,257 @@ export default function UpdateScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#070D1E',
+    backgroundColor: '#060B18',
   },
   ambientGlow: {
     position: 'absolute',
-    top: -60,
+    top: '15%',
     alignSelf: 'center',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(217, 119, 6, 0.12)',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(217, 119, 6, 0.08)',
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 40,
+    flexGrow: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
-  iconContainer: {
-    marginBottom: 16,
+  cardContainer: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 8,
   },
   iconFrame: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
+    width: 68,
+    height: 68,
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    marginBottom: 12,
     borderWidth: 2,
     borderColor: '#D97706',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
   logoImage: {
-    width: 60,
-    height: 60,
+    width: 48,
+    height: 48,
   },
   badgePill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(217, 119, 6, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.35)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    marginBottom: 14,
+    borderColor: 'rgba(217, 119, 6, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 3.5,
+    borderRadius: 16,
+    marginBottom: 10,
   },
   pulsingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#10B981',
-    marginRight: 8,
+    marginRight: 6,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
     color: '#D97706',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   title: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '900',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
     color: '#94A3B8',
     textAlign: 'center',
-    marginBottom: 20,
-    maxWidth: 320,
+    marginBottom: 14,
+    paddingHorizontal: 8,
   },
-  versionCard: {
+  versionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     width: '100%',
-    marginBottom: 18,
+    marginBottom: 12,
   },
-  versionColumn: {
+  versionCol: {
     alignItems: 'center',
     flex: 1,
   },
   versionLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: '#64748B',
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  versionOldValue: {
-    fontSize: 13,
+  versionOldVal: {
+    fontSize: 12,
     fontWeight: '800',
     color: '#EF4444',
   },
-  versionNewValue: {
-    fontSize: 13,
+  versionNewVal: {
+    fontSize: 12,
     fontWeight: '800',
     color: '#10B981',
   },
-  arrowBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  versionArrow: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: 'rgba(217, 119, 6, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featuresCard: {
-    width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  featureRow: {
+  featurePillsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    width: '100%',
     marginBottom: 12,
   },
-  featureIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  featureTextCol: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  featureDesc: {
-    fontSize: 11,
-    color: '#94A3B8',
-    lineHeight: 15,
-  },
-  notesCard: {
-    width: '100%',
-    backgroundColor: 'rgba(217, 119, 6, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.2)',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 18,
-  },
-  notesHeader: {
+  featurePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
   },
-  notesTitle: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#D97706',
-    textTransform: 'uppercase',
-  },
-  notesBody: {
-    fontSize: 12,
-    lineHeight: 17,
+  featurePillText: {
+    fontSize: 9.5,
+    fontWeight: '700',
     color: '#E2E8F0',
+  },
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(217, 119, 6, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(217, 119, 6, 0.18)',
+    borderRadius: 10,
+    padding: 8,
+    gap: 6,
+    width: '100%',
+    marginBottom: 12,
+  },
+  messageText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 15,
+    color: '#CBD5E1',
   },
   primaryButton: {
     width: '100%',
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 12,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 10,
   },
   primaryGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
   },
   primaryButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 0.4,
   },
-  secondaryButton: {
+  apkButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
     backgroundColor: 'rgba(56, 189, 248, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.25)',
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 12,
+    borderColor: 'rgba(56, 189, 248, 0.22)',
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginBottom: 10,
   },
-  secondaryButtonText: {
-    fontSize: 12.5,
+  apkButtonText: {
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#38BDF8',
   },
-  supportButton: {
+  bottomLinksRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    marginBottom: 8,
+    gap: 16,
+    marginTop: 2,
   },
-  supportButtonText: {
-    fontSize: 12,
+  supportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  supportLinkText: {
+    fontSize: 11.5,
     fontWeight: '600',
     color: '#94A3B8',
   },
-  laterButton: {
-    paddingVertical: 8,
-    marginBottom: 8,
+  laterLink: {
+    paddingVertical: 4,
   },
-  laterButtonText: {
-    fontSize: 12,
-    color: '#64748B',
+  laterLinkText: {
+    fontSize: 11.5,
     fontWeight: '600',
+    color: '#64748B',
     textDecorationLine: 'underline',
   },
   footerWrap: {
-    marginTop: 10,
+    marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   footerText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '600',
     color: '#64748B',
   },
