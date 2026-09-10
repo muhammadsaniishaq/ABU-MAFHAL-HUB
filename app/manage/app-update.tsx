@@ -107,6 +107,7 @@ export default function AdminAppUpdate() {
   const [appStoreUrl, setAppStoreUrl] = useState('https://apps.apple.com/app/abu-mafhal-sub');
   const [apkDownloadUrl, setApkDownloadUrl] = useState('');
   const [appUpdateMessage, setAppUpdateMessage] = useState(AI_RELEASE_PRESETS[0].notes);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   // Push Broadcast Configuration
   const [broadcastPush, setBroadcastPush] = useState(true);
@@ -137,6 +138,21 @@ export default function AdminAppUpdate() {
           if (s.key === 'app_store_url') setAppStoreUrl(s.value || 'https://apps.apple.com/app/abu-mafhal-sub');
           if (s.key === 'apk_download_url') setApkDownloadUrl(s.value || '');
           if (s.key === 'app_update_message' && s.value) setAppUpdateMessage(s.value);
+          if (s.key === 'app_logo_icon' || s.key === 'app_logo') {
+            const raw = s.value;
+            if (typeof raw === 'string') {
+              if (raw.startsWith('{')) {
+                try {
+                  const p = JSON.parse(raw);
+                  if (p.url) setLogoUrl(p.url);
+                } catch {}
+              } else if (raw.startsWith('http') || raw.startsWith('data:')) {
+                setLogoUrl(raw);
+              }
+            } else if (raw && typeof raw === 'object' && raw.url) {
+              setLogoUrl(raw.url);
+            }
+          }
         });
       }
     } catch (err: any) {
@@ -726,14 +742,14 @@ export default function AdminAppUpdate() {
         animationType="slide"
         onRequestClose={() => setShowPreviewModal(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#070D1E' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
           <View style={s.modalCloseBar}>
             <Text style={s.modalCloseTitle}>LIVE PREVIEW</Text>
             <TouchableOpacity
               onPress={() => setShowPreviewModal(false)}
               style={s.modalCloseBtn}
             >
-              <Ionicons name="close-circle" size={24} color="#FFFFFF" />
+              <Ionicons name="close-circle" size={24} color="#64748B" />
             </TouchableOpacity>
           </View>
 
@@ -745,6 +761,7 @@ export default function AdminAppUpdate() {
             apkDownloadUrl={apkDownloadUrl}
             message={appUpdateMessage}
             isForced={forceAppUpdate}
+            logoUrl={logoUrl}
             onDismiss={() => setShowPreviewModal(false)}
           />
         </SafeAreaView>
@@ -1074,15 +1091,15 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#070D1E',
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: '#E2E8F0',
   },
   modalCloseTitle: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '800',
-    color: C.gold,
+    color: '#0F172A',
     letterSpacing: 0.5,
   },
   modalCloseBtn: {

@@ -388,6 +388,7 @@ export default function RootLayout() {
                 apkDownloadUrl={settings?.apk_download_url}
                 message={settings?.app_update_message}
                 isForced={Boolean(settings?.force_app_update || isBelowMinimum)}
+                logoUrl={settings?.app_logo_icon || settings?.app_logo}
             />
         );
     }
