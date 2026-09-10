@@ -218,6 +218,7 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                             const { error: profErr } = await supabase
                                 .from('profiles')
                                 .update({
+                                    kyc_tier: Math.max(item.profiles?.kyc_tier || 1, 3),
                                     transfer_status: 'approved',
                                     transfer_approved: true,
                                     transfer_approved_at: now.toISOString(),

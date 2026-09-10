@@ -387,6 +387,7 @@ export default function TransferScreen() {
     // Prevents false "locked" flash before user data arrives
     const [userKycTier, setUserKycTier] = useState<number | null>(null);
     const [userStatus, setUserStatus] = useState<string>('active');
+    const [userRole, setUserRole] = useState<string>('user');
 
     // Transfer Access & Compliance States (Tier 3 Prerequisite + Admin Approval + 24hr Cooldown)
     const [transferStatus, setTransferStatus] = useState<string>('not_applied'); // 'not_applied' | 'pending' | 'approved' | 'rejected'
@@ -423,10 +424,11 @@ export default function TransferScreen() {
     };
 
     // Derived KYC & Transfer Access States
+    const isStaff = userRole === 'admin' || userRole === 'super_admin';
     const isKycLoading = userKycTier === null;
-    const isTier3Qualified = userKycTier !== null && userKycTier >= 3;
-    const isTransferUnlocked = isTier3Qualified && transferStatus === 'approved' && transferApproved === true && cooldownRemainingSeconds <= 0;
-    const isTransferCooldownActive = isTier3Qualified && transferStatus === 'approved' && cooldownRemainingSeconds > 0;
+    const isTier3Qualified = (userKycTier !== null && userKycTier >= 3) || isStaff;
+    const isTransferUnlocked = (isTier3Qualified && transferStatus === 'approved' && transferApproved === true && cooldownRemainingSeconds <= 0) || (isStaff && transferApproved === true);
+    const isTransferCooldownActive = !isStaff && isTier3Qualified && transferStatus === 'approved' && cooldownRemainingSeconds > 0;
     const isTransferPending = isTier3Qualified && transferStatus === 'pending';
     const isTransferRejected = isTier3Qualified && transferStatus === 'rejected';
     const isTransferNotApplied = !isTransferPending && !isTransferRejected && !isTransferCooldownActive && !isTransferUnlocked;
@@ -555,7 +557,7 @@ export default function TransferScreen() {
                 checkDeviceVerification(user.id);
                 const { data } = await supabase
                     .from('profiles')
-                    .select('balance, full_name, kyc_tier, status, transfer_status, transfer_approved, transfer_approved_at, transfer_unlock_at, transfer_rejection_reason')
+                    .select('balance, full_name, kyc_tier, status, role, transfer_status, transfer_approved, transfer_approved_at, transfer_unlock_at, transfer_rejection_reason')
                     .eq('id', user.id)
                     .single();
                 if (data) {
@@ -564,6 +566,7 @@ export default function TransferScreen() {
                     // ✅ Set confirmed tier from DB — clears the null loading state
                     setUserKycTier(Number(data.kyc_tier) || 1);
                     setUserStatus(data.status || 'active');
+                    setUserRole(data.role || 'user');
                     setTransferStatus(data.transfer_status || 'not_applied');
                     setTransferApproved(Boolean(data.transfer_approved));
                     setTransferUnlockAt(data.transfer_unlock_at || null);
@@ -571,6 +574,7 @@ export default function TransferScreen() {
                 } else {
                     // DB returned nothing — safe default
                     setUserKycTier(1);
+                    setUserRole('user');
                     setTransferStatus('not_applied');
                     setTransferApproved(false);
                     setTransferUnlockAt(null);
@@ -582,8 +586,8 @@ export default function TransferScreen() {
                 setCurrentUserEmail('');
                 setIsDeviceVerified(null);
                 setShowDevice2FAModal(false);
-                setUserKycTier(null);
-                setUserBalance(0);
+                setUserKycTier(1);
+                setUserRole('user');
                 setTransferStatus('not_applied');
                 setTransferApproved(false);
                 setTransferUnlockAt(null);
@@ -624,6 +628,15 @@ export default function TransferScreen() {
             fetchUserData();
         }, [])
     );
+
+    // Initial mount fetch and 2.5s fallback to prevent indefinite loading splash
+    useEffect(() => {
+        fetchUserData();
+        const fallbackTimer = setTimeout(() => {
+            setIsDeviceVerified((prev) => (prev === null ? false : prev));
+        }, 2500);
+        return () => clearTimeout(fallbackTimer);
+    }, []);
 
     // Load Banks List on Mount
     useEffect(() => {

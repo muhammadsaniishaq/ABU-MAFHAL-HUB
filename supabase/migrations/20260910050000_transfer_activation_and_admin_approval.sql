@@ -12,6 +12,7 @@ ADD COLUMN IF NOT EXISTS transfer_rejection_reason text;
 -- Auto-approve existing super_admin and admin roles so staff are not blocked
 UPDATE public.profiles
 SET 
+  kyc_tier = 3,
   transfer_status = 'approved',
   transfer_approved = true,
   transfer_approved_at = now(),
@@ -131,19 +132,20 @@ begin
     raise exception 'Your account is currently restricted. Withdrawals and transfers are disabled.';
   end if;
 
-  -- STRICT TIER 3 PREREQUISITE
-  if v_user_tier < 3 then
+  -- STRICT TIER 3 PREREQUISITE (Staff / Admins exempt)
+  if v_user_tier < 3 and not public.is_admin() then
     raise exception 'Transfer locked: In compliance with financial security regulations, you must upgrade your account to Tier 3 before you can apply for or use transfer privileges.';
   end if;
 
-  -- STRICT ADMIN APPROVAL REQUIREMENT
-  if v_transfer_status != 'approved' or not v_transfer_approved then
-    raise exception 'Transfer Access Locked: Your transfer privileges have not been approved by an administrator. Please submit a transfer activation request.';
+  -- STRICT ADMIN APPROVAL REQUIREMENT (Staff / Admins exempt)
+  if (v_transfer_status != 'approved' or not v_transfer_approved) and not public.is_admin() then
+    raise exception 'Transfer locked: Your transfer access application is either pending review or has not yet been approved by compliance administration.';
   end if;
 
-  -- MANDATORY 24-HOUR MATURATION COOLDOWN
-  if v_transfer_unlock_at is not null and now() < v_transfer_unlock_at then
-    raise exception 'Transfer Security Cooldown Active: Your transfer privileges are in the mandatory 24-hour security maturation period. Transfers will unlock at % (UTC).', v_transfer_unlock_at;
+  -- 24-HOUR MATURATION COOLDOWN REQUIREMENT (Staff / Admins exempt)
+  if v_transfer_unlock_at is not null and now() < v_transfer_unlock_at and not public.is_admin() then
+    raise exception 'Security maturation period active. For account safety, transfers unlock in %.', 
+      to_char(v_transfer_unlock_at - now(), 'HH24 hours MI minutes');
   end if;
 
   if v_current_bal is null or v_current_bal < v_total_debit then
@@ -249,18 +251,18 @@ begin
     raise exception 'Your account is currently restricted. Transfers are disabled. Please contact customer support.';
   end if;
 
-  -- STRICT TIER 3 PREREQUISITE
-  if sender_tier < 3 then
+  -- STRICT TIER 3 PREREQUISITE (Staff / Admins exempt)
+  if sender_tier < 3 and not public.is_admin() then
     raise exception 'Transfer locked: In compliance with financial regulations, you must upgrade your account to Tier 3 before you can apply for or use transfer privileges.';
   end if;
 
-  -- STRICT ADMIN APPROVAL REQUIREMENT
-  if sender_transfer_status != 'approved' or not sender_transfer_approved then
+  -- STRICT ADMIN APPROVAL REQUIREMENT (Staff / Admins exempt)
+  if (sender_transfer_status != 'approved' or not sender_transfer_approved) and not public.is_admin() then
     raise exception 'Transfer Access Locked: Your transfer privileges have not been approved by an administrator. Please submit a transfer activation request.';
   end if;
 
-  -- MANDATORY 24-HOUR MATURATION COOLDOWN
-  if sender_transfer_unlock_at is not null and now() < sender_transfer_unlock_at then
+  -- MANDATORY 24-HOUR MATURATION COOLDOWN (Staff / Admins exempt)
+  if sender_transfer_unlock_at is not null and now() < sender_transfer_unlock_at and not public.is_admin() then
     raise exception 'Transfer Security Cooldown Active: Your transfer privileges are in the mandatory 24-hour security maturation period. Transfers will unlock at % (UTC).', sender_transfer_unlock_at;
   end if;
 
