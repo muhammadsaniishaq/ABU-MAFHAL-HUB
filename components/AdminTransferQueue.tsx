@@ -155,8 +155,14 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                 const occ = (item.occupation || '').toLowerCase();
                 const emp = (item.employer_business_name || '').toLowerCase();
                 const idNum = (item.id_number || '').toLowerCase();
+                const bvn = (item.bvn || '').toLowerCase();
+                const cat = (item.account_category || '').toLowerCase();
+                const destBank = (item.destination_bank || '').toLowerCase();
+                const destAcc = (item.destination_account_number || '').toLowerCase();
 
-                const match = name.includes(q) || email.includes(q) || phone.includes(q) || occ.includes(q) || emp.includes(q) || idNum.includes(q);
+                const match = name.includes(q) || email.includes(q) || phone.includes(q) ||
+                              occ.includes(q) || emp.includes(q) || idNum.includes(q) ||
+                              bvn.includes(q) || cat.includes(q) || destBank.includes(q) || destAcc.includes(q);
                 if (!match) return false;
             }
 
@@ -392,6 +398,27 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                                     TIER {profile?.kyc_tier ?? 3}
                                 </Text>
                             </View>
+                            {item.account_category && (
+                                <View style={{ backgroundColor: item.account_category === 'Corporate' ? '#F3E8FF' : '#E0F2FE', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 0.8, borderColor: item.account_category === 'Corporate' ? '#C084FC' : '#7DD3FC' }}>
+                                    <Text style={{ fontSize: 8, fontWeight: '900', color: item.account_category === 'Corporate' ? '#7E22CE' : '#0369A1' }}>
+                                        {item.account_category.toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+                            {item.bvn ? (
+                                <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 0.8, borderColor: L.emeraldBorder }}>
+                                    <Text style={{ fontSize: 8, fontWeight: '900', color: L.emerald }}>
+                                        BVN ✓
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {item.pep_declared ? (
+                                <View style={{ backgroundColor: L.roseBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 0.8, borderColor: L.roseBorder }}>
+                                    <Text style={{ fontSize: 8, fontWeight: '900', color: L.rose }}>
+                                        PEP ⚠️
+                                    </Text>
+                                </View>
+                            ) : null}
                         </View>
                         <Text style={{ fontSize: 10, color: L.textMuted, marginTop: 2 }}>
                             {item.email || profile?.email || item.phone || profile?.phone}
@@ -441,6 +468,14 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                             <Text style={{ fontSize: 10, color: L.textMuted, fontWeight: '600' }}>CAC Reg. Number:</Text>
                             <Text style={{ fontSize: 10, color: L.goldAmber, fontWeight: '900' }}>
                                 {item.cac_number}
+                            </Text>
+                        </View>
+                    ) : null}
+                    {item.destination_bank ? (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 10, color: L.textMuted, fontWeight: '600' }}>Settlement Bank:</Text>
+                            <Text style={{ fontSize: 10, color: L.navyHeader, fontWeight: '800' }}>
+                                {item.destination_bank} • {item.destination_account_number || ''}
                             </Text>
                         </View>
                     ) : null}
@@ -685,12 +720,33 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                                         <Text style={{ fontSize: 11, color: L.textMuted, marginTop: 2 }}>
                                             Phone: {selectedRequest.phone || selectedRequest.profiles?.phone} • Email: {selectedRequest.email || selectedRequest.profiles?.email}
                                         </Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                                             <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
                                                 <Text style={{ fontSize: 9, fontWeight: '900', color: L.emerald }}>
                                                     TIER {selectedRequest.profiles?.kyc_tier ?? 3} VERIFIED
                                                 </Text>
                                             </View>
+                                            {selectedRequest.account_category && (
+                                                <View style={{ backgroundColor: selectedRequest.account_category === 'Corporate' ? '#F3E8FF' : '#E0F2FE', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: selectedRequest.account_category === 'Corporate' ? '#C084FC' : '#7DD3FC' }}>
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: selectedRequest.account_category === 'Corporate' ? '#7E22CE' : '#0369A1' }}>
+                                                        {selectedRequest.account_category.toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            {selectedRequest.bvn ? (
+                                                <View style={{ backgroundColor: L.goldLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.goldDk }}>
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: L.goldAmber }}>
+                                                        BVN: {selectedRequest.bvn}
+                                                    </Text>
+                                                </View>
+                                            ) : null}
+                                            {selectedRequest.pep_declared ? (
+                                                <View style={{ backgroundColor: L.roseBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.roseBorder }}>
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: L.rose }}>
+                                                        PEP DECLARED ⚠️
+                                                    </Text>
+                                                </View>
+                                            ) : null}
                                             <Text style={{ fontSize: 10, color: L.textSecondary, fontWeight: '700' }}>
                                                 Balance: ₦{Number(selectedRequest.profiles?.balance || 0).toLocaleString()}
                                             </Text>
@@ -705,8 +761,70 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                                         </Text>
                                     </View>
 
-                                    {/* Detailed Sections */}
-                                    <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, textTransform: 'uppercase', marginBottom: 6 }}>Financial & Employment</Text>
+                                    {/* Section 1: Account & Regulatory KYC */}
+                                    <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, textTransform: 'uppercase', marginBottom: 6 }}>Regulatory & KYC Identity</Text>
+                                    <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10, gap: 6, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Account Classification:</Text>
+                                            <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800' }}>{selectedRequest.account_category || 'Individual / Personal'}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Bank Verification No (BVN):</Text>
+                                            <Text style={{ fontSize: 10, color: selectedRequest.bvn ? L.goldAmber : L.textMuted, fontWeight: '900' }}>
+                                                {selectedRequest.bvn || 'Not Supplied'}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Govt. ID Document:</Text>
+                                            <Text style={{ fontSize: 10, color: L.navyHeader, fontWeight: '900' }}>
+                                                {selectedRequest.id_type?.toUpperCase()}: {selectedRequest.id_number}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Security Challenge Word:</Text>
+                                            <Text style={{ fontSize: 10, color: selectedRequest.security_secret_word ? L.textPrimary : L.textMuted, fontWeight: '800' }}>
+                                                {selectedRequest.security_secret_word || 'None Provided'}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: '#E2E8F0', paddingTop: 6, marginTop: 2 }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>PEP Declaration:</Text>
+                                            <Text style={{ fontSize: 10, color: selectedRequest.pep_declared ? L.rose : L.emerald, fontWeight: '900' }}>
+                                                {selectedRequest.pep_declared ? '⚠️ Politically Exposed Person (PEP)' : 'Standard / Non-PEP Confirmed'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Section 2: Settlement / Beneficiary Account */}
+                                    <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, textTransform: 'uppercase', marginBottom: 6 }}>Designated Settlement Bank</Text>
+                                    <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10, gap: 6, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Destination Bank:</Text>
+                                            <Text style={{ fontSize: 10, color: L.navyHeader, fontWeight: '900' }}>
+                                                {selectedRequest.destination_bank || 'Not Specified'}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Account Number (NUBAN):</Text>
+                                            <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800' }}>
+                                                {selectedRequest.destination_account_number || 'N/A'}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Account Beneficiary Name:</Text>
+                                            <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800' }}>
+                                                {selectedRequest.destination_account_name || 'N/A'}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: '#E2E8F0', paddingTop: 6, marginTop: 2 }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>Daily Transfer Frequency:</Text>
+                                            <Text style={{ fontSize: 10, color: L.emerald, fontWeight: '900' }}>
+                                                {selectedRequest.daily_transfer_frequency || '1 - 5 transfers/day'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Section 3: Financial & Employment */}
+                                    <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, textTransform: 'uppercase', marginBottom: 6 }}>Financial & Employment Profile</Text>
                                     <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10, gap: 6, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                             <Text style={{ fontSize: 10, color: L.textMuted }}>Occupation:</Text>
@@ -744,6 +862,7 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                                         </View>
                                     </View>
 
+                                    {/* Section 4: Residential Address */}
                                     <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, textTransform: 'uppercase', marginBottom: 6 }}>Residential Address</Text>
                                     <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10, gap: 6, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                                         <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800' }}>{selectedRequest.residential_address}</Text>
@@ -753,7 +872,8 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                                         )}
                                     </View>
 
-                                    <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, textTransform: 'uppercase', marginBottom: 6 }}>Next of Kin & Identification</Text>
+                                    {/* Section 5: Next of Kin */}
+                                    <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, textTransform: 'uppercase', marginBottom: 6 }}>Next of Kin & AML Confirmation</Text>
                                     <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10, gap: 6, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                             <Text style={{ fontSize: 10, color: L.textMuted }}>Next of Kin Name:</Text>
@@ -767,13 +887,15 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                                             <Text style={{ fontSize: 10, color: L.textMuted }}>Phone Number:</Text>
                                             <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800' }}>{selectedRequest.next_of_kin_phone}</Text>
                                         </View>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: '#E2E8F0', paddingTop: 6, marginTop: 4 }}>
-                                            <Text style={{ fontSize: 10, color: L.textMuted }}>ID Type & Number:</Text>
-                                            <Text style={{ fontSize: 10, color: L.navyHeader, fontWeight: '900' }}>
-                                                {selectedRequest.id_type?.toUpperCase()}: {selectedRequest.id_number}
-                                            </Text>
-                                        </View>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                        {selectedRequest.next_of_kin_address && (
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                <Text style={{ fontSize: 10, color: L.textMuted }}>Contact Address:</Text>
+                                                <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800', flex: 1, textAlign: 'right', marginLeft: 8 }}>
+                                                    {selectedRequest.next_of_kin_address}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, borderTopWidth: 1, borderColor: '#E2E8F0', paddingTop: 6 }}>
                                             <Ionicons name="checkmark-circle" size={14} color={L.emerald} />
                                             <Text style={{ fontSize: 9, color: L.emerald, fontWeight: '800' }}>AML / Anti-Fraud Legal Terms Accepted</Text>
                                         </View>
