@@ -875,6 +875,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: Platform.OS === 'ios' ? 4 : 8,
         paddingBottom: 24,
+        ...(Platform.OS === 'web' ? {
+            maxWidth: 480,
+            width: '100%',
+            alignSelf: 'center',
+        } : {}),
     },
     topControlRow: {
         flexDirection: 'row',

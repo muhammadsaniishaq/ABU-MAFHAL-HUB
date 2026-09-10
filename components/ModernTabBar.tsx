@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Platform, TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Platform, TouchableOpacity, Text, StyleSheet, Dimensions, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +18,12 @@ const { width } = Dimensions.get('window');
 
 export default function ModernTabBar({ state, descriptors, navigation }: any) {
     const router = useRouter();
+    const { width: windowWidth } = useWindowDimensions();
+
+    // On Desktop and Tablet web, the rich sidebar is displayed instead of the bottom tab bar
+    if (Platform.OS === 'web' && windowWidth >= 768) {
+        return null;
+    }
 
     const activeRoute = state.routes[state.index];
     const { options: activeOptions } = descriptors[activeRoute?.key || ''];

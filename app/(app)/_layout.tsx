@@ -1,6 +1,6 @@
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { View, Platform, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Animated, Linking } from 'react-native';
+import { View, Platform, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Animated, Linking, useWindowDimensions } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import SecurityModal from '../../components/SecurityModal';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import ModernTabBar from '../../components/ModernTabBar';
+import WebDesktopSidebar from '../../components/WebDesktopSidebar';
+import WebDesktopHeader from '../../components/WebDesktopHeader';
 import { useAppSettings } from '../../hooks/useAppSettings';
 
 const LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
@@ -16,11 +18,14 @@ export default function AppLayout() {
     const router = useRouter();
     const pathname = usePathname();
     const { settings } = useAppSettings();
+    const { width } = useWindowDimensions();
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isFabOpen, setIsFabOpen] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     usePushNotifications(); // Register for push notifications
 
-    const hideFab = pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/');
+    const isDesktopWeb = Platform.OS === 'web' && width >= 768;
+    const hideFab = isDesktopWeb || pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/');
 
     useEffect(() => {
         // AI Button Pulse Animation
@@ -43,41 +48,75 @@ export default function AppLayout() {
         AsyncStorage.setItem('last_security_verification_time', String(Date.now())).catch(err => console.log(err));
     }, []);
 
+    const tabsComponent = (
+        <Tabs
+            tabBar={(props) => <ModernTabBar {...props} />}
+            screenOptions={{
+                headerShown: false,
+            }}
+        >
+            <Tabs.Screen name="dashboard" options={{ title: 'Home' }} />
+            <Tabs.Screen name="wallet" options={{ title: 'Wallet' }} />
+            <Tabs.Screen name="qr-pay" options={{ title: 'QR Pay' }} />
+            <Tabs.Screen name="history" options={{ title: 'History' }} />
+            <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+            
+            {/* Hidden service screens - tab bar will show when these are active */}
+            <Tabs.Screen name="referrals" options={{ href: null }} />
+            <Tabs.Screen name="social-boost" options={{ href: null }} />
+            <Tabs.Screen name="social-orders" options={{ href: null }} />
+            <Tabs.Screen name="data" options={{ href: null }} />
+            <Tabs.Screen name="airtime" options={{ href: null }} />
+            <Tabs.Screen name="airtime-to-cash" options={{ href: null }} />
+            <Tabs.Screen name="bills" options={{ href: null }} />
+            <Tabs.Screen name="education" options={{ href: null }} />
+            <Tabs.Screen name="bvn-services/index" options={{ href: null }} />
+            <Tabs.Screen name="nin-services/index" options={{ href: null }} />
+            <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="kyc" options={{ href: null }} />
+            <Tabs.Screen name="virtual-cards" options={{ href: null }} />
+            <Tabs.Screen name="transfer" options={{ href: null }} />
+            <Tabs.Screen name="saved-cards" options={{ href: null }} />
+            <Tabs.Screen name="beneficiaries" options={{ href: null }} />
+            <Tabs.Screen name="support" options={{ href: null }} />
+            <Tabs.Screen name="cac-services" options={{ href: null }} />
+            <Tabs.Screen name="cac-history" options={{ href: null }} />
+            <Tabs.Screen name="bulk-sms" options={{ href: null }} />
+            <Tabs.Screen name="recharge-pin" options={{ href: null }} />
+            <Tabs.Screen name="smile" options={{ href: null }} />
+            <Tabs.Screen name="reviews" options={{ href: null }} />
+            <Tabs.Screen name="about" options={{ href: null }} />
+            <Tabs.Screen name="tickets/index" options={{ href: null }} />
+            <Tabs.Screen name="tickets/[id]" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        </Tabs>
+    );
+
+    if (isDesktopWeb) {
+        return (
+            <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#f8fafc', minHeight: '100%' }}>
+                {/* Modern Desktop Sidebar */}
+                <WebDesktopSidebar 
+                    collapsed={sidebarCollapsed || (width < 1024)} 
+                    onToggleCollapse={() => setSidebarCollapsed(prev => !prev)} 
+                />
+
+                {/* Main Content Area */}
+                <View style={{ flex: 1, flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                    <WebDesktopHeader 
+                        onToggleSidebar={() => setSidebarCollapsed(prev => !prev)}
+                        showToggle={width < 1024}
+                    />
+                    <View style={{ flex: 1, width: '100%', maxWidth: 1280, alignSelf: 'center' }}>
+                        {tabsComponent}
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
     return (
         <View style={{ flex: 1 }}>
-            <Tabs
-                tabBar={(props) => <ModernTabBar {...props} />}
-                screenOptions={{
-                    headerShown: false,
-                }}
-            >
-                <Tabs.Screen name="dashboard" options={{ title: 'Home' }} />
-                <Tabs.Screen name="wallet" options={{ title: 'Wallet' }} />
-                <Tabs.Screen name="qr-pay" options={{ title: 'QR Pay' }} />
-                <Tabs.Screen name="history" options={{ title: 'History' }} />
-                <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-                
-                {/* Hidden service screens - tab bar will show when these are active */}
-                <Tabs.Screen name="referrals" options={{ href: null }} />
-                <Tabs.Screen name="social-boost" options={{ href: null }} />
-                <Tabs.Screen name="social-orders" options={{ href: null }} />
-                <Tabs.Screen name="data" options={{ href: null }} />
-                <Tabs.Screen name="airtime" options={{ href: null }} />
-                <Tabs.Screen name="bills" options={{ href: null }} />
-                <Tabs.Screen name="education" options={{ href: null }} />
-                <Tabs.Screen name="bvn-services" options={{ href: null }} />
-                <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
-                <Tabs.Screen name="kyc" options={{ href: null }} />
-                <Tabs.Screen name="virtual-cards" options={{ href: null }} />
-                <Tabs.Screen name="transfer" options={{ href: null }} />
-                <Tabs.Screen name="saved-cards" options={{ href: null }} />
-                <Tabs.Screen name="beneficiaries" options={{ href: null }} />
-                <Tabs.Screen name="support" options={{ href: null }} />
-                <Tabs.Screen name="nin-services" options={{ href: null }} />
-                <Tabs.Screen name="about" options={{ href: null }} />
-                <Tabs.Screen name="tickets/index" options={{ href: null }} />
-                <Tabs.Screen name="tickets/[id]" options={{ href: null, tabBarStyle: { display: 'none' } }} />
-            </Tabs>
+            {tabsComponent}
 
             {/* FLOATING ACTION BUTTON (FAB) */}
             {!hideFab && isFabOpen && (
