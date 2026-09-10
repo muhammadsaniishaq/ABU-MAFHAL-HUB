@@ -65,6 +65,24 @@ import { useAppSettings } from '../hooks/useAppSettings';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import MaintenanceScreen from '../components/MaintenanceScreen';
 import UpdateScreen from '../components/UpdateScreen';
+import Constants from 'expo-constants';
+
+function isVersionLower(currentVersion: string, targetVersion: string): boolean {
+    if (!currentVersion || !targetVersion) return false;
+    const cleanCurrent = currentVersion.replace(/^v/i, '').trim();
+    const cleanTarget = targetVersion.replace(/^v/i, '').trim();
+    if (cleanCurrent === cleanTarget) return false;
+    const cParts = cleanCurrent.split('.').map(x => parseInt(x, 10) || 0);
+    const tParts = cleanTarget.split('.').map(x => parseInt(x, 10) || 0);
+    const maxLen = Math.max(cParts.length, tParts.length);
+    for (let i = 0; i < maxLen; i++) {
+        const c = cParts[i] || 0;
+        const t = tParts[i] || 0;
+        if (c < t) return true;
+        if (c > t) return false;
+    }
+    return false;
+}
 
 const isUserAdmin = (role?: string | null, email?: string | null) => {
     if (role === 'admin' || role === 'super_admin') return true;
@@ -347,8 +365,29 @@ export default function RootLayout() {
 
     const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
-    if (settings?.force_app_update) {
-        return <UpdateScreen />;
+    const currentAppVersion = Constants?.expoConfig?.version || '1.0.4';
+    const minRequiredVersion = settings?.min_app_version || '1.0.4';
+    const latestAvailableVersion = settings?.latest_app_version || minRequiredVersion;
+    const isBelowMinimum = isVersionLower(currentAppVersion, minRequiredVersion);
+    const isOutdated = isVersionLower(currentAppVersion, latestAvailableVersion);
+    const isManaging = segments?.[0] === 'manage';
+
+    const shouldShowUpdate = Platform.OS !== 'web' && !isManaging && (
+        Boolean(settings?.force_app_update) || 
+        isBelowMinimum || 
+        isOutdated
+    );
+
+    if (shouldShowUpdate) {
+        return (
+            <UpdateScreen 
+                currentVersion={currentAppVersion}
+                latestVersion={latestAvailableVersion}
+                playStoreUrl={settings?.play_store_url}
+                message={settings?.app_update_message}
+                isForced={Boolean(settings?.force_app_update || isBelowMinimum)}
+            />
+        );
     }
 
     if (settings?.maintenance_mode && !isAdmin) {

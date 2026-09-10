@@ -75,6 +75,10 @@ export default function AdminSettings() {
     const [registrations, setRegistrations] = useState(true);
     const [requireEmailVerif, setRequireEmailVerif] = useState(false);
     const [forceAppUpdate, setForceAppUpdate] = useState(false);
+    const [minAppVersion, setMinAppVersion] = useState('1.0.4');
+    const [latestAppVersion, setLatestAppVersion] = useState('1.0.4');
+    const [playStoreUrl, setPlayStoreUrl] = useState('https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub');
+    const [appUpdateMessage, setAppUpdateMessage] = useState('');
     const [allowBiometrics, setAllowBiometrics] = useState(true);
     const [autoApproveKyc, setAutoApproveKyc] = useState(false);
     const [hideUserBalances, setHideUserBalances] = useState(false);
@@ -191,6 +195,10 @@ export default function AdminSettings() {
                     if (s.key === 'allow_registrations') setRegistrations(s.value === 'true');
                     if (s.key === 'require_email_verif') setRequireEmailVerif(s.value === 'true');
                     if (s.key === 'force_app_update') setForceAppUpdate(s.value === 'true');
+                    if (s.key === 'min_app_version') setMinAppVersion(s.value || '1.0.4');
+                    if (s.key === 'latest_app_version') setLatestAppVersion(s.value || '1.0.4');
+                    if (s.key === 'play_store_url') setPlayStoreUrl(s.value || 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub');
+                    if (s.key === 'app_update_message') setAppUpdateMessage(s.value || '');
                     if (s.key === 'allow_biometrics') setAllowBiometrics(s.value === 'true');
                     if (s.key === 'auto_approve_kyc') setAutoApproveKyc(s.value === 'true');
                     if (s.key === 'hide_user_balances') setHideUserBalances(s.value === 'true');
@@ -346,6 +354,10 @@ export default function AdminSettings() {
                 { key: 'allow_registrations', value: String(registrations) },
                 { key: 'require_email_verif', value: String(requireEmailVerif) },
                 { key: 'force_app_update', value: String(forceAppUpdate) },
+                { key: 'min_app_version', value: minAppVersion },
+                { key: 'latest_app_version', value: latestAppVersion },
+                { key: 'play_store_url', value: playStoreUrl },
+                { key: 'app_update_message', value: appUpdateMessage },
                 { key: 'allow_biometrics', value: String(allowBiometrics) },
                 { key: 'auto_approve_kyc', value: String(autoApproveKyc) },
                 { key: 'hide_user_balances', value: String(hideUserBalances) },
@@ -529,8 +541,33 @@ export default function AdminSettings() {
                             />
                             <View style={s.divider} />
                             <ToggleRow 
-                                title="Force App Update" subtitle="Require users to download the latest version"
+                                title="Force App Update" subtitle="Require users with older versions to update before accessing the app"
                                 icon="cloud-download" color="#DB2777" value={forceAppUpdate} onValueChange={setForceAppUpdate}
+                            />
+                            <InputRow 
+                                label="Latest App Version" 
+                                value={latestAppVersion} 
+                                onChangeText={setLatestAppVersion} 
+                                placeholder="e.g. 1.0.5" 
+                            />
+                            <InputRow 
+                                label="Minimum Required Version" 
+                                value={minAppVersion} 
+                                onChangeText={setMinAppVersion} 
+                                placeholder="e.g. 1.0.4" 
+                            />
+                            <InputRow 
+                                label="Play Store URL" 
+                                value={playStoreUrl} 
+                                onChangeText={setPlayStoreUrl} 
+                                placeholder="https://play.google.com/store/apps/details?id=..." 
+                            />
+                            <InputRow 
+                                label="Update Release Notes" 
+                                value={appUpdateMessage} 
+                                onChangeText={setAppUpdateMessage} 
+                                placeholder="Bayani game da sabon update..." 
+                                multiline 
                             />
                             <View style={s.divider} />
                             <ToggleRow 

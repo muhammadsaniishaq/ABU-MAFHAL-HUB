@@ -7,6 +7,10 @@ export interface AppSettings {
     allow_registrations: boolean;
     require_email_verif: boolean;
     force_app_update: boolean;
+    min_app_version?: string;
+    latest_app_version?: string;
+    play_store_url?: string;
+    app_update_message?: string;
     allow_biometrics: boolean;
     auto_approve_kyc: boolean;
     hide_user_balances: boolean;
@@ -31,6 +35,10 @@ const DEFAULT_SETTINGS: AppSettings = {
     allow_registrations: true,
     require_email_verif: false,
     force_app_update: false,
+    min_app_version: '1.0.4',
+    latest_app_version: '1.0.4',
+    play_store_url: 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub',
+    app_update_message: 'Sabon update yana kunshe da ingantattun fasahohi, saurin aiki da karin tsaro. Da fatan za a sabunta don ci gaba da amfani da Abu Mafhal Sub.',
     allow_biometrics: true,
     auto_approve_kyc: false,
     hide_user_balances: false,

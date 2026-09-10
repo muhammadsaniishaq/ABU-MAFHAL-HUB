@@ -20,7 +20,7 @@ if (!fs.existsSync(distDir)) {
 try {
   fs.cpSync(publicDir, distDir, { recursive: true, force: true });
   console.log('[copy-public] Successfully copied all files from public/ to dist/');
-  
+
   // Verify key files exist in dist
   const requiredFiles = ['landing.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html'];
   const missing = requiredFiles.filter(f => !fs.existsSync(path.join(distDir, f)));
