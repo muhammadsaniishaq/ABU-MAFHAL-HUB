@@ -1447,19 +1447,19 @@ export default function TransferScreen() {
         // 5. Approved with 24-Hour Cooldown Active!
         if (isTransferCooldownActive) {
             return (
-                <View style={[s.tierLockCard, { backgroundColor: '#0F172A', borderColor: '#F59E0B', borderWidth: 1.5 }]}>
+                <View style={[s.tierLockCard, { backgroundColor: '#FFFBEB', borderColor: '#F59E0B', borderWidth: 1.5 }]}>
                     <View style={s.tierLockHeaderRow}>
-                        <View style={[s.tierLockIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
-                            <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
+                        <View style={[s.tierLockIconBox, { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A' }]}>
+                            <Ionicons name="shield-checkmark" size={20} color="#D97706" />
                         </View>
                         <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={[s.tierLockTitle, { color: '#F8FAFC' }]}>Transfer Privilege Approved! 🛡️</Text>
-                                <View style={[s.tier1Badge, { backgroundColor: '#F59E0B' }]}>
-                                    <Text style={[s.tier1BadgeText, { color: '#0F172A' }]}>24H COOLDOWN</Text>
+                                <Text style={[s.tierLockTitle, { color: '#92400E' }]}>Transfer Privilege Approved! 🛡️</Text>
+                                <View style={[s.tier1Badge, { backgroundColor: '#D97706' }]}>
+                                    <Text style={[s.tier1BadgeText, { color: '#FFFFFF' }]}>24H COOLDOWN</Text>
                                 </View>
                             </View>
-                            <Text style={[s.tierLockSubtitle, { color: '#CBD5E1' }]}>
+                            <Text style={[s.tierLockSubtitle, { color: '#78350F' }]}>
                                 Your application has been approved by Admin! In accordance with financial security standards, a mandatory 24-hour security maturation buffer is active:
                             </Text>
                         </View>
@@ -1468,21 +1468,26 @@ export default function TransferScreen() {
                     {/* Giant Digital Countdown Timer */}
                     <View style={{
                         marginTop: 12,
-                        backgroundColor: '#020617',
-                        borderRadius: 10,
-                        padding: 14,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 12,
+                        padding: 16,
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderWidth: 1,
-                        borderColor: 'rgba(245, 158, 11, 0.35)'
+                        borderWidth: 1.5,
+                        borderColor: '#FDE68A',
+                        shadowColor: '#D97706',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 6,
+                        elevation: 3,
                     }}>
-                        <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
+                        <Text style={{ color: '#B45309', fontSize: 10.5, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
                             Transfers Automatically Unlock In
                         </Text>
-                        <Text style={{ color: '#F59E0B', fontSize: 24, fontWeight: '900', letterSpacing: 1 }}>
+                        <Text style={{ color: '#D97706', fontSize: 26, fontWeight: '900', letterSpacing: 1, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
                             {formatRemainingTime(cooldownRemainingSeconds)}
                         </Text>
-                        <Text style={{ color: '#64748B', fontSize: 11, marginTop: 4 }}>
+                        <Text style={{ color: '#64748B', fontSize: 10.5, marginTop: 4, fontWeight: '600' }}>
                             Unlock Date: {new Date(transferUnlockAt!).toLocaleString()}
                         </Text>
                     </View>
@@ -1574,12 +1579,12 @@ export default function TransferScreen() {
         if (isTransferCooldownActive) {
             return (
                 <TouchableOpacity
-                    style={[s.submitBtn, { backgroundColor: '#0F172A', borderWidth: 1.5, borderColor: '#F59E0B' }]}
+                    style={[s.submitBtn, { backgroundColor: '#FEF3C7', borderWidth: 1.5, borderColor: '#F59E0B' }]}
                     disabled
                     activeOpacity={1}
                 >
-                    <Ionicons name="timer-outline" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
-                    <Text style={[s.submitBtnText, { color: '#F59E0B', fontWeight: '900' }]}>
+                    <Ionicons name="timer-outline" size={18} color="#D97706" style={{ marginRight: 6 }} />
+                    <Text style={[s.submitBtnText, { color: '#92400E', fontWeight: '900' }]}>
                         ⏳ UNLOCKS IN {formatRemainingTime(cooldownRemainingSeconds)}
                     </Text>
                 </TouchableOpacity>
@@ -1600,7 +1605,7 @@ export default function TransferScreen() {
                 <Ionicons
                     name={isBank ? "arrow-up-circle" : "paper-plane"}
                     size={18}
-                    color={!isFormValid ? '#64748B' : '#F59E0B'}
+                    color={!isFormValid ? '#64748B' : '#FFFFFF'}
                     style={{ marginRight: 6 }}
                 />
                 <Text style={[s.submitBtnText, !isFormValid && s.submitBtnTextDisabled]}>
@@ -1614,16 +1619,16 @@ export default function TransferScreen() {
         );
     };
 
-    // Solid Device Verification Guard: If device check is loading, show secure dark splash
+    // Solid Device Verification Guard: If device check is loading, show secure light splash
     if (isDeviceVerified === null) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#0B0F19', alignItems: 'center', justifyContent: 'center' }}>
-                <StatusBar style="light" />
-                <ActivityIndicator size="large" color="#F59E0B" />
-                <Text style={{ color: '#F1F5F9', marginTop: 16, fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>
+            <View style={{ flex: 1, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                <StatusBar style="dark" />
+                <ActivityIndicator size="large" color="#D97706" />
+                <Text style={{ color: '#0F172A', marginTop: 16, fontSize: 15, fontWeight: '800', letterSpacing: 0.2 }}>
                     Securing Transfer Channel...
                 </Text>
-                <Text style={{ color: '#64748B', marginTop: 6, fontSize: 12 }}>
+                <Text style={{ color: '#64748B', marginTop: 6, fontSize: 12, fontWeight: '500' }}>
                     Verifying Device Security Authorization
                 </Text>
             </View>
@@ -1633,29 +1638,29 @@ export default function TransferScreen() {
     // If device is NOT verified, NEVER render the transfer screen in the background!
     if (isDeviceVerified === false) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#0B0F19', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                <StatusBar style="light" />
-                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                    <Ionicons name="phone-portrait-outline" size={32} color="#F59E0B" />
+            <View style={{ flex: 1, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                <StatusBar style="dark" />
+                <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF3C7', borderWidth: 1.5, borderColor: '#FDE68A', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <Ionicons name="phone-portrait-outline" size={32} color="#D97706" />
                 </View>
-                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 8 }}>
+                <Text style={{ color: '#0F172A', fontSize: 18, fontWeight: '900', textAlign: 'center', marginBottom: 8 }}>
                     Device Authorization Required
                 </Text>
-                <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 24, maxWidth: 320 }}>
+                <Text style={{ color: '#475569', fontSize: 12.5, textAlign: 'center', lineHeight: 19, marginBottom: 24, maxWidth: 320 }}>
                     In accordance with banking security protocols, fund transfers on a new or unverified device require two-factor security verification.
                 </Text>
                 <TouchableOpacity
                     onPress={() => setShowDevice2FAModal(true)}
-                    style={{ backgroundColor: '#F59E0B', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 10, width: '100%', maxWidth: 300, alignItems: 'center', marginBottom: 12 }}
+                    style={{ backgroundColor: '#D97706', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 10, width: '100%', maxWidth: 300, alignItems: 'center', marginBottom: 12, shadowColor: '#D97706', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4 }}
                     activeOpacity={0.85}
                 >
-                    <Text style={{ color: '#0F172A', fontWeight: '800', fontSize: 14 }}>AUTHORIZE THIS DEVICE</Text>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>AUTHORIZE THIS DEVICE</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={() => router.replace('/(app)/dashboard')}
                     style={{ paddingVertical: 12, paddingHorizontal: 24 }}
                 >
-                    <Text style={{ color: '#64748B', fontWeight: '600', fontSize: 13 }}>Return to Dashboard</Text>
+                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 12.5 }}>Return to Dashboard</Text>
                 </TouchableOpacity>
 
                 <Device2FAModal
@@ -2010,7 +2015,7 @@ export default function TransferScreen() {
 
                         {accountName ? (
                             <LinearGradient
-                                colors={['#090D16', '#111827', '#0F172A']}
+                                colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={s.resolvedAccountCard}
@@ -2027,11 +2032,11 @@ export default function TransferScreen() {
                                 <View style={s.verifiedHeaderBar}>
                                     <View style={s.verifiedHeaderLeft}>
                                         <View style={s.liveGreenDot} />
-                                        <Ionicons name="shield-checkmark" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                        <Ionicons name="shield-checkmark" size={10} color="#0284C7" style={{ marginRight: 3 }} />
                                         <Text style={s.verifiedHeaderTitle}>NIBSS & CBN DIRECT VERIFIED</Text>
                                     </View>
                                     <View style={s.verifiedHeaderRight}>
-                                        <Ionicons name="flash" size={8.5} color="#F59E0B" style={{ marginRight: 2 }} />
+                                        <Ionicons name="flash" size={8.5} color="#D97706" style={{ marginRight: 2 }} />
                                         <Text style={s.verifiedHeaderSub}>INSTANT ROUTING</Text>
                                     </View>
                                 </View>
@@ -2068,7 +2073,7 @@ export default function TransferScreen() {
                                                 <Ionicons
                                                     name={copiedAcc ? "checkmark-circle" : "copy-outline"}
                                                     size={10}
-                                                    color={copiedAcc ? "#10B981" : "#38BDF8"}
+                                                    color={copiedAcc ? "#10B981" : "#D97706"}
                                                 />
                                                 <Text style={[s.accountNumberCopyLabel, copiedAcc && { color: '#10B981' }]}>
                                                     {copiedAcc ? 'Copied' : 'Copy'}
@@ -2085,7 +2090,7 @@ export default function TransferScreen() {
                                             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name={isSavedFavorite ? "star" : "star-outline"} size={12} color={isSavedFavorite ? "#F59E0B" : "#94A3B8"} />
+                                            <Ionicons name={isSavedFavorite ? "star" : "star-outline"} size={12} color={isSavedFavorite ? "#D97706" : "#94A3B8"} />
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
@@ -2115,13 +2120,13 @@ export default function TransferScreen() {
                                 {/* Micro-Specs Guarantee Strip (Speed / Fee / Risk) */}
                                 <View style={s.verifiedSpecsStrip}>
                                     <View style={s.verifiedSpecItem}>
-                                        <Ionicons name="speedometer-outline" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                        <Ionicons name="speedometer-outline" size={10} color="#0284C7" style={{ marginRight: 3 }} />
                                         <Text style={s.verifiedSpecLabel}>Speed: </Text>
                                         <Text style={s.verifiedSpecValue}>Instant (&lt;15s)</Text>
                                     </View>
                                     <View style={s.verifiedSpecDivider} />
                                     <View style={s.verifiedSpecItem}>
-                                        <Ionicons name="pricetag-outline" size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+                                        <Ionicons name="pricetag-outline" size={10} color="#D97706" style={{ marginRight: 3 }} />
                                         <Text style={s.verifiedSpecLabel}>Fee: </Text>
                                         <Text style={s.verifiedSpecValue}>₦{transferFee.toFixed(2)}</Text>
                                     </View>
@@ -2139,52 +2144,66 @@ export default function TransferScreen() {
                                 {/* Quick Amount Shortcuts Row with Active Highlight */}
                                 <View style={s.quickAmountRow}>
                                     <View style={s.quickAmountHeader}>
-                                        <Ionicons name="flash" size={10} color="#F59E0B" />
-                                        <Text style={s.quickAmountLabel}>Quick Amount:</Text>
+                                        <Ionicons name="flash-outline" size={10} color="#D97706" />
+                                        <Text style={s.quickAmountLabel}>Quick: </Text>
                                     </View>
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickAmountChipsScroll}>
-                                        {[1000, 2000, 5000, 10000, 20000, 50000].map((amtVal) => {
-                                            const isSelected = numAmount === amtVal;
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={s.quickAmountChipsScroll}
+                                    >
+                                        {[2000, 5000, 10000, 20000, 50000].map((amt) => {
+                                            const isChipActive = amount === String(amt);
                                             return (
                                                 <TouchableOpacity
-                                                    key={amtVal}
-                                                    onPress={() => handleQuickAmountSelect(amtVal)}
-                                                    style={[s.quickAmountChip, isSelected && s.quickAmountChipActive]}
+                                                    key={amt}
+                                                    onPress={() => {
+                                                        setAmount(String(amt));
+                                                        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                    }}
+                                                    style={[s.quickAmountChip, isChipActive && s.quickAmountChipActive]}
                                                     activeOpacity={0.7}
                                                 >
-                                                    <Text style={[s.quickAmountChipText, isSelected && s.quickAmountChipTextActive]}>
-                                                        ₦{amtVal.toLocaleString()}
+                                                    <Text style={[s.quickAmountChipText, isChipActive && s.quickAmountChipTextActive]}>
+                                                        ₦{amt.toLocaleString()}
                                                     </Text>
                                                 </TouchableOpacity>
                                             );
                                         })}
-                                        <TouchableOpacity
-                                            onPress={() => handleQuickAmountSelect('max')}
-                                            style={[s.quickAmountChip, s.quickAmountChipMax]}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={s.quickAmountChipMaxText}>MAX</Text>
-                                        </TouchableOpacity>
+                                        {userBalance > 0 && (
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    const maxBank = Math.max(0, userBalance - (feeThreshold <= userBalance ? feeAbove10k : feeBelow10k));
+                                                    if (maxBank > 0) {
+                                                        setAmount(String(Math.floor(maxBank)));
+                                                        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                    }
+                                                }}
+                                                style={[s.quickAmountChip, s.quickAmountChipMax]}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={[s.quickAmountChipText, s.quickAmountChipMaxText]}>
+                                                    Max
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </ScrollView>
                                 </View>
 
-                                {/* Live Calculation & Balance Preview inside card */}
+                                {/* Live Residual Calculation */}
                                 {numAmount > 0 && (
                                     <View style={s.verifiedLiveCalcRow}>
                                         <Text style={s.verifiedLiveCalcText}>
-                                            Debit: <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>₦{numAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
-                                            {` + ₦${transferFee.toFixed(2)} Fee`}
-                                            {' = '}
-                                            <Text style={{ color: '#FFD700', fontWeight: '900' }}>₦{totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                            Debit: ₦{totalDebit.toLocaleString()} (Fee: ₦{transferFee})
                                         </Text>
-                                        {totalDebit <= userBalance ? (
+                                        {userBalance >= totalDebit ? (
                                             <View style={s.verifiedBalanceOkBadge}>
-                                                <Ionicons name="checkmark-circle" size={10} color="#10B981" />
+                                                <Ionicons name="checkmark-circle" size={9} color="#10B981" />
                                                 <Text style={s.verifiedBalanceOkText}>Balance OK</Text>
                                             </View>
                                         ) : (
                                             <View style={s.verifiedBalanceLowBadge}>
-                                                <Ionicons name="alert-circle" size={10} color="#EF4444" />
+                                                <Ionicons name="alert-circle" size={9} color="#EF4444" />
                                                 <Text style={s.verifiedBalanceLowText}>Low Balance</Text>
                                             </View>
                                         )}
@@ -2198,7 +2217,10 @@ export default function TransferScreen() {
                         <View style={s.amountInputBox}>
                             <Text style={s.currencyPrefix}>₦</Text>
                             <TextInput
-                                style={s.amountInput}
+                                style={[
+                                    s.amountInput,
+                                    !amount ? { fontSize: 13, fontWeight: '500' } : null
+                                ]}
                                 placeholder="0.00"
                                 placeholderTextColor="#94A3B8"
                                 value={amount}
@@ -2266,7 +2288,7 @@ export default function TransferScreen() {
                             <Ionicons name="chatbox-ellipses-outline" size={15} color="#64748B" style={{ marginRight: 6 }} />
                             <TextInput
                                 style={s.textInput}
-                                placeholder="e.g. Support, Bill or Goods"
+                                placeholder="Transfer remark (optional)"
                                 placeholderTextColor="#94A3B8"
                                 value={note}
                                 onChangeText={setNote}
@@ -2357,7 +2379,7 @@ export default function TransferScreen() {
                             <Ionicons name="search-outline" size={15} color="#64748B" style={{ marginRight: 6 }} />
                             <TextInput
                                 style={s.textInput}
-                                placeholder="e.g. 08145853539 or email@domain.com"
+                                placeholder="Phone number or email"
                                 placeholderTextColor="#94A3B8"
                                 value={recipientQuery}
                                 onChangeText={setRecipientQuery}
@@ -2378,7 +2400,7 @@ export default function TransferScreen() {
 
                         {matchedUser && (
                             <LinearGradient
-                                colors={['#090D16', '#111827', '#0F172A']}
+                                colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={s.resolvedAccountCard}
@@ -2395,7 +2417,7 @@ export default function TransferScreen() {
                                 <View style={s.verifiedHeaderBar}>
                                     <View style={s.verifiedHeaderLeft}>
                                         <View style={s.liveGreenDot} />
-                                        <Ionicons name="person-circle" size={10} color="#38BDF8" style={{ marginRight: 3 }} />
+                                        <Ionicons name="person-circle" size={10} color="#0284C7" style={{ marginRight: 3 }} />
                                         <Text style={s.verifiedHeaderTitle}>ABU MAFHAL P2P VERIFIED</Text>
                                     </View>
                                     <View style={s.verifiedHeaderRight}>
@@ -2414,7 +2436,7 @@ export default function TransferScreen() {
                                             </Text>
                                         </View>
                                         <View style={[s.verifiedCheckBadge, { backgroundColor: '#38BDF8' }]}>
-                                            <Ionicons name="checkmark-sharp" size={8} color="#090D16" />
+                                            <Ionicons name="checkmark-sharp" size={8} color="#FFFFFF" />
                                         </View>
                                     </View>
 
@@ -2566,7 +2588,10 @@ export default function TransferScreen() {
                         <View style={s.amountInputBox}>
                             <Text style={s.currencyPrefix}>₦</Text>
                             <TextInput
-                                style={s.amountInput}
+                                style={[
+                                    s.amountInput,
+                                    !amount ? { fontSize: 13, fontWeight: '500' } : null
+                                ]}
                                 placeholder="0.00"
                                 placeholderTextColor="#94A3B8"
                                 value={amount}
@@ -2631,7 +2656,7 @@ export default function TransferScreen() {
                             <Ionicons name="chatbox-ellipses-outline" size={15} color="#64748B" style={{ marginRight: 6 }} />
                             <TextInput
                                 style={s.textInput}
-                                placeholder="e.g. Support or Gift"
+                                placeholder="Payment note (optional)"
                                 placeholderTextColor="#94A3B8"
                                 value={note}
                                 onChangeText={setNote}
@@ -2774,7 +2799,7 @@ export default function TransferScreen() {
                             <Ionicons name="search" size={15} color="#94A3B8" style={{ marginRight: 6 }} />
                             <TextInput
                                 style={s.bankSearchInput}
-                                placeholder="Search bank name (e.g. OPay, GTBank)..."
+                                placeholder="Search bank name..."
                                 placeholderTextColor="#94A3B8"
                                 value={bankSearchText}
                                 onChangeText={setBankSearchText}
@@ -3675,8 +3700,8 @@ const s = StyleSheet.create({
     textInput: {
         flex: 1,
         color: '#0F172A',
-        fontSize: 12.5,
-        fontWeight: '600',
+        fontSize: 11.5,
+        fontWeight: '500',
     },
     resolvingStatusBox: {
         flexDirection: 'row',
@@ -3773,18 +3798,19 @@ const s = StyleSheet.create({
     },
     resolvedAccountCard: {
         flexDirection: 'column',
-        borderRadius: 15,
+        borderRadius: 14,
         paddingTop: 10,
         paddingBottom: 11,
         paddingHorizontal: 12,
         marginTop: 8,
         borderWidth: 1.2,
-        borderColor: 'rgba(217, 119, 6, 0.45)',
+        borderColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
         shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
         overflow: 'hidden',
     },
     verifiedAccentBar: {
@@ -3800,7 +3826,7 @@ const s = StyleSheet.create({
         marginBottom: 8,
         paddingBottom: 6,
         borderBottomWidth: 0.8,
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        borderBottomColor: '#F1F5F9',
     },
     verifiedHeaderLeft: {
         flexDirection: 'row',
@@ -3815,7 +3841,7 @@ const s = StyleSheet.create({
         marginRight: 2,
     },
     verifiedHeaderTitle: {
-        color: '#38BDF8',
+        color: '#0284C7',
         fontSize: 8,
         fontWeight: '900',
         letterSpacing: 0.6,
@@ -3832,7 +3858,7 @@ const s = StyleSheet.create({
         borderColor: 'rgba(245, 158, 11, 0.3)',
     },
     verifiedHeaderSub: {
-        color: '#F59E0B',
+        color: '#D97706',
         fontSize: 7.5,
         fontWeight: '900',
         letterSpacing: 0.4,
@@ -3851,7 +3877,7 @@ const s = StyleSheet.create({
         borderColor: '#F59E0B',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#0F172A',
+        backgroundColor: '#FEF3C7',
     },
     verifiedCheckBadge: {
         position: 'absolute',
@@ -3864,20 +3890,20 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
-        borderColor: '#090D16',
+        borderColor: '#FFFFFF',
     },
     p2pAvatarCircle: {
         width: 38,
         height: 38,
         borderRadius: 19,
-        backgroundColor: '#1E293B',
+        backgroundColor: '#FEF3C7',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
-        borderColor: '#38BDF8',
+        borderColor: '#F59E0B',
     },
     p2pAvatarText: {
-        color: '#FFFFFF',
+        color: '#D97706',
         fontSize: 14,
         fontWeight: '900',
     },
@@ -3887,14 +3913,14 @@ const s = StyleSheet.create({
         marginRight: 6,
     },
     resolvedName: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        color: '#0F172A',
+        fontSize: 12.5,
         fontWeight: '800',
         letterSpacing: 0.2,
         lineHeight: 16,
     },
     resolvedBankSub: {
-        color: '#94A3B8',
+        color: '#64748B',
         fontSize: 9.5,
         fontWeight: '600',
         marginTop: 1,
@@ -3908,9 +3934,9 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
-        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        backgroundColor: '#F1F5F9',
         borderWidth: 0.8,
-        borderColor: 'rgba(56, 189, 248, 0.3)',
+        borderColor: '#CBD5E1',
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 5,
@@ -3921,14 +3947,14 @@ const s = StyleSheet.create({
         borderColor: '#10B981',
     },
     accountNumberChipText: {
-        color: '#38BDF8',
+        color: '#0F172A',
         fontSize: 10,
         fontWeight: '800',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
         letterSpacing: 0.6,
     },
     accountNumberCopyLabel: {
-        color: '#38BDF8',
+        color: '#D97706',
         fontSize: 8,
         fontWeight: '800',
         textTransform: 'uppercase',
@@ -3942,31 +3968,31 @@ const s = StyleSheet.create({
         width: 26,
         height: 26,
         borderRadius: 7,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 0.8,
-        borderColor: 'rgba(255, 255, 255, 0.14)',
+        borderColor: '#E2E8F0',
     },
     cardFeatureBtnActive: {
-        backgroundColor: 'rgba(245, 158, 11, 0.22)',
+        backgroundColor: '#FEF3C7',
         borderColor: '#F59E0B',
     },
     cardFeatureBtnClose: {
-        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-        borderColor: 'rgba(239, 68, 68, 0.25)',
+        backgroundColor: '#FEE2E2',
+        borderColor: '#FECACA',
     },
     verifiedSpecsStrip: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        backgroundColor: '#F8FAFC',
         borderRadius: 7,
         paddingVertical: 4.5,
         paddingHorizontal: 8,
         marginTop: 8,
-        borderWidth: 0.6,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 0.8,
+        borderColor: '#E2E8F0',
     },
     verifiedSpecItem: {
         flexDirection: 'row',
@@ -3974,22 +4000,22 @@ const s = StyleSheet.create({
     },
     verifiedSpecLabel: {
         color: '#64748B',
-        fontSize: 8,
+        fontSize: 8.5,
         fontWeight: '700',
     },
     verifiedSpecValue: {
-        color: '#E2E8F0',
-        fontSize: 8.5,
+        color: '#0F172A',
+        fontSize: 9,
         fontWeight: '800',
     },
     verifiedSpecDivider: {
         width: 1,
         height: 9,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: '#E2E8F0',
     },
     verifiedCardDivider: {
         height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.07)',
+        backgroundColor: '#F1F5F9',
         width: '100%',
         marginVertical: 7,
     },
@@ -4017,46 +4043,46 @@ const s = StyleSheet.create({
         gap: 4,
     },
     quickAmountChip: {
-        backgroundColor: 'rgba(255, 255, 255, 0.07)',
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.14)',
+        borderColor: '#E2E8F0',
         paddingHorizontal: 6.5,
         paddingVertical: 2.5,
         borderRadius: 6,
     },
     quickAmountChipActive: {
-        backgroundColor: 'rgba(245, 158, 11, 0.22)',
+        backgroundColor: '#FEF3C7',
         borderColor: '#F59E0B',
     },
     quickAmountChipText: {
-        color: '#CBD5E1',
+        color: '#475569',
         fontSize: 9,
         fontWeight: '800',
     },
     quickAmountChipTextActive: {
-        color: '#FFD700',
+        color: '#B45309',
     },
     quickAmountChipMax: {
-        backgroundColor: 'rgba(217, 119, 6, 0.25)',
-        borderColor: '#D97706',
+        backgroundColor: '#FEF3C7',
+        borderColor: '#F59E0B',
     },
     quickAmountChipMaxText: {
-        color: '#F59E0B',
+        color: '#D97706',
     },
     verifiedLiveCalcRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+        backgroundColor: '#F8FAFC',
         borderRadius: 6,
         paddingHorizontal: 7,
         paddingVertical: 3.5,
         marginTop: 6,
         borderWidth: 0.8,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: '#E2E8F0',
     },
     verifiedLiveCalcText: {
-        color: '#94A3B8',
+        color: '#64748B',
         fontSize: 8.5,
         fontWeight: '700',
     },
@@ -4064,13 +4090,15 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 2,
-        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 5,
+        paddingVertical: 1.5,
         borderRadius: 4,
+        borderWidth: 0.6,
+        borderColor: '#A7F3D0',
     },
     verifiedBalanceOkText: {
-        color: '#10B981',
+        color: '#059669',
         fontSize: 8,
         fontWeight: '800',
     },
@@ -4078,13 +4106,15 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 2,
-        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
+        backgroundColor: '#FEF2F2',
+        paddingHorizontal: 5,
+        paddingVertical: 1.5,
         borderRadius: 4,
+        borderWidth: 0.6,
+        borderColor: '#FECACA',
     },
     verifiedBalanceLowText: {
-        color: '#EF4444',
+        color: '#DC2626',
         fontSize: 8,
         fontWeight: '800',
     },
@@ -4125,7 +4155,7 @@ const s = StyleSheet.create({
         paddingVertical: 5,
     },
     chipBtnActive: {
-        backgroundColor: '#0F172A',
+        backgroundColor: '#FEF3C7',
         borderColor: '#D97706',
     },
     chipText: {
@@ -4134,7 +4164,7 @@ const s = StyleSheet.create({
         fontWeight: '700',
     },
     chipTextActive: {
-        color: '#FBBF24',
+        color: '#B45309',
         fontWeight: '900',
     },
     presetRow: {
@@ -4211,14 +4241,14 @@ const s = StyleSheet.create({
         marginTop: 12,
     },
     submitBtnActive: {
-        backgroundColor: '#0F172A',
-        borderWidth: 1.5,
-        borderColor: '#D97706',
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 2 },
+        backgroundColor: '#D97706',
+        borderWidth: 1,
+        borderColor: '#B45309',
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.25,
-        shadowRadius: 5,
-        elevation: 3,
+        shadowRadius: 6,
+        elevation: 4,
     },
     submitBtnDisabled: {
         backgroundColor: '#F1F5F9',
@@ -4758,12 +4788,12 @@ const s = StyleSheet.create({
         letterSpacing: 0.5,
     },
     detailAmountCard: {
-        backgroundColor: '#0F172A',
+        backgroundColor: '#FFFBEB',
         borderRadius: 14,
         padding: 14,
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(218, 165, 32, 0.45)',
+        borderWidth: 1.5,
+        borderColor: '#FDE68A',
         marginBottom: 10,
     },
     amountCardTopRow: {
@@ -4774,15 +4804,15 @@ const s = StyleSheet.create({
         marginBottom: 6,
     },
     debitPillTag: {
-        backgroundColor: 'rgba(217, 119, 6, 0.2)',
+        backgroundColor: '#FEF3C7',
         borderWidth: 0.8,
-        borderColor: 'rgba(245, 158, 11, 0.5)',
+        borderColor: '#FDE68A',
         paddingHorizontal: 8,
         paddingVertical: 2.5,
         borderRadius: 6,
     },
     debitPillText: {
-        color: '#F59E0B',
+        color: '#B45309',
         fontSize: 9.5,
         fontWeight: '900',
         letterSpacing: 0.8,
@@ -4791,15 +4821,15 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 3,
-        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        backgroundColor: '#ECFDF5',
         borderWidth: 0.8,
-        borderColor: 'rgba(16, 185, 129, 0.4)',
+        borderColor: '#A7F3D0',
         paddingHorizontal: 8,
         paddingVertical: 2.5,
         borderRadius: 12,
     },
     statusSuccessText: {
-        color: '#34D399',
+        color: '#059669',
         fontSize: 9,
         fontWeight: '800',
         letterSpacing: 0.5,
@@ -4807,14 +4837,14 @@ const s = StyleSheet.create({
     detailAmountText: {
         fontSize: 28,
         fontWeight: '900',
-        color: '#FFFFFF',
+        color: '#0F172A',
         letterSpacing: -0.5,
         marginBottom: 2,
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
     detailAmountSubBreakdown: {
         fontSize: 9,
-        color: '#CBD5E1',
+        color: '#64748B',
         fontWeight: '600',
         marginTop: 2,
     },
@@ -4934,9 +4964,9 @@ const s = StyleSheet.create({
         fontWeight: '800',
     },
     whatsappSupportBtn: {
-        backgroundColor: '#0F172A',
-        borderColor: '#25D366',
+        backgroundColor: '#25D366',
         borderWidth: 1,
+        borderColor: '#16A34A',
         height: 38,
         borderRadius: 10,
         flexDirection: 'row',

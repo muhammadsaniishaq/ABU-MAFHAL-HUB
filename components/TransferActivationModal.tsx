@@ -42,6 +42,7 @@ export default function TransferActivationModal({
     const [email, setEmail] = useState(initialEmail);
     const [occupation, setOccupation] = useState('');
     const [employerBusinessName, setEmployerBusinessName] = useState('');
+    const [cacNumber, setCacNumber] = useState('');
     const [purpose, setPurpose] = useState('Family Support & Personal Expenses');
     const [monthlyVolume, setMonthlyVolume] = useState('₦100,000 - ₦500,000');
     const [averageAmount, setAverageAmount] = useState('₦10,000 - ₦50,000');
@@ -63,7 +64,7 @@ export default function TransferActivationModal({
         if (!fullName.trim() || !phone.trim() || !occupation.trim() || !employerBusinessName.trim() ||
             !address.trim() || !city.trim() || !stateName.trim() || !nextOfKinName.trim() ||
             !nextOfKinPhone.trim() || !idNumber.trim()) {
-            Alert.alert('Required Information Missing', 'Please fill out all required fields to complete your Transfer Activation application.');
+            Alert.alert('Required Information Missing', 'Please fill out all required fields marked with an asterisk (*) to complete your Transfer Activation application.');
             return;
         }
 
@@ -74,7 +75,7 @@ export default function TransferActivationModal({
 
         setSubmitting(true);
         try {
-            // 1. Insert into transfer_activation_requests
+            // 1. Insert into transfer_activation_requests (including cac_number)
             const { error: reqError } = await supabase
                 .from('transfer_activation_requests')
                 .insert({
@@ -84,6 +85,7 @@ export default function TransferActivationModal({
                     email: email.trim(),
                     occupation: occupation.trim(),
                     employer_business_name: employerBusinessName.trim(),
+                    cac_number: cacNumber.trim() || null,
                     purpose: purpose.trim(),
                     estimated_monthly_volume: monthlyVolume.trim(),
                     average_transfer_amount: averageAmount.trim(),
@@ -139,26 +141,26 @@ export default function TransferActivationModal({
                 style={s.backdrop}
             >
                 <View style={s.card}>
-                    {/* Header */}
+                    {/* Modern Executive Header */}
                     <View style={s.header}>
                         <View style={s.iconBox}>
-                            <Ionicons name="shield-checkmark" size={22} color="#F59E0B" />
+                            <Ionicons name="shield-checkmark" size={20} color="#D97706" />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={s.title}>Transfer Activation Application</Text>
-                            <Text style={s.subtitle}>Tier 3 Compliance & Security Vetting Form</Text>
+                            <Text style={s.subtitle}>Tier 3 Compliance & Security Verification</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-                            <Ionicons name="close" size={20} color="#94A3B8" />
+                        <TouchableOpacity onPress={onClose} style={s.closeBtn} activeOpacity={0.7}>
+                            <Ionicons name="close" size={20} color="#64748B" />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
                         {/* Notice Banner */}
                         <View style={s.noticeBanner}>
-                            <Ionicons name="information-circle" size={18} color="#F59E0B" style={{ marginRight: 8 }} />
+                            <Ionicons name="shield-checkmark-outline" size={17} color="#D97706" style={{ marginRight: 8 }} />
                             <Text style={s.noticeText}>
-                                In compliance with anti-fraud regulations, transfer privileges require manual administrator approval. Please provide accurate details.
+                                In compliance with anti-fraud regulations, fund transfer privileges require compliance review. Please provide accurate details.
                             </Text>
                         </View>
 
@@ -170,8 +172,8 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={fullName}
                             onChangeText={setFullName}
-                            placeholder="Enter full legal name"
-                            placeholderTextColor="#64748B"
+                            placeholder="Full legal name"
+                            placeholderTextColor="#94A3B8"
                         />
 
                         <View style={s.row}>
@@ -182,7 +184,7 @@ export default function TransferActivationModal({
                                     value={phone}
                                     onChangeText={setPhone}
                                     placeholder="08012345678"
-                                    placeholderTextColor="#64748B"
+                                    placeholderTextColor="#94A3B8"
                                     keyboardType="phone-pad"
                                 />
                             </View>
@@ -193,7 +195,7 @@ export default function TransferActivationModal({
                                     value={email}
                                     onChangeText={setEmail}
                                     placeholder="user@example.com"
-                                    placeholderTextColor="#64748B"
+                                    placeholderTextColor="#94A3B8"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                 />
@@ -208,8 +210,8 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={occupation}
                             onChangeText={setOccupation}
-                            placeholder="e.g. Civil Servant, Trader, Software Engineer"
-                            placeholderTextColor="#64748B"
+                            placeholder="e.g. Civil Servant, Trader, Engineer"
+                            placeholderTextColor="#94A3B8"
                         />
 
                         <Text style={s.label}>Employer / Registered Business Name *</Text>
@@ -217,8 +219,24 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={employerBusinessName}
                             onChangeText={setEmployerBusinessName}
-                            placeholder="e.g. Federal Ministry / Self-Employed Enterprise"
-                            placeholderTextColor="#64748B"
+                            placeholder="e.g. Enterprise or Ministry Name"
+                            placeholderTextColor="#94A3B8"
+                        />
+
+                        {/* CAC REGISTRATION NUMBER FIELD */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                            <Text style={s.label}>CAC Registration Number (RC / BN)</Text>
+                            <View style={s.corporateBadge}>
+                                <Text style={s.corporateBadgeText}>BUSINESS / OPTIONAL</Text>
+                            </View>
+                        </View>
+                        <TextInput
+                            style={s.input}
+                            value={cacNumber}
+                            onChangeText={setCacNumber}
+                            placeholder="e.g. RC-1849203 or BN-938201"
+                            placeholderTextColor="#94A3B8"
+                            autoCapitalize="characters"
                         />
 
                         <Text style={s.label}>Primary Purpose of Outgoing Transfers *</Text>
@@ -226,8 +244,8 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={purpose}
                             onChangeText={setPurpose}
-                            placeholder="e.g. Family support, vendor settlement, utility payments"
-                            placeholderTextColor="#64748B"
+                            placeholder="e.g. Personal expenses, vendor payments"
+                            placeholderTextColor="#94A3B8"
                         />
 
                         <View style={s.row}>
@@ -238,7 +256,7 @@ export default function TransferActivationModal({
                                     value={monthlyVolume}
                                     onChangeText={setMonthlyVolume}
                                     placeholder="e.g. ₦100,000 - ₦500,000"
-                                    placeholderTextColor="#64748B"
+                                    placeholderTextColor="#94A3B8"
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
@@ -248,7 +266,7 @@ export default function TransferActivationModal({
                                     value={averageAmount}
                                     onChangeText={setAverageAmount}
                                     placeholder="e.g. ₦10,000 - ₦50,000"
-                                    placeholderTextColor="#64748B"
+                                    placeholderTextColor="#94A3B8"
                                 />
                             </View>
                         </View>
@@ -258,17 +276,17 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={sourceOfFunds}
                             onChangeText={setSourceOfFunds}
-                            placeholder="e.g. Monthly Salary, Business Revenue, Savings"
-                            placeholderTextColor="#64748B"
+                            placeholder="e.g. Salary, Business earnings"
+                            placeholderTextColor="#94A3B8"
                         />
 
-                        <Text style={s.label}>Primary Bank / Originating Funding Institution</Text>
+                        <Text style={s.label}>Primary Originating Bank / Institution</Text>
                         <TextInput
                             style={s.input}
                             value={originatingBank}
                             onChangeText={setOriginatingBank}
-                            placeholder="e.g. GTBank, Zenith Bank, OPay, Moniepoint"
-                            placeholderTextColor="#64748B"
+                            placeholder="e.g. GTBank, Zenith, OPay"
+                            placeholderTextColor="#94A3B8"
                         />
 
                         {/* SECTION 3: RESIDENTIAL ADDRESS */}
@@ -279,8 +297,8 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={address}
                             onChangeText={setAddress}
-                            placeholder="Street number, building name and street"
-                            placeholderTextColor="#64748B"
+                            placeholder="Residential street address"
+                            placeholderTextColor="#94A3B8"
                         />
 
                         <View style={s.row}>
@@ -290,8 +308,8 @@ export default function TransferActivationModal({
                                     style={s.input}
                                     value={city}
                                     onChangeText={setCity}
-                                    placeholder="e.g. Ikeja, Kano, Abuja"
-                                    placeholderTextColor="#64748B"
+                                    placeholder="City or Town"
+                                    placeholderTextColor="#94A3B8"
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
@@ -300,8 +318,8 @@ export default function TransferActivationModal({
                                     style={s.input}
                                     value={stateName}
                                     onChangeText={setStateName}
-                                    placeholder="e.g. Lagos, Kano, FCT"
-                                    placeholderTextColor="#64748B"
+                                    placeholder="State"
+                                    placeholderTextColor="#94A3B8"
                                 />
                             </View>
                         </View>
@@ -311,8 +329,8 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={landmark}
                             onChangeText={setLandmark}
-                            placeholder="e.g. Near Central Mosque / General Hospital"
-                            placeholderTextColor="#64748B"
+                            placeholder="Nearest landmark (optional)"
+                            placeholderTextColor="#94A3B8"
                         />
 
                         {/* SECTION 4: NEXT OF KIN */}
@@ -323,8 +341,8 @@ export default function TransferActivationModal({
                             style={s.input}
                             value={nextOfKinName}
                             onChangeText={setNextOfKinName}
-                            placeholder="Full name of next of kin"
-                            placeholderTextColor="#64748B"
+                            placeholder="Full legal name"
+                            placeholderTextColor="#94A3B8"
                         />
 
                         <View style={s.row}>
@@ -334,8 +352,8 @@ export default function TransferActivationModal({
                                     style={s.input}
                                     value={nextOfKinRelationship}
                                     onChangeText={setNextOfKinRelationship}
-                                    placeholder="e.g. Spouse, Sibling, Parent"
-                                    placeholderTextColor="#64748B"
+                                    placeholder="e.g. Sibling, Spouse"
+                                    placeholderTextColor="#94A3B8"
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
@@ -345,75 +363,80 @@ export default function TransferActivationModal({
                                     value={nextOfKinPhone}
                                     onChangeText={setNextOfKinPhone}
                                     placeholder="08012345678"
-                                    placeholderTextColor="#64748B"
+                                    placeholderTextColor="#94A3B8"
                                     keyboardType="phone-pad"
                                 />
                             </View>
                         </View>
 
                         {/* SECTION 5: IDENTIFICATION */}
-                        <Text style={s.sectionTitle}>5. Official Identity Verification</Text>
+                        <Text style={s.sectionTitle}>5. Government Identification</Text>
 
-                        <Text style={s.label}>Government ID Document Type *</Text>
-                        <TextInput
-                            style={s.input}
-                            value={idType}
-                            onChangeText={setIdType}
-                            placeholder="e.g. NIN, Voter's Card, Driver's License, Passport"
-                            placeholderTextColor="#64748B"
-                        />
+                        <Text style={s.label}>ID Document Type *</Text>
+                        <View style={s.idTypeRow}>
+                            {['NIN', 'BVN', "Voter's Card", "Driver's License"].map((type) => (
+                                <TouchableOpacity
+                                    key={type}
+                                    onPress={() => setIdType(type)}
+                                    style={[s.idTypeChip, idType === type && s.idTypeChipActive]}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[s.idTypeChipText, idType === type && s.idTypeChipTextActive]}>
+                                        {type}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
 
-                        <Text style={s.label}>ID Document Number *</Text>
+                        <Text style={s.label}>Document / Identification Number *</Text>
                         <TextInput
                             style={s.input}
                             value={idNumber}
                             onChangeText={setIdNumber}
-                            placeholder="Enter corresponding document number"
-                            placeholderTextColor="#64748B"
+                            placeholder="ID or document number"
+                            placeholderTextColor="#94A3B8"
                         />
 
-                        {/* AML AGREEMENT */}
+                        {/* SECTION 6: LEGAL DECLARATION */}
                         <TouchableOpacity
-                            style={s.checkboxRow}
                             onPress={() => setAmlAgreed(!amlAgreed)}
-                            activeOpacity={0.8}
+                            style={s.checkboxRow}
+                            activeOpacity={0.7}
                         >
                             <Ionicons
-                                name={amlAgreed ? "checkbox" : "square-outline"}
-                                size={22}
-                                color={amlAgreed ? "#F59E0B" : "#64748B"}
+                                name={amlAgreed ? 'checkbox' : 'square-outline'}
+                                size={18}
+                                color={amlAgreed ? '#D97706' : '#94A3B8'}
                             />
                             <Text style={s.checkboxText}>
-                                I certify under penalty of perjury that all information provided is true and accurate. I pledge that all outgoing funds are legitimate and in full compliance with Nigerian AML/CFT and financial regulations.
+                                I hereby declare that all provided details are true and accurate. I confirm that all funds processed through this account originate from lawful activities and strictly comply with Anti-Money Laundering (AML/CFT) regulations.
                             </Text>
                         </TouchableOpacity>
 
-                        {/* Cooldown Warning Notice */}
+                        {/* 24-HOUR MATURATION NOTICE */}
                         <View style={s.cooldownNotice}>
-                            <Ionicons name="time-outline" size={16} color="#3B82F6" style={{ marginRight: 6 }} />
+                            <Ionicons name="time-outline" size={17} color="#2563EB" style={{ marginRight: 8 }} />
                             <Text style={s.cooldownNoticeText}>
-                                Note: Upon Administrator Approval, a mandatory 24-hour security maturation cooldown is enforced before transfers become active.
+                                Mandatory 24h Cooldown: Once approved by Compliance Admin, fund transfers remain locked for exactly 24 hours to prevent unauthorized account takeovers.
                             </Text>
                         </View>
 
-                        {/* Submit Button */}
+                        {/* SUBMIT BUTTON */}
                         <TouchableOpacity
-                            style={[s.submitBtn, submitting && { opacity: 0.6 }]}
                             onPress={handleSubmit}
                             disabled={submitting}
+                            style={s.submitBtn}
                             activeOpacity={0.85}
                         >
                             {submitting ? (
-                                <ActivityIndicator color="#020617" />
+                                <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <>
-                                    <Ionicons name="paper-plane" size={16} color="#020617" style={{ marginRight: 8 }} />
-                                    <Text style={s.submitBtnText}>SUBMIT APPLICATION FOR REVIEW</Text>
+                                    <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                    <Text style={s.submitBtnText}>SUBMIT ACTIVATION APPLICATION</Text>
                                 </>
                             )}
                         </TouchableOpacity>
-
-                        <View style={{ height: 24 }} />
                     </ScrollView>
                 </View>
             </KeyboardAvoidingView>
@@ -424,141 +447,204 @@ export default function TransferActivationModal({
 const s = StyleSheet.create({
     backdrop: {
         flex: 1,
-        backgroundColor: 'rgba(2, 6, 23, 0.85)',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
         justifyContent: 'flex-end',
     },
     card: {
-        backgroundColor: '#0F172A',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 22,
+        borderTopRightRadius: 22,
         maxHeight: '92%',
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 10,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 18,
+        paddingHorizontal: 18,
+        paddingTop: 16,
         paddingBottom: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#1E293B',
+        borderBottomColor: '#F1F5F9',
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 22,
+        borderTopRightRadius: 22,
     },
     iconBox: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 10,
     },
     title: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '800',
+        color: '#0F172A',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: -0.2,
     },
     subtitle: {
-        color: '#94A3B8',
-        fontSize: 12,
-        marginTop: 2,
+        color: '#64748B',
+        fontSize: 10.5,
+        marginTop: 1,
     },
     closeBtn: {
-        padding: 6,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     scrollContent: {
-        padding: 20,
+        padding: 18,
+        paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     },
     noticeBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        backgroundColor: '#FFFBEB',
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.25)',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 20,
+        borderColor: '#FDE68A',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 16,
     },
     noticeText: {
         flex: 1,
-        color: '#FDE68A',
-        fontSize: 12,
-        lineHeight: 17,
+        color: '#92400E',
+        fontSize: 11,
+        lineHeight: 16,
+        fontWeight: '600',
     },
     sectionTitle: {
-        color: '#F59E0B',
-        fontSize: 14,
-        fontWeight: '800',
-        marginTop: 14,
-        marginBottom: 12,
+        color: '#D97706',
+        fontSize: 12,
+        fontWeight: '900',
+        marginTop: 12,
+        marginBottom: 10,
+        textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
     label: {
-        color: '#E2E8F0',
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 6,
+        color: '#334155',
+        fontSize: 11,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    corporateBadge: {
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        borderWidth: 0.8,
+        borderColor: '#A7F3D0',
+    },
+    corporateBadgeText: {
+        color: '#059669',
+        fontSize: 8,
+        fontWeight: '900',
     },
     input: {
-        backgroundColor: '#020617',
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: '#334155',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        color: '#FFFFFF',
-        fontSize: 13,
-        marginBottom: 12,
+        borderColor: '#E2E8F0',
+        borderRadius: 8,
+        paddingHorizontal: 11,
+        paddingVertical: 7.5,
+        color: '#0F172A',
+        fontSize: 11.5,
+        marginBottom: 10,
+        fontWeight: '500',
     },
     row: {
         flexDirection: 'row',
     },
+    idTypeRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 10,
+    },
+    idTypeChip: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 7,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    idTypeChipActive: {
+        backgroundColor: '#FEF3C7',
+        borderColor: '#F59E0B',
+    },
+    idTypeChipText: {
+        color: '#475569',
+        fontSize: 10.5,
+        fontWeight: '700',
+    },
+    idTypeChipTextActive: {
+        color: '#B45309',
+        fontWeight: '900',
+    },
     checkboxRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginTop: 12,
-        marginBottom: 16,
-        gap: 10,
+        marginTop: 8,
+        marginBottom: 14,
+        gap: 8,
     },
     checkboxText: {
         flex: 1,
-        color: '#94A3B8',
-        fontSize: 11.5,
-        lineHeight: 16,
+        color: '#64748B',
+        fontSize: 10.5,
+        lineHeight: 15,
+        fontWeight: '500',
     },
     cooldownNotice: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        backgroundColor: '#EFF6FF',
         borderWidth: 1,
-        borderColor: 'rgba(59, 130, 246, 0.25)',
+        borderColor: '#BFDBFE',
         borderRadius: 10,
         padding: 10,
-        marginBottom: 20,
+        marginBottom: 18,
     },
     cooldownNoticeText: {
         flex: 1,
-        color: '#93C5FD',
-        fontSize: 11.5,
-        lineHeight: 16,
+        color: '#1E40AF',
+        fontSize: 10.5,
+        lineHeight: 15,
+        fontWeight: '600',
     },
     submitBtn: {
-        backgroundColor: '#F59E0B',
-        borderRadius: 12,
-        paddingVertical: 14,
+        backgroundColor: '#D97706',
+        borderRadius: 10,
+        paddingVertical: 13,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
+        marginBottom: 10,
     },
     submitBtnText: {
-        color: '#020617',
-        fontSize: 13,
-        fontWeight: '800',
-        letterSpacing: 0.5,
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.4,
     },
 });

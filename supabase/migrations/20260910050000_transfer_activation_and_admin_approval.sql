@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.transfer_activation_requests (
   email text,
   occupation text NOT NULL,
   employer_business_name text NOT NULL,
+  cac_number text,
   purpose text NOT NULL,
   estimated_monthly_volume text NOT NULL,
   average_transfer_amount text NOT NULL,
@@ -52,6 +53,10 @@ CREATE TABLE IF NOT EXISTS public.transfer_activation_requests (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure cac_number column exists if table was already created
+ALTER TABLE public.transfer_activation_requests
+ADD COLUMN IF NOT EXISTS cac_number text;
 
 -- Enable RLS
 ALTER TABLE public.transfer_activation_requests ENABLE ROW LEVEL SECURITY;

@@ -436,6 +436,14 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                             {item.occupation} • {item.employer_business_name}
                         </Text>
                     </View>
+                    {item.cac_number ? (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 10, color: L.textMuted, fontWeight: '600' }}>CAC Reg. Number:</Text>
+                            <Text style={{ fontSize: 10, color: L.goldAmber, fontWeight: '900' }}>
+                                {item.cac_number}
+                            </Text>
+                        </View>
+                    ) : null}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                         <Text style={{ fontSize: 10, color: L.textMuted, fontWeight: '600' }}>Source of Funds:</Text>
                         <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800' }}>
@@ -707,6 +715,12 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                             <Text style={{ fontSize: 10, color: L.textMuted }}>Employer / Business:</Text>
                                             <Text style={{ fontSize: 10, color: L.textPrimary, fontWeight: '800' }}>{selectedRequest.employer_business_name}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ fontSize: 10, color: L.textMuted }}>CAC Reg. Number:</Text>
+                                            <Text style={{ fontSize: 10, color: selectedRequest.cac_number ? L.goldAmber : L.textMuted, fontWeight: '800' }}>
+                                                {selectedRequest.cac_number || 'N/A (Individual)'}
+                                            </Text>
                                         </View>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                             <Text style={{ fontSize: 10, color: L.textMuted }}>Source of Funds:</Text>
