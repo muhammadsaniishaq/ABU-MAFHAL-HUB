@@ -1,15 +1,21 @@
 import { Stack } from 'expo-router';
-import { View, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, Text, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import AdminWebSidebar from '../../components/AdminWebSidebar';
+import AdminWebHeader from '../../components/AdminWebHeader';
 
 export default function AdminLayout() {
     const router = useRouter();
+    const { width } = useWindowDimensions();
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    const isDesktopWeb = Platform.OS === 'web' && width >= 768;
 
     useEffect(() => {
         let isMounted = true;
@@ -117,7 +123,7 @@ export default function AdminLayout() {
         );
     }
 
-    return (
+    const stackContent = (
         <Stack
             screenOptions={{
                 headerStyle: {
@@ -165,9 +171,29 @@ export default function AdminLayout() {
             <Stack.Screen name="legal" options={{ title: 'Legal Vault' }} />
             <Stack.Screen name="voice" options={{ title: 'Voice OS' }} />
             <Stack.Screen name="cards" options={{ title: 'Card Issuer' }} />
-            <Stack.Screen name="lending" options={{ title: 'Lending HQ' }} />
-            <Stack.Screen name="wealth" options={{ title: 'Wealth & Assets' }} />
             <Stack.Screen name="accounting" options={{ title: 'Profit & Expense Ledger' }} />
         </Stack>
     );
+
+    if (isDesktopWeb) {
+        return (
+            <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F8FAFC', minHeight: '100%' }}>
+                <AdminWebSidebar
+                    collapsed={sidebarCollapsed || width < 1024}
+                    onToggleCollapse={() => setSidebarCollapsed(p => !p)}
+                />
+                <View style={{ flex: 1, flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                    <AdminWebHeader
+                        onToggleSidebar={() => setSidebarCollapsed(p => !p)}
+                        showToggle={width < 1024}
+                    />
+                    <View style={{ flex: 1, width: '100%', maxWidth: 1440, alignSelf: 'center' }}>
+                        {stackContent}
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
+    return stackContent;
 }

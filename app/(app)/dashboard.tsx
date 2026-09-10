@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking, Animated, Easing, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking, Animated, Easing, Modal, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +41,13 @@ AsyncStorage.getItem('@app_hidden_features_cache').then(s => {
 }).catch(() => {});
 
 export default function Dashboard() {
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width >= 1024;
+  const isTablet = Platform.OS === 'web' && width >= 768 && width < 1024;
+  const isWebDesktop = Platform.OS === 'web' && width >= 768;
+
+  const actionItemWidth = isDesktop ? '12%' : isTablet ? '16%' : (width - 32 - 28 - 24) / 4;
+
   const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string; avatar_url?: string; kyc_tier?: number; bvn?: string | null } | null>(null);
   const { settings, loading: settingsLoading } = useAppSettings();
   const [showBalance, setShowBalance] = useState(false);
@@ -539,14 +546,14 @@ export default function Dashboard() {
 
       <ScrollView 
         style={s.scrollView}
-        contentContainerStyle={{ paddingBottom: 180 }}
+        contentContainerStyle={[{ paddingBottom: isWebDesktop ? 40 : 180 }, isWebDesktop && { maxWidth: 1280, width: '100%', alignSelf: 'center' }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />}
       >
         {/* ─── PREMIUM HEADER ─── */}
         <LinearGradient
           colors={['#06112b', '#0d1f4a', '#112660']}
-          style={[s.headerContainer, { paddingTop: insets.top + 12 }]}
+          style={[s.headerContainer, { paddingTop: isWebDesktop ? 24 : insets.top + 12 }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
@@ -554,41 +561,43 @@ export default function Dashboard() {
           <View style={s.decorCircle1} />
           <View style={s.decorCircle2} />
 
-          {/* ── Top bar: Logo + Brand + Admin + Bell ── */}
-          <View style={s.headerTop}>
-            <View style={s.brandRow}>
-              <View style={s.logoWrapper}>
-                <Image
-                  source={logoUrl ? { uri: logoUrl } : (settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
-                  style={s.headerLogo as any}
-                  resizeMode="contain"
-                />
+          {/* ── Top bar: Logo + Brand + Admin + Bell (Mobile only - Desktop has WebDesktopHeader) ── */}
+          {!isWebDesktop && (
+            <View style={s.headerTop}>
+              <View style={s.brandRow}>
+                <View style={s.logoWrapper}>
+                  <Image
+                    source={logoUrl ? { uri: logoUrl } : (settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
+                    style={s.headerLogo as any}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View>
+                  <Text style={s.brandTxt}>{firstPart.toUpperCase()}</Text>
+                  {rest ? <Text style={s.brandSub}>{rest.toUpperCase()}</Text> : null}
+                </View>
               </View>
-              <View>
-                <Text style={s.brandTxt}>{firstPart.toUpperCase()}</Text>
-                {rest ? <Text style={s.brandSub}>{rest.toUpperCase()}</Text> : null}
-              </View>
-            </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {['admin', 'super_admin'].includes(userData?.role || '') && (
-                <TouchableOpacity onPress={() => router.push('/manage')} style={s.adminConsoleBtn} activeOpacity={0.8}>
-                  <LinearGradient colors={['#f5a623', '#d4890e']} style={s.adminConsoleBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                    <Ionicons name="shield-checkmark" size={10} color="#0d1b3e" style={{ marginRight: 3 }} />
-                    <Text style={s.adminConsoleBtnTxt}>Admin</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => router.push('/notifications')} style={s.bellBtn} activeOpacity={0.8}>
-                <Ionicons name="notifications-outline" size={20} color={T.white} />
-                {unreadCount > 0 && (
-                  <View style={s.bellBadge}>
-                    <Text style={s.bellBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                  </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {['admin', 'super_admin'].includes(userData?.role || '') && (
+                  <TouchableOpacity onPress={() => router.push('/manage')} style={s.adminConsoleBtn} activeOpacity={0.8}>
+                    <LinearGradient colors={['#f5a623', '#d4890e']} style={s.adminConsoleBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                      <Ionicons name="shield-checkmark" size={10} color="#0d1b3e" style={{ marginRight: 3 }} />
+                      <Text style={s.adminConsoleBtnTxt}>Admin</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/notifications')} style={s.bellBtn} activeOpacity={0.8}>
+                  <Ionicons name="notifications-outline" size={20} color={T.white} />
+                  {unreadCount > 0 && (
+                    <View style={s.bellBadge}>
+                      <Text style={s.bellBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* ── Welcome Row ── */}
           <View style={s.welcomeRow}>
@@ -664,251 +673,296 @@ export default function Dashboard() {
           </View>
         </LinearGradient>
 
-        {/* ─── DYNAMIC PROMO BANNERS CAROUSEL ─── */}
-        <DynamicBanners placement="dashboard" />
+        {/* ── Content Sections: 2-column on Desktop, 1-column on Mobile/Tablet ── */}
+        {(() => {
+          const bannersEl = <DynamicBanners placement="dashboard" />;
 
-        {/* Database Warning */}
-        {dbError && (
-          <View style={s.dbErrorBox}>
-            <View style={s.dbErrorHeader}>
-              <Ionicons name="warning" size={16} color="#EF4444" />
-              <Text style={s.dbErrorTitle}>Database Access Limited</Text>
-            </View>
-            <Text style={s.dbErrorText}>Infinite recursion detected in database policies. Please apply the SQL fix to Supabase database.</Text>
-          </View>
-        )}
-
-        {/* ─── Modernized Quick Actions Section ─── */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={s.sectionTitle}>Quick Actions</Text>
-              <View style={{ backgroundColor: T.navyMid + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                <Text style={{ fontSize: 9, fontWeight: '800', color: T.navyMid }}>{pinnedActions.length} Pinned</Text>
+          const dbErrorEl = dbError ? (
+            <View style={s.dbErrorBox}>
+              <View style={s.dbErrorHeader}>
+                <Ionicons name="warning" size={16} color="#EF4444" />
+                <Text style={s.dbErrorTitle}>Database Access Limited</Text>
               </View>
+              <Text style={s.dbErrorText}>Infinite recursion detected in database policies. Please apply the SQL fix to Supabase database.</Text>
             </View>
-            <TouchableOpacity 
-              activeOpacity={0.7} 
-              style={s.editBtn}
-              onPress={() => setShowEditQuickActionsModal(true)}
-            >
-              <Ionicons name="create-outline" size={11} color={T.indigo} style={{ marginRight: 3 }} />
-              <Text style={s.editBtnTxt}>Edit Actions</Text>
-            </TouchableOpacity>
-          </View>
+          ) : null;
 
-          <View style={s.actionsGrid}>
-            {displayedActions.map((act, index) => {
-              const isBadged = Boolean(act.badge);
-              return (
-                <TouchableOpacity
-                  key={act.id || index}
-                  style={s.actionItem}
-                  onPress={(e) => {
-                    if (act.route === 'more') setShowAllActions(true);
-                    else if (act.route === 'less') setShowAllActions(false);
-                    else handleActionPress(act, e);
-                  }}
-                  activeOpacity={0.75}
+          const quickActionsEl = (
+            <View style={[s.section, isDesktop && { marginHorizontal: 0, marginTop: 0 }]}>
+              <View style={s.sectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={s.sectionTitle}>Quick Actions</Text>
+                  <View style={{ backgroundColor: T.navyMid + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '800', color: T.navyMid }}>{pinnedActions.length} Pinned</Text>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  activeOpacity={0.7} 
+                  style={s.editBtn}
+                  onPress={() => setShowEditQuickActionsModal(true)}
                 >
-                  <Animated.View
-                    style={[
-                      s.actionIconBox,
-                      { borderColor: act.color + '45' },
-                      isBadged && { transform: [{ scale: pulseAnim }] },
-                    ]}
-                  >
-                    <Ionicons name={act.icon as any} size={24} color={act.color} />
-                    {act.badge ? (
-                      <View style={[s.badgeOverlay, { backgroundColor: act.color }]}>
-                        <Text style={s.badgeText}>{act.badge}</Text>
-                      </View>
-                    ) : null}
-                  </Animated.View>
-                  <Text style={s.actionLabel} numberOfLines={1}>{act.label}</Text>
+                  <Ionicons name="create-outline" size={11} color={T.indigo} style={{ marginRight: 3 }} />
+                  <Text style={s.editBtnTxt}>Edit Actions</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ─── Refer & Earn Banner ─── */}
-        <View style={s.promoContainer}>
-          <LinearGradient 
-            colors={['#071633', '#0e2652']} 
-            style={s.promoCard}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          >
-            <View style={s.promoLeft}>
-              <Text style={s.promoTitle}>Refer & Earn</Text>
-              <Text style={s.promoDesc}>Invite friends and earn exciting rewards</Text>
-              <TouchableOpacity onPress={() => router.push('/referrals')} style={s.promoBtn} activeOpacity={0.8}>
-                <Text style={s.promoBtnTxt}>Refer Now</Text>
-                <Ionicons name="arrow-forward" size={10} color={T.white} style={{ marginLeft: 4 }} />
-              </TouchableOpacity>
-            </View>
-            <View style={s.promoRight}>
-              <Image source={require('../../assets/images/referral_gift.jpg')} style={s.promoGiftImage} resizeMode="contain" />
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* ─── Customer Reviews Banner ─── */}
-        <View style={[s.promoContainer, { marginTop: -8 }]}>
-          <TouchableOpacity onPress={() => router.push('/reviews')} activeOpacity={0.85}>
-            <LinearGradient 
-              colors={['#0d1b3e', '#142258']} 
-              style={[s.promoCard, { borderWidth: 1, borderColor: 'rgba(245,166,35,0.3)' }]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            >
-              <View style={s.promoLeft}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                  <Text style={[s.promoTitle, { fontSize: 12 }]}>Customer Reviews</Text>
-                  <View style={{ flexDirection: 'row', marginLeft: 5, gap: 1 }}>
-                    {[1,2,3,4,5].map(st => <Ionicons key={st} name="star" size={9} color="#f5a623" />)}
-                  </View>
-                </View>
-                <Text style={s.promoDesc}>See what 1,400+ satisfied users say or leave your rating!</Text>
-                <View style={[s.promoBtn, { backgroundColor: '#f5a623', marginTop: 6 }]}>
-                  <Text style={[s.promoBtnTxt, { color: '#0d1b3e', fontWeight: 'bold' }]}>Explore Reviews</Text>
-                  <Ionicons name="arrow-forward" size={10} color="#0d1b3e" style={{ marginLeft: 4 }} />
-                </View>
               </View>
-              <View style={s.promoRight}>
-                <Ionicons name="chatbubbles" size={40} color="rgba(245, 166, 35, 0.3)" />
+
+              <View style={s.actionsGrid}>
+                {displayedActions.map((act, index) => {
+                  const isBadged = Boolean(act.badge);
+                  return (
+                    <TouchableOpacity
+                      key={act.id || index}
+                      style={[s.actionItem, { width: actionItemWidth }]}
+                      onPress={(e) => {
+                        if (act.route === 'more') setShowAllActions(true);
+                        else if (act.route === 'less') setShowAllActions(false);
+                        else handleActionPress(act, e);
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <Animated.View
+                        style={[
+                          s.actionIconBox,
+                          { borderColor: act.color + '45' },
+                          isBadged && { transform: [{ scale: pulseAnim }] },
+                        ]}
+                      >
+                        <Ionicons name={act.icon as any} size={24} color={act.color} />
+                        {act.badge ? (
+                          <View style={[s.badgeOverlay, { backgroundColor: act.color }]}>
+                            <Text style={s.badgeText}>{act.badge}</Text>
+                          </View>
+                        ) : null}
+                      </Animated.View>
+                      <Text style={s.actionLabel} numberOfLines={1}>{act.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* ─── Recent Transactions ─── */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Recent Transactions</Text>
-            <TouchableOpacity onPress={() => router.push('/history')} activeOpacity={0.7}>
-              <Text style={s.seeAllTxt}>See All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {(() => {
-            if (transactions.length === 0) {
-              return (
-                <View style={s.txEmpty}>
-                  <Ionicons name="receipt-outline" size={18} color={T.textSub} style={{ marginBottom: 5 }} />
-                  <Text style={s.txEmptyText}>No recent transactions</Text>
-                </View>
-              );
-            }
-            return transactions.slice(0, 3).map((tx, i) => {
-              const isDeposit = tx.type === 'deposit' || tx.type === 'referral_withdrawal';
-              let iconName: any = 'arrow-up';
-              let iconBg = '#107c10';
-              if (tx.type === 'payment' || tx.type === 'bill') { iconName = 'receipt'; iconBg = '#0056d2'; }
-              else if (tx.type === 'transfer') { iconName = 'arrow-up'; iconBg = '#ef4444'; }
-              else if (isDeposit) { iconName = 'arrow-down'; iconBg = '#107c10'; }
-
-              let metaText = '';
-              if (tx.metadata) {
-                const meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : tx.metadata;
-                metaText = meta.recipient || meta.biller || meta.bank_name || meta.method || '';
-              }
-              if (!metaText) {
-                if (tx.type === 'deposit') metaText = 'Bank Transfer';
-                else if (tx.type === 'transfer') metaText = 'Transfer Out';
-                else if (tx.type === 'bill' || tx.type === 'payment') {
-                  if (tx.description?.toLowerCase().includes('airtime')) metaText = 'MTN – 0803 123 4567';
-                  else if (tx.description?.toLowerCase().includes('electricity')) metaText = 'KEDCO – Prepaid';
-                  else metaText = 'Utility Bill';
-                }
-              }
-
-              return (
-                <View key={tx.id || i} style={s.txRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <View style={[s.txIconBox, { backgroundColor: iconBg + '18' }]}>
-                      <Ionicons name={iconName} size={14} color={iconBg} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.txTitle} numberOfLines={1}>{tx.description || 'Transaction'}</Text>
-                      <Text style={s.txSub} numberOfLines={1}>{metaText}</Text>
-                    </View>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[s.txAmount, { color: isDeposit ? '#107c10' : '#ef4444' }]}>
-                      {isDeposit ? '+' : '-'}₦{parseFloat(tx.amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </Text>
-                    <Text style={s.txDateText}>{formatTxDate(tx.created_at)}</Text>
-                  </View>
-                </View>
-              );
-            });
-          })()}
-        </View>
-
-        {/* ─── Pay Bills Scroll Row ─── */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Pay Bills</Text>
-            <TouchableOpacity onPress={() => router.push('/bills')} activeOpacity={0.7}>
-              <Text style={s.seeAllTxt}>See All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.billsScroll}>
-            {[
-              { label: 'PHCN',       gradient: ['#fef08a', '#fef9c3'], icon: 'flash',             color: '#eab308' },
-              { label: 'DStv',       gradient: ['#dbeafe', '#eff6ff'], icon: 'tv',                color: '#2563eb' },
-              { label: 'GOtv',       gradient: ['#bbf7d0', '#f0fdf4'], icon: 'play-circle',       color: '#16a34a' },
-              { label: 'StarTimes',  gradient: ['#fed7aa', '#fff7ed'], icon: 'star',              color: '#ea580c' },
-              { label: 'Spectranet', gradient: ['#f5d0fe', '#fdf4ff'], icon: 'globe',             color: '#d946ef' },
-              { label: 'More',       gradient: ['#e2e8f0', '#f1f5f9'], icon: 'ellipsis-horizontal', color: '#64748b' }
-            ].map((op, i) => (
-              <TouchableOpacity key={i} onPress={() => router.push('/bills')} style={s.billOpCard} activeOpacity={0.8}>
-                <LinearGradient colors={op.gradient as any} style={s.billOpGlow}>
-                  <Ionicons name={op.icon as any} size={20} color={op.color} />
-                </LinearGradient>
-                <Text style={s.billOpLabel}>{op.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* ─── Our Partners ─── */}
-        {activePartners.length > 0 && (
-          <View style={s.section}>
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionTitle}>Our Partners</Text>
             </View>
-            <View style={{ overflow: 'hidden', height: 52, width: '100%' }}>
-              <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: partnerAnim }] }}>
-                {[...activePartners, ...activePartners, ...activePartners, ...activePartners].map((partner, i) => (
-                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, backgroundColor: '#f8fafc', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                    {partner.logo_url ? (
-                      <Image source={{ uri: partner.logo_url }} style={{ width: 24, height: 24, borderRadius: 5, marginRight: 6 }} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="business" size={20} color="#CBD5E1" style={{ marginRight: 6 }} />
-                    )}
-                    <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>{partner.name}</Text>
-                  </View>
+          );
+
+          const payBillsEl = (
+            <View style={[s.section, isDesktop && { marginHorizontal: 0 }]}>
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionTitle}>Pay Bills</Text>
+                <TouchableOpacity onPress={() => router.push('/bills')} activeOpacity={0.7}>
+                  <Text style={s.seeAllTxt}>See All</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.billsScroll}>
+                {[
+                  { label: 'PHCN',       gradient: ['#fef08a', '#fef9c3'], icon: 'flash',             color: '#eab308' },
+                  { label: 'DStv',       gradient: ['#dbeafe', '#eff6ff'], icon: 'tv',                color: '#2563eb' },
+                  { label: 'GOtv',       gradient: ['#bbf7d0', '#f0fdf4'], icon: 'play-circle',       color: '#16a34a' },
+                  { label: 'StarTimes',  gradient: ['#fed7aa', '#fff7ed'], icon: 'star',              color: '#ea580c' },
+                  { label: 'Spectranet', gradient: ['#f5d0fe', '#fdf4ff'], icon: 'globe',             color: '#d946ef' },
+                  { label: 'More',       gradient: ['#e2e8f0', '#f1f5f9'], icon: 'ellipsis-horizontal', color: '#64748b' }
+                ].map((op, i) => (
+                  <TouchableOpacity key={i} onPress={() => router.push('/bills')} style={s.billOpCard} activeOpacity={0.8}>
+                    <LinearGradient colors={op.gradient as any} style={s.billOpGlow}>
+                      <Ionicons name={op.icon as any} size={20} color={op.color} />
+                    </LinearGradient>
+                    <Text style={s.billOpLabel}>{op.label}</Text>
+                  </TouchableOpacity>
                 ))}
-              </Animated.View>
+              </ScrollView>
             </View>
-          </View>
-        )}
+          );
 
-        {/* ─── Secure Banner ─── */}
-        <TouchableOpacity style={s.secureBanner} activeOpacity={0.9}>
-          <View style={s.secureLeft}>
-            <View style={s.secureShield}>
-              <Ionicons name="shield-checkmark" size={16} color={T.goldDk} />
+          const referEarnEl = (
+            <View style={[s.promoContainer, isDesktop && { marginHorizontal: 0 }]}>
+              <LinearGradient 
+                colors={['#071633', '#0e2652']} 
+                style={s.promoCard}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              >
+                <View style={s.promoLeft}>
+                  <Text style={s.promoTitle}>Refer & Earn</Text>
+                  <Text style={s.promoDesc}>Invite friends and earn exciting rewards</Text>
+                  <TouchableOpacity onPress={() => router.push('/referrals')} style={s.promoBtn} activeOpacity={0.8}>
+                    <Text style={s.promoBtnTxt}>Refer Now</Text>
+                    <Ionicons name="arrow-forward" size={10} color={T.white} style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                </View>
+                <View style={s.promoRight}>
+                  <Image source={require('../../assets/images/referral_gift.jpg')} style={s.promoGiftImage} resizeMode="contain" />
+                </View>
+              </LinearGradient>
             </View>
-            <View style={{ marginLeft: 10, flex: 1 }}>
-              <Text style={s.secureTitle}>Secure. Fast. Reliable.</Text>
-              <Text style={s.secureDesc} numberOfLines={1}>Your transactions are protected with top-tier security.</Text>
+          );
+
+          const reviewsEl = (
+            <View style={[s.promoContainer, { marginTop: isDesktop ? 0 : -8 }, isDesktop && { marginHorizontal: 0 }]}>
+              <TouchableOpacity onPress={() => router.push('/reviews')} activeOpacity={0.85}>
+                <LinearGradient 
+                  colors={['#0d1b3e', '#142258']} 
+                  style={[s.promoCard, { borderWidth: 1, borderColor: 'rgba(245,166,35,0.3)' }]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                >
+                  <View style={s.promoLeft}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                      <Text style={[s.promoTitle, { fontSize: 12 }]}>Customer Reviews</Text>
+                      <View style={{ flexDirection: 'row', marginLeft: 5, gap: 1 }}>
+                        {[1,2,3,4,5].map(st => <Ionicons key={st} name="star" size={9} color="#f5a623" />)}
+                      </View>
+                    </View>
+                    <Text style={s.promoDesc}>See what 1,400+ satisfied users say or leave your rating!</Text>
+                    <View style={[s.promoBtn, { backgroundColor: '#f5a623', marginTop: 6 }]}>
+                      <Text style={[s.promoBtnTxt, { color: '#0d1b3e', fontWeight: 'bold' }]}>Explore Reviews</Text>
+                      <Ionicons name="arrow-forward" size={10} color="#0d1b3e" style={{ marginLeft: 4 }} />
+                    </View>
+                  </View>
+                  <View style={s.promoRight}>
+                    <Ionicons name="chatbubbles" size={40} color="rgba(245, 166, 35, 0.3)" />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={T.navy} />
-        </TouchableOpacity>
+          );
+
+          const transactionsEl = (
+            <View style={[s.section, isDesktop && { marginHorizontal: 0, marginTop: 0 }]}>
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionTitle}>Recent Transactions</Text>
+                <TouchableOpacity onPress={() => router.push('/history')} activeOpacity={0.7}>
+                  <Text style={s.seeAllTxt}>See All</Text>
+                </TouchableOpacity>
+              </View>
+
+              {(() => {
+                if (transactions.length === 0) {
+                  return (
+                    <View style={s.txEmpty}>
+                      <Ionicons name="receipt-outline" size={18} color={T.textSub} style={{ marginBottom: 5 }} />
+                      <Text style={s.txEmptyText}>No recent transactions</Text>
+                    </View>
+                  );
+                }
+                return transactions.slice(0, 3).map((tx, i) => {
+                  const isDeposit = tx.type === 'deposit' || tx.type === 'referral_withdrawal';
+                  let iconName: any = 'arrow-up';
+                  let iconBg = '#107c10';
+                  if (tx.type === 'payment' || tx.type === 'bill') { iconName = 'receipt'; iconBg = '#0056d2'; }
+                  else if (tx.type === 'transfer') { iconName = 'arrow-up'; iconBg = '#ef4444'; }
+                  else if (isDeposit) { iconName = 'arrow-down'; iconBg = '#107c10'; }
+
+                  let metaText = '';
+                  if (tx.metadata) {
+                    const meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : tx.metadata;
+                    metaText = meta.recipient || meta.biller || meta.bank_name || meta.method || '';
+                  }
+                  if (!metaText) {
+                    if (tx.type === 'deposit') metaText = 'Bank Transfer';
+                    else if (tx.type === 'transfer') metaText = 'Transfer Out';
+                    else if (tx.type === 'bill' || tx.type === 'payment') {
+                      if (tx.description?.toLowerCase().includes('airtime')) metaText = 'MTN – 0803 123 4567';
+                      else if (tx.description?.toLowerCase().includes('electricity')) metaText = 'KEDCO – Prepaid';
+                      else metaText = 'Utility Bill';
+                    }
+                  }
+
+                  return (
+                    <View key={tx.id || i} style={s.txRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <View style={[s.txIconBox, { backgroundColor: iconBg + '18' }]}>
+                          <Ionicons name={iconName} size={14} color={iconBg} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.txTitle} numberOfLines={1}>{tx.description || 'Transaction'}</Text>
+                          <Text style={s.txSub} numberOfLines={1}>{metaText}</Text>
+                        </View>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[s.txAmount, { color: isDeposit ? '#107c10' : '#ef4444' }]}>
+                          {isDeposit ? '+' : '-'}₦{parseFloat(tx.amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Text>
+                        <Text style={s.txDateText}>{formatTxDate(tx.created_at)}</Text>
+                      </View>
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+          );
+
+          const partnersEl = activePartners.length > 0 ? (
+            <View style={[s.section, isDesktop && { marginHorizontal: 0 }]}>
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionTitle}>Our Partners</Text>
+              </View>
+              <View style={{ overflow: 'hidden', height: 52, width: '100%' }}>
+                <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: partnerAnim }] }}>
+                  {[...activePartners, ...activePartners, ...activePartners, ...activePartners].map((partner, i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, backgroundColor: '#f8fafc', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                      {partner.logo_url ? (
+                        <Image source={{ uri: partner.logo_url }} style={{ width: 24, height: 24, borderRadius: 5, marginRight: 6 }} resizeMode="contain" />
+                      ) : (
+                        <Ionicons name="business" size={20} color="#CBD5E1" style={{ marginRight: 6 }} />
+                      )}
+                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>{partner.name}</Text>
+                    </View>
+                  ))}
+                </Animated.View>
+              </View>
+            </View>
+          ) : null;
+
+          const secureBannerEl = (
+            <TouchableOpacity style={[s.secureBanner, isDesktop && { marginHorizontal: 0 }]} activeOpacity={0.9}>
+              <View style={s.secureLeft}>
+                <View style={s.secureShield}>
+                  <Ionicons name="shield-checkmark" size={16} color={T.goldDk} />
+                </View>
+                <View style={{ marginLeft: 10, flex: 1 }}>
+                  <Text style={s.secureTitle}>Secure. Fast. Reliable.</Text>
+                  <Text style={s.secureDesc} numberOfLines={1}>Your transactions are protected with top-tier security.</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={T.navy} />
+            </TouchableOpacity>
+          );
+
+          if (isDesktop) {
+            return (
+              <View style={{ flexDirection: 'row', gap: 16, paddingHorizontal: 16, marginTop: 12, alignItems: 'flex-start' }}>
+                {/* Left Column (Desktop) */}
+                <View style={{ flex: 1.25 }}>
+                  {bannersEl}
+                  {dbErrorEl}
+                  {quickActionsEl}
+                  {payBillsEl}
+                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
+                    <View style={{ flex: 1 }}>{referEarnEl}</View>
+                    <View style={{ flex: 1 }}>{reviewsEl}</View>
+                  </View>
+                </View>
+
+                {/* Right Column (Desktop) */}
+                <View style={{ flex: 0.95 }}>
+                  {transactionsEl}
+                  {partnersEl}
+                  {secureBannerEl}
+                </View>
+              </View>
+            );
+          }
+
+          return (
+            <>
+              {bannersEl}
+              {dbErrorEl}
+              {quickActionsEl}
+              {referEarnEl}
+              {reviewsEl}
+              {transactionsEl}
+              {payBillsEl}
+              {partnersEl}
+              {secureBannerEl}
+            </>
+          );
+        })()}
 
       </ScrollView>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Dimensions, TextInput, StyleSheet, Platform,
-  Image, Alert, StatusBar, Animated,
+  Image, Alert, StatusBar, Animated, useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -148,6 +148,14 @@ const TABS = [
 
 export default function AdminDashboard() {
   const router    = useRouter();
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width >= 1200;
+  const isTablet  = Platform.OS === 'web' && width >= 768 && width < 1200;
+  const isWebDesktop = Platform.OS === 'web' && width >= 768;
+
+  const statCardWidth = isDesktop ? '23.8%' : isTablet ? '48.5%' : (width - 32 - 10) / 2;
+  const modCardWidth  = isDesktop ? '23.8%' : isTablet ? '31.8%' : (width - 32 - 28 - 10) / 2;
+
   const pulse     = useRef(new Animated.Value(1)).current;
   const [profile, setProfile]   = useState<any>(null);
   const [loading, setLoading]   = useState(true);
@@ -253,7 +261,7 @@ export default function AdminDashboard() {
             return (
               <TouchableOpacity
                 key={i}
-                style={s.modCard}
+                style={[s.modCard, { width: modCardWidth }]}
                 activeOpacity={0.72}
                 onPress={()=>{
                   if(locked){Alert.alert('Access Restricted 🔒','Only Super Admin can access this.');return;}
@@ -298,7 +306,12 @@ export default function AdminDashboard() {
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor={C.navy}/>
 
-      <ScrollView style={{flex:1}} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} bounces={Platform.OS==='ios'}>
+      <ScrollView 
+        style={{flex:1}} 
+        contentContainerStyle={[{paddingBottom: isWebDesktop ? 40 : 100}, isWebDesktop && { maxWidth: 1400, width: '100%', alignSelf: 'center', paddingHorizontal: 16 }]} 
+        showsVerticalScrollIndicator={false} 
+        bounces={Platform.OS==='ios'}
+      >
 
         {/* ── HEADER ── */}
         <LinearGradient colors={[C.navy,C.navyMid]} start={{x:0,y:0}} end={{x:1,y:1}} style={s.header}>
@@ -306,35 +319,37 @@ export default function AdminDashboard() {
           <View style={s.orb1}/>
           <View style={s.orb2}/>
 
-          {/* Top Row */}
-          <View style={s.topRow}>
-            <View style={s.brand}>
-              <View style={s.logoBox}>
-                <Image source={logo?{uri:logo}:require('../../assets/images/logo-icon.png')} style={s.logoImg as any} resizeMode="contain"/>
-              </View>
-              <View>
-                <Text style={s.brandName}>ABU MAFHAL</Text>
-                <Text style={s.brandTag}>ADMIN CONTROL CENTRE</Text>
-              </View>
-            </View>
-            <View style={s.topRight}>
-              <TouchableOpacity style={s.switchBtn} onPress={()=>router.replace('/(app)/dashboard')} activeOpacity={0.8}>
-                <Ionicons name="swap-horizontal" size={12} color={C.gold}/>
-                <Text style={s.switchText}>App</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.avatarWrap} onPress={()=>router.push('/manage/profile')} activeOpacity={0.85}>
-                <View style={s.avatarRing}>
-                  <View style={s.avatarCircle}>
-                    {profile?.avatar_url
-                      ? <Image source={{uri:profile.avatar_url}} style={s.avatarImg}/>
-                      : <Text style={s.avatarInit}>{profile?.full_name?.[0]?.toUpperCase()||'A'}</Text>
-                    }
-                  </View>
+          {/* Top Row (Mobile only - Desktop has AdminWebHeader) */}
+          {!isWebDesktop && (
+            <View style={s.topRow}>
+              <View style={s.brand}>
+                <View style={s.logoBox}>
+                  <Image source={logo?{uri:logo}:require('../../assets/images/logo-icon.png')} style={s.logoImg as any} resizeMode="contain"/>
                 </View>
-                <Animated.View style={[s.onlineDot,{opacity:pulse}]}/>
-              </TouchableOpacity>
+                <View>
+                  <Text style={s.brandName}>ABU MAFHAL</Text>
+                  <Text style={s.brandTag}>ADMIN CONTROL CENTRE</Text>
+                </View>
+              </View>
+              <View style={s.topRight}>
+                <TouchableOpacity style={s.switchBtn} onPress={()=>router.replace('/(app)/dashboard')} activeOpacity={0.8}>
+                  <Ionicons name="swap-horizontal" size={12} color={C.gold}/>
+                  <Text style={s.switchText}>App</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.avatarWrap} onPress={()=>router.push('/manage/profile')} activeOpacity={0.85}>
+                  <View style={s.avatarRing}>
+                    <View style={s.avatarCircle}>
+                      {profile?.avatar_url
+                        ? <Image source={{uri:profile.avatar_url}} style={s.avatarImg}/>
+                        : <Text style={s.avatarInit}>{profile?.full_name?.[0]?.toUpperCase()||'A'}</Text>
+                      }
+                    </View>
+                  </View>
+                  <Animated.View style={[s.onlineDot,{opacity:pulse}]}/>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Greeting */}
           <View style={s.greetRow}>
@@ -376,7 +391,7 @@ export default function AdminDashboard() {
         <View style={s.statsSec}>
           <View style={s.statsGrid}>
             {stats.map((sc,i)=>(
-              <TouchableOpacity key={i} style={s.statCard} activeOpacity={0.78} onPress={()=>router.push(sc.r as any)}>
+              <TouchableOpacity key={i} style={[s.statCard, { width: statCardWidth }]} activeOpacity={0.78} onPress={()=>router.push(sc.r as any)}>
                 <View style={[s.statIcon,{backgroundColor:sc.b}]}>
                   <Ionicons name={sc.i as any} size={16} color={sc.c}/>
                 </View>
@@ -438,17 +453,19 @@ export default function AdminDashboard() {
         </View>
       </ScrollView>
 
-      {/* ── BOTTOM DOCK ── */}
-      <View style={s.dock}>
-        {DOCK.map((d,i)=>(
-          <TouchableOpacity key={i} style={s.dockItem} onPress={()=>router.push(d.r as any)} activeOpacity={0.75}>
-            <View style={s.dockIconBox}>
-              <Ionicons name={d.i as any} size={18} color={C.navy}/>
-            </View>
-            <Text style={s.dockLabel}>{d.l}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* ── BOTTOM DOCK (Mobile only) ── */}
+      {!isWebDesktop && (
+        <View style={s.dock}>
+          {DOCK.map((d,i)=>(
+            <TouchableOpacity key={i} style={s.dockItem} onPress={()=>router.push(d.r as any)} activeOpacity={0.75}>
+              <View style={s.dockIconBox}>
+                <Ionicons name={d.i as any} size={18} color={C.navy}/>
+              </View>
+              <Text style={s.dockLabel}>{d.l}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
