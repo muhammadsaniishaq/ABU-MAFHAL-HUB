@@ -544,6 +544,33 @@ export default function AdminSettings() {
                                 title="Force App Update" subtitle="Require users with older versions to update before accessing the app"
                                 icon="cloud-download" color="#DB2777" value={forceAppUpdate} onValueChange={setForceAppUpdate}
                             />
+                            <TouchableOpacity
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    backgroundColor: '#FEF3C7',
+                                    borderWidth: 1,
+                                    borderColor: '#FDE68A',
+                                    borderRadius: 14,
+                                    padding: 12,
+                                    marginVertical: 10,
+                                }}
+                                onPress={() => router.push('/manage/app-update')}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                    <Ionicons name="sparkles" size={20} color="#D97706" />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#B45309' }}>
+                                            Dedicated App Update & Release Manager 🚀
+                                        </Text>
+                                        <Text style={{ fontSize: 11, color: '#92400E' }}>
+                                            Loda APK, sarrafa AI features, da tura push broadcast kai tsaye.
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Ionicons name="arrow-forward" size={16} color="#B45309" />
+                            </TouchableOpacity>
                             <InputRow 
                                 label="Latest App Version" 
                                 value={latestAppVersion} 

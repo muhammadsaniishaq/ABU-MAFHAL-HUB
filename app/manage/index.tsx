@@ -75,6 +75,7 @@ const MODS = {
     { t:'Crypto Mgmt',     i:'logo-bitcoin',     r:'/manage/crypto',         c:N,  b:NL },
   ],
   technical: [
+    { t:'App Updates',     i:'cloud-download',   r:'/manage/app-update',     c:G,  b:GL,  tag:'AI/OTA', badge:1 },
     { t:'Infrastructure',  i:'server',           r:'/manage/infrastructure', c:N,  b:NL },
     { t:'Database',        i:'server',           r:'/manage/db',             c:G,  b:GL },
     { t:'API Vault',       i:'code-working',     r:'/manage/api',            c:N,  b:NL },
@@ -106,6 +107,7 @@ const MODS = {
 
 const QUICK = [
   { l:'Master Hub',  i:'ribbon',           r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
+  { l:'App Updates', i:'cloud-download',   r:'/manage/app-update',     c:G,  b:GL,  tag:'AI' },
   { l:'Profits & Expenses', i:'calculator', r:'/manage/accounting',     c:G,  b:GL,  tag:'Super', sup:true },
   { l:'Audit Logs',  i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
   { l:'Users',       i:'people',           r:'/manage/users',          c:G,  b:GL },

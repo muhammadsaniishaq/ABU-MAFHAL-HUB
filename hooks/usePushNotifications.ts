@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Platform, Alert } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../services/supabase';
@@ -305,8 +305,38 @@ export function usePushNotifications() {
       );
 
       responseListener.current = NotificationsModule.addNotificationResponseReceivedListener(
-        (response: any) => {
-          const route = response?.notification?.request?.content?.data?.route;
+        async (response: any) => {
+          const data = response?.notification?.request?.content?.data;
+          const url =
+            data?.url ||
+            (typeof data?.route === 'string' &&
+            (data.route.startsWith('http://') ||
+              data.route.startsWith('https://') ||
+              data.route.startsWith('market://'))
+              ? data.route
+              : null);
+
+          if (url) {
+            try {
+              if (Platform.OS === 'android' && url.includes('play.google.com/store/apps/details?id=')) {
+                const pkg = url.split('id=')[1]?.split('&')[0];
+                if (pkg) {
+                  const marketUri = `market://details?id=${pkg}`;
+                  const canOpen = await Linking.canOpenURL(marketUri);
+                  if (canOpen) {
+                    await Linking.openURL(marketUri);
+                    return;
+                  }
+                }
+              }
+              await Linking.openURL(url);
+              return;
+            } catch (err) {
+              console.warn('[Push] Error opening URL from notification tap:', err);
+            }
+          }
+
+          const route = data?.route;
           if (route) {
             router.push(route);
           }
