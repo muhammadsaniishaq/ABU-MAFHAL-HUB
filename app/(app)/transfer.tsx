@@ -30,6 +30,7 @@ import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import SecurityModal from '../../components/SecurityModal';
 import Device2FAModal from '../../components/Device2FAModal';
+import TransferActivationModal from '../../components/TransferActivationModal';
 import DynamicBanners from '../../components/DynamicBanners';
 import { createAppNotification } from '../../services/notificationsHelper';
 import { ReceiptData, shareReceiptFile } from '../../services/receiptGenerator';
@@ -387,9 +388,48 @@ export default function TransferScreen() {
     const [userKycTier, setUserKycTier] = useState<number | null>(null);
     const [userStatus, setUserStatus] = useState<string>('active');
 
-    // Derived KYC States
+    // Transfer Access & Compliance States (Tier 3 Prerequisite + Admin Approval + 24hr Cooldown)
+    const [transferStatus, setTransferStatus] = useState<string>('not_applied'); // 'not_applied' | 'pending' | 'approved' | 'rejected'
+    const [transferApproved, setTransferApproved] = useState<boolean>(false);
+    const [transferUnlockAt, setTransferUnlockAt] = useState<string | null>(null);
+    const [transferRejectionReason, setTransferRejectionReason] = useState<string | null>(null);
+    const [showActivationModal, setShowActivationModal] = useState<boolean>(false);
+    const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState<number>(0);
+
+    // 24-Hour Cooldown Countdown Timer
+    useEffect(() => {
+        if (!transferUnlockAt) {
+            setCooldownRemainingSeconds(0);
+            return;
+        }
+        const calculateRemaining = () => {
+            const unlockTime = new Date(transferUnlockAt).getTime();
+            const now = Date.now();
+            const diffSeconds = Math.max(0, Math.ceil((unlockTime - now) / 1000));
+            setCooldownRemainingSeconds(diffSeconds);
+        };
+        calculateRemaining();
+        const interval = setInterval(calculateRemaining, 1000);
+        return () => clearInterval(interval);
+    }, [transferUnlockAt]);
+
+    const formatRemainingTime = (totalSeconds: number) => {
+        if (totalSeconds <= 0) return '00:00:00';
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+        return `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+    };
+
+    // Derived KYC & Transfer Access States
     const isKycLoading = userKycTier === null;
-    const isKycLocked = userKycTier !== null && userKycTier < 2;
+    const isTier3Qualified = userKycTier !== null && userKycTier >= 3;
+    const isTransferUnlocked = isTier3Qualified && transferStatus === 'approved' && transferApproved === true && cooldownRemainingSeconds <= 0;
+    const isTransferCooldownActive = isTier3Qualified && transferStatus === 'approved' && cooldownRemainingSeconds > 0;
+    const isTransferPending = isTier3Qualified && transferStatus === 'pending';
+    const isTransferRejected = isTier3Qualified && transferStatus === 'rejected';
+    const isTransferNotApplied = !isTransferPending && !isTransferRejected && !isTransferCooldownActive && !isTransferUnlocked;
 
     // Device 2FA Authorization States (New Device Guard)
     const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null);
@@ -515,7 +555,7 @@ export default function TransferScreen() {
                 checkDeviceVerification(user.id);
                 const { data } = await supabase
                     .from('profiles')
-                    .select('balance, full_name, kyc_tier, status')
+                    .select('balance, full_name, kyc_tier, status, transfer_status, transfer_approved, transfer_approved_at, transfer_unlock_at, transfer_rejection_reason')
                     .eq('id', user.id)
                     .single();
                 if (data) {
@@ -524,9 +564,17 @@ export default function TransferScreen() {
                     // ✅ Set confirmed tier from DB — clears the null loading state
                     setUserKycTier(Number(data.kyc_tier) || 1);
                     setUserStatus(data.status || 'active');
+                    setTransferStatus(data.transfer_status || 'not_applied');
+                    setTransferApproved(Boolean(data.transfer_approved));
+                    setTransferUnlockAt(data.transfer_unlock_at || null);
+                    setTransferRejectionReason(data.transfer_rejection_reason || null);
                 } else {
                     // DB returned nothing — safe default
                     setUserKycTier(1);
+                    setTransferStatus('not_applied');
+                    setTransferApproved(false);
+                    setTransferUnlockAt(null);
+                    setTransferRejectionReason(null);
                 }
                 fetchTransferHistory(user.id);
             } else {
@@ -536,6 +584,10 @@ export default function TransferScreen() {
                 setShowDevice2FAModal(false);
                 setUserKycTier(null);
                 setUserBalance(0);
+                setTransferStatus('not_applied');
+                setTransferApproved(false);
+                setTransferUnlockAt(null);
+                setTransferRejectionReason(null);
                 setRecentBeneficiaries([]);
                 setTransferHistory([]);
             }
@@ -592,10 +644,11 @@ export default function TransferScreen() {
         return () => { isMounted = false; };
     }, []);
 
-    // Form Validity (Enforces Tier 2+ KYC Requirement & Device 2FA)
+    // Form Validity (Enforces Tier 3 KYC, Admin Approval, 24h Cooldown & Device 2FA)
     const isFormValid = useMemo(() => {
         if (isDeviceVerified === false) return false;
-        if (isKycLoading || isKycLocked) return false;
+        if (isKycLoading || !isTier3Qualified) return false;
+        if (!isTransferUnlocked) return false;
         if (numAmount < MIN_TRANSFER_AMOUNT) return false;
         if (userBalance > 0 && totalDebit > userBalance) return false;
         if (activeTab === 'p2p') {
@@ -603,7 +656,7 @@ export default function TransferScreen() {
         } else {
             return !!selectedBank && accountNumber.trim().length === 10 && !!accountName.trim();
         }
-    }, [isDeviceVerified, isKycLoading, isKycLocked, activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
+    }, [isDeviceVerified, isKycLoading, isTier3Qualified, isTransferUnlocked, activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
 
     // Function to verify bank account details
     const handleVerifyBeneficiary = async () => {
@@ -816,10 +869,55 @@ export default function TransferScreen() {
             return;
         }
 
-        if (isKycLocked) {
+        if (!isTier3Qualified) {
             showTransferNotice(
-                'Tier 2 Verification Required 🔒',
-                'Transfer Feature Locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can transfer funds. Tap Upgrade below to verify now.',
+                'Tier 3 Verification Required 🔒',
+                'Transfer Feature Locked: In compliance with financial security regulations, fund transfers require a Tier 3 Verified Account (Advanced Identity & Proof of Address Verification). Tap Upgrade below to verify now.',
+                false
+            );
+            return;
+        }
+
+        if (isTransferNotApplied) {
+            showTransferNotice(
+                'Transfer Activation Required 🛡️',
+                'You are Tier 3 verified! Please submit your Transfer Activation Application for Compliance Team approval.',
+                false
+            );
+            return;
+        }
+
+        if (isTransferPending) {
+            showTransferNotice(
+                'Application Under Review ⏳',
+                'Your Transfer Activation Application is currently being audited by our Compliance Team. Once approved, a mandatory 24-hour security maturation cooldown begins before transfers unlock.',
+                false
+            );
+            return;
+        }
+
+        if (isTransferRejected) {
+            showTransferNotice(
+                'Application Declined ❌',
+                transferRejectionReason || 'Your Transfer Activation Application was declined. Please re-apply with corrected information.',
+                false
+            );
+            return;
+        }
+
+        if (isTransferCooldownActive) {
+            showTransferNotice(
+                'Security Cooldown Active 🛡️',
+                `Your transfer privilege has been approved! As an anti-theft safeguard on newly authorized accounts, transfers will unlock in ${formatRemainingTime(cooldownRemainingSeconds)}.`,
+                false
+            );
+            return;
+        }
+
+        if (!isTransferUnlocked) {
+            showTransferNotice(
+                'Transfer Locked 🔒',
+                'Transfers are currently locked for this account.',
                 false
             );
             return;
@@ -882,8 +980,24 @@ export default function TransferScreen() {
         setTransferError(null);
 
         try {
-            if (isKycLocked || isKycLoading) {
-                throw new Error("Transfer Feature Locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can transfer funds.");
+            if (isKycLoading || !isTier3Qualified) {
+                throw new Error("Transfer Feature Locked: Fund transfers require a Tier 3 Verified Account. Please complete your Tier 3 verification.");
+            }
+
+            if (isTransferNotApplied) {
+                throw new Error("Transfer Activation Required: Please submit your Transfer Activation Application for Compliance Team approval.");
+            }
+
+            if (isTransferPending) {
+                throw new Error("Application Under Review: Your Transfer Activation Application is currently being audited by our Compliance Team.");
+            }
+
+            if (isTransferCooldownActive) {
+                throw new Error(`Security Cooldown Active: Transfers will unlock in ${formatRemainingTime(cooldownRemainingSeconds)}.`);
+            }
+
+            if (!isTransferUnlocked) {
+                throw new Error("Transfer Locked: Your account has not yet unlocked transfer privileges.");
             }
 
             if (userStatus && userStatus !== 'active') {
@@ -1182,8 +1296,371 @@ export default function TransferScreen() {
     }, [banksList, bankSearchText]);
 
     const popularBanks = useMemo(() => {
-        return banksList.filter((b) => POPULAR_BANK_CODES.includes(b.code)).slice(0, 8);
+        return banksList.slice(0, 8);
     }, [banksList]);
+
+    const renderTransferComplianceGate = () => {
+        if (isKycLoading) {
+            return (
+                <View style={[s.tierLockCard, { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', padding: 14, alignItems: 'center' }]}>
+                    <ActivityIndicator size="small" color="#D97706" />
+                    <Text style={[s.tierLockSubtitle, { marginTop: 6, textAlign: 'center', color: '#64748B' }]}>
+                        Verifying Transfer Security Clearance...
+                    </Text>
+                </View>
+            );
+        }
+
+        // 1. Not Tier 3 (Tier 1 or Tier 2)
+        if (!isTier3Qualified) {
+            return (
+                <View style={s.tierLockCard}>
+                    <View style={s.tierLockHeaderRow}>
+                        <View style={s.tierLockIconBox}>
+                            <Ionicons name="lock-closed" size={18} color="#EF4444" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={s.tierLockTitle}>Transfer Privilege Locked</Text>
+                                <View style={s.tier1Badge}>
+                                    <Text style={s.tier1BadgeText}>TIER {userKycTier || 1} USER</Text>
+                                </View>
+                            </View>
+                            <Text style={s.tierLockSubtitle}>
+                                In compliance with anti-fraud regulations, fund transfers require a Tier 3 Verified Account (Advanced Identity & Proof of Address Verification). Please upgrade to Tier 3 to be eligible for transfer activation.
+                            </Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => router.push('/kyc')}
+                        style={s.tierUpgradeBtn}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="shield-checkmark" size={14} color="#020617" />
+                        <Text style={s.tierUpgradeBtnText}>UPGRADE TO TIER 3 (UNLOCK ELIGIBILITY)</Text>
+                        <Ionicons name="arrow-forward" size={13} color="#020617" />
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
+        // 2. Tier 3 Verified, but not applied yet
+        if (isTransferNotApplied) {
+            return (
+                <View style={[s.tierLockCard, { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' }]}>
+                    <View style={s.tierLockHeaderRow}>
+                        <View style={[s.tierLockIconBox, { backgroundColor: '#FEF3C7' }]}>
+                            <Ionicons name="document-text" size={18} color="#D97706" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={[s.tierLockTitle, { color: '#92400E' }]}>Transfer Activation Required</Text>
+                                <View style={[s.tier1Badge, { backgroundColor: '#10B981' }]}>
+                                    <Text style={s.tier1BadgeText}>TIER 3 ELIGIBLE</Text>
+                                </View>
+                            </View>
+                            <Text style={[s.tierLockSubtitle, { color: '#78350F' }]}>
+                                You are Tier 3 verified! To activate bank transfers and member settlements, submit your Transfer Activation Application for Compliance Team approval.
+                            </Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => setShowActivationModal(true)}
+                        style={[s.tierUpgradeBtn, { backgroundColor: '#D97706' }]}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="create-outline" size={14} color="#FFFFFF" />
+                        <Text style={[s.tierUpgradeBtnText, { color: '#FFFFFF' }]}>APPLY FOR TRANSFER ACTIVATION</Text>
+                        <Ionicons name="arrow-forward" size={13} color="#FFFFFF" />
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
+        // 3. Application Under Review (Pending)
+        if (isTransferPending) {
+            return (
+                <View style={[s.tierLockCard, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
+                    <View style={s.tierLockHeaderRow}>
+                        <View style={[s.tierLockIconBox, { backgroundColor: '#DCFCE7' }]}>
+                            <Ionicons name="hourglass-outline" size={18} color="#15803D" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={[s.tierLockTitle, { color: '#166534' }]}>Application Under Review ⏳</Text>
+                                <View style={[s.tier1Badge, { backgroundColor: '#F59E0B' }]}>
+                                    <Text style={s.tier1BadgeText}>PENDING APPROVAL</Text>
+                                </View>
+                            </View>
+                            <Text style={[s.tierLockSubtitle, { color: '#14532D' }]}>
+                                Your Transfer Activation Application is currently being audited by our Compliance Team. Once approved, a mandatory 24-hour security maturation cooldown begins before transfers unlock.
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            );
+        }
+
+        // 4. Application Declined (Rejected)
+        if (isTransferRejected) {
+            return (
+                <View style={[s.tierLockCard, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}>
+                    <View style={s.tierLockHeaderRow}>
+                        <View style={[s.tierLockIconBox, { backgroundColor: '#FEE2E2' }]}>
+                            <Ionicons name="close-circle" size={18} color="#DC2626" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={[s.tierLockTitle, { color: '#991B1B' }]}>Activation Application Declined ❌</Text>
+                            </View>
+                            <Text style={[s.tierLockSubtitle, { color: '#7F1D1D' }]}>
+                                {transferRejectionReason ? `Reason: ${transferRejectionReason}` : 'Your application could not be verified with current compliance requirements. Please review your details and re-apply.'}
+                            </Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => setShowActivationModal(true)}
+                        style={[s.tierUpgradeBtn, { backgroundColor: '#DC2626' }]}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="refresh-outline" size={14} color="#FFFFFF" />
+                        <Text style={[s.tierUpgradeBtnText, { color: '#FFFFFF' }]}>RE-APPLY FOR TRANSFER ACTIVATION</Text>
+                        <Ionicons name="arrow-forward" size={13} color="#FFFFFF" />
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
+        // 5. Approved with 24-Hour Cooldown Active!
+        if (isTransferCooldownActive) {
+            return (
+                <View style={[s.tierLockCard, { backgroundColor: '#0F172A', borderColor: '#F59E0B', borderWidth: 1.5 }]}>
+                    <View style={s.tierLockHeaderRow}>
+                        <View style={[s.tierLockIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
+                            <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={[s.tierLockTitle, { color: '#F8FAFC' }]}>Transfer Privilege Approved! 🛡️</Text>
+                                <View style={[s.tier1Badge, { backgroundColor: '#F59E0B' }]}>
+                                    <Text style={[s.tier1BadgeText, { color: '#0F172A' }]}>24H COOLDOWN</Text>
+                                </View>
+                            </View>
+                            <Text style={[s.tierLockSubtitle, { color: '#CBD5E1' }]}>
+                                Your application has been approved by Admin! In accordance with financial security standards, a mandatory 24-hour security maturation buffer is active:
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Giant Digital Countdown Timer */}
+                    <View style={{
+                        marginTop: 12,
+                        backgroundColor: '#020617',
+                        borderRadius: 10,
+                        padding: 14,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: 'rgba(245, 158, 11, 0.35)'
+                    }}>
+                        <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
+                            Transfers Automatically Unlock In
+                        </Text>
+                        <Text style={{ color: '#F59E0B', fontSize: 24, fontWeight: '900', letterSpacing: 1 }}>
+                            {formatRemainingTime(cooldownRemainingSeconds)}
+                        </Text>
+                        <Text style={{ color: '#64748B', fontSize: 11, marginTop: 4 }}>
+                            Unlock Date: {new Date(transferUnlockAt!).toLocaleString()}
+                        </Text>
+                    </View>
+                </View>
+            );
+        }
+
+        return null;
+    };
+
+    const renderSubmitButton = (tabType: 'bank' | 'p2p') => {
+        const isBank = tabType === 'bank';
+        if (isSubmitting) {
+            return (
+                <TouchableOpacity style={[s.submitBtn, s.submitBtnActive]} disabled activeOpacity={1}>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                </TouchableOpacity>
+            );
+        }
+
+        if (isKycLoading) {
+            return (
+                <TouchableOpacity style={[s.submitBtn, s.submitBtnDisabled]} disabled activeOpacity={1}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                        <Text style={s.submitBtnText}>CHECKING ACCOUNT...</Text>
+                    </View>
+                </TouchableOpacity>
+            );
+        }
+
+        // 1. Not Tier 3 Qualified
+        if (!isTier3Qualified) {
+            return (
+                <TouchableOpacity
+                    onPress={() => router.push('/kyc')}
+                    style={[s.submitBtn, { backgroundColor: '#B45309' }]}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="lock-closed" size={17} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={s.submitBtnText}>🔒 UPGRADE TO TIER 3 TO TRANSFER</Text>
+                </TouchableOpacity>
+            );
+        }
+
+        // 2. Tier 3, Not Applied
+        if (isTransferNotApplied) {
+            return (
+                <TouchableOpacity
+                    onPress={() => setShowActivationModal(true)}
+                    style={[s.submitBtn, { backgroundColor: '#D97706' }]}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="document-text" size={17} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={s.submitBtnText}>📝 APPLY FOR TRANSFER ACTIVATION</Text>
+                </TouchableOpacity>
+            );
+        }
+
+        // 3. Pending Approval
+        if (isTransferPending) {
+            return (
+                <TouchableOpacity
+                    style={[s.submitBtn, { backgroundColor: '#475569' }]}
+                    disabled
+                    activeOpacity={1}
+                >
+                    <Ionicons name="hourglass-outline" size={17} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={s.submitBtnText}>⏳ APPLICATION UNDER COMPLIANCE REVIEW</Text>
+                </TouchableOpacity>
+            );
+        }
+
+        // 4. Rejected
+        if (isTransferRejected) {
+            return (
+                <TouchableOpacity
+                    onPress={() => setShowActivationModal(true)}
+                    style={[s.submitBtn, { backgroundColor: '#DC2626' }]}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="refresh-circle" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={s.submitBtnText}>❌ APPLICATION DECLINED - RE-APPLY</Text>
+                </TouchableOpacity>
+            );
+        }
+
+        // 5. Cooldown Active
+        if (isTransferCooldownActive) {
+            return (
+                <TouchableOpacity
+                    style={[s.submitBtn, { backgroundColor: '#0F172A', borderWidth: 1.5, borderColor: '#F59E0B' }]}
+                    disabled
+                    activeOpacity={1}
+                >
+                    <Ionicons name="timer-outline" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
+                    <Text style={[s.submitBtnText, { color: '#F59E0B', fontWeight: '900' }]}>
+                        ⏳ UNLOCKS IN {formatRemainingTime(cooldownRemainingSeconds)}
+                    </Text>
+                </TouchableOpacity>
+            );
+        }
+
+        // 6. Fully Unlocked & Active!
+        return (
+            <TouchableOpacity
+                onPress={handleInitiateTransfer}
+                style={[
+                    s.submitBtn,
+                    !isFormValid ? s.submitBtnDisabled : s.submitBtnActive
+                ]}
+                disabled={!isFormValid}
+                activeOpacity={0.85}
+            >
+                <Ionicons
+                    name={isBank ? "arrow-up-circle" : "paper-plane"}
+                    size={18}
+                    color={!isFormValid ? '#64748B' : '#F59E0B'}
+                    style={{ marginRight: 6 }}
+                />
+                <Text style={[s.submitBtnText, !isFormValid && s.submitBtnTextDisabled]}>
+                    {numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
+                        ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
+                        : isFormValid
+                        ? (isBank ? `PROCEED WITH ₦${numAmount.toLocaleString('en-NG')}` : `SEND ₦${numAmount.toLocaleString()} TO MEMBER`)
+                        : (isBank ? 'ENTER TRANSFER DETAILS' : 'ENTER MEMBER DETAILS')}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
+
+    // Solid Device Verification Guard: If device check is loading, show secure dark splash
+    if (isDeviceVerified === null) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#0B0F19', alignItems: 'center', justifyContent: 'center' }}>
+                <StatusBar style="light" />
+                <ActivityIndicator size="large" color="#F59E0B" />
+                <Text style={{ color: '#F1F5F9', marginTop: 16, fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>
+                    Securing Transfer Channel...
+                </Text>
+                <Text style={{ color: '#64748B', marginTop: 6, fontSize: 12 }}>
+                    Verifying Device Security Authorization
+                </Text>
+            </View>
+        );
+    }
+
+    // If device is NOT verified, NEVER render the transfer screen in the background!
+    if (isDeviceVerified === false) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#0B0F19', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                <StatusBar style="light" />
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <Ionicons name="phone-portrait-outline" size={32} color="#F59E0B" />
+                </View>
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 8 }}>
+                    Device Authorization Required
+                </Text>
+                <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 24, maxWidth: 320 }}>
+                    In accordance with banking security protocols, fund transfers on a new or unverified device require two-factor security verification.
+                </Text>
+                <TouchableOpacity
+                    onPress={() => setShowDevice2FAModal(true)}
+                    style={{ backgroundColor: '#F59E0B', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 10, width: '100%', maxWidth: 300, alignItems: 'center', marginBottom: 12 }}
+                    activeOpacity={0.85}
+                >
+                    <Text style={{ color: '#0F172A', fontWeight: '800', fontSize: 14 }}>AUTHORIZE THIS DEVICE</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => router.replace('/(app)/dashboard')}
+                    style={{ paddingVertical: 12, paddingHorizontal: 24 }}
+                >
+                    <Text style={{ color: '#64748B', fontWeight: '600', fontSize: 13 }}>Return to Dashboard</Text>
+                </TouchableOpacity>
+
+                <Device2FAModal
+                    visible={showDevice2FAModal && isDeviceVerified === false && !!currentUserId}
+                    userId={currentUserId}
+                    userEmail={currentUserEmail}
+                    onVerified={() => {
+                        setIsDeviceVerified(true);
+                        setShowDevice2FAModal(false);
+                    }}
+                    onCancel={() => {
+                        setShowDevice2FAModal(false);
+                        router.replace('/(app)/dashboard');
+                    }}
+                />
+            </View>
+        );
+    }
 
     return (
         <View style={s.container}>
@@ -1340,36 +1817,8 @@ export default function TransferScreen() {
                             </View>
                         </View>
 
-                        {/* Tier 1 Strict Lock Warning Card */}
-                        {isKycLocked && (
-                            <View style={s.tierLockCard}>
-                                <View style={s.tierLockHeaderRow}>
-                                    <View style={s.tierLockIconBox}>
-                                        <Ionicons name="lock-closed" size={18} color="#EF4444" />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                            <Text style={s.tierLockTitle}>Transfer Feature Locked</Text>
-                                            <View style={s.tier1Badge}>
-                                                <Text style={s.tier1BadgeText}>TIER 1</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.tierLockSubtitle}>
-                                            In compliance with security policies, transfers require Tier 2 identity verification (BVN / NIN).
-                                        </Text>
-                                    </View>
-                                </View>
-                                <TouchableOpacity
-                                    onPress={() => router.push('/kyc')}
-                                    style={s.tierUpgradeBtn}
-                                    activeOpacity={0.85}
-                                >
-                                    <Ionicons name="shield-checkmark" size={14} color="#020617" />
-                                    <Text style={s.tierUpgradeBtnText}>UPGRADE TO TIER 2 TO UNLOCK</Text>
-                                    <Ionicons name="arrow-forward" size={13} color="#020617" />
-                                </TouchableOpacity>
-                            </View>
-                        )}
+                        {/* Transfer Compliance Security Gate */}
+                        {renderTransferComplianceGate()}
 
                         {/* Inline Error Alert */}
                         {transferError ? (
@@ -1847,44 +2296,7 @@ export default function TransferScreen() {
                         )}
 
                         {/* Submit Button */}
-                        <TouchableOpacity
-                            onPress={isKycLocked ? () => router.push('/kyc') : handleInitiateTransfer}
-                            style={[
-                                s.submitBtn,
-                                (!isFormValid && !isKycLocked) ? s.submitBtnDisabled : s.submitBtnActive,
-                                isKycLocked && { backgroundColor: '#B45309' }
-                            ]}
-                            disabled={isSubmitting || isKycLoading}
-                            activeOpacity={0.85}
-                        >
-                            {isSubmitting ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : isKycLoading ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
-                                    <Text style={s.submitBtnText}>CHECKING ACCOUNT...</Text>
-                                </View>
-                            ) : (
-                                <>
-                                    <Ionicons
-                                        name={isKycLocked ? "lock-closed" : "arrow-up-circle"}
-                                        size={18}
-                                        color={isKycLocked ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
-                                        style={{ marginRight: 6 }}
-                                    />
-                                    <Text style={[s.submitBtnText, (!isFormValid && !isKycLocked) && s.submitBtnTextDisabled]}>
-                                        {isKycLocked
-                                            ? '🔒 UPGRADE TO TIER 2 TO TRANSFER'
-                                            : (numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
-                                                ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
-                                                : isFormValid
-                                                ? `PROCEED WITH ₦${numAmount.toLocaleString('en-NG')}`
-                                                : 'ENTER TRANSFER DETAILS')
-                                        }
-                                    </Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
+                        {renderSubmitButton('bank')}
                     </View>
                 ) : (
                     // ── MODE 2: P2P MEMBER TRANSFER ─────
@@ -1901,36 +2313,8 @@ export default function TransferScreen() {
                             </View>
                         </View>
 
-                        {/* Tier 1 Strict Lock Warning Card */}
-                        {isKycLocked && (
-                            <View style={s.tierLockCard}>
-                                <View style={s.tierLockHeaderRow}>
-                                    <View style={s.tierLockIconBox}>
-                                        <Ionicons name="lock-closed" size={18} color="#EF4444" />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                            <Text style={s.tierLockTitle}>Transfer Feature Locked</Text>
-                                            <View style={s.tier1Badge}>
-                                                <Text style={s.tier1BadgeText}>TIER 1</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.tierLockSubtitle}>
-                                            In compliance with security policies, transfers require Tier 2 identity verification (BVN / NIN).
-                                        </Text>
-                                    </View>
-                                </View>
-                                <TouchableOpacity
-                                    onPress={() => router.push('/kyc')}
-                                    style={s.tierUpgradeBtn}
-                                    activeOpacity={0.85}
-                                >
-                                    <Ionicons name="shield-checkmark" size={14} color="#020617" />
-                                    <Text style={s.tierUpgradeBtnText}>UPGRADE TO TIER 2 TO UNLOCK</Text>
-                                    <Ionicons name="arrow-forward" size={13} color="#020617" />
-                                </TouchableOpacity>
-                            </View>
-                        )}
+                        {/* Transfer Compliance Security Gate */}
+                        {renderTransferComplianceGate()}
 
                         {/* Inline Error Alert */}
                         {transferError ? (
@@ -2266,44 +2650,7 @@ export default function TransferScreen() {
                         )}
 
                         {/* P2P Submit Button */}
-                        <TouchableOpacity
-                            onPress={isKycLocked ? () => router.push('/kyc') : handleInitiateTransfer}
-                            style={[
-                                s.submitBtn,
-                                (!isFormValid && !isKycLocked) ? s.submitBtnDisabled : s.submitBtnActive,
-                                isKycLocked && { backgroundColor: '#B45309' }
-                            ]}
-                            disabled={isSubmitting || isKycLoading}
-                            activeOpacity={0.85}
-                        >
-                            {isSubmitting ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : isKycLoading ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
-                                    <Text style={s.submitBtnText}>CHECKING ACCOUNT...</Text>
-                                </View>
-                            ) : (
-                                <>
-                                    <Ionicons
-                                        name={isKycLocked ? "lock-closed" : "paper-plane"}
-                                        size={17}
-                                        color={isKycLocked ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
-                                        style={{ marginRight: 6 }}
-                                    />
-                                    <Text style={[s.submitBtnText, (!isFormValid && !isKycLocked) && s.submitBtnTextDisabled]}>
-                                        {isKycLocked
-                                            ? '🔒 UPGRADE TO TIER 2 TO TRANSFER'
-                                            : (numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
-                                                ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
-                                                : isFormValid
-                                                ? `SEND ₦${numAmount.toLocaleString()} TO MEMBER`
-                                                : 'ENTER MEMBER DETAILS')
-                                        }
-                                    </Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
+                        {renderSubmitButton('p2p')}
                     </View>
                 )}
 
@@ -2558,20 +2905,6 @@ export default function TransferScreen() {
                 description={`Enter transaction PIN to authorize debit of ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}
             />
 
-            {/* ── NEW DEVICE 2FA VERIFICATION MODAL ── */}
-            <Device2FAModal
-                visible={showDevice2FAModal && isDeviceVerified === false && !!currentUserId}
-                userId={currentUserId}
-                userEmail={currentUserEmail}
-                onVerified={() => {
-                    setIsDeviceVerified(true);
-                    setShowDevice2FAModal(false);
-                }}
-                onCancel={() => {
-                    setShowDevice2FAModal(false);
-                    router.replace('/(app)/dashboard');
-                }}
-            />
 
             {/* ── FULL SCREEN PROCESSING MODAL ────────────────── */}
             <Modal visible={isSubmitting} transparent animationType="fade">
@@ -2895,6 +3228,19 @@ export default function TransferScreen() {
                 visible={exportModalVisible}
                 onClose={() => setExportModalVisible(false)}
                 receiptData={exportReceiptData}
+            />
+
+            {/* ── TRANSFER ACTIVATION APPLICATION MODAL ── */}
+            <TransferActivationModal
+                visible={showActivationModal}
+                userId={currentUserId}
+                initialName={currentUserName}
+                initialEmail={currentUserEmail}
+                onClose={() => setShowActivationModal(false)}
+                onSubmitted={() => {
+                    setShowActivationModal(false);
+                    fetchUserData();
+                }}
             />
         </View>
     );

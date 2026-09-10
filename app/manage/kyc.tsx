@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
 import * as Clipboard from 'expo-clipboard';
+import AdminTransferQueue from '../../components/AdminTransferQueue';
 
 // Executive Light Navy & Gold Design System Tokens
 const L = {
@@ -53,6 +54,7 @@ export default function KYCManagerScreen() {
     const [totalRejectedCount, setTotalRejectedCount] = useState(0);
     
     // Filter & Search States
+    const [sectionMode, setSectionMode] = useState<'kyc' | 'transfer_requests'>('kyc');
     const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
     const [filterType, setFilterType] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -497,27 +499,78 @@ export default function KYCManagerScreen() {
                         </View>
                     </View>
 
-                    <Text style={{ color: L.gold, fontSize: 13, fontWeight: '900', letterSpacing: -0.2, marginBottom: 1 }}>COMPLIANCE & KYC QUEUE</Text>
-                    <Text style={{ color: '#CBD5E1', fontSize: 9, marginBottom: 6 }}>Review user identities, BVN, NIN, utility bills & tier upgrades.</Text>
+                    <Text style={{ color: L.gold, fontSize: 13, fontWeight: '900', letterSpacing: -0.2, marginBottom: 1 }}>
+                        {sectionMode === 'kyc' ? 'COMPLIANCE & KYC QUEUE' : 'TRANSFER ACTIVATION QUEUE'}
+                    </Text>
+                    <Text style={{ color: '#CBD5E1', fontSize: 9, marginBottom: 8 }}>
+                        {sectionMode === 'kyc' ? 'Review user identities, BVN, NIN, utility bills & tier upgrades.' : 'Approve transfer access with mandatory 24-hour maturation cooldown.'}
+                    </Text>
 
-                    {/* Search Input Bar */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', paddingHorizontal: 8, height: 32 }}>
-                        <Ionicons name="search-outline" size={12} color={L.gold} />
-                        <TextInput
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            placeholder="Search user name, email, BVN or NIN..."
-                            placeholderTextColor="#94A3B8"
-                            style={{ flex: 1, marginLeft: 6, color: '#FFFFFF', fontWeight: '600', fontSize: 10 }}
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={12} color="#94A3B8" />
-                            </TouchableOpacity>
-                        )}
+                    {/* Mode Switcher: Identity KYC vs Transfer Activation Queue */}
+                    <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 3, marginBottom: sectionMode === 'kyc' ? 8 : 2, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)' }}>
+                        <TouchableOpacity
+                            onPress={() => setSectionMode('kyc')}
+                            style={{
+                                flex: 1,
+                                paddingVertical: 5,
+                                borderRadius: 7,
+                                backgroundColor: sectionMode === 'kyc' ? L.gold : 'transparent',
+                                alignItems: 'center',
+                                flexDirection: 'row',
+                                justifyContent: 'center',
+                                gap: 4
+                            }}
+                        >
+                            <Ionicons name="documents" size={11} color={sectionMode === 'kyc' ? '#0F172A' : '#CBD5E1'} />
+                            <Text style={{ fontSize: 9, fontWeight: '900', color: sectionMode === 'kyc' ? '#0F172A' : '#CBD5E1', textTransform: 'uppercase' }}>
+                                Identity KYC
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => setSectionMode('transfer_requests')}
+                            style={{
+                                flex: 1,
+                                paddingVertical: 5,
+                                borderRadius: 7,
+                                backgroundColor: sectionMode === 'transfer_requests' ? L.gold : 'transparent',
+                                alignItems: 'center',
+                                flexDirection: 'row',
+                                justifyContent: 'center',
+                                gap: 4
+                            }}
+                        >
+                            <Ionicons name="shield-checkmark" size={11} color={sectionMode === 'transfer_requests' ? '#0F172A' : '#CBD5E1'} />
+                            <Text style={{ fontSize: 9, fontWeight: '900', color: sectionMode === 'transfer_requests' ? '#0F172A' : '#CBD5E1', textTransform: 'uppercase' }}>
+                                Transfer Queue (24h)
+                            </Text>
+                        </TouchableOpacity>
                     </View>
+
+                    {sectionMode === 'kyc' && (
+                        /* Search Input Bar */
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', paddingHorizontal: 8, height: 32 }}>
+                            <Ionicons name="search-outline" size={12} color={L.gold} />
+                            <TextInput
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                placeholder="Search user name, email, BVN or NIN..."
+                                placeholderTextColor="#94A3B8"
+                                style={{ flex: 1, marginLeft: 6, color: '#FFFFFF', fontWeight: '600', fontSize: 10 }}
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                    <Ionicons name="close-circle" size={12} color="#94A3B8" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
                 </LinearGradient>
 
+                {sectionMode === 'transfer_requests' ? (
+                    <AdminTransferQueue onShowToast={(msg) => showToast(msg)} />
+                ) : (
+                    <>
                 {/* Master Automation & Virtual Account Control Bar */}
                 <View style={{ backgroundColor: '#0F172A', paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 1, borderColor: L.goldDk }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -813,6 +866,8 @@ export default function KYCManagerScreen() {
                         })
                     )}
                 </ScrollView>
+                </>
+                )}
             </KeyboardAvoidingView>
 
             {/* DOCUMENT INSPECTOR MODAL */}
