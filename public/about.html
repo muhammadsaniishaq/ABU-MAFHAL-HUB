@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>About Us — Abu Mafhal Hub | Abu Mafhal Enterprise Ltd (RC-8979939)</title>
+  <meta name="description" content="Abu Mafhal Hub (Abu Mafhal Enterprise Ltd - RC-8979939) is a leading Nigerian digital utility and telecom VAS platform providing automated airtime, data bundles, electricity bill payments, cable TV, and secure transactional services." />
+  <meta name="keywords" content="Abu Mafhal Hub, Abu Mafhal Enterprise Ltd, RC-8979939, About Us, Nigerian VAS, VTU platform, data bundles, airtime, Kano, Nigeria" />
+  <meta property="og:title" content="About Us — Abu Mafhal Hub | Abu Mafhal Enterprise Ltd" />
+  <meta property="og:description" content="Learn about Abu Mafhal Hub, our corporate mission, CAC registration (RC-8979939), services, and physical office in Nigeria." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://abumafhal.com.ng/about" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0d1b3e;
+      --navy-mid: #122050;
+      --navy-light: #1a2f6e;
+      --gold: #f5a623;
+      --gold-dark: #e09510;
+      --gold-light: #ffc04d;
+      --emerald: #10b981;
+      --emerald-bg: #ecfdf5;
+      --white: #ffffff;
+      --off-white: #f8f9fc;
+      --gray-100: #f0f2f8;
+      --gray-200: #e2e5ef;
+      --gray-400: #9aa3c0;
+      --gray-600: #5a6385;
+      --gray-800: #2d3559;
+      --text-dark: #0d1b3e;
+      --text-mid: #3d4870;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-sm: 8px;
+      --radius: 16px;
+      --radius-lg: 24px;
+      --radius-xl: 32px;
+      --shadow-sm: 0 2px 8px rgba(13,27,62,0.06);
+      --shadow: 0 8px 28px rgba(13,27,62,0.10);
+      --shadow-lg: 0 18px 50px rgba(13,27,62,0.16);
+      --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    html { scroll-behavior: smooth; overflow-x: hidden; }
+
+    body {
+      font-family: var(--font);
+      color: var(--text-dark);
+      background: var(--off-white);
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    /* ===================== NAVBAR ===================== */
+    .navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 6%;
+      height: 76px;
+      background: rgba(255,255,255,0.97);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(13,27,62,0.08);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-logo img { width: 44px; height: 44px; object-fit: contain; border-radius: 10px; }
+    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .nav-logo-text .brand-name { font-size: 18px; font-weight: 900; color: var(--navy); letter-spacing: 0.5px; }
+    .nav-logo-text .brand-sub { font-size: 11px; font-weight: 700; color: var(--gold); letter-spacing: 1.5px; text-transform: uppercase; }
+
+    .nav-links { display: flex; align-items: center; gap: 32px; }
+    .nav-links a {
+      font-size: 14.5px; font-weight: 600; color: var(--text-mid);
+      text-decoration: none; transition: color var(--transition);
+      position: relative;
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--navy); }
+    .nav-links a.active::after {
+      content: ''; position: absolute; bottom: -6px; left: 0; right: 0;
+      height: 2.5px; background: var(--gold); border-radius: 2px;
+    }
+
+    .nav-actions { display: flex; align-items: center; gap: 14px; }
+    .btn-login {
+      font-size: 14px; font-weight: 600; color: var(--navy);
+      text-decoration: none; padding: 10px 18px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--gray-200); background: var(--white);
+      transition: all var(--transition);
+    }
+    .btn-login:hover { border-color: var(--navy); background: var(--gray-100); }
+    .btn-primary {
+      font-size: 14px; font-weight: 700; color: var(--navy);
+      text-decoration: none; padding: 10px 22px; border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--gold), var(--gold-light));
+      box-shadow: 0 4px 14px rgba(245,166,35,0.35);
+      transition: all var(--transition);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(245,166,35,0.45); }
+
+    /* ===================== HERO SECTION ===================== */
+    .hero-about {
+      position: relative;
+      padding: 150px 6% 80px;
+      background: linear-gradient(145deg, var(--navy) 0%, #071026 100%);
+      color: var(--white);
+      overflow: hidden;
+      text-align: center;
+    }
+    .hero-about::before {
+      content: '';
+      position: absolute;
+      top: -30%; right: -10%;
+      width: 550px; height: 550px;
+      background: radial-gradient(circle, rgba(245,166,35,0.15) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .hero-about::after {
+      content: '';
+      position: absolute;
+      bottom: -30%; left: -10%;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .cac-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      background: rgba(245,166,35,0.15);
+      border: 1px solid rgba(245,166,35,0.4);
+      border-radius: 50px;
+      color: var(--gold-light);
+      font-size: 12.5px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+    .cac-badge span.dot {
+      width: 8px; height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #10b981;
+    }
+
+    .hero-title {
+      font-size: clamp(32px, 5vw, 54px);
+      font-weight: 900;
+      line-height: 1.15;
+      max-width: 900px;
+      margin: 0 auto 20px;
+      letter-spacing: -0.5px;
+    }
+    .hero-title span {
+      background: linear-gradient(135deg, #ffc04d, var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: clamp(16px, 2vw, 19px);
+      color: rgba(255,255,255,0.82);
+      max-width: 760px;
+      margin: 0 auto 36px;
+      font-weight: 400;
+      line-height: 1.7;
+    }
+
+    /* ===================== METRICS STRIP ===================== */
+    .metrics-container {
+      max-width: 1140px;
+      margin: -45px auto 60px;
+      padding: 0 5%;
+      position: relative;
+      z-index: 10;
+    }
+    .metrics-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      padding: 32px 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 28px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--gray-200);
+    }
+    .metric-item {
+      text-align: center;
+      border-right: 1px solid var(--gray-200);
+      padding: 0 15px;
+    }
+    .metric-item:last-child { border-right: none; }
+    .metric-val {
+      font-size: 34px;
+      font-weight: 900;
+      color: var(--navy);
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+    .metric-val span { color: var(--gold); }
+    .metric-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-600);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ===================== SECTION STYLES ===================== */
+    .section {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 70px 5%;
+    }
+    .section-header {
+      text-align: center;
+      max-width: 750px;
+      margin: 0 auto 54px;
+    }
+    .section-tag {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--gold-dark);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .section-title {
+      font-size: clamp(26px, 3.5vw, 38px);
+      font-weight: 900;
+      color: var(--navy);
+      line-height: 1.25;
+      letter-spacing: -0.5px;
+      margin-bottom: 16px;
+    }
+    .section-desc {
+      font-size: 16px;
+      color: var(--text-mid);
+      line-height: 1.7;
+    }
+
+    /* ===================== COMPANY PROFILE GRID ===================== */
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+    .profile-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 36px 32px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--gray-200);
+      transition: all var(--transition);
+      position: relative;
+    }
+    .profile-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+      border-color: rgba(245,166,35,0.4);
+    }
+    .card-icon {
+      width: 58px; height: 58px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(13,27,62,0.06), rgba(13,27,62,0.12));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      margin-bottom: 22px;
+    }
+    .card-icon.gold { background: linear-gradient(135deg, #fff7ed, #fef3c7); color: #d97706; }
+    .card-icon.emerald { background: linear-gradient(135deg, #ecfdf5, #d1fae5); color: #059669; }
+    .card-icon.sky { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); color: #0284c7; }
+    
+    .profile-card h3 {
+      font-size: 21px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 14px;
+    }
+    .profile-card p {
+      font-size: 14.5px;
+      color: var(--text-mid);
+      line-height: 1.7;
+    }
+
+    /* ===================== REGULATORY / LEGAL BOX ===================== */
+    .legal-box {
+      background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+      border-radius: var(--radius-lg);
+      border: 2px solid #e2e8f0;
+      padding: 40px 44px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 30px;
+      margin: 20px 0 60px;
+    }
+    .legal-info h4 {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .legal-info p {
+      font-size: 14.5px;
+      color: var(--text-mid);
+      max-width: 620px;
+      line-height: 1.6;
+    }
+    .legal-reg-pill {
+      background: var(--navy);
+      color: var(--white);
+      padding: 16px 26px;
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .legal-reg-pill .top { font-size: 11px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
+    .legal-reg-pill .number { font-size: 24px; font-weight: 900; letter-spacing: 1px; margin: 4px 0; }
+    .legal-reg-pill .sub { font-size: 11px; color: rgba(255,255,255,0.7); }
+
+    /* ===================== SERVICES SHOWCASE ===================== */
+    .services-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 22px;
+      margin-bottom: 50px;
+    }
+    .service-pill {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      border: 1px solid var(--gray-200);
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      transition: all var(--transition);
+    }
+    .service-pill:hover {
+      border-color: var(--gold);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
+    .service-pill .icon-box {
+      width: 44px; height: 44px; min-width: 44px;
+      border-radius: 12px;
+      background: var(--gray-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .service-pill .pill-text h5 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 4px;
+    }
+    .service-pill .pill-text p {
+      font-size: 13px;
+      color: var(--text-mid);
+      line-height: 1.5;
+    }
+
+    /* ===================== HEADQUARTERS & CONTACT BANNER ===================== */
+    .hq-banner {
+      background: linear-gradient(135deg, var(--navy) 0%, #071026 100%);
+      color: var(--white);
+      border-radius: var(--radius-xl);
+      padding: 50px 48px;
+      margin: 40px 0 80px;
+      box-shadow: var(--shadow-lg);
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+    .hq-content h3 {
+      font-size: clamp(24px, 3vw, 32px);
+      font-weight: 900;
+      margin-bottom: 16px;
+      line-height: 1.25;
+    }
+    .hq-content p {
+      color: rgba(255,255,255,0.85);
+      font-size: 15px;
+      margin-bottom: 26px;
+      line-height: 1.7;
+    }
+    .hq-info-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .hq-info-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 14.5px;
+    }
+    .hq-info-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: rgba(245,166,35,0.18);
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .hq-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      justify-content: center;
+    }
+
+    /* ===================== FOOTER ===================== */
+    footer {
+      background: var(--navy);
+      color: var(--white);
+      padding: 60px 6% 30px;
+    }
+    .footer-top {
+      display: grid;
+      grid-template-columns: 1.8fr 1fr 1fr 1.2fr;
+      gap: 40px;
+      padding-bottom: 40px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    .footer-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: 14px; }
+    .footer-logo img { width: 40px; height: 40px; object-fit: contain; }
+    .footer-brand-name { font-size: 17px; font-weight: 800; color: var(--white); }
+    .footer-brand-sub { font-size: 10px; font-weight: 700; color: var(--gold); letter-spacing: 1.5px; }
+    .footer-tagline { font-size: 13.5px; color: rgba(255,255,255,0.7); max-width: 300px; line-height: 1.6; }
+
+    .footer-col h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--white);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+    }
+    .footer-col ul { list-style: none; }
+    .footer-col ul li { margin-bottom: 10px; }
+    .footer-col ul li a {
+      color: rgba(255,255,255,0.65);
+      font-size: 13.5px;
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+    .footer-col ul li a:hover { color: var(--gold); }
+
+    .footer-contact-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13.5px;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 12px;
+    }
+
+    .footer-bottom {
+      padding-top: 25px;
+      text-align: center;
+      font-size: 12.5px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    @media (max-width: 900px) {
+      .nav-links { display: none; }
+      .hq-banner { grid-template-columns: 1fr; }
+      .footer-top { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .footer-top { grid-template-columns: 1fr; }
+      .legal-box { padding: 26px 20px; text-align: center; justify-content: center; }
+      .metrics-card { padding: 24px 20px; }
+      .metric-item { border-right: none; border-bottom: 1px solid var(--gray-200); padding-bottom: 16px; }
+      .metric-item:last-child { border-bottom: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== NAVBAR ==================== -->
+  <nav class="navbar" id="navbar">
+    <a href="/landing" class="nav-logo" aria-label="Abu Mafhal Hub Home">
+      <img src="/landing-assets/images/logo.png" alt="Abu Mafhal Hub Logo" onerror="this.src='/assets/images/logo.png'" />
+      <div class="nav-logo-text">
+        <span class="brand-name">ABU MAFHAL</span>
+        <span class="brand-sub">HUB • RC-8979939</span>
+      </div>
+    </a>
+
+    <div class="nav-links">
+      <a href="/landing">Home</a>
+      <a href="/landing#services">Services</a>
+      <a href="/about" class="active">About Us</a>
+      <a href="/contact">Contact</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+
+    <div class="nav-actions">
+      <a href="/" class="btn-login">Login</a>
+      <a href="/" class="btn-primary">Launch App</a>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO SECTION ==================== -->
+  <section class="hero-about">
+    <div class="cac-badge">
+      <span class="dot"></span>
+      Corporate Affairs Commission (CAC) Registered • RC-8979939
+    </div>
+    <h1 class="hero-title">Empowering Nigeria With <span>Instant, Dependable</span> Digital Utilities</h1>
+    <p class="hero-desc">
+      Abu Mafhal Hub (operated by Abu Mafhal Enterprise Ltd) is a premier digital utility and telecommunications value-added service (VAS) provider. We provide high-speed, 24/7 automated connectivity for individuals and corporate businesses across Nigeria.
+    </p>
+  </section>
+
+  <!-- ==================== METRICS STRIP ==================== -->
+  <div class="metrics-container">
+    <div class="metrics-card">
+      <div class="metric-item">
+        <div class="metric-val">50,000<span>+</span></div>
+        <div class="metric-label">Active Users Nationwide</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">99.98<span>%</span></div>
+        <div class="metric-label">Platform Uptime</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">&lt; 5<span>s</span></div>
+        <div class="metric-label">Instant Delivery Speed</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">24<span>/7</span></div>
+        <div class="metric-label">Live Customer Support</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CORPORATE PROFILE & LEGAL STATUS ==================== -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-tag">Corporate Profile</span>
+      <h2 class="section-title">Built on Trust, Regulatory Compliance &amp; Engineering Excellence</h2>
+      <p class="section-desc">
+        Registered under Nigerian law with the Corporate Affairs Commission, Abu Mafhal Enterprise Ltd combines modern telecom integrations with licensed banking switches to power uninterrupted financial and digital utility services.
+      </p>
+    </div>
+
+    <!-- Legal Certification Showcase -->
+    <div class="legal-box">
+      <div class="legal-info">
+        <h4>Officially Registered Corporate Entity</h4>
+        <p>
+          Abu Mafhal Enterprise Ltd is formally recognized and registered by the Corporate Affairs Commission (CAC) of the Federal Republic of Nigeria under Registration Number <strong>RC-8979939</strong>. We adhere strictly to national consumer protection, telecom compliance, and NDPR data privacy standards.
+        </p>
+      </div>
+      <div class="legal-reg-pill">
+        <span class="top">CAC Registration</span>
+        <span class="number">RC-8979939</span>
+        <span class="sub">Corporate Affairs Commission, Nigeria</span>
+      </div>
+    </div>
+
+    <!-- Who We Are / Mission / Vision Grid -->
+    <div class="profile-grid">
+      <div class="profile-card">
+        <div class="card-icon gold">🏛️</div>
+        <h3>Who We Are</h3>
+        <p>
+          Founded as an enterprise digital service ecosystem, Abu Mafhal Hub bridges the digital connectivity gap in Nigeria. Through automated API pipelines connected directly to major telco carriers and electricity distribution companies (DisCos), we process thousands of daily transactions with sub-second latency.
+        </p>
+      </div>
+
+      <div class="profile-card">
+        <div class="card-icon emerald">🎯</div>
+        <h3>Our Mission</h3>
+        <p>
+          To deliver accessible, ultra-affordable, and lightning-fast digital utility services to every Nigerian home and enterprise. We empower entrepreneurs, students, and everyday consumers with reliable VTU solutions, transparent accounting, and dedicated virtual accounts.
+        </p>
+      </div>
+
+      <div class="profile-card">
+        <div class="card-icon sky">🔭</div>
+        <h3>Our Vision</h3>
+        <p>
+          To stand as West Africa's benchmark telecommunications and fintech utility bridge, pioneering accessible micro-transactions, automated bill vending, and secure transactional messaging with unmatched reliability and customer care.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== OUR SERVICES ==================== -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-header">
+      <span class="section-tag">Core Capabilities</span>
+      <h2 class="section-title">What We Deliver to Our Customers</h2>
+      <p class="section-desc">
+        A unified infrastructure supporting everyday essential services across Nigeria.
+      </p>
+    </div>
+
+    <div class="services-list">
+      <div class="service-pill">
+        <div class="icon-box">📶</div>
+        <div class="pill-text">
+          <h5>Automated Data Bundles</h5>
+          <p>Instant activation for MTN, Airtel, Glo, and 9mobile at wholesale pricing.</p>
+        </div>
+      </div>
+
+      <div class="service-pill">
+        <div class="icon-box">📲</div>
+        <div class="pill-text">
+          <h5>Airtime VTU Top-Up</h5>
+          <p>Instant airtime recharge with automated discounts and transactional validation.</p>
+        </div>
+      </div>
+
+      <div class="service-pill">
+        <div class="icon-box">💡</div>
+        <div class="pill-text">
+          <h5>Electricity Bill Tokens</h5>
+          <p>Prepaid and postpaid meter tokens for KEDCO, AEDC, EKEDC, IBEDC, IKEDC, JED, PHED &amp; KAEDCO.</p>
+        </div>
+      </div>
+
+      <div class="service-pill">
+        <div class="icon-box">📺</div>
+        <div class="pill-text">
+          <h5>Cable TV Subscriptions</h5>
+          <p>Direct renewal and bouquet activation for DSTV, GOTV, Startimes, and Showmax.</p>
+        </div>
+      </div>
+
+      <div class="service-pill">
+        <div class="icon-box">🏦</div>
+        <div class="pill-text">
+          <h5>Dedicated Virtual Accounts</h5>
+          <p>Auto-assigned 9PSB and PalmPay virtual bank accounts with instant automated wallet crediting.</p>
+        </div>
+      </div>
+
+      <div class="service-pill">
+        <div class="icon-box">💬</div>
+        <div class="pill-text">
+          <h5>Transactional SMS &amp; Alerts</h5>
+          <p>Whitelisted Sender ID transactional OTPs and transaction receipts delivered reliably to all networks.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== HEADQUARTERS & CONTACT BANNER ==================== -->
+  <section class="section" style="padding-top: 0;">
+    <div class="hq-banner">
+      <div class="hq-content">
+        <h3>Visit Our Office or Connect With Us</h3>
+        <p>
+          Our corporate headquarters and customer care center operate with transparent accountability. Whether you have corporate partnership inquiries or require technical support, our team is at your disposal.
+        </p>
+
+        <div class="hq-info-list">
+          <div class="hq-info-row">
+            <div class="hq-info-icon">📍</div>
+            <div>
+              <strong>Head Office Address:</strong><br />
+              No. 1 Abu Mafhal Hub Plaza, Kano State, Nigeria.
+            </div>
+          </div>
+
+          <div class="hq-info-row">
+            <div class="hq-info-icon">📞</div>
+            <div>
+              <strong>Support &amp; WhatsApp:</strong><br />
+              +234 814 585 3539 (24/7 Desk)
+            </div>
+          </div>
+
+          <div class="hq-info-row">
+            <div class="hq-info-icon">✉️</div>
+            <div>
+              <strong>Official Email:</strong><br />
+              support@abumafhal.com.ng &bull; admin@abumafhal.com.ng
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hq-actions">
+        <a href="/contact" class="btn-primary" style="text-align: center; padding: 16px;">Contact Support Team &rarr;</a>
+        <a href="/" class="btn-login" style="text-align: center; padding: 14px; background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.2);">Open Abu Mafhal App</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer>
+    <div class="footer-top">
+      <div>
+        <a href="/landing" class="footer-logo">
+          <img src="/landing-assets/images/logo.png" alt="Abu Mafhal Hub" onerror="this.src='/assets/images/logo.png'" />
+          <div>
+            <div class="footer-brand-name">ABU MAFHAL HUB</div>
+            <div class="footer-brand-sub">ABU MAFHAL ENTERPRISE LTD &bull; RC-8979939</div>
+          </div>
+        </a>
+        <p class="footer-tagline">
+          Nigeria's trusted digital utility and telecommunications platform. Licensed, secure, and available 24/7.
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="/landing">Home</a></li>
+          <li><a href="/landing#services">Services</a></li>
+          <li><a href="/about">About Us</a></li>
+          <li><a href="/contact">Contact Office</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Compliance &amp; Legal</h4>
+        <ul>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Service</a></li>
+          <li><a href="#">CAC Verification (RC-8979939)</a></li>
+          <li><a href="#">Security &amp; Encryption</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Head Office</h4>
+        <div class="footer-contact-item">
+          <span>📍</span> No. 1 Abu Mafhal Hub Plaza, Kano State, Nigeria
+        </div>
+        <div class="footer-contact-item">
+          <span>📞</span> +234 814 585 3539
+        </div>
+        <div class="footer-contact-item">
+          <span>✉️</span> support@abumafhal.com.ng
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 Abu Mafhal Enterprise Ltd (RC-8979939). All rights reserved. Registered in the Federal Republic of Nigeria.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

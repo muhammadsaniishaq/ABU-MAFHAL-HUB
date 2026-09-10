@@ -1,2 +1,9 @@
+# Static Pages
+/landing    /landing.html   200
+/about      /about.html     200
+/contact    /contact.html   200
+/privacy    /privacy.html   200
+/terms      /terms.html     200
+
 # SPA Catch-all redirect for web deployment
 /*    /index.html   200

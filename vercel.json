@@ -35,8 +35,16 @@
   "rewrites": [
     { "source": "/landing", "destination": "/landing.html" },
     { "source": "/landing.html", "destination": "/landing.html" },
+    { "source": "/about", "destination": "/about.html" },
+    { "source": "/about.html", "destination": "/about.html" },
+    { "source": "/contact", "destination": "/contact.html" },
+    { "source": "/contact.html", "destination": "/contact.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/privacy.html", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/terms.html", "destination": "/terms.html" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!landing|landing-assets|_expo|assets|sw.js|manifest.json|favicon.ico|robots.txt|.*\\..*).*)", "destination": "/index.html" },
+    { "source": "/((?!landing|about|contact|privacy|terms|landing-assets|_expo|assets|sw.js|manifest.json|favicon.ico|robots.txt|.*\\..*).*)", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
