@@ -532,7 +532,10 @@ export default function TransferScreen() {
         if (!userId) return;
         try {
             const key = `@device_transfer_verified_${userId}`;
-            const verified = await AsyncStorage.getItem(key);
+            let verified = await AsyncStorage.getItem(key);
+            if (verified !== 'true' && Platform.OS !== 'web') {
+                verified = await SecureStore.getItemAsync(key).catch(() => null);
+            }
             if (verified === 'true') {
                 setIsDeviceVerified(true);
                 setShowDevice2FAModal(false);
