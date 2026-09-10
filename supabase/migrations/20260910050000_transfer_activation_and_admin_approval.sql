@@ -75,8 +75,18 @@ CREATE POLICY "Admins can view and update all transfer activation requests"
 ON public.transfer_activation_requests FOR ALL
 USING (public.is_admin());
 
--- Realtime publication
-ALTER PUBLICATION supabase_realtime ADD TABLE public.transfer_activation_requests;
+-- Realtime publication (Safe idempotent check)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+      AND schemaname = 'public' 
+      AND tablename = 'transfer_activation_requests'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.transfer_activation_requests;
+  END IF;
+END $$;
 
 -- 3. HARDENED EXECUTE_USER_BANK_WITHDRAWAL (Enforces Tier 3, Admin Approval, and 24hr Cooldown)
 CREATE OR REPLACE FUNCTION public.execute_user_bank_withdrawal(
