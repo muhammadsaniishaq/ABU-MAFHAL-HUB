@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
@@ -16,7 +16,7 @@ import {
     FlatList,
     Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -381,8 +381,14 @@ export default function TransferScreen() {
     const [copiedRef, setCopiedRef] = useState(false);
 
     // KYC Tier & Account Status States
-    const [userKycTier, setUserKycTier] = useState<number>(1);
+    // ✅ null = loading (unknown), number = confirmed from DB
+    // Prevents false "locked" flash before user data arrives
+    const [userKycTier, setUserKycTier] = useState<number | null>(null);
     const [userStatus, setUserStatus] = useState<string>('active');
+
+    // Derived KYC States
+    const isKycLoading = userKycTier === null;
+    const isKycLocked = userKycTier !== null && userKycTier < 2;
 
     // Success Receipt Modal
     const [successModalVisible, setSuccessModalVisible] = useState(false);
@@ -428,23 +434,37 @@ export default function TransferScreen() {
         setIsUserInsufficientBalance(isUserBal);
     };
 
-    // Load recent beneficiaries and history
+    // Load recent beneficiaries — scoped to current user ID
     useEffect(() => {
-        loadRecentBeneficiaries();
-    }, []);
+        if (currentUserId) {
+            loadRecentBeneficiaries(currentUserId);
+        } else {
+            setRecentBeneficiaries([]);
+        }
+    }, [currentUserId]);
 
-    const loadRecentBeneficiaries = async () => {
+    const getBeneficiaryKey = (userId: string) => `@recent_beneficiaries_${userId}`;
+
+    const loadRecentBeneficiaries = async (userId: string) => {
+        if (!userId) return;
         try {
-            const stored = await AsyncStorage.getItem('@recent_bank_beneficiaries');
+            // Clean up legacy unscoped key if present
+            AsyncStorage.removeItem('@recent_bank_beneficiaries').catch(() => {});
+            // ✅ Key is scoped per user — no cross-account leakage
+            const stored = await AsyncStorage.getItem(getBeneficiaryKey(userId));
             if (stored) {
                 setRecentBeneficiaries(JSON.parse(stored));
+            } else {
+                setRecentBeneficiaries([]);  // ✅ Clear if no data for this user
             }
         } catch (_) {}
     };
 
     const saveRecentBeneficiary = async (accNum: string, accName: string, bCode: string, bName: string) => {
+        if (!currentUserId) return;
         try {
-            const stored = await AsyncStorage.getItem('@recent_bank_beneficiaries');
+            const key = getBeneficiaryKey(currentUserId);
+            const stored = await AsyncStorage.getItem(key);
             let list: RecentBeneficiary[] = stored ? JSON.parse(stored) : [];
             list = list.filter((b) => !(b.accountNumber === accNum && b.bankCode === bCode));
             list.unshift({
@@ -455,7 +475,7 @@ export default function TransferScreen() {
                 lastUsed: Date.now(),
             });
             list = list.slice(0, 8);
-            await AsyncStorage.setItem('@recent_bank_beneficiaries', JSON.stringify(list));
+            await AsyncStorage.setItem(key, JSON.stringify(list));
             setRecentBeneficiaries(list);
         } catch (_) {}
     };
@@ -475,10 +495,20 @@ export default function TransferScreen() {
                 if (data) {
                     setUserBalance(Number(data.balance) || 0);
                     if (data.full_name) setCurrentUserName(data.full_name);
+                    // ✅ Set confirmed tier from DB — clears the null loading state
                     setUserKycTier(Number(data.kyc_tier) || 1);
                     setUserStatus(data.status || 'active');
+                } else {
+                    // DB returned nothing — safe default
+                    setUserKycTier(1);
                 }
                 fetchTransferHistory(user.id);
+            } else {
+                setCurrentUserId('');
+                setUserKycTier(null);
+                setUserBalance(0);
+                setRecentBeneficiaries([]);
+                setTransferHistory([]);
             }
         } catch (err) {
             console.warn('Balance fetch error:', err);
@@ -507,9 +537,15 @@ export default function TransferScreen() {
         }
     };
 
+    // Refresh user balance and verification status every time Transfer screen is focused (e.g. after KYC verification)
+    useFocusEffect(
+        useCallback(() => {
+            fetchUserData();
+        }, [])
+    );
+
     // Load Banks List on Mount
     useEffect(() => {
-        fetchUserData();
 
         let isMounted = true;
         const fetchBanks = async () => {
@@ -529,7 +565,7 @@ export default function TransferScreen() {
 
     // Form Validity (Enforces Tier 2+ KYC Requirement)
     const isFormValid = useMemo(() => {
-        if (userKycTier < 2) return false;
+        if (isKycLoading || isKycLocked) return false;
         if (numAmount < MIN_TRANSFER_AMOUNT) return false;
         if (userBalance > 0 && totalDebit > userBalance) return false;
         if (activeTab === 'p2p') {
@@ -537,7 +573,7 @@ export default function TransferScreen() {
         } else {
             return !!selectedBank && accountNumber.trim().length === 10 && !!accountName.trim();
         }
-    }, [userKycTier, activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
+    }, [isKycLoading, isKycLocked, activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
 
     // Function to verify bank account details
     const handleVerifyBeneficiary = async () => {
@@ -736,7 +772,16 @@ export default function TransferScreen() {
 
     // Initiate Transfer (Opens confirmation)
     const handleInitiateTransfer = () => {
-        if (userKycTier < 2) {
+        if (isKycLoading) {
+            showTransferNotice(
+                'Checking Account Status ⏳',
+                'Please wait a moment while your account verification status is being loaded.',
+                false
+            );
+            return;
+        }
+
+        if (isKycLocked) {
             showTransferNotice(
                 'Tier 2 Verification Required 🔒',
                 'Transfer Feature Locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can transfer funds. Tap Upgrade below to verify now.',
@@ -802,7 +847,7 @@ export default function TransferScreen() {
         setTransferError(null);
 
         try {
-            if (userKycTier < 2) {
+            if (isKycLocked || isKycLoading) {
                 throw new Error("Transfer Feature Locked: In compliance with financial security regulations, you must upgrade your account to Tier 2 (verify your BVN or NIN) before you can transfer funds.");
             }
 
@@ -1261,7 +1306,7 @@ export default function TransferScreen() {
                         </View>
 
                         {/* Tier 1 Strict Lock Warning Card */}
-                        {userKycTier < 2 && (
+                        {isKycLocked && (
                             <View style={s.tierLockCard}>
                                 <View style={s.tierLockHeaderRow}>
                                     <View style={s.tierLockIconBox}>
@@ -1768,27 +1813,32 @@ export default function TransferScreen() {
 
                         {/* Submit Button */}
                         <TouchableOpacity
-                            onPress={userKycTier < 2 ? () => router.push('/kyc') : handleInitiateTransfer}
+                            onPress={isKycLocked ? () => router.push('/kyc') : handleInitiateTransfer}
                             style={[
                                 s.submitBtn,
-                                (!isFormValid && userKycTier >= 2) ? s.submitBtnDisabled : s.submitBtnActive,
-                                userKycTier < 2 && { backgroundColor: '#B45309' }
+                                (!isFormValid && !isKycLocked) ? s.submitBtnDisabled : s.submitBtnActive,
+                                isKycLocked && { backgroundColor: '#B45309' }
                             ]}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isKycLoading}
                             activeOpacity={0.85}
                         >
                             {isSubmitting ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
+                            ) : isKycLoading ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                    <Text style={s.submitBtnText}>CHECKING ACCOUNT...</Text>
+                                </View>
                             ) : (
                                 <>
                                     <Ionicons
-                                        name={userKycTier < 2 ? "lock-closed" : "arrow-up-circle"}
+                                        name={isKycLocked ? "lock-closed" : "arrow-up-circle"}
                                         size={18}
-                                        color={userKycTier < 2 ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
+                                        color={isKycLocked ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
                                         style={{ marginRight: 6 }}
                                     />
-                                    <Text style={[s.submitBtnText, (!isFormValid && userKycTier >= 2) && s.submitBtnTextDisabled]}>
-                                        {userKycTier < 2
+                                    <Text style={[s.submitBtnText, (!isFormValid && !isKycLocked) && s.submitBtnTextDisabled]}>
+                                        {isKycLocked
                                             ? '🔒 UPGRADE TO TIER 2 TO TRANSFER'
                                             : (numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
                                                 ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
@@ -1817,7 +1867,7 @@ export default function TransferScreen() {
                         </View>
 
                         {/* Tier 1 Strict Lock Warning Card */}
-                        {userKycTier < 2 && (
+                        {isKycLocked && (
                             <View style={s.tierLockCard}>
                                 <View style={s.tierLockHeaderRow}>
                                     <View style={s.tierLockIconBox}>
@@ -2182,27 +2232,32 @@ export default function TransferScreen() {
 
                         {/* P2P Submit Button */}
                         <TouchableOpacity
-                            onPress={userKycTier < 2 ? () => router.push('/kyc') : handleInitiateTransfer}
+                            onPress={isKycLocked ? () => router.push('/kyc') : handleInitiateTransfer}
                             style={[
                                 s.submitBtn,
-                                (!isFormValid && userKycTier >= 2) ? s.submitBtnDisabled : s.submitBtnActive,
-                                userKycTier < 2 && { backgroundColor: '#B45309' }
+                                (!isFormValid && !isKycLocked) ? s.submitBtnDisabled : s.submitBtnActive,
+                                isKycLocked && { backgroundColor: '#B45309' }
                             ]}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isKycLoading}
                             activeOpacity={0.85}
                         >
                             {isSubmitting ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
+                            ) : isKycLoading ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                    <Text style={s.submitBtnText}>CHECKING ACCOUNT...</Text>
+                                </View>
                             ) : (
                                 <>
                                     <Ionicons
-                                        name={userKycTier < 2 ? "lock-closed" : "paper-plane"}
+                                        name={isKycLocked ? "lock-closed" : "paper-plane"}
                                         size={17}
-                                        color={userKycTier < 2 ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
+                                        color={isKycLocked ? "#FFFFFF" : (!isFormValid ? '#64748B' : '#F59E0B')}
                                         style={{ marginRight: 6 }}
                                     />
-                                    <Text style={[s.submitBtnText, (!isFormValid && userKycTier >= 2) && s.submitBtnTextDisabled]}>
-                                        {userKycTier < 2
+                                    <Text style={[s.submitBtnText, (!isFormValid && !isKycLocked) && s.submitBtnTextDisabled]}>
+                                        {isKycLocked
                                             ? '🔒 UPGRADE TO TIER 2 TO TRANSFER'
                                             : (numAmount > 0 && numAmount < MIN_TRANSFER_AMOUNT
                                                 ? `MINIMUM TRANSFER IS ₦${MIN_TRANSFER_AMOUNT}`
