@@ -56,37 +56,37 @@ const DEFAULT_PLAY_STORE_URL =
 const AI_RELEASE_PRESETS = [
   {
     id: 'ai_v2',
-    name: '🤖 AI Next-Gen Engine',
-    title: '⚡ Sabon Update na Abu Mafhal Sub v{{version}}!',
-    body: 'An saki sabon update mai dauke da sabbin fasahohin AI da saurin sarrafa biyan kudi cikin 0.4s. Danna nan don sabuntawa a Play Store!',
+    name: '🤖 AI Performance Core',
+    title: '⚡ New Abu Mafhal Sub Update v{{version}}!',
+    body: 'A new update featuring AI performance enhancements and 0.4s transaction execution is now live. Tap to update on Google Play!',
     notes:
-      '✨ SABBIN FASAHOHIN AI & SAURIN AIKI:\n' +
-      '• 🤖 AI Smart Route Optimizer: Gano layin data mafi sauri ba tare da faduwar network ba.\n' +
-      '• ⚡ AI Turbo 0.4s Dispatch: Biyan NEPA, TV da Data cikin kiftawar ido.\n' +
-      '• 🛡️ AI Fraud Shield: Cikakken tsaro da kariyar asusunka ta hanyar Biometrics.\n' +
-      '• 📊 AI Smart Analytics: Bada shawarwarin saukin farashin data.',
+      'AI & PERFORMANCE ENHANCEMENTS:\n' +
+      '• AI Smart Routing: Instant automated gateway switching for 99.9% uptime.\n' +
+      '• Turbo Speed: Sub-second 0.4s delivery on Data, Airtime & Utility bills.\n' +
+      '• Enhanced Security: Upgraded 2FA biometric verification and 256-bit encryption.\n' +
+      '• System Stability: Optimized interface performance and smooth real-time syncing.',
   },
   {
     id: 'perf_fix',
     name: '🚀 Speed & Stability',
-    title: '🚀 Muhimmin Update na Abu Mafhal Sub v{{version}}',
-    body: 'Mun inganta saurin manhaja da gyara kurakurai don samun gogewa mafi sauki. Danna nan don sabuntawa yanzu!',
+    title: '🚀 Important Update: Abu Mafhal Sub v{{version}}',
+    body: 'We have optimized app responsiveness and fixed minor issues for a smoother experience. Tap to update now!',
     notes:
-      '🔧 GYARAN KURAKURAI DA KARIN SAURI:\n' +
-      '• Saurin bude shafukan manhaja da kashi 45%.\n' +
-      '• Gyaran matsalar tura kudi da sabunta ma\'aunin asusu.\n' +
-      '• Inganta karbar sanarwar biyan kudi (Push Notifications).',
+      'BUG FIXES & IMPROVEMENTS:\n' +
+      '• 45% faster screen rendering and reduced memory consumption.\n' +
+      '• Resolved transaction status synchronization edge cases.\n' +
+      '• Improved instant push notifications delivery.',
   },
   {
     id: 'security_2fa',
     name: '🛡️ Security & 2FA',
-    title: '🔒 Sabon Tsaro na Abu Mafhal Sub v{{version}}',
-    body: 'An kara ingantaccen tsaron asusu da fasahar 2FA. Da fatan a sabunta don tabbatar da lafiyar asusunka.',
+    title: '🔒 Security Upgrade: Abu Mafhal Sub v{{version}}',
+    body: 'Enhanced account security and New Device Verification are now active. Please update your app.',
     notes:
-      '🛡️ KARIN TSARON ASUSU:\n' +
-      '• Sabuwar fasahar tabbatar da sabuwar na\'ura (New Device 2FA).\n' +
-      '• Kariya daga kutse da shiga ba tare da izini ba.\n' +
-      '• 256-bit bank-grade encryption.',
+      'SECURITY UPGRADES:\n' +
+      '• New Device Two-Factor Authentication (2FA) verification.\n' +
+      '• Advanced fraud prevention and unauthorized access shielding.\n' +
+      '• Upgraded bank-grade API token encryption.',
   },
 ];
 
@@ -109,9 +109,9 @@ export default function AdminAppUpdate() {
 
   // Push Broadcast Configuration
   const [broadcastPush, setBroadcastPush] = useState(true);
-  const [pushTitle, setPushTitle] = useState('⚡ Sabon Update na Abu Mafhal Sub!');
+  const [pushTitle, setPushTitle] = useState('⚡ New Abu Mafhal Sub Update!');
   const [pushBody, setPushBody] = useState(
-    'An saki sabon update mai dauke da sabbin fasahohin AI da saurin aiki. Danna nan don sabuntawa a Play Store kai tsaye!'
+    'A new update featuring AI performance enhancements is now available. Tap to update directly on Google Play!'
   );
 
   // Installed app version from Expo Constants
@@ -139,7 +139,7 @@ export default function AdminAppUpdate() {
       }
     } catch (err: any) {
       console.warn('[AdminAppUpdate] Fetch error:', err);
-      Alert.alert('Gargaɗi', 'An samu matsala wajen ɗauko bayanan update: ' + err.message);
+      Alert.alert('Notice', 'Failed to retrieve update configuration: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -184,13 +184,13 @@ export default function AdminAppUpdate() {
       if (uploadResult.success && uploadResult.publicUrl) {
         setApkDownloadUrl(uploadResult.publicUrl);
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('An Yi Nasara! 🎉', 'An loda fayil ɗin APK cikin nasara kuma an saita hanyar saukewa.');
+        Alert.alert('Success', 'APK file uploaded successfully. Direct download URL configured.');
       } else {
         throw new Error(uploadResult.error || 'Upload failed');
       }
     } catch (err: any) {
       console.error('[AdminAppUpdate] APK Upload error:', err);
-      Alert.alert('Kuskure Wajen Loda APK', err.message || 'Ba a samu damar loda fayil ɗin ba. Zaka iya rubuta direct link da hannu.');
+      Alert.alert('Upload Error', err.message || 'Could not upload file. You can enter a direct URL manually.');
     } finally {
       setUploadingApk(false);
     }
@@ -217,17 +217,17 @@ export default function AdminAppUpdate() {
       );
 
       Alert.alert(
-        'An Aika Sanarwar Gwaji 🔔',
-        'An saukar da sanarwar a wayarka! Danna kanta a saman allonka (drop-down) don ganin yadda zata bude Google Play Store kai tsaye.'
+        'Test Notification Sent 🔔',
+        'Check your notification tray. Tapping the notification will immediately open Google Play Store.'
       );
     } catch (err: any) {
-      Alert.alert('Kuskure', err.message || 'An gaza tura gwajin sanarwa.');
+      Alert.alert('Error', err.message || 'Could not dispatch test notification.');
     }
   };
 
   const handleSaveAndBroadcast = async () => {
     if (!latestAppVersion.trim()) {
-      Alert.alert('Kuskure', 'Da fatan a saka sabon lambar version (misali 1.0.5)');
+      Alert.alert('Error', 'Please enter a valid version number (e.g. 1.0.5)');
       return;
     }
 
@@ -267,7 +267,6 @@ export default function AdminAppUpdate() {
           .limit(2000);
 
         if (!fetchUsersErr && userProfiles && userProfiles.length > 0) {
-          // Chunk notification inserts
           const batchNotifications = userProfiles.map((p) => ({
             user_id: p.id,
             title: finalTitle,
@@ -281,13 +280,12 @@ export default function AdminAppUpdate() {
             created_at: new Date().toISOString(),
           }));
 
-          // Insert in chunks of 200
           for (let i = 0; i < batchNotifications.length; i += 200) {
             const chunk = batchNotifications.slice(i, i + 200);
             await supabase.from('notifications').insert(chunk);
           }
 
-          // B. Remote Push to Expo Push API for tokens
+          // B. Remote Push to Expo Push API
           const validTokens = userProfiles
             .map((p) => p.expo_push_token)
             .filter(
@@ -302,7 +300,6 @@ export default function AdminAppUpdate() {
           broadcastCount = validTokens.length;
 
           if (validTokens.length > 0) {
-            // Expo allows up to 100 messages per batch
             for (let i = 0; i < validTokens.length; i += 100) {
               const tokenChunk = validTokens.slice(i, i + 100);
               const messages = tokenChunk.map((t) => ({
@@ -354,7 +351,7 @@ export default function AdminAppUpdate() {
           console.log('[AdminAppUpdate] Edge function invoke note:', fnErr);
         }
 
-        // D. Also send instant local notification for current admin
+        // D. Send local notification for admin device
         await sendInstantNotification(
           finalTitle,
           finalBody,
@@ -362,18 +359,18 @@ export default function AdminAppUpdate() {
           'security'
         );
 
-        notificationStats = `\n\n🔔 An tura Push Notifications zuwa ga wayoyi ${broadcastCount || userProfiles?.length || 0} masu rajista! Idan suka danna zai kaisu Play Store kai tsaye.`;
+        notificationStats = `\n\nPush notification dispatched to ${broadcastCount || userProfiles?.length || 0} registered devices. Tapping it opens Google Play directly.`;
       }
 
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
-        'An Sabunta Cikin Nasara! 🚀',
-        `An ajiye sabon update na v${latestAppVersion} a tsarin Abu Mafhal Sub.${notificationStats}`
+        'Settings Saved 🚀',
+        `Release configuration for v${latestAppVersion} has been saved successfully.${notificationStats}`
       );
     } catch (err: any) {
       console.error('[AdminAppUpdate] Save error:', err);
-      Alert.alert('Kuskure', err.message || 'An gaza ajiye saitunan update.');
+      Alert.alert('Error', err.message || 'Failed to save update configuration.');
     } finally {
       setSaving(false);
     }
@@ -384,7 +381,7 @@ export default function AdminAppUpdate() {
       <View style={s.centerScreen}>
         <Stack.Screen options={{ headerShown: false }} />
         <ActivityIndicator size="large" color={C.gold} />
-        <Text style={s.loadingText}>Ana ɗauko bayanan App Update...</Text>
+        <Text style={s.loadingText}>Loading update configuration...</Text>
       </View>
     );
   }
@@ -405,7 +402,7 @@ export default function AdminAppUpdate() {
 
         <View style={s.headerTitleWrap}>
           <Text style={s.headerTitle}>App Updates & Releases</Text>
-          <Text style={s.headerSub}>OTA Engine • Google Play Store • AI Features</Text>
+          <Text style={s.headerSub}>Google Play Store • OTA • Direct APK</Text>
         </View>
 
         <TouchableOpacity
@@ -413,7 +410,7 @@ export default function AdminAppUpdate() {
           onPress={() => setShowPreviewModal(true)}
           activeOpacity={0.8}
         >
-          <Ionicons name="eye" size={17} color={C.gold} />
+          <Ionicons name="eye-outline" size={16} color={C.gold} />
           <Text style={s.previewHeaderText}>Preview</Text>
         </TouchableOpacity>
       </View>
@@ -422,7 +419,7 @@ export default function AdminAppUpdate() {
         contentContainerStyle={s.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Banner */}
+        {/* Status Hero Card */}
         <LinearGradient
           colors={['#070D1E', '#0F172A']}
           style={s.heroCard}
@@ -431,44 +428,44 @@ export default function AdminAppUpdate() {
         >
           <View style={s.heroTopRow}>
             <View style={s.heroIconBox}>
-              <Ionicons name="rocket" size={22} color={C.gold} />
+              <Ionicons name="rocket-outline" size={22} color={C.gold} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={s.heroTitle}>Sakin Sabbin Vershoni na Manhaja</Text>
+              <Text style={s.heroTitle}>Release Pipeline Manager</Text>
               <Text style={s.heroSubtitle}>
-                Daga nan zaka iya tilasta update, loda sabon APK, rubuta bayanin AI features, da tura sanarwar Play Store ga dukkan users.
+                Configure target version requirements, upload APK binaries, and broadcast updates to all users.
               </Text>
             </View>
           </View>
 
           <View style={s.heroStatsRow}>
             <View style={s.heroStatItem}>
-              <Text style={s.heroStatLabel}>Installed v</Text>
+              <Text style={s.heroStatLabel}>Installed</Text>
               <Text style={s.heroStatValue}>v{installedAppVersion}</Text>
             </View>
             <View style={s.heroStatDivider} />
             <View style={s.heroStatItem}>
-              <Text style={s.heroStatLabel}>Latest v</Text>
-              <Text style={[s.heroStatValue, { color: '#34d399' }]}>v{latestAppVersion}</Text>
+              <Text style={s.heroStatLabel}>Latest Target</Text>
+              <Text style={[s.heroStatValue, { color: '#34D399' }]}>v{latestAppVersion}</Text>
             </View>
             <View style={s.heroStatDivider} />
             <View style={s.heroStatItem}>
               <Text style={s.heroStatLabel}>Min Enforced</Text>
-              <Text style={[s.heroStatValue, { color: '#fbbf24' }]}>v{minAppVersion}</Text>
+              <Text style={[s.heroStatValue, { color: '#FBBF24' }]}>v{minAppVersion}</Text>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Section 1: Version Numbers & Enforcement */}
+        {/* Section 1: Version Configuration */}
         <View style={s.sectionCard}>
           <View style={s.sectionHeader}>
-            <Ionicons name="git-branch" size={18} color={C.gold} />
-            <Text style={s.sectionTitle}>1. Saitin Vershoni (Version Numbers)</Text>
+            <Ionicons name="git-branch-outline" size={17} color={C.gold} />
+            <Text style={s.sectionTitle}>1. Version Configuration</Text>
           </View>
 
           <View style={s.inputRowDual}>
             <View style={s.inputHalf}>
-              <Text style={s.label}>Sabuwar Version (Latest)</Text>
+              <Text style={s.label}>Latest Version</Text>
               <TextInput
                 value={latestAppVersion}
                 onChangeText={setLatestAppVersion}
@@ -476,11 +473,10 @@ export default function AdminAppUpdate() {
                 placeholder="1.0.5"
                 placeholderTextColor={C.muted}
               />
-              <Text style={s.helpHint}>Misali: 1.0.5</Text>
             </View>
 
             <View style={s.inputHalf}>
-              <Text style={s.label}>Mafi Karancin Version (Min)</Text>
+              <Text style={s.label}>Minimum Required</Text>
               <TextInput
                 value={minAppVersion}
                 onChangeText={setMinAppVersion}
@@ -488,16 +484,15 @@ export default function AdminAppUpdate() {
                 placeholder="1.0.4"
                 placeholderTextColor={C.muted}
               />
-              <Text style={s.helpHint}>Wanda ke kasa zai tilasta update</Text>
             </View>
           </View>
 
           {/* Force Update Toggle */}
           <View style={s.toggleRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={s.toggleTitle}>Tilasta Sabuntawa (Force Update)</Text>
+              <Text style={s.toggleTitle}>Enforce Mandatory Update</Text>
               <Text style={s.toggleSub}>
-                Idan aka kunna wannan, kowanne user dole ya sabunta app kafin ya shiga asusunsa.
+                Users running versions lower than minimum will be required to update before accessing services.
               </Text>
             </View>
             <Switch
@@ -509,22 +504,21 @@ export default function AdminAppUpdate() {
           </View>
         </View>
 
-        {/* Section 2: Download Links & APK Upload */}
+        {/* Section 2: Distribution Links & APK Upload */}
         <View style={s.sectionCard}>
           <View style={s.sectionHeader}>
-            <Ionicons name="cloud-download" size={18} color={C.cyan} />
-            <Text style={s.sectionTitle}>2. Hanyoyin Saukewa (Play Store & APK)</Text>
+            <Ionicons name="cloud-download-outline" size={17} color={C.cyan} />
+            <Text style={s.sectionTitle}>2. Distribution Channels</Text>
           </View>
 
-          {/* Google Play Store Link */}
           <View style={s.inputGroup}>
             <Text style={s.label}>Google Play Store URL</Text>
             <View style={s.inputWithIcon}>
-              <Ionicons name="logo-google-playstore" size={20} color={C.green} style={s.inputIcon} />
+              <Ionicons name="logo-google-playstore" size={18} color={C.green} style={s.inputIcon} />
               <TextInput
                 value={playStoreUrl}
                 onChangeText={setPlayStoreUrl}
-                style={[s.input, { paddingLeft: 42 }]}
+                style={[s.input, { paddingLeft: 40 }]}
                 placeholder={DEFAULT_PLAY_STORE_URL}
                 placeholderTextColor={C.muted}
                 autoCapitalize="none"
@@ -532,15 +526,14 @@ export default function AdminAppUpdate() {
             </View>
           </View>
 
-          {/* Direct APK File URL & Upload */}
           <View style={s.inputGroup}>
-            <Text style={s.label}>Direct APK File URL (Uptodown / Direct Server)</Text>
+            <Text style={s.label}>Direct APK Download Link (Optional)</Text>
             <View style={s.inputWithIcon}>
-              <Ionicons name="link-outline" size={20} color={C.cyan} style={s.inputIcon} />
+              <Ionicons name="link-outline" size={18} color={C.cyan} style={s.inputIcon} />
               <TextInput
                 value={apkDownloadUrl}
                 onChangeText={setApkDownloadUrl}
-                style={[s.input, { paddingLeft: 42 }]}
+                style={[s.input, { paddingLeft: 40 }]}
                 placeholder="https://abumafhal.com.ng/download/app.apk"
                 placeholderTextColor={C.muted}
                 autoCapitalize="none"
@@ -559,21 +552,21 @@ export default function AdminAppUpdate() {
               <ActivityIndicator size="small" color={C.gold} />
             ) : (
               <>
-                <Ionicons name="cloud-upload-outline" size={20} color={C.gold} style={{ marginRight: 8 }} />
-                <Text style={s.uploadApkText}>Loda Sabon Fayil ɗin .APK Daga Na'ura</Text>
+                <Ionicons name="cloud-upload-outline" size={18} color={C.gold} style={{ marginRight: 8 }} />
+                <Text style={s.uploadApkText}>Upload New APK Binary (.apk)</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Section 3: AI Release Notes Presets & Editor */}
+        {/* Section 3: Release Notes Presets & Editor */}
         <View style={s.sectionCard}>
           <View style={s.sectionHeader}>
-            <Ionicons name="sparkles" size={18} color={C.gold} />
-            <Text style={s.sectionTitle}>3. Bayanin Sabuntawa & AI Features (Release Notes)</Text>
+            <Ionicons name="sparkles-outline" size={17} color={C.gold} />
+            <Text style={s.sectionTitle}>3. Release Notes & Highlights</Text>
           </View>
 
-          <Text style={s.presetTitle}>Zaɓi Salo na Musamman (One-Tap Presets):</Text>
+          <Text style={s.presetTitle}>Quick Templates:</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -592,32 +585,32 @@ export default function AdminAppUpdate() {
           </ScrollView>
 
           <View style={s.inputGroup}>
-            <Text style={s.label}>Bayanin da User Zai Gani a Screen (Hausa/English)</Text>
+            <Text style={s.label}>Release Notes Displayed to Users</Text>
             <TextInput
               value={appUpdateMessage}
               onChangeText={setAppUpdateMessage}
               style={[s.input, s.textArea]}
               multiline
-              numberOfLines={6}
+              numberOfLines={5}
               textAlignVertical="top"
-              placeholder="Rubuta bayanin abubuwan da aka inganta da fasahohin AI..."
+              placeholder="Enter release notes and highlights..."
               placeholderTextColor={C.muted}
             />
           </View>
         </View>
 
-        {/* Section 4: Push Notification Broadcast to All Users */}
+        {/* Section 4: Push Notification Broadcast */}
         <View style={s.sectionCard}>
           <View style={s.sectionHeader}>
-            <Ionicons name="megaphone" size={18} color={C.red} />
-            <Text style={s.sectionTitle}>4. Tura Sanarwar Wayar Salula (Push Broadcast)</Text>
+            <Ionicons name="megaphone-outline" size={17} color={C.red} />
+            <Text style={s.sectionTitle}>4. Push Notification Broadcast</Text>
           </View>
 
           <View style={s.toggleRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={s.toggleTitle}>Aika Push Notification Yayin Ajiye Update</Text>
+              <Text style={s.toggleTitle}>Broadcast Push on Save</Text>
               <Text style={s.toggleSub}>
-                Sanarwar zata shiga saman wayar kowanne user (status bar heads-up). Idan ya danna, zata bude Play Store kai tsaye.
+                Sends a high-priority notification to all user devices. Tapping it immediately opens Google Play Store.
               </Text>
             </View>
             <Switch
@@ -631,44 +624,42 @@ export default function AdminAppUpdate() {
           {broadcastPush && (
             <>
               <View style={s.inputGroup}>
-                <Text style={s.label}>Taken Sanarwa (Notification Title)</Text>
+                <Text style={s.label}>Notification Title</Text>
                 <TextInput
                   value={pushTitle}
                   onChangeText={setPushTitle}
                   style={s.input}
-                  placeholder="⚡ Sabon Update na Abu Mafhal Sub!"
+                  placeholder="⚡ New Abu Mafhal Sub Update!"
                   placeholderTextColor={C.muted}
                 />
               </View>
 
               <View style={s.inputGroup}>
-                <Text style={s.label}>Sakon Sanarwa (Notification Body)</Text>
+                <Text style={s.label}>Notification Message</Text>
                 <TextInput
                   value={pushBody}
                   onChangeText={setPushBody}
-                  style={[s.input, { minHeight: 70 }]}
+                  style={[s.input, { minHeight: 65 }]}
                   multiline
-                  placeholder="An saki sabon update..."
+                  placeholder="A new update is now available..."
                   placeholderTextColor={C.muted}
                 />
               </View>
 
-              {/* Action notice */}
               <View style={s.actionNoticeBox}>
-                <Ionicons name="information-circle" size={18} color={C.gold} />
+                <Ionicons name="information-circle-outline" size={18} color={C.gold} />
                 <Text style={s.actionNoticeText}>
-                  Ayyukan Danna Sanarwa: Idan user ya taɓa wannan sanarwa a wayarsa, tsarin zai buɗe shafin Google Play Store kai tsaye ba tare da ya sha wahalar bincike ba!
+                  Direct Action: When any user taps this notification on their phone, it will open the Google Play Store update page directly.
                 </Text>
               </View>
 
-              {/* Test Button */}
               <TouchableOpacity
                 style={s.testPushBtn}
                 onPress={handleTestInstantPush}
                 activeOpacity={0.8}
               >
                 <Ionicons name="notifications-circle" size={18} color={C.cyan} style={{ marginRight: 8 }} />
-                <Text style={s.testPushText}>Gwada Tura Sanarwa a Wayata Yanzu (Test Push)</Text>
+                <Text style={s.testPushText}>Send Test Notification to This Device</Text>
               </TouchableOpacity>
             </>
           )}
@@ -691,9 +682,9 @@ export default function AdminAppUpdate() {
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <Ionicons name="paper-plane" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={s.saveText}>
-                  {broadcastPush ? 'Ajiye & Aika Push Notification Zuwa Users' : 'Ajiye Saitunan Update Kawai'}
+                  {broadcastPush ? 'Save & Broadcast Push Notification' : 'Save Update Settings'}
                 </Text>
               </>
             )}
@@ -706,30 +697,28 @@ export default function AdminAppUpdate() {
           onPress={() => setShowPreviewModal(true)}
           activeOpacity={0.8}
         >
-          <Ionicons name="phone-portrait-outline" size={18} color={C.navy} style={{ marginRight: 8 }} />
-          <Text style={s.previewBtnBottomText}>Duba Yadda Allon Update Zai Fito (Live Screen Preview)</Text>
+          <Ionicons name="phone-portrait-outline" size={17} color={C.navy} style={{ marginRight: 8 }} />
+          <Text style={s.previewBtnBottomText}>Preview Update Screen</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal for Live Preview of UpdateScreen */}
+      {/* Modal for Live Preview */}
       <Modal
         visible={showPreviewModal}
         animationType="slide"
         onRequestClose={() => setShowPreviewModal(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#040814' }}>
-          {/* Top close bar */}
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#070D1E' }}>
           <View style={s.modalCloseBar}>
-            <Text style={s.modalCloseTitle}>LIVE PREVIEW: Yadda User Zai Gani</Text>
+            <Text style={s.modalCloseTitle}>LIVE PREVIEW</Text>
             <TouchableOpacity
               onPress={() => setShowPreviewModal(false)}
               style={s.modalCloseBtn}
             >
-              <Ionicons name="close-circle" size={26} color="#FFFFFF" />
+              <Ionicons name="close-circle" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Render Actual UpdateScreen */}
           <UpdateScreen
             currentVersion={installedAppVersion}
             latestVersion={latestAppVersion}
@@ -758,7 +747,7 @@ const s = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 13,
     color: C.sub,
     fontWeight: '600',
   },
@@ -785,7 +774,7 @@ const s = StyleSheet.create({
     marginLeft: 12,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: C.navy,
   },
@@ -800,42 +789,35 @@ const s = StyleSheet.create({
     backgroundColor: C.goldLight,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: C.goldBorder,
     gap: 4,
   },
   previewHeaderText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: C.gold,
   },
   scrollContainer: {
     padding: 16,
-    paddingBottom: 50,
+    paddingBottom: 40,
   },
   heroCard: {
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
   },
   heroTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   heroIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     backgroundColor: 'rgba(217, 119, 6, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -843,7 +825,7 @@ const s = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   heroSubtitle: {
     fontSize: 11.5,
@@ -854,9 +836,9 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   heroStatItem: {
     flex: 1,
@@ -864,45 +846,40 @@ const s = StyleSheet.create({
   },
   heroStatDivider: {
     width: 1,
-    height: 24,
+    height: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   heroStatLabel: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: '#94A3B8',
     fontWeight: '600',
     marginBottom: 2,
     textTransform: 'uppercase',
   },
   heroStatValue: {
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 13.5,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   sectionCard: {
     backgroundColor: C.card,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: C.border,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
+    padding: 14,
+    marginBottom: 14,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
     color: C.navy,
   },
@@ -915,22 +892,22 @@ const s = StyleSheet.create({
     flex: 1,
   },
   inputGroup: {
-    marginBottom: 14,
+    marginBottom: 12,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: C.navyMid,
-    marginBottom: 6,
+    marginBottom: 5,
   },
   input: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 13.5,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
     color: C.text,
     fontWeight: '600',
   },
@@ -943,19 +920,14 @@ const s = StyleSheet.create({
     left: 12,
     zIndex: 1,
   },
-  helpHint: {
-    fontSize: 10.5,
-    color: C.muted,
-    marginTop: 4,
-  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   toggleTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     color: C.navy,
     marginBottom: 2,
@@ -972,41 +944,41 @@ const s = StyleSheet.create({
     backgroundColor: C.goldLight,
     borderWidth: 1,
     borderColor: C.goldBorder,
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingVertical: 11,
     marginTop: 4,
   },
   uploadApkText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
     color: C.gold,
   },
   presetTitle: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
     color: C.sub,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   presetScroll: {
-    marginBottom: 14,
+    marginBottom: 12,
   },
   presetChip: {
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#BFDBFE',
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    paddingVertical: 6,
+    borderRadius: 16,
     marginRight: 8,
   },
   presetChipText: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#1E40AF',
   },
   textArea: {
-    minHeight: 110,
-    lineHeight: 18,
+    minHeight: 90,
+    lineHeight: 17,
   },
   actionNoticeBox: {
     flexDirection: 'row',
@@ -1014,16 +986,16 @@ const s = StyleSheet.create({
     backgroundColor: C.goldLight,
     borderWidth: 1,
     borderColor: C.goldBorder,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 10,
+    padding: 10,
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   actionNoticeText: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 11,
     color: '#92400E',
-    lineHeight: 16,
+    lineHeight: 15,
     fontWeight: '600',
   },
   testPushBtn: {
@@ -1033,36 +1005,35 @@ const s = StyleSheet.create({
     backgroundColor: C.cyanLight,
     borderWidth: 1,
     borderColor: '#BAE6FD',
-    borderRadius: 12,
-    paddingVertical: 11,
+    borderRadius: 10,
+    paddingVertical: 10,
   },
   testPushText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: C.cyan,
   },
   saveButton: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
     shadowColor: C.gold,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 6,
-    marginBottom: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+    marginBottom: 12,
   },
   saveGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
   saveText: {
-    fontSize: 14.5,
-    fontWeight: '900',
+    fontSize: 13.5,
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.3,
   },
   previewBtnBottom: {
     flexDirection: 'row',
@@ -1071,11 +1042,11 @@ const s = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: C.border,
-    paddingVertical: 13,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   previewBtnBottomText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '700',
     color: C.navy,
   },
@@ -1090,12 +1061,12 @@ const s = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalCloseTitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: C.gold,
     letterSpacing: 0.5,
   },
   modalCloseBtn: {
-    padding: 4,
+    padding: 2,
   },
 });

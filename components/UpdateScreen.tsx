@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Platform,
   Image,
   ScrollView,
-  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,8 +37,6 @@ export default function UpdateScreen({
   isForced = true,
   onDismiss,
 }: UpdateScreenProps) {
-  const [showFullNotes, setShowFullNotes] = useState(false);
-
   const handleUpdate = async () => {
     if (Platform.OS !== 'web') {
       try {
@@ -57,9 +54,7 @@ export default function UpdateScreen({
           await Linking.openURL(marketUrl);
           return;
         }
-      } catch {
-        // Fallback to web URL below
-      }
+      } catch {}
     }
 
     try {
@@ -91,280 +86,167 @@ export default function UpdateScreen({
       } catch {}
     }
     const text = encodeURIComponent(
-      `Sannu Abu Mafhal Support, ina neman taimako game da sabunta sabon version na manhaja (v${latestVersion}).`
+      `Hello Abu Mafhal Support, I need help updating the app to the latest version (v${latestVersion}).`
     );
     Linking.openURL(`https://wa.me/2348145853539?text=${text}`).catch(() => {});
-  };
-
-  const handleShareUpdate = async () => {
-    try {
-      await Share.share({
-        message: `Sabunta sabuwar manhaja ta Abu Mafhal Sub (v${latestVersion}) mai dauke da sabbin fasahohin AI da saurin 0.4s transaction: ${playStoreUrl || DEFAULT_PLAY_STORE_URL}`,
-      });
-    } catch {}
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
-        colors={['#040814', '#0a1226', '#0f1f42']}
+        colors={['#070D1E', '#0A1226', '#0F1A36']}
         style={StyleSheet.absoluteFillObject}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
 
-      {/* Decorative Cyber Ambient Glows */}
-      <View style={styles.glowTopCenter} />
-      <View style={styles.glowRight} />
-      <View style={styles.glowBottomLeft} />
+      {/* Subtle Background Glow */}
+      <View style={styles.ambientGlow} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Futuristic App Icon Ring with AI Sparkle */}
-        <View style={styles.logoWrapper}>
-          <View style={styles.outerPulseGlow}>
-            <View style={styles.logoRing}>
-              <Image
-                source={require('../assets/images/logo-icon.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-          <View style={styles.aiBadgeFloat}>
-            <Ionicons name="sparkles" size={11} color="#050b14" />
-            <Text style={styles.aiBadgeFloatText}>AI CORE v2</Text>
+        {/* App Icon */}
+        <View style={styles.iconContainer}>
+          <View style={styles.iconFrame}>
+            <Image
+              source={require('../assets/images/logo-icon.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
         </View>
 
-        {/* Pulsing Pill Status */}
+        {/* Status Pill */}
         <View style={styles.badgePill}>
           <View style={styles.pulsingDot} />
-          <Ionicons name="hardware-chip-outline" size={14} color="#f5a623" style={{ marginRight: 6 }} />
-          <Text style={styles.badgeText}>SABON UPDATE • NEXT-GEN AI RELEASE</Text>
+          <Text style={styles.badgeText}>
+            {isForced ? 'MANDATORY UPDATE' : 'UPDATE AVAILABLE'}
+          </Text>
         </View>
 
-        {/* Headline Titles */}
-        <Text style={styles.headlineTitle}>Sabunta Abu Mafhal Sub</Text>
-        <Text style={styles.headlineSub}>
-          An inganta manhajar da sabbin fasahohin AI masu sarrafa biyan kudi da data cikin ƙiftawar ido (0.4s) tare da tsaron asusu na musamman.
+        {/* Heading & Subtitle */}
+        <Text style={styles.title}>
+          {isForced ? 'Update Required' : 'New Version Available'}
+        </Text>
+        <Text style={styles.subtitle}>
+          A new version of Abu Mafhal Sub is now available on Google Play with enhanced performance and security upgrades.
         </Text>
 
-        {/* Version Comparison Card */}
+        {/* Version Compare Card */}
         <View style={styles.versionCard}>
-          <View style={styles.versionCol}>
-            <Text style={styles.versionColLabel}>Version Ɗinka</Text>
-            <View style={styles.versionTagOld}>
-              <Ionicons name="alert-circle" size={12} color="#f87171" style={{ marginRight: 4 }} />
-              <Text style={styles.versionTagOldText}>v{currentVersion}</Text>
+          <View style={styles.versionColumn}>
+            <Text style={styles.versionLabel}>Installed</Text>
+            <Text style={styles.versionOldValue}>v{currentVersion}</Text>
+          </View>
+
+          <View style={styles.arrowBox}>
+            <Ionicons name="arrow-forward" size={16} color="#D97706" />
+          </View>
+
+          <View style={styles.versionColumn}>
+            <Text style={styles.versionLabel}>Latest</Text>
+            <Text style={styles.versionNewValue}>v{latestVersion}</Text>
+          </View>
+        </View>
+
+        {/* Highlights List */}
+        <View style={styles.featuresCard}>
+          <View style={styles.featureRow}>
+            <View style={[styles.featureIcon, { backgroundColor: 'rgba(217, 119, 6, 0.15)' }]}>
+              <Ionicons name="flash" size={16} color="#F59E0B" />
+            </View>
+            <View style={styles.featureTextCol}>
+              <Text style={styles.featureTitle}>AI Smart Dispatch</Text>
+              <Text style={styles.featureDesc}>Sub-second 0.4s transaction processing across all networks.</Text>
             </View>
           </View>
 
-          <View style={styles.versionArrowCol}>
-            <View style={styles.arrowGlowWrap}>
-              <Ionicons name="arrow-forward" size={16} color="#070d1e" />
+          <View style={styles.featureRow}>
+            <View style={[styles.featureIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+              <Ionicons name="shield-checkmark" size={16} color="#10B981" />
             </View>
-            <Text style={styles.upgradeText}>UPGRADE</Text>
+            <View style={styles.featureTextCol}>
+              <Text style={styles.featureTitle}>Advanced 2FA Security</Text>
+              <Text style={styles.featureDesc}>Bank-grade 256-bit encryption with biometric authentication.</Text>
+            </View>
           </View>
 
-          <View style={styles.versionCol}>
-            <Text style={styles.versionColLabel}>Sabuwar Version</Text>
-            <View style={styles.versionTagNew}>
-              <Ionicons name="sparkles" size={12} color="#34d399" style={{ marginRight: 4 }} />
-              <Text style={styles.versionTagNewText}>v{latestVersion}</Text>
+          <View style={[styles.featureRow, { marginBottom: 0 }]}>
+            <View style={[styles.featureIcon, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+              <Ionicons name="hardware-chip" size={16} color="#38BDF8" />
+            </View>
+            <View style={styles.featureTextCol}>
+              <Text style={styles.featureTitle}>System Stability & Fixes</Text>
+              <Text style={styles.featureDesc}>Optimized user interface with automatic status sync.</Text>
             </View>
           </View>
         </View>
 
-        {/* AI Features Highlight Grid */}
-        <View style={styles.aiFeaturesCard}>
-          <View style={styles.aiCardHeader}>
-            <View style={styles.aiIconBadge}>
-              <Ionicons name="bulb-outline" size={14} color="#f5a623" />
-            </View>
-            <Text style={styles.aiCardTitle}>Sabbin Fasahohin AI a Ciki (AI Features):</Text>
-          </View>
-
-          {/* AI Feature 1 */}
-          <View style={styles.aiFeatureItem}>
-            <View style={[styles.aiItemIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
-              <Ionicons name="git-network-outline" size={18} color="#38bdf8" />
-            </View>
-            <View style={styles.aiItemTextWrap}>
-              <View style={styles.aiItemTitleRow}>
-                <Text style={styles.aiItemTitle}>AI Smart Route Optimizer</Text>
-                <View style={styles.aiMiniPill}>
-                  <Text style={styles.aiMiniPillText}>99.9% UPTIME</Text>
-                </View>
-              </View>
-              <Text style={styles.aiItemDesc}>
-                Fasahar AI da ke gano layin da yafi sauri (MTN, Airtel, Glo) don tura data da katin waya nan take ba tare da jinkiri ba.
-              </Text>
-            </View>
-          </View>
-
-          {/* AI Feature 2 */}
-          <View style={styles.aiFeatureItem}>
-            <View style={[styles.aiItemIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-              <Ionicons name="shield-checkmark-outline" size={18} color="#10b981" />
-            </View>
-            <View style={styles.aiItemTextWrap}>
-              <View style={styles.aiItemTitleRow}>
-                <Text style={styles.aiItemTitle}>AI Fraud Shield & 2FA Engine</Text>
-                <View style={[styles.aiMiniPill, { backgroundColor: 'rgba(16, 185, 129, 0.18)' }]}>
-                  <Text style={[styles.aiMiniPillText, { color: '#34d399' }]}>SECURED</Text>
-                </View>
-              </View>
-              <Text style={styles.aiItemDesc}>
-                Kariya mai inganci da ke dakile kowanne irin kutse, tare da sahalewar shiga ta fuska ko yatsa (Biometrics).
-              </Text>
-            </View>
-          </View>
-
-          {/* AI Feature 3 */}
-          <View style={styles.aiFeatureItem}>
-            <View style={[styles.aiItemIconBox, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
-              <Ionicons name="flash-outline" size={18} color="#f5a623" />
-            </View>
-            <View style={styles.aiItemTextWrap}>
-              <View style={styles.aiItemTitleRow}>
-                <Text style={styles.aiItemTitle}>AI Turbo Instant Dispatch</Text>
-                <View style={[styles.aiMiniPill, { backgroundColor: 'rgba(245, 166, 35, 0.18)' }]}>
-                  <Text style={[styles.aiMiniPillText, { color: '#fbbf24' }]}>0.4s SPEED</Text>
-                </View>
-              </View>
-              <Text style={styles.aiItemDesc}>
-                Saurin sarrafa biyan NEPA, katin TV (DSTV/GOTV) da canjin kudi a cikin daƙiƙa 0.4 kacal.
-              </Text>
-            </View>
-          </View>
-
-          {/* AI Feature 4 */}
-          <View style={[styles.aiFeatureItem, { marginBottom: 0 }]}>
-            <View style={[styles.aiItemIconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
-              <Ionicons name="pie-chart-outline" size={18} color="#c084fc" />
-            </View>
-            <View style={styles.aiItemTextWrap}>
-              <View style={styles.aiItemTitleRow}>
-                <Text style={styles.aiItemTitle}>AI Smart Wallet Assistant</Text>
-                <View style={[styles.aiMiniPill, { backgroundColor: 'rgba(168, 85, 247, 0.18)' }]}>
-                  <Text style={[styles.aiMiniPillText, { color: '#c084fc' }]}>ANALYTICS</Text>
-                </View>
-              </View>
-              <Text style={styles.aiItemDesc}>
-                Kula da yadda kudaden ka ke fita tare da bada shawarwari kan saukin farashin data mafi dacewa da kai.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Custom Message / Release Notes from Admin */}
+        {/* Optional Custom Release Note from Admin */}
         {message ? (
-          <View style={styles.releaseNotesBox}>
-            <TouchableOpacity
-              style={styles.releaseNotesHeader}
-              activeOpacity={0.7}
-              onPress={() => setShowFullNotes(!showFullNotes)}
-            >
-              <View style={styles.releaseNotesHeaderLeft}>
-                <Ionicons name="newspaper-outline" size={16} color="#f5a623" />
-                <Text style={styles.releaseNotesTitle}>Bayanin Sabuntawa (Release Notes)</Text>
-              </View>
-              <Ionicons
-                name={showFullNotes ? 'chevron-up' : 'chevron-down'}
-                size={18}
-                color="#94a3b8"
-              />
-            </TouchableOpacity>
-
-            <Text
-              style={styles.releaseNotesBody}
-              numberOfLines={showFullNotes ? undefined : 3}
-            >
-              {message}
-            </Text>
-
-            {!showFullNotes && message.length > 120 && (
-              <TouchableOpacity
-                onPress={() => setShowFullNotes(true)}
-                style={styles.expandTextBtn}
-              >
-                <Text style={styles.expandText}>Karanta Karin Bayani...</Text>
-              </TouchableOpacity>
-            )}
+          <View style={styles.notesCard}>
+            <View style={styles.notesHeader}>
+              <Ionicons name="document-text-outline" size={15} color="#D97706" />
+              <Text style={styles.notesTitle}>Release Notes</Text>
+            </View>
+            <Text style={styles.notesBody}>{message}</Text>
           </View>
         ) : null}
 
-        {/* Primary Action Button: Update on Google Play Store */}
+        {/* Primary Action Button: Google Play Store */}
         <TouchableOpacity
           style={styles.primaryButton}
-          activeOpacity={0.88}
+          activeOpacity={0.9}
           onPress={handleUpdate}
         >
           <LinearGradient
-            colors={['#f5a623', '#d97706']}
+            colors={['#D97706', '#B45309']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.primaryButtonGradient}
+            style={styles.primaryGradient}
           >
-            <Ionicons name="logo-google-playstore" size={22} color="#070d1e" style={{ marginRight: 10 }} />
-            <View style={styles.primaryBtnTextWrap}>
-              <Text style={styles.primaryButtonText}>SABUNTA A GOOGLE PLAY STORE</Text>
-              <Text style={styles.primaryButtonSub}>Official Verified Android Build</Text>
-            </View>
+            <Ionicons name="logo-google-playstore" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.primaryButtonText}>UPDATE ON GOOGLE PLAY</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Secondary Action: Direct APK Download / Uptodown option */}
+        {/* Optional Secondary Action: Direct APK */}
+        {apkDownloadUrl ? (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+            onPress={handleDownloadApk}
+          >
+            <Ionicons name="download-outline" size={18} color="#38BDF8" style={{ marginRight: 8 }} />
+            <Text style={styles.secondaryButtonText}>Direct APK Download</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* WhatsApp Support Link */}
         <TouchableOpacity
-          style={styles.apkButton}
-          activeOpacity={0.85}
-          onPress={handleDownloadApk}
+          style={styles.supportButton}
+          activeOpacity={0.75}
+          onPress={handleSupport}
         >
-          <View style={styles.apkButtonInner}>
-            <Ionicons name="download-outline" size={19} color="#38bdf8" style={{ marginRight: 8 }} />
-            <Text style={styles.apkButtonText}>
-              {apkDownloadUrl ? 'Sauke Direct APK File (Direct Download)' : 'Sauke Ta Wata Hanyar (Direct Link)'}
-            </Text>
-          </View>
+          <Ionicons name="logo-whatsapp" size={16} color="#25D366" style={{ marginRight: 6 }} />
+          <Text style={styles.supportButtonText}>Need Help? Contact Support</Text>
         </TouchableOpacity>
 
-        {/* Helper Action Row: Share + WhatsApp Helpdesk */}
-        <View style={styles.helpRow}>
-          <TouchableOpacity
-            style={styles.helpRowBtn}
-            activeOpacity={0.8}
-            onPress={handleSupport}
-          >
-            <Ionicons name="logo-whatsapp" size={17} color="#25D366" style={{ marginRight: 6 }} />
-            <Text style={styles.helpRowBtnText}>WhatsApp Support</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.helpRowBtn}
-            activeOpacity={0.8}
-            onPress={handleShareUpdate}
-          >
-            <Ionicons name="share-social-outline" size={17} color="#f5a623" style={{ marginRight: 6 }} />
-            <Text style={styles.helpRowBtnText}>Share Link</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Optional dismiss button if update is not mandatory */}
+        {/* Optional Dismiss if update is not forced */}
         {!isForced && onDismiss && (
           <TouchableOpacity style={styles.laterButton} onPress={onDismiss} activeOpacity={0.7}>
-            <Text style={styles.laterButtonText}>Daga Baya (Remind Me Later)</Text>
+            <Text style={styles.laterButtonText}>Remind Me Later</Text>
           </TouchableOpacity>
         )}
 
-        {/* Corporate Verified Footnote */}
+        {/* Verified Footer */}
         <View style={styles.footerWrap}>
-          <Ionicons name="shield-checkmark" size={12} color="#64748b" style={{ marginRight: 5 }} />
-          <Text style={styles.footerCopy}>
-            Abu Mafhal Ltd (RC-8979939) • Certified Google Play Protection
+          <Ionicons name="shield-checkmark" size={12} color="#64748B" style={{ marginRight: 5 }} />
+          <Text style={styles.footerText}>
+            Abu Mafhal Ltd (RC-8979939) • Official Release
           </Text>
         </View>
       </ScrollView>
@@ -375,134 +257,83 @@ export default function UpdateScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#040814',
+    backgroundColor: '#070D1E',
   },
-  glowTopCenter: {
+  ambientGlow: {
     position: 'absolute',
-    top: -80,
+    top: -60,
     alignSelf: 'center',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(245, 166, 35, 0.16)',
-  },
-  glowRight: {
-    position: 'absolute',
-    top: '30%',
-    right: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
-  },
-  glowBottomLeft: {
-    position: 'absolute',
-    bottom: -50,
-    left: -60,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: 'rgba(16, 185, 129, 0.07)',
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: 'rgba(217, 119, 6, 0.12)',
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 24,
+    paddingTop: 32,
     paddingBottom: 40,
     alignItems: 'center',
   },
-  logoWrapper: {
+  iconContainer: {
     marginBottom: 16,
-    alignItems: 'center',
-    position: 'relative',
   },
-  outerPulseGlow: {
-    padding: 4,
-    borderRadius: 34,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
-  },
-  logoRing: {
-    width: 90,
-    height: 90,
-    borderRadius: 28,
-    backgroundColor: '#ffffff',
+  iconFrame: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#f5a623',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
     elevation: 8,
-    borderWidth: 3,
-    borderColor: '#f5a623',
+    borderWidth: 2,
+    borderColor: '#D97706',
   },
   logoImage: {
-    width: 62,
-    height: 62,
-  },
-  aiBadgeFloat: {
-    position: 'absolute',
-    bottom: -8,
-    backgroundColor: '#f5a623',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 12,
-    gap: 4,
-    shadowColor: '#f5a623',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  aiBadgeFloatText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: '#070d1e',
-    letterSpacing: 0.5,
+    width: 60,
+    height: 60,
   },
   badgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    backgroundColor: 'rgba(217, 119, 6, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
+    borderColor: 'rgba(217, 119, 6, 0.35)',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
-    marginTop: 10,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   pulsingDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#34d399',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
     marginRight: 8,
   },
   badgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#f5a623',
-    letterSpacing: 0.7,
+    color: '#D97706',
+    letterSpacing: 0.8,
   },
-  headlineTitle: {
-    fontSize: 23,
+  title: {
+    fontSize: 22,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
-    letterSpacing: 0.2,
   },
-  headlineSub: {
-    fontSize: 12.5,
+  subtitle: {
+    fontSize: 13,
     lineHeight: 19,
-    color: '#94a3b8',
+    color: '#94A3B8',
     textAlign: 'center',
-    marginBottom: 18,
-    maxWidth: 340,
+    marginBottom: 20,
+    maxWidth: 320,
   },
   versionCard: {
     flexDirection: 'row',
@@ -511,287 +342,175 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     width: '100%',
-    marginBottom: 16,
+    marginBottom: 18,
   },
-  versionCol: {
+  versionColumn: {
     alignItems: 'center',
     flex: 1,
   },
-  versionColLabel: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginBottom: 6,
+  versionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  versionTagOld: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.35)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  versionTagOldText: {
-    fontSize: 12.5,
+  versionOldValue: {
+    fontSize: 13,
     fontWeight: '800',
-    color: '#f87171',
+    color: '#EF4444',
   },
-  versionArrowCol: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
+  versionNewValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10B981',
   },
-  arrowGlowWrap: {
+  arrowBox: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#f5a623',
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 3,
   },
-  upgradeText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#f5a623',
-    letterSpacing: 0.8,
-  },
-  versionTagNew: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.45)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  versionTagNewText: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#34d399',
-  },
-  aiFeaturesCard: {
+  featuresCard: {
     width: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
   },
-  aiCardHeader: {
+  featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    marginBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-    paddingBottom: 10,
+    marginBottom: 12,
   },
-  aiIconBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  aiCardTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#f5a623',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  aiFeatureItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 13,
-  },
-  aiItemIconBox: {
+  featureIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 11,
-    marginTop: 1,
+    marginRight: 12,
   },
-  aiItemTextWrap: {
+  featureTextCol: {
     flex: 1,
   },
-  aiItemTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  featureTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 2,
   },
-  aiItemTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+  featureDesc: {
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 15,
   },
-  aiMiniPill: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 6,
-  },
-  aiMiniPillText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#38bdf8',
-  },
-  aiItemDesc: {
-    fontSize: 10.5,
-    color: '#94a3b8',
-    lineHeight: 14.5,
-  },
-  releaseNotesBox: {
+  notesCard: {
     width: '100%',
-    backgroundColor: 'rgba(245, 166, 35, 0.07)',
+    backgroundColor: 'rgba(217, 119, 6, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.22)',
+    borderColor: 'rgba(217, 119, 6, 0.2)',
     borderRadius: 14,
-    padding: 13,
-    marginBottom: 16,
+    padding: 14,
+    marginBottom: 18,
   },
-  releaseNotesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  releaseNotesHeaderLeft: {
+  notesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginBottom: 6,
   },
-  releaseNotesTitle: {
+  notesTitle: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#f5a623',
+    color: '#D97706',
     textTransform: 'uppercase',
   },
-  releaseNotesBody: {
+  notesBody: {
     fontSize: 12,
     lineHeight: 17,
-    color: '#e2e8f0',
-  },
-  expandTextBtn: {
-    marginTop: 5,
-    alignSelf: 'flex-start',
-  },
-  expandText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#f5a623',
+    color: '#E2E8F0',
   },
   primaryButton: {
     width: '100%',
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#f5a623',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    elevation: 8,
-    marginBottom: 10,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+    marginBottom: 12,
   },
-  primaryButtonGradient: {
+  primaryGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  primaryBtnTextWrap: {
-    alignItems: 'flex-start',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
   },
   primaryButtonText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '900',
-    color: '#070d1e',
+    color: '#FFFFFF',
     letterSpacing: 0.4,
   },
-  primaryButtonSub: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  apkButton: {
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     width: '100%',
     backgroundColor: 'rgba(56, 189, 248, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(56, 189, 248, 0.25)',
-    borderRadius: 14,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderRadius: 12,
     marginBottom: 12,
   },
-  apkButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  apkButtonText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#38bdf8',
-  },
-  helpRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 10,
-    marginBottom: 14,
-  },
-  helpRowBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  helpRowBtnText: {
-    fontSize: 11.5,
+  secondaryButtonText: {
+    fontSize: 12.5,
     fontWeight: '700',
-    color: '#cbd5e1',
+    color: '#38BDF8',
+  },
+  supportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  supportButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
   },
   laterButton: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
     marginBottom: 8,
   },
   laterButtonText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748B',
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
   footerWrap: {
-    marginTop: 6,
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footerCopy: {
-    fontSize: 9.5,
+  footerText: {
+    fontSize: 10,
     fontWeight: '600',
-    color: '#64748b',
-    textAlign: 'center',
+    color: '#64748B',
   },
 });

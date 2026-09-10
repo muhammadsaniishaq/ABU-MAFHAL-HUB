@@ -50,15 +50,15 @@ export default function AppStores() {
                 <View style={s.badgePill}>
                   <Text style={s.badgePillText}>OTA & PUSH ENGINE ACTIVE</Text>
                 </View>
-                <Text style={s.ctaTitle}>Gudanar da Sabbin Updates</Text>
+                <Text style={s.ctaTitle}>App Releases & OTA Updates</Text>
                 <Text style={s.ctaSub}>
-                  Loda APK, saita vershoni, rubuta bayanan AI features, da tura push notifications ga dukkan users zuwa Play Store.
+                  Upload APK binaries, configure target versions, set AI release notes, and broadcast updates to user devices.
                 </Text>
               </View>
             </View>
 
             <View style={s.ctaButtonInner}>
-              <Text style={s.ctaButtonInnerText}>Buɗe App Update Manager</Text>
+              <Text style={s.ctaButtonInnerText}>Open App Update Manager</Text>
               <Ionicons name="arrow-forward" size={16} color="#070D1E" />
             </View>
           </LinearGradient>
@@ -108,8 +108,8 @@ export default function AppStores() {
           activeOpacity={0.8}
         >
           <Ionicons name="cloud-upload" size={24} color="#D97706" />
-          <Text style={s.uploadBtnText}>Saita Sabon Release ko Loda APK (.apk)</Text>
-          <Text style={s.uploadBtnSub}>Danna nan don shiga babban shafin App Updates</Text>
+          <Text style={s.uploadBtnText}>Configure New Release & Upload APK (.apk)</Text>
+          <Text style={s.uploadBtnSub}>Tap to open the dedicated App Update Management console</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

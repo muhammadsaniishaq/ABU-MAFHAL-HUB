@@ -565,7 +565,7 @@ export default function AdminSettings() {
                                             Dedicated App Update & Release Manager 🚀
                                         </Text>
                                         <Text style={{ fontSize: 11, color: '#92400E' }}>
-                                            Loda APK, sarrafa AI features, da tura push broadcast kai tsaye.
+                                            Upload APK binaries, configure AI features, and broadcast updates.
                                         </Text>
                                     </View>
                                 </View>
