@@ -28,11 +28,12 @@ interface SecurityModalProps {
   title?: string;
   description?: string;
   requiredFor?: string;
+  skipMfa?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export default function SecurityModal({ visible, onClose, onSuccess, title = "Security" }: SecurityModalProps) {
+export default function SecurityModal({ visible, onClose, onSuccess, title = "Security", skipMfa = false }: SecurityModalProps) {
   const [pin, setPin] = useState<string[]>([]);
   const [confirmPin, setConfirmPin] = useState<string[] | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -283,24 +284,26 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
   };
 
   const handleAuthSuccess = async (authenticatedPin?: string) => {
-    // Check if account has Google Authenticator 2FA (MFA) enabled and user has it required for transfers
-    try {
-      const requireTransferMfa = await AsyncStorage.getItem('mfa_required_for_transfers');
-      if (requireTransferMfa !== 'false') {
-        const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
-        if (!listError && factors?.totp) {
-          const activeFactor = factors.totp.find(f => f.status === 'verified');
-          if (activeFactor) {
-            // User has active 2FA, retain authenticated PIN and transition modal to 2FA verification!
-            setTempPin(authenticatedPin || savedPin || undefined);
-            setMfaMode(true);
-            setPin([]);
-            return;
+    // Check if account has Google Authenticator 2FA (MFA) enabled and user explicitly has it required for every transfer
+    if (!skipMfa) {
+      try {
+        const requireTransferMfa = await AsyncStorage.getItem('mfa_required_for_transfers');
+        if (requireTransferMfa === 'true') {
+          const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+          if (!listError && factors?.totp) {
+            const activeFactor = factors.totp.find(f => f.status === 'verified');
+            if (activeFactor) {
+              // User has active 2FA, retain authenticated PIN and transition modal to 2FA verification!
+              setTempPin(authenticatedPin || savedPin || undefined);
+              setMfaMode(true);
+              setPin([]);
+              return;
+            }
           }
         }
+      } catch (e) {
+        console.log("MFA check notice during transfer verification:", e);
       }
-    } catch (e) {
-      console.log("MFA check notice during transfer verification:", e);
     }
 
     triggerHaptic('success');

@@ -29,6 +29,7 @@ import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import SecurityModal from '../../components/SecurityModal';
+import Device2FAModal from '../../components/Device2FAModal';
 import DynamicBanners from '../../components/DynamicBanners';
 import { createAppNotification } from '../../services/notificationsHelper';
 import { ReceiptData, shareReceiptFile } from '../../services/receiptGenerator';
@@ -390,6 +391,11 @@ export default function TransferScreen() {
     const isKycLoading = userKycTier === null;
     const isKycLocked = userKycTier !== null && userKycTier < 2;
 
+    // Device 2FA Authorization States (New Device Guard)
+    const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null);
+    const [showDevice2FAModal, setShowDevice2FAModal] = useState(false);
+    const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+
     // Success Receipt Modal
     const [successModalVisible, setSuccessModalVisible] = useState(false);
     const [lastTxDetails, setLastTxDetails] = useState<{
@@ -480,6 +486,24 @@ export default function TransferScreen() {
         } catch (_) {}
     };
 
+    const checkDeviceVerification = async (userId: string) => {
+        if (!userId) return;
+        try {
+            const key = `@device_transfer_verified_${userId}`;
+            const verified = await AsyncStorage.getItem(key);
+            if (verified === 'true') {
+                setIsDeviceVerified(true);
+                setShowDevice2FAModal(false);
+            } else {
+                setIsDeviceVerified(false);
+                setShowDevice2FAModal(true);
+            }
+        } catch (_) {
+            setIsDeviceVerified(false);
+            setShowDevice2FAModal(true);
+        }
+    };
+
     // Fetch User Balance & Transfer History
     const fetchUserData = async () => {
         setLoadingBalance(true);
@@ -487,6 +511,8 @@ export default function TransferScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setCurrentUserId(user.id);
+                if (user.email) setCurrentUserEmail(user.email);
+                checkDeviceVerification(user.id);
                 const { data } = await supabase
                     .from('profiles')
                     .select('balance, full_name, kyc_tier, status')
@@ -505,6 +531,9 @@ export default function TransferScreen() {
                 fetchTransferHistory(user.id);
             } else {
                 setCurrentUserId('');
+                setCurrentUserEmail('');
+                setIsDeviceVerified(null);
+                setShowDevice2FAModal(false);
                 setUserKycTier(null);
                 setUserBalance(0);
                 setRecentBeneficiaries([]);
@@ -563,8 +592,9 @@ export default function TransferScreen() {
         return () => { isMounted = false; };
     }, []);
 
-    // Form Validity (Enforces Tier 2+ KYC Requirement)
+    // Form Validity (Enforces Tier 2+ KYC Requirement & Device 2FA)
     const isFormValid = useMemo(() => {
+        if (isDeviceVerified === false) return false;
         if (isKycLoading || isKycLocked) return false;
         if (numAmount < MIN_TRANSFER_AMOUNT) return false;
         if (userBalance > 0 && totalDebit > userBalance) return false;
@@ -573,7 +603,7 @@ export default function TransferScreen() {
         } else {
             return !!selectedBank && accountNumber.trim().length === 10 && !!accountName.trim();
         }
-    }, [isKycLoading, isKycLocked, activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
+    }, [isDeviceVerified, isKycLoading, isKycLocked, activeTab, matchedUser, selectedBank, accountNumber, accountName, numAmount, totalDebit, userBalance]);
 
     // Function to verify bank account details
     const handleVerifyBeneficiary = async () => {
@@ -772,6 +802,11 @@ export default function TransferScreen() {
 
     // Initiate Transfer (Opens confirmation)
     const handleInitiateTransfer = () => {
+        if (isDeviceVerified === false) {
+            setShowDevice2FAModal(true);
+            return;
+        }
+
         if (isKycLoading) {
             showTransferNotice(
                 'Checking Account Status ⏳',
@@ -2512,6 +2547,7 @@ export default function TransferScreen() {
             <SecurityModal
                 visible={securityModalVisible}
                 onClose={() => setSecurityModalVisible(false)}
+                skipMfa={true}
                 onSuccess={(pin) => {
                     setSecurityModalVisible(false);
                     setTimeout(() => {
@@ -2520,6 +2556,21 @@ export default function TransferScreen() {
                 }}
                 title="Security PIN"
                 description={`Enter transaction PIN to authorize debit of ₦${totalDebit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}
+            />
+
+            {/* ── NEW DEVICE 2FA VERIFICATION MODAL ── */}
+            <Device2FAModal
+                visible={showDevice2FAModal && isDeviceVerified === false && !!currentUserId}
+                userId={currentUserId}
+                userEmail={currentUserEmail}
+                onVerified={() => {
+                    setIsDeviceVerified(true);
+                    setShowDevice2FAModal(false);
+                }}
+                onCancel={() => {
+                    setShowDevice2FAModal(false);
+                    router.replace('/(app)/dashboard');
+                }}
             />
 
             {/* ── FULL SCREEN PROCESSING MODAL ────────────────── */}
