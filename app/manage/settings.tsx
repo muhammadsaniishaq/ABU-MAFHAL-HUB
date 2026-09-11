@@ -515,7 +515,7 @@ export default function AdminSettings() {
                 </SafeAreaView>
             </LinearGradient>
 
-            <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={[s.scrollContent, Platform.OS === 'web' && { maxWidth: 1200, width: '100%', alignSelf: 'center' }]} showsVerticalScrollIndicator={false}>
                 
                 {activeTab === 'system' && (
                     <View style={s.section}>

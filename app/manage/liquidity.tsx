@@ -66,7 +66,11 @@ const NIGERIAN_BANKS = [
 export default function LiquidityVaultScreen() {
     const router = useRouter();
     const { width } = useWindowDimensions();
-    const isDesktop = width >= 768;
+    const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+    const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
+    const isDesktop = Platform.OS === 'web' && width >= 768;
+
+    const providerCardWidth = isDesktopWeb ? '32.3%' : isTabletWeb ? '48.8%' : '100%';
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -1055,7 +1059,7 @@ export default function LiquidityVaultScreen() {
                         <Text style={styles.emptySub}>No vendor matched your search criteria.</Text>
                     </View>
                 ) : (
-                    <View style={styles.providersGrid}>
+                    <View style={[styles.providersGrid, isDesktop && { flexDirection: 'row', flexWrap: 'wrap' }]}>
                         {filteredProviders.map((p) => {
                             const isHealthy = p.status === 'healthy';
                             const isLow = p.status === 'low';
@@ -1063,7 +1067,7 @@ export default function LiquidityVaultScreen() {
                             const isUnconfigured = p.status === 'unconfigured';
 
                             return (
-                                <View key={p.id} style={styles.providerCard}>
+                                <View key={p.id} style={[styles.providerCard, { width: providerCardWidth }]}>
                                     {/* Left Accent Bar */}
                                     <View style={[
                                         styles.providerCardLeftBar,
@@ -1472,7 +1476,7 @@ const styles = StyleSheet.create({
         paddingBottom: 28,
     },
     desktopScrollContent: {
-        maxWidth: 740,
+        maxWidth: 1400,
         alignSelf: 'center',
         width: '100%',
     },

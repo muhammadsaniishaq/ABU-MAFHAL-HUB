@@ -1,7 +1,7 @@
 import {
   View, Text, ScrollView, TouchableOpacity, Switch, Alert,
   ActivityIndicator, StyleSheet, Platform, TextInput, Modal,
-  Dimensions,
+  Dimensions, useWindowDimensions,
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
@@ -180,6 +180,12 @@ interface ServiceCustom {
 
 export default function ManageFeaturesScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width >= 1200;
+  const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1200;
+  const isWeb = Platform.OS === 'web' && width >= 768;
+
+  const cardWidth = isDesktopWeb ? '23.8%' : isTabletWeb ? '31.8%' : (width - 32 - 10) / 2;
 
   const [activeTab, setActiveTab] = useState<'services' | 'app_features' | 'admin_locks'>('services');
   const [userRole, setUserRole]   = useState('admin');
@@ -390,8 +396,8 @@ export default function ManageFeaturesScreen() {
 
     return (
       <Modal visible transparent animationType="slide" onRequestClose={() => setEditingService(null)}>
-        <View style={m.overlay}>
-          <View style={m.sheet}>
+        <View style={[m.overlay, isWeb && { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+          <View style={[m.sheet, isWeb && { maxWidth: 620, width: '100%', borderRadius: 24, maxHeight: '90%' }]}>
             {/* Modal Header */}
             <View style={m.sheetHead}>
               <View style={m.sheetHeadLeft}>
@@ -601,7 +607,7 @@ export default function ManageFeaturesScreen() {
           <Text style={{ color: C.sub, marginTop: 10, fontWeight: '700', fontSize: 12 }}>Loading Settings...</Text>
         </View>
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ paddingBottom: 50 }, isWeb && { maxWidth: 1400, width: '100%', alignSelf: 'center' }]} showsVerticalScrollIndicator={false}>
 
           {/* ═══════════════════════════════════════════════════════════════════════
               TAB 1: USER DASHBOARD SERVICE CUSTOMIZER
@@ -649,7 +655,7 @@ export default function ManageFeaturesScreen() {
                   }
 
                   return (
-                    <View key={svc.id} style={[s.svcCard, !visible && s.svcCardHidden]}>
+                    <View key={svc.id} style={[s.svcCard, { width: cardWidth }, !visible && s.svcCardHidden]}>
                       <View style={[s.svcAccentBar, { backgroundColor: visible ? color : C.muted }]} />
 
                       <View style={s.svcCardInner}>
@@ -713,7 +719,7 @@ export default function ManageFeaturesScreen() {
 
               <View style={s.svcGrid}>
                 {features.map(feature => (
-                  <View key={feature.feature_key} style={[s.svcCard, !feature.is_enabled && { borderColor: '#FECACA' }]}>
+                  <View key={feature.feature_key} style={[s.svcCard, { width: cardWidth }, !feature.is_enabled && { borderColor: '#FECACA' }]}>
                     <View style={[s.svcAccentBar, { backgroundColor: feature.is_enabled ? C.green : C.red }]} />
                     <View style={s.svcCardInner}>
                       <View style={s.svcCardTop}>
@@ -795,7 +801,7 @@ export default function ManageFeaturesScreen() {
                 {ADMIN_LOCKABLE_MODULES.map(mod => {
                   const isHidden = hiddenModules.includes(mod.key);
                   return (
-                    <View key={mod.key} style={[s.svcCard, isHidden && { borderColor: '#FECACA', backgroundColor: C.redL }]}>
+                    <View key={mod.key} style={[s.svcCard, { width: cardWidth }, isHidden && { borderColor: '#FECACA', backgroundColor: C.redL }]}>
                       <View style={[s.svcAccentBar, { backgroundColor: isHidden ? C.red : C.green }]} />
                       <View style={s.svcCardInner}>
                         <View style={s.svcCardTop}>

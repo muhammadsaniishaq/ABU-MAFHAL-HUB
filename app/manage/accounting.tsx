@@ -12,6 +12,7 @@ import {
     Platform,
     RefreshControl,
     Dimensions,
+    useWindowDimensions,
     Switch
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
@@ -43,6 +44,7 @@ import {
 } from '../../services/accounting';
 
 const { width } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
 
 // Executive Navy & Gold Theme (Light Background)
 const C = {
@@ -130,6 +132,11 @@ export default function AccountingScreen() {
 function AccountingContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isDesktopWeb = isWeb && width >= 1024;
+    const isTabletWeb = isWeb && width >= 768 && width < 1024;
+
+    const metricCardWidth = isDesktopWeb ? '23.8%' : isTabletWeb ? '48.5%' : (width - 42) / 2;
 
     // Clearance & Access States
     const [authLoading, setAuthLoading] = useState(true);
@@ -672,7 +679,7 @@ _Certified by Abu Mafhal Enterprise Cloud Accounting Ledger_`;
                 </View>
             ) : (
                 <ScrollView
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={[styles.scrollContent, isWeb && { maxWidth: 1400, width: '100%', alignSelf: 'center' }]}
                     showsVerticalScrollIndicator={false}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.goldBright} />}
                 >
@@ -729,7 +736,7 @@ _Certified by Abu Mafhal Enterprise Cloud Accounting Ledger_`;
 
                             {/* 2. 4 SECONDARY METRIC CARDS */}
                             <View style={styles.metricsGrid}>
-                                <View style={styles.metricCard}>
+                                <View style={[styles.metricCard, { width: metricCardWidth }]}>
                                     <View style={[styles.metricIconWrap, { backgroundColor: C.blueBg }]}>
                                         <Ionicons name="cart" size={15} color={C.blue} />
                                     </View>
@@ -738,7 +745,7 @@ _Certified by Abu Mafhal Enterprise Cloud Accounting Ledger_`;
                                     <Text style={styles.metricHint}>{metrics?.successfulTransactionsCount || 0} Successful Sales</Text>
                                 </View>
 
-                                <View style={styles.metricCard}>
+                                <View style={[styles.metricCard, { width: metricCardWidth }]}>
                                     <View style={[styles.metricIconWrap, { backgroundColor: '#F1F5F9' }]}>
                                         <Ionicons name="cube" size={15} color={C.textSub} />
                                     </View>
@@ -747,7 +754,7 @@ _Certified by Abu Mafhal Enterprise Cloud Accounting Ledger_`;
                                     <Text style={styles.metricHint}>Provider Settlements</Text>
                                 </View>
 
-                                <View style={styles.metricCard}>
+                                <View style={[styles.metricCard, { width: metricCardWidth }]}>
                                     <View style={[styles.metricIconWrap, { backgroundColor: C.emeraldBg }]}>
                                         <Ionicons name="sparkles" size={15} color={C.emerald} />
                                     </View>
@@ -756,7 +763,7 @@ _Certified by Abu Mafhal Enterprise Cloud Accounting Ledger_`;
                                     <Text style={styles.metricHint}>Before Operating Costs</Text>
                                 </View>
 
-                                <View style={styles.metricCard}>
+                                <View style={[styles.metricCard, { width: metricCardWidth }]}>
                                     <View style={[styles.metricIconWrap, { backgroundColor: C.coralBg }]}>
                                         <Ionicons name="arrow-down-circle" size={15} color={C.coral} />
                                     </View>
@@ -2717,6 +2724,9 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         padding: 20,
         marginHorizontal: 16,
+        maxWidth: 640,
+        width: '100%',
+        alignSelf: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.15,
@@ -2784,12 +2794,18 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        justifyContent: 'flex-end',
+        justifyContent: isWeb ? 'center' : 'flex-end',
+        alignItems: isWeb ? 'center' : 'stretch',
+        padding: isWeb ? 20 : 0,
     },
     modalCard: {
         backgroundColor: C.cardBg,
         borderTopLeftRadius: 26,
         borderTopRightRadius: 26,
+        borderBottomLeftRadius: isWeb ? 26 : 0,
+        borderBottomRightRadius: isWeb ? 26 : 0,
+        maxWidth: isWeb ? 640 : '100%',
+        width: '100%',
         padding: 22,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView,
   Platform, ScrollView, Image, ActivityIndicator, RefreshControl,
-  LayoutAnimation, UIManager, Alert, Modal, Linking, Switch, StyleSheet, Dimensions, StatusBar
+  LayoutAnimation, UIManager, Alert, Modal, Linking, Switch, StyleSheet, Dimensions, StatusBar,
+  useWindowDimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -73,6 +74,9 @@ const CANNED_REPLIES = [
 
 export default function ManagerSupportDesk() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = isWeb && width >= 1024;
+  const isTabletWeb = isWeb && width >= 768 && width < 1024;
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
@@ -512,6 +516,9 @@ export default function ManagerSupportDesk() {
         <FlatList
           data={filteredTickets}
           keyExtractor={item => item.id}
+          key={isDesktopWeb ? 'tickets-2col' : 'tickets-1col'}
+          numColumns={isDesktopWeb ? 2 : 1}
+          columnWrapperStyle={isDesktopWeb ? { justifyContent: 'space-between', gap: 10 } : undefined}
           contentContainerStyle={s.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => fetchTickets(true)} tintColor={L.goldDk} />
@@ -546,7 +553,7 @@ export default function ManagerSupportDesk() {
                   if (selectMode) toggleSelection(item.id);
                   else setSelectedTicket(item);
                 }}
-                style={[s.ticketCard, isSelected && s.ticketCardSelected]}
+                style={[s.ticketCard, isDesktopWeb && { width: '48.8%' }, isSelected && s.ticketCardSelected]}
                 activeOpacity={0.8}
               >
                 <View style={s.ticketCardHeader}>
@@ -852,8 +859,8 @@ export default function ManagerSupportDesk() {
 
         {/* USER PROFILE MODAL */}
         <Modal visible={showUserModal} transparent animationType="slide" onRequestClose={() => setShowUserModal(false)}>
-          <View style={s.modalOverlay}>
-            <View style={s.userModalCard}>
+          <View style={[s.modalOverlay, isWeb && { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+            <View style={[s.userModalCard, isWeb && { maxWidth: 580, width: '100%', borderRadius: 24 }]}>
               <View style={s.userModalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={s.userModalIcon}>
@@ -943,7 +950,9 @@ export default function ManagerSupportDesk() {
     <View style={s.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
       <Stack.Screen options={{ headerShown: false }} />
-      {selectedTicket ? renderChatInterface() : renderTicketList()}
+      <View style={[{ flex: 1 }, isWeb && { maxWidth: 1400, width: '100%', alignSelf: 'center' }]}>
+        {selectedTicket ? renderChatInterface() : renderTicketList()}
+      </View>
     </View>
   );
 }
