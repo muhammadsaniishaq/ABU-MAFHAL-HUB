@@ -155,20 +155,38 @@ export default function AdminAppUpdate() {
           if (s.key === 'app_store_url') setAppStoreUrl(s.value || 'https://apps.apple.com/app/abu-mafhal-sub');
           if (s.key === 'apk_download_url') setApkDownloadUrl(s.value || '');
           if (s.key === 'app_update_message' && s.value) setAppUpdateMessage(s.value);
-          if (s.key === 'app_logo_icon' || s.key === 'app_logo') {
+          if (s.key === 'app_logo') {
             const raw = s.value;
+            let resolvedUrl = '';
             if (typeof raw === 'string') {
               if (raw.startsWith('{')) {
                 try {
                   const p = JSON.parse(raw);
-                  if (p.url) setLogoUrl(p.url);
+                  if (p.url) resolvedUrl = p.url;
                 } catch {}
               } else if (raw.startsWith('http') || raw.startsWith('data:')) {
-                setLogoUrl(raw);
+                resolvedUrl = raw;
               }
             } else if (raw && typeof raw === 'object' && raw.url) {
-              setLogoUrl(raw.url);
+              resolvedUrl = raw.url;
             }
+            if (resolvedUrl) setLogoUrl(resolvedUrl);
+          } else if (s.key === 'app_logo_icon' && !logoUrl) {
+            const raw = s.value;
+            let resolvedUrl = '';
+            if (typeof raw === 'string') {
+              if (raw.startsWith('{')) {
+                try {
+                  const p = JSON.parse(raw);
+                  if (p.url) resolvedUrl = p.url;
+                } catch {}
+              } else if (raw.startsWith('http') || raw.startsWith('data:')) {
+                resolvedUrl = raw;
+              }
+            } else if (raw && typeof raw === 'object' && raw.url) {
+              resolvedUrl = raw.url;
+            }
+            if (resolvedUrl) setLogoUrl(resolvedUrl);
           }
         });
       }

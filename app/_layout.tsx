@@ -400,7 +400,7 @@ export default function RootLayout() {
                 apkDownloadUrl={settings?.apk_download_url}
                 message={settings?.app_update_message}
                 isForced={isForced}
-                logoUrl={settings?.app_logo_icon || settings?.app_logo}
+                logoUrl={settings?.app_logo || settings?.app_logo_icon}
                 onDismiss={() => setDismissedUpdate(true)}
             />
         );

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import Svg, { Path } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 
 interface UpdateScreenProps {
@@ -53,6 +54,42 @@ function extractLogoUri(val: any): string | null {
   return null;
 }
 
+function isDistortedLegacyLogo(uri: string | null): boolean {
+  if (!uri) return false;
+  // If url points to legacy black badge icon or corrupted checkerboard jpeg
+  return uri.includes('icon_1784121258904') || uri.includes('logo_1788567402265');
+}
+
+/**
+ * Authentic 4-Color Google Play Store Logo (Cyan, Yellow, Red, Green)
+ */
+function GooglePlayBrandLogo({ size = 22 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 512 512">
+      {/* Left Blue/Cyan */}
+      <Path
+        fill="#00D4FF"
+        d="M29.5 25.1c-4.3 4.7-6.8 12.1-6.8 21.6v418.6c0 9.5 2.5 16.9 6.8 21.6l1.2 1.1 234.3-234.3v-5.4L30.7 24l-1.2 1.1z"
+      />
+      {/* Right Yellow */}
+      <Path
+        fill="#FFCE00"
+        d="M342.3 337.8l-77.3-77.3v-5.4l77.3-77.3 1.8 1 91.6 52c26.1 14.8 26.1 39.1 0 53.9l-91.6 52-1.8 1.1z"
+      />
+      {/* Bottom Red */}
+      <Path
+        fill="#FF3A44"
+        d="M265 255.1L29.5 490.6c8.6 9.1 22.9 10.2 39.1 1l273.7-155.5-77.3-81z"
+      />
+      {/* Top Green */}
+      <Path
+        fill="#00F076"
+        d="M265 256.9l77.3-77.3L68.6 23.9c-16.2-9.2-30.5-8.1-39.1 1.1l235.5 231.9z"
+      />
+    </Svg>
+  );
+}
+
 export default function UpdateScreen({
   currentVersion = '1.0.4',
   latestVersion = '1.0.5',
@@ -67,14 +104,17 @@ export default function UpdateScreen({
   const isIOS = Platform.OS === 'ios';
   const isAndroid = Platform.OS === 'android';
 
-  const [dynamicLogo, setDynamicLogo] = useState<string | null>(extractLogoUri(initialLogoUrl));
+  const [dynamicLogo, setDynamicLogo] = useState<string | null>(() => {
+    const parsed = extractLogoUri(initialLogoUrl);
+    return isDistortedLegacyLogo(parsed) ? null : parsed;
+  });
   const [imageFailed, setImageFailed] = useState(false);
 
   // Fetch admin-uploaded logo from app_settings if not already available
   useEffect(() => {
     if (initialLogoUrl) {
       const parsed = extractLogoUri(initialLogoUrl);
-      if (parsed) {
+      if (parsed && !isDistortedLegacyLogo(parsed)) {
         setDynamicLogo(parsed);
         return;
       }
@@ -86,14 +126,14 @@ export default function UpdateScreen({
         const { data } = await supabase
           .from('app_settings')
           .select('key, value')
-          .in('key', ['app_logo_icon', 'app_logo']);
+          .in('key', ['app_logo', 'app_logo_icon']);
 
         if (data && isMounted) {
-          const iconSetting = data.find((s) => s.key === 'app_logo_icon');
           const logoSetting = data.find((s) => s.key === 'app_logo');
-          const target = iconSetting?.value || logoSetting?.value;
+          const iconSetting = data.find((s) => s.key === 'app_logo_icon');
+          const target = logoSetting?.value || iconSetting?.value;
           const uri = extractLogoUri(target);
-          if (uri) {
+          if (uri && !isDistortedLegacyLogo(uri)) {
             setDynamicLogo(uri);
           }
         }
@@ -196,7 +236,7 @@ export default function UpdateScreen({
       >
         {/* Compact, Ultra-Modern Card */}
         <View style={styles.card}>
-          {/* Admin Uploaded Logo */}
+          {/* Admin Uploaded Logo / Official Brand Logo */}
           <View style={styles.logoRing}>
             {dynamicLogo && !imageFailed ? (
               <Image
@@ -207,7 +247,7 @@ export default function UpdateScreen({
               />
             ) : (
               <Image
-                source={require('../assets/images/logo-icon.png')}
+                source={require('../assets/images/logo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -279,7 +319,7 @@ export default function UpdateScreen({
             </View>
           ) : null}
 
-          {/* Primary Button: Vivid Google Play / App Store Brand Colors */}
+          {/* Primary Button: Luxury Navy Gradient with Authentic Google Play 4-Color Brand Logo */}
           <TouchableOpacity
             style={styles.primaryButton}
             activeOpacity={0.88}
@@ -287,12 +327,14 @@ export default function UpdateScreen({
           >
             {isIOS ? (
               <LinearGradient
-                colors={['#0071E3', '#0058B3']}
+                colors={['#0B1E40', '#1E3A8A']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.primaryGradient}
               >
-                <Ionicons name="logo-apple" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <View style={styles.playIconBadge}>
+                  <Ionicons name="logo-apple" size={20} color="#0F172A" />
+                </View>
                 <View>
                   <Text style={styles.primaryBtnTitle}>UPDATE ON APP STORE</Text>
                   <Text style={styles.primaryBtnSub}>Official Apple App Store Release</Text>
@@ -300,13 +342,13 @@ export default function UpdateScreen({
               </LinearGradient>
             ) : (
               <LinearGradient
-                colors={['#01875F', '#006C4C']}
+                colors={['#0B1E40', '#1E3A8A']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.primaryGradient}
               >
-                <View style={styles.playIconContainer}>
-                  <Ionicons name="logo-google-playstore" size={20} color="#FFFFFF" />
+                <View style={styles.playIconBadge}>
+                  <GooglePlayBrandLogo size={22} />
                 </View>
                 <View>
                   <Text style={styles.primaryBtnTitle}>UPDATE ON GOOGLE PLAY</Text>
@@ -401,25 +443,25 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#F59E0B',
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    shadowColor: '#D97706',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 4,
   },
   logoImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -557,9 +599,9 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#01875F',
+    shadowColor: '#0B1E40',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.28,
     shadowRadius: 8,
     elevation: 4,
     marginBottom: 10,
@@ -568,13 +610,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 13,
+    paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  playIconContainer: {
-    marginRight: 10,
+  playIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   primaryBtnTitle: {
     fontSize: 13,
