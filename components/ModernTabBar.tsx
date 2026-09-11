@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { 
     useSharedValue, 
     useAnimatedStyle, 
@@ -19,6 +20,7 @@ const { width } = Dimensions.get('window');
 export default function ModernTabBar({ state, descriptors, navigation }: any) {
     const router = useRouter();
     const { width: windowWidth } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
 
     // On Desktop and Tablet web, the rich sidebar is displayed instead of the bottom tab bar
     if (Platform.OS === 'web' && windowWidth >= 768) {
@@ -34,8 +36,16 @@ export default function ModernTabBar({ state, descriptors, navigation }: any) {
 
     const allowedTabs = ['dashboard', 'wallet', 'qr-pay', 'history', 'profile'];
 
+    // Dynamic Safe Bottom Calculation:
+    // On Android edge-to-edge, insets.bottom accounts for the 3-button navigation bar (typically ~48px)
+    // or gesture bar (16-24px). Floating the tab bar at (insets.bottom + 10) prevents it from ever
+    // hiding behind or overlapping the phone's system navigation bar!
+    const bottomPosition = insets.bottom > 0
+        ? insets.bottom + (Platform.OS === 'android' ? 10 : 6)
+        : (Platform.OS === 'ios' ? 20 : 14);
+
     return (
-        <View style={s.tabBarContainer}>
+        <View style={[s.tabBarContainer, { bottom: bottomPosition }]}>
             {Platform.OS === 'ios' ? (
                 <BlurView intensity={90} tint="light" style={s.absoluteBlur} />
             ) : (
@@ -140,7 +150,6 @@ function TabItem({ isFocused, onPress, icon, label }: { isFocused: boolean, onPr
 const s = StyleSheet.create({
     tabBarContainer: {
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 20 : 12,
         left: 16,
         right: 16,
         height: 60,

@@ -11,6 +11,7 @@ import ModernTabBar from '../../components/ModernTabBar';
 import WebDesktopSidebar from '../../components/WebDesktopSidebar';
 import WebDesktopHeader from '../../components/WebDesktopHeader';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 
@@ -19,10 +20,16 @@ export default function AppLayout() {
     const pathname = usePathname();
     const { settings } = useAppSettings();
     const { width } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isFabOpen, setIsFabOpen] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     usePushNotifications(); // Register for push notifications
+
+    const tabBarBottom = insets.bottom > 0
+        ? insets.bottom + (Platform.OS === 'android' ? 10 : 6)
+        : (Platform.OS === 'ios' ? 20 : 14);
+    const fabBottom = tabBarBottom + 60 + 12;
 
     const isDesktopWeb = Platform.OS === 'web' && width >= 768;
     const hideFab = isDesktopWeb || pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/');
@@ -232,7 +239,7 @@ export default function AppLayout() {
             )}
             
             {!hideFab && (
-                <View pointerEvents="box-none" style={{ position: 'absolute', bottom: 72, right: 20, zIndex: 50, alignItems: 'center' }}>
+                <View pointerEvents="box-none" style={{ position: 'absolute', bottom: fabBottom, right: 20, zIndex: 50, alignItems: 'center' }}>
                     {isFabOpen && (
                         <View style={{ alignItems: 'center', marginBottom: 12 }}>
                             <TouchableOpacity 
