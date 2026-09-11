@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Image, Switch, ActivityIndicator,
   Modal, TextInput, Alert, ScrollView, StyleSheet, Platform, Dimensions, StatusBar,
-  PanResponder
+  PanResponder, useWindowDimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -46,6 +46,10 @@ const AVAILABLE_PLACEMENTS = [
 
 export default function ModernContentManager() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+  const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
+
   const [banners, setBanners] = useState<any[]>([]);
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -741,49 +745,51 @@ export default function ModernContentManager() {
                   <Text style={s.emptySub}>Tap "New Banner" above to create promotions and app sliders.</Text>
                 </View>
               ) : (
-                banners.map(b => (
-                  <View key={b.id} style={s.card}>
-                    <View style={[s.bannerPreviewContainer, { aspectRatio: Math.max(3.0, Math.min(bannerRatios[b.id] || 5.5, 7.5)) }]}>
-                      <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
-                    </View>
-                    <View style={s.cardBody}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                          <Text style={s.cardTitle}>{b.title || 'Untitled Banner'}</Text>
-                          {b.target_url ? <Text style={s.cardUrl} numberOfLines={1}>{b.target_url}</Text> : null}
-                        </View>
-                        <Switch
-                          value={b.is_active}
-                          onValueChange={() => toggleBanner(b.id, b.is_active)}
-                          trackColor={{ false: '#CBD5E1', true: L.emerald }}
-                          thumbColor="#FFFFFF"
-                          style={{ transform: [{ scale: 0.75 }] }}
-                        />
+                <View style={[(isDesktopWeb || isTabletWeb) && { flexDirection: 'row', flexWrap: 'wrap', gap: 14 }]}>
+                  {banners.map(b => (
+                    <View key={b.id} style={[s.card, isDesktopWeb ? { width: '48.8%' } : isTabletWeb ? { width: '48.8%' } : null]}>
+                      <View style={[s.bannerPreviewContainer, { aspectRatio: Math.max(3.0, Math.min(bannerRatios[b.id] || 5.5, 7.5)) }]}>
+                        <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="contain" />
                       </View>
-
-                      {/* Placements */}
-                      <View style={s.placementsRow}>
-                        {(b.placement ? b.placement.split(',') : ['dashboard']).map((p: string) => (
-                          <View key={p} style={s.placementBadge}>
-                            <Text style={s.placementBadgeText}>{p.toUpperCase()}</Text>
+                      <View style={s.cardBody}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <View style={{ flex: 1, marginRight: 8 }}>
+                            <Text style={s.cardTitle}>{b.title || 'Untitled Banner'}</Text>
+                            {b.target_url ? <Text style={s.cardUrl} numberOfLines={1}>{b.target_url}</Text> : null}
                           </View>
-                        ))}
-                      </View>
+                          <Switch
+                            value={b.is_active}
+                            onValueChange={() => toggleBanner(b.id, b.is_active)}
+                            trackColor={{ false: '#CBD5E1', true: L.emerald }}
+                            thumbColor="#FFFFFF"
+                            style={{ transform: [{ scale: 0.75 }] }}
+                          />
+                        </View>
 
-                      {/* Actions */}
-                      <View style={s.cardFooter}>
-                        <TouchableOpacity onPress={() => openEditBannerModal(b)} style={s.actionBtn}>
-                          <Ionicons name="pencil" size={11} color={L.navyHeader} />
-                          <Text style={s.actionBtnText}>Edit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => deleteBanner(b.id)} style={[s.actionBtn, { borderColor: L.coralBorder, backgroundColor: L.coralBg }]}>
-                          <Ionicons name="trash-outline" size={11} color={L.coral} />
-                          <Text style={[s.actionBtnText, { color: L.coral }]}>Delete</Text>
-                        </TouchableOpacity>
+                        {/* Placements */}
+                        <View style={s.placementsRow}>
+                          {(b.placement ? b.placement.split(',') : ['dashboard']).map((p: string) => (
+                            <View key={p} style={s.placementBadge}>
+                              <Text style={s.placementBadgeText}>{p.toUpperCase()}</Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        {/* Actions */}
+                        <View style={s.cardFooter}>
+                          <TouchableOpacity onPress={() => openEditBannerModal(b)} style={s.actionBtn}>
+                            <Ionicons name="pencil" size={11} color={L.navyHeader} />
+                            <Text style={s.actionBtnText}>Edit</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => deleteBanner(b.id)} style={[s.actionBtn, { borderColor: L.coralBorder, backgroundColor: L.coralBg }]}>
+                            <Ionicons name="trash-outline" size={11} color={L.coral} />
+                            <Text style={[s.actionBtnText, { color: L.coral }]}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))
+                  ))}
+                </View>
               )}
             </View>
           )}
@@ -798,23 +804,25 @@ export default function ModernContentManager() {
                   <Text style={s.emptySub}>Add network providers, payment gateways, and banking partners.</Text>
                 </View>
               ) : (
-                partners.map(p => (
-                  <View key={p.id} style={s.partnerCard}>
-                    <Image source={{ uri: p.logo_url }} style={s.partnerLogo} resizeMode="contain" />
-                    <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={s.partnerName}>{p.name}</Text>
-                      <Text style={s.partnerSub}>Sort Order: {p.sort_order || 1}</Text>
+                <View style={[(isDesktopWeb || isTabletWeb) && { flexDirection: 'row', flexWrap: 'wrap', gap: 14 }]}>
+                  {partners.map(p => (
+                    <View key={p.id} style={[s.partnerCard, isDesktopWeb ? { width: '31.8%' } : isTabletWeb ? { width: '48.8%' } : null]}>
+                      <Image source={{ uri: p.logo_url }} style={s.partnerLogo} resizeMode="contain" />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={s.partnerName}>{p.name}</Text>
+                        <Text style={s.partnerSub}>Sort Order: {p.sort_order || 1}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity onPress={() => openEditPartnerModal(p)} style={s.iconBtn}>
+                          <Ionicons name="pencil" size={12} color={L.navyHeader} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => deletePartner(p.id)} style={[s.iconBtn, { backgroundColor: L.coralBg, borderColor: L.coralBorder }]}>
+                          <Ionicons name="trash-outline" size={12} color={L.coral} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <TouchableOpacity onPress={() => openEditPartnerModal(p)} style={s.iconBtn}>
-                        <Ionicons name="pencil" size={12} color={L.navyHeader} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => deletePartner(p.id)} style={[s.iconBtn, { backgroundColor: L.coralBg, borderColor: L.coralBorder }]}>
-                        <Ionicons name="trash-outline" size={12} color={L.coral} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))
+                  ))}
+                </View>
               )}
             </View>
           )}
@@ -1738,7 +1746,7 @@ const s = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxWidth: 460,
+    maxWidth: 620,
     backgroundColor: L.card,
     borderRadius: 16,
     padding: 14,

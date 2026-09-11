@@ -17,6 +17,8 @@ import { useAppSettings } from '../hooks/useAppSettings';
 interface AdminWebSidebarProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  isDrawer?: boolean;
+  onCloseDrawer?: () => void;
 }
 
 interface NavItem {
@@ -37,6 +39,8 @@ interface NavGroup {
 export default function AdminWebSidebar({
   collapsed = false,
   onToggleCollapse,
+  isDrawer = false,
+  onCloseDrawer,
 }: AdminWebSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -191,6 +195,7 @@ export default function AdminWebSidebar({
   ];
 
   const handleNavigate = (route: string) => {
+    if (onCloseDrawer) onCloseDrawer();
     router.push(route as any);
   };
 
@@ -222,15 +227,17 @@ export default function AdminWebSidebar({
     return require('../assets/images/logo.png');
   };
 
+  const isCurrentlyCollapsed = isDrawer ? false : collapsed;
+
   return (
-    <View style={[styles.container, collapsed ? styles.containerCollapsed : styles.containerExpanded]}>
+    <View style={[styles.container, isDrawer ? styles.containerDrawer : (collapsed ? styles.containerCollapsed : styles.containerExpanded)]}>
       {/* ── Brand Header ── */}
-      <View style={[styles.brandHeader, collapsed && styles.brandHeaderCollapsed]}>
+      <View style={[styles.brandHeader, !isDrawer && collapsed && styles.brandHeaderCollapsed]}>
         <View style={styles.brandLogoBox}>
           <Image source={getLogoSource()} style={styles.brandLogo} resizeMode="contain" />
         </View>
 
-        {!collapsed && (
+        {!isCurrentlyCollapsed && (
           <View style={styles.brandTextCol}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={styles.brandName} numberOfLines={1}>
@@ -246,7 +253,15 @@ export default function AdminWebSidebar({
           </View>
         )}
 
-        {onToggleCollapse && (
+        {isDrawer && onCloseDrawer ? (
+          <TouchableOpacity
+            onPress={onCloseDrawer}
+            style={styles.closeDrawerBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : onToggleCollapse ? (
           <TouchableOpacity
             onPress={onToggleCollapse}
             style={styles.collapseToggleBtn}
@@ -258,11 +273,11 @@ export default function AdminWebSidebar({
               color="#94A3B8"
             />
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
 
       {/* ── Admin Info Pill ── */}
-      {!collapsed ? (
+      {!isCurrentlyCollapsed ? (
         <View style={styles.adminProfileCard}>
           <View style={styles.adminAvatarBox}>
             {adminProfile?.avatar_url ? (
@@ -295,20 +310,20 @@ export default function AdminWebSidebar({
       )}
 
       {/* ── Switch to User App Button ── */}
-      <View style={{ paddingHorizontal: collapsed ? 8 : 12, marginBottom: 12 }}>
+      <View style={{ paddingHorizontal: isCurrentlyCollapsed ? 8 : 12, marginBottom: 12 }}>
         <TouchableOpacity
           onPress={() => router.replace('/(app)/dashboard')}
-          style={[styles.switchAppBtn, collapsed && { paddingHorizontal: 0, justifyContent: 'center' }]}
+          style={[styles.switchAppBtn, isCurrentlyCollapsed && { paddingHorizontal: 0, justifyContent: 'center' }]}
           activeOpacity={0.8}
         >
           <LinearGradient
             colors={['#10B981', '#059669']}
-            style={[styles.switchAppGradient, collapsed && { paddingHorizontal: 0, justifyContent: 'center' }]}
+            style={[styles.switchAppGradient, isCurrentlyCollapsed && { paddingHorizontal: 0, justifyContent: 'center' }]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
             <Ionicons name="swap-horizontal" size={15} color="#FFFFFF" />
-            {!collapsed && (
+            {!isCurrentlyCollapsed && (
               <Text style={styles.switchAppTxt} numberOfLines={1}>
                 Switch to User App
               </Text>
@@ -329,7 +344,7 @@ export default function AdminWebSidebar({
 
           return (
             <View key={gIdx} style={styles.groupContainer}>
-              {!collapsed && (
+              {!isCurrentlyCollapsed && (
                 <Text style={styles.groupHeaderTitle}>{group.title}</Text>
               )}
 
@@ -344,7 +359,7 @@ export default function AdminWebSidebar({
                     onPress={() => handleNavigate(item.route)}
                     style={[
                       styles.navItemBtn,
-                      collapsed && styles.navItemBtnCollapsed,
+                      isCurrentlyCollapsed && styles.navItemBtnCollapsed,
                       isActive && styles.navItemBtnActive,
                     ]}
                     activeOpacity={0.7}
@@ -365,7 +380,7 @@ export default function AdminWebSidebar({
                       />
                     </View>
 
-                    {!collapsed && (
+                    {!isCurrentlyCollapsed && (
                       <View style={styles.navLabelWrapper}>
                         <Text
                           style={[
@@ -415,7 +430,7 @@ export default function AdminWebSidebar({
       <View style={styles.sidebarFooter}>
         <TouchableOpacity
           onPress={handleLogout}
-          style={[styles.logoutBtn, collapsed && styles.logoutBtnCollapsed]}
+          style={[styles.logoutBtn, isCurrentlyCollapsed && styles.logoutBtnCollapsed]}
           activeOpacity={0.7}
           disabled={loggingOut}
         >
@@ -424,7 +439,7 @@ export default function AdminWebSidebar({
           ) : (
             <>
               <Ionicons name="log-out-outline" size={17} color="#EF4444" />
-              {!collapsed && <Text style={styles.logoutBtnTxt}>Sign Out Admin</Text>}
+              {!isCurrentlyCollapsed && <Text style={styles.logoutBtnTxt}>Sign Out Admin</Text>}
             </>
           )}
         </TouchableOpacity>
@@ -448,6 +463,28 @@ const styles = StyleSheet.create({
   },
   containerCollapsed: {
     width: 74,
+  },
+  containerDrawer: {
+    width: 280,
+    maxWidth: '85%',
+    position: 'absolute' as any,
+    top: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 9999,
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 25,
+  },
+  closeDrawerBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   brandHeader: {
     flexDirection: 'row',

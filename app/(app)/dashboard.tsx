@@ -518,13 +518,25 @@ export default function Dashboard() {
     { id: 'bvn',          icon: 'finger-print-outline',   label: 'BVN',             color: '#0056D2', route: '/bvn-services',   badge: null },
   ];
 
-  // Apply admin customizations on top of base catalog
+  const isActionHidden = useCallback((action: { id: string; route?: string }) => {
+    // 1. Service-specific visibility in dashboard_service_customizations
+    const cust = serviceCustoms[action.id];
+    if (cust && cust.is_visible === false) return true;
+
+    // 2. Global hidden features list
+    const featKey = (action.route && featureMap[action.route]) || actionIdFeatureMap[action.id];
+    if (featKey && hiddenFeatures.includes(featKey)) return true;
+
+    // 3. Feature flags under maintenance / disabled
+    if (featKey && featureFlags[featKey] && featureFlags[featKey].is_enabled === false) return true;
+
+    return false;
+  }, [serviceCustoms, hiddenFeatures, featureFlags]);
+
+  // Apply admin customizations on top of base catalog, filtering out any hidden services
   const ALL_ACTIONS_CATALOG = useMemo(() => {
     return BASE_CATALOG
-      .filter(item => {
-        const cust = serviceCustoms[item.id];
-        return !cust || cust.is_visible !== false;
-      })
+      .filter(item => !isActionHidden(item))
       .map(item => {
         const cust = serviceCustoms[item.id];
         if (!cust) return item;
@@ -537,28 +549,19 @@ export default function Dashboard() {
           bgStyle: cust.custom_bg_style || 'tint',
         };
       });
-  }, [serviceCustoms]);
+  }, [isActionHidden, serviceCustoms]);
 
   const catalogMap = useMemo(() => new Map(ALL_ACTIONS_CATALOG.map(a => [a.id, a])), [ALL_ACTIONS_CATALOG]);
 
   const pinnedActions = useMemo(() => {
     return pinnedActionIds
       .map(id => catalogMap.get(id))
-      .filter((a): a is typeof ALL_ACTIONS_CATALOG[0] => Boolean(a))
-      .filter(action => {
-        const featKey = featureMap[action.route] || actionIdFeatureMap[action.id];
-        return !(featKey && hiddenFeatures.includes(featKey));
-      });
-  }, [pinnedActionIds, catalogMap, hiddenFeatures]);
+      .filter((a): a is typeof ALL_ACTIONS_CATALOG[0] => Boolean(a));
+  }, [pinnedActionIds, catalogMap]);
 
   const unpinnedActions = useMemo(() => {
-    return ALL_ACTIONS_CATALOG
-      .filter(a => !pinnedActionIds.includes(a.id))
-      .filter(action => {
-        const featKey = featureMap[action.route] || actionIdFeatureMap[action.id];
-        return !(featKey && hiddenFeatures.includes(featKey));
-      });
-  }, [ALL_ACTIONS_CATALOG, pinnedActionIds, hiddenFeatures]);
+    return ALL_ACTIONS_CATALOG.filter(a => !pinnedActionIds.includes(a.id));
+  }, [ALL_ACTIONS_CATALOG, pinnedActionIds]);
 
   const displayedActions = useMemo(() => {
     return showAllActions 
@@ -1008,8 +1011,8 @@ export default function Dashboard() {
         animationType="slide"
         onRequestClose={() => setShowEditQuickActionsModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: 'rgba(13, 27, 62, 0.75)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: T.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '85%' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(13, 27, 62, 0.75)', justifyContent: isWebDesktop ? 'center' : 'flex-end', alignItems: isWebDesktop ? 'center' : 'stretch', padding: isWebDesktop ? 20 : 0 }}>
+          <View style={{ backgroundColor: T.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderRadius: isWebDesktop ? 24 : undefined, padding: 20, maxHeight: '85%', width: isWebDesktop ? 560 : '100%', maxWidth: 560, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
             
             {/* Modal Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -1036,20 +1039,19 @@ export default function Dashboard() {
               <View style={{ marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text style={{ fontSize: 11, fontWeight: '900', color: T.navy, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    📌 Pinned Shortcuts ({pinnedActionIds.length})
+                    📌 Pinned Shortcuts ({pinnedActions.length})
                   </Text>
                   <Text style={{ fontSize: 9, color: T.indigo, fontWeight: '700' }}>Tap arrows to reorder</Text>
                 </View>
 
-                {pinnedActionIds.length === 0 ? (
+                {pinnedActions.length === 0 ? (
                   <View style={{ padding: 14, backgroundColor: T.bg, borderRadius: 12, alignItems: 'center' }}>
                     <Text style={{ fontSize: 10, color: T.textSub, fontStyle: 'italic' }}>No pinned shortcuts. Add services below!</Text>
                   </View>
                 ) : (
                   <View style={{ gap: 6 }}>
-                    {pinnedActionIds.map((id, idx) => {
-                      const item = catalogMap.get(id);
-                      if (!item) return null;
+                    {pinnedActions.map((item, idx) => {
+                      const id = item.id;
                       return (
                         <View key={id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: T.bg, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
@@ -1065,11 +1067,15 @@ export default function Dashboard() {
                               disabled={idx === 0}
                               onPress={() => {
                                 if (idx > 0) {
-                                  const newArr = [...pinnedActionIds];
-                                  const temp = newArr[idx];
-                                  newArr[idx] = newArr[idx - 1];
-                                  newArr[idx - 1] = temp;
-                                  setPinnedActionIds(newArr);
+                                  const validPinnedIds = pinnedActionIds.filter(pid => catalogMap.has(pid));
+                                  const currentPos = validPinnedIds.indexOf(id);
+                                  if (currentPos > 0) {
+                                    const newArr = [...validPinnedIds];
+                                    const temp = newArr[currentPos];
+                                    newArr[currentPos] = newArr[currentPos - 1];
+                                    newArr[currentPos - 1] = temp;
+                                    setPinnedActionIds(newArr);
+                                  }
                                 }
                               }}
                               style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: idx === 0 ? '#f1f5f9' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
@@ -1079,19 +1085,23 @@ export default function Dashboard() {
 
                             {/* Move Down */}
                             <TouchableOpacity
-                              disabled={idx === pinnedActionIds.length - 1}
+                              disabled={idx === pinnedActions.length - 1}
                               onPress={() => {
-                                if (idx < pinnedActionIds.length - 1) {
-                                  const newArr = [...pinnedActionIds];
-                                  const temp = newArr[idx];
-                                  newArr[idx] = newArr[idx + 1];
-                                  newArr[idx + 1] = temp;
-                                  setPinnedActionIds(newArr);
+                                if (idx < pinnedActions.length - 1) {
+                                  const validPinnedIds = pinnedActionIds.filter(pid => catalogMap.has(pid));
+                                  const currentPos = validPinnedIds.indexOf(id);
+                                  if (currentPos !== -1 && currentPos < validPinnedIds.length - 1) {
+                                    const newArr = [...validPinnedIds];
+                                    const temp = newArr[currentPos];
+                                    newArr[currentPos] = newArr[currentPos + 1];
+                                    newArr[currentPos + 1] = temp;
+                                    setPinnedActionIds(newArr);
+                                  }
                                 }
                               }}
-                              style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: idx === pinnedActionIds.length - 1 ? '#f1f5f9' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+                              style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: idx === pinnedActions.length - 1 ? '#f1f5f9' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
                             >
-                              <Ionicons name="chevron-down" size={14} color={idx === pinnedActionIds.length - 1 ? '#cbd5e1' : T.navy} />
+                              <Ionicons name="chevron-down" size={14} color={idx === pinnedActions.length - 1 ? '#cbd5e1' : T.navy} />
                             </TouchableOpacity>
 
                             {/* Unpin */}
@@ -1114,24 +1124,30 @@ export default function Dashboard() {
               {/* Available Services Section */}
               <View style={{ marginBottom: 12 }}>
                 <Text style={{ fontSize: 11, fontWeight: '900', color: T.navy, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                  ➕ Available Services
+                  ➕ Available Services ({unpinnedActions.length})
                 </Text>
 
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {ALL_ACTIONS_CATALOG.filter(a => !pinnedActionIds.includes(a.id)).map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      onPress={() => {
-                        setPinnedActionIds([...pinnedActionIds, item.id]);
-                      }}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.bg, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}
-                    >
-                      <Ionicons name={item.icon as any} size={14} color={item.color} />
-                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: T.navy }}>{item.label}</Text>
-                      <Ionicons name="add-circle" size={14} color={T.indigo} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {unpinnedActions.length === 0 ? (
+                  <View style={{ padding: 12, backgroundColor: T.bg, borderRadius: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, color: T.textSub, fontStyle: 'italic' }}>All available services are pinned.</Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {unpinnedActions.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => {
+                          setPinnedActionIds([...pinnedActionIds, item.id]);
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.bg, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}
+                      >
+                        <Ionicons name={item.icon as any} size={14} color={item.color} />
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: T.navy }}>{item.label}</Text>
+                        <Ionicons name="add-circle" size={14} color={T.indigo} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
 
             </ScrollView>
@@ -1140,7 +1156,8 @@ export default function Dashboard() {
             <View style={{ flexDirection: 'row', gap: 8, paddingTop: 10, borderTopWidth: 1, borderColor: '#f1f5f9' }}>
               <TouchableOpacity
                 onPress={() => {
-                  saveQuickActionPreferences(DEFAULT_PINNED_IDS);
+                  const activeDefaults = DEFAULT_PINNED_IDS.filter(id => catalogMap.has(id));
+                  saveQuickActionPreferences(activeDefaults);
                 }}
                 style={{ paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, backgroundColor: T.bg, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
               >
@@ -1149,7 +1166,8 @@ export default function Dashboard() {
 
               <TouchableOpacity
                 onPress={() => {
-                  saveQuickActionPreferences(pinnedActionIds);
+                  const sanitizedPinned = pinnedActionIds.filter(id => catalogMap.has(id));
+                  saveQuickActionPreferences(sanitizedPinned);
                   setShowEditQuickActionsModal(false);
                 }}
                 style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: T.navy, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.gold }}

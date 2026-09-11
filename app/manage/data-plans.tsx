@@ -8,7 +8,8 @@ import {
     Alert, 
     Modal, 
     Platform, 
-    Switch 
+    Switch,
+    useWindowDimensions
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,6 +53,9 @@ const VENDORS = [
 export default function ManageDataPlans() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { width } = useWindowDimensions();
+    const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+    const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
 
     const [plans, setPlans] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -658,8 +662,8 @@ export default function ManageDataPlans() {
                         <Text style={{ color: L.textMuted, fontSize: 11, marginTop: 8 }}>Loading {selectedNetwork.toUpperCase()} data tariffs...</Text>
                     </View>
                 ) : (
-                    <View style={{ paddingHorizontal: 12, gap: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 4 }}>
+                    <View style={[{ paddingHorizontal: 12, gap: 8 }, (isDesktopWeb || isTabletWeb) && { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 4, width: '100%' }}>
                             <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900' }}>
                                 Showing {plans.length} Data Plans for {selectedNetwork.toUpperCase()}
                             </Text>
@@ -699,7 +703,8 @@ export default function ManageDataPlans() {
                                         flexDirection: 'row',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
-                                        elevation: 1
+                                        elevation: 1,
+                                        width: isDesktopWeb ? '32.3%' : isTabletWeb ? '48.8%' : '100%'
                                     }}
                                 >
                                     <View style={{ flex: 1, paddingRight: 8 }}>
@@ -1020,8 +1025,8 @@ export default function ManageDataPlans() {
                 animationType="slide"
                 onRequestClose={() => setSyncResultModal(prev => ({ ...prev, visible: false }))}
             >
-                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.8)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: L.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '88%', borderTopWidth: 3, borderColor: L.goldDk }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.8)', justifyContent: (isDesktopWeb || isTabletWeb) ? 'center' : 'flex-end', alignItems: (isDesktopWeb || isTabletWeb) ? 'center' : 'stretch', padding: (isDesktopWeb || isTabletWeb) ? 20 : 0 }}>
+                    <View style={{ backgroundColor: L.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderRadius: (isDesktopWeb || isTabletWeb) ? 24 : undefined, width: '100%', maxWidth: 720, alignSelf: 'center', padding: 20, maxHeight: '88%', borderTopWidth: 3, borderColor: L.goldDk, overflow: 'hidden' }}>
                         
                         {/* Header */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>

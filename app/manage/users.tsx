@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Stack, useRouter } from 'expo-router';
@@ -120,6 +120,11 @@ interface LoginLog {
 
 export default function UserManagement() {
     const router = useRouter();
+    const { width } = useWindowDimensions();
+    const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+    const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
+    const numColumns = isDesktopWeb ? 3 : isTabletWeb ? 2 : 1;
+
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -2070,22 +2075,22 @@ Metadata:
                     </TouchableOpacity>
                 </View>
 
-                {/* 2x2 Stats Grid for Clean Mobile Viewing */}
+                {/* Executive Responsive Stats Grid */}
                 {!isSelectionMode && (
-                    <View style={s.statsGrid}>
-                        <View style={s.statCard}>
+                    <View style={[s.statsGrid, (isDesktopWeb || isTabletWeb) && { flexDirection: 'row', gap: 12 }]}>
+                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
                             <Text style={s.statCardLabel}>TOTAL VAULT</Text>
                             <Text style={s.statCardValue}>₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance.toLocaleString()}</Text>
                         </View>
-                        <View style={s.statCard}>
+                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
                             <Text style={s.statCardLabel}>ACTIVE</Text>
                             <Text style={s.statCardValue}>{stats.activeUsers}</Text>
                         </View>
-                        <View style={s.statCard}>
+                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
                             <Text style={s.statCardLabel}>VERIFIED</Text>
                             <Text style={s.statCardValue}>{stats.verifiedUsers}</Text>
                         </View>
-                        <View style={s.statCard}>
+                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
                             <Text style={s.statCardLabel}>CORPORATE</Text>
                             <Text style={s.statCardValue}>{stats.corporateAdmins}</Text>
                         </View>
@@ -2195,12 +2200,15 @@ Metadata:
                 </View>
             )}
 
-            {/* Mobile-First Stacked User Cards (Light Mode) */}
+            {/* Multi-Column Responsive Executive User Cards */}
             <FlatList
+                key={`user-grid-${numColumns}`}
                 data={getFilteredUsers()}
                 keyExtractor={(item) => item.id}
+                numColumns={numColumns}
+                columnWrapperStyle={numColumns > 1 ? { gap: 12, paddingHorizontal: 12 } : undefined}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={s.listContent}
+                contentContainerStyle={[s.listContent, Platform.OS === 'web' && { maxWidth: 1560, width: '100%', alignSelf: 'center' }]}
                 refreshControl={
                     <RefreshControl 
                         refreshing={refreshing} 
@@ -2213,7 +2221,11 @@ Metadata:
                     <TouchableOpacity 
                         onPress={() => isSelectionMode ? toggleSelection(item.id) : setSelectedUser(item)}
                         onLongPress={() => handleLongPress(item.id)}
-                        style={[s.userCard, selectedIds.has(item.id) ? s.userCardSelected : null]}
+                        style={[
+                            s.userCard, 
+                            numColumns > 1 && { flex: 1 / numColumns, marginHorizontal: 0 },
+                            selectedIds.has(item.id) ? s.userCardSelected : null
+                        ]}
                     >
                         {/* Section 1: Top Row */}
                         <View style={s.userCardTopRow}>
@@ -2680,9 +2692,10 @@ const s = StyleSheet.create({
     modalCard: {
         backgroundColor: T.bg,
         borderRadius: 20,
-        height: '95%',
+        height: '92%',
         width: '100%',
-        maxWidth: 500,
+        maxWidth: 760,
+        alignSelf: 'center',
         overflow: 'hidden',
         borderWidth: 1.5,
         borderColor: T.gold,
@@ -3175,7 +3188,8 @@ const s = StyleSheet.create({
         borderRadius: 20,
         height: '85%',
         width: '96%',
-        maxWidth: 440,
+        maxWidth: 600,
+        alignSelf: 'center',
         overflow: 'hidden',
         borderWidth: 1.5,
         borderColor: T.gold,
@@ -3313,6 +3327,8 @@ const s = StyleSheet.create({
 
     batchModalContainer: {
         width: '92%',
+        maxWidth: 620,
+        alignSelf: 'center',
         maxHeight: '85%',
         backgroundColor: T.card,
         borderRadius: 16,

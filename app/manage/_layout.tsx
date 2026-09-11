@@ -12,10 +12,13 @@ export default function AdminLayout() {
     const router = useRouter();
     const { width } = useWindowDimensions();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [drawerOpen, setDrawerOpen] = useState(false);
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    const isDesktopWeb = Platform.OS === 'web' && width >= 768;
+    const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+    const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
+    const isAnyWeb = Platform.OS === 'web';
 
     useEffect(() => {
         let isMounted = true;
@@ -128,6 +131,7 @@ export default function AdminLayout() {
     const stackContent = (
         <Stack
             screenOptions={{
+                headerShown: Platform.OS !== 'web',
                 headerStyle: {
                     backgroundColor: '#0F172A',
                 },
@@ -177,19 +181,52 @@ export default function AdminLayout() {
         </Stack>
     );
 
-    if (isDesktopWeb) {
+    if (isAnyWeb) {
         return (
-            <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F8FAFC', minHeight: '100%' }}>
-                <AdminWebSidebar
-                    collapsed={sidebarCollapsed || width < 1024}
-                    onToggleCollapse={() => setSidebarCollapsed(p => !p)}
-                />
+            <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F8FAFC', minHeight: '100%', position: 'relative' }}>
+                {/* Static Sidebar for Desktop and Tablet Rail */}
+                {(isDesktopWeb || isTabletWeb) && (
+                    <AdminWebSidebar
+                        collapsed={isTabletWeb ? true : sidebarCollapsed}
+                        onToggleCollapse={() => {
+                            if (isTabletWeb) setDrawerOpen(true);
+                            else setSidebarCollapsed(p => !p);
+                        }}
+                    />
+                )}
+
+                {/* Slide-over Drawer for Tablet (when expanded) & Mobile Web */}
+                {drawerOpen && (
+                    <>
+                        <TouchableOpacity
+                            style={{
+                                position: 'absolute' as any,
+                                top: 0,
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                                zIndex: 9998,
+                            }}
+                            activeOpacity={1}
+                            onPress={() => setDrawerOpen(false)}
+                        />
+                        <AdminWebSidebar
+                            isDrawer={true}
+                            onCloseDrawer={() => setDrawerOpen(false)}
+                        />
+                    </>
+                )}
+
                 <View style={{ flex: 1, flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                     <AdminWebHeader
-                        onToggleSidebar={() => setSidebarCollapsed(p => !p)}
-                        showToggle={width < 1024}
+                        onToggleSidebar={() => {
+                            if (isDesktopWeb) setSidebarCollapsed(p => !p);
+                            else setDrawerOpen(p => !p);
+                        }}
+                        showToggle={true}
                     />
-                    <View style={{ flex: 1, width: '100%', maxWidth: 1440, alignSelf: 'center' }}>
+                    <View style={{ flex: 1, width: '100%', maxWidth: width >= 1600 ? 1560 : 1440, alignSelf: 'center' }}>
                         {stackContent}
                     </View>
                 </View>

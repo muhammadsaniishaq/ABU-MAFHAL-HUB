@@ -1,7 +1,7 @@
 import { 
     View, Text, FlatList, TouchableOpacity, Image, 
     ActivityIndicator, Alert, Modal, TextInput, RefreshControl, 
-    ScrollView, Platform, KeyboardAvoidingView 
+    ScrollView, Platform, KeyboardAvoidingView, useWindowDimensions 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +44,9 @@ const L = {
 export default function KYCManagerScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+    const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
     
     // Core Data States
     const [kycQueue, setKycQueue] = useState<any[]>([]);
@@ -743,7 +746,8 @@ export default function KYCManagerScreen() {
                             </Text>
                         </View>
                     ) : (
-                        filteredQueue.map((item: any, idx: number) => {
+                        <View style={[(isDesktopWeb || isTabletWeb) && { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }]}>
+                        {filteredQueue.map((item: any, idx: number) => {
                             const isPending = item.status === 'pending';
                             const isApproved = item.status === 'approved';
                             const targetTier = targetTierNumber(item.document_type);
@@ -758,7 +762,8 @@ export default function KYCManagerScreen() {
                                         marginBottom: 10,
                                         borderWidth: 1,
                                         borderColor: isPending ? L.cardBorder : L.inputBorder,
-                                        elevation: 2
+                                        elevation: 2,
+                                        width: (isDesktopWeb || isTabletWeb) ? '48.8%' : '100%'
                                     }}
                                 >
                                     {/* Card Header Row */}
@@ -770,24 +775,29 @@ export default function KYCManagerScreen() {
                                                 </Text>
                                             </View>
                                             <View style={{ flex: 1 }}>
-                                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }} numberOfLines={1}>
-                                                    {item.profiles?.full_name || 'System User'}
+                                                <Text style={{ color: L.textPrimary, fontWeight: '900', fontSize: 11 }} numberOfLines={1}>
+                                                    {item.profiles?.full_name || 'Anonymous User'}
                                                 </Text>
-                                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>
-                                                    Current Tier {item.profiles?.kyc_tier || 1} • {item.profiles?.email || item.profiles?.phone || 'No Contact'}
+                                                <Text style={{ color: L.textMuted, fontSize: 8.5 }} numberOfLines={1}>
+                                                    {item.profiles?.email || item.profiles?.phone || 'No Contact'}
                                                 </Text>
                                             </View>
                                         </View>
 
                                         {/* Status Badge */}
-                                        <View style={{
-                                            backgroundColor: isPending ? L.goldLight : isApproved ? L.emeraldBg : L.roseBg,
-                                            paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
-                                            borderWidth: 1, borderColor: isPending ? L.goldDk : isApproved ? L.emeraldBorder : L.roseBorder
+                                        <View style={{ 
+                                            paddingHorizontal: 7, 
+                                            paddingVertical: 2, 
+                                            borderRadius: 6, 
+                                            backgroundColor: isPending ? L.goldBg : isApproved ? L.emeraldBg : L.roseBg,
+                                            borderWidth: 1,
+                                            borderColor: isPending ? L.goldAmber : isApproved ? L.emeraldBorder : L.roseBorder 
                                         }}>
-                                            <Text style={{
-                                                fontSize: 8, fontWeight: '900', textTransform: 'uppercase',
-                                                color: isPending ? L.goldAmber : isApproved ? L.emerald : L.rose
+                                            <Text style={{ 
+                                                fontSize: 8, 
+                                                fontWeight: '900', 
+                                                textTransform: 'uppercase',
+                                                color: isPending ? L.goldAmber : isApproved ? L.emerald : L.rose 
                                             }}>
                                                 {item.status}
                                             </Text>
@@ -863,7 +873,8 @@ export default function KYCManagerScreen() {
                                     </View>
                                 </View>
                             );
-                        })
+                        })}
+                        </View>
                     )}
                 </ScrollView>
                 </>
@@ -873,7 +884,7 @@ export default function KYCManagerScreen() {
             {/* DOCUMENT INSPECTOR MODAL */}
             <Modal visible={inspectorItem !== null && !showRejectModal} transparent animationType="fade" onRequestClose={closeInspector}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)', justifyContent: 'center', padding: 14 }}>
-                    <View style={{ backgroundColor: L.card, borderRadius: 18, padding: 14, borderWidth: 1.5, borderColor: L.goldDk, maxHeight: '90%' }}>
+                    <View style={{ backgroundColor: L.card, borderRadius: 18, padding: 14, borderWidth: 1.5, borderColor: L.goldDk, maxHeight: '90%', width: '100%', maxWidth: 720, alignSelf: 'center' }}>
                         <ScrollView showsVerticalScrollIndicator={false}>
                             
                             {/* Modal Header */}
@@ -993,7 +1004,7 @@ export default function KYCManagerScreen() {
             {/* REJECTION REASON MODAL */}
             <Modal visible={showRejectModal} transparent animationType="fade" onRequestClose={() => setShowRejectModal(false)}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)', justifyContent: 'center', padding: 14 }}>
-                    <View style={{ backgroundColor: L.card, borderRadius: 18, padding: 14, borderWidth: 1.5, borderColor: L.roseBorder }}>
+                    <View style={{ backgroundColor: L.card, borderRadius: 18, padding: 14, borderWidth: 1.5, borderColor: L.roseBorder, width: '100%', maxWidth: 520, alignSelf: 'center' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                             <Text style={{ color: L.rose, fontWeight: '900', fontSize: 12 }}>Decline / Revoke Verification</Text>
                             <TouchableOpacity onPress={() => setShowRejectModal(false)}>

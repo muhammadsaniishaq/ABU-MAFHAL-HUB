@@ -10,7 +10,8 @@ import {
     TextInput,
     RefreshControl,
     ScrollView,
-    Platform
+    Platform,
+    useWindowDimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabase';
@@ -51,6 +52,11 @@ interface AdminTransferQueueProps {
 }
 
 export default function AdminTransferQueue({ onShowToast }: AdminTransferQueueProps) {
+    const { width } = useWindowDimensions();
+    const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+    const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
+    const numColumns = isDesktopWeb ? 2 : 1;
+
     const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -383,7 +389,8 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 2 },
                     shadowOpacity: 0.05,
-                    shadowRadius: 4
+                    shadowRadius: 4,
+                    flex: numColumns > 1 ? 1 / numColumns : undefined
                 }}
             >
                 {/* Top Row: User Name & Status Badge */}
@@ -677,8 +684,11 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
                 </View>
             ) : (
                 <FlatList
+                    key={`transfer-queue-grid-${numColumns}`}
                     data={filteredRequests}
                     keyExtractor={(item) => item.id}
+                    numColumns={numColumns}
+                    columnWrapperStyle={numColumns > 1 ? { gap: 12 } : undefined}
                     renderItem={renderRequestCard}
                     contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 40 }}
                     refreshControl={
@@ -698,10 +708,10 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
 
             {/* Full Inspector Modal */}
             <Modal visible={!!selectedRequest && !showRejectModal} animationType="slide" transparent>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%', paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: (isDesktopWeb || isTabletWeb) ? 'center' : 'flex-end', alignItems: (isDesktopWeb || isTabletWeb) ? 'center' : 'stretch', padding: (isDesktopWeb || isTabletWeb) ? 20 : 0 }}>
+                    <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderRadius: (isDesktopWeb || isTabletWeb) ? 24 : undefined, width: '100%', maxWidth: 720, alignSelf: 'center', maxHeight: '90%', paddingBottom: Platform.OS === 'ios' ? 34 : 20, overflow: 'hidden' }}>
                         {/* Header */}
-                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 16, paddingVertical: 14, borderTopLeftRadius: 24, borderTopRightRadius: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 16, paddingVertical: 14, borderTopLeftRadius: (isDesktopWeb || isTabletWeb) ? 24 : 24, borderTopRightRadius: (isDesktopWeb || isTabletWeb) ? 24 : 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View>
                                 <Text style={{ color: L.gold, fontSize: 13, fontWeight: '900', textTransform: 'uppercase' }}>TRANSFER COMPLIANCE DOSSIER</Text>
                                 <Text style={{ color: '#94A3B8', fontSize: 10 }}>Application ID: {selectedRequest?.id.slice(0, 8)}...</Text>
@@ -950,7 +960,7 @@ export default function AdminTransferQueue({ onShowToast }: AdminTransferQueuePr
             {/* Reject Modal */}
             <Modal visible={showRejectModal} animationType="fade" transparent>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, width: '100%', maxWidth: 440, padding: 18 }}>
+                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, width: '100%', maxWidth: 520, padding: 18 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                             <Text style={{ fontSize: 14, fontWeight: '900', color: L.rose }}>Decline Transfer Application</Text>
                             <TouchableOpacity onPress={() => setShowRejectModal(false)}>
