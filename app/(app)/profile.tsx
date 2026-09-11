@@ -313,8 +313,8 @@ export default function UserProfileScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Mobile Viewport Shell (100% on Mobile, Max 500px on Web/Tablet) */}
-            <View style={{ flex: 1, width: '100%', maxWidth: 500, backgroundColor: L.bg }}>
+            {/* Executive Viewport Shell (100% on Mobile, Max 920px on Web/Tablet) */}
+            <View style={{ flex: 1, width: '100%', maxWidth: 920, backgroundColor: L.bg }}>
                 
                 {/* Micro Toast */}
                 {toastMsg && (

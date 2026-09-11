@@ -40,6 +40,7 @@ export default function WebDesktopSidebar({
 
     const [showBalance, setShowBalance] = useState(true);
     const [loggingOut, setLoggingOut] = useState(false);
+    const [hiddenFeatures, setHiddenFeatures] = useState<string[]>([]);
 
     useEffect(() => {
         let isMounted = true;
@@ -76,6 +77,34 @@ export default function WebDesktopSidebar({
 
         loadProfile();
 
+        // Load hidden features cache
+        AsyncStorage.getItem('@app_hidden_features_cache').then(val => {
+            if (val && isMounted) {
+                try {
+                    const parsed = JSON.parse(val);
+                    if (Array.isArray(parsed)) setHiddenFeatures(parsed);
+                } catch (_) {}
+            }
+        });
+
+        // Load hidden features from Supabase
+        supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'hidden_features')
+            .maybeSingle()
+            .then(({ data }) => {
+                if (data?.value && isMounted) {
+                    try {
+                        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                        if (Array.isArray(parsed)) {
+                            setHiddenFeatures(parsed);
+                            AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(parsed)).catch(() => {});
+                        }
+                    } catch (_) {}
+                }
+            });
+
         // Subscribe to live balance updates
         const channel = supabase
             .channel('sidebar-balance-changes')
@@ -94,9 +123,30 @@ export default function WebDesktopSidebar({
             )
             .subscribe();
 
+        // Subscribe to real-time hidden features changes
+        const hiddenChannel = supabase
+            .channel('web-sidebar-hidden-sync')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.hidden_features' },
+                (payload: any) => {
+                    if (payload.new?.value && isMounted) {
+                        try {
+                            const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+                            if (Array.isArray(parsed)) {
+                                setHiddenFeatures(parsed);
+                                AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(parsed)).catch(() => {});
+                            }
+                        } catch (_) {}
+                    }
+                }
+            )
+            .subscribe();
+
         return () => {
             isMounted = false;
             supabase.removeChannel(channel);
+            supabase.removeChannel(hiddenChannel);
         };
     }, []);
 
@@ -170,6 +220,34 @@ export default function WebDesktopSidebar({
         },
     ];
 
+    const ROUTE_FEATURE_MAP: Record<string, string> = {
+        '/(app)/transfer': 'feature_transfer',
+        '/(app)/airtime': 'feature_airtime',
+        '/(app)/data': 'feature_data',
+        '/(app)/bills': 'feature_bills',
+        '/(app)/education': 'feature_education',
+        '/(app)/nin-services': 'feature_nin',
+        '/(app)/bvn-services': 'feature_bvn',
+        '/(app)/cac-services': 'feature_cac',
+        '/(app)/virtual-cards': 'feature_cards',
+        '/(app)/qr-pay': 'feature_qr',
+        '/(app)/airtime-to-cash': 'feature_airtime',
+        '/(app)/recharge-pin': 'feature_airtime',
+        '/(app)/social-boost': 'feature_social',
+        '/(app)/referrals': 'feature_rewards',
+        '/(app)/crypto': 'feature_crypto',
+        '/(app)/bulk-sms': 'feature_bulk_sms',
+        '/(app)/smile': 'feature_smile',
+    };
+
+    const visibleNavItems = navItems.map(section => ({
+        ...section,
+        items: section.items.filter(item => {
+            const featKey = ROUTE_FEATURE_MAP[item.route];
+            return !featKey || !hiddenFeatures.includes(featKey);
+        })
+    })).filter(section => section.items.length > 0);
+
     const getLogoUri = () => {
         if (settings?.app_logo_icon) return settings.app_logo_icon;
         if (typeof settings?.app_logo === 'string') return settings.app_logo;
@@ -222,11 +300,11 @@ export default function WebDesktopSidebar({
                 )}
             </View>
 
-            {/* 2. Wallet Balance Card */}
+            {/* 2. User Balance Pill Card */}
             {!collapsed && (
                 <View style={styles.walletCardWrapper}>
                     <LinearGradient
-                        colors={['#0F2454', '#0A1738']}
+                        colors={['#0F1E4A', '#0D1B3E']}
                         style={styles.walletCardGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -234,46 +312,47 @@ export default function WebDesktopSidebar({
                         <View style={styles.walletCardTop}>
                             <View style={styles.walletBadgeRow}>
                                 <View style={styles.greenLiveDot} />
-                                <Text style={styles.walletBadgeText}>WALLET BALANCE</Text>
+                                <Text style={styles.walletBadgeText}>AVAILABLE BALANCE</Text>
                             </View>
                             <TouchableOpacity
-                                onPress={() => setShowBalance(!showBalance)}
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                onPress={() => setShowBalance(prev => !prev)}
+                                style={styles.eyeToggleBtn}
+                                accessibilityLabel="Toggle balance visibility"
                             >
                                 <Ionicons
                                     name={showBalance ? 'eye-outline' : 'eye-off-outline'}
-                                    size={15}
-                                    color="#F59E0B"
+                                    size={14}
+                                    color="#94A3B8"
                                 />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.walletBalanceAmount}>
+                        <Text style={styles.walletBalanceAmount} numberOfLines={1}>
                             {showBalance
-                                ? `₦${(userProfile?.balance ?? 0).toLocaleString('en-NG', {
+                                ? `₦${(userProfile?.balance || 0).toLocaleString(undefined, {
                                       minimumFractionDigits: 2,
                                       maximumFractionDigits: 2,
                                   })}`
-                                : '₦ ••••••••'}
+                                : '₦••••••••'}
                         </Text>
 
                         <View style={styles.walletActionBtnsRow}>
                             <TouchableOpacity
-                                onPress={() => router.push('/(app)/wallet')}
+                                onPress={() => router.push('/(app)/wallet' as any)}
                                 style={styles.walletPrimaryBtn}
                                 activeOpacity={0.8}
                             >
                                 <Ionicons name="add-circle" size={13} color="#0D1B3E" style={{ marginRight: 4 }} />
-                                <Text style={styles.walletPrimaryBtnText}>Fund Wallet</Text>
+                                <Text style={styles.walletPrimaryBtnText}>Fund</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={() => router.push('/(app)/transfer')}
+                                onPress={() => router.push('/(app)/transfer' as any)}
                                 style={styles.walletSecondaryBtn}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name="arrow-forward" size={12} color="#FFFFFF" style={{ marginRight: 3 }} />
-                                <Text style={styles.walletSecondaryBtnText}>Transfer</Text>
+                                <Ionicons name="paper-plane" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                                <Text style={styles.walletSecondaryBtnText}>Send</Text>
                             </TouchableOpacity>
                         </View>
                     </LinearGradient>
@@ -286,7 +365,7 @@ export default function WebDesktopSidebar({
                 contentContainerStyle={styles.navScrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {navItems.map((section, sIdx) => (
+                {visibleNavItems.map((section, sIdx) => (
                     <View key={`sec-${sIdx}`} style={styles.navSection}>
                         {!collapsed && (
                             <Text style={styles.navSectionHeader}>{section.group}</Text>
@@ -543,6 +622,9 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#CBD5E1',
         letterSpacing: 0.5,
+    },
+    eyeToggleBtn: {
+        padding: 4,
     },
     walletBalanceAmount: {
         fontSize: 18,

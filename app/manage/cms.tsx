@@ -40,7 +40,7 @@ const L = {
 };
 
 const AVAILABLE_PLACEMENTS = [
-  'dashboard', 'airtime', 'data', 'bills', 'transfer',
+  'dashboard', 'web_desktop', 'mobile_only', 'airtime', 'data', 'bills', 'transfer',
   'education', 'smile', 'cac', 'nin_bvn', 'social_boost', 'crypto', 'qr_pay', 'wallet', 'services'
 ];
 
@@ -1054,15 +1054,20 @@ export default function ModernContentManager() {
               <View style={s.placementSelectorRow}>
                 {AVAILABLE_PLACEMENTS.map(p => {
                   const isChecked = newPlacements.includes(p);
+                  const displayLabel = p === 'web_desktop' ? '💻 Web / Desktop' : p === 'mobile_only' ? '📱 Mobile Only' : p;
                   return (
                     <TouchableOpacity
                       key={p}
                       onPress={() => togglePlacement(p)}
-                      style={[s.placementSelectChip, isChecked && s.placementSelectChipActive]}
+                      style={[
+                        s.placementSelectChip, 
+                        isChecked && s.placementSelectChipActive,
+                        (p === 'web_desktop' || p === 'mobile_only') && { borderWidth: 1.5, borderColor: isChecked ? '#0F172A' : L.goldDk }
+                      ]}
                       activeOpacity={0.7}
                     >
                       <Ionicons name={isChecked ? "checkbox" : "square-outline"} size={11} color={isChecked ? '#0F172A' : L.textMuted} />
-                      <Text style={[s.placementSelectText, isChecked && s.placementSelectTextActive]}>{p}</Text>
+                      <Text style={[s.placementSelectText, isChecked && s.placementSelectTextActive]}>{displayLabel}</Text>
                     </TouchableOpacity>
                   );
                 })}

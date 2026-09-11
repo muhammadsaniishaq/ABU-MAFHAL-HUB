@@ -1663,7 +1663,7 @@ const s = StyleSheet.create({
   webPageContainer: {
     alignSelf: 'center',
     width: '100%',
-    maxWidth: 450,
+    maxWidth: 920,
   },
   headerContainer: {
     paddingBottom: 16,

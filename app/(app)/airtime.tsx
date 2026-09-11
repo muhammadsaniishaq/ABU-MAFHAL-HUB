@@ -430,7 +430,7 @@ function AirtimeScreenContent() {
                 style={[{ flex: 1, backgroundColor: '#f4f6fb' }, isWeb && s.webPageContainer]}
             >
                 <ScrollView 
-                    style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
+                    style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 920 } : { flex: 1 }}
                     contentContainerStyle={[
                         { padding: 16, paddingBottom: 130, paddingTop: 14 },
                         isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
@@ -935,7 +935,7 @@ const s = StyleSheet.create({
   webPageContainer: {
     alignSelf: 'center',
     width: '100%',
-    maxWidth: 450,
+    maxWidth: 920,
   },
   headerTop: {
     flexDirection: 'row',

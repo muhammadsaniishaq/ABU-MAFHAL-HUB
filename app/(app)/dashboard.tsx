@@ -432,13 +432,48 @@ export default function Dashboard() {
   };
 
   const featureMap: Record<string, string> = {
-    '/transfer': 'feature_transfer', '/airtime': 'feature_airtime', '/data': 'feature_data',
-    '/education': 'feature_education', '/bills': 'feature_bills', '/virtual-cards': 'feature_cards',
+    '/transfer': 'feature_transfer',
+    '/airtime': 'feature_airtime',
+    '/recharge-pin': 'feature_airtime',
+    '/airtime-to-cash': 'feature_airtime',
+    '/data': 'feature_data',
+    '/education': 'feature_education',
+    '/bills': 'feature_bills',
+    '/virtual-cards': 'feature_cards',
     '/crypto': 'feature_crypto',
-    '/analytics': 'feature_analytics', '/rewards': 'feature_rewards', '/qr-pay': 'feature_qr',
+    '/analytics': 'feature_analytics',
+    '/rewards': 'feature_rewards',
+    '/referrals': 'feature_rewards',
+    '/qr-pay': 'feature_qr',
     '/bvn-services': 'feature_bvn',
-    '/nin-services': 'feature_nin', '/cac-services': 'feature_cac', '/smile': 'feature_smile',
-    '/social-boost': 'feature_social', '/bulk-sms': 'feature_bulk_sms'
+    '/nin-services': 'feature_nin',
+    '/cac-services': 'feature_cac',
+    '/smile': 'feature_smile',
+    '/social-boost': 'feature_social',
+    '/bulk-sms': 'feature_bulk_sms'
+  };
+
+  const actionIdFeatureMap: Record<string, string> = {
+    'airtime': 'feature_airtime',
+    'recharge_pin': 'feature_airtime',
+    'airtime_cash': 'feature_airtime',
+    'data': 'feature_data',
+    'transfer': 'feature_transfer',
+    'bills': 'feature_bills',
+    'cable': 'feature_bills',
+    'electricity': 'feature_bills',
+    'education': 'feature_education',
+    'nin': 'feature_nin',
+    'bvn': 'feature_bvn',
+    'cac': 'feature_cac',
+    'cards': 'feature_cards',
+    'crypto': 'feature_crypto',
+    'analytics': 'feature_analytics',
+    'rewards': 'feature_rewards',
+    'qr': 'feature_qr',
+    'smile': 'feature_smile',
+    'social': 'feature_social',
+    'bulk_sms': 'feature_bulk_sms',
   };
 
   const handleActionPress = (action: any, e?: any) => {
@@ -511,8 +546,8 @@ export default function Dashboard() {
       .map(id => catalogMap.get(id))
       .filter((a): a is typeof ALL_ACTIONS_CATALOG[0] => Boolean(a))
       .filter(action => {
-        const featureKey = featureMap[action.route];
-        return !(featureKey && hiddenFeatures.includes(featureKey));
+        const featKey = featureMap[action.route] || actionIdFeatureMap[action.id];
+        return !(featKey && hiddenFeatures.includes(featKey));
       });
   }, [pinnedActionIds, catalogMap, hiddenFeatures]);
 
@@ -520,8 +555,8 @@ export default function Dashboard() {
     return ALL_ACTIONS_CATALOG
       .filter(a => !pinnedActionIds.includes(a.id))
       .filter(action => {
-        const featureKey = featureMap[action.route];
-        return !(featureKey && hiddenFeatures.includes(featureKey));
+        const featKey = featureMap[action.route] || actionIdFeatureMap[action.id];
+        return !(featKey && hiddenFeatures.includes(featKey));
       });
   }, [ALL_ACTIONS_CATALOG, pinnedActionIds, hiddenFeatures]);
 
@@ -742,7 +777,7 @@ export default function Dashboard() {
             </View>
           );
 
-          const payBillsEl = (
+          const payBillsEl = !hiddenFeatures.includes('feature_bills') ? (
             <View style={[s.section, isDesktop && { marginHorizontal: 0 }]}>
               <View style={s.sectionHeader}>
                 <Text style={s.sectionTitle}>Pay Bills</Text>
@@ -769,9 +804,9 @@ export default function Dashboard() {
                 ))}
               </ScrollView>
             </View>
-          );
+          ) : null;
 
-          const referEarnEl = (
+          const referEarnEl = !hiddenFeatures.includes('feature_rewards') ? (
             <View style={[s.promoContainer, isDesktop && { marginHorizontal: 0 }]}>
               <LinearGradient 
                 colors={['#071633', '#0e2652']} 
@@ -791,7 +826,7 @@ export default function Dashboard() {
                 </View>
               </LinearGradient>
             </View>
-          );
+          ) : null;
 
           const reviewsEl = (
             <View style={[s.promoContainer, { marginTop: isDesktop ? 0 : -8 }, isDesktop && { marginHorizontal: 0 }]}>

@@ -230,7 +230,7 @@ export default function EducationScreen() {
 
             <LinearGradient 
                 colors={[T.navy, T.navyLight]} 
-                style={[s.headerContainer, isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450 }]}
+                style={[s.headerContainer, isWeb && { alignSelf: 'center', width: '100%', maxWidth: 920 }]}
             >
                 <View style={s.headerTopRow}>
                     <TouchableOpacity onPress={() => navigation?.goBack?.()} style={s.headerIconBtn}>
@@ -254,7 +254,7 @@ export default function EducationScreen() {
             </LinearGradient>
 
             <ScrollView 
-                style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
+                style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 920 } : { flex: 1 }}
                 contentContainerStyle={[
                     { padding: 24, paddingBottom: 120 },
                     isWeb && { backgroundColor: T.white, minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }

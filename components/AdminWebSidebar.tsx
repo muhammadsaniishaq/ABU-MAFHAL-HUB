@@ -51,6 +51,7 @@ export default function AdminWebSidebar({
 
   const [loggingOut, setLoggingOut] = useState(false);
   const [counts, setCounts] = useState({ users: 0, kyc: 0, tickets: 0 });
+  const [hiddenAdminModules, setHiddenAdminModules] = useState<string[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -70,9 +71,10 @@ export default function AdminWebSidebar({
           setAdminProfile(data);
         }
 
-        const [kc, tc] = await Promise.all([
+        const [kc, tc, hd] = await Promise.all([
           supabase.from('kyc_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
           supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+          supabase.from('app_settings').select('value').eq('key', 'hidden_admin_modules').maybeSingle(),
         ]);
 
         if (isMounted) {
@@ -81,6 +83,12 @@ export default function AdminWebSidebar({
             kyc: kc.count || 0,
             tickets: tc.count || 0,
           });
+          if (hd.data?.value) {
+            try {
+              const parsed = typeof hd.data.value === 'string' ? JSON.parse(hd.data.value) : hd.data.value;
+              if (Array.isArray(parsed)) setHiddenAdminModules(parsed);
+            } catch (_) {}
+          }
         }
       } catch (e) {
         console.log('Admin sidebar load error:', e);
@@ -89,8 +97,25 @@ export default function AdminWebSidebar({
 
     loadAdminInfo();
 
+    const adminHiddenChannel = supabase
+      .channel('admin-sidebar-hidden-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.hidden_admin_modules' },
+        (payload: any) => {
+          if (payload.new?.value && isMounted) {
+            try {
+              const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+              if (Array.isArray(parsed)) setHiddenAdminModules(parsed);
+            } catch (_) {}
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
+      supabase.removeChannel(adminHiddenChannel);
     };
   }, []);
 
@@ -98,6 +123,12 @@ export default function AdminWebSidebar({
     adminProfile?.role === 'super_admin' ||
     adminProfile?.email === 'sale.abumafhal@gmail.com' ||
     adminProfile?.email === 'abumafhal@gmail.com';
+
+  const isModuleHidden = (route: string) => {
+    if (isSuper) return false;
+    const modKey = route.split('/').pop()?.replace(/-/g, '_') || '';
+    return hiddenAdminModules.includes(modKey);
+  };
 
   const NAV_GROUPS: NavGroup[] = [
     {
@@ -293,7 +324,7 @@ export default function AdminWebSidebar({
         showsVerticalScrollIndicator={false}
       >
         {NAV_GROUPS.map((group, gIdx) => {
-          const visibleItems = group.items.filter((it) => !it.isSuperOnly || isSuper);
+          const visibleItems = group.items.filter((it) => (!it.isSuperOnly || isSuper) && !isModuleHidden(it.route));
           if (visibleItems.length === 0) return null;
 
           return (

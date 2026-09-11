@@ -170,9 +170,27 @@ export function useAppSettings() {
 
         initFetch();
 
+        const settingsChannel = supabase
+            .channel('app-settings-live-sync')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'app_settings' },
+                (payload: any) => {
+                    if (payload.new && mounted) {
+                        const { key, value } = payload.new;
+                        const parsedVal = (value === 'true' || value === 'false') ? value === 'true' : value;
+                        globalSettings = { ...globalSettings, [key]: parsedVal };
+                        setSettings(prev => ({ ...prev, [key]: parsedVal }));
+                        AsyncStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(globalSettings)).catch(() => {});
+                    }
+                }
+            )
+            .subscribe();
+
         return () => {
             mounted = false;
             clearTimeout(safetyTimer);
+            supabase.removeChannel(settingsChannel);
         };
     }, []);
 

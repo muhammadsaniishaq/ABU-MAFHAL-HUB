@@ -91,6 +91,102 @@ export default function AppLayout() {
         </Tabs>
     );
 
+    const rawHidden = settings?.hidden_features;
+    let hiddenFeatures: string[] = [];
+    if (Array.isArray(rawHidden)) {
+        hiddenFeatures = rawHidden;
+    } else if (typeof rawHidden === 'string') {
+        try {
+            const parsed = JSON.parse(rawHidden);
+            if (Array.isArray(parsed)) hiddenFeatures = parsed;
+        } catch (_) {}
+    }
+
+    const ROUTE_FEATURE_MAP: Record<string, string> = {
+        'transfer': 'feature_transfer',
+        'airtime': 'feature_airtime',
+        'recharge-pin': 'feature_airtime',
+        'airtime-to-cash': 'feature_airtime',
+        'data': 'feature_data',
+        'bills': 'feature_bills',
+        'education': 'feature_education',
+        'nin-services': 'feature_nin',
+        'bvn-services': 'feature_bvn',
+        'cac-services': 'feature_cac',
+        'cac-history': 'feature_cac',
+        'virtual-cards': 'feature_cards',
+        'qr-pay': 'feature_qr',
+        'social-boost': 'feature_social',
+        'social-orders': 'feature_social',
+        'referrals': 'feature_rewards',
+        'crypto': 'feature_crypto',
+        'bulk-sms': 'feature_bulk_sms',
+        'smile': 'feature_smile',
+    };
+
+    const activeRouteKey = Object.keys(ROUTE_FEATURE_MAP).find(key => pathname?.includes(key));
+    const activeFeatureKey = activeRouteKey ? ROUTE_FEATURE_MAP[activeRouteKey] : null;
+    const isCurrentRouteHidden = Boolean(activeFeatureKey && hiddenFeatures.includes(activeFeatureKey));
+
+    const isDashboard = pathname?.includes('dashboard') || pathname === '/' || pathname === '/(app)';
+    const contentMaxWidth = isDashboard ? 1280 : 920;
+
+    const disabledServiceFallback = (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#f8fafc' }}>
+            <View style={{
+                maxWidth: 480,
+                width: '100%',
+                backgroundColor: '#ffffff',
+                borderRadius: 24,
+                padding: 32,
+                alignItems: 'center',
+                borderWidth: 1.5,
+                borderColor: '#e2e8f0',
+                shadowColor: '#0f172a',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.08,
+                shadowRadius: 20,
+                elevation: 4
+            }}>
+                <View style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    backgroundColor: '#FEF3C7',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 18,
+                    borderWidth: 2,
+                    borderColor: '#FDE68A'
+                }}>
+                    <Ionicons name="construct-outline" size={36} color="#D97706" />
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', textAlign: 'center', marginBottom: 8 }}>
+                    Service Under Maintenance
+                </Text>
+                <Text style={{ fontSize: 13.5, color: '#64748B', textAlign: 'center', lineHeight: 21, marginBottom: 24 }}>
+                    This service has been temporarily paused by administration for scheduled maintenance or optimization. Please check back shortly.
+                </Text>
+                <TouchableOpacity
+                    onPress={() => router.replace('/(app)/dashboard')}
+                    activeOpacity={0.85}
+                    style={{
+                        backgroundColor: '#0F172A',
+                        paddingVertical: 14,
+                        paddingHorizontal: 28,
+                        borderRadius: 14,
+                        width: '100%',
+                        alignItems: 'center'
+                    }}
+                >
+                    <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800' }}>
+                        ← Return to Dashboard
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
     if (isDesktopWeb) {
         return (
             <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#f8fafc', minHeight: '100%' }}>
@@ -106,10 +202,18 @@ export default function AppLayout() {
                         onToggleSidebar={() => setSidebarCollapsed(prev => !prev)}
                         showToggle={width < 1024}
                     />
-                    <View style={{ flex: 1, width: '100%', maxWidth: 1280, alignSelf: 'center' }}>
-                        {tabsComponent}
+                    <View style={{ flex: 1, width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' }}>
+                        {isCurrentRouteHidden ? disabledServiceFallback : tabsComponent}
                     </View>
                 </View>
+            </View>
+        );
+    }
+
+    if (isCurrentRouteHidden) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+                {disabledServiceFallback}
             </View>
         );
     }
