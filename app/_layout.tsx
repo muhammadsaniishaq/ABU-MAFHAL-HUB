@@ -104,6 +104,7 @@ export default function RootLayout() {
     const [session, setSession] = useState<Session | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
+    const [dismissedUpdate, setDismissedUpdate] = useState(false);
     const router = useRouter();
     const segments = useSegments();
     const { settings } = useAppSettings();
@@ -365,18 +366,29 @@ export default function RootLayout() {
 
     const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
-    const currentAppVersion = Constants?.expoConfig?.version || '1.0.4';
+    const currentAppVersion = 
+        Constants?.nativeAppVersion || 
+        Constants?.expoConfig?.version || 
+        (Constants as any)?.manifest2?.extra?.expoClient?.version || 
+        '1.0.4';
     const minRequiredVersion = settings?.min_app_version || '1.0.4';
-    const latestAvailableVersion = settings?.latest_app_version || minRequiredVersion;
+    const rawLatestVersion = settings?.latest_app_version || minRequiredVersion;
+    const latestAvailableVersion = isVersionLower(rawLatestVersion, minRequiredVersion)
+        ? minRequiredVersion
+        : rawLatestVersion;
+
     const isBelowMinimum = isVersionLower(currentAppVersion, minRequiredVersion);
     const isOutdated = isVersionLower(currentAppVersion, latestAvailableVersion);
     const isManaging = segments?.[0] === 'manage';
 
-    const shouldShowUpdate = Platform.OS !== 'web' && !isManaging && (
-        Boolean(settings?.force_app_update) || 
-        isBelowMinimum || 
-        isOutdated
-    );
+    // Crucial Bug Fix: An update screen must ONLY be shown if an update is ACTUALLY needed!
+    // (i.e. user's current installed version is lower than latest or below minimum).
+    // force_app_update dictates whether the user is forced to update without dismissal.
+    // It should NEVER block a user who has already updated to the latest version!
+    const hasUpdateAvailable = isBelowMinimum || isOutdated;
+    const isForced = Boolean(settings?.force_app_update || isBelowMinimum);
+
+    const shouldShowUpdate = Platform.OS !== 'web' && !isManaging && hasUpdateAvailable && (!dismissedUpdate || isForced);
 
     if (shouldShowUpdate) {
         return (
@@ -387,8 +399,9 @@ export default function RootLayout() {
                 appStoreUrl={settings?.app_store_url}
                 apkDownloadUrl={settings?.apk_download_url}
                 message={settings?.app_update_message}
-                isForced={Boolean(settings?.force_app_update || isBelowMinimum)}
+                isForced={isForced}
                 logoUrl={settings?.app_logo_icon || settings?.app_logo}
+                onDismiss={() => setDismissedUpdate(true)}
             />
         );
     }

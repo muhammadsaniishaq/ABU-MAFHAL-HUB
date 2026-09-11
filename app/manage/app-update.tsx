@@ -90,6 +90,23 @@ const AI_RELEASE_PRESETS = [
   },
 ];
 
+function isVersionLower(currentVersion: string, targetVersion: string): boolean {
+  if (!currentVersion || !targetVersion) return false;
+  const cleanCurrent = currentVersion.replace(/^v/i, '').trim();
+  const cleanTarget = targetVersion.replace(/^v/i, '').trim();
+  if (cleanCurrent === cleanTarget) return false;
+  const cParts = cleanCurrent.split('.').map(x => parseInt(x, 10) || 0);
+  const tParts = cleanTarget.split('.').map(x => parseInt(x, 10) || 0);
+  const maxLen = Math.max(cParts.length, tParts.length);
+  for (let i = 0; i < maxLen; i++) {
+    const c = cParts[i] || 0;
+    const t = tParts[i] || 0;
+    if (c < t) return true;
+    if (c > t) return false;
+  }
+  return false;
+}
+
 export default function AdminAppUpdate() {
   const router = useRouter();
 
@@ -252,11 +269,16 @@ export default function AdminAppUpdate() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSaving(true);
 
+    const cleanLatest = latestAppVersion.trim();
+    const cleanMin = minAppVersion.trim() || cleanLatest;
+    const finalLatest = isVersionLower(cleanLatest, cleanMin) ? cleanMin : cleanLatest;
+    const finalMin = cleanMin;
+
     try {
       // 1. Save Settings to app_settings table
       const settingsToUpsert = [
-        { key: 'latest_app_version', value: latestAppVersion.trim() },
-        { key: 'min_app_version', value: minAppVersion.trim() },
+        { key: 'latest_app_version', value: finalLatest },
+        { key: 'min_app_version', value: finalMin },
         { key: 'force_app_update', value: String(forceAppUpdate) },
         { key: 'play_store_url', value: playStoreUrl.trim() },
         { key: 'app_store_url', value: appStoreUrl.trim() },
