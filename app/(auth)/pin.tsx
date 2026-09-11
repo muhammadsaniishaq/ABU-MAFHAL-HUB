@@ -95,10 +95,15 @@ export default function PinUnlockScreen() {
 
     const initPinScreen = async () => {
         try {
-            // Check for saved PIN in local storage first for instant rendering
+            // Check for saved PIN securely
             let localPin: string | null = null;
             if (Platform.OS === 'web') {
-                localPin = await AsyncStorage.getItem(PIN_KEY);
+                if (typeof window !== 'undefined' && window.sessionStorage) {
+                    localPin = window.sessionStorage.getItem(PIN_KEY);
+                }
+                if (!localPin) {
+                    localPin = await AsyncStorage.getItem(PIN_KEY);
+                }
             } else {
                 localPin = await SecureStore.getItemAsync(PIN_KEY);
             }
@@ -136,14 +141,19 @@ export default function PinUnlockScreen() {
                         setUserAvatar(profile.avatar_url);
                     }
                     if (profile) {
-                        AsyncStorage.setItem('user_profile_cache', JSON.stringify(profile)).catch(() => {});
+                        // Strip transaction_pin before storing into general cache
+                        const { transaction_pin: _, ...safeProfile } = profile;
+                        AsyncStorage.setItem('user_profile_cache', JSON.stringify(safeProfile)).catch(() => {});
                     }
 
                     if (!localPin && profile?.transaction_pin) {
-                        const fetchedPin = profile.transaction_pin;
+                        const fetchedPin = String(profile.transaction_pin);
                         setSavedPin(fetchedPin);
                         if (Platform.OS === 'web') {
-                            await AsyncStorage.setItem(PIN_KEY, fetchedPin);
+                            if (typeof window !== 'undefined') {
+                                if (window.sessionStorage) window.sessionStorage.setItem(PIN_KEY, fetchedPin);
+                                try { window.localStorage.removeItem(PIN_KEY); } catch {}
+                            }
                         } else {
                             await SecureStore.setItemAsync(PIN_KEY, fetchedPin);
                         }

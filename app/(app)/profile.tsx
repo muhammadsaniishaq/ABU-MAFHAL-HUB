@@ -140,7 +140,11 @@ export default function UserProfileScreen() {
 
     const fetchProfileData = async (userId: string) => {
         try {
-            const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, phone, username, custom_id, referral_code, avatar_url, kyc_tier, balance, created_at, role')
+                .eq('id', userId)
+                .maybeSingle();
             if (data && !error) {
                 setProfile(data);
                 saveCache({ profile: data });

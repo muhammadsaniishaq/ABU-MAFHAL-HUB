@@ -585,6 +585,14 @@ export default function SignupScreen() {
         try {
             const cleanPhone = selectedCountry.dialCode + cleanPhoneInput.replace(/^0+/, '');
             const digits10 = cleanPhoneInput.replace(/\D/g, '').slice(-10);
+            const lowerEmail = cleanEmail.toLowerCase();
+
+            // Security Hardening: Disallow unauthorized public registrations with official company domains
+            if (lowerEmail.endsWith('@abumafhal.com') || lowerEmail.endsWith('@abumafhal.com.ng')) {
+                notifyUser('Restricted Domain 🔒', 'Public registration with official corporate email addresses is not permitted. Please use your personal email address.');
+                setLoading(false);
+                return;
+            }
 
             // Direct Database Pre-Check to guarantee absolute uniqueness
             try {

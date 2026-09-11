@@ -111,12 +111,25 @@ export async function processOAuthReturn(): Promise<boolean> {
 export async function forceSignOut(): Promise<void> {
   try {
     await supabase.auth.signOut();
-    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem('user_transaction_pin');
-      window.localStorage.removeItem('saved_user_pin');
+    if (isWeb && typeof window !== 'undefined') {
+      try {
+        if (window.localStorage) {
+          window.localStorage.removeItem('user_transaction_pin');
+          window.localStorage.removeItem('saved_user_pin');
+          window.localStorage.removeItem('@cached_admin_profile');
+          window.localStorage.removeItem('user_profile_cache');
+          window.localStorage.removeItem('app_unlocked');
+        }
+        if (window.sessionStorage) {
+          window.sessionStorage.clear();
+        }
+      } catch (_) {}
     }
     await AsyncStorage.removeItem('user_transaction_pin');
     await AsyncStorage.removeItem('saved_user_pin');
+    await AsyncStorage.removeItem('@cached_admin_profile');
+    await AsyncStorage.removeItem('user_profile_cache');
+    await AsyncStorage.removeItem('app_unlocked');
   } catch (e) {
     console.warn('forceSignOut error:', e);
   }

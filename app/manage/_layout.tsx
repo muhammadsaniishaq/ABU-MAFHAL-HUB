@@ -40,17 +40,19 @@ export default function AdminLayout() {
                     return;
                 }
 
-                const userEmail = user.email?.toLowerCase() || '';
-                const isKnownAdminEmail = userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com' || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng');
+                const TRUSTED_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'abumafhal@gmail.com', 'admin@abumafhal.com'];
+                const userEmail = user.email?.toLowerCase().trim() || '';
+                const isKnownAdminEmail = TRUSTED_ADMIN_EMAILS.includes(userEmail);
 
-                // 2. Fetch verified role directly from profiles table
+                // 2. Fetch verified role directly from profiles table (database source of truth)
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('role, email')
                     .eq('id', user.id)
                     .maybeSingle();
 
-                const role = profile?.role || user.user_metadata?.role || (isKnownAdminEmail ? 'admin' : 'user');
+                // NEVER trust client-mutable user_metadata. Role must originate from database or verified owner email.
+                const role = profile?.role || (isKnownAdminEmail ? 'admin' : 'user');
                 const hasAdminPrivileges = ['admin', 'super_admin'].includes(role) || isKnownAdminEmail;
 
                 if (hasAdminPrivileges) {

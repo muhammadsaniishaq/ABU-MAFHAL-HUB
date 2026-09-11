@@ -89,7 +89,12 @@ export default function Device2FAModal({
             // 2. Check Transaction PIN availability
             let existingPin: string | null = null;
             if (Platform.OS === 'web') {
-                existingPin = await AsyncStorage.getItem(PIN_KEY);
+                if (typeof window !== 'undefined' && window.sessionStorage) {
+                    existingPin = window.sessionStorage.getItem(PIN_KEY);
+                }
+                if (!existingPin) {
+                    existingPin = await AsyncStorage.getItem(PIN_KEY);
+                }
             } else {
                 existingPin = await SecureStore.getItemAsync(PIN_KEY);
             }
@@ -103,7 +108,10 @@ export default function Device2FAModal({
                 if (profile?.transaction_pin) {
                     existingPin = String(profile.transaction_pin);
                     if (Platform.OS === 'web') {
-                        await AsyncStorage.setItem(PIN_KEY, existingPin);
+                        if (typeof window !== 'undefined') {
+                            if (window.sessionStorage) window.sessionStorage.setItem(PIN_KEY, existingPin);
+                            try { window.localStorage.removeItem(PIN_KEY); } catch {}
+                        }
                     } else {
                         await SecureStore.setItemAsync(PIN_KEY, existingPin);
                     }
@@ -282,7 +290,12 @@ export default function Device2FAModal({
                 if (!currentPin) {
                     // Try to re-fetch from storage or DB
                     if (Platform.OS === 'web') {
-                        currentPin = await AsyncStorage.getItem(PIN_KEY);
+                        if (typeof window !== 'undefined' && window.sessionStorage) {
+                            currentPin = window.sessionStorage.getItem(PIN_KEY);
+                        }
+                        if (!currentPin) {
+                            currentPin = await AsyncStorage.getItem(PIN_KEY);
+                        }
                     } else {
                         currentPin = await SecureStore.getItemAsync(PIN_KEY);
                     }

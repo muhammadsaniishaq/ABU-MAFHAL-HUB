@@ -193,10 +193,10 @@ export default function AdminDashboard() {
 
   const load = async () => {
     try {
-      const {data:{session}} = await supabase.auth.getSession();
-      const user = session?.user || (await supabase.auth.getUser()).data.user;
-      if(user){
-        const {data:p} = await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user || (await supabase.auth.getUser()).data?.user;
+      if (user) {
+        const { data: p } = await supabase.from('profiles').select('id, full_name, email, role, avatar_url, phone, status').eq('id', user.id).maybeSingle();
         const prof = p||{id:user.id,full_name:user.user_metadata?.full_name||'Admin',email:user.email,role:'admin',avatar_url:user.user_metadata?.avatar_url};
         setProfile(prof);
         AsyncStorage.setItem('@cached_admin_profile',JSON.stringify(prof));

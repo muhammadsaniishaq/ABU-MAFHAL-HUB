@@ -66,7 +66,11 @@ export default function UserKYCScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not logged in");
 
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, phone, kyc_tier, kyc_verified, nin, bvn')
+                .eq('id', user.id)
+                .single();
             setUserData({ ...profile, id: user.id });
 
             // Fetch User Virtual Accounts

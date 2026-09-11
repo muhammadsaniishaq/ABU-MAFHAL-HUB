@@ -21,6 +21,28 @@ import { supabase } from '../services/supabase';
 
 const PIN_KEY = 'user_transaction_pin';
 
+const getSecurePin = async (): Promise<string | null> => {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      return window.sessionStorage.getItem(PIN_KEY);
+    }
+    return null;
+  }
+  return await SecureStore.getItemAsync(PIN_KEY);
+};
+
+const saveSecurePin = async (pin: string): Promise<void> => {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      if (window.sessionStorage) window.sessionStorage.setItem(PIN_KEY, pin);
+      // Guarantee plaintext PIN is wiped from persistent localStorage
+      try { window.localStorage.removeItem(PIN_KEY); } catch {}
+    }
+    return;
+  }
+  await SecureStore.setItemAsync(PIN_KEY, pin);
+};
+
 interface SecurityModalProps {
   visible: boolean;
   onClose: () => void;
@@ -58,10 +80,10 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
       const isFrozen = await AsyncStorage.getItem('account_emergency_freeze');
       if (isFrozen === 'true') {
         Alert.alert(
-          "Account Transfers Frozen 🛡️",
-          "Your account is currently in Emergency Freeze mode to protect your funds. Outgoing transactions are paused. Go to Security & Credentials to unfreeze your account."
+          "Account Locked 🔒",
+          "This account is currently in emergency freeze mode. All transactions and actions are suspended. Please contact support to unfreeze.",
+          [{ text: "OK", onPress: onClose }]
         );
-        onClose();
         return true;
       }
     } catch (_) {}
@@ -128,12 +150,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
 
   const initModalSecurity = async () => {
     try {
-      let existingPin: string | null = null;
-      if (Platform.OS === 'web') {
-        existingPin = await AsyncStorage.getItem(PIN_KEY);
-      } else {
-        existingPin = await SecureStore.getItemAsync(PIN_KEY);
-      }
+      let existingPin: string | null = await getSecurePin();
       
       // If PIN is not found locally, query Supabase profiles database
       if (!existingPin) {
@@ -147,12 +164,8 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
           if (profile?.transaction_pin) {
             const fetchedPin = String(profile.transaction_pin);
             existingPin = fetchedPin;
-            // Cache locally for offline and quick access
-            if (Platform.OS === 'web') {
-              await AsyncStorage.setItem(PIN_KEY, fetchedPin);
-            } else {
-              await SecureStore.setItemAsync(PIN_KEY, fetchedPin);
-            }
+            // Cache locally for offline and quick access securely
+            await saveSecurePin(fetchedPin);
           }
         }
       }
@@ -322,11 +335,7 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
       } else {
         if (inputPin === confirmPin.join('')) {
           try {
-            if (Platform.OS === 'web') {
-              await AsyncStorage.setItem(PIN_KEY, inputPin);
-            } else {
-              await SecureStore.setItemAsync(PIN_KEY, inputPin);
-            }
+            await saveSecurePin(inputPin);
 
             // Sync with Supabase database profiles table
             const { data: { user } } = await supabase.auth.getUser();

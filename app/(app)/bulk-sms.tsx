@@ -267,9 +267,12 @@ FORMATTING & STYLE RULES:
             if (invokeError) throw new Error(invokeError.message || 'Failed to call Edge Function');
 
             if (result && result.status === 'success') {
-                const newBalance = userBalance - totalCost;
-                await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
-                setUserBalance(newBalance);
+                const { data: updatedBal, error: deductErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: totalCost
+                });
+                const finalBalance = (typeof updatedBal === 'number') ? updatedBal : Math.max(0, userBalance - totalCost);
+                setUserBalance(finalBalance);
                 
                 await supabase.from('transactions').insert({
                     user_id: userId,

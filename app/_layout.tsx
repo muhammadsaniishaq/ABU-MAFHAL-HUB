@@ -84,18 +84,17 @@ function isVersionLower(currentVersion: string, targetVersion: string): boolean 
     return false;
 }
 
+const KNOWN_ADMIN_EMAILS = [
+    'sale.abumafhal@gmail.com',
+    'admin@abumafhal.com',
+    'abumafhal@gmail.com'
+];
+
 const isUserAdmin = (role?: string | null, email?: string | null) => {
     if (role === 'admin' || role === 'super_admin') return true;
     const lowerEmail = email ? email.toLowerCase().trim() : '';
     if (!lowerEmail) return false;
-    return (
-        lowerEmail === 'sale.abumafhal@gmail.com' ||
-        lowerEmail === 'admin@abumafhal.com' ||
-        lowerEmail === 'abumafhal@gmail.com' ||
-        lowerEmail.endsWith('@abumafhal.com') ||
-        lowerEmail.endsWith('@abumafhal.com.ng') ||
-        lowerEmail.includes('admin')
-    );
+    return KNOWN_ADMIN_EMAILS.includes(lowerEmail);
 };
 
 export default function RootLayout() {
@@ -108,8 +107,6 @@ export default function RootLayout() {
     const router = useRouter();
     const segments = useSegments();
     const { settings } = useAppSettings();
-
-    const KNOWN_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'admin@abumafhal.com', 'abumafhal@gmail.com'];
 
     const fetchUserRole = async (userId: string, userEmail?: string | null) => {
         try {
@@ -315,9 +312,17 @@ export default function RootLayout() {
                 const userId = session.user.id;
                 const unlocked = await AsyncStorage.getItem('app_unlocked');
                 
-                let localPin = Platform.OS === 'web'
-                    ? await AsyncStorage.getItem(`user_transaction_pin_${userId}`) || await AsyncStorage.getItem('user_transaction_pin')
-                    : await SecureStore.getItemAsync(`user_transaction_pin_${userId}`) || await SecureStore.getItemAsync('user_transaction_pin');
+                let localPin: string | null = null;
+                if (Platform.OS === 'web') {
+                    if (typeof window !== 'undefined' && window.sessionStorage) {
+                        localPin = window.sessionStorage.getItem(`user_transaction_pin_${userId}`) || window.sessionStorage.getItem('user_transaction_pin');
+                    }
+                    if (!localPin) {
+                        localPin = await AsyncStorage.getItem(`user_transaction_pin_${userId}`) || await AsyncStorage.getItem('user_transaction_pin');
+                    }
+                } else {
+                    localPin = await SecureStore.getItemAsync(`user_transaction_pin_${userId}`) || await SecureStore.getItemAsync('user_transaction_pin');
+                }
 
                 // 1. User has NO PIN configured -> Must complete PIN Setup
                 if (!localPin) {
@@ -326,8 +331,17 @@ export default function RootLayout() {
                             const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', userId).maybeSingle();
                             if (data?.transaction_pin) {
                                 const validPin = String(data.transaction_pin);
-                                if (Platform.OS === 'web') await AsyncStorage.setItem(`user_transaction_pin_${userId}`, validPin);
-                                else await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
+                                if (Platform.OS === 'web') {
+                                    if (typeof window !== 'undefined') {
+                                        if (window.sessionStorage) window.sessionStorage.setItem(`user_transaction_pin_${userId}`, validPin);
+                                        try {
+                                            window.localStorage.removeItem(`user_transaction_pin_${userId}`);
+                                            window.localStorage.removeItem('user_transaction_pin');
+                                        } catch {}
+                                    }
+                                } else {
+                                    await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
+                                }
                                 if (unlocked !== 'true') router.replace('/(auth)/pin' as any);
                                 else router.replace('/dashboard' as any);
                             } else {
