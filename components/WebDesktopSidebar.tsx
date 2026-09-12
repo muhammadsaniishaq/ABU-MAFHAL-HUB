@@ -479,7 +479,7 @@ export default function WebDesktopSidebar({
                             <Text style={styles.footerUserName} numberOfLines={1}>
                                 {userProfile?.full_name || 'My Account'}
                             </Text>
-                            <Text style={styles.footerVersion}>v1.0.4 · Enterprise Web</Text>
+                            <Text style={styles.footerVersion}>v1.0.5 · Enterprise Web</Text>
                         </View>
                     )}
 

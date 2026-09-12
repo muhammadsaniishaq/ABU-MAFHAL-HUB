@@ -384,7 +384,7 @@ export default function RootLayout() {
         Constants?.nativeAppVersion || 
         Constants?.expoConfig?.version || 
         (Constants as any)?.manifest2?.extra?.expoClient?.version || 
-        '1.0.4';
+        '1.0.5';
     const minRequiredVersion = settings?.min_app_version || '1.0.4';
     const rawLatestVersion = settings?.latest_app_version || minRequiredVersion;
     const latestAvailableVersion = isVersionLower(rawLatestVersion, minRequiredVersion)

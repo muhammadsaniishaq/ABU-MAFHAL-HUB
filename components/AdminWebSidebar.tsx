@@ -184,7 +184,7 @@ export default function AdminWebSidebar({
     {
       title: 'SYSTEM & SECURITY',
       items: [
-        { label: 'App Update & OTA', route: '/manage/app-update', icon: 'cloud-download', tag: 'v1.0.4' },
+        { label: 'App Update & OTA', route: '/manage/app-update', icon: 'cloud-download', tag: 'v1.0.5' },
         { label: 'API Vault & Secret', route: '/manage/api', icon: 'key' },
         { label: 'Audit Logs', route: '/manage/logs', icon: 'shield-checkmark', tag: 'Live' },
         { label: 'Security Center', route: '/manage/security', icon: 'shield' },

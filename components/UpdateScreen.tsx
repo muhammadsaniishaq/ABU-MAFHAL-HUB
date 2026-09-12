@@ -91,7 +91,7 @@ function GooglePlayBrandLogo({ size = 22 }: { size?: number }) {
 }
 
 export default function UpdateScreen({
-  currentVersion = '1.0.4',
+  currentVersion = '1.0.5',
   latestVersion = '1.0.5',
   playStoreUrl = DEFAULT_PLAY_STORE_URL,
   appStoreUrl = DEFAULT_APP_STORE_URL,
