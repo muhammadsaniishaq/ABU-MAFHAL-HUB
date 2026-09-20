@@ -169,6 +169,8 @@ export default function AdminSettings() {
     const [identityApiKey, setIdentityApiKey] = useState('');
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [smileIdKey, setSmileIdKey] = useState('');
+    const [smilePartnerId, setSmilePartnerId] = useState('');
+    const [smileEnv, setSmileEnv] = useState('sandbox');
     const [termiiKey, setTermiiKey] = useState('');
     const [openAiKey, setOpenAiKey] = useState('');
     const [bigiToken, setBigiToken] = useState('');
@@ -265,6 +267,8 @@ export default function AdminSettings() {
                     if (secret.key === 'IDENTITY_API_KEY') setIdentityApiKey(secret.value);
                     if (secret.key === 'AGENTHUB_API_KEY') setAgentHubApiKey(secret.value);
                     if (secret.key === 'SMILE_ID_KEY') setSmileIdKey(secret.value);
+                    if (secret.key === 'SMILE_ID_PARTNER_ID') setSmilePartnerId(secret.value);
+                    if (secret.key === 'SMILE_ID_ENVIRONMENT') setSmileEnv(secret.value || 'sandbox');
                     if (secret.key === 'TERMII_API_KEY') setTermiiKey(secret.value);
                     if (secret.key === 'OPENAI_API_KEY') setOpenAiKey(secret.value);
                     if (secret.key === 'BIGI_API_TOKEN') setBigiToken(secret.value);
@@ -288,6 +292,8 @@ export default function AdminSettings() {
                 { key: 'IDENTITY_API_KEY', value: identityApiKey, description: 'Identity Provider API Key' },
                 { key: 'AGENTHUB_API_KEY', value: agentHubApiKey, description: 'AgentHub API Key (agenthub.ng)' },
                 { key: 'SMILE_ID_KEY', value: smileIdKey, description: 'SmileID API Key' },
+                { key: 'SMILE_ID_PARTNER_ID', value: smilePartnerId, description: 'SmileID Partner ID' },
+                { key: 'SMILE_ID_ENVIRONMENT', value: smileEnv, description: 'SmileID Environment (sandbox or production)' },
                 { key: 'TERMII_API_KEY', value: termiiKey, description: 'Termii SMS API Key' },
                 { key: 'OPENAI_API_KEY', value: openAiKey, description: 'OpenAI API Key for Cortex AI' },
                 { key: 'BIGI_API_TOKEN', value: bigiToken, description: 'Bigisub SMS API Token' },
@@ -399,6 +405,11 @@ export default function AdminSettings() {
             
             try {
                 await AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(hiddenFeaturesList));
+                // Sync feature_flags table
+                const flagUpdates = Object.entries(features).map(([key, isEnabled]) => 
+                    supabase.from('feature_flags').update({ is_enabled: isEnabled }).eq('feature_key', key)
+                );
+                await Promise.allSettled(flagUpdates);
             } catch (_) {}
             
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1089,7 +1100,12 @@ export default function AdminSettings() {
                                 <ApiInputRow placeholder="AgentHub API Key (Bearer Token)" value={agentHubApiKey} onChangeText={setAgentHubApiKey} isSecret={true} />
                                 
                                 <View style={s.divider} />
-                                <ApiInputRow placeholder="SmileID API Key" value={smileIdKey} onChangeText={setSmileIdKey} isSecret={true} />
+                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>😊 Smile ID Biometrics (SmartSelfie & KYC)</Text>
+                                <ApiInputRow placeholder="Smile ID Partner ID" value={smilePartnerId} onChangeText={setSmilePartnerId} />
+                                <ApiInputRow placeholder="Smile ID API Key" value={smileIdKey} onChangeText={setSmileIdKey} isSecret={true} />
+                                <ApiInputRow placeholder="Environment: sandbox or production" value={smileEnv} onChangeText={setSmileEnv} />
+                                
+                                <View style={s.divider} />
                                 <ApiInputRow placeholder="Termii SMS API Key" value={termiiKey} onChangeText={setTermiiKey} isSecret={true} />
                             </View>
                         )}

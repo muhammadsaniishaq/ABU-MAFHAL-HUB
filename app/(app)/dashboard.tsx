@@ -476,7 +476,13 @@ export default function Dashboard() {
     'bulk_sms': 'feature_bulk_sms',
   };
 
+  const isNavigatingRef = useRef(false);
+
   const handleActionPress = (action: any, e?: any) => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    setTimeout(() => { isNavigatingRef.current = false; }, 600);
+
     if (celebrationSettings?.is_enabled && celebrationSettings?.confetti_on_tap) {
       if (e?.nativeEvent?.pageX && e?.nativeEvent?.pageY) {
         triggerGlobalConfetti(e.nativeEvent.pageX, e.nativeEvent.pageY);

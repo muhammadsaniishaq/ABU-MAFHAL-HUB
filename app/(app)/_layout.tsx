@@ -210,17 +210,14 @@ export default function AppLayout() {
                         showToggle={width < 1024}
                     />
                     <View style={{ flex: 1, width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' }}>
-                        {isCurrentRouteHidden ? disabledServiceFallback : tabsComponent}
+                        {tabsComponent}
+                        {isCurrentRouteHidden && (
+                            <View style={[StyleSheet.absoluteFill, { zIndex: 100, backgroundColor: '#f8fafc' }]}>
+                                {disabledServiceFallback}
+                            </View>
+                        )}
                     </View>
                 </View>
-            </View>
-        );
-    }
-
-    if (isCurrentRouteHidden) {
-        return (
-            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-                {disabledServiceFallback}
             </View>
         );
     }
@@ -228,6 +225,13 @@ export default function AppLayout() {
     return (
         <View style={{ flex: 1 }}>
             {tabsComponent}
+
+            {/* In-place maintenance overlay without destroying tab navigation */}
+            {isCurrentRouteHidden && (
+                <View style={[StyleSheet.absoluteFill, { zIndex: 100, backgroundColor: '#f8fafc' }]}>
+                    {disabledServiceFallback}
+                </View>
+            )}
 
             {/* FLOATING ACTION BUTTON (FAB) */}
             {!hideFab && isFabOpen && (

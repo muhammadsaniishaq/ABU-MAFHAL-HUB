@@ -45,6 +45,7 @@ yarn-error.*
 *.aab
 *.apk
 *.keystore
+*.aar
 
 # temporary scratch files
 scratch/

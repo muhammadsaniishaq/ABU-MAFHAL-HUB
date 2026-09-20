@@ -107,6 +107,8 @@ AsyncStorage.getItem(SETTINGS_CACHE_KEY).then((cached) => {
     }
 }).catch(() => {});
 
+let lastFetchTimestamp = 0;
+
 export function useAppSettings() {
     const [settings, setSettings] = useState<AppSettings>(globalSettings);
     const [loading, setLoading] = useState(!fetchPromise && !isFetching);
@@ -131,7 +133,8 @@ export function useAppSettings() {
         }, 1000);
 
         const initFetch = async () => {
-            if (!fetchPromise) {
+            const now = Date.now();
+            if (!fetchPromise || (now - lastFetchTimestamp > 15000)) {
                 isFetching = true;
                 fetchPromise = (async () => {
                     try {
@@ -143,11 +146,18 @@ export function useAppSettings() {
                             data.forEach((item: any) => {
                                 if (item.value === 'true' || item.value === 'false') {
                                     newSettings[item.key] = item.value === 'true';
+                                } else if (item.key === 'hidden_features' && typeof item.value === 'string') {
+                                    try {
+                                        newSettings[item.key] = JSON.parse(item.value);
+                                    } catch (_) {
+                                        newSettings[item.key] = item.value;
+                                    }
                                 } else {
                                     newSettings[item.key] = item.value;
                                 }
                             });
                             globalSettings = newSettings;
+                            lastFetchTimestamp = Date.now();
                             // Persist to offline storage
                             AsyncStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(newSettings)).catch(() => {});
                         }
@@ -178,7 +188,10 @@ export function useAppSettings() {
                 (payload: any) => {
                     if (payload.new && mounted) {
                         const { key, value } = payload.new;
-                        const parsedVal = (value === 'true' || value === 'false') ? value === 'true' : value;
+                        let parsedVal = (value === 'true' || value === 'false') ? value === 'true' : value;
+                        if (key === 'hidden_features' && typeof value === 'string') {
+                            try { parsedVal = JSON.parse(value); } catch (_) {}
+                        }
                         globalSettings = { ...globalSettings, [key]: parsedVal };
                         setSettings(prev => ({ ...prev, [key]: parsedVal }));
                         AsyncStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(globalSettings)).catch(() => {});

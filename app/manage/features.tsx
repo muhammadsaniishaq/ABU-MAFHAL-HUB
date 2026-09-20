@@ -301,14 +301,66 @@ export default function ManageFeaturesScreen() {
     setEditingService(null);
   };
 
+  const SERVICE_TO_FEATURE_KEY: Record<string, string> = {
+    airtime: 'feature_airtime',
+    data: 'feature_data',
+    transfer: 'feature_transfer',
+    recharge_pin: 'feature_airtime',
+    airtime_cash: 'feature_airtime',
+    bills: 'feature_bills',
+    nin: 'feature_nin',
+    tickets: 'feature_support',
+    bulk_sms: 'feature_bulk_sms',
+    cable: 'feature_bills',
+    electricity: 'feature_bills',
+    smile: 'feature_smile',
+    education: 'feature_education',
+    cac: 'feature_cac',
+    social: 'feature_social',
+    reviews: 'feature_reviews',
+    cards: 'feature_cards',
+    crypto: 'feature_crypto',
+    analytics: 'feature_analytics',
+    rewards: 'feature_rewards',
+    qr: 'feature_qr',
+    bvn: 'feature_bvn',
+  };
+
   const toggleServiceVisible = async (id: string) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const cur = getServiceCustom(id);
+    const newVisible = !cur.is_visible;
     const updated = {
       ...serviceCustoms,
-      [id]: { ...cur, service_id: id, is_visible: !cur.is_visible },
+      [id]: { ...cur, service_id: id, is_visible: newVisible },
     };
     await saveServiceCustoms(updated);
+
+    // Synchronize with global hidden_features setting
+    const featKey = SERVICE_TO_FEATURE_KEY[id];
+    if (featKey) {
+      try {
+        const { data: curSetting } = await supabase.from('app_settings').select('value').eq('key', 'hidden_features').maybeSingle();
+        let list: string[] = [];
+        if (curSetting?.value) {
+          list = typeof curSetting.value === 'string' ? JSON.parse(curSetting.value) : curSetting.value;
+          if (!Array.isArray(list)) list = [];
+        }
+        if (newVisible) {
+          list = list.filter(k => k !== featKey);
+        } else {
+          if (!list.includes(featKey)) list.push(featKey);
+        }
+        await supabase.from('app_settings').upsert({ key: 'hidden_features', value: JSON.stringify(list) }, { onConflict: 'key' });
+        await AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(list));
+
+        // Also sync feature_flags table
+        await supabase.from('feature_flags').update({ is_enabled: newVisible }).eq('feature_key', featKey);
+        setFeatures(prev => prev.map(f => f.feature_key === featKey ? { ...f, is_enabled: newVisible } : f));
+      } catch (e) {
+        console.warn('Sync error on toggle service:', e);
+      }
+    }
   };
 
   // ── Feature Flags ───────────────────────────────────────────────────────────
@@ -336,6 +388,25 @@ export default function ManageFeaturesScreen() {
     const { error } = await supabase.from('feature_flags').update({ is_enabled: nv }).eq('feature_key', feature.feature_key);
     if (!error) {
       setFeatures(features.map(f => f.feature_key === feature.feature_key ? { ...f, is_enabled: nv } : f));
+
+      // Sync with global hidden_features setting
+      try {
+        const { data: curSetting } = await supabase.from('app_settings').select('value').eq('key', 'hidden_features').maybeSingle();
+        let list: string[] = [];
+        if (curSetting?.value) {
+          list = typeof curSetting.value === 'string' ? JSON.parse(curSetting.value) : curSetting.value;
+          if (!Array.isArray(list)) list = [];
+        }
+        if (nv) {
+          list = list.filter(k => k !== feature.feature_key);
+        } else {
+          if (!list.includes(feature.feature_key)) list.push(feature.feature_key);
+        }
+        await supabase.from('app_settings').upsert({ key: 'hidden_features', value: JSON.stringify(list) }, { onConflict: 'key' });
+        await AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(list));
+      } catch (e) {
+        console.warn('Sync error on toggle feature:', e);
+      }
     }
     setUpdating(null);
   };

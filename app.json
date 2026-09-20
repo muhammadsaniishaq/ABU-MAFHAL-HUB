@@ -39,7 +39,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow ABU MAFHAL SUB to access your camera to scan recipient QR codes."
+          "cameraPermission": "Allow ABU MAFHAL SUB to access your camera for face biometric identity verification and scanning QR codes."
         }
       ],
       [

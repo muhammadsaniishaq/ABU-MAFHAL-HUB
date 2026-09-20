@@ -312,8 +312,9 @@ export default function KYCManagerScreen() {
                     case 'bank_statement':
                         if (targetTier < 3) targetTier = 3;
                         break;
+                    case 'face_biometric':
                     case 'liveness':
-                        if (targetTier < 4) targetTier = 4;
+                        if (targetTier < 3) targetTier = 3;
                         break;
                     default:
                         if (targetTier < 2) targetTier = 2;
@@ -402,7 +403,8 @@ export default function KYCManagerScreen() {
             case 'drivers_license': return 'Tier 2 (Identity)';
             case 'utility_bill': return 'Tier 3 (Address)';
             case 'bank_statement': return 'Tier 3 (Address)';
-            case 'liveness': return 'Tier 4 (Liveness)';
+            case 'face_biometric': return 'Tier 3 (Face Biometric)';
+            case 'liveness': return 'Tier 3 (Face Biometric)';
             default: return 'Tier 2';
         }
     };
@@ -415,7 +417,8 @@ export default function KYCManagerScreen() {
             case 'drivers_license': return 2;
             case 'utility_bill':
             case 'bank_statement': return 3;
-            case 'liveness': return 4;
+            case 'face_biometric':
+            case 'liveness': return 3;
             default: return 2;
         }
     };
@@ -446,6 +449,7 @@ export default function KYCManagerScreen() {
 
     const filters = [
         { id: 'all', label: 'All Documents' },
+        { id: 'face_biometric', label: 'Face Biometric' },
         { id: 'bvn', label: 'BVN' },
         { id: 'nin', label: 'NIN' },
         { id: 'voters_card', label: 'Voters Card' },
@@ -809,7 +813,7 @@ export default function KYCManagerScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                 <Ionicons 
-                                                    name={item.document_type === 'liveness' ? 'camera' : item.document_type === 'utility_bill' ? 'home' : 'card'} 
+                                                    name={item.document_type === 'face_biometric' || item.document_type === 'liveness' ? 'scan-outline' : item.document_type === 'utility_bill' ? 'home' : 'card'} 
                                                     size={12} 
                                                     color={L.navyHeader} 
                                                 />

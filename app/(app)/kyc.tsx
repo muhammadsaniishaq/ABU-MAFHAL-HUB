@@ -14,6 +14,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { decode } from 'base64-arraybuffer';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import FaceBiometricScanner from '../../components/FaceBiometricScanner';
+import { submitFaceBiometricKYC, checkUserFaceBiometricStatus } from '../../services/faceBiometrics';
 
 // Executive Light Platinum, Royal Navy & Gold Tokens
 const L = {
@@ -56,6 +58,16 @@ export default function UserKYCScreen() {
     const [idNumberInput, setIdNumberInput] = useState('');
     const [docImageUri, setDocImageUri] = useState<string | null>(null);
 
+    // Face Biometrics State
+    const [faceScannerOpen, setFaceScannerOpen] = useState(false);
+    const [submittingFace, setSubmittingFace] = useState(false);
+    const [biometricInfo, setBiometricInfo] = useState<{
+        hasBiometric: boolean;
+        status: 'approved' | 'pending' | 'rejected' | null;
+        photoUrl: string | null;
+        createdAt: string | null;
+    }>({ hasBiometric: false, status: null, photoUrl: null, createdAt: null });
+
     useEffect(() => {
         loadData();
     }, []);
@@ -95,6 +107,10 @@ export default function UserKYCScreen() {
                 .maybeSingle();
 
             if (pending) setPendingRequest(pending);
+
+            // Fetch Face Biometric Status
+            const bioStatus = await checkUserFaceBiometricStatus(user.id);
+            setBiometricInfo(bioStatus);
 
             const currentTier = profile?.kyc_tier || 0;
             setTier(currentTier);
@@ -147,6 +163,39 @@ export default function UserKYCScreen() {
             }
         } catch (e: any) {
             Alert.alert("Camera Error", e.message || "Failed to take photo.");
+        }
+    };
+
+    const handleFaceBiometricCapture = async (result: { uri: string; base64?: string }) => {
+        try {
+            setSubmittingFace(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not logged in");
+
+            const isAutoApprove = settings?.auto_kyc_verification_enabled === true || settings?.auto_approve_kyc === true;
+
+            const res = await submitFaceBiometricKYC({
+                userId: user.id,
+                imageUri: result.uri,
+                imageBase64: result.base64,
+                idType: selectedDocType,
+                idNumber: idNumberInput.trim() || undefined,
+                autoApprove: isAutoApprove,
+            });
+
+            if (res.success) {
+                Alert.alert(
+                    res.status === 'approved' ? "Face Biometric Verified! 🎉" : "Face Biometric Saved! 🛡️",
+                    res.message
+                );
+                await loadData();
+            } else {
+                Alert.alert("Submission Update", res.message);
+            }
+        } catch (e: any) {
+            Alert.alert("Biometric Error", e.message || "Failed to process face biometric.");
+        } finally {
+            setSubmittingFace(false);
         }
     };
 
@@ -410,6 +459,79 @@ export default function UserKYCScreen() {
                         </View>
                     ) : null}
 
+                    {/* FACE BIOMETRIC & SMILE ID SMARTSELFIE CARD */}
+                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 10, elevation: 2 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}>
+                                    <Ionicons name="scan-outline" size={14} color={L.goldAmber} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>Face Biometric & SmartSelfie</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>AI Live Face & Smile Liveness Verification</Text>
+                                </View>
+                            </View>
+                            <View style={{ 
+                                backgroundColor: biometricInfo.status === 'approved' ? L.emeraldBg : biometricInfo.status === 'pending' ? L.goldBg : 'rgba(15, 23, 42, 0.06)', 
+                                paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, 
+                                borderColor: biometricInfo.status === 'approved' ? L.emeraldBorder : biometricInfo.status === 'pending' ? L.goldDk : L.inputBorder 
+                            }}>
+                                <Text style={{ 
+                                    color: biometricInfo.status === 'approved' ? L.emerald : biometricInfo.status === 'pending' ? L.goldAmber : L.textMuted, 
+                                    fontSize: 8, fontWeight: '900', textTransform: 'uppercase' 
+                                }}>
+                                    {biometricInfo.status === 'approved' ? 'Verified ✅' : biometricInfo.status === 'pending' ? 'Pending Review ⏳' : 'Not Enrolled'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {biometricInfo.photoUrl ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: L.bg, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 4 }}>
+                                <Image 
+                                    source={{ uri: biometricInfo.photoUrl }} 
+                                    style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: L.gold }} 
+                                    resizeMode="cover"
+                                />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Biometric Face Identity On File</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 8, marginTop: 1 }}>
+                                        {biometricInfo.status === 'approved' 
+                                            ? 'Your face biometric is authenticated and active on your account.' 
+                                            : 'Face scan captured successfully and recorded in your KYC record.'}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => setFaceScannerOpen(true)}
+                                    style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: L.gold }}
+                                >
+                                    <Text style={{ color: L.gold, fontSize: 8, fontWeight: '900' }}>RETAKE</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, lineHeight: 13, marginBottom: 8 }}>
+                                    Capture your live biometric selfie with real-time smile detection to verify your identity and unlock instant account upgrade.
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => setFaceScannerOpen(true)}
+                                    disabled={submittingFace}
+                                    style={{ height: 38, backgroundColor: L.navyHeader, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: L.gold }}
+                                >
+                                    {submittingFace ? (
+                                        <ActivityIndicator size="small" color={L.gold} />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="camera" size={14} color={L.gold} />
+                                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9.5, textTransform: 'uppercase' }}>
+                                                Launch Biometric Face Scan 📸
+                                            </Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+
 
                     {/* STEP 1: BVN FIRST (Tier === 0) */}
                     {tier === 0 && (
@@ -662,6 +784,13 @@ export default function UserKYCScreen() {
 
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Face Biometric & Smile Liveness Modal */}
+            <FaceBiometricScanner
+                visible={faceScannerOpen}
+                onClose={() => setFaceScannerOpen(false)}
+                onCapture={handleFaceBiometricCapture}
+            />
         </View>
     );
 }
