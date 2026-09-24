@@ -1,3881 +1,1921 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, Alert, Modal, TextInput, Share, Vibration, Image, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
-import { useAppSettings } from '../../hooks/useAppSettings';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  TextInput,
+  Share,
+  Image,
+  Dimensions,
+  Platform,
+  ScrollView,
+  KeyboardAvoidingView,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useState, useEffect, useRef } from 'react';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import SecurityModal from '../../components/SecurityModal';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import * as MediaLibrary from 'expo-media-library';
-import { useIsFocused } from '@react-navigation/native';
-import DynamicBanners from '../../components/DynamicBanners';
-import * as Print from 'expo-print';
-import { Asset } from 'expo-asset';
-import ViewShot from 'react-native-view-shot';
-import jsQR from 'jsqr';
-import { ABU_MAFHAL_LOGO_B64 } from '../../assets/images/logoB64';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
-import ErrorBoundary from '../../components/ErrorBoundary';
 
+import { supabase } from '../../services/supabase';
+import { useAppSettings } from '../../hooks/useAppSettings';
+import SecurityModal from '../../components/SecurityModal';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import { createAppNotification } from '../../services/notificationsHelper';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ─── Luxury Fintech Design Tokens ─────────────────────────────────────────────
 const T = {
-  navy:    '#0d1b3e',
+  navyDark: '#060B18',
+  navy: '#0D1B3E',
   navyMid: '#142258',
-  gold:    '#f5a623',
-  goldDk:  '#d4890e',
-  white:   '#ffffff',
-  bg:      '#f4f6fb',
-  text:    '#0d1b3e',
-  textSub: '#5a6890',
-  indigo:  '#4F46E5',
+  navyLight: '#1E2D60',
+  gold: '#F5A623',
+  goldDark: '#D4890E',
+  goldLight: '#FDE3A7',
+  emerald: '#10B981',
+  emeraldDark: '#059669',
+  rose: '#EF4444',
+  white: '#FFFFFF',
+  slate50: '#F8FAFC',
+  slate100: '#F1F5F9',
+  slate200: '#E2E8F0',
+  slate400: '#94A3B8',
+  slate500: '#64748B',
+  slate700: '#334155',
+  slate800: '#1E293B',
+  slate900: '#0F172A',
 };
 
-// Hermes & Android safe formatting helpers
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const safeFormatCurrency = (val: any) => {
   const num = parseFloat(val);
   if (isNaN(num)) return '0.00';
   return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
-const safeFormatDate = (dateStr: any, includeTime = false) => {
+const safeFormatDate = (dateStr: any) => {
   try {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[d.getMonth()] || '';
-    const day = d.getDate();
-    if (!includeTime) return `${month} ${day}`;
-    const hours = d.getHours().toString().padStart(2, '0');
-    const mins = d.getMinutes().toString().padStart(2, '0');
-    return `${month} ${day}, ${hours}:${mins}`;
+    return d.toLocaleString('en-NG', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
     return '';
   }
 };
 
-export default function QRPayScreen() {
+// ─── Bulletproof QR Code Component with Dual Rendering Engine ─────────────────
+function SafeQRCode({ value, size = 180 }: { value: string; size?: number }) {
+  const [hasError, setHasError] = useState(false);
+  const encodedVal = encodeURIComponent(value || 'https://abumafhalsub.com');
+  const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size * 2}x${size * 2}&data=${encodedVal}&margin=1&color=0D1B3E`;
+
+  if (hasError || Platform.OS === 'web') {
     return (
-        <ErrorBoundary fallbackTitle="QR Pay Error" fallbackSubtitle="An unexpected issue occurred in QR Pay. Tap below to reload.">
-            <QRPayContent />
-        </ErrorBoundary>
+      <Image
+        source={{ uri: fallbackUrl }}
+        style={{ width: size, height: size, borderRadius: 12 }}
+        resizeMode="contain"
+      />
     );
+  }
+
+  try {
+    return (
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        <QRCode
+          value={value || 'https://abumafhalsub.com'}
+          size={size}
+          color={T.navy}
+          backgroundColor={T.white}
+          onError={() => setHasError(true)}
+        />
+      </View>
+    );
+  } catch {
+    return (
+      <Image
+        source={{ uri: fallbackUrl }}
+        style={{ width: size, height: size, borderRadius: 12 }}
+        resizeMode="contain"
+      />
+    );
+  }
 }
 
+// ─── Main Export ──────────────────────────────────────────────────────────────
+export default function QRPayScreen() {
+  return (
+    <ErrorBoundary
+      fallbackTitle="QR Pay Unavailable"
+      fallbackSubtitle="An unexpected issue occurred. Tap below to reload the QR Pay screen."
+    >
+      <QRPayContent />
+    </ErrorBoundary>
+  );
+}
+
+// ─── Inner Screen Component ───────────────────────────────────────────────────
 function QRPayContent() {
-    const insets = useSafeAreaInsets();
-    const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 38 : 20) + 8;
-    const { settings } = useAppSettings();
-    const router = useRouter();
-    const isFocused = useIsFocused();
-    const [activeTab, setActiveTab] = useState<'mycode' | 'scan'>('mycode');
-    const [permission, requestPermission] = useCameraPermissions();
-    const [torchEnabled, setTorchEnabled] = useState(false);
-    const [scanned, setScanned] = useState(false);
-    const [cameraActive, setCameraActive] = useState(false);
-    
-    // User data
-    const [currentUser, setCurrentUser] = useState<any>(null);
-    const [userBalance, setUserBalance] = useState(0);
-    
-    // Transaction UI states
-    const [scannedUser, setScannedUser] = useState<any>(null);
-    const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-    const [securityModalVisible, setSecurityModalVisible] = useState(false);
-    const [successModalVisible, setSuccessModalVisible] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    
-    // Manual Input states
-    const [manualInputVisible, setManualInputVisible] = useState(false);
-    const [manualInput, setManualInput] = useState('');
-    const [isVerifyingManual, setIsVerifyingManual] = useState(false);
-    
-    // Gallery Upload states
-    const [isReadingGallery, setIsReadingGallery] = useState(false);
-    const [isSharingReceipt, setIsSharingReceipt] = useState(false);
-    
-    // Form Inputs
-    const [amount, setAmount] = useState('');
-    const [description, setDescription] = useState('');
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { settings } = useAppSettings();
 
-    // Balance Privacy
-    const [showBalance, setShowBalance] = useState(true);
+  // Navigation & Tabs
+  const [activeTab, setActiveTab] = useState<'scan' | 'mycode'>('scan');
 
-    // Requested Amount on QR
-    const [requestedAmount, setRequestedAmount] = useState('');
-    const [amountModalVisible, setAmountModalVisible] = useState(false);
-    const [tempAmountInput, setTempAmountInput] = useState('');
+  // Camera & Permissions
+  const [permission, requestPermission] = useCameraPermissions();
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const isScanningLocked = useRef(false);
 
-    // Copy Toast State
-    const [copiedToast, setCopiedToast] = useState<string | null>(null);
+  // Animated Laser Beam
+  const laserAnim = useRef(new Animated.Value(0)).current;
 
-    // Recent Transfers State & Collapsible View Toggles (Visible by default)
-    const [recentTransfers, setRecentTransfers] = useState<any[]>([]);
-    const [showFrequentRecipients, setShowFrequentRecipients] = useState<boolean>(true);
-    const [showRecentActivity, setShowRecentActivity] = useState<boolean>(true);
+  // User & Balances
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userBalance, setUserBalance] = useState(0);
+  const [recentPayees, setRecentPayees] = useState<any[]>([]);
 
-    // Notice / Alert Modal State (Cross-Platform)
-    const [noticeModal, setNoticeModal] = useState<{ visible: boolean; title: string; message: string }>({
-        visible: false,
-        title: '',
-        message: '',
-    });
+  // Recipient Resolution & Payment Flow
+  const [recipientUser, setRecipientUser] = useState<any>(null);
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferNote, setTransferNote] = useState('');
+  const [isResolving, setIsResolving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-    const showScanNotice = (title: string, message: string) => {
-        setScanned(false);
-        setNoticeModal({ visible: true, title, message });
-    };
+  // Modals
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [securityModalVisible, setSecurityModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [manualModalVisible, setManualModalVisible] = useState(false);
+  const [amountModalVisible, setAmountModalVisible] = useState(false);
 
-    // Scanner animation & Flyer Ref
-    const scanLineAnim = useRef(new Animated.Value(0)).current;
-    const flyerRef = useRef<ViewShot>(null);
-    const webVideoRef = useRef<any>(null);
+  // Inputs
+  const [manualInput, setManualInput] = useState('');
+  const [requestedAmount, setRequestedAmount] = useState('');
+  const [tempAmountInput, setTempAmountInput] = useState('');
+  const [copiedToast, setCopiedToast] = useState(false);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
 
-    // Real-Time Web Camera Scanner using jsQR with cross-device constraints
-    useEffect(() => {
-        if (Platform.OS !== 'web' || !cameraActive) return;
+  // Final Receipt Details
+  const [receiptData, setReceiptData] = useState<{
+    ref: string;
+    amount: number;
+    recipientName: string;
+    recipientEmail: string;
+    recipientPhone: string;
+    date: string;
+    note: string;
+  } | null>(null);
 
-        let activeStream: any = null;
-        let animationFrameId: number;
+  // ─── Initial Data Fetching ──────────────────────────────────────────────────
+  const fetchUserData = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.replace('/(auth)/login');
+        return;
+      }
 
-        const startWebcam = async () => {
-            try {
-                if (!navigator?.mediaDevices?.getUserMedia) {
-                    showScanNotice("Camera Notice", "Webcam access is not supported on this browser. You can upload a QR image from Gallery instead.");
-                    setCameraActive(false);
-                    return;
-                }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, username, avatar_url, balance')
+        .eq('id', user.id)
+        .maybeSingle();
 
-                let stream: any = null;
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-                    });
-                } catch (_) {
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    } catch (e2) {
-                        throw e2;
-                    }
-                }
+      if (profile) {
+        setCurrentUser(profile);
+        setUserBalance(Number(profile.balance) || 0);
+      }
 
-                activeStream = stream;
-                if (webVideoRef.current) {
-                    webVideoRef.current.srcObject = stream;
-                    webVideoRef.current.play().catch(() => {});
-                }
+      // Fetch 4 recent unique transfer recipients
+      const { data: txList } = await supabase
+        .from('transactions')
+        .select('details, description, metadata, created_at')
+        .eq('user_id', user.id)
+        .in('type', ['transfer', 'p2p_transfer'])
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-                const scanCanvas = document.createElement('canvas');
-                const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
-
-                const scanFrame = () => {
-                    if (!cameraActive) return;
-                    const video = webVideoRef.current;
-                    if (video && video.readyState >= 2 && scanCtx) {
-                        scanCanvas.width = video.videoWidth || 640;
-                        scanCanvas.height = video.videoHeight || 480;
-                        scanCtx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
-                        const imgData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-                        const code = jsQR(imgData.data, imgData.width, imgData.height, {
-                            inversionAttempts: 'attemptBoth'
-                        });
-                        if (code && code.data) {
-                            setScanned(true);
-                            setCameraActive(false);
-                            onBarcodeScanned({ data: code.data });
-                            return;
-                        }
-                    }
-                    animationFrameId = requestAnimationFrame(scanFrame);
-                };
-
-                animationFrameId = requestAnimationFrame(scanFrame);
-            } catch (err: any) {
-                console.warn("Web camera error:", err);
-                showScanNotice("Camera Notice", "Could not access webcam. Please allow camera permissions in your browser or upload a QR picture from Gallery instead.");
-                setCameraActive(false);
-            }
-        };
-
-        startWebcam();
-
-        return () => {
-            if (activeStream && activeStream.getTracks) {
-                activeStream.getTracks().forEach((t: any) => t.stop());
-            }
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
-        };
-    }, [cameraActive]);
-
-    useEffect(() => {
-        if (isFocused) {
-            loadUserProfile();
-        }
-    }, [isFocused]);
-
-    useEffect(() => {
-        if ((activeTab === 'scan' || cameraActive) && !scanned) {
-            // Laser line looping animation
-            scanLineAnim.setValue(0);
-            Animated.loop(
-                Animated.sequence([
-                    Animated.timing(scanLineAnim, {
-                        toValue: 240,
-                        duration: 2500,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(scanLineAnim, {
-                        toValue: 0,
-                        duration: 2500,
-                        useNativeDriver: true,
-                    })
-                ])
-            ).start();
-        } else {
-            scanLineAnim.stopAnimation();
-        }
-    }, [activeTab, cameraActive, scanned]);
-
-    const loadUserProfile = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, username, phone, email, balance, avatar_url, created_at')
-                    .eq('id', user.id)
-                    .single();
-                if (profile) {
-                    setCurrentUser(profile);
-                    setUserBalance(parseFloat(profile.balance?.toString() || '0'));
-                    loadRecentTransfers(profile.id);
-                }
-            }
-        } catch (e) {
-            console.error("Error loading user profile:", e);
-        }
-    };
-
-    const loadRecentTransfers = async (userId: string) => {
-        try {
-            const { data, error } = await supabase
-                .from('transactions')
-                .select('id, amount, type, status, description, created_at')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(12);
-            if (!error && data) {
-                setRecentTransfers(data);
-            }
-        } catch (err) {
-            console.warn("Recent transfers load notice:", err);
-        }
-    };
-
-    const handleCopy = async (text: string, label: string) => {
-        if (!text) return;
-        try {
-            await Clipboard.setStringAsync(text);
-            if (Platform.OS !== 'web') {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            }
-            setCopiedToast(label);
-            setTimeout(() => setCopiedToast(null), 2500);
-        } catch (e) {
-            console.warn("Clipboard copy notice:", e);
-        }
-    };
-
-    const downloadCardOnWeb = async (): Promise<boolean> => {
-        if (!currentUser) return false;
-        try {
-            if (typeof document === 'undefined') return false;
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = 750;
-            canvas.height = 1050;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return false;
-
-            // 1. Dark background gradient
-            const bgGrad = ctx.createLinearGradient(0, 0, 750, 1050);
-            bgGrad.addColorStop(0, '#060C1B');
-            bgGrad.addColorStop(0.5, '#0B1736');
-            bgGrad.addColorStop(1, '#060C1B');
-            ctx.fillStyle = bgGrad;
-            ctx.beginPath();
-            if (ctx.roundRect) {
-                ctx.roundRect(0, 0, 750, 1050, 28);
-            } else {
-                ctx.rect(0, 0, 750, 1050);
-            }
-            ctx.fill();
-
-            // 2. Gold border
-            ctx.strokeStyle = '#F5A623';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            // 3. Abu Mafhal Hub Header with Official Logo
-            const logoSrc = (settings?.app_logo && typeof settings.app_logo === 'string' && settings.app_logo.startsWith('data:'))
-                ? settings.app_logo
-                : ABU_MAFHAL_LOGO_B64;
-            
-            try {
-                const logoImg = new window.Image();
-                logoImg.src = logoSrc;
-                await new Promise((res) => {
-                    if (logoImg.complete) {
-                        res(null);
-                    } else {
-                        logoImg.onload = () => res(null);
-                        logoImg.onerror = () => res(null);
-                    }
-                });
-                if (logoImg.width > 0) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(80, 80, 30, 0, Math.PI * 2);
-                    ctx.clip();
-                    ctx.drawImage(logoImg, 50, 50, 60, 60);
-                    ctx.restore();
-                }
-            } catch (_) {}
-
-            // Header brand text
-            ctx.fillStyle = '#F5A623';
-            ctx.font = 'bold 26px sans-serif';
-            ctx.fillText('ABU MAFHAL HUB', 125, 74);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-            ctx.font = 'bold 15px sans-serif';
-            ctx.fillText('OFFICIAL VIP PAYMENT PASS', 125, 100);
-
-            // Verified badge pill on top right
-            ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
-            ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(550, 58, 145, 38, 19);
-            else ctx.rect(550, 58, 145, 38);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = '#10B981';
-            ctx.font = 'bold 15px sans-serif';
-            ctx.fillText('✓ VERIFIED', 575, 83);
-
-            // Divider line
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.beginPath();
-            ctx.moveTo(50, 130);
-            ctx.lineTo(700, 130);
-            ctx.stroke();
-
-            // 4. User Profile Row
-            let avatarLoaded = false;
-            if (currentUser.avatar_url) {
-                try {
-                    const avImg = new window.Image();
-                    avImg.crossOrigin = 'anonymous';
-                    await new Promise((res) => {
-                        avImg.onload = res;
-                        avImg.onerror = res;
-                        avImg.src = currentUser.avatar_url;
-                    });
-                    if (avImg.width > 0) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(95, 185, 34, 0, Math.PI * 2);
-                        ctx.clip();
-                        ctx.drawImage(avImg, 61, 151, 68, 68);
-                        ctx.restore();
-                        avatarLoaded = true;
-                    }
-                } catch (_) {}
-            }
-            if (!avatarLoaded) {
-                ctx.beginPath();
-                ctx.arc(95, 185, 34, 0, Math.PI * 2);
-                ctx.fillStyle = '#F5A623';
-                ctx.fill();
-                ctx.fillStyle = '#0D1B3E';
-                ctx.font = 'bold 26px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText((currentUser.full_name ? currentUser.full_name[0] : 'U').toUpperCase(), 95, 195);
-                ctx.textAlign = 'left';
-            }
-
-            // User Name & Email
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 26px sans-serif';
-            ctx.fillText(currentUser.full_name || 'Mafhal User', 145, 180);
-            ctx.fillStyle = '#94A3B8';
-            ctx.font = '17px sans-serif';
-            ctx.fillText(currentUser.email || '', 145, 210);
-
-            // 5. QR Code Plate
-            ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(175, 255, 400, 400, 20);
-            else ctx.rect(175, 255, 400, 400);
-            ctx.fill();
-
-            // Gold corner accents
-            ctx.strokeStyle = '#F5A623';
-            ctx.lineWidth = 4;
-            // Top Left
-            ctx.beginPath();
-            ctx.moveTo(185, 290);
-            ctx.lineTo(185, 270);
-            ctx.lineTo(205, 270);
-            ctx.stroke();
-            // Top Right
-            ctx.beginPath();
-            ctx.moveTo(545, 270);
-            ctx.lineTo(565, 270);
-            ctx.lineTo(565, 290);
-            ctx.stroke();
-            // Bottom Left
-            ctx.beginPath();
-            ctx.moveTo(185, 620);
-            ctx.lineTo(185, 640);
-            ctx.lineTo(205, 640);
-            ctx.stroke();
-            // Bottom Right
-            ctx.beginPath();
-            ctx.moveTo(545, 640);
-            ctx.lineTo(565, 640);
-            ctx.lineTo(565, 620);
-            ctx.stroke();
-
-            // Load and draw QR code
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(myCodePayload)}&color=0D1B3E&margin=0`;
-            const qrImg = new window.Image();
-            qrImg.crossOrigin = 'anonymous';
-            await new Promise((res) => {
-                qrImg.onload = res;
-                qrImg.onerror = res;
-                qrImg.src = qrUrl;
+      if (txList && txList.length > 0) {
+        const uniqueMap = new Map();
+        for (const t of txList) {
+          const recName = t.details?.recipient_name || t.metadata?.target_name || t.description;
+          const recId = t.details?.target_id || t.metadata?.target_id;
+          if (recId && !uniqueMap.has(recId)) {
+            uniqueMap.set(recId, {
+              id: recId,
+              name: recName || 'Mafhal Member',
+              email: t.details?.target_email || t.metadata?.target_email || '',
+              avatarUrl: t.details?.avatar_url || null,
             });
-            ctx.drawImage(qrImg, 195, 275, 360, 360);
-
-            // Amount banner or subtitle
-            if (requestedAmount && parseFloat(requestedAmount) > 0) {
-                ctx.fillStyle = '#FDE68A';
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(200, 675, 350, 42, 12);
-                else ctx.rect(200, 675, 350, 42);
-                ctx.fill();
-                ctx.fillStyle = '#78350F';
-                ctx.font = 'bold 19px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(`REQUESTED AMOUNT: ₦${parseFloat(requestedAmount).toLocaleString()}`, 375, 703);
-                ctx.textAlign = 'left';
-            } else {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-                ctx.font = '16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('Scan with Abu Mafhal App or Any Banking Camera', 375, 695);
-                ctx.textAlign = 'left';
-            }
-
-            // 6. Bottom Details Card ("a kasa da bayanan sa")
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(60, 735, 630, 200, 18);
-            else ctx.rect(60, 735, 630, 200);
-            ctx.fill();
-            ctx.stroke();
-
-            // Row 1: Wallet ID
-            ctx.fillStyle = '#F5A623';
-            ctx.font = 'bold 20px monospace';
-            ctx.fillText(`WALLET ID:  MAF-${(currentUser.id || '').substring(0, 8).toUpperCase()}`, 90, 780);
-
-            // Row 2: Account Name
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 18px sans-serif';
-            ctx.fillText(`ACCOUNT NAME:  ${currentUser.full_name}`, 90, 820);
-
-            // Row 3: Email
-            ctx.fillStyle = '#94A3B8';
-            ctx.font = '17px sans-serif';
-            ctx.fillText(`EMAIL ADDRESS:  ${currentUser.email}`, 90, 858);
-
-            // Row 4: Phone & Settlement
-            ctx.fillStyle = '#10B981';
-            ctx.font = 'bold 16px sans-serif';
-            ctx.fillText(`PHONE: ${currentUser.phone || 'Verified'}   •   FEE: 0% Free Instant Transfer`, 90, 898);
-
-            // 7. Footer Watermark Seal
-            ctx.fillStyle = 'rgba(245, 166, 35, 0.85)';
-            ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('POWERED BY ABU MAFHAL HUB • SECURE 256-BIT ENCRYPTION', 375, 975);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-            ctx.font = '13px sans-serif';
-            ctx.fillText('www.abumafhal.com.ng', 375, 1000);
-
-            // Trigger download
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = `Abu_Mafhal_QR_${(currentUser.full_name || 'Card').replace(/\s+/g, '_')}.png`;
-            link.href = dataUrl;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            Alert.alert("Downloaded 🎉", "Your official Abu Mafhal QR Card has been saved successfully!");
-            return true;
-        } catch (canvasErr) {
-            console.error("downloadCardOnWeb error:", canvasErr);
-            return false;
+          }
         }
-    };
+        setRecentPayees(Array.from(uniqueMap.values()).slice(0, 4));
+      }
+    } catch (err) {
+      console.warn('Error fetching user data in QR Pay:', err);
+    }
+  }, [router]);
 
-    const handleSaveToGallery = async () => {
-        if (!currentUser) return;
-        try {
-            if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            }
-            if (Platform.OS === 'web') {
-                await downloadCardOnWeb();
-                return;
-            }
-            if (flyerRef.current && flyerRef.current.capture) {
-                const uri = await flyerRef.current.capture();
-                const { status } = await MediaLibrary.requestPermissionsAsync();
-                if (status === 'granted') {
-                    await MediaLibrary.saveToLibraryAsync(uri);
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    Alert.alert("Saved to Photos 📸", "Your Abu Mafhal QR Card has been saved to your photo gallery!");
-                } else {
-                    await Sharing.shareAsync(uri, {
-                        mimeType: 'image/png',
-                        dialogTitle: `Abu Mafhal Pay QR - ${currentUser.full_name}`,
-                    });
-                }
-            } else {
-                handleShareMyCode();
-            }
-        } catch (error: any) {
-            console.error("Save to gallery error:", error);
-            if (Platform.OS === 'web') {
-                await downloadCardOnWeb();
-            } else {
-                handleShareMyCode();
-            }
-        }
-    };
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
 
-    const handleShareMyCode = async () => {
-        if (!currentUser) return;
-        
-        setIsSubmitting(true);
-        try {
-            if (Platform.OS === 'web') {
-                await downloadCardOnWeb();
-                return;
-            }
-            if (flyerRef.current && flyerRef.current.capture) {
-                const uri = await flyerRef.current.capture();
-                await Sharing.shareAsync(uri, {
-                    mimeType: 'image/png',
-                    dialogTitle: `Pay ${currentUser.full_name} - Abu Mafhal Hub`,
-                });
-            } else {
-                throw new Error("Unable to capture QR Flyer");
-            }
-        } catch (error: any) {
-            console.error("Flyer share error:", error);
-            try {
-                await Share.share({
-                    title: `Pay ${currentUser.full_name}`,
-                    message: `Assalamu alaikum, scan this QR code or use my details to send me money instantly on Abu Mafhal Hub:\n\n👤 Name: ${currentUser.full_name}\n📧 Email: ${currentUser.email}\n💳 Wallet ID: MAF-${currentUser.id.substring(0, 8).toUpperCase()}`,
-                });
-            } catch (fallbackError: any) {
-                Alert.alert("Share Error", fallbackError.message);
-            }
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+  // ─── Oscillating Laser Beam Animation ───────────────────────────────────────
+  useEffect(() => {
+    if (activeTab === 'scan' && !scanned) {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(laserAnim, {
+            toValue: 1,
+            duration: 1800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(laserAnim, {
+            toValue: 0,
+            duration: 1800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+      return () => animation.stop();
+    }
+  }, [activeTab, scanned, laserAnim]);
 
-    const decodeQrFromDataUrl = async (dataUrl: string): Promise<string | null> => {
-        return new Promise((resolve) => {
-            try {
-                const img = new window.Image();
-                img.onload = () => {
-                    try {
-                        const maxDim = 1200;
-                        let w = img.naturalWidth || img.width;
-                        let h = img.naturalHeight || img.height;
-                        if (w > maxDim || h > maxDim) {
-                            const scale = maxDim / Math.max(w, h);
-                            w = Math.round(w * scale);
-                            h = Math.round(h * scale);
-                        }
+  // ─── Unlock Scanning When State Resets ──────────────────────────────────────
+  const resetScanner = () => {
+    setScanned(false);
+    isScanningLocked.current = false;
+  };
 
-                        const canvas = document.createElement('canvas');
-                        canvas.width = w;
-                        canvas.height = h;
-                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                        if (!ctx) {
-                            resolve(null);
-                            return;
-                        }
+  // ─── Recipient Resolver Engine (Postgres-Safe) ──────────────────────────────
+  const resolveRecipient = async (inputStr: string) => {
+    const raw = (inputStr || '').trim();
+    if (!raw) return null;
 
-                        ctx.drawImage(img, 0, 0, w, h);
-                        
-                        // 1. Full Image Scan
-                        const fullData = ctx.getImageData(0, 0, w, h);
-                        let code = jsQR(fullData.data, w, h, { inversionAttempts: 'attemptBoth' });
-                        if (code && code.data) {
-                            resolve(code.data);
-                            return;
-                        }
+    let targetUserId = '';
+    let targetEmail = '';
+    let targetPhone = '';
+    let targetUsername = '';
+    let prefilledAmount = '';
 
-                        // 2. Center 70% Box (Flyer / Card format)
-                        const c70w = Math.floor(w * 0.7);
-                        const c70h = Math.floor(h * 0.7);
-                        const c70x = Math.floor(w * 0.15);
-                        const c70y = Math.floor(h * 0.15);
-                        const c70Data = ctx.getImageData(c70x, c70y, c70w, c70h);
-                        code = jsQR(c70Data.data, c70w, c70h, { inversionAttempts: 'attemptBoth' });
-                        if (code && code.data) {
-                            resolve(code.data);
-                            return;
-                        }
+    // 1. Try parsing JSON payload
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.userId) targetUserId = parsed.userId;
+      if (parsed.email) targetEmail = parsed.email;
+      if (parsed.phone) targetPhone = parsed.phone;
+      if (parsed.amount && Number(parsed.amount) > 0) prefilledAmount = String(parsed.amount);
+    } catch {
+      // 2. Format checks
+      if (raw.toUpperCase().startsWith('MAF-')) {
+        const clean = raw.replace(/^MAF-/i, '').trim();
+        targetUserId = clean;
+      } else if (raw.includes('@')) {
+        targetEmail = raw.toLowerCase();
+      } else if (/^[0-9+]+$/.test(raw)) {
+        targetPhone = raw.replace(/\D/g, '');
+      } else if (raw.length === 36 && raw.includes('-')) {
+        targetUserId = raw;
+      } else {
+        targetUsername = raw.toLowerCase();
+      }
+    }
 
-                        // 3. Center 50% Box (Focused QR)
-                        const c50w = Math.floor(w * 0.5);
-                        const c50h = Math.floor(h * 0.5);
-                        const c50x = Math.floor(w * 0.25);
-                        const c50y = Math.floor(h * 0.25);
-                        const c50Data = ctx.getImageData(c50x, c50y, c50w, c50h);
-                        code = jsQR(c50Data.data, c50w, c50h, { inversionAttempts: 'attemptBoth' });
-                        if (code && code.data) {
-                            resolve(code.data);
-                            return;
-                        }
+    let profile = null;
 
-                        // 4. Downscale 50% for high-resolution images
-                        const downCanvas = document.createElement('canvas');
-                        downCanvas.width = Math.floor(w / 2);
-                        downCanvas.height = Math.floor(h / 2);
-                        const downCtx = downCanvas.getContext('2d', { willReadFrequently: true });
-                        if (downCtx) {
-                            downCtx.drawImage(img, 0, 0, downCanvas.width, downCanvas.height);
-                            const downData = downCtx.getImageData(0, 0, downCanvas.width, downCanvas.height);
-                            code = jsQR(downData.data, downCanvas.width, downCanvas.height, { inversionAttempts: 'attemptBoth' });
-                            if (code && code.data) {
-                                resolve(code.data);
-                                return;
-                            }
-                        }
+    // A. Direct UUID match (Exact 36 chars)
+    if (targetUserId && targetUserId.length === 36) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, username, avatar_url')
+        .eq('id', targetUserId)
+        .maybeSingle();
+      if (data) profile = data;
+    }
 
-                        resolve(null);
-                    } catch (e) {
-                        console.warn("Canvas decode error:", e);
-                        resolve(null);
-                    }
-                };
-                img.onerror = () => resolve(null);
-                img.src = dataUrl;
-            } catch (err) {
-                console.warn("Image load error:", err);
-                resolve(null);
-            }
+    // B. Match by Email
+    if (!profile && targetEmail) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, username, avatar_url')
+        .ilike('email', targetEmail)
+        .maybeSingle();
+      if (data) profile = data;
+    }
+
+    // C. Match by Phone Number (Last 8 digits)
+    if (!profile && targetPhone) {
+      const last8 = targetPhone.slice(-8);
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, username, avatar_url')
+        .ilike('phone', `%${last8}%`)
+        .limit(1)
+        .maybeSingle();
+      if (data) profile = data;
+    }
+
+    // D. Match by Username
+    if (!profile && targetUsername) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, username, avatar_url')
+        .ilike('username', targetUsername)
+        .maybeSingle();
+      if (data) profile = data;
+    }
+
+    // E. Fallback OR search
+    if (!profile && raw.length >= 3) {
+      const cleanQ = raw.toLowerCase();
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, username, avatar_url')
+        .or(`email.ilike.%${cleanQ}%,username.ilike.%${cleanQ}%,phone.ilike.%${cleanQ}%`)
+        .limit(1)
+        .maybeSingle();
+      if (data) profile = data;
+    }
+
+    return { profile, prefilledAmount };
+  };
+
+  // ─── Process Scanned or Selected Recipient ──────────────────────────────────
+  const handleProcessRecipient = async (dataPayload: string) => {
+    setIsResolving(true);
+    try {
+      const result = await resolveRecipient(dataPayload);
+      if (!result || !result.profile) {
+        Alert.alert(
+          "Recipient Not Found",
+          "Could not locate an active Abu Mafhal account matching this QR code or input. Please verify the details."
+        );
+        resetScanner();
+        return;
+      }
+
+      if (currentUser && result.profile.id === currentUser.id) {
+        Alert.alert("Self-Payment Notice", "You cannot transfer funds to your own wallet account.");
+        resetScanner();
+        return;
+      }
+
+      setRecipientUser(result.profile);
+      if (result.prefilledAmount) {
+        setTransferAmount(result.prefilledAmount);
+      } else {
+        setTransferAmount('');
+      }
+      setTransferNote('');
+      setConfirmModalVisible(true);
+    } catch (err: any) {
+      Alert.alert("Scan Error", "Failed to process recipient information. Please try again.");
+      resetScanner();
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
+  // ─── Camera Barcode Scanned Handler ─────────────────────────────────────────
+  const handleBarcodeScanned = async ({ data }: { data: string }) => {
+    if (isScanningLocked.current || scanned) return;
+    isScanningLocked.current = true;
+    setScanned(true);
+
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    }
+
+    await handleProcessRecipient(data);
+  };
+
+  // ─── Gallery QR Picker & Analyzer ───────────────────────────────────────────
+  const handlePickFromGallery = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Access Required", "Please grant photo library access to upload a QR code image.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.9,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      setIsAnalyzingImage(true);
+      const uri = result.assets[0].uri;
+
+      // Online API analyzer with graceful error handling
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: 'qr_image.jpg',
+        type: 'image/jpeg',
+      } as any);
+
+      const res = await fetch('https://api.qrserver.com/v1/read-qr-code/', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+      setIsAnalyzingImage(false);
+
+      const codeText = json?.[0]?.symbol?.[0]?.data;
+      if (codeText) {
+        await handleProcessRecipient(codeText);
+      } else {
+        Alert.alert(
+          "No QR Code Detected",
+          "Could not detect a clear QR code in this image. Please crop closer to the square QR code and try again."
+        );
+      }
+    } catch {
+      setIsAnalyzingImage(false);
+      Alert.alert(
+        "Upload Notice",
+        "Could not decode QR image. You can also use the 'Pay by Phone/Email' option below."
+      );
+    }
+  };
+
+  // ─── Manual Search Trigger ──────────────────────────────────────────────────
+  const handleManualSearch = async () => {
+    if (!manualInput.trim()) {
+      Alert.alert("Input Required", "Please enter a phone number, email, or username.");
+      return;
+    }
+    setManualModalVisible(false);
+    await handleProcessRecipient(manualInput.trim());
+    setManualInput('');
+  };
+
+  // ─── Step 1: Confirm Payment Initiation ─────────────────────────────────────
+  const handleProceedToPin = () => {
+    const amt = parseFloat(transferAmount);
+    if (isNaN(amt) || amt < 100) {
+      Alert.alert("Invalid Amount", "Minimum transfer amount is ₦100.00.");
+      return;
+    }
+    if (amt > userBalance) {
+      Alert.alert("Insufficient Balance", "Your available wallet balance is insufficient for this payment.");
+      return;
+    }
+    setSecurityModalVisible(true);
+  };
+
+  // ─── Step 2: Execute Transfer via Supabase RPC ──────────────────────────────
+  const handleExecuteTransfer = async (authPin?: string) => {
+    if (!recipientUser || !currentUser) return;
+    const amt = parseFloat(transferAmount);
+
+    setSecurityModalVisible(false);
+    setIsProcessing(true);
+
+    try {
+      let rpcRes = await supabase.rpc('execute_wallet_transfer', {
+        sender_id: currentUser.id,
+        target_id: recipientUser.id,
+        amount: amt,
+        p_pin: authPin || '',
+      });
+
+      if (rpcRes.error) {
+        rpcRes = await supabase.rpc('execute_p2p_transfer', {
+          sender_id: currentUser.id,
+          target_id: recipientUser.id,
+          amount: amt,
+          p_pin: authPin || '',
         });
-    };
+      }
 
-    const handleUploadFromGallery = async () => {
+      const { data, error } = rpcRes;
+      if (error) throw new Error(error.message || 'P2P transfer failed.');
+      if (data && data.success === false) throw new Error(data.message || 'P2P transfer failed.');
+
+      const newBal = data?.new_balance ?? Math.max(0, userBalance - amt);
+      setUserBalance(newBal);
+
+      const refNumber = data?.reference || `TRF-QR-${Date.now().toString().slice(-8)}`;
+
+      // Immediate in-app notification
+      createAppNotification(
+        currentUser.id,
+        `Debit Alert: ₦${safeFormatCurrency(amt)}`,
+        `₦${safeFormatCurrency(amt)} transferred to ${recipientUser.full_name || recipientUser.email}. Ref: ${refNumber}`,
+        'transfer',
+        'high'
+      ).catch(() => {});
+
+      setReceiptData({
+        ref: refNumber,
+        amount: amt,
+        recipientName: recipientUser.full_name || 'Mafhal Member',
+        recipientEmail: recipientUser.email || '',
+        recipientPhone: recipientUser.phone || '',
+        date: new Date().toISOString(),
+        note: transferNote || 'QR Code Payment',
+      });
+
+      setConfirmModalVisible(false);
+      setSuccessModalVisible(true);
+
+      if (Platform.OS !== 'web') {
         try {
-            if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.style.display = 'none';
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+      }
+    } catch (err: any) {
+      Alert.alert("Payment Failed", err.message || "An error occurred while processing your transfer.");
+    } finally {
+      setIsProcessing(false);
+      resetScanner();
+    }
+  };
 
-                input.onchange = async (e: any) => {
-                    const file = e.target?.files?.[0];
-                    if (!file) return;
-                    setIsReadingGallery(true);
-                    setScanned(false);
+  // ─── Share Receipt ──────────────────────────────────────────────────────────
+  const handleShareReceipt = async () => {
+    if (!receiptData) return;
+    try {
+      const message = `━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ABU MAFHAL HUB - PAYMENT RECEIPT
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Amount: ₦${safeFormatCurrency(receiptData.amount)}
+To: ${receiptData.recipientName}
+Email: ${receiptData.recipientEmail || '-'}
+Reference: ${receiptData.ref}
+Date: ${safeFormatDate(receiptData.date)}
+Type: Instant QR Transfer
+Status: SUCCESSFUL (Instant Settlement)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Thank you for transacting with Abu Mafhal Hub!
+https://abumafhalsub.com`;
 
-                    const reader = new FileReader();
-                    reader.onload = async (re) => {
-                        const dataUrl = re.target?.result as string;
-                        if (!dataUrl) {
-                            setIsReadingGallery(false);
-                            showScanNotice("File Error", "Could not read this picture file. Please try another image.");
-                            return;
-                        }
+      await Share.share({
+        title: `Receipt - ${receiptData.ref}`,
+        message,
+      });
+    } catch {}
+  };
 
-                        const decodedText = await decodeQrFromDataUrl(dataUrl);
-                        setIsReadingGallery(false);
+  // ─── Copy Wallet ID ─────────────────────────────────────────────────────────
+  const handleCopyWalletId = async () => {
+    if (!currentUser?.id) return;
+    const walletId = `MAF-${currentUser.id.substring(0, 8).toUpperCase()}`;
+    await Clipboard.setStringAsync(walletId);
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    }
+    setCopiedToast(true);
+    setTimeout(() => setCopiedToast(false), 2500);
+  };
 
-                        if (decodedText) {
-                            onBarcodeScanned({ data: decodedText });
-                        } else {
-                            showScanNotice(
-                                "No QR Code Detected",
-                                "Could not find a recognizable QR code in this image. Please crop tightly to the square QR code and try again, or enter the recipient's email manually."
-                            );
-                        }
-                    };
-                    reader.onerror = () => {
-                        setIsReadingGallery(false);
-                        showScanNotice("File Error", "Failed to read image file. Please try again.");
-                    };
-                    reader.readAsDataURL(file);
-                };
+  // ─── Share My QR Details ────────────────────────────────────────────────────
+  const handleShareMyCode = async () => {
+    if (!currentUser) return;
+    const walletId = `MAF-${currentUser.id.substring(0, 8).toUpperCase()}`;
+    const amountStr = requestedAmount && parseFloat(requestedAmount) > 0 
+      ? `\nRequested Amount: ₦${safeFormatCurrency(requestedAmount)}`
+      : '';
+    const shareText = `Hi! You can pay me instantly on Abu Mafhal Hub:
+Name: ${currentUser.full_name}
+Wallet ID: ${walletId}${amountStr}
+Email: ${currentUser.email}
 
-                document.body.appendChild(input);
-                input.click();
-                setTimeout(() => {
-                    try { document.body.removeChild(input); } catch (_) {}
-                }, 1000);
-                return;
-            }
+Open Abu Mafhal Hub app > QR Pay to send money in seconds!
+https://abumafhalsub.com`;
 
-            // Native Mobile (iOS & Android)
-            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permissionResult.granted) {
-                showScanNotice("Permission Denied", "We need access to your photo gallery to upload QR images.");
-                return;
-            }
+    try {
+      await Share.share({
+        title: `Pay ${currentUser.full_name} on Abu Mafhal`,
+        message: shareText,
+      });
+    } catch {}
+  };
 
-            const pickerResult = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsEditing: true,
-                quality: 1,
-            });
+  // ─── Build User QR Payload ──────────────────────────────────────────────────
+  const myCodePayload = useMemo(() => {
+    if (!currentUser) return 'https://abumafhalsub.com';
+    return JSON.stringify({
+      app: 'abumafhal',
+      type: 'p2p_transfer',
+      userId: currentUser.id,
+      name: currentUser.full_name,
+      email: currentUser.email,
+      phone: currentUser.phone || '',
+      ...(requestedAmount && parseFloat(requestedAmount) > 0
+        ? { amount: parseFloat(requestedAmount) }
+        : {}),
+    });
+  }, [currentUser, requestedAmount]);
 
-            if (pickerResult.canceled || !pickerResult.assets || pickerResult.assets.length === 0) {
-                return;
-            }
+  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? 36 : 20) + 8;
+  const bottomPadding = Math.max(insets.bottom, 16);
 
-            const selectedImage = pickerResult.assets[0];
-            setIsReadingGallery(true);
-            setScanned(false);
+  return (
+    <View style={s.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" />
 
-            const formData = new FormData();
-            formData.append('file', {
-                uri: selectedImage.uri,
-                name: 'qr.jpg',
-                type: 'image/jpeg',
-            } as any);
+      {/* ─── Ultra-Sleek Executive Header ───────────────────────────────────── */}
+      <LinearGradient colors={[T.navyDark, T.navy]} style={[s.header, { paddingTop: topPadding }]}>
+        <View style={s.headerTop}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={s.headerIconBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={20} color={T.white} />
+          </TouchableOpacity>
 
-            const response = await fetch('https://api.qrserver.com/v1/read-qr-code/', {
-                method: 'POST',
-                body: formData,
-            });
+          <View style={{ alignItems: 'center' }}>
+            <Text style={s.headerTitle}>QR Pay & Transfer</Text>
+            <Text style={s.headerSubtitle}>Instant Zero-Fee P2P Settlements</Text>
+          </View>
 
-            const result = await response.json();
-            setIsReadingGallery(false);
-
-            const qrText = result?.[0]?.symbol?.[0]?.data;
-            if (qrText) {
-                onBarcodeScanned({ data: qrText });
-            } else {
-                showScanNotice(
-                    "No QR Code Detected",
-                    "Could not find a clear QR code in this picture. Please crop closer to the square QR code."
-                );
-            }
-        } catch (e: any) {
-            setIsReadingGallery(false);
-            console.error("Gallery scan error:", e);
-            showScanNotice("Scan Error", "Failed to scan QR code from gallery. Please try another image or enter email manually.");
-        }
-    };
-
-    const onBarcodeScanned = async ({ data }: { data: string }) => {
-        if (confirmModalVisible || successModalVisible) return;
-        setScanned(true);
-        setCameraActive(false);
-        if (Platform.OS !== 'web') {
-            Vibration.vibrate(100);
-        }
-        
-        try {
-            let userId = '';
-            let email = '';
-            
-            try {
-                const parsed = JSON.parse(data);
-                if (parsed.userId) {
-                    userId = parsed.userId;
-                    email = parsed.email || '';
-                    if (parsed.amount && parseFloat(parsed.amount) > 0) {
-                        setAmount(String(parsed.amount));
-                    }
-                }
-            } catch (jsonErr) {
-                const trimmedData = data.trim();
-                // 1. Check if it's Wallet ID format: MAF-XXXXXXXX
-                if (trimmedData.toUpperCase().startsWith('MAF-')) {
-                    const cleanPrefix = trimmedData.replace(/^MAF-/i, '').trim();
-                    userId = cleanPrefix;
-                } 
-                // 2. Check for URL with query params
-                else if (trimmedData.includes('http://') || trimmedData.includes('https://')) {
-                    try {
-                        const urlObj = new URL(trimmedData);
-                        userId = urlObj.searchParams.get('userId') || '';
-                        email = urlObj.searchParams.get('email') || '';
-                    } catch (_) {}
-                }
-                // 3. Check for email anywhere in text
-                const emailMatch = trimmedData.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-                if (emailMatch && !userId) {
-                    email = emailMatch[0].toLowerCase();
-                } else if (!userId && !email) {
-                    if (trimmedData.length === 36) {
-                        userId = trimmedData;
-                    } else {
-                        email = trimmedData.toLowerCase();
-                    }
-                }
-            }
-
-            let query = supabase.from('profiles').select('id, full_name, email, avatar_url');
-            if (userId) {
-                if (userId.length === 36) {
-                    query = query.eq('id', userId);
-                } else {
-                    query = query.ilike('id', `${userId}%`);
-                }
-            } else if (email) {
-                query = query.eq('email', email);
-            } else {
-                showScanNotice("Invalid QR", "This QR code does not contain a valid Abu Mafhal user ID, Wallet ID, or email.");
-                return;
-            }
-
-            const { data: recipient, error } = await query.maybeSingle();
-            
-            if (error || !recipient) {
-                showScanNotice("User Not Found", "No registered Abu Mafhal user was found matching this QR code.");
-                return;
-            }
-
-            if (currentUser && recipient.id === currentUser.id) {
-                showScanNotice("Self Scan Notice", `You scanned your own QR code (${currentUser.full_name || 'My Account'}). To make a transfer, please scan another user's QR code.`);
-                return;
-            }
-
-            setScannedUser({
-                userId: recipient.id,
-                name: recipient.full_name,
-                email: recipient.email,
-                avatarUrl: recipient.avatar_url
-            });
-            setConfirmModalVisible(true);
-        } catch (err: any) {
-            showScanNotice("Scan Error", "Failed to process QR code details. Please try again.");
-        }
-    };
-
-    const handleVerifyManualRecipient = async () => {
-        if (!manualInput) {
-            Alert.alert("Error", "Please enter an email address.");
-            return;
-        }
-        
-        setIsVerifyingManual(true);
-        try {
-            const { data: recipient, error } = await supabase.rpc('find_profile_by_email', {
-                email_query: manualInput.trim().toLowerCase()
-            });
-                
-            if (error) throw error;
-            
-            if (!recipient) {
-                Alert.alert("Not Found", "No user found with this email address. Please make sure the email is typed correctly.");
-                return;
-            }
-
-            if (currentUser && recipient.id === currentUser.id) {
-                Alert.alert("Error", "You cannot transfer money to yourself!");
-                return;
-            }
-
-            setScannedUser({
-                userId: recipient.id,
-                name: recipient.full_name,
-                email: recipient.email,
-                avatarUrl: recipient.avatar_url
-            });
-            setManualInputVisible(false);
-            setManualInput('');
-            setConfirmModalVisible(true);
-        } catch (e: any) {
-            Alert.alert("Verification Failed", e.message || "An error occurred.");
-        } finally {
-            setIsVerifyingManual(false);
-        }
-    };
-
-    const handleConfirmTransfer = async () => {
-        if (!amount || parseFloat(amount) <= 0) {
-            Alert.alert("Invalid Amount", "Please enter a valid amount.");
-            return;
-        }
-
-        const transferAmt = parseFloat(amount);
-        if (transferAmt > userBalance) {
-            Alert.alert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}, which is less than ₦${transferAmt.toLocaleString()}.`);
-            return;
-        }
-
-        setConfirmModalVisible(false);
-        setSecurityModalVisible(true);
-    };
-
-    const executeTransfer = async () => {
-        setSecurityModalVisible(false);
-        setIsSubmitting(true);
-        
-        try {
-            const transferAmt = parseFloat(amount);
-            const senderId = currentUser.id;
-            const recipientId = scannedUser.userId;
-
-            const { data, error } = await supabase.rpc('execute_wallet_transfer', {
-                sender_id: senderId,
-                target_id: recipientId,
-                amount: transferAmt,
-                note: description
-            });
-
-            if (error) throw error;
-
-            Vibration.vibrate([0, 100, 50, 100]);
-            
-            // Refresh local balance
-            await loadUserProfile();
-            
-            setSuccessModalVisible(true);
-        } catch (e: any) {
-            Alert.alert("Transfer Failed", e.message || "An error occurred during payment.");
-            setScanned(false);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleSuccessDone = () => {
-        setSuccessModalVisible(false);
-        setAmount('');
-        setDescription('');
-        setScanned(false);
-        setCameraActive(false);
-        setScannedUser(null);
-    };
-
-    const handleShareReceipt = async () => {
-        if (!scannedUser || !amount || isSharingReceipt) return;
-        
-        setIsSharingReceipt(true);
-        const transferAmt = parseFloat(amount);
-        const formattedAmount = safeFormatCurrency(transferAmt);
-        const dateStr = safeFormatDate(new Date(), true);
-        const reference = 'QR-' + Math.floor(Date.now() / 1000);
-        
-        // 1. Download logo asset locally for rendering inside the document
-        let logoSrc = '';
-        try {
-            const logoAsset = Asset.fromModule((settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png')));
-            await logoAsset.downloadAsync();
-            logoSrc = logoAsset.localUri || logoAsset.uri;
-        } catch (logoErr) {
-            console.error("Failed to load logo asset:", logoErr);
-        }
-
-        // 2. Prepare profile photos (avatars) for both Sender and Recipient
-        const senderName = currentUser?.full_name || 'Mafhal User';
-        const senderEmail = currentUser?.email || 'sender@abumafhal.com.ng';
-        const senderAvatarHtml = currentUser?.avatar_url
-            ? `<img src="${currentUser.avatar_url}" class="profile-avatar" />`
-            : `<div class="profile-avatar-placeholder">${senderName[0].toUpperCase()}</div>`;
-
-        const recipientName = scannedUser.name;
-        const recipientEmail = scannedUser.email || '-';
-        const recipientAvatarHtml = scannedUser.avatarUrl
-            ? `<img src="${scannedUser.avatarUrl}" class="profile-avatar" />`
-            : `<div class="profile-avatar-placeholder">${recipientName[0].toUpperCase()}</div>`;
-
-        // 3. Construct the full PDF HTML receipt document mirroring the Jobber template structure
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>Transaction Receipt</title>
-                <style>
-                    body {
-                        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                        margin: 0;
-                        padding: 30px;
-                        color: #1e293b;
-                        background-color: #ffffff;
-                        -webkit-print-color-adjust: exact;
-                    }
-                    .container {
-                        max-width: 640px;
-                        margin: 0 auto;
-                    }
-                    .header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        margin-bottom: 28px;
-                    }
-                    .brand-info {
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    .logo-container {
-                        display: flex;
-                        align-items: center;
-                        margin-bottom: 8px;
-                    }
-                    .logo-img {
-                        width: 44px;
-                        height: 44px;
-                        border-radius: 22px;
-                        background-color: #0d1b3e;
-                        margin-right: 10px;
-                    }
-                    .brand-name {
-                        font-size: 20px;
-                        font-weight: 800;
-                        color: #0d1b3e;
-                    }
-                    .brand-address, .brand-contact {
-                        font-size: 11px;
-                        color: #475569;
-                        margin: 1px 0;
-                    }
-                    .meta-box {
-                        width: 220px;
-                        border: 1px solid #cbd5e1;
-                        border-radius: 4px;
-                        overflow: hidden;
-                    }
-                    .meta-header {
-                        background-color: #7cae12;
-                        color: #ffffff;
-                        padding: 8px 10px;
-                        font-size: 12.5px;
-                        font-weight: 800;
-                    }
-                    .meta-body {
-                        background-color: #f1f5f9;
-                        padding: 6px 10px;
-                        font-size: 10.5px;
-                        font-weight: 600;
-                        color: #334155;
-                    }
-                    .profiles-section {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 28px;
-                        gap: 12px;
-                    }
-                    .profile-card {
-                        flex: 1;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 8px;
-                        padding: 12px;
-                        background-color: #f8fafc;
-                        display: flex;
-                        align-items: center;
-                    }
-                    .profile-avatar {
-                        width: 50px;
-                        height: 50px;
-                        border-radius: 25px;
-                        border: 2.5px solid #7cae12;
-                        margin-right: 12px;
-                        object-fit: cover;
-                        background-color: #cbd5e1;
-                    }
-                    .profile-avatar-placeholder {
-                        width: 50px;
-                        height: 50px;
-                        border-radius: 25px;
-                        border: 2.5px solid #7cae12;
-                        margin-right: 12px;
-                        background-color: #0d1b3e;
-                        color: #ffffff;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 20px;
-                        font-weight: bold;
-                    }
-                    .profile-info {
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    .profile-role {
-                        font-size: 8px;
-                        font-weight: 800;
-                        color: #7cae12;
-                        text-transform: uppercase;
-                        margin-bottom: 2px;
-                        letter-spacing: 0.5px;
-                    }
-                    .profile-name {
-                        font-size: 13px;
-                        font-weight: 800;
-                        color: #0f172a;
-                        margin-bottom: 2px;
-                    }
-                    .profile-email {
-                        font-size: 10px;
-                        color: #475569;
-                    }
-                    .transfer-arrow {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: #7cae12;
-                        font-size: 18px;
-                        font-weight: bold;
-                        width: 24px;
-                    }
-                    .table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 28px;
-                    }
-                    .table th {
-                        background-color: #7cae12;
-                        color: #ffffff;
-                        padding: 8px 10px;
-                        font-size: 10px;
-                        font-weight: 800;
-                        text-align: left;
-                        text-transform: uppercase;
-                    }
-                    .table td {
-                        padding: 12px 10px;
-                        font-size: 11px;
-                        border-bottom: 1px solid #cbd5e1;
-                        vertical-align: top;
-                    }
-                    .font-bold {
-                        font-weight: 700;
-                    }
-                    .text-center {
-                        text-align: center;
-                    }
-                    .text-right {
-                        text-align: right;
-                    }
-                    .bottom-section {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        margin-bottom: 36px;
-                    }
-                    .thanks-msg {
-                        font-size: 12px;
-                        color: #475569;
-                        font-style: italic;
-                    }
-                    .totals-box {
-                        width: 220px;
-                    }
-                    .totals-title {
-                        font-size: 13px;
-                        font-weight: 800;
-                        color: #334155;
-                        margin-bottom: 8px;
-                    }
-                    .totals-row {
-                        display: flex;
-                        justify-content: space-between;
-                        font-size: 11px;
-                        padding: 4px 0;
-                    }
-                    .totals-label {
-                        color: #64748b;
-                    }
-                    .totals-value {
-                        font-weight: 700;
-                        color: #0f172a;
-                    }
-                    .divider {
-                        height: 1px;
-                        background-color: #cbd5e1;
-                        margin: 4px 0;
-                    }
-                    .footer {
-                        border-top: 1px solid #f1f5f9;
-                        padding-top: 18px;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                    }
-                    .powered-label {
-                        font-size: 8px;
-                        font-weight: 700;
-                        color: #94a3b8;
-                        letter-spacing: 1px;
-                        margin-bottom: 2px;
-                    }
-                    .powered-brand {
-                        display: flex;
-                        align-items: center;
-                        font-size: 10px;
-                        font-weight: 800;
-                        color: #475569;
-                        letter-spacing: 1px;
-                    }
-                    .powered-logo {
-                        width: 12px;
-                        height: 12px;
-                        margin-right: 4px;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <div class="brand-info">
-                            <div class="logo-container">
-                                ${logoSrc ? `<img src="${logoSrc}" class="logo-img" />` : ''}
-                                <span class="brand-name">Mafhal Sub</span>
-                            </div>
-                            <div class="brand-address">Plot 124, Gwarinpa Road, Kano, Nigeria</div>
-                            <div class="brand-contact">+234 803 123 4567 | hello@abumafhal.com.ng</div>
-                        </div>
-                        <div class="meta-box">
-                            <div class="meta-header">Receipt for #${reference}</div>
-                            <div class="meta-body">Transaction Date: ${dateStr}</div>
-                        </div>
-                    </div>
-
-                    <!-- PROFILES WITH SENDER AND RECIPIENT FACES -->
-                    <div class="profiles-section">
-                        <!-- Sender -->
-                        <div class="profile-card">
-                            ${senderAvatarHtml}
-                            <div class="profile-info">
-                                <span class="profile-role">Sender</span>
-                                <span class="profile-name">${senderName}</span>
-                                <span class="profile-email">${senderEmail}</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Arrow -->
-                        <div class="transfer-arrow">⚡</div>
-
-                        <!-- Recipient -->
-                        <div class="profile-card">
-                            ${recipientAvatarHtml}
-                            <div class="profile-info">
-                                <span class="profile-role">Recipient</span>
-                                <span class="profile-name">${recipientName}</span>
-                                <span class="profile-email">${recipientEmail}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th style="width: 25%">Product / Service</th>
-                                <th style="width: 40%">Description</th>
-                                <th style="width: 10%" class="text-center">Qty.</th>
-                                <th style="width: 12.5%" class="text-right">Cost</th>
-                                <th style="width: 12.5%" class="text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="font-bold">Wallet Transfer</td>
-                                <td style="color: #475569; font-size: 11px; line-height: 1.4">
-                                    Instant secure peer-to-peer wallet transfer to ${recipientName}.
-                                </td>
-                                <td class="text-center">1</td>
-                                <td class="text-right">₦${formattedAmount}</td>
-                                <td class="text-right font-bold">₦${formattedAmount}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="bottom-section">
-                        <div class="thanks-msg">Thanks for your business!</div>
-                        <div class="totals-box">
-                            <div class="totals-title">Receipt for Payment</div>
-                            <div class="totals-row">
-                                <span class="totals-label">Subtotal</span>
-                                <span class="totals-value">₦${formattedAmount}</span>
-                            </div>
-                            <div class="totals-row">
-                                <span class="totals-label">Fee (0%)</span>
-                                <span class="totals-value">₦0.00</span>
-                            </div>
-                            <div class="divider"></div>
-                            <div class="totals-row" style="margin-top: 4px;">
-                                <span class="totals-label font-bold" style="font-size: 14px; color: #0f172a;">Total</span>
-                                <span class="totals-value font-bold" style="font-size: 14px; color: #0f172a;">₦${formattedAmount}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        <div class="powered-label">POWERED BY</div>
-                        <div class="powered-brand">
-                            ${logoSrc ? `<img src="${logoSrc}" class="powered-logo" />` : ''}
-                            <span>MAFHAL SUB</span>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
-
-        try {
-            if (Platform.OS === 'web') {
-                // On Web, trigger native print / save as PDF dialog directly in the browser
-                await Print.printAsync({ html });
-            } else {
-                // On Mobile (Android/iOS), print the HTML to a PDF file locally, then share the PDF file!
-                const { uri } = await Print.printToFileAsync({ html });
-                await Sharing.shareAsync(uri, {
-                    UTI: '.pdf',
-                    mimeType: 'application/pdf',
-                    dialogTitle: `Mafhal Sub Receipt - Ref: ${reference}`,
-                });
-            }
-        } catch (error: any) {
-            console.error("PDF Receipt share error:", error);
-            // Fallback to text sharing if PDF printing/sharing fails
-            try {
-                const receiptText = `*MAFHAL SUB - TRANSACTION RECEIPT*\n\n` +
-                    `👤 *Sender*: ${senderName}\n` +
-                    `👤 *Recipient*: ${recipientName}\n` +
-                    `📧 *Email*: ${recipientEmail}\n` +
-                    `💵 *Amount*: ₦${formattedAmount}\n` +
-                    `📅 *Date*: ${dateStr}\n` +
-                    `📌 *Ref*: ${reference}\n` +
-                    `⚡ *Status*: SUCCESSFUL\n\n` +
-                    `Secured by Mafhal Sub Transfer System.`;
-                
-                await Share.share({
-                    title: `Transaction Receipt`,
-                    message: receiptText,
-                });
-            } catch (fallbackError: any) {
-                Alert.alert("Share Error", fallbackError.message);
-            }
-        } finally {
-            setIsSharingReceipt(false);
-        }
-    };
-
-    // Build user QR code payload with optional requested amount
-    const myCodePayload = currentUser ? JSON.stringify({
-        type: 'transfer',
-        userId: currentUser.id,
-        name: currentUser.full_name,
-        email: currentUser.email,
-        ...(requestedAmount && parseFloat(requestedAmount) > 0 ? { amount: parseFloat(requestedAmount) } : {})
-    }) : '';
-
-    return (
-        <View className="flex-1 bg-[#f4f6fb]">
-            <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar style="light" />
-
-            {/* Ultra-Sleek Executive Curved Header (Safe Area Protected) */}
-            <LinearGradient 
-              colors={['#060B18', '#0D1B3E']} 
-              style={[s.headerContainer, { paddingTop: headerTopPadding }]}
+          {activeTab === 'scan' && permission?.granted ? (
+            <TouchableOpacity
+              onPress={() => setTorchEnabled(!torchEnabled)}
+              style={[s.headerIconBtn, torchEnabled && { backgroundColor: T.gold }]}
+              activeOpacity={0.7}
             >
-              <View style={s.headerTop}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-                  <Ionicons name="arrow-back" size={18} color="white" />
-                </TouchableOpacity>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={s.headerTitle}>QR Pay & Transfer</Text>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      if (Platform.OS !== 'web') Haptics.selectionAsync();
-                      setShowBalance(!showBalance);
-                    }}
-                    style={s.headerBalancePill}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="wallet-outline" size={11} color="#F5A623" style={{ marginRight: 4 }} />
-                    <Text style={s.headerBalance}>
-                      {showBalance ? `₦${safeFormatCurrency(userBalance)}` : '₦ • • • • • •'}
+              <Ionicons
+                name={torchEnabled ? 'flash' : 'flash-outline'}
+                size={18}
+                color={torchEnabled ? T.navyDark : T.white}
+              />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setManualModalVisible(true)}
+              style={s.headerIconBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="search" size={18} color={T.white} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ─── 2-Tab Segmented Controller ───────────────────────────────────── */}
+        <View style={s.tabContainer}>
+          <TouchableOpacity
+            style={[s.tabButton, activeTab === 'scan' && s.tabButtonActive]}
+            onPress={() => {
+              if (Platform.OS !== 'web') Haptics.selectionAsync();
+              setActiveTab('scan');
+              resetScanner();
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="scan"
+              size={17}
+              color={activeTab === 'scan' ? T.navyDark : T.slate400}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[s.tabButtonText, activeTab === 'scan' && s.tabButtonTextActive]}>
+              Scan to Pay
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[s.tabButton, activeTab === 'mycode' && s.tabButtonActive]}
+            onPress={() => {
+              if (Platform.OS !== 'web') Haptics.selectionAsync();
+              setActiveTab('mycode');
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="qr-code"
+              size={17}
+              color={activeTab === 'mycode' ? T.navyDark : T.slate400}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[s.tabButtonText, activeTab === 'mycode' && s.tabButtonTextActive]}>
+              My QR Pass
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      {/* ─── Main Content Views ────────────────────────────────────────────── */}
+      <ScrollView
+        contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPadding + 32 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {activeTab === 'scan' ? (
+          /* ══════════════════════════════════════════════════════════════════
+             TAB 1: SCAN TO PAY (CAMERA VIEW & TOOLS)
+             ══════════════════════════════════════════════════════════════════ */
+          <View style={s.scanTabWrapper}>
+            {/* Viewfinder Frame */}
+            <View style={s.viewfinderContainer}>
+              {permission?.granted ? (
+                <View style={StyleSheet.absoluteFillObject}>
+                  <CameraView
+                    style={StyleSheet.absoluteFillObject}
+                    facing="back"
+                    enableTorch={torchEnabled}
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+                  />
+
+                  {/* Laser Scanning Beam */}
+                  {!scanned && (
+                    <Animated.View
+                      style={[
+                        s.laserBeam,
+                        {
+                          transform: [
+                            {
+                              translateY: laserAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [24, 216],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                  )}
+
+                  {/* Corner Targets */}
+                  <View style={s.viewfinderCorners}>
+                    <View style={[s.cornerBracket, s.cornerTL]} />
+                    <View style={[s.cornerBracket, s.cornerTR]} />
+                    <View style={[s.cornerBracket, s.cornerBL]} />
+                    <View style={[s.cornerBracket, s.cornerBR]} />
+                  </View>
+
+                  {/* Instructional Tip Overlay */}
+                  <View style={s.viewfinderHint}>
+                    <Ionicons name="sparkles" size={13} color={T.gold} style={{ marginRight: 5 }} />
+                    <Text style={s.viewfinderHintText}>
+                      {scanned ? "Processing code..." : "Align QR code inside the frame"}
                     </Text>
-                    <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={11} color="#F5A623" style={{ marginLeft: 4 }} />
+                  </View>
+                </View>
+              ) : (
+                /* Permission Request Card */
+                <View style={s.permissionBox}>
+                  <View style={s.permissionIconRing}>
+                    <Ionicons name="camera" size={32} color={T.gold} />
+                  </View>
+                  <Text style={s.permissionTitle}>Camera Access Required</Text>
+                  <Text style={s.permissionSubtitle}>
+                    Grant camera permission to instantly scan Abu Mafhal merchant and peer QR codes.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={requestPermission}
+                    style={s.permissionBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.permissionBtnText}>Enable Camera</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity 
-                  onPress={() => {
-                    if (Platform.OS !== 'web') Haptics.selectionAsync();
-                    setActiveTab(activeTab === 'mycode' ? 'scan' : 'mycode');
-                  }} 
-                  style={s.headerToggleBtn}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={activeTab === 'mycode' ? 'scan-outline' : 'qr-code-outline'} size={16} color="#F5A623" />
-                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Quick Action Buttons Below Camera */}
+            <View style={s.actionRow}>
+              <TouchableOpacity
+                onPress={handlePickFromGallery}
+                style={s.actionCard}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIconBadge, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
+                  {isAnalyzingImage ? (
+                    <ActivityIndicator size="small" color={T.gold} />
+                  ) : (
+                    <Ionicons name="images" size={20} color={T.gold} />
+                  )}
+                </View>
+                <Text style={s.actionCardTitle}>From Gallery</Text>
+                <Text style={s.actionCardSubtitle}>Scan QR from Photos</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setManualModalVisible(true)}
+                style={s.actionCard}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIconBadge, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                  <Ionicons name="search" size={20} color={T.emerald} />
+                </View>
+                <Text style={s.actionCardTitle}>Manual Search</Text>
+                <Text style={s.actionCardSubtitle}>Pay via Phone or Email</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recent Payees Quick Row */}
+            {recentPayees.length > 0 && (
+              <View style={s.recentPayeesSection}>
+                <Text style={s.sectionHeading}>RECENT RECIPIENTS</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.recentPayeesRow}>
+                  {recentPayees.map((rec) => (
+                    <TouchableOpacity
+                      key={rec.id}
+                      style={s.recentPayeeChip}
+                      onPress={() => handleProcessRecipient(rec.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={s.recentAvatarCircle}>
+                        <Text style={s.recentAvatarText}>
+                          {(rec.name || 'M')[0].toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={s.recentPayeeName} numberOfLines={1}>
+                        {(rec.name || '').split(' ')[0]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Security Guarantee Banner */}
+            <View style={s.securityBanner}>
+              <Ionicons name="shield-checkmark" size={18} color={T.emerald} style={{ marginRight: 8 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.securityBannerTitle}>Protected by 256-Bit P2P Security</Text>
+                <Text style={s.securityBannerSubtitle}>
+                  Zero transfer fees. Payments are debited and credited instantly.
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* ══════════════════════════════════════════════════════════════════
+             TAB 2: MY QR PASS (EXECUTIVE RECEIVE CARD)
+             ══════════════════════════════════════════════════════════════════ */
+          <View style={s.myCodeTabWrapper}>
+            {/* Luxury Executive Pass Card */}
+            <LinearGradient
+              colors={[T.navyDark, T.navy, T.navyMid]}
+              style={s.executiveCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              {/* Card Header */}
+              <View style={s.cardHeader}>
+                <View style={s.brandLogoWrapper}>
+                  <Image
+                    source={require('../../assets/images/logo.png')}
+                    style={s.brandLogoImg}
+                    resizeMode="contain"
+                  />
+                  <View style={{ marginLeft: 10 }}>
+                    <Text style={s.brandTitle}>ABU MAFHAL HUB</Text>
+                    <Text style={s.brandBadge}>OFFICIAL VIP PAYMENT PASS</Text>
+                  </View>
+                </View>
+
+                <View style={s.verifiedTag}>
+                  <Ionicons name="shield-checkmark" size={11} color={T.gold} style={{ marginRight: 4 }} />
+                  <Text style={s.verifiedTagText}>Verified</Text>
+                </View>
               </View>
 
-              {/* Ultra-Compact Segmented Tab Switcher */}
-              <View style={s.tabContainer}>
-                <TouchableOpacity
-                    onPress={() => { 
-                      if (Platform.OS !== 'web') Haptics.selectionAsync();
-                      setActiveTab('mycode'); 
-                      setCameraActive(false); 
-                    }}
-                    style={[s.tabItem, activeTab === 'mycode' && s.tabItemActive]}
-                    activeOpacity={0.8}
-                >
-                    <Ionicons name="qr-code" size={13} color={activeTab === 'mycode' ? '#F5A623' : 'rgba(255,255,255,0.45)'} style={{ marginRight: 5 }} />
-                    <Text style={[s.tabText, activeTab === 'mycode' && s.tabTextActive]}>My QR Code</Text>
-                </TouchableOpacity>
+              {/* User Account Info */}
+              <View style={s.cardUserInfo}>
+                <Text style={s.userNameText}>{currentUser?.full_name || 'Valued Member'}</Text>
+                <Text style={s.userEmailText}>{currentUser?.email || 'user@abumafhalsub.com'}</Text>
+              </View>
 
+              {/* Wallet ID Pill with 1-Tap Copy */}
+              <TouchableOpacity
+                onPress={handleCopyWalletId}
+                style={s.walletIdPill}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={s.walletIdLabel}>WALLET ID: </Text>
+                  <Text style={s.walletIdValue}>
+                    {currentUser?.id
+                      ? `MAF-${currentUser.id.substring(0, 8).toUpperCase()}`
+                      : 'MAF-ACCOUNT'}
+                  </Text>
+                </View>
+                <Ionicons name="copy-outline" size={14} color={T.gold} style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+
+              {/* The Razor-Sharp QR Code Card */}
+              <View style={s.qrWrapperCard}>
+                <SafeQRCode value={myCodePayload} size={190} />
+              </View>
+
+              {/* Dynamic Requested Amount Tag */}
+              {requestedAmount && parseFloat(requestedAmount) > 0 ? (
+                <View style={s.requestedRibbon}>
+                  <Ionicons name="pricetag" size={13} color={T.navyDark} style={{ marginRight: 6 }} />
+                  <Text style={s.requestedRibbonText}>
+                    Requesting: ₦{safeFormatCurrency(requestedAmount)}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setRequestedAmount('')}
+                    style={s.requestedRibbonClose}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close" size={13} color={T.navyDark} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
                 <TouchableOpacity
-                    onPress={() => { 
-                      if (Platform.OS !== 'web') Haptics.selectionAsync();
-                      setActiveTab('scan'); 
-                      setCameraActive(false); 
-                    }}
-                    style={[s.tabItem, activeTab === 'scan' && s.tabItemActive]}
-                    activeOpacity={0.8}
+                  onPress={() => {
+                    setTempAmountInput('');
+                    setAmountModalVisible(true);
+                  }}
+                  style={s.setAmountBtn}
+                  activeOpacity={0.7}
                 >
-                    <Ionicons name="scan" size={13} color={activeTab === 'scan' ? '#10B981' : 'rgba(255,255,255,0.45)'} style={{ marginRight: 5 }} />
-                    <Text style={[s.tabText, activeTab === 'scan' && s.tabTextActiveScan]}>Scan to Pay</Text>
+                  <Ionicons name="add-circle-outline" size={14} color={T.gold} style={{ marginRight: 5 }} />
+                  <Text style={s.setAmountBtnText}>Request Specific Amount (₦)</Text>
                 </TouchableOpacity>
+              )}
+
+              {/* Card Footer Security Seal */}
+              <View style={s.cardFooter}>
+                <Ionicons name="lock-closed" size={11} color="rgba(255,255,255,0.4)" style={{ marginRight: 4 }} />
+                <Text style={s.cardFooterText}>Secured by Abu Mafhal Automated Core</Text>
               </View>
             </LinearGradient>
 
-            {activeTab === 'scan' ? (
-                <View style={{ flex: 1 }}>
-                    <ScrollView 
-                        contentContainerStyle={s.scanDashboardContainer} 
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {/* 1. Ultra-Compact Modern Scan Hub Card */}
-                        <LinearGradient
-                            colors={['#070D1E', '#0D1B3E', '#081128']}
-                            style={s.modernScanHubCard}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        >
-                            {/* Ambient Glow */}
-                            <View style={s.ambientOrb} />
-
-                            {/* Header row with badges */}
-                            <View style={s.scanCardTopRow}>
-                                <View style={[s.cardBrandBadge, { borderColor: 'rgba(16, 185, 129, 0.35)', backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                                    <Ionicons name="scan" size={10} color="#10B981" />
-                                    <Text style={[s.cardBrandTitle, { color: '#10B981' }]}>FAST SCAN & PAY</Text>
-                                </View>
-                                <View style={[s.cardBrandBadge, { borderColor: 'rgba(245, 166, 35, 0.35)', backgroundColor: 'rgba(245, 166, 35, 0.1)' }]}>
-                                    <Ionicons name="flash" size={9} color="#F5A623" />
-                                    <Text style={[s.cardBrandTitle, { color: '#F5A623' }]}>0% FEE • INSTANT</Text>
-                                </View>
-                            </View>
-
-                            {/* Compact Interactive Camera Launch Bar */}
-                            <TouchableOpacity 
-                                onPress={async () => {
-                                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    setScanned(false);
-                                    if (Platform.OS === 'web') {
-                                        setCameraActive(true);
-                                    } else if (!permission?.granted) {
-                                        const res = await requestPermission();
-                                        if (res.granted) setCameraActive(true);
-                                        else showScanNotice("Camera Access Required", "Please allow camera access to scan QR codes.");
-                                    } else {
-                                        setCameraActive(true);
-                                    }
-                                }}
-                                activeOpacity={0.88}
-                                style={s.scannerInteractiveBox}
-                            >
-                                {/* 4 Gold Targeting Brackets */}
-                                <View style={[s.qrCorner, s.qrCornerTL]} />
-                                <View style={[s.qrCorner, s.qrCornerTR]} />
-                                <View style={[s.qrCorner, s.qrCornerBL]} />
-                                <View style={[s.qrCorner, s.qrCornerBR]} />
-
-                                {/* Laser Line Animation */}
-                                <Animated.View style={[s.previewLaserLine, { transform: [{ translateY: scanLineAnim }] }]} />
-
-                                {/* Center Content */}
-                                <View style={s.previewCenterContent}>
-                                    <View style={s.previewCameraIconRing}>
-                                        <Ionicons name="camera" size={18} color="#F5A623" />
-                                    </View>
-                                    <View style={{ flex: 1, marginHorizontal: 8 }}>
-                                        <Text style={s.previewTapTitle}>Tap to Launch Live Camera</Text>
-                                        <Text style={s.previewTapSub}>Align any recipient QR code to pay</Text>
-                                    </View>
-                                    <View style={s.scanLaunchArrow}>
-                                        <Ionicons name="chevron-forward" size={15} color="#F5A623" />
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
-
-                            {/* Two Compact Action Buttons Inside Card */}
-                            <View style={s.scanQuickActionsGrid}>
-                                <TouchableOpacity 
-                                    onPress={handleUploadFromGallery}
-                                    style={s.scanQuickActionCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <LinearGradient colors={['rgba(16, 185, 129, 0.15)', 'rgba(6, 78, 59, 0.3)']} style={s.scanQuickActionGrad}>
-                                        <Ionicons name="image" size={14} color="#10B981" />
-                                        <Text style={s.scanQuickActionTitle}>Upload Photo</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    onPress={() => setManualInputVisible(true)}
-                                    style={s.scanQuickActionCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <LinearGradient colors={['rgba(59, 130, 246, 0.15)', 'rgba(30, 58, 138, 0.3)']} style={s.scanQuickActionGrad}>
-                                        <Ionicons name="mail" size={14} color="#3B82F6" />
-                                        <Text style={s.scanQuickActionTitle}>Pay via Email</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-                        </LinearGradient>
-
-                        {/* 2. DYNAMIC BANNER - PLACED HIGH UP SO IT IS IMMEDIATELY VISIBLE */}
-                        <View style={{ width: '100%', maxWidth: 340, marginTop: 10 }}>
-                            <DynamicBanners placement="qr_pay" />
-                        </View>
-
-                        {/* 3. FREQUENT RECIPIENTS - DEFAULT VISIBLE & PROMINENT */}
-                        <View style={s.recentTransfersContainer}>
-                            <TouchableOpacity 
-                                style={s.recentTransfersHeader}
-                                activeOpacity={0.7}
-                                onPress={() => {
-                                    if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                    setShowFrequentRecipients(!showFrequentRecipients);
-                                }}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="people" size={13} color="#F5A623" />
-                                    <Text style={s.recentTransfersTitle}>Frequent Recipients</Text>
-                                    <View style={s.recentCountBadge}>
-                                        <Text style={s.recentCountBadgeText}>
-                                            {recentTransfers.length > 0 ? `${recentTransfers.length}` : '0'}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Top Icon Toggle */}
-                                <View style={s.recentHeaderToggleBtn}>
-                                    <Ionicons 
-                                        name={showFrequentRecipients ? "eye-off" : "eye"} 
-                                        size={13} 
-                                        color="#D4890E" 
-                                    />
-                                    <Text style={s.recentHeaderToggleText}>
-                                        {showFrequentRecipients ? "Hide" : "Show"}
-                                    </Text>
-                                    <Ionicons 
-                                        name={showFrequentRecipients ? "chevron-up" : "chevron-down"} 
-                                        size={12} 
-                                        color="#D4890E" 
-                                    />
-                                </View>
-                            </TouchableOpacity>
-
-                            {showFrequentRecipients && (
-                                <View style={{ marginTop: 4 }}>
-                                    {recentTransfers.length > 0 ? (
-                                        recentTransfers.slice(0, 4).map((tx, idx) => {
-                                            const emailMatch = tx.description?.match(/[\w.-]+@[\w.-]+\.\w+/);
-                                            const targetEmail = tx.recipient_email || (emailMatch ? emailMatch[0] : null);
-                                            return (
-                                                <TouchableOpacity 
-                                                    key={tx.id || idx} 
-                                                    style={s.recentTxRow}
-                                                    activeOpacity={0.7}
-                                                    onPress={() => {
-                                                        if (targetEmail) {
-                                                            setManualInput(targetEmail);
-                                                            setManualInputVisible(true);
-                                                        } else if (tx.description) {
-                                                            setManualInput(tx.description);
-                                                            setManualInputVisible(true);
-                                                        }
-                                                    }}
-                                                >
-                                                    <View style={s.recentTxIcon}>
-                                                        <Ionicons name="arrow-up" size={12} color="#F5A623" />
-                                                    </View>
-                                                    <View style={{ flex: 1, marginHorizontal: 8 }}>
-                                                        <Text style={s.recentTxDesc} numberOfLines={1}>
-                                                            {tx.description || 'Wallet Transfer'}
-                                                        </Text>
-                                                        <Text style={s.recentTxDate}>
-                                                            {safeFormatDate(tx.created_at)}
-                                                        </Text>
-                                                    </View>
-                                                    <View style={{ alignItems: 'flex-end' }}>
-                                                        <Text style={s.recentTxAmount}>
-                                                            ₦{safeFormatCurrency(tx.amount)}
-                                                        </Text>
-                                                        <Text style={{ fontSize: 8.5, color: '#10B981', fontWeight: '800' }}>Tap to Pay</Text>
-                                                    </View>
-                                                </TouchableOpacity>
-                                            );
-                                        })
-                                    ) : (
-                                        <View style={s.recentEmptyBox}>
-                                            <View style={s.recentEmptyIconCircle}>
-                                                <Ionicons name="people-outline" size={16} color="#94A3B8" />
-                                            </View>
-                                            <View style={{ flex: 1, marginLeft: 10 }}>
-                                                <Text style={s.recentEmptyTitle}>No Frequent Recipients</Text>
-                                                <Text style={s.recentEmptySub}>People you pay via QR or email will be remembered here for 1-tap transfers.</Text>
-                                            </View>
-                                        </View>
-                                    )}
-                                </View>
-                            )}
-                        </View>
-
-                        {/* 4. Bank-Grade Security Pill */}
-                        <View style={s.securityShieldPill}>
-                            <Ionicons name="shield-checkmark" size={14} color="#10B981" />
-                            <View style={{ flex: 1, marginLeft: 8 }}>
-                                <Text style={s.securityShieldTitle}>End-to-End Encrypted Transfer</Text>
-                                <Text style={s.securityShieldSub}>Instant wallet settlement with zero transaction fees.</Text>
-                            </View>
-                        </View>
-                    </ScrollView>
-                </View>
-            ) : (
-                <ScrollView 
-                    contentContainerStyle={s.myCodeDashboardContainer}
-                    showsVerticalScrollIndicator={false}
+            {/* Quick Card Action Buttons */}
+            <View style={s.cardActionRow}>
+              <TouchableOpacity
+                onPress={handleShareMyCode}
+                style={s.primaryActionBtn}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[T.gold, T.goldDark]}
+                  style={s.primaryActionGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                 >
-                    {currentUser ? (
-                        <>
-                            {/* LUXURY COMPACT VIP QR CARD */}
-                            <ViewShot ref={flyerRef} options={{ format: 'png', quality: 1 }}>
-                                <LinearGradient 
-                                    colors={['#060B18', '#0D1B3E', '#081126']} 
-                                    style={s.myCodeCard}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                >
-                                    {/* Ambient Glow */}
-                                    <View style={s.ambientOrb} />
+                  <Ionicons name="share-social" size={17} color={T.navyDark} style={{ marginRight: 8 }} />
+                  <Text style={s.primaryActionText}>Share QR Pass</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-                                    {/* 1. Official Branding: Logo + VIP Header */}
-                                    <View style={s.cardBrandRow}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                                            <Image 
-                                                source={{ uri: (settings?.app_logo && typeof settings.app_logo === 'string' && settings.app_logo.startsWith('http')) ? settings.app_logo : ABU_MAFHAL_LOGO_B64 }}
-                                                style={s.cardBrandLogo}
-                                                resizeMode="contain"
-                                            />
-                                            <View>
-                                                <Text style={s.cardBrandTitle}>ABU MAFHAL HUB</Text>
-                                                <Text style={s.cardBrandSubText}>OFFICIAL VIP QR PASS</Text>
-                                            </View>
-                                        </View>
-                                        <View style={s.cardVerifiedPill}>
-                                            <Ionicons name="shield-checkmark" size={10} color="#10B981" />
-                                            <Text style={s.cardVerifiedText}>VERIFIED</Text>
-                                        </View>
-                                    </View>
+              <TouchableOpacity
+                onPress={handleCopyWalletId}
+                style={s.secondaryActionBtn}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="copy-outline" size={17} color={T.navy} style={{ marginRight: 8 }} />
+                <Text style={s.secondaryActionText}>Copy ID</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </ScrollView>
 
-                                    {/* 2. User Profile: Avatar + Full Name + Email */}
-                                    <View style={s.cardTopRow}>
-                                        <View style={s.cardTopUser}>
-                                            <LinearGradient
-                                                colors={['#F5A623', '#D97706']}
-                                                style={s.avatarGradientRing}
-                                            >
-                                                <View style={s.avatarInnerWrapper}>
-                                                    {currentUser.avatar_url ? (
-                                                        <Image 
-                                                            source={{ uri: currentUser.avatar_url }} 
-                                                            style={{ width: '100%', height: '100%', borderRadius: 17.5 }}
-                                                        />
-                                                    ) : (
-                                                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#F5A623' }}>
-                                                            {currentUser.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            </LinearGradient>
-                                            <View style={{ marginLeft: 9, flex: 1 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                    <Text style={s.myCodeName} numberOfLines={1}>{currentUser.full_name}</Text>
-                                                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
-                                                </View>
-                                                <TouchableOpacity 
-                                                    onPress={() => handleCopy(currentUser.email, 'Email')}
-                                                    style={s.emailCopyBtn}
-                                                    activeOpacity={0.7}
-                                                >
-                                                    <Text style={s.myCodeEmail} numberOfLines={1}>{currentUser.email}</Text>
-                                                    <Ionicons name="copy-outline" size={9} color="#94A3B8" />
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
+      {/* ─── Toast for Copied ID ────────────────────────────────────────────── */}
+      {copiedToast && (
+        <View style={s.toastPill}>
+          <Ionicons name="checkmark-circle" size={16} color={T.emerald} style={{ marginRight: 6 }} />
+          <Text style={s.toastText}>Wallet ID copied to clipboard!</Text>
+        </View>
+      )}
 
-                                        {/* Status badge */}
-                                        <View style={s.instantBadge}>
-                                            <Ionicons name="flash" size={9} color="#F5A623" />
-                                            <Text style={s.instantBadgeText}>0% FEE</Text>
-                                        </View>
-                                    </View>
+      {/* ─── MODAL 1: Payment Confirmation & Amount Input ────────────────────── */}
+      <Modal
+        visible={confirmModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setConfirmModalVisible(false);
+          resetScanner();
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={s.modalOverlay}
+        >
+          <View style={s.confirmModalCard}>
+            <View style={s.modalHandle} />
+            <Text style={s.modalHeading}>Confirm Transfer</Text>
 
-                                    {/* 3. Center: High-Definition QR Code with Precision Gold Reticle */}
-                                    <View style={s.qrWrapperContainer}>
-                                        <View style={s.qrWrapper}>
-                                            <View style={[s.qrCorner, s.qrCornerTL]} />
-                                            <View style={[s.qrCorner, s.qrCornerTR]} />
-                                            <View style={[s.qrCorner, s.qrCornerBL]} />
-                                            <View style={[s.qrCorner, s.qrCornerBR]} />
-
-                                            <QRCode
-                                                value={myCodePayload || 'https://abumafhalsub.com'}
-                                                size={116}
-                                                color="#0D1B3E"
-                                                backgroundColor="#FFFFFF"
-                                            />
-                                        </View>
-
-                                        {/* Dynamic Requested Amount Ribbon */}
-                                        {requestedAmount && parseFloat(requestedAmount) > 0 ? (
-                                            <View style={s.requestedAmountBanner}>
-                                                <View style={s.requestedAmountIcon}>
-                                                    <Ionicons name="pricetag" size={9} color="#0D1B3E" />
-                                                </View>
-                                                <Text style={s.requestedAmountTxt}>
-                                                    Amount: <Text style={{ fontWeight: '900', color: '#0D1B3E' }}>₦{safeFormatCurrency(requestedAmount)}</Text>
-                                                </Text>
-                                                <TouchableOpacity 
-                                                    onPress={() => {
-                                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                                        setRequestedAmount('');
-                                                    }}
-                                                    style={s.requestedAmountClearBtn}
-                                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                                                >
-                                                    <Ionicons name="close" size={11} color="#0D1B3E" />
-                                                </TouchableOpacity>
-                                            </View>
-                                        ) : (
-                                            <View style={s.qrSecurityNote}>
-                                                <Ionicons name="shield-checkmark" size={9} color="#F5A623" />
-                                                <Text style={s.qrSecurityNoteText}>Scan with Mafhal App or any Camera to Pay</Text>
-                                            </View>
-                                        )}
-                                    </View>
-
-                                    {/* 4. Bottom: Wallet ID Bar with 1-Tap Copy & User Details */}
-                                    <View style={s.cardFooter}>
-                                        <TouchableOpacity 
-                                            onPress={() => handleCopy(`MAF-${currentUser.id.substring(0, 8).toUpperCase()}`, 'Wallet ID')}
-                                            style={s.walletIdPill}
-                                            activeOpacity={0.8}
-                                        >
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Ionicons name="wallet-outline" size={13} color="#F5A623" />
-                                                <Text style={s.cardInfoLabel}>WALLET ID:</Text>
-                                                <Text style={s.cardInfoValue}>MAF-{currentUser.id.substring(0, 8).toUpperCase()}</Text>
-                                            </View>
-                                            <View style={s.copyIconBadge}>
-                                                <Ionicons name="copy-outline" size={11} color="#F5A623" />
-                                            </View>
-                                        </TouchableOpacity>
-
-                                        {/* User Details Footer */}
-                                        <View style={s.cardDetailsSubBar}>
-                                            <Text style={s.cardDetailsSubText} numberOfLines={1}>
-                                                👤 {currentUser.full_name}   •   📱 {currentUser.phone || 'Abu Mafhal Pay'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </LinearGradient>
-                            </ViewShot>
-
-                            {/* 3 LUXURY DECORATED ACTION BUTTONS */}
-                            <View style={s.featureActionGrid}>
-                                {/* 1. Set Amount (Warm Amber) */}
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        setTempAmountInput(requestedAmount);
-                                        setAmountModalVisible(true);
-                                    }}
-                                    style={s.featureActionBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <LinearGradient colors={['#2B1B04', '#150D02']} style={[s.featureActionGrad, { borderColor: 'rgba(245, 166, 35, 0.35)' }]}>
-                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(245, 166, 35, 0.18)' }]}>
-                                            <Ionicons name="pricetag" size={14} color="#F5A623" />
-                                        </View>
-                                        <Text style={s.featureActionTitle}>
-                                            {requestedAmount ? 'Edit Amount' : 'Set Amount'}
-                                        </Text>
-                                        <Text style={[s.featureActionSub, { color: '#FBBF24' }]}>
-                                            {requestedAmount ? `₦${safeFormatCurrency(requestedAmount)}` : 'Custom'}
-                                        </Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-
-                                {/* 2. Save Image (Emerald Green) */}
-                                <TouchableOpacity 
-                                    onPress={handleSaveToGallery}
-                                    style={s.featureActionBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <LinearGradient colors={['#04261A', '#02130D']} style={[s.featureActionGrad, { borderColor: 'rgba(16, 185, 129, 0.35)' }]}>
-                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.18)' }]}>
-                                            <Ionicons name="arrow-down-circle" size={14} color="#10B981" />
-                                        </View>
-                                        <Text style={s.featureActionTitle}>Save Photo</Text>
-                                        <Text style={[s.featureActionSub, { color: '#34D399' }]}>To Photos</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-
-                                {/* 3. Share Flyer (Sapphire Royal Blue) */}
-                                <TouchableOpacity 
-                                    onPress={handleShareMyCode}
-                                    style={s.featureActionBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <LinearGradient colors={['#0C1938', '#060D1E']} style={[s.featureActionGrad, { borderColor: 'rgba(59, 130, 246, 0.35)' }]}>
-                                        <View style={[s.featureActionIcon, { backgroundColor: 'rgba(59, 130, 246, 0.18)' }]}>
-                                            <Ionicons name="share-social" size={14} color="#3B82F6" />
-                                        </View>
-                                        <Text style={s.featureActionTitle}>Share Flyer</Text>
-                                        <Text style={[s.featureActionSub, { color: '#60A5FA' }]}>To Chat</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* RECENT TRANSFERS ACTIVITY with Top Toggle Icon */}
-                            <View style={s.recentTransfersContainer}>
-                                <TouchableOpacity 
-                                    style={s.recentTransfersHeader}
-                                    activeOpacity={0.7}
-                                    onPress={() => {
-                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                        setShowRecentActivity(!showRecentActivity);
-                                    }}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Ionicons name="time" size={13} color="#F5A623" />
-                                        <Text style={s.recentTransfersTitle}>Recent Activity</Text>
-                                        <View style={s.recentCountBadge}>
-                                            <Text style={s.recentCountBadgeText}>
-                                                {recentTransfers.length > 0 ? `${recentTransfers.length}` : '0'}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Icon a sama - idan an danna zai nuna su */}
-                                    <View style={s.recentHeaderToggleBtn}>
-                                        <Ionicons 
-                                            name={showRecentActivity ? "eye-off" : "eye"} 
-                                            size={14} 
-                                            color="#D4890E" 
-                                        />
-                                        <Text style={s.recentHeaderToggleText}>
-                                            {showRecentActivity ? "Hide" : "Show"}
-                                        </Text>
-                                        <Ionicons 
-                                            name={showRecentActivity ? "chevron-up" : "chevron-down"} 
-                                            size={13} 
-                                            color="#D4890E" 
-                                        />
-                                    </View>
-                                </TouchableOpacity>
-
-                                {showRecentActivity && (
-                                    <View style={{ marginTop: 4 }}>
-                                        {recentTransfers.length > 0 ? (
-                                            recentTransfers.map((tx, idx) => (
-                                                <View key={tx.id || idx} style={s.recentTxRow}>
-                                                    <View style={s.recentTxIcon}>
-                                                        <Ionicons 
-                                                            name={tx.type === 'transfer' ? "swap-horizontal" : "arrow-up"} 
-                                                            size={12} 
-                                                            color="#F5A623" 
-                                                        />
-                                                    </View>
-                                                    <View style={{ flex: 1, marginHorizontal: 8 }}>
-                                                        <Text style={s.recentTxDesc} numberOfLines={1}>
-                                                            {tx.description || 'Wallet Transfer'}
-                                                        </Text>
-                                                        <Text style={s.recentTxDate}>
-                                                            {safeFormatDate(tx.created_at, true)}
-                                                        </Text>
-                                                    </View>
-                                                    <Text style={s.recentTxAmount}>
-                                                        ₦{safeFormatCurrency(tx.amount)}
-                                                    </Text>
-                                                </View>
-                                            ))
-                                        ) : (
-                                            <View style={s.recentEmptyBox}>
-                                                <View style={s.recentEmptyIconCircle}>
-                                                    <Ionicons name="receipt-outline" size={18} color="#94A3B8" />
-                                                </View>
-                                                <View style={{ flex: 1, marginLeft: 10 }}>
-                                                    <Text style={s.recentEmptyTitle}>No Recent Transfers Yet</Text>
-                                                    <Text style={s.recentEmptySub}>
-                                                        Your peer-to-peer QR payments and wallet transfers will appear here automatically.
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Dynamic Banner in Footer */}
-                            <View style={{ width: '100%', maxWidth: 350, marginTop: 10 }}>
-                                <DynamicBanners placement="qr_pay" />
-                            </View>
-                        </>
-                    ) : (
-                        <ActivityIndicator size="large" color="#0056D2" />
-                    )}
-                </ScrollView>
+            {/* Recipient Details Badge */}
+            {recipientUser && (
+              <View style={s.recipientBadge}>
+                <LinearGradient colors={[T.gold, T.goldDark]} style={s.recipientAvatarRing}>
+                  <View style={s.recipientAvatarInner}>
+                    <Text style={s.recipientAvatarLetter}>
+                      {(recipientUser.full_name || 'U')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                </LinearGradient>
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={s.recipientFullName} numberOfLines={1}>
+                    {recipientUser.full_name || 'Abu Mafhal User'}
+                  </Text>
+                  <Text style={s.recipientSubtext} numberOfLines={1}>
+                    {recipientUser.email || recipientUser.phone || 'Verified Account'}
+                  </Text>
+                </View>
+              </View>
             )}
 
-            {/* CONFIRM / AMOUNT INPUT MODAL */}
-            <Modal visible={confirmModalVisible} transparent animationType="slide" onRequestClose={() => { setConfirmModalVisible(false); setScanned(false); }}>
-                <View style={s.modalOverlay}>
-                    <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
-                    
-                    <KeyboardAvoidingView 
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        style={{ width: '100%', alignItems: 'center' }}
-                    >
-                        <LinearGradient
-                            colors={['#102258', '#0b163a']}
-                            style={s.decoratedModalCard}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        >
-                            <View style={s.modalPill} />
-                            
-                            <Text style={s.decoratedModalTitle}>Send Wallet Transfer</Text>
+            {/* Amount Field */}
+            <Text style={s.inputLabel}>AMOUNT TO SEND (₦)</Text>
+            <View style={s.amountInputRow}>
+              <Text style={s.nairaPrefix}>₦</Text>
+              <TextInput
+                style={s.amountInputField}
+                keyboardType="numeric"
+                value={transferAmount}
+                onChangeText={setTransferAmount}
+                placeholder="0.00"
+                placeholderTextColor={T.slate400}
+                autoFocus
+              />
+            </View>
 
-                            {scannedUser && (
-                                <View style={s.recipientBadge}>
-                                    <LinearGradient 
-                                        colors={['#f5a623', '#d4890e']}
-                                        style={s.recipientAvatarRing}
-                                    >
-                                        <View style={s.recipientAvatarInner}>
-                                            {scannedUser.avatarUrl ? (
-                                                <Image 
-                                                    source={{ uri: scannedUser.avatarUrl }} 
-                                                    style={{ width: '100%', height: '100%', borderRadius: 20 }}
-                                                    resizeMode="cover"
-                                                />
-                                            ) : (
-                                                <Text style={s.recipientAvatarText}>
-                                                    {scannedUser.name ? scannedUser.name[0].toUpperCase() : 'U'}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    </LinearGradient>
-                                    <View style={{ marginLeft: 12, flex: 1 }}>
-                                        <Text style={s.recipientNameText} numberOfLines={1}>{scannedUser.name}</Text>
-                                        <Text style={s.recipientEmailText} numberOfLines={1}>{scannedUser.email}</Text>
-                                    </View>
-                                </View>
-                            )}
+            {/* Quick Amount Chips */}
+            <View style={s.chipRow}>
+              {['500', '1000', '2000', '5000'].map((chip) => (
+                <TouchableOpacity
+                  key={chip}
+                  onPress={() => {
+                    if (Platform.OS !== 'web') Haptics.selectionAsync();
+                    setTransferAmount(chip);
+                  }}
+                  style={[s.amountChip, transferAmount === chip && s.amountChipActive]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.amountChipText, transferAmount === chip && s.amountChipTextActive]}>
+                    ₦{safeFormatCurrency(chip)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS !== 'web') Haptics.selectionAsync();
+                  setTransferAmount(userBalance > 0 ? String(userBalance) : '0');
+                }}
+                style={[s.amountChip, s.maxChip]}
+                activeOpacity={0.7}
+              >
+                <Text style={s.maxChipText}>Max</Text>
+              </TouchableOpacity>
+            </View>
 
-                            {/* Amount */}
-                            <Text style={s.inputLabelDecorated}>Amount to Send</Text>
-                            <View style={s.inputContainerDecorated}>
-                                <Text style={s.currencySymbol}>₦</Text>
-                                <TextInput
-                                    style={s.amountInputDecorated}
-                                    keyboardType="number-pad"
-                                    value={amount}
-                                    onChangeText={setAmount}
-                                    placeholder="0.00"
-                                    placeholderTextColor="rgba(255,255,255,0.2)"
-                                    autoFocus
-                                />
-                            </View>
+            {/* Balance Indicator */}
+            <View style={s.balanceRow}>
+              <Ionicons name="wallet-outline" size={13} color={T.gold} style={{ marginRight: 4 }} />
+              <Text style={s.balanceInfoText}>
+                Wallet Balance: <Text style={{ fontWeight: '800', color: T.navy }}>₦{safeFormatCurrency(userBalance)}</Text>
+              </Text>
+            </View>
 
-                            {/* Quick Amount Chips */}
-                            <View style={s.quickChipRow}>
-                                {['500', '1000', '2000', '5000'].map(val => (
-                                    <TouchableOpacity 
-                                        key={val} 
-                                        style={[s.quickChip, amount === val && s.quickChipActive]}
-                                        onPress={() => {
-                                            if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                            setAmount(val);
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={[s.quickChipText, amount === val && s.quickChipTextActive]}>
-                                            ₦{safeFormatCurrency(val)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                                <TouchableOpacity 
-                                    style={[s.quickChip, s.quickChipMax]}
-                                    onPress={() => {
-                                        if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                        setAmount(userBalance > 0 ? String(userBalance) : '0');
-                                    }}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={[s.quickChipText, { color: '#F5A623', fontWeight: '900' }]}>Max</Text>
-                                </TouchableOpacity>
-                            </View>
-                            
-                            <View style={s.balanceWrapper}>
-                                <Ionicons name="wallet-outline" size={14} color="#f5a623" />
-                                <Text style={s.balanceTextDecorated}>
-                                    Available: <Text style={{ color: 'white', fontWeight: '900' }}>₦{safeFormatCurrency(userBalance)}</Text>
-                                </Text>
-                            </View>
-
-                            {/* Action buttons */}
-                            <View style={s.btnRowDecorated}>
-                                <TouchableOpacity 
-                                    onPress={() => { setConfirmModalVisible(false); setScanned(false); setCameraActive(false); }}
-                                    style={s.cancelBtnDecorated}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={s.cancelBtnTextDecorated}>Cancel</Text>
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity 
-                                    onPress={handleConfirmTransfer}
-                                    style={s.sendBtnDecorated}
-                                    activeOpacity={0.9}
-                                >
-                                    <LinearGradient 
-                                        colors={['#f5a623', '#d4890e']}
-                                        style={s.sendBtnGradient}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                    >
-                                        <Text style={s.sendBtnText}>Send Money</Text>
-                                        <Ionicons name="paper-plane" size={14} color={T.navy} style={{ marginLeft: 6 }} />
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-                        </LinearGradient>
-                    </KeyboardAvoidingView>
-                </View>
-            </Modal>
-
-            {/* GLASSMORPHIC MANUAL RECIPIENT INPUT MODAL */}
-            <Modal visible={manualInputVisible} transparent animationType="fade" onRequestClose={() => setManualInputVisible(false)}>
-                <View style={s.modalOverlay}>
-                    <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFillObject} />
-                    
-                    <Animated.View style={s.modalCard}>
-                        {/* Drag indicator */}
-                        <View style={s.modalPill} />
-
-                        <View style={s.modalHeaderWrapper}>
-                            <View style={s.modalIconWrapper}>
-                                <Ionicons name="mail" size={22} color="#0056D2" />
-                            </View>
-                            <View style={{ marginLeft: 12 }}>
-                                <Text style={s.modalTitle}>Enter Recipient</Text>
-                                <Text style={s.modalSub}>Type the registered user email address.</Text>
-                            </View>
-                        </View>
-
-                        {/* Text Input */}
-                        <Text style={s.inputLabel}>Recipient Email</Text>
-                        <View style={s.inputContainer}>
-                            <Ionicons name="mail-outline" size={20} color="#94a3b8" style={{ marginRight: 10 }} />
-                            <TextInput
-                                style={s.textInput}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={manualInput}
-                                onChangeText={setManualInput}
-                                placeholder="name@domain.com"
-                                placeholderTextColor="#cbd5e1"
-                            />
-                        </View>
-
-                        {/* Actions */}
-                        <View style={s.btnRow}>
-                            <TouchableOpacity 
-                                onPress={() => { setManualInputVisible(false); setManualInput(''); }}
-                                style={s.cancelBtn}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={s.cancelBtnText}>Cancel</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity 
-                                onPress={handleVerifyManualRecipient}
-                                style={s.actionBtn}
-                                disabled={isVerifyingManual}
-                                activeOpacity={0.9}
-                            >
-                                <LinearGradient colors={['#0056D2', '#1e40af']} style={s.actionBtnGradient} start={{x:0, y:0}} end={{x:1, y:0}}>
-                                    {isVerifyingManual ? (
-                                        <ActivityIndicator color="white" size="small" />
-                                    ) : (
-                                        <>
-                                            <Text style={s.actionBtnText}>Verify User</Text>
-                                            <Ionicons name="checkmark-circle-outline" size={16} color="white" style={{ marginLeft: 4 }} />
-                                        </>
-                                    )}
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
-                </View>
-            </Modal>
-
-            {/* SECURITY VERIFICATION MODAL */}
-            <SecurityModal
-                visible={securityModalVisible}
-                onClose={() => { setSecurityModalVisible(false); setScanned(false); }}
-                onSuccess={executeTransfer}
-                title="Verify PIN"
-                description="Enter transaction PIN to authorize QR payment."
+            {/* Optional Note Field */}
+            <Text style={s.inputLabel}>NOTE (OPTIONAL)</Text>
+            <TextInput
+              style={s.noteInput}
+              value={transferNote}
+              onChangeText={setTransferNote}
+              placeholder="e.g. Dinner, groceries, subscription"
+              placeholderTextColor={T.slate400}
+              maxLength={40}
             />
 
-            {/* TRANSACTION SUCCESS MODAL */}
-            <Modal visible={successModalVisible} transparent animationType="fade" onRequestClose={handleSuccessDone}>
-                <View className="flex-1 bg-black/60 items-center justify-center p-6">
-                    <View className="bg-white rounded-[32px] p-6 items-center w-full max-w-[340px] shadow-2xl relative overflow-hidden">
-                        <View className="absolute -top-10 -left-10 w-24 h-24 bg-green-50 rounded-full" />
-                        
-                        <View className="w-20 h-20 bg-emerald-100 rounded-full items-center justify-center mb-6 shadow-inner mt-4">
-                            <Ionicons name="checkmark-circle" size={48} color="#107C10" />
-                        </View>
+            {/* Modal Actions */}
+            <View style={s.modalActionRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  setConfirmModalVisible(false);
+                  resetScanner();
+                }}
+                style={s.modalCancelBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
 
-                        <Text className="text-xl font-black text-slate-800 mb-2">Transfer Successful!</Text>
-                        <Text className="text-slate-400 text-xs font-semibold mb-6 uppercase tracking-wider text-center">Receipt</Text>
+              <TouchableOpacity
+                onPress={handleProceedToPin}
+                style={s.modalSubmitBtn}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[T.gold, T.goldDark]}
+                  style={s.modalSubmitGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={s.modalSubmitText}>Proceed to Pay</Text>
+                  <Ionicons name="arrow-forward" size={15} color={T.navyDark} style={{ marginLeft: 6 }} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
-                        {/* Receipt details */}
-                        <View className="w-full bg-slate-50 p-4 rounded-2xl mb-8 border border-slate-100">
-                            <View className="flex-row justify-between mb-3">
-                                <Text className="text-slate-400 text-xs font-semibold">Sent Amount</Text>
-                                <Text className="text-slate-800 font-black text-sm">₦{parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-                            </View>
-                            <View className="flex-row justify-between mb-3">
-                                <Text className="text-slate-400 text-xs font-semibold">Recipient</Text>
-                                <Text className="text-slate-800 font-black text-sm">{scannedUser?.name}</Text>
-                            </View>
-                            <View className="flex-row justify-between">
-                                <Text className="text-slate-400 text-xs font-semibold">Method</Text>
-                                <Text className="text-slate-800 font-black text-sm">QR Code / Manual Email</Text>
-                            </View>
-                        </View>
+      {/* ─── MODAL 2: Manual Recipient Search ─────────────────────────────────── */}
+      <Modal
+        visible={manualModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setManualModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={s.modalOverlay}
+        >
+          <View style={s.manualModalCard}>
+            <View style={s.modalHandle} />
+            <Text style={s.modalHeading}>Pay by Details</Text>
+            <Text style={s.manualModalSubtitle}>
+              Enter recipient's phone number, email address, or Wallet ID (e.g. MAF-12345678).
+            </Text>
 
-                        {/* Action buttons */}
-                        <View className="w-full gap-3">
-                            <TouchableOpacity 
-                                onPress={handleShareReceipt}
-                                disabled={isSharingReceipt}
-                                className="w-full bg-slate-100 h-14 rounded-2xl items-center justify-center border border-slate-200 flex-row gap-2"
-                                activeOpacity={0.8}
-                            >
-                                {isSharingReceipt ? (
-                                    <ActivityIndicator size="small" color="#475569" />
-                                ) : (
-                                    <>
-                                        <Ionicons name="share-social" size={18} color="#475569" />
-                                        <Text className="text-slate-700 font-bold text-base">Share Receipt</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
+            <TextInput
+              style={s.manualInputField}
+              value={manualInput}
+              onChangeText={setManualInput}
+              placeholder="Phone, Email, or Wallet ID"
+              placeholderTextColor={T.slate400}
+              autoCapitalize="none"
+              autoFocus
+            />
 
-                            <TouchableOpacity 
-                                onPress={handleSuccessDone}
-                                className="w-full bg-[#107C10] h-14 rounded-2xl items-center justify-center shadow-lg active:bg-green-700"
-                            >
-                                <Text className="text-white font-bold text-base">Done</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+            <View style={s.modalActionRow}>
+              <TouchableOpacity
+                onPress={() => setManualModalVisible(false)}
+                style={s.modalCancelBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleManualSearch}
+                style={s.modalSubmitBtn}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[T.navy, T.navyMid]}
+                  style={s.modalSubmitGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={[s.modalSubmitText, { color: T.white }]}>Find Account</Text>
+                  <Ionicons name="search" size={14} color={T.white} style={{ marginLeft: 6 }} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── MODAL 3: Set Requested Amount on QR ─────────────────────────────── */}
+      <Modal
+        visible={amountModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAmountModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={s.modalOverlay}
+        >
+          <View style={s.manualModalCard}>
+            <View style={s.modalHandle} />
+            <Text style={s.modalHeading}>Request Specific Amount</Text>
+            <Text style={s.manualModalSubtitle}>
+              Anyone scanning your QR code will have this amount automatically filled in.
+            </Text>
+
+            <View style={s.amountInputRow}>
+              <Text style={s.nairaPrefix}>₦</Text>
+              <TextInput
+                style={s.amountInputField}
+                keyboardType="numeric"
+                value={tempAmountInput}
+                onChangeText={setTempAmountInput}
+                placeholder="0.00"
+                placeholderTextColor={T.slate400}
+                autoFocus
+              />
+            </View>
+
+            <View style={s.modalActionRow}>
+              <TouchableOpacity
+                onPress={() => setAmountModalVisible(false)}
+                style={s.modalCancelBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setRequestedAmount(tempAmountInput);
+                  setAmountModalVisible(false);
+                }}
+                style={s.modalSubmitBtn}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[T.gold, T.goldDark]}
+                  style={s.modalSubmitGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={s.modalSubmitText}>Apply to QR</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── MODAL 4: 4-Digit Security PIN Modal ─────────────────────────────── */}
+      <SecurityModal
+        visible={securityModalVisible}
+        onClose={() => {
+          setSecurityModalVisible(false);
+          resetScanner();
+        }}
+        onSuccess={handleExecuteTransfer}
+        title="Authorize QR Transfer"
+        description={`Enter your 4-digit Transaction PIN to transfer ₦${safeFormatCurrency(transferAmount)} to ${recipientUser?.full_name || 'Recipient'}.`}
+      />
+
+      {/* ─── MODAL 5: Transaction Success & Receipt ──────────────────────────── */}
+      <Modal
+        visible={successModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setSuccessModalVisible(false);
+          resetScanner();
+        }}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.receiptCard}>
+            <View style={s.receiptSuccessRing}>
+              <Ionicons name="checkmark" size={32} color={T.white} />
+            </View>
+
+            <Text style={s.receiptHeading}>Transfer Successful!</Text>
+            <Text style={s.receiptAmountText}>
+              ₦{safeFormatCurrency(receiptData?.amount || 0)}
+            </Text>
+
+            <View style={s.receiptDetailsBox}>
+              <View style={s.receiptRow}>
+                <Text style={s.receiptLabel}>Recipient</Text>
+                <Text style={s.receiptValue}>{receiptData?.recipientName}</Text>
+              </View>
+
+              <View style={s.receiptRow}>
+                <Text style={s.receiptLabel}>Reference</Text>
+                <Text style={[s.receiptValue, { fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
+                  {receiptData?.ref}
+                </Text>
+              </View>
+
+              <View style={s.receiptRow}>
+                <Text style={s.receiptLabel}>Date & Time</Text>
+                <Text style={s.receiptValue}>{safeFormatDate(receiptData?.date)}</Text>
+              </View>
+
+              <View style={s.receiptRow}>
+                <Text style={s.receiptLabel}>Payment Type</Text>
+                <Text style={s.receiptValue}>Instant P2P Transfer</Text>
+              </View>
+
+              <View style={[s.receiptRow, { borderBottomWidth: 0 }]}>
+                <Text style={s.receiptLabel}>Status</Text>
+                <View style={s.statusTag}>
+                  <Text style={s.statusTagText}>SETTLED</Text>
                 </View>
-            </Modal>
+              </View>
+            </View>
 
-            {/* SET REQUESTED AMOUNT MODAL */}
-            <Modal visible={amountModalVisible} transparent animationType="fade" onRequestClose={() => setAmountModalVisible(false)}>
-                <View style={s.modalOverlay}>
-                    <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
-                    
-                    <KeyboardAvoidingView 
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        style={{ width: '100%', alignItems: 'center' }}
-                    >
-                        <LinearGradient
-                            colors={['#0F1D40', '#070D1E']}
-                            style={s.decoratedModalCard}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        >
-                            <View style={s.modalPill} />
-                            
-                            <View style={{ alignItems: 'center', marginBottom: 14 }}>
-                                <View style={[s.modalIconWrapper, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
-                                    <Ionicons name="pricetag" size={20} color="#F5A623" />
-                                </View>
-                                <Text style={s.decoratedModalTitle}>Set Request Amount</Text>
-                                <Text style={s.modalSubTitle}>
-                                    Anyone who scans this QR code will pay this exact amount automatically.
-                                </Text>
-                            </View>
+            <View style={s.modalActionRow}>
+              <TouchableOpacity
+                onPress={handleShareReceipt}
+                style={s.receiptShareBtn}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="share-social" size={16} color={T.navy} style={{ marginRight: 6 }} />
+                <Text style={s.receiptShareText}>Share Receipt</Text>
+              </TouchableOpacity>
 
-                            {/* Quick Amount Chips */}
-                            <View style={s.quickChipRow}>
-                                {['500', '1000', '2000', '5000', '10000'].map(val => (
-                                    <TouchableOpacity 
-                                        key={val} 
-                                        style={[s.quickChip, tempAmountInput === val && s.quickChipActive]}
-                                        onPress={() => {
-                                            if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                            setTempAmountInput(val);
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={[s.quickChipText, tempAmountInput === val && s.quickChipTextActive]}>
-                                            ₦{parseInt(val).toLocaleString()}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            {/* Amount Input */}
-                            <Text style={s.inputLabelDecorated}>Custom Amount (₦)</Text>
-                            <View style={s.inputContainerDecorated}>
-                                <Text style={s.currencySymbol}>₦</Text>
-                                <TextInput
-                                    style={s.amountInputDecorated}
-                                    keyboardType="number-pad"
-                                    value={tempAmountInput}
-                                    onChangeText={setTempAmountInput}
-                                    placeholder="0.00"
-                                    placeholderTextColor="rgba(255,255,255,0.25)"
-                                    autoFocus
-                                />
-                            </View>
-
-                            {/* Buttons */}
-                            <View style={s.btnRowDecorated}>
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        setAmountModalVisible(false);
-                                        setTempAmountInput('');
-                                    }}
-                                    style={s.cancelBtnDecorated}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={s.cancelBtnTextDecorated}>Cancel</Text>
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                        setRequestedAmount(tempAmountInput);
-                                        setAmountModalVisible(false);
-                                    }}
-                                    style={s.sendBtnDecorated}
-                                    activeOpacity={0.9}
-                                >
-                                    <LinearGradient 
-                                        colors={['#F5A623', '#D4890E']}
-                                        style={s.sendBtnGradient}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                    >
-                                        <Text style={s.sendBtnText}>Apply to QR</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-                        </LinearGradient>
-                    </KeyboardAvoidingView>
-                </View>
-            </Modal>
-
-            {/* FLOATING COPIED TOAST */}
-            {copiedToast && (
-                <View style={s.toastContainer} pointerEvents="none">
-                    <BlurView intensity={80} tint="dark" style={s.toastBlur}>
-                        <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                        <Text style={s.toastText}>{copiedToast} copied to clipboard!</Text>
-                    </BlurView>
-                </View>
-            )}
-
-            {/* FULL-SCREEN LIVE CAMERA SCANNER MODAL WITH CYBER HUD DECORATION */}
-            <Modal
-                visible={cameraActive}
-                animationType="fade"
-                transparent={false}
-                onRequestClose={() => setCameraActive(false)}
-                statusBarTranslucent
-            >
-                <View style={{ flex: 1, backgroundColor: '#030712', position: 'relative' }}>
-                    {Platform.OS === 'web' ? (
-                        <video
-                            ref={webVideoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                backgroundColor: '#030712',
-                            }}
-                        />
-                    ) : !scanned && permission?.granted ? (
-                        <CameraView
-                            style={StyleSheet.absoluteFillObject}
-                            facing="back"
-                            enableTorch={torchEnabled}
-                            onBarcodeScanned={onBarcodeScanned}
-                            barcodeScannerSettings={{
-                                barcodeTypes: ["qr"],
-                            }}
-                        />
-                    ) : !scanned ? (
-                        <View style={{ flex: 1, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                            <Ionicons name="camera-outline" size={44} color="#F5A623" />
-                            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>Camera Permission Needed</Text>
-                            <Text style={{ color: '#94A3B8', fontSize: 12.5, textAlign: 'center', marginTop: 8, marginBottom: 20 }}>
-                                Camera access is needed to scan recipient QR codes.
-                            </Text>
-                            <TouchableOpacity
-                                onPress={async () => {
-                                    const res = await requestPermission();
-                                    if (!res?.granted) {
-                                        showScanNotice("Permission Denied", "Camera permission is disabled. You can also upload a QR photo from your gallery.");
-                                    }
-                                }}
-                                style={{ backgroundColor: '#F5A623', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12 }}
-                            >
-                                <Text style={{ color: '#0D1B3E', fontWeight: '800', fontSize: 13 }}>Grant Permission</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : null}
-
-                    {scanned && (
-                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(3,7,18,0.95)', alignItems: 'center', justifyContent: 'center', zIndex: 60 }]}>
-                            <ActivityIndicator size="large" color="#F5A623" />
-                            <Text style={{ color: '#FFFFFF', fontWeight: '800', marginTop: 14, fontSize: 15 }}>Processing recipient details...</Text>
-                        </View>
-                    )}
-
-                    {/* Cyber Luxury Decorated Viewfinder Overlay */}
-                    {!scanned && (
-                        <View style={s.cyberOverlayContainer}>
-                            {/* 1. Top HUD Header Bar */}
-                            <View style={s.cyberHudTopBar}>
-                                <TouchableOpacity 
-                                    onPress={() => setCameraActive(false)}
-                                    style={s.cyberHudCircleBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="close" size={20} color="#FFFFFF" />
-                                </TouchableOpacity>
-
-                                <View style={s.cyberHudTitleWrapper}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <View style={s.cyberStatusDot} />
-                                        <Text style={s.cyberHudTitle}>LIVE QR SCANNER</Text>
-                                    </View>
-                                    <Text style={s.cyberHudSub}>ABU MAFHAL • AI TARGETING</Text>
-                                </View>
-
-                                <TouchableOpacity 
-                                    onPress={() => setTorchEnabled(!torchEnabled)}
-                                    style={[s.cyberHudCircleBtn, torchEnabled && s.cyberHudBtnActive]}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name={torchEnabled ? "flash" : "flash-off"} size={17} color={torchEnabled ? "#F5A623" : "#FFFFFF"} />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* 2. Middle Targeted Viewfinder Window with Cyber Corners & Crosshairs */}
-                            <View style={s.cyberMiddleSection}>
-                                <View style={s.cyberDarkSideMask} />
-                                
-                                <View style={s.cyberScanWindow}>
-                                    {/* 4 Glowing Gold Cyber Brackets */}
-                                    <View style={[s.cyberCorner, s.cyberCornerTL]} />
-                                    <View style={[s.cyberCorner, s.cyberCornerTR]} />
-                                    <View style={[s.cyberCorner, s.cyberCornerBL]} />
-                                    <View style={[s.cyberCorner, s.cyberCornerBR]} />
-
-                                    {/* Cyber HUD Corner Tags */}
-                                    <Text style={s.cyberTagTL}>[ REC ]</Text>
-                                    <Text style={s.cyberTagTR}>[ 60 FPS ]</Text>
-                                    <Text style={s.cyberTagBL}>[ 256-BIT ]</Text>
-                                    <Text style={s.cyberTagBR}>[ SECURE ]</Text>
-
-                                    {/* Central Crosshair Target */}
-                                    <View style={s.cyberCrosshairH} />
-                                    <View style={s.cyberCrosshairV} />
-                                    <View style={s.cyberTargetRing} />
-
-                                    {/* Animated Glowing Sweeping Laser */}
-                                    <Animated.View style={[s.cyberLaserLine, { transform: [{ translateY: scanLineAnim }] }]}>
-                                        <LinearGradient
-                                            colors={['rgba(245, 166, 35, 0)', '#F5A623', '#FFFFFF', '#F5A623', 'rgba(245, 166, 35, 0)']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={{ width: '100%', height: '100%' }}
-                                        />
-                                    </Animated.View>
-                                </View>
-
-                                <View style={s.cyberDarkSideMask} />
-                            </View>
-
-                            {/* 3. Bottom HUD Section with Instruction & Controls */}
-                            <View style={s.cyberHudBottomSection}>
-                                <View style={s.cyberInstructionPill}>
-                                    <Ionicons name="scan" size={13} color="#F5A623" />
-                                    <Text style={s.cyberInstructionText}>Align recipient QR code inside the frame to pay</Text>
-                                </View>
-
-                                {/* Floating Glass Controls Dock */}
-                                <View style={s.cyberControlDock}>
-                                    <TouchableOpacity 
-                                        onPress={handleUploadFromGallery}
-                                        style={s.cyberDockBtn}
-                                        activeOpacity={0.8}
-                                    >
-                                        <LinearGradient
-                                            colors={['rgba(16, 185, 129, 0.25)', 'rgba(6, 78, 59, 0.5)']}
-                                            style={s.cyberDockBtnGrad}
-                                        >
-                                            <Ionicons name="image" size={16} color="#10B981" />
-                                            <Text style={s.cyberDockBtnText}>Upload Photo</Text>
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity 
-                                        onPress={() => { setCameraActive(false); setManualInputVisible(true); }}
-                                        style={s.cyberDockBtn}
-                                        activeOpacity={0.8}
-                                    >
-                                        <LinearGradient
-                                            colors={['rgba(59, 130, 246, 0.25)', 'rgba(30, 58, 138, 0.5)']}
-                                            style={s.cyberDockBtnGrad}
-                                        >
-                                            <Ionicons name="mail" size={16} color="#3B82F6" />
-                                            <Text style={s.cyberDockBtnText}>Pay via Email</Text>
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </View>
-                    )}
-                </View>
-            </Modal>
-
-            {/* CROSS-PLATFORM THEMED NOTICE / ALERT MODAL */}
-            <Modal visible={noticeModal.visible} transparent animationType="fade" onRequestClose={() => setNoticeModal({ visible: false, title: '', message: '' })}>
-                <View style={s.modalOverlay}>
-                    <View style={s.noticeCard}>
-                        <View style={s.noticeIconRing}>
-                            <Ionicons name="information-circle" size={32} color="#F5A623" />
-                        </View>
-                        <Text style={s.noticeTitle}>{noticeModal.title}</Text>
-                        <Text style={s.noticeMessage}>{noticeModal.message}</Text>
-                        <TouchableOpacity
-                            onPress={() => setNoticeModal({ visible: false, title: '', message: '' })}
-                            style={s.noticeDismissBtn}
-                            activeOpacity={0.85}
-                        >
-                            <LinearGradient colors={['#F5A623', '#D4890E']} style={s.noticeDismissGrad}>
-                                <Text style={s.noticeDismissText}>Understood</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            {/* Global Loader overlay for submissions, loading states, and gallery scanning */}
-            {(isSubmitting || isReadingGallery) && (
-                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(5,11,23,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }]}>
-                    <View style={s.readingGalleryBox}>
-                        <ActivityIndicator size="large" color="#F5A623" />
-                        <Text style={s.readingGalleryText}>
-                            {isReadingGallery ? "Scanning gallery image..." : "Processing transaction..."}
-                        </Text>
-                    </View>
-                </View>
-            )}
+              <TouchableOpacity
+                onPress={() => {
+                  setSuccessModalVisible(false);
+                  resetScanner();
+                }}
+                style={s.receiptDoneBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={s.receiptDoneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-    );
+      </Modal>
+
+      {/* ─── Loading Overlay ─────────────────────────────────────────────────── */}
+      {(isResolving || isProcessing) && (
+        <View style={s.loadingOverlay}>
+          <View style={s.loadingBox}>
+            <ActivityIndicator size="large" color={T.gold} />
+            <Text style={s.loadingText}>
+              {isResolving ? 'Resolving recipient...' : 'Processing secure transfer...'}
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
 }
 
+// ─── Stylesheet ───────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  // Ultra-Compact Curved Header
-  headerContainer: {
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 44 : 14,
-    paddingBottom: 10,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
-    zIndex: 20,
+  container: {
+    flex: 1,
+    backgroundColor: T.slate100,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  backBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 15,
+    color: T.white,
+    fontSize: 16,
     fontWeight: '900',
-    color: 'white',
-    letterSpacing: -0.2,
+    letterSpacing: 0.3,
   },
-  headerBalancePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.25)',
+  headerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    fontWeight: '600',
     marginTop: 2,
   },
-  headerBalance: {
-    color: '#F5A623',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  headerToggleBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(245, 166, 35, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Tab bar
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    height: 36,
-  },
-  tabItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-  },
-  tabItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
-  },
-  tabText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  tabTextActive: {
-    color: '#F5A623',
-    fontWeight: '900',
-  },
-  tabTextActiveScan: {
-    color: '#10B981',
-    fontWeight: '900',
-  },
-  // Dashboard Scroll Container
-  myCodeDashboardContainer: {
-    flexGrow: 1,
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 130,
-  },
-  // Permission Card
-  permissionCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 24,
-    margin: 20,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e5ef',
-    shadowColor: 'rgba(13,27,62,0.04)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  permissionIconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0,86,210,0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  permissionTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: T.navy,
-    marginBottom: 8,
-  },
-  permissionDesc: {
-    fontSize: 13,
-    color: T.textSub,
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 16,
-    marginBottom: 28,
-  },
-  grantBtn: {
-    width: '100%',
-    maxWidth: 240,
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#0056D2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  gradientBtn: {
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  grantBtnText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  manualLinkText: {
-    color: '#0056D2',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-  },
-  // Executive Luxury VIP QR Card (Compact, Horizontal Balanced & Perfectly Arranged)
-  myCodeCard: {
-    width: '100%',
-    maxWidth: 330,
-    borderRadius: 20,
-    padding: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    elevation: 6,
-    borderWidth: 1.2,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
-    overflow: 'hidden',
-    backgroundColor: '#070D1E',
-  },
-  ambientOrb: {
-    position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: '#F5A623',
-    opacity: 0.1,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  cardTopUser: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatarGradientRing: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    padding: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInnerWrapper: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 17.5,
-    backgroundColor: '#070D1E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  myCodeName: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.2,
-  },
-  emailCopyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 1,
-  },
-  myCodeEmail: {
-    fontSize: 10,
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
-  cardBrandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 8,
-    paddingBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  cardBrandLogo: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-  },
-  cardBrandBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.25)',
-    gap: 4,
-  },
-  cardBrandTitle: {
-    color: '#F5A623',
-    fontSize: 10.5,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
-  cardBrandSubText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 8,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  cardVerifiedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 10,
-    gap: 3,
-  },
-  cardVerifiedText: {
-    color: '#10B981',
-    fontSize: 8.5,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-  },
-  instantBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.25)',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 10,
-    gap: 3,
-  },
-  instantBadgeText: {
-    color: '#F5A623',
-    fontSize: 8.5,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-  },
-  cardDetailsSubBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    marginTop: 6,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 8,
-  },
-  cardDetailsSubText: {
-    fontSize: 9,
-    color: '#94A3B8',
-    fontWeight: '700',
-  },
-  qrWrapperContainer: {
-    alignItems: 'center',
-    marginVertical: 4,
-    width: '100%',
-  },
-  qrWrapper: {
-    padding: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    shadowColor: '#F5A623',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 5,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qrCorner: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderColor: '#F5A623',
-  },
-  qrCornerTL: {
-    top: 3,
-    left: 3,
-    borderTopWidth: 2.5,
-    borderLeftWidth: 2.5,
-    borderTopLeftRadius: 5,
-  },
-  qrCornerTR: {
-    top: 3,
-    right: 3,
-    borderTopWidth: 2.5,
-    borderRightWidth: 2.5,
-    borderTopRightRadius: 5,
-  },
-  qrCornerBL: {
-    bottom: 3,
-    left: 3,
-    borderBottomWidth: 2.5,
-    borderLeftWidth: 2.5,
-    borderBottomLeftRadius: 5,
-  },
-  qrCornerBR: {
-    bottom: 3,
-    right: 3,
-    borderBottomWidth: 2.5,
-    borderRightWidth: 2.5,
-    borderBottomRightRadius: 5,
-  },
-  requestedAmountBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FDE68A',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
-    gap: 5,
-  },
-  requestedAmountIcon: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#F5A623',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  requestedAmountTxt: {
-    color: '#78350F',
-    fontSize: 10.5,
-    fontWeight: '700',
-  },
-  requestedAmountClearBtn: {
-    marginLeft: 3,
-    padding: 2,
-  },
-  qrSecurityNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-  },
-  qrSecurityNoteText: {
-    color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  cardFooter: {
-    alignItems: 'center',
-    width: '100%',
-    marginTop: 6,
-  },
-  walletIdPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    width: '100%',
-  },
-  cardInfoLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: 'rgba(245, 166, 35, 0.9)',
-    letterSpacing: 0.5,
-  },
-  cardInfoValue: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    letterSpacing: 1.2,
-  },
-  copyIconBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // 3 Decorated Action Buttons
-  featureActionGrid: {
-    flexDirection: 'row',
-    width: '100%',
-    maxWidth: 330,
-    marginTop: 10,
-    gap: 8,
-  },
-  featureActionBtn: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  featureActionGrad: {
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 16,
-  },
-  featureActionIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  featureActionTitle: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  featureActionSub: {
-    fontSize: 8.5,
-    fontWeight: '700',
-    marginTop: 1,
-    textAlign: 'center',
-  },
-  recentTransfersContainer: {
-    width: '100%',
-    maxWidth: 330,
-    marginTop: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: 'rgba(13, 27, 62, 0.04)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  recentTransfersHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  recentTransfersTitle: {
-    color: '#334155',
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  recentCountBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: '#E2E8F0',
-  },
-  recentCountBadgeText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#64748B',
-  },
-  recentHeaderToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.35)',
-    gap: 4,
-  },
-  recentHeaderToggleText: {
-    color: '#D4890E',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  recentTxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#F1F5F9',
-  },
-  recentTxIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(245, 166, 35, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recentTxDesc: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  recentTxDate: {
-    fontSize: 9,
-    color: '#94A3B8',
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  recentTxAmount: {
-    fontSize: 11.5,
-    fontWeight: '900',
-    color: '#10B981',
-  },
-  recentTransfersBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  recentTransfersBadgeText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#64748B',
-  },
-  recentEmptyBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    marginTop: 2,
+    padding: 3,
   },
-  recentEmptyIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 11,
   },
-  recentEmptyTitle: {
-    fontSize: 11.5,
+  tabButtonActive: {
+    backgroundColor: T.gold,
+  },
+  tabButtonText: {
+    color: T.slate400,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#0F172A',
   },
-  recentEmptySub: {
-    fontSize: 9.5,
-    color: '#64748B',
-    fontWeight: '500',
-    marginTop: 2,
-    lineHeight: 13,
+  tabButtonTextActive: {
+    color: T.navyDark,
   },
-  modalSubTitle: {
-    color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: 11,
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: 12,
-    marginTop: 4,
-  },
-  quickChipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 14,
-    justifyContent: 'center',
-  },
-  quickChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  quickChipActive: {
-    backgroundColor: 'rgba(245, 166, 35, 0.25)',
-    borderColor: '#F5A623',
-  },
-  quickChipMax: {
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    borderColor: 'rgba(245, 166, 35, 0.35)',
-  },
-  quickChipText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  quickChipTextActive: {
-    color: '#F5A623',
-    fontWeight: '900',
-  },
-  toastContainer: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  toastBlur: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+  scrollContent: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  toastText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  // Modal layout
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: 'white',
-    borderRadius: 30,
-    padding: 24,
-    shadowColor: 'black',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-    position: 'relative',
-  },
-  modalPill: {
-    width: 36,
-    height: 4,
-    backgroundColor: '#e2e5ef',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  modalHeaderWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,86,210,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: T.navy,
-  },
-  modalSub: {
-    fontSize: 10,
-    color: T.textSub,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  inputLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: T.navy,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 6,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e5ef',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    height: 52,
-    backgroundColor: '#f8f9fc',
-    marginBottom: 24,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: T.navy,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: '#f1f3f9',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 50,
-  },
-  cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: T.textSub,
-  },
-  actionBtn: {
-    flex: 1.5,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  actionBtnGradient: {
-    height: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: 'white',
-  },
-  // Cyber Luxury Live Camera HUD Overlay Styles
-  cyberOverlayContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    zIndex: 10,
-  },
-  cyberHudTopBar: {
-    paddingTop: Platform.OS === 'ios' ? 48 : 22,
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(3, 7, 18, 0.78)',
-    paddingBottom: 12,
-  },
-  cyberHudCircleBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cyberHudBtnActive: {
-    backgroundColor: 'rgba(245, 166, 35, 0.25)',
-    borderColor: '#F5A623',
-  },
-  cyberHudTitleWrapper: {
-    alignItems: 'center',
-  },
-  cyberHudTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  cyberHudSub: {
-    color: '#F5A623',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginTop: 2,
-  },
-  cyberStatusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  cyberMiddleSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 250,
-  },
-  cyberDarkSideMask: {
-    flex: 1,
-    height: '100%',
-    backgroundColor: 'rgba(3, 7, 18, 0.78)',
-  },
-  cyberScanWindow: {
-    width: 240,
-    height: 240,
-    borderRadius: 20,
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
-    backgroundColor: 'transparent',
-  },
-  cyberCorner: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderColor: '#F5A623',
-  },
-  cyberCornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 3.5,
-    borderLeftWidth: 3.5,
-    borderTopLeftRadius: 16,
-  },
-  cyberCornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 3.5,
-    borderRightWidth: 3.5,
-    borderTopRightRadius: 16,
-  },
-  cyberCornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 3.5,
-    borderLeftWidth: 3.5,
-    borderBottomLeftRadius: 16,
-  },
-  cyberCornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 3.5,
-    borderRightWidth: 3.5,
-    borderBottomRightRadius: 16,
-  },
-  cyberTagTL: {
-    position: 'absolute',
-    top: 6,
-    left: 9,
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#F5A623',
-    letterSpacing: 0.5,
-  },
-  cyberTagTR: {
-    position: 'absolute',
-    top: 6,
-    right: 9,
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#10B981',
-    letterSpacing: 0.5,
-  },
-  cyberTagBL: {
-    position: 'absolute',
-    bottom: 6,
-    left: 9,
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#3B82F6',
-    letterSpacing: 0.5,
-  },
-  cyberTagBR: {
-    position: 'absolute',
-    bottom: 6,
-    right: 9,
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#10B981',
-    letterSpacing: 0.5,
-  },
-  cyberCrosshairH: {
-    position: 'absolute',
-    top: 119,
-    left: 85,
-    right: 85,
-    height: 1,
-    backgroundColor: 'rgba(245, 166, 35, 0.4)',
-  },
-  cyberCrosshairV: {
-    position: 'absolute',
-    left: 119,
-    top: 85,
-    bottom: 85,
-    width: 1,
-    backgroundColor: 'rgba(245, 166, 35, 0.4)',
-  },
-  cyberTargetRing: {
-    position: 'absolute',
-    top: 106,
-    left: 106,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.45)',
-  },
-  cyberLaserLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 3,
-    shadowColor: '#F5A623',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cyberHudBottomSection: {
-    flex: 1,
-    backgroundColor: 'rgba(3, 7, 18, 0.78)',
-    alignItems: 'center',
     paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
-    justifyContent: 'space-between',
-  },
-  cyberInstructionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 16,
-    gap: 6,
-  },
-  cyberInstructionText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '700',
-  },
-  cyberControlDock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    width: '100%',
-    maxWidth: 320,
-  },
-  cyberDockBtn: {
-    flex: 1,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  cyberDockBtnGrad: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 14,
-  },
-  cyberDockBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
   },
 
-  // Compact Scan Tab Dashboard
-  scanDashboardContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 130,
+  // ─── Tab 1: Scanner Styles ──────────────────────────────────────────────────
+  scanTabWrapper: {
     alignItems: 'center',
   },
-  modernScanHubCard: {
+  viewfinderContainer: {
     width: '100%',
-    maxWidth: 330,
-    borderRadius: 18,
-    padding: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    elevation: 6,
-    borderWidth: 1.2,
-    borderColor: 'rgba(245, 166, 35, 0.32)',
-    overflow: 'hidden',
-    backgroundColor: '#070D1E',
-  },
-  scanCardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 8,
-  },
-  scannerInteractiveBox: {
-    width: '100%',
-    height: 64,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.25)',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  previewLaserLine: {
-    position: 'absolute',
-    left: 10,
-    right: 10,
-    height: 2,
-    backgroundColor: '#F5A623',
-    shadowColor: '#F5A623',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 4,
-    zIndex: 10,
-  },
-  previewCenterContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 12,
-  },
-  previewCameraIconRing: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewTapTitle: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  previewTapSub: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 9.5,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  scanLaunchArrow: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanQuickActionsGrid: {
-    flexDirection: 'row',
-    width: '100%',
-    marginTop: 8,
-    gap: 8,
-  },
-  scanQuickActionCard: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  scanQuickActionGrad: {
-    flexDirection: 'row',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    gap: 6,
-  },
-  scanQuickActionTitle: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  securityShieldPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    width: '100%',
-    maxWidth: 340,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: 'rgba(13, 27, 62, 0.04)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  securityShieldTitle: {
-    color: '#0F172A',
-    fontSize: 10.5,
-    fontWeight: '800',
-  },
-  securityShieldSub: {
-    color: '#64748B',
-    fontSize: 9,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  readingGalleryBox: {
-    backgroundColor: '#0D1B3E',
-    borderRadius: 22,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.35)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-    minWidth: 260,
-  },
-  readingGalleryText: {
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '700',
-    marginTop: 14,
-    textAlign: 'center',
-  },
-  noticeCard: {
-    backgroundColor: '#0D1B3E',
+    height: 310,
+    backgroundColor: T.navyDark,
     borderRadius: 24,
-    padding: 24,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+  },
+  viewfinderCorners: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 240,
+    height: 240,
+    marginLeft: -120,
+    marginTop: -120,
+  },
+  cornerBracket: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderColor: T.gold,
+  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 3.5, borderLeftWidth: 3.5, borderTopLeftRadius: 10 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 3.5, borderRightWidth: 3.5, borderTopRightRadius: 10 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3.5, borderLeftWidth: 3.5, borderBottomLeftRadius: 10 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3.5, borderRightWidth: 3.5, borderBottomRightRadius: 10 },
+  laserBeam: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    height: 2.5,
+    backgroundColor: T.gold,
+    shadowColor: T.gold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  viewfinderHint: {
+    position: 'absolute',
+    bottom: 14,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 11, 24, 0.75)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  viewfinderHintText: {
+    color: T.white,
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  permissionBox: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 12,
-    width: '88%',
-    maxWidth: 340,
+    padding: 24,
   },
-  noticeIconRing: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  permissionIconRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(245, 166, 35, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.45)',
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  noticeTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
+  permissionTitle: {
+    color: T.white,
+    fontSize: 15,
+    fontWeight: '800',
     marginBottom: 6,
-    textAlign: 'center',
   },
-  noticeMessage: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12.5,
-    fontWeight: '600',
+  permissionSubtitle: {
+    color: T.slate400,
+    fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 18,
   },
-  noticeDismissBtn: {
+  permissionBtn: {
+    backgroundColor: T.gold,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  permissionBtnText: {
+    color: T.navyDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+
+  // Action Cards Below Camera
+  actionRow: {
+    flexDirection: 'row',
     width: '100%',
+    gap: 12,
+    marginTop: 14,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: T.white,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: T.slate200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  actionIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionCardTitle: {
+    color: T.slate900,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  actionCardSubtitle: {
+    color: T.slate500,
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // Recent Payees
+  recentPayeesSection: {
+    width: '100%',
+    marginTop: 18,
+  },
+  sectionHeading: {
+    color: T.slate500,
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  recentPayeesRow: {
+    flexDirection: 'row',
+  },
+  recentPayeeChip: {
+    alignItems: 'center',
+    marginRight: 14,
+    width: 60,
+  },
+  recentAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: T.navyMid,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: T.gold,
+    marginBottom: 4,
+  },
+  recentAvatarText: {
+    color: T.gold,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  recentPayeeName: {
+    color: T.slate700,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  // Security Banner
+  securityBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 18,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  securityBannerTitle: {
+    color: T.emeraldDark,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  securityBannerSubtitle: {
+    color: T.slate700,
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+
+  // ─── Tab 2: My QR Code Styles ───────────────────────────────────────────────
+  myCodeTabWrapper: {
+    alignItems: 'center',
+  },
+  executiveCard: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 14,
+  },
+  brandLogoWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandLogoImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  brandTitle: {
+    color: T.white,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  brandBadge: {
+    color: T.gold,
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  verifiedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.3)',
+  },
+  verifiedTagText: {
+    color: T.gold,
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  cardUserInfo: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  userNameText: {
+    color: T.white,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  userEmailText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  walletIdPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.3)',
+    marginBottom: 16,
+  },
+  walletIdLabel: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  walletIdValue: {
+    color: T.gold,
+    fontSize: 12,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  qrWrapperCard: {
+    backgroundColor: T.white,
+    borderRadius: 18,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
+    marginBottom: 14,
+  },
+  requestedRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: T.gold,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  requestedRibbonText: {
+    color: T.navyDark,
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+  requestedRibbonClose: {
+    marginLeft: 6,
+    padding: 2,
+  },
+  setAmountBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  setAmountBtnText: {
+    color: T.gold,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  cardFooterText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 9.5,
+    fontWeight: '600',
+  },
+  cardActionRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+    marginTop: 16,
+  },
+  primaryActionBtn: {
+    flex: 1.6,
+    height: 48,
     borderRadius: 14,
     overflow: 'hidden',
   },
-  noticeDismissGrad: {
-    paddingVertical: 11,
+  primaryActionGrad: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  noticeDismissText: {
-    color: '#0D1B3E',
+  primaryActionText: {
+    color: T.navyDark,
     fontSize: 13.5,
     fontWeight: '900',
   },
-  decoratedModalCard: {
-    width: '90%',
-    maxWidth: 340,
-    backgroundColor: '#0d1b3e',
-    borderRadius: 24,
-    padding: 20,
+  secondaryActionBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: T.white,
     borderWidth: 1.5,
+    borderColor: T.slate200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryActionText: {
+    color: T.navy,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  // Toast
+  toastPill: {
+    position: 'absolute',
+    bottom: 24,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: T.navyDark,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-    alignItems: 'stretch',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  decoratedModalTitle: {
-    color: 'white',
+  toastText: {
+    color: T.white,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  // ─── Modal Components ───────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(6, 11, 24, 0.65)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: T.slate200,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  confirmModalCard: {
+    width: '100%',
+    backgroundColor: T.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 22,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  manualModalCard: {
+    width: '92%',
+    backgroundColor: T.white,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 40,
+  },
+  modalHeading: {
+    color: T.slate900,
     fontSize: 17,
     fontWeight: '900',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 14,
+  },
+  manualModalSubtitle: {
+    color: T.slate500,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
   },
   recipientBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: T.slate50,
     padding: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 20,
+    borderColor: T.slate200,
+    marginBottom: 16,
   },
   recipientAvatarRing: {
     width: 44,
@@ -3889,103 +1929,289 @@ const s = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 20,
-    backgroundColor: '#0d1b3e',
+    backgroundColor: T.navyMid,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  recipientAvatarText: {
-    color: '#f5a623',
+  recipientAvatarLetter: {
+    color: T.gold,
     fontSize: 18,
     fontWeight: '900',
   },
-  recipientNameText: {
-    color: 'white',
+  recipientFullName: {
+    color: T.slate900,
     fontSize: 14,
     fontWeight: '800',
   },
-  recipientEmailText: {
-    color: 'rgba(255, 255, 255, 0.5)',
+  recipientSubtext: {
+    color: T.slate500,
     fontSize: 11,
     fontWeight: '600',
-    marginTop: 1,
+    marginTop: 2,
   },
-  inputLabelDecorated: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: 9,
+  inputLabel: {
+    color: T.slate500,
+    fontSize: 10,
     fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     marginBottom: 6,
   },
-  inputContainerDecorated: {
+  amountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: T.slate200,
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 52,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    marginBottom: 8,
+    backgroundColor: T.slate50,
+    marginBottom: 10,
   },
-  currencySymbol: {
-    color: '#f5a623',
-    fontSize: 20,
+  nairaPrefix: {
+    color: T.goldDark,
+    fontSize: 22,
     fontWeight: '900',
-    marginRight: 8,
+    marginRight: 6,
   },
-  amountInputDecorated: {
+  amountInputField: {
     flex: 1,
-    color: 'white',
-    fontSize: 20,
+    color: T.slate900,
+    fontSize: 22,
     fontWeight: '900',
   },
-  balanceWrapper: {
+  manualInputField: {
+    borderWidth: 1.5,
+    borderColor: T.slate200,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 48,
+    backgroundColor: T.slate50,
+    color: T.slate900,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+  },
+  amountChip: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: T.slate100,
+    borderWidth: 1,
+    borderColor: T.slate200,
+    alignItems: 'center',
+  },
+  amountChipActive: {
+    backgroundColor: T.goldLight,
+    borderColor: T.gold,
+  },
+  amountChipText: {
+    color: T.slate700,
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  amountChipTextActive: {
+    color: T.navyDark,
+  },
+  maxChip: {
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    borderColor: T.gold,
+  },
+  maxChipText: {
+    color: T.goldDark,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  balanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    marginLeft: 2,
+    marginBottom: 14,
   },
-  balanceTextDecorated: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 11,
-    fontWeight: '700',
-    marginLeft: 6,
+  balanceInfoText: {
+    color: T.slate500,
+    fontSize: 11.5,
+    fontWeight: '600',
   },
-  btnRowDecorated: {
+  noteInput: {
+    borderWidth: 1,
+    borderColor: T.slate200,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 42,
+    backgroundColor: T.slate50,
+    color: T.slate800,
+    fontSize: 12.5,
+    fontWeight: '600',
+    marginBottom: 20,
+  },
+  modalActionRow: {
     flexDirection: 'row',
     gap: 12,
   },
-  cancelBtnDecorated: {
+  modalCancelBtn: {
     flex: 1,
     height: 48,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: T.slate100,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelBtnTextDecorated: {
-    color: 'rgba(255, 255, 255, 0.6)',
+  modalCancelText: {
+    color: T.slate700,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  sendBtnDecorated: {
+  modalSubmitBtn: {
     flex: 1.5,
     height: 48,
     borderRadius: 14,
     overflow: 'hidden',
   },
-  sendBtnGradient: {
+  modalSubmitGrad: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnText: {
-    color: '#0d1b3e',
-    fontSize: 13,
+  modalSubmitText: {
+    color: T.navyDark,
+    fontSize: 13.5,
     fontWeight: '900',
-  }
+  },
+
+  // ─── Receipt Modal ──────────────────────────────────────────────────────────
+  receiptCard: {
+    width: '90%',
+    backgroundColor: T.white,
+    borderRadius: 26,
+    padding: 22,
+    alignItems: 'center',
+    marginBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  receiptSuccessRing: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: T.emerald,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: T.emerald,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  receiptHeading: {
+    color: T.slate900,
+    fontSize: 17,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  receiptAmountText: {
+    color: T.emeraldDark,
+    fontSize: 26,
+    fontWeight: '900',
+    marginBottom: 16,
+  },
+  receiptDetailsBox: {
+    width: '100%',
+    backgroundColor: T.slate50,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: T.slate200,
+    marginBottom: 20,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: T.slate200,
+  },
+  receiptLabel: {
+    color: T.slate500,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  receiptValue: {
+    color: T.slate800,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  statusTag: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  statusTagText: {
+    color: T.emeraldDark,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  receiptShareBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: T.slate100,
+    borderWidth: 1,
+    borderColor: T.slate200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptShareText: {
+    color: T.navy,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  receiptDoneBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: T.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptDoneText: {
+    color: T.white,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  // ─── Loading Overlay ────────────────────────────────────────────────────────
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(6, 11, 24, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: T.navyMid,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderRadius: 20,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+  },
+  loadingText: {
+    color: T.white,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 12,
+  },
 });
