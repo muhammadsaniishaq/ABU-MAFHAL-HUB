@@ -2269,6 +2269,28 @@ $$ language plpgsql security definer;
                     const email = data.customer?.email;
                     let userId = null;
 
+                    // ── FORWARD ABU MAFHAL MARKETPLACE TRANSACTIONS TO abumafhal.com ──
+                    if (data.tx_ref && (data.tx_ref.startsWith('AMF-') || data.tx_ref.includes('AMF-'))) {
+                        console.log('[Flutterwave Webhook] Forwarding Marketplace transaction (' + data.tx_ref + ') to abumafhal.com...');
+                        try {
+                            const fwdRes = await fetch('https://abumafhal.com/api/webhook-flutterwave', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'verif-hash': flwSignature || ''
+                                },
+                                body: JSON.stringify(event)
+                            });
+                            console.log('[Flutterwave Webhook] Forwarded to Marketplace. HTTP Status:', fwdRes.status);
+                        } catch (fwdErr) {
+                            console.error('[Flutterwave Webhook] Marketplace forwarding error:', fwdErr);
+                        }
+                        return new Response(JSON.stringify({ status: 'forwarded_to_marketplace', tx_ref: data.tx_ref }), {
+                            status: 200,
+                            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                        });
+                    }
+
                     if (data.tx_ref && data.tx_ref.startsWith('dva_')) {
                         const parts = data.tx_ref.split('_');
                         if (parts[1] === 'assign' && parts.length > 2) {
