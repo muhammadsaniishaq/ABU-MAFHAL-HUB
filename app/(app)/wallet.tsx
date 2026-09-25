@@ -48,6 +48,9 @@ export default function WalletScreen() {
     // Paystack States
     const [fundAmount, setFundAmount] = useState('');
     const [paystackVisible, setPaystackVisible] = useState(false);
+    const [showVerifyModal, setShowVerifyModal] = useState(false);
+    const [manualRefInput, setManualRefInput] = useState('');
+    const [isVerifyingManual, setIsVerifyingManual] = useState(false);
     const [paystackKey, setPaystackKey] = useState('');
     const [userEmail, setUserEmail] = useState('');
     const [currentUserId, setCurrentUserId] = useState('');
@@ -326,6 +329,36 @@ export default function WalletScreen() {
         }
     };
 
+        const handleManualVerify = async () => {
+        if (!manualRefInput.trim()) {
+            Alert.alert('Input Required', 'Please enter a transaction reference from your receipt or bank.');
+            return;
+        }
+        setIsVerifyingManual(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('payment-webhook', {
+                body: {
+                    action: 'verify_paystack',
+                    reference: manualRefInput.trim(),
+                    userId: currentUserId,
+                }
+            });
+            if (error) throw error;
+            if (data?.success) {
+                Alert.alert('Payment Verified! 🎉', 'Your wallet balance has been updated.');
+                setShowVerifyModal(false);
+                setManualRefInput('');
+                await fetchWalletData();
+            } else {
+                Alert.alert('Notice', data?.message || 'Transaction could not be verified. If you transferred to your bank account, please refresh in 30-60 seconds.');
+            }
+        } catch (e: any) {
+            Alert.alert('Notice', e.message || 'Could not complete verification. Please check your reference.');
+        } finally {
+            setIsVerifyingManual(false);
+        }
+    };
+
     const handlePaystackSuccess = async (response: any) => {
         try {
             setPaystackVisible(false);
@@ -484,24 +517,15 @@ export default function WalletScreen() {
                         )}
                     </View>
 
-                    {/* Quick Action Buttons */}
+                    {/* Quick Action Buttons - Withdraw Completely Removed */}
                     <View style={s.actionButtonsRow}>
                         <TouchableOpacity
                             onPress={() => setFundModalVisible(true)}
-                            style={s.fundWalletBtn}
+                            style={s.fundWalletBtnFull}
                             activeOpacity={0.85}
                         >
-                            <Ionicons name="add-circle" size={16} color="#020617" />
-                            <Text style={s.fundWalletBtnText}>Add Funds</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => router.push('/transfer')}
-                            style={s.withdrawBtn}
-                            activeOpacity={0.85}
-                        >
-                            <Ionicons name="arrow-up-circle" size={16} color="#F59E0B" />
-                            <Text style={s.withdrawBtnText}>Transfer</Text>
+                            <Ionicons name="add-circle" size={18} color="#020617" />
+                            <Text style={s.fundWalletBtnFullText}>Fund Wallet / Add Cash</Text>
                         </TouchableOpacity>
                     </View>
                 </LinearGradient>
@@ -837,19 +861,37 @@ export default function WalletScreen() {
                                     Fund your wallet instantly using Debit Card or USSD via Paystack.
                                 </Text>
 
-                                <View style={s.amountInputContainer}>
-                                    <Text style={s.amountInputHeader}>FUNDING AMOUNT (NGN)</Text>
-                                    <View style={s.amountInputFlexRow}>
-                                        <Text style={s.currencyPrefix}>₦</Text>
-                                        <TextInput
-                                            value={fundAmount}
-                                            onChangeText={setFundAmount}
-                                            keyboardType="numeric"
-                                            placeholder="0.00"
-                                            placeholderTextColor="#94A3B8"
-                                            style={s.amountInputField}
-                                        />
+                                {/* Modernized Clean Input (No inner rawani/wrapper) */}
+                                <Text style={s.modernFieldHeader}>ENTER RECHARGE AMOUNT</Text>
+                                <View style={s.modernAmountCard}>
+                                    <View style={s.modernCurrencyTag}>
+                                        <Text style={s.modernCurrencyTagText}>₦ NGN</Text>
                                     </View>
+                                    <TextInput
+                                        value={fundAmount}
+                                        onChangeText={setFundAmount}
+                                        keyboardType="numeric"
+                                        placeholder="5000"
+                                        placeholderTextColor="#94A3B8"
+                                        style={s.modernAmountInput}
+                                    />
+                                </View>
+
+                                {/* Quick Amount Preset Chips */}
+                                <Text style={s.modernPresetHeader}>PRESET QUICK AMOUNTS</Text>
+                                <View style={s.modernPresetGrid}>
+                                    {['1000', '2500', '5000', '10000', '25000', '50000'].map(val => (
+                                        <TouchableOpacity
+                                            key={val}
+                                            style={[s.modernPresetChip, fundAmount === val && s.modernPresetChipActive]}
+                                            onPress={() => setFundAmount(val)}
+                                            activeOpacity={0.75}
+                                        >
+                                            <Text style={[s.modernPresetChipTxt, fundAmount === val && s.modernPresetChipTxtActive]}>
+                                                ₦{Number(val).toLocaleString()}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
                                 </View>
 
                                 {parseFloat(fundAmount) > 0 && (
@@ -878,6 +920,16 @@ export default function WalletScreen() {
                                         </View>
                                     </View>
                                 )}
+
+                                <TouchableOpacity
+                                    onPress={() => setShowVerifyModal(true)}
+                                    style={{ marginTop: 10, marginBottom: 14, alignItems: 'center' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#D97706', textDecorationLine: 'underline' }}>
+                                        Already debited? Tap here to Verify Transaction Reference ➔
+                                    </Text>
+                                </TouchableOpacity>
 
                                 <TouchableOpacity
                                     onPress={async () => {
@@ -914,6 +966,55 @@ export default function WalletScreen() {
                                 </TouchableOpacity>
                             </View>
                         )}
+                    </View>
+                </View>
+            </Modal>
+
+            
+            {/* MANUAL REFERENCE VERIFICATION MODAL */}
+            <Modal
+                visible={showVerifyModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowVerifyModal(false)}
+            >
+                <View style={s.modalOverlayDim}>
+                    <View style={[s.modalCard, { maxHeight: 380 }]}>
+                        <View style={s.modalDragBar} />
+                        <View style={s.modalHeaderFlex}>
+                            <View>
+                                <Text style={s.modalTitleText}>Verify Reference</Text>
+                                <Text style={s.modalSubText}>Reconcile un-credited payment or bank transfer</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowVerifyModal(false)} style={s.modalCloseCircle}>
+                                <Ionicons name="close" size={16} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={s.modernFieldHeader}>TRANSACTION REFERENCE</Text>
+                        <View style={s.modernAmountCard}>
+                            <TextInput
+                                value={manualRefInput}
+                                onChangeText={setManualRefInput}
+                                placeholder="e.g. PAY_... or FLW-..."
+                                placeholderTextColor="#94A3B8"
+                                style={[s.modernAmountInput, { fontSize: 15 }]}
+                                autoCapitalize="none"
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={handleManualVerify}
+                            disabled={isVerifyingManual}
+                            style={[s.submitPayBtn, isVerifyingManual && { opacity: 0.7 }]}
+                            activeOpacity={0.85}
+                        >
+                            {isVerifyingManual ? (
+                                <ActivityIndicator color="#020617" />
+                            ) : (
+                                <Text style={s.submitPayBtnText}>Verify & Credit Balance</Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -1790,6 +1891,104 @@ const s = StyleSheet.create({
         textAlign: 'center',
         marginTop: 2,
     },
+    
+    fundWalletBtnFull: {
+        flex: 1,
+        height: 44,
+        borderRadius: 13,
+        backgroundColor: '#F59E0B',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    fundWalletBtnFullText: {
+        color: '#020617',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
+    modernFieldHeader: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: '#64748B',
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    modernAmountCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 12,
+    },
+    modernCurrencyTag: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginRight: 10,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    modernCurrencyTagText: {
+        color: '#B45309',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    modernAmountInput: {
+        flex: 1,
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#0F172A',
+        padding: 0,
+    },
+    modernPresetHeader: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#94A3B8',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    modernPresetGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 12,
+    },
+    modernPresetChip: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    modernPresetChipActive: {
+        backgroundColor: '#FFFBEB',
+        borderColor: '#F59E0B',
+    },
+    modernPresetChipTxt: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    modernPresetChipTxtActive: {
+        color: '#D97706',
+        fontWeight: '900',
+    },
+
     amountInputContainer: {
         backgroundColor: '#F8FAFC',
         borderColor: '#CBD5E1',
