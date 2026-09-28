@@ -702,29 +702,107 @@ function AirtimeScreenContent() {
                     })}
                 </View>
 
-                {/* Real-time Savings Estimator Card */}
-                {Boolean(network && amount && Number(amount) > 0) ? (
-                    <View style={s.estimatorContainer}>
-                        <View style={s.estimatorHeader}>
-                            <Ionicons name="sparkles" size={15} color="#d97706" style={{ marginRight: 6 }} />
-                            <Text style={s.estimatorTitle}>Real-Time Savings Estimator</Text>
-                        </View>
-                        <View style={s.estimatorDivider} />
-                        <View style={s.estimatorRow}>
-                            <Text style={s.estimatorLabel}>Original Price:</Text>
-                            <Text style={s.estimatorValue}>₦{formatCurrency(amount)}</Text>
-                        </View>
-                        <View style={s.estimatorRow}>
-                            <Text style={s.estimatorLabel}>Cashback Discount ({NETWORKS_DATA.find(n => n.id === network)?.cashback || '2% Off'}):</Text>
-                            <Text style={[s.estimatorValue, { color: '#16a34a' }]}>-₦{formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))}</Text>
-                        </View>
-                        <View style={s.estimatorRow}>
-                            <Text style={s.estimatorLabelTotal}>You Pay:</Text>
-                            <Text style={s.estimatorValueTotal}>₦{formatCurrency(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)))}</Text>
-                        </View>
-                        <View style={[s.estimatorBadge, { backgroundColor: '#fef3c7' }]}>
-                            <Text style={s.estimatorBadgeText}>🎉 Saved ₦{formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))} with {NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase()} Smart Top-up!</Text>
-                        </View>
+                {/* Transaction Preview & Order Details Card */}
+                {Boolean(amount && Number(amount) > 0) ? (
+                    <View style={s.previewCardContainer}>
+                        <LinearGradient
+                            colors={['#ffffff', '#f8fafc']}
+                            style={s.previewCardInner}
+                        >
+                            {/* Card Header with Badges */}
+                            <View style={s.previewCardHeader}>
+                                <View style={s.previewHeaderLeft}>
+                                    <View style={s.previewBadgeDot} />
+                                    <Text style={s.previewHeaderTitle}>Preview Details & Breakdown</Text>
+                                </View>
+                                <View style={s.previewNetworkPill}>
+                                    {network && NETWORK_LOGOS[network] ? (
+                                        <Image source={NETWORK_LOGOS[network]} style={s.previewMiniLogo} resizeMode="contain" />
+                                    ) : null}
+                                    <Text style={s.previewNetworkPillText}>
+                                        {NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase()}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={s.previewDivider} />
+
+                            {/* Details Rows */}
+                            <View style={s.previewRowsList}>
+                                <View style={s.previewRow}>
+                                    <Text style={s.previewRowLabel}>Recipient Line</Text>
+                                    <View style={s.previewRecipientWrap}>
+                                        <Text style={[s.previewRowValue, !phoneNumber && { color: '#94a3b8' }]}>
+                                            {phoneNumber ? phoneNumber : 'Enter phone number'}
+                                        </Text>
+                                        {phoneNumber.length === 11 ? (
+                                            <Ionicons name="checkmark-circle" size={14} color="#16a34a" style={{ marginLeft: 4 }} />
+                                        ) : null}
+                                    </View>
+                                </View>
+
+                                <View style={s.previewRow}>
+                                    <Text style={s.previewRowLabel}>Top-up Method</Text>
+                                    <Text style={s.previewRowValue}>
+                                        {topupMode === 'direct' ? 'Direct Recharge (Pinless)' : 'PIN Voucher (Code)'}
+                                    </Text>
+                                </View>
+
+                                <View style={s.previewRow}>
+                                    <Text style={s.previewRowLabel}>Airtime Face Value</Text>
+                                    <Text style={s.previewRowValue}>₦{formatCurrency(amount)}</Text>
+                                </View>
+
+                                <View style={s.previewRow}>
+                                    <Text style={s.previewRowLabel}>
+                                        Instant Cashback ({NETWORKS_DATA.find(n => n.id === network)?.cashback || '2% Off'})
+                                    </Text>
+                                    <View style={s.previewDiscountBadge}>
+                                        <Ionicons name="sparkles" size={10} color="#16a34a" style={{ marginRight: 3 }} />
+                                        <Text style={s.previewDiscountText}>
+                                            -₦{formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Total Highlight Box */}
+                            <View style={s.previewTotalBox}>
+                                <View>
+                                    <Text style={s.previewTotalLabel}>NET PAYABLE AMOUNT</Text>
+                                    <Text style={s.previewTotalSub}>Debited directly from wallet</Text>
+                                </View>
+                                <Text style={s.previewTotalValue}>
+                                    ₦{formatCurrency(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)))}
+                                </Text>
+                            </View>
+
+                            {/* Wallet Status Footer */}
+                            <View style={s.previewFooterStatus}>
+                                {balance !== null ? (
+                                    Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)) <= Number(balance || 0) ? (
+                                        <View style={s.previewWalletOk}>
+                                            <Ionicons name="checkmark-circle" size={12} color="#16a34a" style={{ marginRight: 4 }} />
+                                            <Text style={s.previewWalletOkText}>
+                                                Sufficient Balance (₦{formatCurrency(balance)})
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <View style={s.previewWalletLow}>
+                                            <Ionicons name="alert-circle" size={12} color="#dc2626" style={{ marginRight: 4 }} />
+                                            <Text style={s.previewWalletLowText}>
+                                                Insufficient Balance (₦{formatCurrency(balance)})
+                                            </Text>
+                                        </View>
+                                    )
+                                ) : null}
+
+                                <View style={s.previewInstantBadge}>
+                                    <Ionicons name="flash" size={11} color="#f5a623" style={{ marginRight: 3 }} />
+                                    <Text style={s.previewInstantText}>Automated & Instant</Text>
+                                </View>
+                            </View>
+                        </LinearGradient>
                     </View>
                 ) : null}
 
@@ -883,17 +961,17 @@ function AirtimeScreenContent() {
                 onClose={() => setShowConfirmation(false)}
                 onConfirm={() => {
                     setShowConfirmation(false);
-                    setTimeout(() => setShowSecurityModal(true), 500);
+                    setTimeout(() => setShowSecurityModal(true), 400);
                 }}
-                title="Confirm Airtime Purchase"
+                title="Preview & Confirm Details"
                 network={network || 'mtn'}
                 details={[
                     { label: 'Transaction Type', value: 'Airtime Top-up' },
                     { label: 'Recharge Type', value: topupMode === 'direct' ? 'Direct Recharge (Pinless)' : 'PIN Voucher (Recharge Code)' },
-                    { label: 'Network', value: NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase() },
+                    { label: 'Network Provider', value: NETWORKS_DATA.find(n => n.id === network)?.name || (network || 'MTN').toUpperCase() },
                     { label: 'Phone Number', value: phoneNumber },
-                    { label: 'Original Amount', value: `₦${formatCurrency(amount)}`, isAmount: true },
-                    { label: `Discount (${((NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02) * 100).toFixed(0)}%)`, value: `-₦${formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))}`, isDiscount: true },
+                    { label: 'Airtime Face Value', value: `₦${formatCurrency(amount)}`, isAmount: true },
+                    { label: `Cashback Discount (${((NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02) * 100).toFixed(0)}%)`, value: `-₦${formatCurrency(Number(amount || 0) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))}`, isDiscount: true },
                     { label: 'Total To Pay', value: `₦${formatCurrency(Number(amount || 0) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)))}`, isTotal: true },
                 ]}
             />
@@ -1058,65 +1136,171 @@ const s = StyleSheet.create({
   modeButtonTextActive: {
     color: '#ffffff',
   },
-  // Estimator Card
-  estimatorContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 12,
+  // Modern Preview Details Card
+  previewCardContainer: {
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    marginBottom: 18,
-    width: '100%',
+    backgroundColor: '#ffffff',
+    shadowColor: '#0d1b3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  estimatorHeader: {
+  previewCardInner: {
+    padding: 16,
+  },
+  previewCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-  },
-  estimatorTitle: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0d1b3e',
-  },
-  estimatorDivider: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginBottom: 8,
-  },
-  estimatorRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
   },
-  estimatorLabel: {
-    fontSize: 10.5,
-    color: '#64748b',
+  previewHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  estimatorValue: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#0d1b3e',
+  previewBadgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#f5a623',
   },
-  estimatorLabelTotal: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0d1b3e',
-  },
-  estimatorValueTotal: {
-    fontSize: 13,
+  previewHeaderTitle: {
+    fontSize: 12.5,
     fontWeight: '900',
     color: '#0d1b3e',
+    letterSpacing: -0.2,
   },
-  estimatorBadge: {
-    marginTop: 8,
-    padding: 6,
-    borderRadius: 8,
+  previewNetworkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 4,
+  },
+  previewMiniLogo: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  previewNetworkPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  previewDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginVertical: 12,
+  },
+  previewRowsList: {
+    gap: 8,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  estimatorBadgeText: {
-    fontSize: 9,
+  previewRowLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  previewRecipientWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewRowValue: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  previewDiscountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  previewDiscountText: {
+    color: '#15803d',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  previewTotalBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  previewTotalLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 0.5,
+  },
+  previewTotalSub: {
+    fontSize: 9.5,
+    color: '#94a3b8',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  previewTotalValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0d1b3e',
+    letterSpacing: -0.3,
+  },
+  previewFooterStatus: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  previewWalletOk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewWalletOkText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#b45309',
+    color: '#15803d',
+  },
+  previewWalletLow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewWalletLowText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  previewInstantBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewInstantText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
   },
   // Auto-Refill Card
   scheduleContainer: {

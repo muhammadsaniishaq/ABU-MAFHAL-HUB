@@ -2138,4 +2138,36 @@ const s = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
     },
+    modalOverlayDim: {
+        flex: 1,
+        backgroundColor: 'rgba(2, 6, 23, 0.85)',
+        justifyContent: 'flex-end',
+    },
+    modalCard: {
+        backgroundColor: '#0F172A',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 20,
+        borderTopWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    modalHeaderFlex: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    modalSubText: {
+        color: '#94A3B8',
+        fontSize: 11,
+        marginTop: 2,
+    },
+    modalCloseCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });
