@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
     View, Text, TouchableOpacity, ScrollView, Image, 
     ActivityIndicator, Alert, Modal, TextInput, Platform, 
@@ -376,6 +376,7 @@ export default function CryptoScreen() {
     const [selectedCoinDetail, setSelectedCoinDetail] = useState<AssetConfig | null>(null);
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [securityAction, setSecurityAction] = useState<(() => void) | null>(null);
+    const pendingSecurityActionRef = useRef<((pin?: string) => Promise<void> | void) | null>(null);
     const [securityDescription, setSecurityDescription] = useState<string>('');
 
     // Quick Currency Converter / Calculator State
@@ -903,7 +904,10 @@ export default function CryptoScreen() {
             const netObj = assetObj?.networks[withdrawNetworkIdx] || assetObj?.networks[0];
 
             setSecurityDescription(`Authorize payout of ${amt} ${withdrawAsset} to ${withdrawAddress.slice(0, 8)}... (${netObj?.label}) via NOWPayments`);
-            setSecurityAction(() => () => executeExternalWithdrawal(netObj?.network || 'TRC20', withdrawAddress.trim(), amt));
+            const targetNetwork = netObj?.network || 'TRC20';
+            const targetAddr = withdrawAddress.trim();
+            pendingSecurityActionRef.current = () => executeExternalWithdrawal(targetNetwork, targetAddr, amt);
+            setSecurityAction(() => () => executeExternalWithdrawal(targetNetwork, targetAddr, amt));
             setShowSecurityModal(true);
         } else {
             // Internal Transfer
@@ -912,7 +916,9 @@ export default function CryptoScreen() {
                 return;
             }
             setSecurityDescription(`Transfer ${amt} ${withdrawAsset} to ${transferResolvedRecipient.full_name || transferResolvedRecipient.phone || 'Abu Mafhal User'} (0 Gas Fee)`);
-            setSecurityAction(() => () => executeInternalTransfer(transferResolvedRecipient.id, amt));
+            const targetRecipientId = transferResolvedRecipient.id;
+            pendingSecurityActionRef.current = () => executeInternalTransfer(targetRecipientId, amt);
+            setSecurityAction(() => () => executeInternalTransfer(targetRecipientId, amt));
             setShowSecurityModal(true);
         }
     };
@@ -1219,18 +1225,34 @@ export default function CryptoScreen() {
             setSecurityDescription(`Authorize instant payout of ${amtGasNum} ${selectedGasNetwork.symbol} to ${addr.slice(0, 8)}... (${selectedGasNetwork.networkName}) for $${costUsdt} USDT via NOWPayments`);
         }
 
-        setSecurityAction(() => () => executeBuyGasPayout(amtGasNum, costNgn, costUsdt));
+        const targetAddr = addr;
+        const targetNetwork = selectedGasNetwork;
+        const targetMethod = gasPaymentMethod;
+
+        pendingSecurityActionRef.current = () => executeBuyGasPayout(
+            amtGasNum, costNgn, costUsdt, targetAddr, targetNetwork, targetMethod
+        );
+        setSecurityAction(() => () => executeBuyGasPayout(
+            amtGasNum, costNgn, costUsdt, targetAddr, targetNetwork, targetMethod
+        ));
         setShowSecurityModal(true);
     };
 
-    const executeBuyGasPayout = async (amtGas: number, amtNgn: number, amtUsdt: number) => {
+    const executeBuyGasPayout = async (
+        amtGas: number, 
+        amtNgn: number, 
+        amtUsdt: number,
+        destAddress: string,
+        network: GasNetworkOption,
+        method: 'NGN' | 'USDT'
+    ) => {
         setGasOrdering(true);
         try {
             const res = await api.crypto.buyGas({
-                gasType: selectedGasNetwork.currency,
-                walletAddress: gasWalletAddress.trim(),
-                paymentMethod: gasPaymentMethod,
-                amountPayment: gasPaymentMethod === 'NGN' ? amtNgn : amtUsdt,
+                gasType: network.currency,
+                walletAddress: destAddress.trim(),
+                paymentMethod: method,
+                amountPayment: method === 'NGN' ? amtNgn : amtUsdt,
                 amountGas: amtGas
             });
 
@@ -1240,14 +1262,14 @@ export default function CryptoScreen() {
                 }
                 Alert.alert(
                     "Gas Payout Dispatched ⛽🚀",
-                    `Successfully dispatched ${amtGas} ${selectedGasNetwork.symbol} to ${gasWalletAddress.slice(0, 10)}... Processing via NOWPayments gateway!\n\nTx Ref: ${res.txId || 'Dispatched'}`
+                    `Successfully dispatched ${amtGas} ${network.symbol} to ${destAddress.slice(0, 10)}... via NOWPayments!\n\nTx Ref: ${res.txId || 'Dispatched'}`
                 );
                 setGasWalletAddress('');
                 if (userId) {
                     await createAppNotification(
                         userId,
                         "Crypto Gas Refilled",
-                        `Your gas order of ${amtGas} ${selectedGasNetwork.symbol} was dispatched to ${gasWalletAddress.slice(0, 8)}... via NOWPayments.`,
+                        `Your gas order of ${amtGas} ${network.symbol} was dispatched to ${destAddress.slice(0, 8)}... via NOWPayments.`,
                         "crypto",
                         "high"
                     );
@@ -1259,7 +1281,8 @@ export default function CryptoScreen() {
                 throw new Error("Failed to dispatch gas payout.");
             }
         } catch (err: any) {
-            Alert.alert("Gas Purchase Failed", err.message || "Could not complete gas purchase.");
+            console.error("Gas purchase execution error:", err);
+            Alert.alert("Gas Purchase Failed", err?.message || "Could not complete gas purchase.");
         } finally {
             setGasOrdering(false);
         }
@@ -3060,10 +3083,21 @@ export default function CryptoScreen() {
             {/* SECURITY CONFIRMATION MODAL */}
             <SecurityModal
                 visible={showSecurityModal}
-                onClose={() => setShowSecurityModal(false)}
-                onSuccess={() => {
+                onClose={() => {
                     setShowSecurityModal(false);
-                    if (securityAction) securityAction();
+                    pendingSecurityActionRef.current = null;
+                    setSecurityAction(null);
+                }}
+                onSuccess={(pin) => {
+                    setShowSecurityModal(false);
+                    const actionToRun = pendingSecurityActionRef.current || securityAction;
+                    pendingSecurityActionRef.current = null;
+                    setSecurityAction(null);
+                    if (actionToRun) {
+                        setTimeout(() => {
+                            actionToRun(pin);
+                        }, 400);
+                    }
                 }}
                 title="Authorize Crypto Payout"
                 description={securityDescription}
