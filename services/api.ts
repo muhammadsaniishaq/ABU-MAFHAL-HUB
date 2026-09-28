@@ -989,26 +989,34 @@ export const api = {
                 throw new Error(edgeData?.error || "Instant payout failed.");
             }
 
-            // 4. Create Gas Order as COMPLETED
-            await supabase.from('crypto_gas_orders').insert({
-                user_id: userId,
-                gas_type: params.gasType,
-                wallet_address: params.walletAddress,
-                amount_fiat: params.paymentMethod === 'NGN' ? params.amountPayment : params.amountPayment * 1600, 
-                amount_gas: params.amountGas,
-                status: 'completed' // Instantly completed!
-            });
+            // 4. Create Gas Order record
+            try {
+                await supabase.from('crypto_gas_orders').insert({
+                    user_id: userId,
+                    gas_type: params.gasType,
+                    wallet_address: params.walletAddress,
+                    amount_fiat: params.paymentMethod === 'NGN' ? params.amountPayment : params.amountPayment * 1600, 
+                    amount_gas: params.amountGas,
+                    status: 'completed'
+                });
+            } catch (err) {
+                console.warn("Gas order log error:", err);
+            }
 
             // 5. Create transaction log
-            await supabase.from('transactions').insert({
-                user_id: userId,
-                type: 'crypto_gas',
-                amount: params.paymentMethod === 'NGN' ? params.amountPayment : params.amountPayment * 1600,
-                status: 'completed',
-                description: `Purchased ${params.amountGas} ${params.gasType} to ${params.walletAddress} (Tx: ${edgeData.txId})`
-            });
+            try {
+                await supabase.from('transactions').insert({
+                    user_id: userId,
+                    type: 'crypto_gas',
+                    amount: params.paymentMethod === 'NGN' ? params.amountPayment : params.amountPayment * 1600,
+                    status: 'completed',
+                    description: `Purchased ${params.amountGas} ${params.gasType} to ${params.walletAddress} (Tx: ${edgeData.txId || 'Completed'})`
+                });
+            } catch (err) {
+                console.warn("Transaction log error:", err);
+            }
 
-            return { success: true };
+            return { success: true, txId: edgeData.txId };
         }
     },
 
