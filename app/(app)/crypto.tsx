@@ -2,13 +2,15 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
     View, Text, TouchableOpacity, ScrollView, Image, 
     ActivityIndicator, Alert, Modal, TextInput, Platform, 
-    StyleSheet, RefreshControl, Share, KeyboardAvoidingView
+    StyleSheet, RefreshControl, Share, KeyboardAvoidingView,
+    Linking
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
@@ -45,9 +47,24 @@ const C = {
     blueBg: '#EFF6FF',
     purple: '#7C3AED',
     purpleBg: '#F5F3FF',
+    cyan: '#0891B2',
+    cyanBg: '#ECFEFF',
     white: '#FFFFFF',
     inputBg: '#F1F5F9',
 };
+
+// Storage Keys
+const SAVED_WALLETS_KEY = '@crypto_saved_wallets_v3';
+const PRICE_ALERTS_KEY = '@crypto_price_alerts_v3';
+const FAVORITES_KEY = '@crypto_favorites_v3';
+
+export interface PriceAlertItem {
+    id: string;
+    asset: string;
+    targetPrice: number;
+    condition: 'above' | 'below';
+    createdAt: string;
+}
 
 // ─── Supported Assets & NOWPayments Network Mappings ───────────────────────────
 interface AssetConfig {
@@ -55,7 +72,7 @@ interface AssetConfig {
     name: string;
     icon: string;
     defaultRateUsd: number;
-    networks: { label: string; network: string; currency: string; minDeposit: string }[];
+    networks: { label: string; network: string; currency: string; minDeposit: string; explorer: string }[];
 }
 
 const SUPPORTED_ASSETS: AssetConfig[] = [
@@ -65,11 +82,11 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
         defaultRateUsd: 1.00,
         networks: [
-            { label: 'TRON (TRC20)', network: 'TRC20', currency: 'usdttrc20', minDeposit: '5 USDT' },
-            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'usdtbsc', minDeposit: '5 USDT' },
-            { label: 'Ethereum (ERC20)', network: 'ERC20', currency: 'usdterc20', minDeposit: '20 USDT' },
-            { label: 'Polygon (POL)', network: 'POLYGON', currency: 'usdtmatic', minDeposit: '5 USDT' },
-            { label: 'Solana (SOL)', network: 'SOL', currency: 'usdtsol', minDeposit: '5 USDT' },
+            { label: 'TRON (TRC20)', network: 'TRC20', currency: 'usdttrc20', minDeposit: '5 USDT', explorer: 'https://tronscan.org/#/transaction/' },
+            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'usdtbsc', minDeposit: '5 USDT', explorer: 'https://bscscan.com/tx/' },
+            { label: 'Ethereum (ERC20)', network: 'ERC20', currency: 'usdterc20', minDeposit: '20 USDT', explorer: 'https://etherscan.io/tx/' },
+            { label: 'Polygon (POL)', network: 'POLYGON', currency: 'usdtmatic', minDeposit: '5 USDT', explorer: 'https://polygonscan.com/tx/' },
+            { label: 'Solana (SOL)', network: 'SOL', currency: 'usdtsol', minDeposit: '5 USDT', explorer: 'https://solscan.io/tx/' },
         ]
     },
     {
@@ -78,7 +95,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
         defaultRateUsd: 87500,
         networks: [
-            { label: 'Bitcoin Mainnet', network: 'BTC', currency: 'btc', minDeposit: '0.0002 BTC' }
+            { label: 'Bitcoin Mainnet', network: 'BTC', currency: 'btc', minDeposit: '0.0002 BTC', explorer: 'https://mempool.space/tx/' }
         ]
     },
     {
@@ -87,9 +104,9 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
         defaultRateUsd: 3100,
         networks: [
-            { label: 'Ethereum Mainnet (ERC20)', network: 'ERC20', currency: 'eth', minDeposit: '0.005 ETH' },
-            { label: 'Arbitrum One', network: 'ARBITRUM', currency: 'etharb', minDeposit: '0.002 ETH' },
-            { label: 'Base Network', network: 'BASE', currency: 'ethbase', minDeposit: '0.002 ETH' },
+            { label: 'Ethereum Mainnet (ERC20)', network: 'ERC20', currency: 'eth', minDeposit: '0.005 ETH', explorer: 'https://etherscan.io/tx/' },
+            { label: 'Arbitrum One', network: 'ARBITRUM', currency: 'etharb', minDeposit: '0.002 ETH', explorer: 'https://arbiscan.io/tx/' },
+            { label: 'Base Network', network: 'BASE', currency: 'ethbase', minDeposit: '0.002 ETH', explorer: 'https://basescan.org/tx/' },
         ]
     },
     {
@@ -98,7 +115,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/4128/large/solana.png',
         defaultRateUsd: 185,
         networks: [
-            { label: 'Solana Mainnet', network: 'SOL', currency: 'sol', minDeposit: '0.05 SOL' }
+            { label: 'Solana Mainnet', network: 'SOL', currency: 'sol', minDeposit: '0.05 SOL', explorer: 'https://solscan.io/tx/' }
         ]
     },
     {
@@ -107,7 +124,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/1094/large/tron-logo.png',
         defaultRateUsd: 0.22,
         networks: [
-            { label: 'TRON (TRC20)', network: 'TRX', currency: 'trx', minDeposit: '20 TRX' }
+            { label: 'TRON (TRC20)', network: 'TRX', currency: 'trx', minDeposit: '20 TRX', explorer: 'https://tronscan.org/#/transaction/' }
         ]
     },
     {
@@ -116,7 +133,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png',
         defaultRateUsd: 620,
         networks: [
-            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'bnbbsc', minDeposit: '0.01 BNB' }
+            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'bnbbsc', minDeposit: '0.01 BNB', explorer: 'https://bscscan.com/tx/' }
         ]
     },
     {
@@ -125,7 +142,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/17980/large/ton_symbol.png',
         defaultRateUsd: 5.40,
         networks: [
-            { label: 'The Open Network (TON)', network: 'TON', currency: 'ton', minDeposit: '1 TON' }
+            { label: 'The Open Network (TON)', network: 'TON', currency: 'ton', minDeposit: '1 TON', explorer: 'https://tonviewer.com/transaction/' }
         ]
     },
     {
@@ -134,7 +151,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png',
         defaultRateUsd: 0.16,
         networks: [
-            { label: 'Dogecoin Network', network: 'DOGE', currency: 'doge', minDeposit: '15 DOGE' }
+            { label: 'Dogecoin Network', network: 'DOGE', currency: 'doge', minDeposit: '15 DOGE', explorer: 'https://dogechain.info/tx/' }
         ]
     }
 ];
@@ -191,17 +208,32 @@ export default function CryptoScreen() {
 
     // User Data & Balances
     const [userId, setUserId] = useState<string | null>(null);
+    const [currentUserPhone, setCurrentUserPhone] = useState<string>('');
     const [nairaBalance, setNairaBalance] = useState<number>(0);
     const [cryptoBalances, setCryptoBalances] = useState<Record<string, number>>({});
     const [hideBalance, setHideBalance] = useState<boolean>(false);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loadingTxns, setLoadingTxns] = useState(false);
 
+    // Search and Asset Filters
+    const [coinSearchQuery, setCoinSearchQuery] = useState<string>('');
+    const [coinCategoryFilter, setCoinCategoryFilter] = useState<'all' | 'watchlist' | 'myAssets' | 'gainers'>('all');
+    const [historyTypeFilter, setHistoryTypeFilter] = useState<'ALL' | 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'BUY' | 'SELL'>('ALL');
+    const [favorites, setFavorites] = useState<string[]>(['BTC', 'USDT']);
+
     // Modals
-    const [activeModal, setActiveModal] = useState<'deposit' | 'withdraw' | 'buy' | 'sell' | 'txReceipt' | null>(null);
+    const [activeModal, setActiveModal] = useState<
+        'deposit' | 'withdraw' | 'buy' | 'sell' | 'assetDetail' | 'addressBook' | 'priceAlert' | 'txReceipt' | 'converter' | null
+    >(null);
+    const [selectedCoinDetail, setSelectedCoinDetail] = useState<AssetConfig | null>(null);
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [securityAction, setSecurityAction] = useState<(() => void) | null>(null);
     const [securityDescription, setSecurityDescription] = useState<string>('');
+
+    // Quick Currency Converter / Calculator State
+    const [calcCoin, setCalcCoin] = useState<string>('BTC');
+    const [calcAmount, setCalcAmount] = useState<string>('1');
+    const [calcMode, setCalcMode] = useState<'crypto' | 'ngn' | 'usd'>('crypto');
 
     // Deposit State (Real NOWPayments API)
     const [depositAsset, setDepositAsset] = useState<string>('USDT');
@@ -210,12 +242,18 @@ export default function CryptoScreen() {
     const [depositLoading, setDepositLoading] = useState<boolean>(false);
     const [depositCopied, setDepositCopied] = useState<boolean>(false);
 
-    // Withdraw State (Real NOWPayments Payout API)
+    // Withdraw / Send State (Dual Mode: External Blockchain OR Internal Abu Mafhal 0 Gas)
+    const [sendMode, setSendMode] = useState<'external' | 'internal'>('external');
     const [withdrawAsset, setWithdrawAsset] = useState<string>('USDT');
     const [withdrawNetworkIdx, setWithdrawNetworkIdx] = useState<number>(0);
     const [withdrawAddress, setWithdrawAddress] = useState<string>('');
     const [withdrawAmount, setWithdrawAmount] = useState<string>('');
     const [withdrawing, setWithdrawing] = useState<boolean>(false);
+
+    // Internal Transfer Sub-State
+    const [transferRecipientInput, setTransferRecipientInput] = useState<string>('');
+    const [transferResolvedRecipient, setTransferResolvedRecipient] = useState<{ id: string; full_name?: string; phone?: string; username?: string } | null>(null);
+    const [transferResolving, setTransferResolving] = useState<boolean>(false);
 
     // Buy State (Naira ➡️ Crypto via Edge Function)
     const [buyAsset, setBuyAsset] = useState<string>('USDT');
@@ -233,12 +271,26 @@ export default function CryptoScreen() {
     const [swapAmount, setSwapAmount] = useState<string>('100');
     const [swapping, setSwapping] = useState<boolean>(false);
 
+    // Saved Wallets (Address Book)
+    const [savedWallets, setSavedWallets] = useState<{ id: string; nickname: string; asset: string; address: string }[]>([]);
+    const [newWalletNickname, setNewWalletNickname] = useState('');
+    const [newWalletAddress, setNewWalletAddress] = useState('');
+
+    // Price Alerts
+    const [priceAlerts, setPriceAlerts] = useState<PriceAlertItem[]>([]);
+    const [alertCoin, setAlertCoin] = useState<string>('BTC');
+    const [alertTargetPrice, setAlertTargetPrice] = useState('');
+    const [alertCondition, setAlertCondition] = useState<'above' | 'below'>('above');
+
     // Selected Transaction for Receipt Modal
     const [selectedTx, setSelectedTx] = useState<any | null>(null);
 
     // ─── Lifecycle & Data Fetching ─────────────────────────────────────────────
     useEffect(() => {
         initUserData();
+        loadSavedWallets();
+        loadFavorites();
+        loadPriceAlerts();
         fetchRates();
         const interval = setInterval(fetchRates, 30000);
         return () => clearInterval(interval);
@@ -261,9 +313,10 @@ export default function CryptoScreen() {
 
     const fetchUserBalances = async (uid: string) => {
         try {
-            const { data: prof } = await supabase.from('profiles').select('balance').eq('id', uid).maybeSingle();
-            if (prof && prof.balance !== undefined) {
-                setNairaBalance(Number(prof.balance) || 0);
+            const { data: prof } = await supabase.from('profiles').select('balance, phone').eq('id', uid).maybeSingle();
+            if (prof) {
+                if (prof.balance !== undefined) setNairaBalance(Number(prof.balance) || 0);
+                if (prof.phone) setCurrentUserPhone(prof.phone);
             }
 
             const { data: cBals } = await supabase.from('crypto_balances').select('asset, balance').eq('user_id', uid);
@@ -290,7 +343,7 @@ export default function CryptoScreen() {
                 .eq('user_id', uid)
                 .like('type', 'crypto_%')
                 .order('created_at', { ascending: false })
-                .limit(30);
+                .limit(40);
 
             if (!error && data) {
                 setTransactions(data);
@@ -361,6 +414,225 @@ export default function CryptoScreen() {
         return totalPortfolioUsd * getUsdtToNgnRate('sell');
     }, [totalPortfolioUsd, getUsdtToNgnRate]);
 
+    // ─── Filtered Assets ───────────────────────────────────────────────────────
+    const filteredAssets = useMemo(() => {
+        return SUPPORTED_ASSETS.filter(asset => {
+            const query = coinSearchQuery.trim().toLowerCase();
+            const matchesQuery = !query || 
+                asset.name.toLowerCase().includes(query) || 
+                asset.symbol.toLowerCase().includes(query);
+
+            if (!matchesQuery) return false;
+
+            if (coinCategoryFilter === 'watchlist') {
+                return favorites.includes(asset.symbol);
+            }
+            if (coinCategoryFilter === 'myAssets') {
+                return (cryptoBalances[asset.symbol] || 0) > 0;
+            }
+            if (coinCategoryFilter === 'gainers') {
+                const coin = assetsRates.find(r => r.symbol?.toUpperCase() === asset.symbol);
+                return (coin?.percent_change_24h || 0) > 0;
+            }
+            return true;
+        });
+    }, [coinSearchQuery, coinCategoryFilter, favorites, cryptoBalances, assetsRates]);
+
+    // ─── Favorites (Watchlist) Logic ───────────────────────────────────────────
+    const loadFavorites = async () => {
+        try {
+            const raw = await AsyncStorage.getItem(FAVORITES_KEY);
+            if (raw) setFavorites(JSON.parse(raw));
+        } catch {}
+    };
+
+    const toggleFavorite = async (sym: string) => {
+        const exists = favorites.includes(sym);
+        const updated = exists ? favorites.filter(f => f !== sym) : [...favorites, sym];
+        setFavorites(updated);
+        await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+        if (Platform.OS !== 'web') {
+            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+        }
+    };
+
+    // ─── Price Alerts Logic ────────────────────────────────────────────────────
+    const loadPriceAlerts = async () => {
+        try {
+            const raw = await AsyncStorage.getItem(PRICE_ALERTS_KEY);
+            if (raw) setPriceAlerts(JSON.parse(raw));
+        } catch {}
+    };
+
+    const handleAddPriceAlert = async () => {
+        const price = parseFloat(alertTargetPrice.trim());
+        if (isNaN(price) || price <= 0) {
+            Alert.alert("Invalid Price", "Please enter a valid target price in USD.");
+            return;
+        }
+        const newAlert: PriceAlertItem = {
+            id: Date.now().toString(),
+            asset: alertCoin,
+            targetPrice: price,
+            condition: alertCondition,
+            createdAt: new Date().toISOString()
+        };
+        const updated = [...priceAlerts, newAlert];
+        setPriceAlerts(updated);
+        await AsyncStorage.setItem(PRICE_ALERTS_KEY, JSON.stringify(updated));
+        setAlertTargetPrice('');
+        if (Platform.OS !== 'web') {
+            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+        }
+        Alert.alert("Price Alert Set 🔔", `We'll monitor when ${alertCoin} moves ${alertCondition} $${price.toLocaleString()}.`);
+    };
+
+    const handleDeletePriceAlert = async (id: string) => {
+        const filtered = priceAlerts.filter(a => a.id !== id);
+        setPriceAlerts(filtered);
+        await AsyncStorage.setItem(PRICE_ALERTS_KEY, JSON.stringify(filtered));
+    };
+
+    // ─── Live Currency Converter Calculations ──────────────────────────────────
+    const converterValues = useMemo(() => {
+        const coinPriceUsd = getAssetPriceUsd(calcCoin);
+        const usdtRate = getUsdtToNgnRate('buy');
+        const amt = parseFloat(calcAmount.trim()) || 0;
+
+        let convertedCrypto = 0;
+        let convertedUsd = 0;
+        let convertedNgn = 0;
+
+        if (calcMode === 'crypto') {
+            convertedCrypto = amt;
+            convertedUsd = amt * coinPriceUsd;
+            convertedNgn = convertedUsd * usdtRate;
+        } else if (calcMode === 'ngn') {
+            convertedNgn = amt;
+            convertedUsd = usdtRate > 0 ? amt / usdtRate : 0;
+            convertedCrypto = coinPriceUsd > 0 ? convertedUsd / coinPriceUsd : 0;
+        } else {
+            // 'usd'
+            convertedUsd = amt;
+            convertedNgn = amt * usdtRate;
+            convertedCrypto = coinPriceUsd > 0 ? convertedUsd / coinPriceUsd : 0;
+        }
+
+        return {
+            coinPriceUsd,
+            usdtRate,
+            convertedCrypto,
+            convertedUsd,
+            convertedNgn
+        };
+    }, [calcCoin, calcAmount, calcMode, getAssetPriceUsd, getUsdtToNgnRate]);
+
+    // ─── Filtered Transactions ─────────────────────────────────────────────────
+    const filteredTransactions = useMemo(() => {
+        return transactions.filter(tx => {
+            if (historyTypeFilter === 'ALL') return true;
+            if (historyTypeFilter === 'DEPOSIT') return tx.type === 'crypto_deposit';
+            if (historyTypeFilter === 'WITHDRAW') return tx.type === 'crypto_withdrawal';
+            if (historyTypeFilter === 'TRANSFER') return tx.type === 'crypto_transfer_in' || tx.type === 'crypto_transfer_out';
+            if (historyTypeFilter === 'BUY') return tx.type === 'crypto_buy';
+            if (historyTypeFilter === 'SELL') return tx.type === 'crypto_sell';
+            return true;
+        });
+    }, [transactions, historyTypeFilter]);
+
+    // ─── Export Transaction Statement ──────────────────────────────────────────
+    const handleExportStatement = async () => {
+        if (transactions.length === 0) {
+            Alert.alert("No Records", "No transaction records found to export.");
+            return;
+        }
+        const lines = [
+            `📊 ABU MAFHAL CRYPTO HUB — TRANSACTION STATEMENT`,
+            `Generated: ${new Date().toLocaleString()}`,
+            `Total Filtered Records: ${filteredTransactions.length}`,
+            `----------------------------------------------------`
+        ];
+        filteredTransactions.slice(0, 30).forEach((tx, idx) => {
+            lines.push(
+                `${idx + 1}. [${tx.type?.toUpperCase()}] ₦${Number(tx.amount || 0).toLocaleString()} | ${tx.status?.toUpperCase() || 'SUCCESS'}\n   Ref: ${tx.reference || tx.id}\n   Date: ${tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '-'}`
+            );
+        });
+        lines.push(`----------------------------------------------------`);
+        lines.push(`⚡ Abu Mafhal Crypto Hub — Powered by NOWPayments`);
+        try {
+            await Share.share({
+                message: lines.join('\n'),
+                title: 'Abu Mafhal Crypto Statement'
+            });
+        } catch {}
+    };
+
+    // ─── Address Book Logic ────────────────────────────────────────────────────
+    const loadSavedWallets = async () => {
+        try {
+            const raw = await AsyncStorage.getItem(SAVED_WALLETS_KEY);
+            if (raw) setSavedWallets(JSON.parse(raw));
+        } catch {}
+    };
+
+    const handleSaveWallet = async () => {
+        if (!newWalletNickname.trim() || !newWalletAddress.trim()) {
+            Alert.alert("Required", "Please provide a nickname and address.");
+            return;
+        }
+        const updated = [
+            ...savedWallets,
+            {
+                id: Date.now().toString(),
+                nickname: newWalletNickname.trim(),
+                asset: withdrawAsset,
+                address: newWalletAddress.trim()
+            }
+        ];
+        setSavedWallets(updated);
+        await AsyncStorage.setItem(SAVED_WALLETS_KEY, JSON.stringify(updated));
+        setNewWalletNickname('');
+        setNewWalletAddress('');
+        if (Platform.OS !== 'web') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        Alert.alert("Saved 🔒", "Wallet address whitelisted to your address book.");
+    };
+
+    const handleDeleteSavedWallet = async (id: string) => {
+        const filtered = savedWallets.filter(w => w.id !== id);
+        setSavedWallets(filtered);
+        await AsyncStorage.setItem(SAVED_WALLETS_KEY, JSON.stringify(filtered));
+    };
+
+    // ─── Share Portfolio Statement ─────────────────────────────────────────────
+    const handleSharePortfolio = async () => {
+        try {
+            const lines: string[] = [
+                `💎 ABU MAFHAL CRYPTO HUB — SUMMARY`,
+                `📅 Date: ${new Date().toLocaleDateString()}`,
+                `💰 Portfolio Value: $${totalPortfolioUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (≈ ₦${totalPortfolioNgn.toLocaleString()} NGN)`,
+                `----------------------------------------`
+            ];
+            SUPPORTED_ASSETS.forEach(a => {
+                const bal = cryptoBalances[a.symbol] || 0;
+                if (bal > 0) {
+                    lines.push(`• ${a.symbol}: ${bal.toLocaleString(undefined, { maximumFractionDigits: 6 })}`);
+                }
+            });
+            lines.push(`----------------------------------------`);
+            lines.push(`⚡ Powered by NOWPayments Gateway`);
+
+            if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }
+            await Share.share({
+                message: lines.join('\n'),
+                title: 'Crypto Portfolio Statement'
+            });
+        } catch {}
+    };
+
     // ─── Real NOWPayments Deposit Address Generation ───────────────────────────
     const loadNowPaymentsAddress = async (assetSym: string, netIndex: number) => {
         if (!userId) return;
@@ -406,39 +678,84 @@ export default function CryptoScreen() {
         } catch {}
     };
 
-    const handleShareAddress = async () => {
-        if (!depositAddress) return;
-        try {
-            await Share.share({
-                message: `My ${depositAsset} (${SUPPORTED_ASSETS.find(a => a.symbol === depositAsset)?.networks[depositNetworkIdx]?.label}) Address on ABU MAFHAL SUB:\n${depositAddress}`,
-                title: `${depositAsset} Deposit Address`
-            });
-        } catch {}
-    };
-
-    // ─── Real NOWPayments Withdrawal Execution ─────────────────────────────────
-    const initiateWithdrawal = () => {
-        const amt = parseFloat(withdrawAmount.trim());
-        if (!withdrawAddress.trim() || isNaN(amt) || amt <= 0) {
-            Alert.alert("Invalid Input", "Please provide a valid recipient address and amount.");
+    // ─── Dual Send / Withdrawal Flow ───────────────────────────────────────────
+    const resolveInternalRecipient = async (query: string) => {
+        const clean = query.trim();
+        if (clean.length < 3) {
+            setTransferResolvedRecipient(null);
             return;
         }
+        setTransferResolving(true);
+        try {
+            // A. Search by ID if valid UUID
+            if (clean.length === 36) {
+                const { data } = await supabase.from('profiles').select('id, full_name, phone, username').eq('id', clean).maybeSingle();
+                if (data && data.id !== userId) {
+                    setTransferResolvedRecipient(data);
+                    return;
+                }
+            }
+            // B. Search by Phone (last 8 digits)
+            const cleanPhone = clean.replace(/\D/g, '');
+            if (cleanPhone.length >= 8) {
+                const last8 = cleanPhone.slice(-8);
+                const { data } = await supabase.from('profiles').select('id, full_name, phone, username').ilike('phone', `%${last8}%`).limit(1).maybeSingle();
+                if (data && data.id !== userId) {
+                    setTransferResolvedRecipient(data);
+                    return;
+                }
+            }
+            // C. Search by Username
+            const { data: userProf } = await supabase.from('profiles').select('id, full_name, phone, username').ilike('username', clean).maybeSingle();
+            if (userProf && userProf.id !== userId) {
+                setTransferResolvedRecipient(userProf);
+                return;
+            }
+            setTransferResolvedRecipient(null);
+        } catch (e) {
+            console.warn("Recipient lookup error:", e);
+        } finally {
+            setTransferResolving(false);
+        }
+    };
 
+    const handleInitiateSend = () => {
+        const amt = parseFloat(withdrawAmount.trim());
         const currentBal = cryptoBalances[withdrawAsset] || 0;
+
+        if (isNaN(amt) || amt <= 0) {
+            Alert.alert("Invalid Amount", "Please enter a valid amount to send.");
+            return;
+        }
         if (amt > currentBal) {
             Alert.alert("Insufficient Balance", `You only have ${currentBal.toFixed(4)} ${withdrawAsset} available.`);
             return;
         }
 
-        const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset);
-        const netObj = assetObj?.networks[withdrawNetworkIdx] || assetObj?.networks[0];
+        if (sendMode === 'external') {
+            if (!withdrawAddress.trim()) {
+                Alert.alert("Recipient Required", "Please provide a valid recipient wallet address.");
+                return;
+            }
+            const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset);
+            const netObj = assetObj?.networks[withdrawNetworkIdx] || assetObj?.networks[0];
 
-        setSecurityDescription(`Authorize withdrawal of ${amt} ${withdrawAsset} to ${withdrawAddress.slice(0, 8)}... (${netObj?.label}) via NOWPayments`);
-        setSecurityAction(() => () => executeWithdrawal(netObj?.network || 'TRC20', withdrawAddress.trim(), amt));
-        setShowSecurityModal(true);
+            setSecurityDescription(`Authorize payout of ${amt} ${withdrawAsset} to ${withdrawAddress.slice(0, 8)}... (${netObj?.label}) via NOWPayments`);
+            setSecurityAction(() => () => executeExternalWithdrawal(netObj?.network || 'TRC20', withdrawAddress.trim(), amt));
+            setShowSecurityModal(true);
+        } else {
+            // Internal Transfer
+            if (!transferResolvedRecipient || !transferResolvedRecipient.id) {
+                Alert.alert("Recipient Required", "Please enter an Abu Mafhal user phone number or username.");
+                return;
+            }
+            setSecurityDescription(`Transfer ${amt} ${withdrawAsset} to ${transferResolvedRecipient.full_name || transferResolvedRecipient.phone || 'Abu Mafhal User'} (0 Gas Fee)`);
+            setSecurityAction(() => () => executeInternalTransfer(transferResolvedRecipient.id, amt));
+            setShowSecurityModal(true);
+        }
     };
 
-    const executeWithdrawal = async (networkName: string, destAddr: string, amountNum: number) => {
+    const executeExternalWithdrawal = async (networkName: string, destAddr: string, amountNum: number) => {
         setWithdrawing(true);
         try {
             const res = await api.crypto.withdraw(networkName, destAddr, amountNum);
@@ -474,6 +791,74 @@ export default function CryptoScreen() {
         }
     };
 
+    const executeInternalTransfer = async (targetUserId: string, amt: number) => {
+        if (!userId) return;
+        setWithdrawing(true);
+        try {
+            // 1. Deduct sender
+            const { data: deductData, error: deductErr } = await supabase.rpc('deduct_crypto_balance', {
+                user_id: userId,
+                asset: withdrawAsset.toLowerCase(),
+                amount: amt
+            });
+            if (deductErr || !deductData?.success) {
+                throw new Error(deductErr?.message || deductData?.error || "Failed to deduct crypto balance.");
+            }
+
+            // 2. Credit recipient
+            const { data: creditData, error: creditErr } = await supabase.rpc('credit_crypto_balance', {
+                user_id: targetUserId,
+                asset: withdrawAsset.toLowerCase(),
+                amount: amt
+            });
+            if (creditErr || !creditData?.success) {
+                // Rollback
+                await supabase.rpc('credit_crypto_balance', {
+                    user_id: userId,
+                    asset: withdrawAsset.toLowerCase(),
+                    amount: amt
+                });
+                throw new Error(creditErr?.message || creditData?.error || "Failed to credit recipient balance.");
+            }
+
+            // 3. Transactions
+            const assetPriceUsd = getAssetPriceUsd(withdrawAsset);
+            const ngnVal = Math.floor(amt * assetPriceUsd * getUsdtToNgnRate('sell'));
+
+            await Promise.all([
+                supabase.from('transactions').insert({
+                    user_id: userId,
+                    type: 'crypto_transfer_out',
+                    amount: ngnVal,
+                    status: 'success',
+                    description: `Sent: ${amt} ${withdrawAsset} to ${transferResolvedRecipient?.full_name || transferResolvedRecipient?.phone}`
+                }),
+                supabase.from('transactions').insert({
+                    user_id: targetUserId,
+                    type: 'crypto_transfer_in',
+                    amount: ngnVal,
+                    status: 'success',
+                    description: `Received: ${amt} ${withdrawAsset} from ${currentUserPhone || 'Abu Mafhal User'}`
+                })
+            ]);
+
+            if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+            Alert.alert("Transfer Complete 🎉", `Successfully sent ${amt} ${withdrawAsset} with ZERO gas fees!`);
+            setActiveModal(null);
+            setWithdrawAmount('');
+            setTransferRecipientInput('');
+            setTransferResolvedRecipient(null);
+            fetchUserBalances(userId);
+            fetchCryptoTransactions(userId);
+        } catch (err: any) {
+            Alert.alert("Transfer Failed", err.message || "Could not complete internal transfer.");
+        } finally {
+            setWithdrawing(false);
+        }
+    };
+
     // ─── Real Buy Crypto (Naira ➡️ Crypto) ──────────────────────────────────────
     const handleBuySubmit = async () => {
         const costNgn = parseFloat(buyNgnAmount.trim());
@@ -503,13 +888,13 @@ export default function CryptoScreen() {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
-                Alert.alert("Crypto Purchase Complete 🎉", `You bought ${amountCrypto.toFixed(6)} ${buyAsset} for ₦${costNgn.toLocaleString()}!`);
+                Alert.alert("Purchase Complete 🎉", `You bought ${amountCrypto.toFixed(6)} ${buyAsset} for ₦${costNgn.toLocaleString()}!`);
                 setActiveModal(null);
                 setBuyNgnAmount('10000');
                 if (userId) {
                     await createAppNotification(
                         userId,
-                        "Crypto Purchased Successfully",
+                        "Crypto Purchased",
                         `You have purchased ${amountCrypto.toFixed(6)} ${buyAsset} for ₦${costNgn.toLocaleString()}.`,
                         "crypto",
                         "normal"
@@ -558,7 +943,7 @@ export default function CryptoScreen() {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
-                Alert.alert("Crypto Sold Successfully 💰", `Sold ${cryptoAmt} ${sellAsset} for ₦${expectedNgn.toLocaleString()} credited to your Naira wallet!`);
+                Alert.alert("Sold Successfully 💰", `Sold ${cryptoAmt} ${sellAsset} for ₦${expectedNgn.toLocaleString()} credited to your Naira wallet!`);
                 setActiveModal(null);
                 setSellCryptoAmount('10');
                 if (userId) {
@@ -657,9 +1042,20 @@ export default function CryptoScreen() {
                         </View>
                     </View>
 
-                    <TouchableOpacity onPress={onRefresh} style={s.headerIconBtn} activeOpacity={0.7}>
-                        <Ionicons name="reload" size={17} color={C.white} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity onPress={() => setActiveModal('converter')} style={s.headerIconBtn} activeOpacity={0.7}>
+                            <Ionicons name="calculator-outline" size={16} color={C.white} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setActiveModal('priceAlert')} style={s.headerIconBtn} activeOpacity={0.7}>
+                            <Ionicons name="notifications-outline" size={16} color={C.white} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleSharePortfolio} style={s.headerIconBtn} activeOpacity={0.7}>
+                            <Ionicons name="share-social-outline" size={16} color={C.white} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={onRefresh} style={s.headerIconBtn} activeOpacity={0.7}>
+                            <Ionicons name="reload" size={16} color={C.white} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* CLEAN TOTAL PORTFOLIO BALANCE CARD */}
@@ -715,7 +1111,11 @@ export default function CryptoScreen() {
                     {/* 5 CLEAN CORE FINTECH ACTIONS */}
                     <View style={s.quickActionsRow}>
                         <TouchableOpacity 
-                            onPress={() => setActiveModal('deposit')}
+                            onPress={() => {
+                                setDepositAsset('USDT');
+                                setDepositNetworkIdx(0);
+                                setActiveModal('deposit');
+                            }}
                             style={s.actionButton}
                             activeOpacity={0.8}
                         >
@@ -726,18 +1126,25 @@ export default function CryptoScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            onPress={() => setActiveModal('withdraw')}
+                            onPress={() => {
+                                setWithdrawAsset('USDT');
+                                setWithdrawNetworkIdx(0);
+                                setActiveModal('withdraw');
+                            }}
                             style={s.actionButton}
                             activeOpacity={0.8}
                         >
                             <View style={[s.actionIconWrap, { backgroundColor: C.goldBg, borderColor: '#FDE68A' }]}>
                                 <Ionicons name="arrow-up" size={18} color={C.gold} />
                             </View>
-                            <Text style={s.actionText}>Withdraw</Text>
+                            <Text style={s.actionText}>Send</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            onPress={() => setActiveModal('buy')}
+                            onPress={() => {
+                                setBuyAsset('USDT');
+                                setActiveModal('buy');
+                            }}
                             style={s.actionButton}
                             activeOpacity={0.8}
                         >
@@ -748,7 +1155,10 @@ export default function CryptoScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            onPress={() => setActiveModal('sell')}
+                            onPress={() => {
+                                setSellAsset('USDT');
+                                setActiveModal('sell');
+                            }}
                             style={s.actionButton}
                             activeOpacity={0.8}
                         >
@@ -809,16 +1219,48 @@ export default function CryptoScreen() {
             >
                 <DynamicBanners placement="crypto" />
 
-                {/* ─── TAB 1: ASSETS LIST ──────────────────────────────────────── */}
+                {/* ─── TAB 1: ASSETS LIST (With Search & Filter) ───────────────── */}
                 {activeTab === 'assets' && (
                     <View>
-                        <View style={s.sectionHeaderRow}>
-                            <Text style={s.sectionTitle}>Supported Coins</Text>
-                            <Text style={s.sectionSub}>Tap any coin to deposit or send</Text>
+                        {/* Search Bar */}
+                        <View style={s.searchBar}>
+                            <Ionicons name="search" size={16} color={C.textMuted} />
+                            <TextInput
+                                value={coinSearchQuery}
+                                onChangeText={setCoinSearchQuery}
+                                placeholder="Search coins (BTC, USDT, SOL)..."
+                                placeholderTextColor={C.textMuted}
+                                style={s.searchInput}
+                            />
+                            {coinSearchQuery ? (
+                                <TouchableOpacity onPress={() => setCoinSearchQuery('')}>
+                                    <Ionicons name="close-circle" size={16} color={C.textMuted} />
+                                </TouchableOpacity>
+                            ) : null}
                         </View>
 
+                        {/* Quick Filter Chips */}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterChipsRow}>
+                            {[
+                                { id: 'all', label: 'All Coins' },
+                                { id: 'watchlist', label: `⭐ Watchlist (${favorites.length})` },
+                                { id: 'myAssets', label: 'My Balance > 0' },
+                                { id: 'gainers', label: '🚀 24h Gainers' },
+                            ].map(chip => (
+                                <TouchableOpacity
+                                    key={chip.id}
+                                    onPress={() => setCoinCategoryFilter(chip.id as any)}
+                                    style={[s.filterChip, coinCategoryFilter === chip.id && s.filterChipActive]}
+                                >
+                                    <Text style={[s.filterChipText, coinCategoryFilter === chip.id && s.filterChipTextActive]}>
+                                        {chip.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
                         <View style={s.assetCardsGrid}>
-                            {SUPPORTED_ASSETS.map((asset) => {
+                            {filteredAssets.map((asset) => {
                                 const bal = cryptoBalances[asset.symbol] || 0;
                                 const livePrice = getAssetPriceUsd(asset.symbol);
                                 const valUsd = bal * livePrice;
@@ -831,13 +1273,24 @@ export default function CryptoScreen() {
                                         key={asset.symbol}
                                         style={s.assetCard}
                                         onPress={() => {
-                                            setDepositAsset(asset.symbol);
-                                            setDepositNetworkIdx(0);
-                                            setActiveModal('deposit');
+                                            setSelectedCoinDetail(asset);
+                                            setActiveModal('assetDetail');
                                         }}
                                         activeOpacity={0.75}
                                     >
                                         <View style={s.assetCardLeft}>
+                                            <TouchableOpacity
+                                                onPress={() => toggleFavorite(asset.symbol)}
+                                                style={s.favStarBtn}
+                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons
+                                                    name={favorites.includes(asset.symbol) ? "star" : "star-outline"}
+                                                    size={16}
+                                                    color={favorites.includes(asset.symbol) ? C.gold : C.textMuted}
+                                                />
+                                            </TouchableOpacity>
                                             <Image source={{ uri: asset.icon }} style={s.assetLogo} />
                                             <View>
                                                 <Text style={s.assetSymbol}>{asset.symbol}</Text>
@@ -985,25 +1438,41 @@ export default function CryptoScreen() {
                 {/* ─── TAB 3: TRANSACTION HISTORY ─────────────────────────────── */}
                 {activeTab === 'history' && (
                     <View>
-                        <View style={s.sectionHeaderRow}>
-                            <Text style={s.sectionTitle}>Transactions</Text>
-                            <Text style={s.sectionSub}>Tap to view official blockchain receipt</Text>
+                        {/* Type Filters and Export Button */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.filterChipsRow, { marginBottom: 0, flex: 1 }]}>
+                                {['ALL', 'DEPOSIT', 'WITHDRAW', 'TRANSFER', 'BUY', 'SELL'].map(t => (
+                                    <TouchableOpacity
+                                        key={t}
+                                        onPress={() => setHistoryTypeFilter(t as any)}
+                                        style={[s.filterChip, historyTypeFilter === t && s.filterChipActive]}
+                                    >
+                                        <Text style={[s.filterChipText, historyTypeFilter === t && s.filterChipTextActive]}>
+                                            {t}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                            <TouchableOpacity onPress={handleExportStatement} style={s.exportStatementBtn} activeOpacity={0.8}>
+                                <Ionicons name="share-outline" size={13} color={C.navyDark} />
+                                <Text style={s.exportStatementBtnText}>Export</Text>
+                            </TouchableOpacity>
                         </View>
 
                         {loadingTxns ? (
                             <ActivityIndicator color={C.navyDark} size="small" style={{ padding: 24 }} />
-                        ) : transactions.length === 0 ? (
+                        ) : filteredTransactions.length === 0 ? (
                             <View style={s.emptyHistoryCard}>
                                 <Ionicons name="receipt-outline" size={36} color={C.textMuted} />
-                                <Text style={s.emptyHistoryTitle}>No Crypto Transactions Yet</Text>
+                                <Text style={s.emptyHistoryTitle}>No Crypto Transactions</Text>
                                 <Text style={s.emptyHistorySub}>
                                     Your deposits, withdrawals, swaps, and buys will appear here with live blockchain verification.
                                 </Text>
                             </View>
                         ) : (
                             <View style={s.historyListCard}>
-                                {transactions.map((tx, idx) => {
-                                    const isLast = idx === transactions.length - 1;
+                                {filteredTransactions.map((tx, idx) => {
+                                    const isLast = idx === filteredTransactions.length - 1;
                                     const isSuccess = tx.status === 'success' || tx.status === 'finished' || tx.status === 'confirmed';
                                     const isPending = tx.status === 'pending' || tx.status === 'waiting';
 
@@ -1015,6 +1484,9 @@ export default function CryptoScreen() {
                                     } else if (tx.type === 'crypto_withdrawal') {
                                         iconName = 'arrow-up-circle';
                                         iconColor = C.gold;
+                                    } else if (tx.type === 'crypto_transfer_in' || tx.type === 'crypto_transfer_out') {
+                                        iconName = 'paper-plane';
+                                        iconColor = C.cyan;
                                     } else if (tx.type === 'crypto_buy') {
                                         iconName = 'card';
                                         iconColor = C.blue;
@@ -1074,7 +1546,107 @@ export default function CryptoScreen() {
             </ScrollView>
 
             {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 1: DEPOSIT / RECEIVE VIA NOWPAYMENTS
+                MODAL 1: ASSET ACTION SHEET (Tapped on a Coin Card)
+            ═══════════════════════════════════════════════════════════════════ */}
+            <Modal visible={activeModal === 'assetDetail'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
+                <View style={s.modalOverlay}>
+                    <View style={[s.modalCard, isWeb && s.webModalCard]}>
+                        {selectedCoinDetail ? (
+                            <View>
+                                <View style={s.modalHeader}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <Image source={{ uri: selectedCoinDetail.icon }} style={{ width: 28, height: 28, borderRadius: 14 }} />
+                                        <View>
+                                            <Text style={s.modalTitle}>{selectedCoinDetail.name} ({selectedCoinDetail.symbol})</Text>
+                                            <Text style={{ color: C.textSub, fontSize: 11 }}>
+                                                Price: ${getAssetPriceUsd(selectedCoinDetail.symbol).toLocaleString()}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setActiveModal(null)} style={s.modalCloseBtn}>
+                                        <Ionicons name="close" size={18} color={C.textSub} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* User Balance Card for this Coin */}
+                                <View style={s.coinBalanceCard}>
+                                    <Text style={{ color: C.textSub, fontSize: 10.5, fontWeight: '700' }}>YOUR BALANCE</Text>
+                                    <Text style={s.coinBalanceText}>
+                                        {(cryptoBalances[selectedCoinDetail.symbol] || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} {selectedCoinDetail.symbol}
+                                    </Text>
+                                    <Text style={{ color: C.gold, fontSize: 12, fontWeight: '800', marginTop: 2 }}>
+                                        ≈ ${( (cryptoBalances[selectedCoinDetail.symbol] || 0) * getAssetPriceUsd(selectedCoinDetail.symbol) ).toFixed(2)} USD
+                                    </Text>
+                                </View>
+
+                                {/* 3 Direct Action Buttons */}
+                                <View style={{ gap: 8, marginTop: 14 }}>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setDepositAsset(selectedCoinDetail.symbol);
+                                            setDepositNetworkIdx(0);
+                                            setActiveModal('deposit');
+                                        }}
+                                        style={[s.coinActionBtn, { backgroundColor: C.emeraldBg, borderColor: C.emeraldBorder }]}
+                                    >
+                                        <Ionicons name="arrow-down-circle" size={18} color={C.emerald} />
+                                        <Text style={[s.coinActionBtnText, { color: C.emerald }]}>Deposit {selectedCoinDetail.symbol}</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setWithdrawAsset(selectedCoinDetail.symbol);
+                                            setWithdrawNetworkIdx(0);
+                                            setActiveModal('withdraw');
+                                        }}
+                                        style={[s.coinActionBtn, { backgroundColor: C.goldBg, borderColor: '#FDE68A' }]}
+                                    >
+                                        <Ionicons name="arrow-up-circle" size={18} color={C.gold} />
+                                        <Text style={[s.coinActionBtnText, { color: C.gold }]}>Send {selectedCoinDetail.symbol}</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setBuyAsset(selectedCoinDetail.symbol);
+                                            setActiveModal('buy');
+                                        }}
+                                        style={[s.coinActionBtn, { backgroundColor: C.blueBg, borderColor: '#BFDBFE' }]}
+                                    >
+                                        <Ionicons name="card-outline" size={18} color={C.blue} />
+                                        <Text style={[s.coinActionBtnText, { color: C.blue }]}>Buy {selectedCoinDetail.symbol} with Naira</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setAlertCoin(selectedCoinDetail.symbol);
+                                            setAlertTargetPrice(getAssetPriceUsd(selectedCoinDetail.symbol).toString());
+                                            setActiveModal('priceAlert');
+                                        }}
+                                        style={[s.coinActionBtn, { backgroundColor: C.inputBg, borderColor: C.cardBorder }]}
+                                    >
+                                        <Ionicons name="notifications-outline" size={18} color={C.navyDark} />
+                                        <Text style={[s.coinActionBtnText, { color: C.navyDark }]}>Set Price Alert 🔔</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setCalcCoin(selectedCoinDetail.symbol);
+                                            setActiveModal('converter');
+                                        }}
+                                        style={[s.coinActionBtn, { backgroundColor: C.inputBg, borderColor: C.cardBorder }]}
+                                    >
+                                        <Ionicons name="calculator-outline" size={18} color={C.navyDark} />
+                                        <Text style={[s.coinActionBtnText, { color: C.navyDark }]}>Live Converter & Calculator 🧮</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ) : null}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                MODAL 2: DEPOSIT / RECEIVE VIA NOWPAYMENTS
             ═══════════════════════════════════════════════════════════════════ */}
             <Modal visible={activeModal === 'deposit'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
                 <View style={s.modalOverlay}>
@@ -1169,7 +1741,14 @@ export default function CryptoScreen() {
 
                             <View style={s.modalButtonsRow}>
                                 <TouchableOpacity 
-                                    onPress={handleShareAddress} 
+                                    onPress={async () => {
+                                        if (!depositAddress) return;
+                                        try {
+                                            await Share.share({
+                                                message: `My ${depositAsset} address on Abu Mafhal Hub:\n${depositAddress}`
+                                            });
+                                        } catch {}
+                                    }} 
                                     style={s.shareAddressBtn}
                                     activeOpacity={0.8}
                                 >
@@ -1191,15 +1770,36 @@ export default function CryptoScreen() {
             </Modal>
 
             {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 2: WITHDRAW / SEND VIA NOWPAYMENTS PAYOUT
+                MODAL 3: SEND CRYPTO (Dual Mode: External vs Internal 0 Gas)
             ═══════════════════════════════════════════════════════════════════ */}
             <Modal visible={activeModal === 'withdraw'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
                     <View style={[s.modalCard, isWeb && s.webModalCard]}>
                         <View style={s.modalHeader}>
-                            <Text style={s.modalTitle}>Withdraw Crypto</Text>
+                            <Text style={s.modalTitle}>Send Crypto</Text>
                             <TouchableOpacity onPress={() => setActiveModal(null)} style={s.modalCloseBtn}>
                                 <Ionicons name="close" size={18} color={C.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Send Mode Toggle: External Blockchain vs Internal 0 Gas */}
+                        <View style={s.sendModeToggle}>
+                            <TouchableOpacity
+                                onPress={() => setSendMode('external')}
+                                style={[s.sendModePill, sendMode === 'external' && s.sendModePillActive]}
+                            >
+                                <Text style={[s.sendModePillText, sendMode === 'external' && s.sendModePillTextActive]}>
+                                    External Blockchain
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setSendMode('internal')}
+                                style={[s.sendModePill, sendMode === 'internal' && s.sendModePillActive]}
+                            >
+                                <Text style={[s.sendModePillText, sendMode === 'internal' && s.sendModePillTextActive]}>
+                                    Internal User (0 Gas) ⚡
+                                </Text>
                             </TouchableOpacity>
                         </View>
 
@@ -1224,42 +1824,91 @@ export default function CryptoScreen() {
                                 ))}
                             </ScrollView>
 
-                            {/* Network Selection */}
-                            <Text style={s.fieldLabel}>DESTINATION NETWORK:</Text>
-                            <View style={s.networkOptionsRow}>
-                                {SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset)?.networks.map((net, i) => (
-                                    <TouchableOpacity
-                                        key={net.network}
-                                        onPress={() => setWithdrawNetworkIdx(i)}
-                                        style={[s.networkChip, withdrawNetworkIdx === i && s.networkChipActive]}
-                                    >
-                                        <Text style={[s.networkChipText, withdrawNetworkIdx === i && s.networkChipTextActive]}>
-                                            {net.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+                            {/* Mode Specific Inputs */}
+                            {sendMode === 'external' ? (
+                                <>
+                                    {/* Destination Network */}
+                                    <Text style={s.fieldLabel}>DESTINATION NETWORK:</Text>
+                                    <View style={s.networkOptionsRow}>
+                                        {SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset)?.networks.map((net, i) => (
+                                            <TouchableOpacity
+                                                key={net.network}
+                                                onPress={() => setWithdrawNetworkIdx(i)}
+                                                style={[s.networkChip, withdrawNetworkIdx === i && s.networkChipActive]}
+                                            >
+                                                <Text style={[s.networkChipText, withdrawNetworkIdx === i && s.networkChipTextActive]}>
+                                                    {net.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
 
-                            {/* Recipient Address */}
-                            <Text style={s.fieldLabel}>RECIPIENT ADDRESS:</Text>
-                            <View style={s.modalInputWrap}>
-                                <TextInput
-                                    value={withdrawAddress}
-                                    onChangeText={setWithdrawAddress}
-                                    placeholder="Paste destination wallet address..."
-                                    placeholderTextColor={C.textMuted}
-                                    style={s.modalTextInput}
-                                />
-                                <TouchableOpacity 
-                                    onPress={async () => {
-                                        const clip = await Clipboard.getStringAsync();
-                                        if (clip) setWithdrawAddress(clip.trim());
-                                    }}
-                                    style={s.pastePill}
-                                >
-                                    <Text style={s.pastePillText}>Paste</Text>
-                                </TouchableOpacity>
-                            </View>
+                                    {/* Recipient Address with Whitelist Picker Button */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={s.fieldLabel}>RECIPIENT ADDRESS:</Text>
+                                        <TouchableOpacity 
+                                            onPress={() => setActiveModal('addressBook')}
+                                            style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4 }}
+                                        >
+                                            <Ionicons name="bookmarks-outline" size={12} color={C.navyDark} />
+                                            <Text style={{ color: C.navyDark, fontSize: 10, fontWeight: '700' }}>Address Book</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={s.modalInputWrap}>
+                                        <TextInput
+                                            value={withdrawAddress}
+                                            onChangeText={setWithdrawAddress}
+                                            placeholder="Paste destination wallet address..."
+                                            placeholderTextColor={C.textMuted}
+                                            style={s.modalTextInput}
+                                        />
+                                        <TouchableOpacity 
+                                            onPress={async () => {
+                                                const clip = await Clipboard.getStringAsync();
+                                                if (clip) setWithdrawAddress(clip.trim());
+                                            }}
+                                            style={s.pastePill}
+                                        >
+                                            <Text style={s.pastePillText}>Paste</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Internal User Lookup */}
+                                    <Text style={s.fieldLabel}>RECIPIENT PHONE / USERNAME:</Text>
+                                    <View style={s.modalInputWrap}>
+                                        <TextInput
+                                            value={transferRecipientInput}
+                                            onChangeText={(val) => {
+                                                setTransferRecipientInput(val);
+                                                resolveInternalRecipient(val);
+                                            }}
+                                            placeholder="Phone number or username..."
+                                            placeholderTextColor={C.textMuted}
+                                            style={s.modalTextInput}
+                                        />
+                                        {transferResolving && (
+                                            <ActivityIndicator size="small" color={C.navyDark} />
+                                        )}
+                                    </View>
+
+                                    {transferResolvedRecipient && (
+                                        <View style={s.verifiedRecipientCard}>
+                                            <Ionicons name="checkmark-circle" size={18} color={C.emerald} />
+                                            <View style={{ marginLeft: 8 }}>
+                                                <Text style={s.verifiedRecipientName}>
+                                                    {transferResolvedRecipient.full_name || 'Abu Mafhal User'}
+                                                </Text>
+                                                <Text style={{ color: C.emerald, fontSize: 10, fontWeight: '600' }}>
+                                                    {transferResolvedRecipient.phone || transferResolvedRecipient.username}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                </>
+                            )}
 
                             {/* Amount Input */}
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 4 }}>
@@ -1284,19 +1933,23 @@ export default function CryptoScreen() {
                                 <Text style={s.inputCurrencySuffix}>{withdrawAsset}</Text>
                             </View>
 
-                            {/* Valuation breakdown */}
                             <View style={s.withdrawEstimateBox}>
                                 <View style={s.withdrawEstimateRow}>
-                                    <Text style={s.withdrawEstimateLabel}>Estimated USD Value</Text>
+                                    <Text style={s.withdrawEstimateLabel}>Estimated Value</Text>
                                     <Text style={s.withdrawEstimateValue}>
                                         ≈ ${(parseFloat(withdrawAmount || '0') * getAssetPriceUsd(withdrawAsset)).toFixed(2)} USD
                                     </Text>
                                 </View>
+                                <View style={s.withdrawEstimateRow}>
+                                    <Text style={s.withdrawEstimateLabel}>Network Fee</Text>
+                                    <Text style={[s.withdrawEstimateValue, { color: C.emerald }]}>
+                                        {sendMode === 'internal' ? 'FREE (₦0.00)' : 'NOWPayments Automated'}
+                                    </Text>
+                                </View>
                             </View>
 
-                            {/* Submit Button */}
                             <TouchableOpacity
-                                onPress={initiateWithdrawal}
+                                onPress={handleInitiateSend}
                                 disabled={withdrawing}
                                 style={s.primaryModalSubmit}
                                 activeOpacity={0.85}
@@ -1313,7 +1966,7 @@ export default function CryptoScreen() {
             </Modal>
 
             {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 3: BUY CRYPTO WITH NAIRA WALLET
+                MODAL 4: BUY CRYPTO WITH NAIRA WALLET
             ═══════════════════════════════════════════════════════════════════ */}
             <Modal visible={activeModal === 'buy'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
@@ -1390,7 +2043,7 @@ export default function CryptoScreen() {
             </Modal>
 
             {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 4: SELL CRYPTO TO NAIRA WALLET
+                MODAL 5: SELL CRYPTO TO NAIRA WALLET
             ═══════════════════════════════════════════════════════════════════ */}
             <Modal visible={activeModal === 'sell'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
@@ -1471,7 +2124,80 @@ export default function CryptoScreen() {
             </Modal>
 
             {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 5: OFFICIAL RECEIPT
+                MODAL 6: ADDRESS BOOK (WHITELISTED WALLETS)
+            ═══════════════════════════════════════════════════════════════════ */}
+            <Modal visible={activeModal === 'addressBook'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
+                <View style={s.modalOverlay}>
+                    <View style={[s.modalCard, isWeb && s.webModalCard]}>
+                        <View style={s.modalHeader}>
+                            <Text style={s.modalTitle}>Address Book</Text>
+                            <TouchableOpacity onPress={() => setActiveModal(null)} style={s.modalCloseBtn}>
+                                <Ionicons name="close" size={18} color={C.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {/* Add New */}
+                            <Text style={s.fieldLabel}>ADD NEW WALLET:</Text>
+                            <View style={s.modalInputWrap}>
+                                <TextInput
+                                    value={newWalletNickname}
+                                    onChangeText={setNewWalletNickname}
+                                    placeholder="Nickname (e.g. Binance USDT)..."
+                                    placeholderTextColor={C.textMuted}
+                                    style={s.modalTextInput}
+                                />
+                            </View>
+                            <View style={s.modalInputWrap}>
+                                <TextInput
+                                    value={newWalletAddress}
+                                    onChangeText={setNewWalletAddress}
+                                    placeholder="Wallet address..."
+                                    placeholderTextColor={C.textMuted}
+                                    style={s.modalTextInput}
+                                />
+                            </View>
+                            <TouchableOpacity onPress={handleSaveWallet} style={s.primaryModalSubmit}>
+                                <Text style={s.primaryModalText}>Save to Address Book</Text>
+                            </TouchableOpacity>
+
+                            {/* Saved List */}
+                            <Text style={[s.fieldLabel, { marginTop: 16 }]}>SAVED ADDRESSES:</Text>
+                            {savedWallets.length === 0 ? (
+                                <Text style={{ color: C.textMuted, fontSize: 11, fontStyle: 'italic', marginVertical: 8 }}>
+                                    No saved addresses yet.
+                                </Text>
+                            ) : (
+                                savedWallets.map(w => (
+                                    <View key={w.id} style={s.savedWalletRow}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <Text style={{ color: C.textMain, fontSize: 12, fontWeight: '700' }}>{w.nickname}</Text>
+                                            <Text style={{ color: C.textSub, fontSize: 9.5 }} numberOfLines={1}>{w.address}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                                            <TouchableOpacity 
+                                                onPress={() => {
+                                                    setWithdrawAddress(w.address);
+                                                    setActiveModal('withdraw');
+                                                }}
+                                                style={s.useBtn}
+                                            >
+                                                <Text style={s.useBtnText}>Use</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => handleDeleteSavedWallet(w.id)} style={s.deleteBtn}>
+                                                <Ionicons name="trash-outline" size={13} color={C.rose} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                MODAL 7: OFFICIAL RECEIPT WITH EXPLORER LINK
             ═══════════════════════════════════════════════════════════════════ */}
             <Modal visible={activeModal === 'txReceipt'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
                 <View style={s.modalOverlay}>
@@ -1510,16 +2236,282 @@ export default function CryptoScreen() {
                                     </View>
                                 </View>
 
-                                <TouchableOpacity 
-                                    onPress={() => setActiveModal(null)} 
-                                    style={s.primaryModalSubmit}
-                                >
-                                    <Text style={s.primaryModalText}>Close</Text>
-                                </TouchableOpacity>
+                                {/* Share & Close Buttons */}
+                                <View style={{ gap: 8 }}>
+                                    <TouchableOpacity 
+                                        onPress={async () => {
+                                            try {
+                                                await Share.share({
+                                                    message: `ABU MAFHAL CRYPTO RECEIPT:\nType: ${selectedTx.type}\nAmount: ₦${selectedTx.amount}\nRef: ${selectedTx.reference || selectedTx.id}\nStatus: ${selectedTx.status}`
+                                                });
+                                            } catch {}
+                                        }}
+                                        style={[s.primaryModalSubmit, { backgroundColor: C.inputBg, borderWidth: 1, borderColor: C.cardBorder }]}
+                                    >
+                                        <Text style={[s.primaryModalText, { color: C.textMain }]}>Share Receipt</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity 
+                                        onPress={() => setActiveModal(null)} 
+                                        style={s.primaryModalSubmit}
+                                    >
+                                        <Text style={s.primaryModalText}>Close</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </ScrollView>
                         ) : null}
                     </View>
                 </View>
+            </Modal>
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                MODAL 8: LIVE CONVERTER & CALCULATOR
+            ═══════════════════════════════════════════════════════════════════ */}
+            <Modal visible={activeModal === 'converter'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
+                    <View style={[s.modalCard, isWeb && s.webModalCard]}>
+                        <View style={s.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={[s.actionIconWrap, { width: 32, height: 32, borderRadius: 16, backgroundColor: C.goldBg, borderColor: '#FDE68A' }]}>
+                                    <Ionicons name="calculator" size={16} color={C.gold} />
+                                </View>
+                                <View>
+                                    <Text style={s.modalTitle}>Crypto Converter</Text>
+                                    <Text style={{ color: C.textSub, fontSize: 10.5 }}>Real-time live rate calculator</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={() => setActiveModal(null)} style={s.modalCloseBtn}>
+                                <Ionicons name="close" size={18} color={C.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {/* Coin Selector */}
+                            <Text style={s.fieldLabel}>SELECT COIN:</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.assetSelectorScroll}>
+                                {SUPPORTED_ASSETS.map(asset => (
+                                    <TouchableOpacity
+                                        key={asset.symbol}
+                                        onPress={() => setCalcCoin(asset.symbol)}
+                                        style={[s.modalAssetChip, calcCoin === asset.symbol && s.modalAssetChipActive]}
+                                    >
+                                        <Image source={{ uri: asset.icon }} style={s.modalAssetIcon} />
+                                        <Text style={[s.modalAssetText, calcCoin === asset.symbol && s.modalAssetTextActive]}>
+                                            {asset.symbol}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            {/* Amount Input with Unit Toggle */}
+                            <Text style={s.fieldLabel}>ENTER AMOUNT IN:</Text>
+                            <View style={s.calcUnitToggleRow}>
+                                {[
+                                    { id: 'crypto', label: calcCoin },
+                                    { id: 'ngn', label: 'Naira (₦)' },
+                                    { id: 'usd', label: 'USD ($)' },
+                                ].map(u => (
+                                    <TouchableOpacity
+                                        key={u.id}
+                                        onPress={() => setCalcMode(u.id as any)}
+                                        style={[s.calcUnitChip, calcMode === u.id && s.calcUnitChipActive]}
+                                    >
+                                        <Text style={[s.calcUnitChipText, calcMode === u.id && s.calcUnitChipTextActive]}>
+                                            {u.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <View style={s.modalInputWrap}>
+                                <TextInput
+                                    value={calcAmount}
+                                    onChangeText={setCalcAmount}
+                                    keyboardType="numeric"
+                                    placeholder="1.00"
+                                    placeholderTextColor={C.textMuted}
+                                    style={s.modalTextInput}
+                                />
+                                <Text style={s.inputCurrencySuffix}>
+                                    {calcMode === 'crypto' ? calcCoin : calcMode === 'ngn' ? 'NGN' : 'USD'}
+                                </Text>
+                            </View>
+
+                            {/* Conversion Results Box */}
+                            <View style={s.calcResultsBox}>
+                                <View style={s.calcResultRow}>
+                                    <Text style={s.calcResultLabel}>{calcCoin} Quantity</Text>
+                                    <Text style={s.calcResultValue}>
+                                        {converterValues.convertedCrypto.toLocaleString(undefined, { maximumFractionDigits: 6 })} {calcCoin}
+                                    </Text>
+                                </View>
+                                <View style={s.calcResultRow}>
+                                    <Text style={s.calcResultLabel}>USD Equivalent</Text>
+                                    <Text style={[s.calcResultValue, { color: C.blue }]}>
+                                        ${converterValues.convertedUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                                    </Text>
+                                </View>
+                                <View style={s.calcResultRow}>
+                                    <Text style={s.calcResultLabel}>Naira Valuation</Text>
+                                    <Text style={[s.calcResultValue, { color: C.emerald, fontWeight: '800' }]}>
+                                        ₦{Math.floor(converterValues.convertedNgn).toLocaleString()} NGN
+                                    </Text>
+                                </View>
+                                <View style={[s.calcResultRow, { borderBottomWidth: 0, paddingTop: 6 }]}>
+                                    <Text style={{ color: C.textMuted, fontSize: 10 }}>Live Market Reference:</Text>
+                                    <Text style={{ color: C.textSub, fontSize: 10, fontWeight: '600' }}>
+                                        1 {calcCoin} ≈ ${converterValues.coinPriceUsd.toLocaleString()} (₦{Math.floor(converterValues.coinPriceUsd * converterValues.usdtRate).toLocaleString()})
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Action Shortcuts */}
+                            <View style={{ gap: 8, marginTop: 12 }}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setBuyAsset(calcCoin);
+                                        setBuyNgnAmount(Math.floor(converterValues.convertedNgn || 10000).toString());
+                                        setActiveModal('buy');
+                                    }}
+                                    style={[s.primaryModalSubmit, { backgroundColor: C.blueBg, borderWidth: 1, borderColor: '#BFDBFE' }]}
+                                    activeOpacity={0.85}
+                                >
+                                    <Ionicons name="card-outline" size={16} color={C.blue} style={{ marginRight: 6 }} />
+                                    <Text style={[s.primaryModalText, { color: C.blue }]}>Buy {calcCoin} with Naira</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSwapTo(calcCoin);
+                                        setActiveModal(null);
+                                        setActiveTab('trade');
+                                    }}
+                                    style={[s.primaryModalSubmit, { backgroundColor: C.purpleBg, borderWidth: 1, borderColor: '#DDD6FE' }]}
+                                    activeOpacity={0.85}
+                                >
+                                    <Ionicons name="swap-horizontal" size={16} color={C.purple} style={{ marginRight: 6 }} />
+                                    <Text style={[s.primaryModalText, { color: C.purple }]}>Instant Swap to {calcCoin}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                MODAL 9: TARGET PRICE ALERTS
+            ═══════════════════════════════════════════════════════════════════ */}
+            <Modal visible={activeModal === 'priceAlert'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
+                    <View style={[s.modalCard, isWeb && s.webModalCard]}>
+                        <View style={s.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={[s.actionIconWrap, { width: 32, height: 32, borderRadius: 16, backgroundColor: C.goldBg, borderColor: '#FDE68A' }]}>
+                                    <Ionicons name="notifications" size={16} color={C.gold} />
+                                </View>
+                                <View>
+                                    <Text style={s.modalTitle}>Price Alerts 🔔</Text>
+                                    <Text style={{ color: C.textSub, fontSize: 10.5 }}>Target Price Notifications</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={() => setActiveModal(null)} style={s.modalCloseBtn}>
+                                <Ionicons name="close" size={18} color={C.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={s.fieldLabel}>CHOOSE COIN:</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.assetSelectorScroll}>
+                                {SUPPORTED_ASSETS.map(asset => (
+                                    <TouchableOpacity
+                                        key={asset.symbol}
+                                        onPress={() => setAlertCoin(asset.symbol)}
+                                        style={[s.modalAssetChip, alertCoin === asset.symbol && s.modalAssetChipActive]}
+                                    >
+                                        <Image source={{ uri: asset.icon }} style={s.modalAssetIcon} />
+                                        <Text style={[s.modalAssetText, alertCoin === asset.symbol && s.modalAssetTextActive]}>
+                                            {asset.symbol}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            {/* Condition: Above vs Below */}
+                            <Text style={s.fieldLabel}>NOTIFY WHEN PRICE GOES:</Text>
+                            <View style={s.sendModeToggle}>
+                                <TouchableOpacity
+                                    onPress={() => setAlertCondition('above')}
+                                    style={[s.sendModePill, alertCondition === 'above' && s.sendModePillActive]}
+                                >
+                                    <Text style={[s.sendModePillText, alertCondition === 'above' && s.sendModePillTextActive]}>
+                                        📈 Above Target (≥)
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => setAlertCondition('below')}
+                                    style={[s.sendModePill, alertCondition === 'below' && s.sendModePillActive]}
+                                >
+                                    <Text style={[s.sendModePillText, alertCondition === 'below' && s.sendModePillTextActive]}>
+                                        📉 Below Target (≤)
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Target Price in USD */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 4 }}>
+                                <Text style={s.fieldLabel}>TARGET PRICE (USD):</Text>
+                                <Text style={{ color: C.textSub, fontSize: 11 }}>
+                                    Current: ${getAssetPriceUsd(alertCoin).toLocaleString()}
+                                </Text>
+                            </View>
+
+                            <View style={s.modalInputWrap}>
+                                <Text style={{ color: C.textMuted, fontSize: 16, fontWeight: '700', marginRight: 4 }}>$</Text>
+                                <TextInput
+                                    value={alertTargetPrice}
+                                    onChangeText={setAlertTargetPrice}
+                                    keyboardType="numeric"
+                                    placeholder={getAssetPriceUsd(alertCoin).toString()}
+                                    placeholderTextColor={C.textMuted}
+                                    style={s.modalTextInput}
+                                />
+                                <Text style={s.inputCurrencySuffix}>USD</Text>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={handleAddPriceAlert}
+                                style={[s.primaryModalSubmit, { marginTop: 12 }]}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={s.primaryModalText}>Set Price Alert</Text>
+                            </TouchableOpacity>
+
+                            {/* Active Alerts List */}
+                            <Text style={[s.fieldLabel, { marginTop: 18 }]}>ACTIVE ALERTS ({priceAlerts.length}):</Text>
+                            {priceAlerts.length === 0 ? (
+                                <Text style={{ color: C.textMuted, fontSize: 11, fontStyle: 'italic', marginVertical: 8 }}>
+                                    No active price alerts set yet.
+                                </Text>
+                            ) : (
+                                priceAlerts.map(a => (
+                                    <View key={a.id} style={s.savedWalletRow}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <Text style={{ color: C.textMain, fontSize: 12, fontWeight: '700' }}>
+                                                {a.asset} {a.condition === 'above' ? '≥' : '≤'} ${a.targetPrice.toLocaleString()}
+                                            </Text>
+                                            <Text style={{ color: C.textSub, fontSize: 9.5 }}>
+                                                Current: ${getAssetPriceUsd(a.asset).toLocaleString()}
+                                            </Text>
+                                        </View>
+                                        <TouchableOpacity onPress={() => handleDeletePriceAlert(a.id)} style={s.deleteBtn}>
+                                            <Ionicons name="trash-outline" size={13} color={C.rose} />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
             </Modal>
 
             {/* SECURITY CONFIRMATION MODAL */}
@@ -1745,18 +2737,48 @@ const s = StyleSheet.create({
         paddingHorizontal: 14,
         paddingBottom: 40,
     },
-    sectionHeaderRow: {
-        marginVertical: 10,
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.card,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 40,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        marginVertical: 8,
     },
-    sectionTitle: {
+    searchInput: {
+        flex: 1,
+        marginLeft: 8,
         color: C.textMain,
-        fontSize: 14,
-        fontWeight: '800',
+        fontSize: 12,
+        fontWeight: '600',
     },
-    sectionSub: {
+    filterChipsRow: {
+        flexDirection: 'row',
+        gap: 6,
+        marginBottom: 10,
+    },
+    filterChip: {
+        backgroundColor: C.card,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    filterChipActive: {
+        backgroundColor: C.navyDark,
+        borderColor: C.navyDark,
+    },
+    filterChipText: {
         color: C.textSub,
-        fontSize: 11,
-        marginTop: 1,
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    filterChipTextActive: {
+        color: C.white,
     },
     assetCardsGrid: {
         gap: 8,
@@ -1828,6 +2850,33 @@ const s = StyleSheet.create({
     },
     percentText: {
         fontSize: 9.5,
+        fontWeight: '800',
+    },
+    // Coin Action Sheet Modal Styles
+    coinBalanceCard: {
+        backgroundColor: C.inputBg,
+        borderRadius: 12,
+        padding: 14,
+        marginTop: 6,
+        alignItems: 'center',
+    },
+    coinBalanceText: {
+        color: C.textMain,
+        fontSize: 22,
+        fontWeight: '900',
+        marginTop: 4,
+    },
+    coinActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+    },
+    coinActionBtnText: {
+        fontSize: 13,
         fontWeight: '800',
     },
     // Swap Tab Styles
@@ -1979,6 +3028,50 @@ const s = StyleSheet.create({
         fontSize: 13,
         fontWeight: '800',
         textTransform: 'uppercase',
+    },
+    // Send Mode Switcher
+    sendModeToggle: {
+        flexDirection: 'row',
+        backgroundColor: C.inputBg,
+        borderRadius: 10,
+        padding: 3,
+        marginBottom: 12,
+        gap: 4,
+    },
+    sendModePill: {
+        flex: 1,
+        paddingVertical: 7,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    sendModePillActive: {
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    sendModePillText: {
+        color: C.textSub,
+        fontSize: 10.5,
+        fontWeight: '700',
+    },
+    sendModePillTextActive: {
+        color: C.textMain,
+        fontWeight: '800',
+    },
+    verifiedRecipientCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.emeraldBg,
+        borderRadius: 10,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: C.emeraldBorder,
+        marginBottom: 10,
+    },
+    verifiedRecipientName: {
+        color: C.textMain,
+        fontSize: 11.5,
+        fontWeight: '800',
     },
     // History Styles
     emptyHistoryCard: {
@@ -2328,6 +3421,7 @@ const s = StyleSheet.create({
         padding: 8,
         marginTop: 4,
         marginBottom: 12,
+        gap: 4,
     },
     withdrawEstimateRow: {
         flexDirection: 'row',
@@ -2404,6 +3498,35 @@ const s = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
     },
+    // Address Book in Modal
+    savedWalletRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: C.inputBg,
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    useBtn: {
+        backgroundColor: C.navyDark,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 5,
+    },
+    useBtnText: {
+        color: C.white,
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    deleteBtn: {
+        backgroundColor: C.roseBg,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
+        borderRadius: 5,
+    },
     // Receipt Modal Styles
     receiptHeaderBadge: {
         alignItems: 'center',
@@ -2451,5 +3574,81 @@ const s = StyleSheet.create({
         textAlign: 'right',
         flexShrink: 1,
         marginLeft: 10,
+    },
+    favStarBtn: {
+        paddingRight: 6,
+        paddingVertical: 4,
+    },
+    exportStatementBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: C.inputBg,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        marginLeft: 8,
+    },
+    exportStatementBtnText: {
+        color: C.navyDark,
+        fontSize: 10.5,
+        fontWeight: '700',
+    },
+    calcUnitToggleRow: {
+        flexDirection: 'row',
+        gap: 6,
+        marginBottom: 8,
+    },
+    calcUnitChip: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 7,
+        borderRadius: 8,
+        backgroundColor: C.inputBg,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+    },
+    calcUnitChipActive: {
+        backgroundColor: C.goldBg,
+        borderColor: '#FDE68A',
+    },
+    calcUnitChipText: {
+        color: C.textSub,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    calcUnitChipTextActive: {
+        color: C.gold,
+        fontWeight: '800',
+    },
+    calcResultsBox: {
+        backgroundColor: C.inputBg,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        marginTop: 6,
+        gap: 6,
+    },
+    calcResultRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+    },
+    calcResultLabel: {
+        color: C.textSub,
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    calcResultValue: {
+        color: C.textMain,
+        fontSize: 12,
+        fontWeight: '800',
     },
 });
