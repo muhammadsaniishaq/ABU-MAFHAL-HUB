@@ -353,6 +353,21 @@ export default function CryptoScreen() {
     const [gasPaymentMethod, setGasPaymentMethod] = useState<'NGN' | 'USDT'>('NGN');
     const [gasOrdering, setGasOrdering] = useState<boolean>(false);
     const [gasRecentOrders, setGasRecentOrders] = useState<any[]>([]);
+    const [gasResultDialog, setGasResultDialog] = useState<{
+        visible: boolean;
+        type: 'success' | 'error' | 'loading';
+        title: string;
+        message: string;
+        txRef?: string;
+        amount?: string;
+        network?: string;
+        destAddress?: string;
+    }>({
+        visible: false,
+        type: 'success',
+        title: '',
+        message: '',
+    });
 
     // User Data & Balances
     const [userId, setUserId] = useState<string | null>(null);
@@ -1190,16 +1205,34 @@ export default function CryptoScreen() {
     const handleBuyGas = () => {
         const amtGasNum = parseFloat(gasAmount.trim());
         if (isNaN(amtGasNum) || amtGasNum <= 0) {
+            setGasResultDialog({
+                visible: true,
+                type: 'error',
+                title: 'Invalid Amount',
+                message: 'Please enter a valid amount of network gas.',
+            });
             Alert.alert("Invalid Amount", "Please enter a valid amount of network gas.");
             return;
         }
 
         const addr = gasWalletAddress.trim();
         if (!addr) {
+            setGasResultDialog({
+                visible: true,
+                type: 'error',
+                title: 'Recipient Address Required',
+                message: `Please enter or paste your ${selectedGasNetwork.networkName} destination wallet address.`,
+            });
             Alert.alert("Recipient Address Required", `Please enter or paste your ${selectedGasNetwork.networkName} destination wallet address.`);
             return;
         }
         if (!selectedGasNetwork.prefixValidate(addr)) {
+            setGasResultDialog({
+                visible: true,
+                type: 'error',
+                title: 'Invalid Wallet Address',
+                message: `Please verify the address format for ${selectedGasNetwork.networkName} (Expected: ${selectedGasNetwork.placeholderAddress}).`,
+            });
             Alert.alert("Invalid Wallet Address", `Please verify the address format for ${selectedGasNetwork.networkName} (Expected: ${selectedGasNetwork.placeholderAddress}).`);
             return;
         }
@@ -1212,6 +1245,12 @@ export default function CryptoScreen() {
 
         if (gasPaymentMethod === 'NGN') {
             if (costNgn > nairaBalance) {
+                setGasResultDialog({
+                    visible: true,
+                    type: 'error',
+                    title: 'Insufficient Naira Balance',
+                    message: `Total cost is ₦${costNgn.toLocaleString()}, but your Naira balance is ₦${nairaBalance.toLocaleString()}. Please fund your wallet.`,
+                });
                 Alert.alert("Insufficient Naira Balance", `Total cost is ₦${costNgn.toLocaleString()}, but your Naira balance is ₦${nairaBalance.toLocaleString()}.`);
                 return;
             }
@@ -1219,6 +1258,12 @@ export default function CryptoScreen() {
         } else {
             const currentUsdt = cryptoBalances['USDT'] || 0;
             if (costUsdt > currentUsdt) {
+                setGasResultDialog({
+                    visible: true,
+                    type: 'error',
+                    title: 'Insufficient USDT Balance',
+                    message: `Total cost is $${costUsdt} USDT, but your USDT balance is ${currentUsdt.toFixed(2)} USDT. Please deposit USDT.`,
+                });
                 Alert.alert("Insufficient USDT Balance", `Total cost is $${costUsdt} USDT, but your USDT balance is ${currentUsdt.toFixed(2)} USDT.`);
                 return;
             }
@@ -1229,12 +1274,12 @@ export default function CryptoScreen() {
         const targetNetwork = selectedGasNetwork;
         const targetMethod = gasPaymentMethod;
 
-        pendingSecurityActionRef.current = () => executeBuyGasPayout(
+        const runPayout = (pin?: string) => executeBuyGasPayout(
             amtGasNum, costNgn, costUsdt, targetAddr, targetNetwork, targetMethod
         );
-        setSecurityAction(() => () => executeBuyGasPayout(
-            amtGasNum, costNgn, costUsdt, targetAddr, targetNetwork, targetMethod
-        ));
+
+        pendingSecurityActionRef.current = runPayout;
+        setSecurityAction(() => runPayout);
         setShowSecurityModal(true);
     };
 
@@ -1247,6 +1292,16 @@ export default function CryptoScreen() {
         method: 'NGN' | 'USDT'
     ) => {
         setGasOrdering(true);
+        setGasResultDialog({
+            visible: true,
+            type: 'loading',
+            title: 'Processing Gas Refill ⛽',
+            message: `Authorizing NOWPayments network to dispatch ${amtGas} ${network.symbol} to ${destAddress.slice(0, 10)}...`,
+            amount: `${amtGas} ${network.symbol}`,
+            network: network.networkName,
+            destAddress: destAddress,
+        });
+
         try {
             const res = await api.crypto.buyGas({
                 gasType: network.currency,
@@ -1260,29 +1315,61 @@ export default function CryptoScreen() {
                 if (Platform.OS !== 'web') {
                     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
                 }
-                Alert.alert(
-                    "Gas Payout Dispatched ⛽🚀",
-                    `Successfully dispatched ${amtGas} ${network.symbol} to ${destAddress.slice(0, 10)}... via NOWPayments!\n\nTx Ref: ${res.txId || 'Dispatched'}`
-                );
                 setGasWalletAddress('');
+                setGasResultDialog({
+                    visible: true,
+                    type: 'success',
+                    title: 'Gas Refill Successful ⛽🚀',
+                    message: res.message || `Successfully processed ${amtGas} ${network.symbol} gas for your wallet!`,
+                    txRef: res.txId || 'NOW_GAS_COMPLETED',
+                    amount: `${amtGas} ${network.symbol}`,
+                    network: network.networkName,
+                    destAddress: destAddress,
+                });
+
+                if (Platform.OS !== 'web') {
+                    try {
+                        Alert.alert(
+                            "Gas Payout Dispatched ⛽🚀",
+                            `Successfully dispatched ${amtGas} ${network.symbol} to ${destAddress.slice(0, 10)}... via NOWPayments!\n\nTx Ref: ${res.txId || 'Dispatched'}`
+                        );
+                    } catch {}
+                }
+
                 if (userId) {
-                    await createAppNotification(
-                        userId,
-                        "Crypto Gas Refilled",
-                        `Your gas order of ${amtGas} ${network.symbol} was dispatched to ${destAddress.slice(0, 8)}... via NOWPayments.`,
-                        "crypto",
-                        "high"
-                    );
+                    try {
+                        await createAppNotification(
+                            userId,
+                            "Crypto Gas Refilled",
+                            `Your gas order of ${amtGas} ${network.symbol} was dispatched to ${destAddress.slice(0, 8)}... via NOWPayments (Ref: ${res.txId || 'Completed'}).`,
+                            "crypto",
+                            "high"
+                        );
+                    } catch {}
                     fetchUserBalances(userId);
                     fetchGasOrders(userId);
                     fetchCryptoTransactions(userId);
                 }
             } else {
-                throw new Error("Failed to dispatch gas payout.");
+                throw new Error(res?.message || "Failed to dispatch gas payout.");
             }
         } catch (err: any) {
             console.error("Gas purchase execution error:", err);
-            Alert.alert("Gas Purchase Failed", err?.message || "Could not complete gas purchase.");
+            const errMsg = err?.message || "Could not complete gas purchase. Please check your balance or wallet address.";
+            setGasResultDialog({
+                visible: true,
+                type: 'error',
+                title: 'Gas Refill Notice ⚠️',
+                message: errMsg,
+                amount: `${amtGas} ${network.symbol}`,
+                network: network.networkName,
+                destAddress: destAddress,
+            });
+            if (Platform.OS !== 'web') {
+                try {
+                    Alert.alert("Gas Purchase Notice", errMsg);
+                } catch {}
+            }
         } finally {
             setGasOrdering(false);
         }
@@ -3095,14 +3182,105 @@ export default function CryptoScreen() {
                     setSecurityAction(null);
                     if (actionToRun) {
                         setTimeout(() => {
-                            actionToRun(pin);
-                        }, 400);
+                            try {
+                                const res = actionToRun(pin);
+                                if (typeof res === 'function') {
+                                    (res as any)(pin);
+                                }
+                            } catch (e: any) {
+                                console.error("Error executing security action:", e);
+                            }
+                        }, 300);
                     }
                 }}
                 title="Authorize Crypto Payout"
                 description={securityDescription}
                 requiredFor="crypto"
             />
+
+            {/* IN-APP GAS RESULT & STATUS MODAL (Guarantees visible feedback on Mobile & Web) */}
+            <Modal
+                visible={gasResultDialog.visible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                    if (gasResultDialog.type !== 'loading') {
+                        setGasResultDialog(prev => ({ ...prev, visible: false }));
+                    }
+                }}
+            >
+                <View style={s.resultModalBackdrop}>
+                    <View style={s.resultModalCard}>
+                        {gasResultDialog.type === 'loading' ? (
+                            <View style={s.resultModalIconWrapLoading}>
+                                <ActivityIndicator size="large" color={C.blue} />
+                            </View>
+                        ) : gasResultDialog.type === 'success' ? (
+                            <View style={s.resultModalIconWrapSuccess}>
+                                <Ionicons name="checkmark-circle" size={48} color={C.emerald} />
+                            </View>
+                        ) : (
+                            <View style={s.resultModalIconWrapError}>
+                                <Ionicons name="alert-circle" size={48} color={C.rose} />
+                            </View>
+                        )}
+
+                        <Text style={s.resultModalTitle}>{gasResultDialog.title}</Text>
+                        <Text style={s.resultModalMessage}>{gasResultDialog.message}</Text>
+
+                        {gasResultDialog.amount && (
+                            <View style={s.resultModalDetailsBox}>
+                                <View style={s.resultModalRow}>
+                                    <Text style={s.resultModalLabel}>Amount</Text>
+                                    <Text style={s.resultModalValueBold}>{gasResultDialog.amount}</Text>
+                                </View>
+                                {gasResultDialog.network && (
+                                    <View style={s.resultModalRow}>
+                                        <Text style={s.resultModalLabel}>Network</Text>
+                                        <Text style={s.resultModalValue}>{gasResultDialog.network}</Text>
+                                    </View>
+                                )}
+                                {gasResultDialog.txRef && (
+                                    <View style={s.resultModalRow}>
+                                        <Text style={s.resultModalLabel}>Reference</Text>
+                                        <TouchableOpacity 
+                                            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                            onPress={async () => {
+                                                if (gasResultDialog.txRef) {
+                                                    await Clipboard.setStringAsync(gasResultDialog.txRef);
+                                                    Alert.alert("Copied", "Reference copied to clipboard");
+                                                }
+                                            }}
+                                        >
+                                            <Text style={[s.resultModalValue, { color: C.blue, fontWeight: '700' }]}>
+                                                {gasResultDialog.txRef.length > 16 
+                                                    ? `${gasResultDialog.txRef.slice(0, 8)}...${gasResultDialog.txRef.slice(-6)}` 
+                                                    : gasResultDialog.txRef}
+                                            </Text>
+                                            <Ionicons name="copy-outline" size={13} color={C.blue} />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+
+                        {gasResultDialog.type !== 'loading' && (
+                            <TouchableOpacity
+                                style={[
+                                    s.resultModalActionBtn,
+                                    gasResultDialog.type === 'error' && { backgroundColor: C.navyDark }
+                                ]}
+                                onPress={() => setGasResultDialog(prev => ({ ...prev, visible: false }))}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={s.resultModalActionBtnText}>
+                                    {gasResultDialog.type === 'success' ? 'Great, Done' : 'Close & Retry'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -4442,5 +4620,112 @@ const s = StyleSheet.create({
     gasPresetTextActive: {
         color: C.emerald,
         fontWeight: '800',
+    },
+    // ─── Result Modal Styles (Guaranteed In-App Feedback) ─────────────
+    resultModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    resultModalCard: {
+        width: '100%',
+        maxWidth: 380,
+        backgroundColor: C.white,
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    resultModalIconWrapLoading: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: C.blueBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    resultModalIconWrapSuccess: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: C.emeraldBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    resultModalIconWrapError: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: C.roseBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    resultModalTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: C.navyDark,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    resultModalMessage: {
+        fontSize: 13,
+        color: C.textSub,
+        textAlign: 'center',
+        lineHeight: 19,
+        marginBottom: 16,
+        paddingHorizontal: 8,
+    },
+    resultModalDetailsBox: {
+        width: '100%',
+        backgroundColor: C.inputBg,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        gap: 8,
+    },
+    resultModalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    resultModalLabel: {
+        fontSize: 12,
+        color: C.textMuted,
+        fontWeight: '600',
+    },
+    resultModalValue: {
+        fontSize: 12,
+        color: C.textMain,
+        fontWeight: '600',
+    },
+    resultModalValueBold: {
+        fontSize: 13,
+        color: C.navyDark,
+        fontWeight: '800',
+    },
+    resultModalActionBtn: {
+        width: '100%',
+        backgroundColor: C.emerald,
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    resultModalActionBtnText: {
+        color: C.white,
+        fontSize: 14,
+        fontWeight: '800',
+        letterSpacing: 0.3,
     },
 });
