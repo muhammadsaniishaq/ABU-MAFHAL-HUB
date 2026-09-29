@@ -1465,23 +1465,36 @@ export default function CryptoScreen() {
                 }
                 setGasWalletAddress('');
 
-                const finalHash = res.txHash || ('0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join(''));
-                const finalTxId = res.txId || ('qu' + Math.random().toString(36).substring(2, 9) + Math.random().toString(36).substring(2, 9));
-                
+                // Use real provider txId and txHash — never generate fake on-chain hashes
+                const finalTxId = res.txId || ('gas_' + Math.random().toString(36).substring(2, 9));
+                const realTxHash = res.txHash || null;
+
+                // Explorer URL logic:
+                // - If we have a real on-chain hash → use blockchain explorer
+                // - If pending/no hash yet → use NowPayments withdrawal page
+                //   (never generate random hash — it will 404 on explorers)
+                let explorerUrl: string;
+                if (realTxHash && realTxHash.length > 10) {
+                    explorerUrl = `${network.explorerTx}${realTxHash}`;
+                } else {
+                    // Use address explorer so user can verify receiving wallet
+                    explorerUrl = `${network.explorerAddress}${destAddress}`;
+                }
+
                 const receiptPayload = {
                     type: 'Gas fee',
                     symbol: network.symbol,
                     icon: network.icon,
                     networkName: network.networkName,
-                    status: 'Successful',
+                    status: res.status === 'submitted' || res.status === 'created' ? 'Dispatched ⚡' : 'Successful',
                     date: new Date(),
                     recipient: destAddress,
                     amountSent: `${amtGas} ${network.symbol}`,
                     amountPaid: method === 'NGN' ? `₦${amtNgn.toLocaleString()}` : `$${amtUsdt} USDT`,
                     paidFrom: 'Abu Mafhal Hub wallet',
-                    networkFee: `0.15 ${network.symbol} ≈ $0.15`,
-                    txHash: finalHash,
-                    explorerUrl: `${network.explorerTx}${finalHash}`,
+                    networkFee: 'Included',
+                    txHash: realTxHash || 'Pending — check back in 2-3 minutes',
+                    explorerUrl,
                     txId: finalTxId,
                 };
                 setSelectedTx(receiptPayload);
@@ -1489,8 +1502,8 @@ export default function CryptoScreen() {
                 setGasResultDialog({
                     visible: true,
                     type: 'success',
-                    title: 'Gas Refill Successful ⛽🚀',
-                    message: res.message || `Successfully processed ${amtGas} ${network.symbol} gas for your wallet!`,
+                    title: 'Gas Dispatched! ⛽🚀',
+                    message: res.message || `${amtGas} ${network.symbol} has been sent to your wallet via NowPayments. Allow 2-5 minutes for confirmation.`,
                     txRef: finalTxId,
                     amount: `${amtGas} ${network.symbol}`,
                     network: network.networkName,
@@ -1500,8 +1513,8 @@ export default function CryptoScreen() {
                 if (Platform.OS !== 'web') {
                     try {
                         Alert.alert(
-                            "Gas Payout Dispatched ⛽🚀",
-                            `Successfully dispatched ${amtGas} ${network.symbol} to ${destAddress.slice(0, 10)}... via NOWPayments!\n\nTx Ref: ${res.txId || 'Dispatched'}`
+                            "Gas Dispatched ⛽🚀",
+                            `${amtGas} ${network.symbol} sent to ${destAddress.slice(0, 10)}... via NowPayments!\n\nRef: ${finalTxId}\n\nPlease allow 2-5 minutes for blockchain confirmation.`
                         );
                     } catch {}
                 }
@@ -1510,8 +1523,8 @@ export default function CryptoScreen() {
                     try {
                         await createAppNotification(
                             userId,
-                            "Crypto Gas Refilled",
-                            `Your gas order of ${amtGas} ${network.symbol} was dispatched to ${destAddress.slice(0, 8)}... via NOWPayments (Ref: ${res.txId || 'Completed'}).`,
+                            "Crypto Gas Dispatched ⛽",
+                            `Your gas order of ${amtGas} ${network.symbol} was sent to ${destAddress.slice(0, 8)}... via NowPayments (Ref: ${finalTxId}).`,
                             "crypto",
                             "high"
                         );
@@ -1520,6 +1533,7 @@ export default function CryptoScreen() {
                     fetchGasOrders(userId);
                     fetchCryptoTransactions(userId);
                 }
+
             } else {
                 throw new Error(res?.message || "Failed to dispatch gas payout.");
             }

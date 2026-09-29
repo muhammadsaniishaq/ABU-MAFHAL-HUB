@@ -972,43 +972,38 @@ export const api = {
         buyGas: async (params: { gasType: string, walletAddress: string, paymentMethod: 'NGN' | 'USDT', amountPayment: number, amountGas: number }) => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Not authenticated. Please log in.");
-            const userId = session.user.id;
             const token = session.access_token || '';
             const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uagcxrtdqttayulvgpwg.supabase.co';
 
             let edgeData: any = null;
-            let lastErrorMsg: string = '';
 
-            // 1. Try standard functions.invoke
+            // 1. Try standard functions.invoke first
             try {
                 const res = await supabase.functions.invoke('crypto-payout', {
-                    body: { 
-                        gasType: params.gasType, 
-                        walletAddress: params.walletAddress, 
+                    body: {
+                        gasType: params.gasType,
+                        walletAddress: params.walletAddress,
                         amountGas: params.amountGas,
                         paymentMethod: params.paymentMethod,
                         amountPayment: params.amountPayment
                     }
                 });
-
                 if (res.data) {
                     edgeData = res.data;
                 } else if (res.error) {
-                    lastErrorMsg = res.error.message || '';
+                    // Try to extract meaningful error from context
+                    let errMsg = res.error.message || 'Gas payout service error.';
                     try {
                         if (res.error.context && typeof res.error.context.json === 'function') {
-                            const errContext = await res.error.context.json();
-                            if (errContext?.error) lastErrorMsg = errContext.error;
+                            const ctx = await res.error.context.json();
+                            if (ctx?.error) errMsg = ctx.error;
                         }
                     } catch (_) {}
+                    throw new Error(errMsg);
                 }
             } catch (invokeErr: any) {
-                console.warn("Standard functions.invoke failed for crypto-payout, using direct fetch...", invokeErr);
-                lastErrorMsg = invokeErr?.message || '';
-            }
-
-            // 2. Direct HTTP fetch fallback if standard invoke failed to return data
-            if (!edgeData) {
+                // If standard invoke threw, try direct HTTP fetch as fallback
+                console.warn("functions.invoke failed, using direct fetch:", invokeErr?.message);
                 try {
                     const url = `${supabaseUrl}/functions/v1/crypto-payout`;
                     const response = await fetch(url, {
@@ -1018,98 +1013,46 @@ export const api = {
                             'Authorization': `Bearer ${token}`,
                             'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
                         },
-                        body: JSON.stringify({ 
-                            gasType: params.gasType, 
-                            walletAddress: params.walletAddress, 
+                        body: JSON.stringify({
+                            gasType: params.gasType,
+                            walletAddress: params.walletAddress,
                             amountGas: params.amountGas,
                             paymentMethod: params.paymentMethod,
                             amountPayment: params.amountPayment
                         })
                     });
-
                     edgeData = await response.json();
                 } catch (fetchErr: any) {
-                    console.error("Direct fetch fallback failed:", fetchErr);
-                    throw new Error(fetchErr.message || lastErrorMsg || "Failed to communicate with gas payout service.");
+                    throw new Error(fetchErr?.message || invokeErr?.message || "Failed to reach gas payout service.");
                 }
             }
 
-            let finalTxId = edgeData?.txId || '';
-            let finalStatus = 'completed';
-
-            // Generate realistic blockchain transaction hash for receipt
-            const randomHex = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-            const finalTxHash = '0x' + randomHex;
-
+            // 2. Check if edge function reported failure
+            //    IMPORTANT: Do NOT perform any local balance deduction here.
+            //    The edge function handles deduction only after payout is confirmed.
             if (!edgeData || !edgeData.success) {
-                console.warn("NOWPayments automated payout notice, applying secure balance deduction fallback:", edgeData?.error || lastErrorMsg);
-
-                // Secure balance deduction via RPC
-                if (params.paymentMethod === 'NGN') {
-                    const { data: deductRes, error: deductErr } = await supabase.rpc('deduct_balance', {
-                        user_id: userId,
-                        amount: params.amountPayment
-                    });
-                    if (deductErr || (deductRes && deductRes.success === false)) {
-                        throw new Error(deductRes?.error || deductErr?.message || "Insufficient Naira balance to refill gas.");
-                    }
-                } else {
-                    const { data: deductRes, error: deductErr } = await supabase.rpc('deduct_crypto_balance', {
-                        user_id: userId,
-                        asset: 'usdt',
-                        amount: params.amountPayment
-                    });
-                    if (deductErr || (deductRes && deductRes.success === false)) {
-                        throw new Error(deductRes?.error || deductErr?.message || "Insufficient USDT balance to refill gas.");
-                    }
-                }
-
-                finalTxId = 'qu' + Math.random().toString(36).substring(2, 9) + Math.random().toString(36).substring(2, 9);
-                finalStatus = 'completed';
+                const errMsg = edgeData?.error || "Gas payout was not processed. Your balance was not charged.";
+                throw new Error(errMsg);
             }
 
-            // 3. Create Gas Order record
-            try {
-                await supabase.from('crypto_gas_orders').insert({
-                    user_id: userId,
-                    gas_type: params.gasType,
-                    wallet_address: params.walletAddress,
-                    amount_fiat: params.paymentMethod === 'NGN' ? params.amountPayment : params.amountPayment * 1600, 
-                    amount_gas: params.amountGas,
-                    status: 'completed'
-                });
-            } catch (err) {
-                console.warn("Gas order log notice:", err);
-            }
-
-            // 4. Create transaction log
-            try {
-                await supabase.from('transactions').insert({
-                    user_id: userId,
-                    type: 'crypto_gas',
-                    amount: params.paymentMethod === 'NGN' ? params.amountPayment : params.amountPayment * 1600,
-                    status: 'completed',
-                    reference: finalTxId,
-                    description: `Purchased ${params.amountGas} ${params.gasType.toUpperCase()} Gas to ${params.walletAddress} (Hash: ${finalTxHash.slice(0, 10)}...)`
-                });
-            } catch (err) {
-                console.warn("Transaction log notice:", err);
-            }
-
-            return { 
-                success: true, 
-                txId: finalTxId,
-                txHash: finalTxHash,
-                status: 'completed',
+            // 3. Return clean result with real provider tx data
+            return {
+                success: true,
+                txId: edgeData.txId || ('gas_' + Math.random().toString(36).substring(2, 10)),
+                txHash: edgeData.txHash || null,  // Real hash from provider (may be null if still pending)
+                status: edgeData.status || 'submitted',
                 gasType: params.gasType,
                 amountGas: params.amountGas,
                 amountPayment: params.amountPayment,
                 paymentMethod: params.paymentMethod,
                 walletAddress: params.walletAddress,
-                message: 'Gas dispatched successfully via NOWPayments'
+                message: `Gas dispatched successfully! ${params.amountGas} ${params.gasType.toUpperCase()} is on its way.`
             };
         }
+
     },
+
+
 
     // --- VIRTUAL ACCOUNTS ---
     virtualAccount: {
