@@ -211,7 +211,12 @@ serve(async (req) => {
                 user_id: user.id,
                 amount: amountPayment
             });
-            if (deductErr || !deductResult?.success) {
+            // Support both numeric return (new balance) and jsonb return ({ success: true })
+            const isSuccess = !deductErr && (
+                typeof deductResult === 'number' ||
+                (typeof deductResult === 'object' && deductResult !== null && deductResult.success === true)
+            );
+            if (!isSuccess) {
                 console.error("CRITICAL: Gas dispatched but NGN deduction failed:", {
                     userId: user.id, txId, deductErr, deductResult
                 });
@@ -225,7 +230,11 @@ serve(async (req) => {
                 asset: 'usdt',
                 amount: amountPayment
             });
-            if (deductErr || !deductResult?.success) {
+            const isSuccess = !deductErr && (
+                typeof deductResult === 'number' ||
+                (typeof deductResult === 'object' && deductResult !== null && deductResult.success === true)
+            );
+            if (!isSuccess) {
                 console.error("CRITICAL: Gas dispatched but USDT deduction failed:", {
                     userId: user.id, txId, deductErr, deductResult
                 });

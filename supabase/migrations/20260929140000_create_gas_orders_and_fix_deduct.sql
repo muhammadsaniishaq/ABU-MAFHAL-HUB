@@ -1,4 +1,4 @@
-﻿-- =====================================================================
+-- =====================================================================
 -- 1. Create crypto_gas_orders table (missing - causing silent insert failures)
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS public.crypto_gas_orders (
@@ -42,7 +42,9 @@ CREATE INDEX IF NOT EXISTS idx_gas_orders_status ON public.crypto_gas_orders(sta
 -- =====================================================================
 -- 2. Fix deduct_balance to return JSONB with success field
 --    (current version returns NUMERIC - edge fn checks .success which is always NULL)
--- =====================================================================
+-- In PostgreSQL, you must DROP the existing function first if changing its return type (from numeric to jsonb)
+DROP FUNCTION IF EXISTS public.deduct_balance(uuid, numeric);
+
 CREATE OR REPLACE FUNCTION public.deduct_balance(user_id uuid, amount numeric)
 RETURNS JSONB
 LANGUAGE plpgsql
