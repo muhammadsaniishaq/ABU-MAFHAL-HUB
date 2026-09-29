@@ -1249,16 +1249,49 @@ export default function SplashScreen() {
           await processOAuthReturn();
         }
       }
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+
+      let { data: { session } } = await supabase.auth.getSession();
+
+      // On web, Supabase may return session=null on first tick during page reload
+      // while async storage is still hydrating tokens. Retry once before purging.
+      if (!session && Platform.OS === 'web') {
+        const hasActive = await AsyncStorage.getItem('has_active_session');
+        if (hasActive === 'true') {
+          await new Promise(resolve => setTimeout(resolve, 600));
+          const retryResult = await supabase.auth.getSession();
+          session = retryResult.data.session;
+        }
+      }
+
       const unlocked = await AsyncStorage.getItem('app_unlocked');
       if (session?.user) {
+        // Ensure storage flags are kept in sync on reload
+        await AsyncStorage.setItem('has_active_session', 'true');
+        await AsyncStorage.setItem('app_unlocked', 'true');
         setTimeout(
-          () => router.replace(unlocked === 'true' ? ('/dashboard' as any) : ('/(auth)/pin' as any)),
+          () => router.replace('/dashboard' as any),
           500
         );
       } else {
+        // Only clear storage if there was genuinely no active session expected
+        const hasActive = await AsyncStorage.getItem('has_active_session');
+        if (hasActive !== 'true') {
+          await AsyncStorage.removeItem('has_active_session');
+          await AsyncStorage.removeItem('app_unlocked');
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            const pathname = window.location.pathname;
+            if (pathname === '/' || pathname === '' || pathname === '/index.html') {
+              window.location.replace('/landing.html');
+              return;
+            }
+          }
+        }
+        setChecking(false);
+      }
+    } catch {
+      // On error, preserve session flags if they existed to avoid surprise logout
+      const hasActive = await AsyncStorage.getItem('has_active_session');
+      if (hasActive !== 'true') {
         await AsyncStorage.removeItem('has_active_session');
         await AsyncStorage.removeItem('app_unlocked');
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -1267,17 +1300,6 @@ export default function SplashScreen() {
             window.location.replace('/landing.html');
             return;
           }
-        }
-        setChecking(false);
-      }
-    } catch {
-      await AsyncStorage.removeItem('has_active_session');
-      await AsyncStorage.removeItem('app_unlocked');
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const pathname = window.location.pathname;
-        if (pathname === '/' || pathname === '' || pathname === '/index.html') {
-          window.location.replace('/landing.html');
-          return;
         }
       }
       setChecking(false);

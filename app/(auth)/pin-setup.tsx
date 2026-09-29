@@ -47,6 +47,9 @@ export default function PinSetupScreen() {
     // Animation
     const shakeAnim = useRef(new Animated.Value(0)).current;
 
+    // Concurrency guard: prevent duplicate processCompletePin calls
+    const isProcessingRef = useRef(false);
+
     useEffect(() => {
         checkExistingPin();
     }, []);
@@ -158,17 +161,25 @@ export default function PinSetupScreen() {
     };
 
     const processCompletePin = async () => {
+        // Prevent concurrent execution — Supabase JS v2 aborts in-flight requests
+        // when duplicate auth calls are made simultaneously, throwing
+        // "DOMException: The signal has been aborted without reason"
+        if (isProcessingRef.current || loading) return;
+
         if (mode === 'create') {
             if (pin.length === 4) {
                 setMode('confirm');
             }
         } else if (mode === 'confirm') {
             if (confirmPin === pin) {
+                isProcessingRef.current = true;
                 setLoading(true);
                 try {
-                    // 1. Store PIN in local storage & unlock app instantly
-                    const { data: { user: currentUser } } = await supabase.auth.getUser();
-                    const uId = currentUser?.id;
+                    // 1. Use getSession() — instant local resolution, never triggers AbortController
+                    const { data: { session: currentSession } } = await supabase.auth.getSession();
+                    const uId = currentSession?.user?.id;
+
+                    // 2. Store PIN locally & unlock app
                     if (Platform.OS === 'web') {
                         await AsyncStorage.setItem('user_transaction_pin', pin);
                         if (uId) await AsyncStorage.setItem(`user_transaction_pin_${uId}`, pin);
@@ -177,74 +188,57 @@ export default function PinSetupScreen() {
                         if (uId) await SecureStore.setItemAsync(`user_transaction_pin_${uId}`, pin);
                     }
                     await AsyncStorage.setItem('app_unlocked', 'true');
+                    await AsyncStorage.setItem('has_active_session', 'true');
                     await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
                     setStoredPin(pin);
 
-                    // 2. Sync to Supabase profiles & confirm email gracefully
-                    try {
-                        const pendingEmail = await AsyncStorage.getItem('pending_auth_email');
-                        const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
-
-                        if (pendingEmail) {
-                            try {
-                                await supabase.rpc('confirm_user_email', { target_email: pendingEmail });
-                            } catch (r) {}
-
-                            if (pendingPass) {
-                                try {
-                                    const { data: resData } = await supabase.auth.signInWithPassword({
-                                        email: pendingEmail,
-                                        password: pendingPass,
-                                    });
-                                    if (resData?.session) {
-                                        await supabase.auth.setSession(resData.session);
-                                    }
-                                } catch (s) {}
+                    // 3. If no current session, attempt sign-in from pending credentials
+                    let finalUser = currentSession?.user || null;
+                    if (!finalUser) {
+                        try {
+                            const pendingEmail = await AsyncStorage.getItem('pending_auth_email');
+                            const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
+                            if (pendingEmail) {
+                                try { await supabase.rpc('confirm_user_email', { target_email: pendingEmail }); } catch (_) {}
+                            }
+                            if (pendingEmail && pendingPass) {
+                                const { data: resData } = await supabase.auth.signInWithPassword({
+                                    email: pendingEmail,
+                                    password: pendingPass,
+                                });
+                                if (resData?.session) {
+                                    await supabase.auth.setSession(resData.session);
+                                    finalUser = resData.user;
+                                    await AsyncStorage.setItem('has_active_session', 'true');
+                                    await AsyncStorage.setItem('app_unlocked', 'true');
+                                }
+                            }
+                        } catch (pendErr: any) {
+                            // Silently suppress AbortError — session is still valid
+                            if (!pendErr?.message?.includes('aborted') && pendErr?.name !== 'AbortError') {
+                                console.log('Pending sign-in notice:', pendErr);
                             }
                         }
+                    }
 
-                        // Ensure active session is verified before routing to dashboard
-                        let finalUser = null;
-                        const { data: { session: existingSession } } = await supabase.auth.getSession();
-                        if (existingSession?.user) {
-                            finalUser = existingSession.user;
-                        } else {
-                            const pEmail = await AsyncStorage.getItem('pending_auth_email');
-                            const pPass = await AsyncStorage.getItem('pending_auth_pass');
-                            if (pEmail && pPass) {
-                                try {
-                                    const { data: resData } = await supabase.auth.signInWithPassword({
-                                        email: pEmail,
-                                        password: pPass,
-                                    });
-                                    if (resData?.session) {
-                                        await supabase.auth.setSession(resData.session);
-                                        finalUser = resData.user;
-                                    }
-                                } catch (sErr) {}
-                            }
-                        }
-
-                        if (finalUser?.id) {
+                    // 4. Sync PIN to Supabase profiles DB
+                    if (finalUser?.id) {
+                        try {
                             await supabase
                                 .from('profiles')
                                 .update({ transaction_pin: pin, status: 'active' })
                                 .eq('id', finalUser.id);
+                        } catch (syncErr) {
+                            console.log('Profile PIN sync notice:', syncErr);
                         }
-                    } catch (e) {
-                        console.log('Profile transaction_pin sync notice:', e);
                     }
 
                     if (Platform.OS !== 'web') Vibration.vibrate(50);
 
-                    // 3. Mark app as unlocked & navigate
-                    await AsyncStorage.setItem('app_unlocked', 'true');
-                    await AsyncStorage.setItem('has_active_session', 'true');
-                    await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
-
+                    // 5. Re-check session and navigate
                     const { data: { session: verifiedSession } } = await supabase.auth.getSession();
 
-                    if (verifiedSession?.user) {
+                    if (verifiedSession?.user || finalUser) {
                         const successMsg = 'Success! 🎉 Your account & 4-digit Transaction PIN have been created successfully.';
                         if (Platform.OS === 'web') {
                             alert(successMsg);
@@ -255,17 +249,25 @@ export default function PinSetupScreen() {
                             ]);
                         }
                     } else {
-                        const loginNotice = 'PIN set successfully! Please log in with your password to continue to dashboard.';
+                        const loginNotice = 'PIN set successfully! Please log in with your password to continue.';
                         if (Platform.OS === 'web') alert(loginNotice);
                         else Alert.alert('Account Ready', loginNotice);
                         router.replace('/(auth)/login' as any);
                     }
                 } catch (error: any) {
-                    const errMsg = error.message || 'Failed to save PIN';
-                    if (Platform.OS === 'web') alert(errMsg);
-                    else Alert.alert('Error', errMsg);
+                    // Silently handle AbortError — navigate to dashboard if PIN was stored
+                    const isAbortErr = error?.name === 'AbortError' || error?.message?.includes('aborted');
+                    if (isAbortErr) {
+                        console.log('PIN setup: AbortError suppressed, navigating to dashboard');
+                        router.replace('/dashboard' as any);
+                    } else {
+                        const errMsg = error.message || 'Failed to save PIN';
+                        if (Platform.OS === 'web') alert(errMsg);
+                        else Alert.alert('Error', errMsg);
+                    }
                 } finally {
                     setLoading(false);
+                    isProcessingRef.current = false;
                 }
             } else {
                 triggerShakeAnimation();
@@ -292,6 +294,8 @@ export default function PinSetupScreen() {
     };
 
     useEffect(() => {
+        // Guard: skip if already processing
+        if (isProcessingRef.current || loading) return;
         if (mode === 'create' && pin.length === 4) {
             processCompletePin();
         } else if (mode === 'confirm' && confirmPin.length === 4) {

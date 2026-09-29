@@ -140,46 +140,79 @@ export default function RootLayout() {
     };
 
     useEffect(() => {
+        let isMounted = true;
+
         supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+            if (!isMounted) return;
             if (error) {
                 if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
                     await forceSignOut();
                     await AsyncStorage.removeItem('has_active_session');
+                    await AsyncStorage.removeItem('app_unlocked');
                 }
                 setSession(null);
             } else {
                 setSession(session);
                 if (session?.user) {
                     await AsyncStorage.setItem('has_active_session', 'true');
+                    await AsyncStorage.setItem('app_unlocked', 'true');
                     const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                     if (cached) setUserRole(cached);
                     fetchUserRole(session.user.id, session.user.email);
                 } else {
-                    await AsyncStorage.removeItem('has_active_session');
+                    const hasActive = await AsyncStorage.getItem('has_active_session');
+                    if (hasActive !== 'true') {
+                        await AsyncStorage.removeItem('has_active_session');
+                        await AsyncStorage.removeItem('app_unlocked');
+                    }
                 }
             }
             setAuthChecked(true);
             if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
         }).catch(async () => {
-            setAuthChecked(true);
+            if (isMounted) setAuthChecked(true);
             if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            setSession(session);
+            if (!isMounted) return;
+
+            // Prevent blank INITIAL_SESSION from unseating an already loaded session during refresh
+            if (_event === 'INITIAL_SESSION') {
+                if (session?.user) {
+                    setSession(session);
+                    await AsyncStorage.setItem('has_active_session', 'true');
+                    await AsyncStorage.setItem('app_unlocked', 'true');
+                    const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
+                    if (cached) setUserRole(cached);
+                    fetchUserRole(session.user.id, session.user.email);
+                    setAuthChecked(true);
+                }
+                return;
+            }
+
+            if (_event === 'SIGNED_OUT') {
+                setSession(null);
+                setUserRole(null);
+                await AsyncStorage.removeItem('has_active_session');
+                await AsyncStorage.removeItem('app_unlocked');
+                setAuthChecked(true);
+                return;
+            }
+
             if (session?.user) {
+                setSession(session);
                 await AsyncStorage.setItem('has_active_session', 'true');
+                await AsyncStorage.setItem('app_unlocked', 'true');
                 const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                 if (cached) setUserRole(cached);
                 fetchUserRole(session.user.id, session.user.email);
-            } else {
-                await AsyncStorage.removeItem('has_active_session');
-                setUserRole(null);
             }
             setAuthChecked(true);
         });
 
         return () => {
+            isMounted = false;
             subscription.unsubscribe();
         };
     }, []);
@@ -310,7 +343,8 @@ export default function RootLayout() {
 
             (async () => {
                 const userId = session.user.id;
-                const unlocked = await AsyncStorage.getItem('app_unlocked');
+                const storedUnlocked = await AsyncStorage.getItem('app_unlocked');
+                const unlocked = Platform.OS === 'web' ? 'true' : storedUnlocked;
                 
                 let localPin: string | null = null;
                 if (Platform.OS === 'web') {
