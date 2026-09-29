@@ -731,3 +731,179 @@ export async function shareReceiptFile(
   }
 }
 
+// ─── CRYPTO GAS & ASSET RECEIPTS (100% PDF EXPORT & SHARING) ─────────────────
+export interface CryptoReceiptData {
+  reference: string;
+  type: string;
+  symbol: string;
+  networkName: string;
+  amountSent: string;
+  amountPaid: string;
+  paidFrom: string;
+  recipient: string;
+  status: string;
+  date: string | Date;
+  networkFee: string;
+  txHash?: string;
+  explorerUrl?: string;
+  txId: string;
+}
+
+export function generateCryptoReceiptHTML(data: CryptoReceiptData): string {
+  const ref = data.reference || data.txId || `GAS-${Date.now()}`;
+  const formattedDate = formatMoniepointDate(data.date);
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(data.explorerUrl || `https://abumafhal.com/crypto?ref=${ref}`)}`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto_Receipt_${ref}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #F8FAFC; padding: 24px; color: #0F172A; }
+    .receipt-card { max-width: 500px; margin: 0 auto; background: #FFFFFF; border-radius: 20px; border: 1px solid #E2E8F0; padding: 28px 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .brand-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #F1F5F9; padding-bottom: 16px; margin-bottom: 20px; }
+    .brand-name { font-size: 18px; font-weight: 900; color: #0D1B3E; letter-spacing: -0.5px; }
+    .brand-sub { font-size: 10px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .receipt-tag { background: #ECFDF5; color: #059669; padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; border: 1px solid #A7F3D0; }
+    .hero { text-align: center; margin-bottom: 24px; padding: 16px 0; }
+    .hero-type { font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+    .hero-amount { font-size: 30px; font-weight: 900; color: #0F172A; letter-spacing: -0.5px; margin-bottom: 8px; }
+    .hero-status { display: inline-flex; align-items: center; background: #ECFDF5; color: #059669; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800; border: 1px solid #A7F3D0; }
+    .divider { height: 1px; border-top: 1px dashed #CBD5E1; margin: 20px 0; }
+    .section-title { font-size: 10.5px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .data-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #F8FAFC; }
+    .data-label { font-size: 12.5px; color: #64748B; font-weight: 500; }
+    .data-value { font-size: 13px; color: #0F172A; font-weight: 700; text-align: right; max-width: 65%; word-break: break-all; }
+    .data-value-mono { font-family: monospace; font-size: 12px; color: #1E293B; background: #F1F5F9; padding: 2px 6px; border-radius: 4px; }
+    .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #F1F5F9; font-size: 11px; color: #94A3B8; }
+    .qr-box { text-align: center; margin-top: 16px; }
+    .qr-box img { width: 90px; height: 90px; border-radius: 8px; border: 1px solid #E2E8F0; padding: 4px; }
+  </style>
+</head>
+<body>
+  <div class="receipt-card">
+    <div class="brand-header">
+      <div>
+        <div class="brand-name">ABU MAFHAL HUB</div>
+        <div class="brand-sub">Digital Assets & Crypto Hub</div>
+      </div>
+      <div class="receipt-tag">OFFICIAL RECEIPT</div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-type">${data.symbol} GAS REFILL</div>
+      <div class="hero-amount">- ${data.amountSent}</div>
+      <div class="hero-status">✓ ${data.status}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">TRANSACTION DETAILS</div>
+    <div class="data-row">
+      <span class="data-label">Transaction Type</span>
+      <span class="data-value">${data.type}</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">Network</span>
+      <span class="data-value">${data.networkName}</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">Recipient Wallet</span>
+      <span class="data-value-mono">${data.recipient}</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">Date & Time</span>
+      <span class="data-value">${formattedDate}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">PAYMENT AMOUNTS</div>
+    <div class="data-row">
+      <span class="data-label">Amount Sent</span>
+      <span class="data-value" style="color: #059669; font-weight: 900;">${data.amountSent}</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">Amount Paid</span>
+      <span class="data-value">${data.amountPaid}</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">Paid From</span>
+      <span class="data-value">${data.paidFrom}</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">Network Fee</span>
+      <span class="data-value">${data.networkFee}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">VERIFICATION & REFERENCES</div>
+    <div class="data-row">
+      <span class="data-label">Transaction ID</span>
+      <span class="data-value-mono">${data.txId}</span>
+    </div>
+    ${data.txHash ? `
+    <div class="data-row">
+      <span class="data-label">Blockchain Hash</span>
+      <span class="data-value-mono">${data.txHash}</span>
+    </div>` : ''}
+
+    <div class="qr-box">
+      <img src="${qrUrl}" alt="Verification QR Code" />
+      <div style="font-size: 10px; color: #94A3B8; margin-top: 6px;">Scan to inspect on Blockchain Explorer</div>
+    </div>
+
+    <div class="footer">
+      <div>Abu Mafhal Limited (RC-8979939) • support@abumafhal.com</div>
+      <div style="margin-top: 4px;">Thank you for using Abu Mafhal Crypto Gas Station.</div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+export async function shareCryptoReceiptPdf(data: CryptoReceiptData): Promise<boolean> {
+  try {
+    const html = generateCryptoReceiptHTML(data);
+    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        UTI: 'com.adobe.pdf',
+        mimeType: 'application/pdf',
+        dialogTitle: `Abu Mafhal Crypto Receipt - ${data.reference || data.txId}`,
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error sharing crypto receipt PDF:', error);
+    return false;
+  }
+}
+
+export async function saveCryptoReceiptPdf(data: CryptoReceiptData): Promise<string | null> {
+  try {
+    const html = generateCryptoReceiptHTML(data);
+    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    if (Platform.OS === 'web') {
+      await Print.printAsync({ html });
+      return uri;
+    }
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        UTI: 'com.adobe.pdf',
+        mimeType: 'application/pdf',
+        dialogTitle: `Save Crypto Receipt - ${data.reference || data.txId}`,
+      });
+    }
+    return uri;
+  } catch (error) {
+    console.error('Error saving crypto receipt PDF:', error);
+    return null;
+  }
+}
+

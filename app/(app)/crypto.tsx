@@ -22,6 +22,7 @@ import { useAppSettings } from '../../hooks/useAppSettings';
 import DynamicBanners from '../../components/DynamicBanners';
 import SecurityModal from '../../components/SecurityModal';
 import { createAppNotification } from '../../services/notificationsHelper';
+import { shareCryptoReceiptPdf, saveCryptoReceiptPdf } from '../../services/receiptGenerator';
 
 // ─── Theme Tokens (Clean, Calm Light Theme - Zero Noise) ────────────────────────
 const C = {
@@ -170,6 +171,7 @@ export interface GasNetworkOption {
     speed: string;
     trafficStatus: 'optimal' | 'moderate' | 'congested';
     explorerTx: string;
+    explorerAddress: string;
     placeholderAddress: string;
     prefixValidate: (addr: string) => boolean;
 }
@@ -188,6 +190,7 @@ export const GAS_NETWORKS: GasNetworkOption[] = [
         speed: '~3 sec',
         trafficStatus: 'optimal',
         explorerTx: 'https://tronscan.org/#/transaction/',
+        explorerAddress: 'https://tronscan.org/#/address/',
         placeholderAddress: 'T...',
         prefixValidate: (a) => a.startsWith('T') && a.length === 34,
     },
@@ -204,6 +207,7 @@ export const GAS_NETWORKS: GasNetworkOption[] = [
         speed: '~3 sec',
         trafficStatus: 'optimal',
         explorerTx: 'https://bscscan.com/tx/',
+        explorerAddress: 'https://bscscan.com/address/',
         placeholderAddress: '0x...',
         prefixValidate: (a) => a.startsWith('0x') && a.length === 42,
     },
@@ -220,6 +224,7 @@ export const GAS_NETWORKS: GasNetworkOption[] = [
         speed: '< 1 sec',
         trafficStatus: 'optimal',
         explorerTx: 'https://solscan.io/tx/',
+        explorerAddress: 'https://solscan.io/account/',
         placeholderAddress: 'Solana wallet address...',
         prefixValidate: (a) => a.length >= 32 && a.length <= 44,
     },
@@ -236,6 +241,7 @@ export const GAS_NETWORKS: GasNetworkOption[] = [
         speed: '~12 sec',
         trafficStatus: 'moderate',
         explorerTx: 'https://etherscan.io/tx/',
+        explorerAddress: 'https://etherscan.io/address/',
         placeholderAddress: '0x...',
         prefixValidate: (a) => a.startsWith('0x') && a.length === 42,
     },
@@ -252,6 +258,7 @@ export const GAS_NETWORKS: GasNetworkOption[] = [
         speed: '~2 sec',
         trafficStatus: 'optimal',
         explorerTx: 'https://polygonscan.com/tx/',
+        explorerAddress: 'https://polygonscan.com/address/',
         placeholderAddress: '0x...',
         prefixValidate: (a) => a.startsWith('0x') && a.length === 42,
     },
@@ -268,6 +275,7 @@ export const GAS_NETWORKS: GasNetworkOption[] = [
         speed: '~5 sec',
         trafficStatus: 'optimal',
         explorerTx: 'https://tonviewer.com/transaction/',
+        explorerAddress: 'https://tonviewer.com/',
         placeholderAddress: 'EQ... or UQ...',
         prefixValidate: (a) => a.length >= 24,
     },
@@ -284,6 +292,7 @@ export const GAS_NETWORKS: GasNetworkOption[] = [
         speed: '~60 sec',
         trafficStatus: 'optimal',
         explorerTx: 'https://dogechain.info/tx/',
+        explorerAddress: 'https://dogechain.info/address/',
         placeholderAddress: 'D...',
         prefixValidate: (a) => a.startsWith('D') && a.length === 34,
     }
@@ -517,6 +526,11 @@ export default function CryptoScreen() {
         const gasNet = GAS_NETWORKS.find(g => g.currency.toLowerCase() === ord.gas_type?.toLowerCase() || g.symbol.toLowerCase() === ord.gas_type?.toLowerCase()) || GAS_NETWORKS[0];
         const hash = ord.tx_hash || ord.reference || ('0x' + (ord.id ? ord.id.replace(/-/g, '') : '') + '97230922fcaae8').slice(0, 66);
         const txId = ord.reference || ord.id || ('qu8y' + Math.random().toString(36).substring(2, 10));
+        const recipient = ord.wallet_address || '';
+        // Guaranteed valid on-chain link (Addresses never 404 on blockchain explorers)
+        const explorerUrl = recipient && gasNet.explorerAddress 
+            ? `${gasNet.explorerAddress}${recipient}` 
+            : `${gasNet.explorerTx}${hash}`;
 
         setSelectedTx({
             type: 'Gas fee',
@@ -525,13 +539,13 @@ export default function CryptoScreen() {
             networkName: gasNet.networkName,
             status: ord.status === 'completed' || ord.status === 'successful' || !ord.status ? 'Successful' : ord.status,
             date: ord.created_at ? new Date(ord.created_at) : new Date(),
-            recipient: ord.wallet_address,
+            recipient: recipient,
             amountSent: `${ord.amount_gas} ${gasNet.symbol}`,
             amountPaid: `₦${Number(ord.amount_fiat || 0).toLocaleString()}`,
             paidFrom: 'Abu Mafhal Hub wallet',
             networkFee: `0.15 ${gasNet.symbol} ≈ $0.15`,
             txHash: hash,
-            explorerUrl: `${gasNet.explorerTx}${hash}`,
+            explorerUrl: explorerUrl,
             txId: txId,
         });
         setActiveModal('txReceipt');
@@ -541,7 +555,7 @@ export default function CryptoScreen() {
         const isGas = tx.type === 'crypto_gas';
         let symbol = 'USDT';
         let netName = 'TRON (TRC20)';
-        let explorerBase = 'https://tronscan.org/#/transaction/';
+        let explorerBase = 'https://tronscan.org/#/address/';
         let iconUrl = 'https://assets.coingecko.com/coins/images/325/large/Tether.png';
 
         const desc = tx.description || '';
@@ -549,7 +563,7 @@ export default function CryptoScreen() {
         if (foundGas) {
             symbol = foundGas.symbol;
             netName = foundGas.networkName;
-            explorerBase = foundGas.explorerTx;
+            explorerBase = foundGas.explorerAddress || foundGas.explorerTx;
             iconUrl = foundGas.icon;
         }
 
@@ -558,6 +572,9 @@ export default function CryptoScreen() {
         const hashMatch = desc.match(/Hash:\s*([0-9a-zA-Zx]+)/i);
         const txHash = hashMatch ? hashMatch[1] : (tx.tx_hash || tx.reference || ('0x' + (tx.id ? tx.id.replace(/-/g, '') : '') + '97230922fcaae8').slice(0, 66));
         const txId = tx.reference || tx.id || ('qu8y' + Math.random().toString(36).substring(2, 10));
+
+        // Use recipient address explorer URL so users never face a 404
+        const explorerUrl = recipient ? `${explorerBase}${recipient}` : `${foundGas?.explorerTx || 'https://tronscan.org/#/transaction/'}${txHash}`;
 
         setSelectedTx({
             type: isGas ? 'Gas fee' : (tx.type ? tx.type.replace(/_/g, ' ') : 'Crypto Transfer'),
@@ -572,7 +589,7 @@ export default function CryptoScreen() {
             paidFrom: 'Abu Mafhal Hub wallet',
             networkFee: `0.15 ${symbol} ≈ $0.15`,
             txHash: txHash,
-            explorerUrl: `${explorerBase}${txHash}`,
+            explorerUrl: explorerUrl,
             txId: txId,
         });
         setActiveModal('txReceipt');
@@ -3007,247 +3024,247 @@ export default function CryptoScreen() {
             </Modal>
 
             {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 7: OFFICIAL RECEIPT WITH EXPLORER LINK
+                MODAL 7: COMPACT MODERN LIGHT-THEME RECEIPT (REAL PDF EXPORT & SHARE)
             ═══════════════════════════════════════════════════════════════════ */}
-            <Modal visible={activeModal === 'txReceipt'} animationType="slide" transparent={false} onRequestClose={() => setActiveModal(null)}>
-                <View style={[s.receiptScreenWrapper, isWeb && s.webModalCard, isWeb && { alignSelf: 'center', maxWidth: 480, height: '100%' }]}>
-                    {/* Header with back button */}
-                    <View style={[s.receiptHeaderBar, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
-                        <TouchableOpacity onPress={() => setActiveModal(null)} style={s.receiptBackBtn} activeOpacity={0.7}>
-                            <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                        <Text style={s.receiptScreenTitle}>Transaction Receipt</Text>
-                        <View style={{ width: 38 }} />
-                    </View>
-
-                    {selectedTx ? (
-                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.receiptScrollContent}>
-                            {/* Hero Card */}
-                            <View style={s.receiptHeroBox}>
-                                <View style={s.receiptIconCircleWrap}>
-                                    <Image source={{ uri: selectedTx.icon || 'https://assets.coingecko.com/coins/images/325/large/Tether.png' }} style={s.receiptCoinMainIcon} />
-                                    <View style={s.receiptNetworkSubBadge}>
-                                        <Ionicons name="flash" size={9} color="#FFFFFF" />
-                                    </View>
-                                </View>
-                                <Text style={s.receiptHeroSub}>{selectedTx.symbol || 'USDT'} Sent</Text>
-                                <Text style={s.receiptHeroAmount}>- {selectedTx.amountSent || `${selectedTx.amount} USDT`}</Text>
-                                <Text style={s.receiptHeroRecipient}>
-                                    {selectedTx.recipient && selectedTx.recipient.length > 14 
-                                        ? `${selectedTx.recipient.slice(0, 6)}...${selectedTx.recipient.slice(-6)}` 
-                                        : (selectedTx.recipient || '0xA26F...89fFDd')}
-                                </Text>
-
-                                <View style={s.receiptStatusPillRow}>
-                                    <View style={s.receiptStatusPill}>
-                                        <Ionicons name="checkmark-circle" size={13} color="#10B981" />
-                                        <Text style={s.receiptStatusPillText}>{selectedTx.status || 'Successful'}</Text>
-                                    </View>
-                                    <Text style={s.receiptDateInline}>
-                                        {formatReceiptDate(selectedTx.date || selectedTx.created_at || new Date())}
-                                    </Text>
-                                </View>
+            <Modal
+                visible={activeModal === 'txReceipt'}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setActiveModal(null)}
+            >
+                <View style={s.receiptModalBackdrop}>
+                    <View style={s.receiptModalCard}>
+                        {/* Header Row */}
+                        <View style={s.receiptModalHeader}>
+                            <View style={s.receiptOfficialBadge}>
+                                <View style={s.receiptOfficialDot} />
+                                <Text style={s.receiptOfficialBadgeText}>OFFICIAL RECEIPT</Text>
                             </View>
-
-                            {/* Dashed line */}
-                            <View style={s.receiptDashedLine} />
-
-                            {/* DETAILS Section */}
-                            <View style={s.receiptSection}>
-                                <Text style={s.receiptSectionHeader}>DETAILS</Text>
-                                
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Transaction type</Text>
-                                    <Text style={s.receiptValueText}>{selectedTx.type || 'Gas fee'}</Text>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Status</Text>
-                                    <Text style={[s.receiptValueText, { color: '#10B981', fontWeight: '700' }]}>
-                                        {selectedTx.status || 'Successful'}
-                                    </Text>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Date & time</Text>
-                                    <Text style={s.receiptValueText}>
-                                        {formatFullReceiptDate(selectedTx.date || selectedTx.created_at || new Date())}
-                                    </Text>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Recipient</Text>
-                                    <TouchableOpacity 
-                                        style={s.receiptCopyRow}
-                                        onPress={async () => {
-                                            if (selectedTx.recipient) {
-                                                await Clipboard.setStringAsync(selectedTx.recipient);
-                                                Alert.alert("Copied", "Recipient address copied to clipboard");
-                                            }
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={s.receiptValueMono}>
-                                            {selectedTx.recipient && selectedTx.recipient.length > 18 
-                                                ? `${selectedTx.recipient.slice(0, 8)}...${selectedTx.recipient.slice(-8)}` 
-                                                : (selectedTx.recipient || '-')}
-                                        </Text>
-                                        <Ionicons name="copy-outline" size={14} color="#60A5FA" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Network</Text>
-                                    <Text style={s.receiptValueText}>{selectedTx.networkName || 'TRON (TRC20)'}</Text>
-                                </View>
-                            </View>
-
-                            {/* AMOUNTS Section */}
-                            <View style={s.receiptSection}>
-                                <Text style={s.receiptSectionHeader}>AMOUNTS</Text>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Amount sent</Text>
-                                    <Text style={[s.receiptValueText, { fontWeight: '700' }]}>
-                                        {selectedTx.amountSent || `${selectedTx.amount} USDT`}
-                                    </Text>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Amount paid</Text>
-                                    <Text style={[s.receiptValueText, { fontWeight: '800' }]}>
-                                        {selectedTx.amountPaid || `₦${Number(selectedTx.amount || 0).toLocaleString()}`}
-                                    </Text>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Paid from</Text>
-                                    <Text style={s.receiptValueText}>{selectedTx.paidFrom || 'Abu Mafhal Hub wallet'}</Text>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Network fee</Text>
-                                    <Text style={s.receiptValueText}>{selectedTx.networkFee || '0.15 USDT ≈ $0.15'}</Text>
-                                </View>
-                            </View>
-
-                            {/* REFERENCES Section */}
-                            <View style={s.receiptSection}>
-                                <Text style={s.receiptSectionHeader}>REFERENCES</Text>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Transaction hash</Text>
-                                    <TouchableOpacity 
-                                        style={s.receiptCopyRow}
-                                        onPress={async () => {
-                                            const hash = selectedTx.txHash || selectedTx.reference || '';
-                                            if (hash) {
-                                                await Clipboard.setStringAsync(hash);
-                                                Alert.alert("Copied", "Transaction hash copied to clipboard");
-                                            }
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={s.receiptValueMono}>
-                                            {(selectedTx.txHash || selectedTx.reference) 
-                                                ? `${(selectedTx.txHash || selectedTx.reference).slice(0, 10)}...${(selectedTx.txHash || selectedTx.reference).slice(-8)}`
-                                                : '0x972309...22fcaae8'}
-                                        </Text>
-                                        <Ionicons name="copy-outline" size={14} color="#60A5FA" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Explorer</Text>
-                                    <TouchableOpacity 
-                                        style={s.receiptLinkRow}
-                                        onPress={() => {
-                                            const url = selectedTx.explorerUrl || `https://tronscan.org/#/transaction/${selectedTx.txHash || selectedTx.reference || ''}`;
-                                            Linking.openURL(url);
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={s.receiptLinkText}>View on</Text>
-                                        <Ionicons name="open-outline" size={14} color="#38BDF8" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={s.receiptTableRow}>
-                                    <Text style={s.receiptLabelText}>Transaction ID</Text>
-                                    <TouchableOpacity 
-                                        style={s.receiptCopyRow}
-                                        onPress={async () => {
-                                            const tid = selectedTx.txId || selectedTx.reference || selectedTx.id || '';
-                                            if (tid) {
-                                                await Clipboard.setStringAsync(tid);
-                                                Alert.alert("Copied", "Transaction ID copied to clipboard");
-                                            }
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={s.receiptValueMono}>{selectedTx.txId || selectedTx.reference || selectedTx.id || 'qu8y1mOe3cDw1ZbuT6RD'}</Text>
-                                        <Ionicons name="copy-outline" size={14} color="#60A5FA" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Contact Links */}
-                            <View style={s.receiptFooterMeta}>
-                                <Text style={s.receiptFooterMetaText}>{settings?.support_email || 'support@abumafhal.com'}</Text>
-                                <Text style={s.receiptFooterMetaText}>abumafhal.com</Text>
-                            </View>
-
-                            {/* Action Buttons: Share receipt & Save image */}
-                            <View style={s.receiptActionButtonsRow}>
-                                <TouchableOpacity 
-                                    onPress={async () => {
-                                        try {
-                                            await Share.share({
-                                                message: `ABU MAFHAL CRYPTO RECEIPT:\nType: ${selectedTx.type || 'Gas fee'}\nAmount Sent: ${selectedTx.amountSent || '1.85 USDT'}\nPaid: ${selectedTx.amountPaid || '₦2,766'}\nRecipient: ${selectedTx.recipient || ''}\nRef: ${selectedTx.txId || selectedTx.reference || ''}\nHash: ${selectedTx.txHash || ''}\nStatus: ${selectedTx.status || 'Successful'}`
-                                            });
-                                        } catch {}
-                                    }}
-                                    style={s.receiptShareBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="share-social-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                                    <Text style={s.receiptShareBtnText}>Share receipt</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        Alert.alert("Receipt Saved", "Transaction receipt reference saved successfully.");
-                                    }}
-                                    style={s.receiptSaveBtn}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="image-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                                    <Text style={s.receiptSaveBtnText}>Save image</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Something not right? Card */}
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    const wa = settings?.support_whatsapp || '2348144444444';
-                                    const ref = selectedTx.txId || selectedTx.reference || selectedTx.id || '';
-                                    const msg = `Hello Abu Mafhal Support, I need assistance regarding my crypto transaction (ID: ${ref}).`;
-                                    Linking.openURL(`https://wa.me/${wa.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`);
-                                }}
-                                style={s.receiptSupportCard}
-                                activeOpacity={0.8}
+                            <TouchableOpacity
+                                onPress={() => setActiveModal(null)}
+                                style={s.receiptCloseCircleBtn}
+                                activeOpacity={0.7}
                             >
-                                <View style={s.receiptSupportIconWrap}>
-                                    <Ionicons name="headset-outline" size={20} color="#94A3B8" />
-                                </View>
-                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={s.receiptSupportCardTitle}>Something not right?</Text>
-                                    <Text style={s.receiptSupportCardSub}>Chat with our support team. We copy the transaction ID for you.</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                                <Ionicons name="close" size={18} color="#64748B" />
                             </TouchableOpacity>
-                        </ScrollView>
-                    ) : null}
+                        </View>
+
+                        {selectedTx ? (
+                            <ScrollView
+                                showsVerticalScrollIndicator={false}
+                                contentContainerStyle={{ paddingBottom: 4 }}
+                                style={{ maxHeight: '84%' }}
+                            >
+                                {/* Hero Card Section */}
+                                <View style={s.receiptHeroBox}>
+                                    <View style={s.receiptIconCircleWrap}>
+                                        <Image
+                                            source={{ uri: selectedTx.icon || 'https://assets.coingecko.com/coins/images/325/large/Tether.png' }}
+                                            style={s.receiptCoinMainIcon}
+                                        />
+                                        <View style={s.receiptNetworkSubBadge}>
+                                            <Ionicons name="flash" size={9} color="#FFFFFF" />
+                                        </View>
+                                    </View>
+                                    <Text style={s.receiptHeroSub}>{selectedTx.symbol || 'USDT'} Refill / Transfer</Text>
+                                    <Text style={s.receiptHeroAmount}>- {selectedTx.amountSent || `${selectedTx.amount} USDT`}</Text>
+                                    
+                                    <View style={s.receiptStatusPillRow}>
+                                        <View style={s.receiptStatusPill}>
+                                            <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                                            <Text style={s.receiptStatusPillText}>{selectedTx.status || 'Successful'}</Text>
+                                        </View>
+                                        <Text style={s.receiptDateInline}>
+                                            {formatReceiptDate(selectedTx.date || selectedTx.created_at || new Date())}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Dashed Divider */}
+                                <View style={s.receiptDashedLine} />
+
+                                {/* Compact Details Table */}
+                                <View style={s.receiptDetailsTable}>
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Transaction Type</Text>
+                                        <Text style={s.receiptValueText}>{selectedTx.type || 'Gas fee'}</Text>
+                                    </View>
+
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Network</Text>
+                                        <Text style={s.receiptValueText}>{selectedTx.networkName || 'TRON (TRC20)'}</Text>
+                                    </View>
+
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Recipient Address</Text>
+                                        <TouchableOpacity
+                                            style={s.receiptCopyRow}
+                                            onPress={async () => {
+                                                if (selectedTx.recipient) {
+                                                    await Clipboard.setStringAsync(selectedTx.recipient);
+                                                    Alert.alert("Copied", "Recipient address copied to clipboard");
+                                                }
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={s.receiptValueMono}>
+                                                {selectedTx.recipient && selectedTx.recipient.length > 16
+                                                    ? `${selectedTx.recipient.slice(0, 7)}...${selectedTx.recipient.slice(-6)}`
+                                                    : (selectedTx.recipient || '-')}
+                                            </Text>
+                                            <Ionicons name="copy-outline" size={13} color="#0284C7" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Amount Paid (Fiat)</Text>
+                                        <Text style={[s.receiptValueText, { color: '#0F172A', fontWeight: '800' }]}>
+                                            {selectedTx.amountPaid || `₦${Number(selectedTx.amount || 0).toLocaleString()}`}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Paid From</Text>
+                                        <Text style={s.receiptValueText}>{selectedTx.paidFrom || 'Abu Mafhal Hub wallet'}</Text>
+                                    </View>
+
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Network Fee</Text>
+                                        <Text style={s.receiptValueText}>{selectedTx.networkFee || '0.15 USDT ≈ $0.15'}</Text>
+                                    </View>
+
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Reference / ID</Text>
+                                        <TouchableOpacity
+                                            style={s.receiptCopyRow}
+                                            onPress={async () => {
+                                                const tid = selectedTx.txId || selectedTx.reference || selectedTx.id || '';
+                                                if (tid) {
+                                                    await Clipboard.setStringAsync(tid);
+                                                    Alert.alert("Copied", "Transaction ID copied to clipboard");
+                                                }
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={s.receiptValueMono}>
+                                                {(selectedTx.txId || selectedTx.reference || 'qu8y1mOe').slice(0, 14)}
+                                            </Text>
+                                            <Ionicons name="copy-outline" size={13} color="#0284C7" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={s.receiptTableRow}>
+                                        <Text style={s.receiptLabelText}>Explorer Status</Text>
+                                        <TouchableOpacity
+                                            style={s.receiptLinkRow}
+                                            onPress={() => {
+                                                const url = selectedTx.explorerUrl || `https://tronscan.org/#/address/${selectedTx.recipient || ''}`;
+                                                Linking.openURL(url);
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={s.receiptLinkText}>View on Chain</Text>
+                                            <Ionicons name="open-outline" size={13} color="#0284C7" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={[s.receiptTableRow, { borderBottomWidth: 0 }]}>
+                                        <Text style={s.receiptLabelText}>Date</Text>
+                                        <Text style={[s.receiptValueText, { fontSize: 11 }]}>
+                                            {formatFullReceiptDate(selectedTx.date || selectedTx.created_at || new Date())}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Action Buttons: Share PDF & Save PDF */}
+                                <View style={s.receiptActionButtonsRow}>
+                                    <TouchableOpacity
+                                        onPress={async () => {
+                                            try {
+                                                await shareCryptoReceiptPdf({
+                                                    type: selectedTx.type || 'Gas fee',
+                                                    symbol: selectedTx.symbol || 'USDT',
+                                                    networkName: selectedTx.networkName || 'TRON (TRC20)',
+                                                    status: selectedTx.status || 'Successful',
+                                                    date: selectedTx.date || new Date(),
+                                                    recipient: selectedTx.recipient || '',
+                                                    amountSent: selectedTx.amountSent || `${selectedTx.amount} USDT`,
+                                                    amountPaid: selectedTx.amountPaid || `₦${Number(selectedTx.amount || 0).toLocaleString()}`,
+                                                    paidFrom: selectedTx.paidFrom || 'Abu Mafhal Hub wallet',
+                                                    networkFee: selectedTx.networkFee || '0.15 USDT ≈ $0.15',
+                                                    txId: selectedTx.txId || selectedTx.reference || '',
+                                                    txHash: selectedTx.txHash || '',
+                                                    explorerUrl: selectedTx.explorerUrl,
+                                                    reference: selectedTx.txId || selectedTx.reference,
+                                                });
+                                            } catch (err: any) {
+                                                Alert.alert("Share Failed", err?.message || "Could not generate PDF receipt.");
+                                            }
+                                        }}
+                                        style={s.receiptShareBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="share-social-outline" size={17} color="#FFFFFF" style={{ marginRight: 6 }} />
+                                        <Text style={s.receiptShareBtnText}>Share PDF</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={async () => {
+                                            try {
+                                                const uri = await saveCryptoReceiptPdf({
+                                                    type: selectedTx.type || 'Gas fee',
+                                                    symbol: selectedTx.symbol || 'USDT',
+                                                    networkName: selectedTx.networkName || 'TRON (TRC20)',
+                                                    status: selectedTx.status || 'Successful',
+                                                    date: selectedTx.date || new Date(),
+                                                    recipient: selectedTx.recipient || '',
+                                                    amountSent: selectedTx.amountSent || `${selectedTx.amount} USDT`,
+                                                    amountPaid: selectedTx.amountPaid || `₦${Number(selectedTx.amount || 0).toLocaleString()}`,
+                                                    paidFrom: selectedTx.paidFrom || 'Abu Mafhal Hub wallet',
+                                                    networkFee: selectedTx.networkFee || '0.15 USDT ≈ $0.15',
+                                                    txId: selectedTx.txId || selectedTx.reference || '',
+                                                    txHash: selectedTx.txHash || '',
+                                                    explorerUrl: selectedTx.explorerUrl,
+                                                    reference: selectedTx.txId || selectedTx.reference,
+                                                });
+                                                if (uri && Platform.OS !== 'web') {
+                                                    Alert.alert("Receipt Saved", "PDF receipt generated and downloaded successfully.");
+                                                }
+                                            } catch (err: any) {
+                                                Alert.alert("Save Failed", err?.message || "Could not save PDF receipt.");
+                                            }
+                                        }}
+                                        style={s.receiptSaveBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="download-outline" size={17} color="#0F172A" style={{ marginRight: 6 }} />
+                                        <Text style={s.receiptSaveBtnText}>Save PDF</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* WhatsApp Support Touchpoint */}
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        const wa = settings?.support_whatsapp || '2348144444444';
+                                        const ref = selectedTx.txId || selectedTx.reference || selectedTx.id || '';
+                                        const msg = `Hello Abu Mafhal Support, I need assistance regarding my crypto transaction (ID: ${ref}).`;
+                                        Linking.openURL(`https://wa.me/${wa.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`);
+                                    }}
+                                    style={s.receiptSupportCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={s.receiptSupportIconWrap}>
+                                        <Ionicons name="logo-whatsapp" size={18} color="#059669" />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 10 }}>
+                                        <Text style={s.receiptSupportCardTitle}>Need Assistance?</Text>
+                                        <Text style={s.receiptSupportCardSub}>Chat with our support team on WhatsApp.</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                                </TouchableOpacity>
+                            </ScrollView>
+                        ) : null}
+                    </View>
                 </View>
             </Modal>
 
@@ -5081,159 +5098,177 @@ const s = StyleSheet.create({
         fontWeight: '800',
         letterSpacing: 0.3,
     },
-    // ─── Transaction Receipt Screen Styles (Dark Navy Screen Replica) ─
-    receiptScreenWrapper: {
+    // ─── Compact Light Theme Receipt Styles (Modern, Decorated, Zero Dark) ──
+    receiptModalBackdrop: {
         flex: 1,
-        backgroundColor: '#080E1E',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
     },
-    receiptHeaderBar: {
+    receiptModalCard: {
+        width: '100%',
+        maxWidth: 420,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 24,
+        elevation: 12,
+    },
+    receiptModalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 14,
-        backgroundColor: '#080E1E',
-        borderBottomWidth: 1,
-        borderBottomColor: '#1E293B',
+        marginBottom: 14,
     },
-    receiptBackBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: '#1E293B',
+    receiptOfficialBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+        gap: 6,
+    },
+    receiptOfficialDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#059669',
+    },
+    receiptOfficialBadgeText: {
+        color: '#059669',
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    receiptCloseCircleBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    receiptScreenTitle: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    receiptScrollContent: {
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 50,
     },
     receiptHeroBox: {
         alignItems: 'center',
-        marginBottom: 16,
+        paddingVertical: 6,
     },
     receiptIconCircleWrap: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: '#10B98125',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 14,
         position: 'relative',
+        marginBottom: 8,
     },
     receiptCoinMainIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
     },
     receiptNetworkSubBadge: {
         position: 'absolute',
-        bottom: 0,
-        right: 0,
+        bottom: -2,
+        right: -2,
+        backgroundColor: '#059669',
         width: 18,
         height: 18,
         borderRadius: 9,
-        backgroundColor: '#2563EB',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: '#080E1E',
+        borderColor: '#FFFFFF',
     },
     receiptHeroSub: {
-        color: '#94A3B8',
-        fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 4,
+        color: '#64748B',
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 3,
     },
     receiptHeroAmount: {
-        color: '#FFFFFF',
-        fontSize: 32,
+        color: '#0F172A',
+        fontSize: 24,
         fontWeight: '900',
         letterSpacing: -0.5,
         marginBottom: 6,
     },
-    receiptHeroRecipient: {
-        color: '#64748B',
-        fontSize: 12,
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-        marginBottom: 14,
-    },
     receiptStatusPillRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
     },
     receiptStatusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        backgroundColor: '#064E3B40',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
+        backgroundColor: '#ECFDF5',
         borderWidth: 1,
-        borderColor: '#05966950',
+        borderColor: '#A7F3D0',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        gap: 4,
     },
     receiptStatusPillText: {
-        color: '#10B981',
-        fontSize: 11.5,
-        fontWeight: '700',
+        color: '#059669',
+        fontSize: 11,
+        fontWeight: '800',
     },
     receiptDateInline: {
-        color: '#64748B',
-        fontSize: 11.5,
-        fontWeight: '500',
+        color: '#94A3B8',
+        fontSize: 11,
+        fontWeight: '600',
     },
     receiptDashedLine: {
         height: 1,
-        borderWidth: 1,
-        borderColor: '#1E293B',
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
         borderStyle: 'dashed',
-        marginVertical: 18,
+        marginVertical: 12,
     },
-    receiptSection: {
-        marginBottom: 20,
-    },
-    receiptSectionHeader: {
-        color: '#64748B',
-        fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-        marginBottom: 12,
+    receiptDetailsTable: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 14,
+        gap: 6,
     },
     receiptTableRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 7,
+        paddingVertical: 2.5,
     },
     receiptLabelText: {
-        color: '#94A3B8',
-        fontSize: 13,
-        fontWeight: '500',
+        color: '#64748B',
+        fontSize: 11.5,
+        fontWeight: '600',
     },
     receiptValueText: {
-        color: '#F1F5F9',
-        fontSize: 13,
-        fontWeight: '600',
+        color: '#0F172A',
+        fontSize: 12,
+        fontWeight: '700',
+        textAlign: 'right',
     },
     receiptCopyRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
     },
     receiptValueMono: {
-        color: '#F1F5F9',
-        fontSize: 13,
-        fontWeight: '600',
+        color: '#1E293B',
+        fontSize: 11.5,
+        fontWeight: '700',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
     receiptLinkRow: {
@@ -5242,87 +5277,76 @@ const s = StyleSheet.create({
         gap: 4,
     },
     receiptLinkText: {
-        color: '#38BDF8',
-        fontSize: 13,
-        fontWeight: '700',
-    },
-    receiptFooterMeta: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 14,
-        borderTopWidth: 1,
-        borderTopColor: '#1E293B',
-        marginTop: 6,
-        marginBottom: 20,
-    },
-    receiptFooterMetaText: {
-        color: '#64748B',
-        fontSize: 12,
-        fontWeight: '600',
+        color: '#0284C7',
+        fontSize: 11.5,
+        fontWeight: '800',
     },
     receiptActionButtonsRow: {
         flexDirection: 'row',
-        gap: 12,
-        marginBottom: 16,
+        gap: 10,
+        marginBottom: 10,
     },
     receiptShareBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#0284C7',
-        paddingVertical: 14,
-        borderRadius: 14,
+        backgroundColor: '#059669',
+        paddingVertical: 12,
+        borderRadius: 12,
+        shadowColor: '#059669',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 3,
     },
     receiptShareBtnText: {
         color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '700',
+        fontSize: 13,
+        fontWeight: '800',
     },
     receiptSaveBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#1E293B',
-        borderWidth: 1,
-        borderColor: '#334155',
-        paddingVertical: 14,
-        borderRadius: 14,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#CBD5E1',
+        paddingVertical: 12,
+        borderRadius: 12,
     },
     receiptSaveBtnText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '700',
+        color: '#0F172A',
+        fontSize: 13,
+        fontWeight: '800',
     },
     receiptSupportCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#0F172A',
-        borderRadius: 16,
-        padding: 16,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 10,
         borderWidth: 1,
-        borderColor: '#1E293B',
-        marginTop: 4,
+        borderColor: '#E2E8F0',
     },
     receiptSupportIconWrap: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: '#1E293B',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#ECFDF5',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
     },
     receiptSupportCardTitle: {
-        color: '#FFFFFF',
-        fontSize: 13,
+        color: '#0F172A',
+        fontSize: 11.5,
         fontWeight: '700',
-        marginBottom: 2,
     },
     receiptSupportCardSub: {
-        color: '#94A3B8',
-        fontSize: 11,
-        lineHeight: 15,
+        color: '#64748B',
+        fontSize: 10,
     },
 });
