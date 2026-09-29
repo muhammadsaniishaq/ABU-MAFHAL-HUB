@@ -105,6 +105,9 @@ export default function APIVaultScreen() {
     const [payVesselSecretKey, setPayVesselSecretKey] = useState('');
     const [nineBoostApiKey, setNineBoostApiKey] = useState('');
     const [nowPaymentsApiKey, setNowPaymentsApiKey] = useState('');
+    const [nowPaymentsEmail, setNowPaymentsEmail] = useState('');
+    const [nowPaymentsPassword, setNowPaymentsPassword] = useState('');
+    const [tronPrivateKey, setTronPrivateKey] = useState('');
     const [bigiToken, setBigiToken] = useState('');
     const [bigiPin, setBigiPin] = useState('');
     const [termiiApiKey, setTermiiApiKey] = useState('');
@@ -229,7 +232,8 @@ export default function APIVaultScreen() {
                 'IDPRO_API_KEY', 'IDPRO_KEY',
                 'PAYVESSEL_API_KEY', 'PAYVESSEL_KEY', 'PAYVESSEL_SECRET_KEY', 'PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET',
                 'NINEBOOST_API_KEY', 'NINE_BOOST_API_KEY', 'NINEBOOST_KEY', 'NINE_BOOST_KEY',
-                'NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY',
+                'NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY', 'NOWPAYMENTS_EMAIL', 'NOWPAYMENTS_PASSWORD',
+                'TRON_PRIVATE_KEY', 'TRON_HOT_WALLET_KEY',
                 'BIGI_API_TOKEN', 'BIGI_TOKEN', 'BIGI_API_PIN', 'BIGI_PIN',
                 'TERMII_API_KEY', 'TERMII_KEY',
                 'MONNIFY_API_KEY', 'MONNIFY_KEY', 'MONNIFY_SECRET_KEY', 'MONNIFY_SECRET'
@@ -315,6 +319,15 @@ export default function APIVaultScreen() {
 
         const npKey = getFirstValid(map, 'NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY', 'NOWPAYMENTS_TOKEN');
         if (npKey) setNowPaymentsApiKey(npKey);
+
+        const npEmail = getFirstValid(map, 'NOWPAYMENTS_EMAIL');
+        if (npEmail) setNowPaymentsEmail(npEmail);
+
+        const npPass = getFirstValid(map, 'NOWPAYMENTS_PASSWORD');
+        if (npPass) setNowPaymentsPassword(npPass);
+
+        const tronKey = getFirstValid(map, 'TRON_PRIVATE_KEY', 'TRON_HOT_WALLET_KEY');
+        if (tronKey) setTronPrivateKey(tronKey);
 
         const bigiTkn = getFirstValid(map, 'BIGI_API_TOKEN', 'BIGI_TOKEN', 'BIGI_API_KEY');
         if (bigiTkn) setBigiToken(bigiTkn);
@@ -518,6 +531,9 @@ export default function APIVaultScreen() {
                 { canonical: 'PAYVESSEL_SECRET_KEY', aliases: ['PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET'], value: payVesselSecretKey, desc: 'PayVessel Secret Key' },
                 { canonical: 'NINEBOOST_API_KEY', aliases: ['NINE_BOOST_API_KEY', 'NINEBOOST_KEY'], value: nineBoostApiKey, desc: 'NineBoost API Key' },
                 { canonical: 'NOWPAYMENTS_API_KEY', aliases: ['NOWPAYMENTS_KEY'], value: nowPaymentsApiKey, desc: 'NowPayments API Key' },
+                { canonical: 'NOWPAYMENTS_EMAIL', aliases: [], value: nowPaymentsEmail, desc: 'NowPayments Custody Email' },
+                { canonical: 'NOWPAYMENTS_PASSWORD', aliases: [], value: nowPaymentsPassword, desc: 'NowPayments Custody Password' },
+                { canonical: 'TRON_PRIVATE_KEY', aliases: ['TRON_HOT_WALLET_KEY'], value: tronPrivateKey, desc: 'Tron Hot Wallet Private Key (Instant Gas Refill)' },
                 { canonical: 'BIGI_API_TOKEN', aliases: ['BIGI_TOKEN'], value: bigiToken, desc: 'Bigi API Token' },
                 { canonical: 'BIGI_API_PIN', aliases: ['BIGI_PIN'], value: bigiPin, desc: 'Bigi PIN' },
                 { canonical: 'TERMII_API_KEY', aliases: ['TERMII_KEY'], value: termiiApiKey, desc: 'Termii API Key' },
@@ -763,6 +779,38 @@ export default function APIVaultScreen() {
             description: 'Accept USDT, BTC, ETH & crypto settlements.',
             icon: 'logo-bitcoin',
             badgeTag: 'CRYPTO DEPOSITS',
+            isSecret: true
+        },
+        {
+            id: 'nowpayments_payout',
+            keyName: 'NOWPAYMENTS_EMAIL',
+            title: 'NowPayments Payout / Custody Credentials',
+            provider: 'NowPayments',
+            category: 'Crypto',
+            value: nowPaymentsEmail,
+            setValue: setNowPaymentsEmail,
+            placeholder: 'NowPayments account email...',
+            description: 'Required for automated NowPayments payouts (JWT authentication).',
+            icon: 'shield-checkmark',
+            badgeTag: 'PAYOUT AUTH',
+            isSecret: false,
+            secondaryValue: nowPaymentsPassword,
+            setSecondaryValue: setNowPaymentsPassword,
+            secondaryPlaceholder: 'NowPayments account password...',
+            secondaryKeyName: 'NOWPAYMENTS_PASSWORD'
+        },
+        {
+            id: 'tron_hot_wallet',
+            keyName: 'TRON_PRIVATE_KEY',
+            title: 'Direct TRON Hot Wallet (Instant Gas)',
+            provider: 'Tron Blockchain',
+            category: 'Crypto',
+            value: tronPrivateKey,
+            setValue: setTronPrivateKey,
+            placeholder: 'Enter TRON private key (hex)...',
+            description: 'Direct on-chain instant TRX dispatch to users within 3 seconds, bypasses 3rd party custodial delays.',
+            icon: 'flash',
+            badgeTag: 'INSTANT ON-CHAIN',
             isSecret: true
         }
     ];
