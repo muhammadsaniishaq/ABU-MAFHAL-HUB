@@ -377,16 +377,21 @@ Deno.serve(async (req: Request) => {
                         }
 
                         const statusStr = String(result?.status || result?.msg || '').toUpperCase();
-                        const isSuccessStatus = statusStr.includes('RECEIVED') || statusStr.includes('COMPLETED') || statusStr.includes('SUCCESS') || statusStr === '00' || statusStr === '0' || statusStr === '200';
-                        const hasOrderId = result && (Boolean(result.orderid) || Boolean(result.order_id) || Boolean(result.reference) || Boolean(result.requestId));
+                        const isExplicitFailed = statusStr.includes('FAIL') || statusStr.includes('ERR') || statusStr.includes('REJECT');
+                        const isSuccessStatus = !isExplicitFailed && (statusStr.includes('RECEIVED') || statusStr.includes('COMPLETED') || statusStr.includes('SUCCESS') || statusStr === '00' || statusStr === '0' || statusStr === '200');
 
-                        if (result && (isSuccessStatus || hasOrderId)) {
+                        if (result && isSuccessStatus) {
                             console.log(`[Bills] VTU Transaction Succeeded via: ${vendor}`);
                             break;
+                        } else {
+                            console.warn(`[Bills] Vendor ${vendor} returned non-success result:`, JSON.stringify(result));
+                            lastError = new Error(result?.message || result?.msg || `Vendor ${vendor} did not confirm delivery`);
+                            result = null;
                         }
                     } catch (err: any) {
                         console.warn(`[Bills] Vendor ${vendor} failed: ${err.message}. Trying next fallback provider...`);
                         lastError = err;
+                        result = null;
                     }
                 }
 

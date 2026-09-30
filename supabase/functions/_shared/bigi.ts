@@ -55,7 +55,28 @@ export class BigiClient {
         const data = await res.json().catch(() => null);
         console.log(`[BigiClient] Airtime Response (Status ${res.status}):`, JSON.stringify(data));
 
-        if (data && (data.success === true || data.status === 'success' || res.status === 200 || res.status === 201)) {
+        // Strict verification: BigiSub returns HTTP 201 with success: true even when data.status is 'failed'!
+        const isExplicitFailure = 
+            !data ||
+            data.success === false ||
+            data.status === 'failed' ||
+            data.status === 'fail' ||
+            data.data?.status === 'failed' ||
+            data.data?.status === 'fail' ||
+            (typeof data.message === 'string' && data.message.toLowerCase().includes('fail')) ||
+            (typeof data.data?.status_message === 'string' && data.data?.status_message.toLowerCase().includes('fail'));
+
+        if (isExplicitFailure) {
+            const errorMsg = data?.message || data?.data?.status_message || data?.error || data?.detail || `BigiSub airtime purchase failed (HTTP ${res.status})`;
+            throw new Error(errorMsg);
+        }
+
+        const isSuccess = 
+            (res.status === 200 || res.status === 201) &&
+            (data.success === true || data.status === 'success') &&
+            (data.data?.status === 'successful' || data.data?.status === 'success' || !data.data?.status);
+
+        if (isSuccess) {
             return {
                 status: 'ORDER_COMPLETED',
                 orderid: data.data?.transaction_id || data.transaction_id || data.reference || requestId,
@@ -81,8 +102,29 @@ export class BigiClient {
             })
         });
         const data = await res.json().catch(() => null);
+        console.log(`[BigiClient] Data Response (Status ${res.status}):`, JSON.stringify(data));
         
-        if (data && (data.success === true || data.status === 'success' || res.status === 200 || res.status === 201)) {
+        const isExplicitFailure = 
+            !data ||
+            data.success === false ||
+            data.status === 'failed' ||
+            data.status === 'fail' ||
+            data.data?.status === 'failed' ||
+            data.data?.status === 'fail' ||
+            (typeof data.message === 'string' && data.message.toLowerCase().includes('fail')) ||
+            (typeof data.data?.status_message === 'string' && data.data?.status_message.toLowerCase().includes('fail'));
+
+        if (isExplicitFailure) {
+            const errorMsg = data?.message || data?.data?.status_message || data?.error || data?.detail || `BigiSub data purchase failed (HTTP ${res.status})`;
+            throw new Error(errorMsg);
+        }
+
+        const isSuccess = 
+            (res.status === 200 || res.status === 201) &&
+            (data.success === true || data.status === 'success') &&
+            (data.data?.status === 'successful' || data.data?.status === 'success' || !data.data?.status);
+
+        if (isSuccess) {
             return {
                 status: 'ORDER_COMPLETED',
                 orderid: data.data?.transaction_id || data.transaction_id || data.reference || requestId,
@@ -120,7 +162,20 @@ export class BigiClient {
             })
         });
         const data = await res.json().catch(() => null);
-        if (data && (data.success || res.status === 201)) {
+        const isExplicitFailure = 
+            !data ||
+            data.success === false ||
+            data.status === 'failed' ||
+            data.status === 'fail' ||
+            data.data?.status === 'failed' ||
+            data.data?.status === 'fail' ||
+            (typeof data.message === 'string' && data.message.toLowerCase().includes('fail'));
+
+        if (isExplicitFailure) {
+            throw new Error(data?.message || data?.detail || data?.error || 'Failed to purchase recharge pin via Bigi');
+        }
+
+        if (data && (data.success || res.status === 200 || res.status === 201)) {
             return {
                 status: 'ORDER_COMPLETED',
                 orderid: data.data?.transaction_id || requestId,
