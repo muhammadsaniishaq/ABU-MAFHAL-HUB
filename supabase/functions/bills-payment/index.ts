@@ -115,8 +115,8 @@ Deno.serve(async (req: Request) => {
 
         // Smart fail-safe fallback: If no vendor explicitly saved in app_settings, pick configured vendor from system_secrets
         if (!vtuVendor) {
-            if (bilalToken) vtuVendor = 'bilalsadasub';
-            else if (bigiToken) vtuVendor = 'bigi';
+            if (bigiToken) vtuVendor = 'bigi';
+            else if (bilalToken) vtuVendor = 'bilalsadasub';
             else vtuVendor = 'clubkonnect';
         }
 
@@ -168,9 +168,10 @@ Deno.serve(async (req: Request) => {
                 
                 if (step3Res.status === 'success' || step3Res.status === 'completed') {
                     const creditedAmount = Number(step3Res.credited_amount || amount * 0.8);
-                    await rpcClient.rpc('deduct_balance', {
+                    // Use credit_balance (deduct_balance blocks negative numbers)
+                    await rpcClient.rpc('credit_balance', {
                         user_id: userId,
-                        amount: -creditedAmount
+                        amount: creditedAmount
                     });
 
                     await rpcClient.from('transactions').insert({
@@ -181,7 +182,6 @@ Deno.serve(async (req: Request) => {
                         reference: step3Res.transid || `AC_${Date.now()}`,
                         description: `Airtime to Cash (${phone}) -> +₦${creditedAmount.toLocaleString()}`
                     });
-
                 }
 
                 return new Response(JSON.stringify({ success: true, data: step3Res }), {
@@ -229,7 +229,7 @@ Deno.serve(async (req: Request) => {
                  amountToCharge -= (amountToCharge * (Number(config.sell_percentage) / 100));
             }
 
-             providerParams = { network: networkCode, phone: data.phone, amount: Number(data.amount) };
+            providerParams = { network: networkCode, phone: data.phone, amount: Number(data.amount) };
         } else if (type === 'smile') {
              amountToCharge = Number(data.amount);
              if (amountToCharge < 100) throw new Error("Invalid Smile Amount");
@@ -253,8 +253,10 @@ Deno.serve(async (req: Request) => {
              throw new Error(`Unsupported service type: ${type}`);
         }
 
-        console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone || 'N/A'}`);
+        console.log(`[Bills] Required Charge: ₦${amountToCharge} for ${type} to ${data.phone || 'N/A'}`);
 
+        // 3. Pre-Flight Balance Verification (DO NOT DEDUCT YET)
+        // User balance is only verified here. Deduction strictly happens AFTER provider confirms delivery.
         if (type !== 'get_plans' && type !== 'recharge_pin_plans') {
             if (!amountToCharge || isNaN(amountToCharge) || amountToCharge <= 0) {
                 return new Response(JSON.stringify({ success: false, error: "Invalid transaction amount" }), {
@@ -263,34 +265,36 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
-            const { data: newBalance, error: deductError } = await rpcClient.rpc('deduct_balance', {
-                user_id: userId,
-                amount: amountToCharge
-            });
+            const { data: profile, error: profError } = await rpcClient
+                .from('profiles')
+                .select('balance')
+                .eq('id', userId)
+                .single();
 
-            if (deductError) {
-                 console.error("[Bills] Balance Deduction Failed:", deductError.message);
-                 return new Response(JSON.stringify({ success: false, error: deductError.message || "Insufficient balance" }), {
-                     headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-                     status: 200
-                 });
+            if (profError || !profile) {
+                return new Response(JSON.stringify({ success: false, error: "User account profile not found" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
             }
-            console.log(`[Bills] Balance Deducted. New Balance: ₦${newBalance}`);
+
+            const currentBalance = Number(profile.balance || 0);
+            if (currentBalance < amountToCharge) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    error: `Insufficient balance. Available: ₦${currentBalance.toLocaleString()}, Required: ₦${amountToCharge.toLocaleString()}` 
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+                    status: 200
+                });
+            }
         }
 
-        // 4. Call Provider (ClubKonnect, Bigi, Bilalsadasub, or Vital Sub)
+        // 4. Call Provider (BigiSub, Bilalsadasub, or ClubKonnect)
         let result: any;
         try {
             if (type === 'get_plans') {
-                if (vtuVendor === 'bilalsadasub') {
-                    const netName = (data.network || 'MTN').toString().toUpperCase();
-                    const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${netName}`);
-                    const plansData = await res.json();
-                    return new Response(JSON.stringify({ success: true, data: plansData.data || plansData }), {
-                        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-                        status: 200
-                    });
-                } else if (vtuVendor === 'bigi') {
+                if (vtuVendor === 'bigi') {
                     if (!bigiToken) throw new Error("Bigi API Token missing in settings");
                     const bigiClient = new BigiClient(bigiToken, bigiPin || '');
                     
@@ -310,6 +314,14 @@ Deno.serve(async (req: Request) => {
                         headers: { ...corsHeaders, "Content-Type": "application/json" }, 
                         status: 200
                     });
+                } else if (vtuVendor === 'bilalsadasub') {
+                    const netName = (data.network || 'MTN').toString().toUpperCase();
+                    const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${netName}`);
+                    const plansData = await res.json();
+                    return new Response(JSON.stringify({ success: true, data: plansData.data || plansData }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+                        status: 200
+                    });
                 } else {
                     const res = await fetch(`https://www.nellobytesystems.com/APIDatabundlePlansV2.asp?UserID=${ckUserId}`);
                     const plansData = await res.json();
@@ -322,7 +334,11 @@ Deno.serve(async (req: Request) => {
 
             if (type === 'airtime' || type === 'data') {
                 let vendorOrder: string[] = [];
-                if (vtuVendor && vtuVendor.includes(',')) {
+
+                if (type === 'airtime') {
+                    // For Airtime: Always prioritize BigiSub API as primary rail
+                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                } else if (vtuVendor && vtuVendor.includes(',')) {
                     vendorOrder = vtuVendor.split(',').map((v: string) => v.trim()).filter(Boolean);
                 } else if (vtuVendor === 'bigi') {
                     vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
@@ -335,20 +351,20 @@ Deno.serve(async (req: Request) => {
                 let lastError: any = null;
                 for (const vendor of vendorOrder) {
                     try {
-                        console.log(`[Bills] Trying VTU Vendor: ${vendor}`);
-                        if (vendor === 'bilalsadasub' && bilalToken) {
-                            const bilalClient = new BilalsadasubClient(bilalToken);
-                            if (type === 'airtime') {
-                                result = await bilalClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
-                            } else {
-                                result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
-                            }
-                        } else if (vendor === 'bigi' && bigiToken && bigiPin) {
+                        console.log(`[Bills] Trying VTU Vendor for ${type}: ${vendor}`);
+                        if (vendor === 'bigi' && bigiToken && bigiPin) {
                             const bigiClient = new BigiClient(bigiToken, bigiPin);
                             if (type === 'airtime') {
                                 result = await bigiClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
                             } else {
                                 result = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                            }
+                        } else if (vendor === 'bilalsadasub' && bilalToken) {
+                            const bilalClient = new BilalsadasubClient(bilalToken);
+                            if (type === 'airtime') {
+                                result = await bilalClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
+                            } else {
+                                result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
                             }
                         } else if (vendor === 'clubkonnect' && ckUserId && ckApiKey) {
                             if (type === 'airtime') {
@@ -405,8 +421,30 @@ Deno.serve(async (req: Request) => {
             
             console.log(`[Bills] Provider Result: ${JSON.stringify(result)}`);
 
-            if (result && (result.status === 'ORDER_RECEIVED' || result.status === 'ORDER_COMPLETED' || result.status === 'SUCCESS')) {
-                // All good - save to history tables for recharge pin purchases
+            const isSuccess = result && (
+                result.status === 'ORDER_RECEIVED' || 
+                result.status === 'ORDER_COMPLETED' || 
+                result.status === 'SUCCESS' ||
+                result.status === 'success' ||
+                result.success === true
+            );
+
+            if (isSuccess) {
+                // 5. Provider confirmed success — DEDUCT BALANCE NOW
+                if (type !== 'get_plans' && type !== 'recharge_pin_plans') {
+                    const { data: deductResult, error: deductError } = await rpcClient.rpc('deduct_balance', {
+                        user_id: userId,
+                        amount: amountToCharge
+                    });
+
+                    if (deductError) {
+                        console.error("[Bills] Critical: Vendor dispatched, but balance deduction failed:", deductError.message);
+                    } else {
+                        console.log(`[Bills] Balance Deducted successfully for user ${userId}. Amount: ₦${amountToCharge}`);
+                    }
+                }
+
+                // Recharge PIN specific table updates
                 if (type === 'recharge_pin_purchase') {
                     const txId = result.orderid || requestId;
                     const pinsList = result.pins || [];
@@ -414,7 +452,6 @@ Deno.serve(async (req: Request) => {
                     const qty = providerParams.quantity || 1;
                     const bName = providerParams.businessName || 'ABU MAFHAL VTU';
                     
-                    // Determine network and denomination from planId
                     const pinPlanInfo: Record<number, { network: string; denom: string; size: string }> = {
                         1: { network: 'MTN', denom: '₦100', size: '100' },
                         2: { network: 'MTN', denom: '₦200', size: '200' },
@@ -423,7 +460,6 @@ Deno.serve(async (req: Request) => {
                     };
                     const planInfo = pinPlanInfo[Number(planId)] || { network: 'MTN', denom: '₦100', size: '100' };
 
-                    // Save to transactions (main history)
                     try {
                         await rpcClient.from('transactions').insert({
                             user_id: userId,
@@ -437,8 +473,6 @@ Deno.serve(async (req: Request) => {
                         console.warn('[Bills] transactions insert note:', histErr);
                     }
 
-
-                    // Save to recharge_pins table (pin-specific history)
                     try {
                         await rpcClient.from('recharge_pins').insert({
                             user_id: userId,
@@ -456,7 +490,6 @@ Deno.serve(async (req: Request) => {
                         console.warn('[Bills] recharge_pins insert note:', pinErr);
                     }
 
-                    // Return full data including pins to frontend
                     return new Response(JSON.stringify({
                         success: true,
                         data: {
@@ -480,18 +513,13 @@ Deno.serve(async (req: Request) => {
             }
 
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            console.error("[Bills] Execution Failed, Refund Initiating:", errorMessage);
+            const errorMessage = error instanceof Error ? error.message : "Provider transaction failed";
+            console.error("[Bills] Execution Failed:", errorMessage);
             
-            // 5. Refund
-            await rpcClient.rpc('deduct_balance', {
-                user_id: userId,
-                amount: -amountToCharge
-            });
-            
+            // Strict guarantee: User balance was NEVER deducted because deduction only happens after provider confirmation
             return new Response(JSON.stringify({ 
                 success: false, 
-                error: `Service Failure: ${errorMessage}. Wallet Refunded.` 
+                error: `${errorMessage}. Your wallet balance has NOT been deducted.` 
             }), { 
                 headers: { ...corsHeaders, "Content-Type": "application/json" }, 
                 status: 200 
