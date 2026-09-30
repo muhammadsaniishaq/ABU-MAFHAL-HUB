@@ -4,10 +4,11 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Contacts from 'expo-contacts';
+import * as Haptics from 'expo-haptics';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { createAppNotification } from '../../services/notificationsHelper';
-import * as Haptics from 'expo-haptics';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
@@ -34,11 +35,11 @@ interface NetworkItem {
 }
 
 const NETWORKS_DATA: NetworkItem[] = [
-    { id: 'mtn', name: 'MTN', color: '#FFCC00', cashback: '2% Off', discountRate: 0.02, prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
-    { id: 'glo', name: 'Glo', color: '#0F6A37', cashback: '3% Off', discountRate: 0.03, prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
-    { id: 'airtel', name: 'Airtel', color: '#FF0000', cashback: '2% Off', discountRate: 0.02, prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
-    { id: '9mobile', name: '9mobile', color: '#006B3E', cashback: '3% Off', discountRate: 0.03, prefixes: ['0809', '0818', '0817', '0909', '0908'] },
-    { id: 'vitel', name: 'VITEL', color: '#6366F1', cashback: '2% Off', discountRate: 0.02, prefixes: ['070', '091'] },
+    { id: 'mtn', name: 'MTN', color: '#FFCC00', cashback: '2% OFF', discountRate: 0.02, prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
+    { id: 'glo', name: 'Glo', color: '#0F6A37', cashback: '3% OFF', discountRate: 0.03, prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
+    { id: 'airtel', name: 'Airtel', color: '#FF0000', cashback: '2% OFF', discountRate: 0.02, prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
+    { id: '9mobile', name: '9mobile', color: '#006B3E', cashback: '3% OFF', discountRate: 0.03, prefixes: ['0809', '0818', '0817', '0909', '0908'] },
+    { id: 'vitel', name: 'VITEL', color: '#6366F1', cashback: '2% OFF', discountRate: 0.02, prefixes: ['070', '091'] },
 ];
 
 const PRESETS = [100, 200, 500, 1000, 2000, 5000];
@@ -53,14 +54,23 @@ const formatCurrency = (val: number | string | null | undefined): string => {
     }
 };
 
+const cleanNigerianPhone = (raw: string): string => {
+    let p = (raw || '').replace(/\D/g, '');
+    if (p.startsWith('234') && p.length === 13) {
+        p = '0' + p.slice(3);
+    }
+    if (p.length > 11 && p.startsWith('0')) {
+        p = p.slice(0, 11);
+    }
+    return p;
+};
+
 const safeLayoutAnimation = () => {
     try {
         if (Platform.OS !== 'web' && LayoutAnimation?.configureNext && LayoutAnimation?.Presets?.easeInEaseOut) {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         }
-    } catch {
-        // Safe animation fallback
-    }
+    } catch {}
 };
 
 function AirtimeScreenContent() {
@@ -75,17 +85,24 @@ function AirtimeScreenContent() {
     const [userPhone, setUserPhone] = useState<string | null>(null);
     const [recents, setRecents] = useState<any[]>([]);
     
-    // Beneficiary states
+    // Beneficiary & Device Contacts states
     const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
-    const [showBeneficiaryModal, setShowBeneficiaryModal] = useState(false);
-    const [beneficiarySearch, setBeneficiarySearch] = useState('');
+    const [showContactModal, setShowContactModal] = useState(false);
+    const [contactModalTab, setContactModalTab] = useState<'beneficiaries' | 'phonebook'>('beneficiaries');
+    const [deviceContacts, setDeviceContacts] = useState<any[]>([]);
+    const [loadingDeviceContacts, setLoadingDeviceContacts] = useState(false);
+    const [contactSearch, setContactSearch] = useState('');
     const [saveBeneficiary, setSaveBeneficiary] = useState(false);
+
+    // Auto-Renewal states
+    const [autoRenewalEnabled, setAutoRenewalEnabled] = useState(false);
+    const [renewalFrequency, setRenewalFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
     
     // Modals
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [showSecurityModal, setShowSecurityModal] = useState(false);
 
-    // Focus states for dynamic borders
+    // Focus states
     const [phoneFocused, setPhoneFocused] = useState(false);
     const [amountFocused, setAmountFocused] = useState(false);
 
@@ -176,7 +193,78 @@ function AirtimeScreenContent() {
         setNetwork(netId);
     };
 
-    // Current network meta
+    // Device Contacts Picker
+    const handlePickDeviceContact = async () => {
+        try {
+            if (Platform.OS === 'web') {
+                setShowContactModal(true);
+                return;
+            }
+
+            const { status } = await Contacts.requestPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    "Permission Required",
+                    "Please allow contacts access in settings to select numbers directly from your address book.",
+                    [
+                        { text: "View Saved Beneficiaries", onPress: () => setShowContactModal(true) },
+                        { text: "Cancel", style: "cancel" }
+                    ]
+                );
+                return;
+            }
+
+            // Direct native contact picker
+            const contact = await Contacts.presentContactPickerAsync();
+            if (contact && contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+                const selectedPhone = contact.phoneNumbers[0].number || '';
+                const cleaned = cleanNigerianPhone(selectedPhone);
+                if (cleaned) {
+                    setPhoneNumber(cleaned);
+                    detectNetwork(cleaned);
+                    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                }
+            } else if (contact) {
+                Alert.alert("No Number Found", "The selected contact does not have a saved phone number.");
+            }
+        } catch (err: any) {
+            console.warn("Contact picker error:", err);
+            setShowContactModal(true);
+        }
+    };
+
+    // Load device contacts into modal list
+    const loadDeviceContacts = async () => {
+        if (deviceContacts.length > 0) return;
+        setLoadingDeviceContacts(true);
+        try {
+            const { status } = await Contacts.requestPermissionsAsync();
+            if (status === 'granted') {
+                const { data } = await Contacts.getContactsAsync({
+                    fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+                    sort: Contacts.SortTypes.FirstName,
+                    pageSize: 150,
+                });
+                if (data && Array.isArray(data)) {
+                    const validList = data
+                        .filter(c => c.phoneNumbers && c.phoneNumbers.length > 0)
+                        .map(c => ({
+                            id: c.id,
+                            name: c.name || 'Unknown Contact',
+                            phone: cleanNigerianPhone(c.phoneNumbers![0].number || '')
+                        }))
+                        .filter(c => c.phone.length >= 10);
+                    setDeviceContacts(validList);
+                }
+            }
+        } catch (e) {
+            console.warn("Error fetching device contacts:", e);
+        } finally {
+            setLoadingDeviceContacts(false);
+        }
+    };
+
+    // Active network object
     const activeNetworkObj = useMemo(() => {
         return NETWORKS_DATA.find(n => n.id === network) || NETWORKS_DATA[0];
     }, [network]);
@@ -192,31 +280,31 @@ function AirtimeScreenContent() {
 
     const handleInitiatePurchase = () => {
         if (!network) {
-            Alert.alert("Zaɓi Layi", "Da fatan za a zaɓi layin da za a tura wa katin (Select a mobile network).");
+            Alert.alert("Network Required", "Please choose a mobile network to continue.");
             return;
         }
         if (!numAmount || numAmount < 50) {
-            Alert.alert("Kudi Ba Su Isa Ba", "Mafi ƙarancin kudin da za a iya siya shi ne ₦50 (Minimum purchase is ₦50).");
+            Alert.alert("Invalid Amount", "Minimum airtime purchase is ₦50. Please enter an amount of ₦50 or higher.");
             return;
         }
         if (phoneNumber.length !== 11) {
-            Alert.alert("Lambar Waya Bata Cika Ba", `Lambar wayar tana da digit ${phoneNumber.length}/11. Da fatan za a shigar da dukkan lambobin 11.`);
+            Alert.alert("Incomplete Number", `Phone number has ${phoneNumber.length}/11 digits. Please enter an 11-digit phone number.`);
             return;
         }
 
         const phoneValidation = validateNigerianPhone(phoneNumber);
         if (!phoneValidation.isValid) {
-            Alert.alert("Lamba Ba Daidai Ba", phoneValidation.error || "Da fatan za a tabbatar da lambar wayar 11 ce mai aiki a Najeriya.");
+            Alert.alert("Invalid Phone Number", phoneValidation.error || "Please enter a valid 11-digit Nigerian mobile number.");
             return;
         }
 
         if (balance !== null && netPayable > balance) {
             Alert.alert(
-                "Kudin Asusunka Ba Su Isa Ba",
-                `Kudin asusunka (₦${formatCurrency(balance)}) ba zai iya biyan ₦${formatCurrency(netPayable)} ba. Da fatan za a fara zuba kudi a wallet.`,
+                "Insufficient Wallet Balance",
+                `Your current balance (₦${formatCurrency(balance)}) cannot cover this purchase of ₦${formatCurrency(netPayable)}. Please fund your wallet.`,
                 [
-                    { text: "Koma Baya", style: "cancel" },
-                    { text: "Zuba Kudi (Fund)", onPress: () => router.push('/(app)/wallet') }
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Fund Wallet", onPress: () => router.push('/(app)/wallet') }
                 ]
             );
             return;
@@ -229,7 +317,7 @@ function AirtimeScreenContent() {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Ba a tabbatar da mai asusu ba (User not authenticated)");
+            if (!user) throw new Error("User session expired. Please sign in again.");
             
             const activeNetwork = network || 'mtn';
 
@@ -248,6 +336,23 @@ function AirtimeScreenContent() {
                 }
             }
 
+            // Save Auto-Renewal schedule if enabled
+            if (autoRenewalEnabled) {
+                try {
+                    await supabase.from('auto_renewals').insert({
+                        user_id: user.id,
+                        service_type: 'airtime',
+                        network: activeNetwork,
+                        phone: phoneNumber,
+                        amount: numAmount,
+                        frequency: renewalFrequency,
+                        status: 'active'
+                    });
+                } catch (schedErr) {
+                    console.warn("Auto renewal registration note:", schedErr);
+                }
+            }
+
             const result = await api.airtime.purchase(user.id, {
                 network: activeNetwork,
                 phone: phoneNumber,
@@ -261,26 +366,26 @@ function AirtimeScreenContent() {
 
                 await createAppNotification(
                     user.id,
-                    "Airtime Purchase Successful",
-                    `An yi nasarar tura katin ₦${formatCurrency(numAmount)} zuwa ${phoneNumber} (${activeNetwork.toUpperCase()}).`,
+                    "Airtime Recharge Successful",
+                    `Successfully delivered ₦${formatCurrency(numAmount)} airtime to ${phoneNumber} (${activeNetwork.toUpperCase()}).${autoRenewalEnabled ? ` (Auto-Renewal: ${renewalFrequency.toUpperCase()})` : ''}`,
                     "airtime",
                     "normal",
                     { route: "/(app)/history" }
                 ).catch(() => null);
 
-                // Refresh local balance
+                // Refresh wallet balance
                 fetchData();
 
                 router.replace({
                     pathname: '/success',
                     params: {
                         amount: `₦${formatCurrency(netPayable)}`,
-                        type: 'Airtime Purchase',
+                        type: 'Airtime Recharge',
                         reference: result.reference
                     }
                 });
             } else {
-                throw new Error("Katin bai shiga ba.");
+                throw new Error("Airtime delivery failed at carrier network.");
             }
         } catch (error: any) {
             console.error('[Airtime Process Error]:', error);
@@ -291,10 +396,10 @@ function AirtimeScreenContent() {
             // Crucial: Refresh balance so user sees their money was never touched
             fetchData();
 
-            const errMsg = error?.message || "An samu matsala wajen tura katin.";
+            const errMsg = error?.message || "Carrier failed to deliver airtime.";
             Alert.alert(
-                "An Samu Tsaiko (Delivery Failed)",
-                `${errMsg}\n\n🛡️ KUDINKA NA NAN LAFIYA: Ba a cire ko sisi a cikin wallet dinka ba (Your wallet balance has NOT been debited).`
+                "Transaction Unsuccessful",
+                `${errMsg}\n\n🛡️ ZERO-DEDUCTION GUARANTEE: Your wallet balance has NOT been debited.`
             );
         } finally {
             setLoading(false);
@@ -303,47 +408,58 @@ function AirtimeScreenContent() {
     };
 
     const isWeb = Platform.OS === 'web';
-    const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 36 : 22) + 8;
+    const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 36 : 22) + 10;
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <View style={{ flex: 1, backgroundColor: '#070D1E' }}>
             <StatusBar style="light" />
             
-            {/* Mobile-First Header */}
+            {/* Ultra-Modern Header with Glass Pill Balance */}
             <LinearGradient 
-                colors={['#060d21', '#0d1b3e']} 
+                colors={['#050B1A', '#0D1B3E', '#162A5A']} 
                 style={[
                     styles.headerContainer,
                     { paddingTop: headerTopPadding },
                     isWeb && styles.webContainer
                 ]}
             >
+                {/* Ambient Decorative Light */}
+                <View style={styles.ambientGlow} />
+
                 <View style={styles.headerRow}>
                     <TouchableOpacity 
                         onPress={() => router.back()} 
                         style={styles.backButton} 
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="arrow-back" size={20} color="#ffffff" />
+                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
                     </TouchableOpacity>
 
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.headerTitle}>Buy Airtime</Text>
-                        <Text style={styles.headerSubtitle}>Fast delivery with instant cashback</Text>
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                        <Text style={styles.headerTitle}>Airtime Top-Up</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <Ionicons name="flash" size={11} color="#F59E0B" />
+                            <Text style={styles.headerSubtitle}>Instant Delivery • Automated</Text>
+                        </View>
                     </View>
 
-                    {/* Balance Capsule */}
+                    {/* Interactive Balance Pill */}
                     <TouchableOpacity 
                         onPress={() => router.push('/(app)/wallet')}
                         style={styles.balancePill}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="wallet-outline" size={13} color="#f5a623" />
-                        <Text style={styles.balancePillText}>
-                            ₦{formatCurrency(balance)}
-                        </Text>
+                        <View style={styles.balanceIconWrap}>
+                            <Ionicons name="wallet-outline" size={13} color="#F59E0B" />
+                        </View>
+                        <View>
+                            <Text style={styles.balancePillLabel}>Balance</Text>
+                            <Text style={styles.balancePillText}>
+                                ₦{formatCurrency(balance)}
+                            </Text>
+                        </View>
                         <View style={styles.balancePlusWrap}>
-                            <Ionicons name="add" size={12} color="#0d1b3e" />
+                            <Ionicons name="add" size={12} color="#0D1B3E" />
                         </View>
                     </TouchableOpacity>
                 </View>
@@ -351,7 +467,7 @@ function AirtimeScreenContent() {
 
             <KeyboardAvoidingView 
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={[{ flex: 1 }, isWeb && styles.webContainer]}
+                style={[{ flex: 1, backgroundColor: '#F8FAFC' }, isWeb && styles.webContainer]}
             >
                 <ScrollView 
                     style={{ flex: 1 }}
@@ -366,22 +482,33 @@ function AirtimeScreenContent() {
                     <DynamicBanners placement="airtime" />
 
                     {/* Zero-Charge Security Assurance Badge */}
-                    <View style={styles.guaranteeCard}>
+                    <LinearGradient
+                        colors={['#ECFDF5', '#F0FDF4']}
+                        style={styles.guaranteeCard}
+                    >
                         <View style={styles.guaranteeIconWrap}>
-                            <Ionicons name="shield-checkmark" size={16} color="#16a34a" />
+                            <Ionicons name="shield-checkmark" size={17} color="#059669" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.guaranteeTitle}>Garkuwar Kudi 100% (Zero-Risk Delivery)</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.guaranteeTitle}>Zero-Risk Guarantee</Text>
+                                <View style={styles.guaranteePill}>
+                                    <Text style={styles.guaranteePillText}>100% PROTECTED</Text>
+                                </View>
+                            </View>
                             <Text style={styles.guaranteeSubtitle}>
-                                Ba za a cire kudin wallet dinka ba har sai katin ya tabbata ya shiga lambar ka.
+                                Funds are deducted ONLY after airtime is confirmed credited to your phone.
                             </Text>
                         </View>
-                    </View>
+                    </LinearGradient>
 
-                    {/* Recent Numbers Carousel */}
+                    {/* Recent Numbers Row */}
                     {Boolean(recents && recents.length > 0) && (
                         <View style={styles.recentsSection}>
-                            <Text style={styles.sectionLabel}>Lambar Kusa (Recent)</Text>
+                            <View style={styles.labelRow}>
+                                <Text style={styles.sectionLabel}>Recent Refills</Text>
+                                <Text style={styles.sectionSublabel}>Tap to autofill</Text>
+                            </View>
                             <ScrollView 
                                 horizontal 
                                 showsHorizontalScrollIndicator={false} 
@@ -402,19 +529,29 @@ function AirtimeScreenContent() {
                                             {item.network && NETWORK_LOGOS[item.network] ? (
                                                 <Image source={NETWORK_LOGOS[item.network]} style={{ width: 18, height: 18 }} resizeMode="contain" />
                                             ) : (
-                                                <Ionicons name="call" size={12} color="#64748b" />
+                                                <Ionicons name="call" size={12} color="#64748B" />
                                             )}
                                         </View>
-                                        <Text style={styles.recentPhoneText}>{item.phone}</Text>
+                                        <View>
+                                            <Text style={styles.recentPhoneText}>{item.phone}</Text>
+                                            <Text style={styles.recentNetworkText}>{(item.network || 'MTN').toUpperCase()}</Text>
+                                        </View>
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
                         </View>
                     )}
 
-                    {/* 1. Network Selector */}
+                    {/* 1. Mobile Network Selector */}
                     <View style={styles.sectionContainer}>
-                        <Text style={styles.sectionLabel}>Zaɓi Layin Sadarwa (Select Network)</Text>
+                        <View style={styles.labelRow}>
+                            <Text style={styles.sectionLabel}>Select Mobile Network</Text>
+                            <View style={styles.cashbackBadgeWrap}>
+                                <Ionicons name="sparkles" size={11} color="#D97706" />
+                                <Text style={styles.cashbackBadgeTop}>Instant Cashback Available</Text>
+                            </View>
+                        </View>
+                        
                         <View style={styles.networksRow}>
                             {NETWORKS_DATA.map((net) => {
                                 const isSelected = network === net.id;
@@ -428,6 +565,9 @@ function AirtimeScreenContent() {
                                         ]}
                                         activeOpacity={0.8}
                                     >
+                                        {/* Top Colored Indicator Bar */}
+                                        <View style={[styles.networkTopBar, { backgroundColor: net.color }, isSelected && styles.networkTopBarActive]} />
+
                                         <View style={[styles.networkLogoContainer, isSelected && styles.networkLogoContainerActive]}>
                                             <Image 
                                                 source={NETWORK_LOGOS[net.id]} 
@@ -438,14 +578,16 @@ function AirtimeScreenContent() {
                                         <Text style={[styles.networkCardName, isSelected && styles.networkCardNameActive]} numberOfLines={1}>
                                             {net.name}
                                         </Text>
-                                        <View style={[styles.cashbackBadge, isSelected && styles.cashbackBadgeActive]}>
-                                            <Text style={[styles.cashbackBadgeText, isSelected && styles.cashbackBadgeTextActive]}>
+                                        
+                                        <View style={[styles.cashbackTag, isSelected && styles.cashbackTagActive]}>
+                                            <Text style={[styles.cashbackTagText, isSelected && styles.cashbackTagTextActive]}>
                                                 {net.cashback}
                                             </Text>
                                         </View>
+                                        
                                         {isSelected && (
                                             <View style={styles.activeCheckmark}>
-                                                <Ionicons name="checkmark" size={9} color="#ffffff" />
+                                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
                                             </View>
                                         )}
                                     </TouchableOpacity>
@@ -454,15 +596,17 @@ function AirtimeScreenContent() {
                         </View>
                     </View>
 
-                    {/* 2. Phone Input */}
+                    {/* 2. Phone Input Card */}
                     <View style={styles.sectionContainer}>
                         <View style={styles.labelRow}>
-                            <Text style={styles.sectionLabel}>Lambar Waya (Phone Number)</Text>
-                            {isPhoneComplete && (
+                            <Text style={styles.sectionLabel}>Mobile Number</Text>
+                            {isPhoneComplete ? (
                                 <View style={styles.validBadge}>
-                                    <Ionicons name="checkmark-circle" size={12} color="#16a34a" />
-                                    <Text style={styles.validBadgeText}>Lamba Mai Kyau</Text>
+                                    <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                                    <Text style={styles.validBadgeText}>Verified 11 Digits</Text>
                                 </View>
+                            ) : (
+                                <Text style={styles.digitCounter}>{phoneNumber.length}/11 digits</Text>
                             )}
                         </View>
 
@@ -471,12 +615,12 @@ function AirtimeScreenContent() {
                             phoneFocused && styles.inputContainerFocused,
                             isPhoneComplete && styles.inputContainerSuccess
                         ]}>
-                            {/* Selected Network Avatar on Left */}
+                            {/* Selected / Auto-Detected Network Avatar */}
                             <View style={styles.inputLogoWrapper}>
                                 {NETWORK_LOGOS[network] ? (
                                     <Image source={NETWORK_LOGOS[network]} style={{ width: 22, height: 22 }} resizeMode="contain" />
                                 ) : (
-                                    <Ionicons name="call" size={18} color="#64748b" />
+                                    <Ionicons name="call" size={17} color="#64748B" />
                                 )}
                             </View>
 
@@ -485,15 +629,15 @@ function AirtimeScreenContent() {
                                 keyboardType="phone-pad"
                                 value={phoneNumber}
                                 onChangeText={handlePhoneChange}
-                                placeholder="Misali: 08012345678"
-                                placeholderTextColor="#94a3b8"
+                                placeholder="0801 234 5678"
+                                placeholderTextColor="#94A3B8"
                                 maxLength={11}
                                 editable={!loading}
                                 onFocus={() => setPhoneFocused(true)}
                                 onBlur={() => setPhoneFocused(false)}
                             />
 
-                            {/* "My Phone" 1-Tap shortcut */}
+                            {/* "My Line" 1-Tap Shortcut */}
                             {Boolean(userPhone && phoneNumber !== userPhone) && (
                                 <TouchableOpacity 
                                     onPress={() => {
@@ -503,17 +647,18 @@ function AirtimeScreenContent() {
                                     style={styles.mePill}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={styles.mePillText}>Lamba Ta</Text>
+                                    <Ionicons name="person" size={11} color="#0D1B3E" style={{ marginRight: 3 }} />
+                                    <Text style={styles.mePillText}>My Line</Text>
                                 </TouchableOpacity>
                             )}
 
-                            {/* Beneficiary / Contacts picker */}
+                            {/* Native Phonebook & Beneficiaries Selector */}
                             <TouchableOpacity 
-                                onPress={() => setShowBeneficiaryModal(true)}
+                                onPress={handlePickDeviceContact}
                                 style={styles.contactBookBtn}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons name="person-outline" size={17} color="#0d1b3e" />
+                                <Ionicons name="book-outline" size={18} color="#0D1B3E" />
                             </TouchableOpacity>
                         </View>
 
@@ -521,12 +666,12 @@ function AirtimeScreenContent() {
                         {Boolean(isPhoneComplete && !beneficiaries.find(b => b.account_number === phoneNumber)) && (
                             <View style={styles.saveBeneficiaryRow}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="bookmark-outline" size={15} color="#16a34a" />
-                                    <Text style={styles.saveBeneficiaryText}>Ajiye wannan lambar a cikin Beneficiary</Text>
+                                    <Ionicons name="bookmark-outline" size={15} color="#059669" />
+                                    <Text style={styles.saveBeneficiaryText}>Save this number to my beneficiaries</Text>
                                 </View>
                                 <Switch
-                                    trackColor={{ false: "#cbd5e1", true: "#86efac" }}
-                                    thumbColor={saveBeneficiary ? "#16a34a" : "#ffffff"}
+                                    trackColor={{ false: "#CBD5E1", true: "#A7F3D0" }}
+                                    thumbColor={saveBeneficiary ? "#059669" : "#FFFFFF"}
                                     onValueChange={setSaveBeneficiary}
                                     value={saveBeneficiary}
                                     style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
@@ -535,14 +680,17 @@ function AirtimeScreenContent() {
                         )}
                     </View>
 
-                    {/* 3. Amount & Presets */}
+                    {/* 3. Amount Section & Fast Presets */}
                     <View style={styles.sectionContainer}>
                         <View style={styles.labelRow}>
-                            <Text style={styles.sectionLabel}>Adadin Kudi (Amount)</Text>
+                            <Text style={styles.sectionLabel}>Top-Up Amount</Text>
                             {numAmount > 0 && (
-                                <Text style={styles.cashbackHighlight}>
-                                    Ragi: -₦{formatCurrency(discountSavings)} ({activeNetworkObj.cashback})
-                                </Text>
+                                <View style={styles.discountPill}>
+                                    <Ionicons name="sparkles" size={11} color="#059669" />
+                                    <Text style={styles.discountPillText}>
+                                        Save ₦{formatCurrency(discountSavings)} ({activeNetworkObj.cashback})
+                                    </Text>
+                                </View>
                             )}
                         </View>
 
@@ -557,15 +705,15 @@ function AirtimeScreenContent() {
                                 keyboardType="number-pad"
                                 value={amount}
                                 onChangeText={handleAmountChange}
-                                placeholder="0.00"
-                                placeholderTextColor="#cbd5e1"
+                                placeholder="Min: 50"
+                                placeholderTextColor="#CBD5E1"
                                 editable={!loading}
                                 onFocus={() => setAmountFocused(true)}
                                 onBlur={() => setAmountFocused(false)}
                             />
                             {numAmount > 0 && (
                                 <TouchableOpacity onPress={() => setAmount('')} style={{ padding: 4 }}>
-                                    <Ionicons name="close-circle" size={18} color="#94a3b8" />
+                                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -596,150 +744,356 @@ function AirtimeScreenContent() {
                         </View>
                     </View>
 
-                    {/* 4. Live Summary Card */}
+                    {/* 4. Auto-Renewal / Scheduled Top-Up Section */}
+                    <View style={styles.autoRenewalCard}>
+                        <View style={styles.autoRenewalHeader}>
+                            <View style={styles.autoRenewalIconWrap}>
+                                <Ionicons name="repeat" size={18} color="#2563EB" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.autoRenewalTitle}>Auto-Renewal Schedule</Text>
+                                <Text style={styles.autoRenewalSubtitle}>
+                                    {autoRenewalEnabled 
+                                        ? `Active: Refill scheduled ${renewalFrequency.toUpperCase()}` 
+                                        : 'Automatically refill this line on a recurring cycle'}
+                                </Text>
+                            </View>
+                            <Switch
+                                trackColor={{ false: "#CBD5E1", true: "#93C5FD" }}
+                                thumbColor={autoRenewalEnabled ? "#2563EB" : "#FFFFFF"}
+                                onValueChange={(val) => {
+                                    safeLayoutAnimation();
+                                    setAutoRenewalEnabled(val);
+                                }}
+                                value={autoRenewalEnabled}
+                            />
+                        </View>
+
+                        {autoRenewalEnabled && (
+                            <View style={styles.frequencyPickerWrap}>
+                                <Text style={styles.frequencyLabel}>Select Recurrence Frequency:</Text>
+                                <View style={styles.frequencyButtonsRow}>
+                                    {(['daily', 'weekly', 'monthly'] as const).map((freq) => {
+                                        const isSelected = renewalFrequency === freq;
+                                        return (
+                                            <TouchableOpacity
+                                                key={freq}
+                                                onPress={() => {
+                                                    try { Haptics.selectionAsync(); } catch {}
+                                                    setRenewalFrequency(freq);
+                                                }}
+                                                style={[
+                                                    styles.frequencyBtn,
+                                                    isSelected && styles.frequencyBtnActive
+                                                ]}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={[
+                                                    styles.frequencyBtnText,
+                                                    isSelected && styles.frequencyBtnTextActive
+                                                ]}>
+                                                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+
+                                <View style={styles.scheduleInfoNote}>
+                                    <Ionicons name="calendar-outline" size={13} color="#2563EB" style={{ marginRight: 6 }} />
+                                    <Text style={styles.scheduleInfoText}>
+                                        {renewalFrequency === 'daily' && 'Refills automatically every day at 8:00 AM.'}
+                                        {renewalFrequency === 'weekly' && 'Refills automatically every Monday morning at 8:00 AM.'}
+                                        {renewalFrequency === 'monthly' && 'Refills automatically on the 1st of every month at 8:00 AM.'}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* 5. Live Cost Breakdown Card */}
                     {numAmount > 0 && (
                         <View style={styles.summaryCard}>
+                            <View style={styles.summaryHeader}>
+                                <Text style={styles.summaryHeaderTitle}>Order Breakdown</Text>
+                                <View style={styles.summaryNetworkTag}>
+                                    <Text style={styles.summaryNetworkTagText}>{activeNetworkObj.name}</Text>
+                                </View>
+                            </View>
+
                             <View style={styles.summaryRow}>
-                                <Text style={styles.summaryLabel}>Katin da za a tura (Face Value):</Text>
+                                <Text style={styles.summaryLabel}>Face Value Amount</Text>
                                 <Text style={styles.summaryValue}>₦{formatCurrency(numAmount)}</Text>
                             </View>
+
                             <View style={styles.summaryRow}>
-                                <Text style={[styles.summaryLabel, { color: '#16a34a' }]}>
-                                    Cashback Discount ({activeNetworkObj.cashback}):
+                                <Text style={[styles.summaryLabel, { color: '#059669' }]}>
+                                    Instant Cashback ({activeNetworkObj.cashback})
                                 </Text>
-                                <Text style={[styles.summaryValue, { color: '#16a34a', fontWeight: '800' }]}>
+                                <Text style={[styles.summaryValue, { color: '#059669', fontWeight: '800' }]}>
                                     -₦{formatCurrency(discountSavings)}
                                 </Text>
                             </View>
+
+                            {autoRenewalEnabled && (
+                                <View style={styles.summaryRow}>
+                                    <Text style={[styles.summaryLabel, { color: '#2563EB' }]}>
+                                        Auto-Renewal
+                                    </Text>
+                                    <Text style={[styles.summaryValue, { color: '#2563EB', fontWeight: '700' }]}>
+                                        {renewalFrequency.toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+
                             <View style={styles.summaryDivider} />
+
                             <View style={styles.summaryRow}>
-                                <Text style={styles.totalPayableLabel}>Abin da zaka biya (Net To Pay):</Text>
+                                <View>
+                                    <Text style={styles.totalPayableLabel}>Total Payable</Text>
+                                    <Text style={styles.totalPayableSub}>Debited from main wallet</Text>
+                                </View>
                                 <Text style={styles.totalPayableValue}>₦{formatCurrency(netPayable)}</Text>
                             </View>
                             
-                            {/* Balance check prompt */}
+                            {/* Live balance sufficiency check */}
                             {balance !== null && (
-                                <View style={styles.balanceStatusWrap}>
+                                <View style={[
+                                    styles.balanceStatusWrap,
+                                    !isSufficientBalance && styles.balanceStatusWrapError
+                                ]}>
                                     <Ionicons 
                                         name={isSufficientBalance ? "checkmark-circle" : "alert-circle"} 
                                         size={14} 
-                                        color={isSufficientBalance ? "#16a34a" : "#dc2626"} 
+                                        color={isSufficientBalance ? "#059669" : "#DC2626"} 
                                     />
-                                    <Text style={[styles.balanceStatusText, !isSufficientBalance && { color: '#dc2626' }]}>
+                                    <Text style={[styles.balanceStatusText, !isSufficientBalance && { color: '#DC2626' }]}>
                                         {isSufficientBalance 
-                                            ? `Kudin asusunka ya isa (Balance: ₦${formatCurrency(balance)})`
-                                            : `Kudin asusunka bai isa ba (Balance: ₦${formatCurrency(balance)})`}
+                                            ? `Sufficient balance (Wallet: ₦${formatCurrency(balance)})`
+                                            : `Insufficient balance (Wallet: ₦${formatCurrency(balance)}). Please top up.`}
                                     </Text>
                                 </View>
                             )}
                         </View>
                     )}
 
-                    {/* 5. Main Action Button */}
+                    {/* 6. Primary Action Button */}
                     <TouchableOpacity
                         onPress={handleInitiatePurchase}
                         disabled={!canSubmit}
                         activeOpacity={0.85}
-                        style={{ marginTop: 10, marginBottom: 20 }}
+                        style={{ marginTop: 12, marginBottom: 16 }}
                     >
                         <LinearGradient
-                            colors={!canSubmit ? ['#cbd5e1', '#94a3b8'] : ['#060d21', '#0d1b3e', '#f5a623']}
+                            colors={!canSubmit ? ['#CBD5E1', '#94A3B8'] : ['#060D21', '#0D1B3E', '#F59E0B']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.payButton}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#ffffff" size="small" />
+                                <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Ionicons name="lock-closed" size={17} color="#ffffff" />
+                                    <Ionicons name="lock-closed" size={17} color="#FFFFFF" />
                                     <Text style={styles.payButtonText}>
                                         {numAmount > 0 
-                                            ? `Biya ₦${formatCurrency(netPayable)} Yanzu` 
-                                            : "Shigar da Kudi domin Biya"}
+                                            ? `Pay ₦${formatCurrency(netPayable)} Securely` 
+                                            : "Enter Amount to Continue"}
                                     </Text>
                                 </View>
                             )}
                         </LinearGradient>
                     </TouchableOpacity>
 
-                    {/* Trust footer */}
+                    {/* Trust Seal Footer */}
                     <View style={styles.trustFooter}>
-                        <Ionicons name="shield-checkmark" size={13} color="#94a3b8" />
-                        <Text style={styles.trustFooterText}>Tabbatar da Tsaron Kudi & Bayanai ta Supabase da BigiSub</Text>
+                        <Ionicons name="shield-checkmark" size={14} color="#94A3B8" />
+                        <Text style={styles.trustFooterText}>Bank-Grade 256-Bit SSL Encryption • Instant VTU Delivery</Text>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Beneficiary Bottom Sheet Modal */}
+            {/* Comprehensive Contact & Beneficiary Picker Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
-                visible={showBeneficiaryModal}
+                visible={showContactModal}
                 onRequestClose={() => {
-                    setBeneficiarySearch('');
-                    setShowBeneficiaryModal(false);
+                    setContactSearch('');
+                    setShowContactModal(false);
                 }}
             >
                 <View style={styles.modalBackdrop}>
-                    <View style={[styles.modalSheet, isWeb && { maxWidth: 500, alignSelf: 'center', width: '100%' }]}>
+                    <View style={[styles.modalSheet, isWeb && { maxWidth: 520, alignSelf: 'center', width: '100%' }]}>
                         <View style={styles.modalSheetHeader}>
-                            <Text style={styles.modalSheetTitle}>Zaɓi Lambar da aka Ajiye</Text>
-                            <TouchableOpacity onPress={() => setShowBeneficiaryModal(false)}>
-                                <Ionicons name="close" size={22} color="#64748b" />
+                            <Text style={styles.modalSheetTitle}>Select Recipient</Text>
+                            <TouchableOpacity onPress={() => setShowContactModal(false)}>
+                                <Ionicons name="close" size={22} color="#64748B" />
                             </TouchableOpacity>
                         </View>
 
-                        <View style={styles.modalSearchBox}>
-                            <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
-                            <TextInput
-                                style={styles.modalSearchInput}
-                                placeholder="Bincika suna ko lamba..."
-                                placeholderTextColor="#94a3b8"
-                                value={beneficiarySearch}
-                                onChangeText={setBeneficiarySearch}
-                            />
+                        {/* Direct Native Picker Action Button */}
+                        <TouchableOpacity
+                            onPress={() => {
+                                setShowContactModal(false);
+                                handlePickDeviceContact();
+                            }}
+                            style={styles.openSystemContactsBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="phone-portrait-outline" size={18} color="#0D1B3E" />
+                            <Text style={styles.openSystemContactsText}>Open Phone Address Book</Text>
+                            <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {/* Modal Tabs */}
+                        <View style={styles.modalTabsRow}>
+                            <TouchableOpacity
+                                onPress={() => setContactModalTab('beneficiaries')}
+                                style={[
+                                    styles.modalTabBtn,
+                                    contactModalTab === 'beneficiaries' && styles.modalTabBtnActive
+                                ]}
+                            >
+                                <Ionicons 
+                                    name="people" 
+                                    size={14} 
+                                    color={contactModalTab === 'beneficiaries' ? '#0D1B3E' : '#64748B'} 
+                                    style={{ marginRight: 6 }} 
+                                />
+                                <Text style={[
+                                    styles.modalTabBtnText,
+                                    contactModalTab === 'beneficiaries' && styles.modalTabBtnTextActive
+                                ]}>
+                                    Saved Beneficiaries ({beneficiaries.length})
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setContactModalTab('phonebook');
+                                    loadDeviceContacts();
+                                }}
+                                style={[
+                                    styles.modalTabBtn,
+                                    contactModalTab === 'phonebook' && styles.modalTabBtnActive
+                                ]}
+                            >
+                                <Ionicons 
+                                    name="book" 
+                                    size={14} 
+                                    color={contactModalTab === 'phonebook' ? '#0D1B3E' : '#64748B'} 
+                                    style={{ marginRight: 6 }} 
+                                />
+                                <Text style={[
+                                    styles.modalTabBtnText,
+                                    contactModalTab === 'phonebook' && styles.modalTabBtnTextActive
+                                ]}>
+                                    Device Contacts
+                                </Text>
+                            </TouchableOpacity>
                         </View>
 
-                        <FlatList
-                            data={beneficiaries.filter(b => 
-                                (b.name || '').toLowerCase().includes(beneficiarySearch.toLowerCase()) ||
-                                (b.account_number || '').includes(beneficiarySearch)
-                            )}
-                            keyExtractor={(item, index) => item?.id ? String(item.id) : String(index)}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={styles.beneficiaryListItem}
-                                    onPress={() => {
-                                        setPhoneNumber(item.account_number);
-                                        detectNetwork(item.account_number);
-                                        setShowBeneficiaryModal(false);
-                                    }}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.beneficiaryAvatar}>
-                                        <Text style={styles.beneficiaryAvatarText}>
-                                            {item.name ? item.name[0].toUpperCase() : 'B'}
-                                        </Text>
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.beneficiaryItemName}>{item.name}</Text>
-                                        <Text style={styles.beneficiaryItemSub}>{item.account_number}</Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                        {/* Search Box */}
+                        <View style={styles.modalSearchBox}>
+                            <Ionicons name="search" size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+                            <TextInput
+                                style={styles.modalSearchInput}
+                                placeholder="Search by name or phone..."
+                                placeholderTextColor="#94A3B8"
+                                value={contactSearch}
+                                onChangeText={setContactSearch}
+                            />
+                            {contactSearch.length > 0 && (
+                                <TouchableOpacity onPress={() => setContactSearch('')}>
+                                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
                                 </TouchableOpacity>
                             )}
-                            ListEmptyComponent={
-                                <View style={{ padding: 24, alignItems: 'center' }}>
-                                    <Text style={{ color: '#94a3b8', fontSize: 13 }}>Babu lambar da aka ajiye tukuna</Text>
+                        </View>
+
+                        {contactModalTab === 'beneficiaries' ? (
+                            <FlatList
+                                data={beneficiaries.filter(b => 
+                                    (b.name || '').toLowerCase().includes(contactSearch.toLowerCase()) ||
+                                    (b.account_number || '').includes(contactSearch)
+                                )}
+                                keyExtractor={(item, index) => item?.id ? String(item.id) : String(index)}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.beneficiaryListItem}
+                                        onPress={() => {
+                                            setPhoneNumber(item.account_number);
+                                            detectNetwork(item.account_number);
+                                            setShowContactModal(false);
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.beneficiaryAvatar}>
+                                            <Text style={styles.beneficiaryAvatarText}>
+                                                {item.name ? item.name[0].toUpperCase() : 'B'}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.beneficiaryItemName}>{item.name}</Text>
+                                            <Text style={styles.beneficiaryItemSub}>{item.account_number}</Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                                    </TouchableOpacity>
+                                )}
+                                ListEmptyComponent={
+                                    <View style={{ padding: 24, alignItems: 'center' }}>
+                                        <Text style={{ color: '#94A3B8', fontSize: 13 }}>No saved beneficiaries found</Text>
+                                    </View>
+                                }
+                            />
+                        ) : (
+                            loadingDeviceContacts ? (
+                                <View style={{ padding: 32, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#0D1B3E" />
+                                    <Text style={{ marginTop: 8, color: '#64748B', fontSize: 12 }}>Loading device contacts...</Text>
                                 </View>
-                            }
-                        />
+                            ) : (
+                                <FlatList
+                                    data={deviceContacts.filter(c =>
+                                        (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) ||
+                                        (c.phone || '').includes(contactSearch)
+                                    )}
+                                    keyExtractor={(item) => item.id || item.phone}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.beneficiaryListItem}
+                                            onPress={() => {
+                                                setPhoneNumber(item.phone);
+                                                detectNetwork(item.phone);
+                                                setShowContactModal(false);
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={[styles.beneficiaryAvatar, { backgroundColor: '#EFF6FF' }]}>
+                                                <Text style={[styles.beneficiaryAvatarText, { color: '#2563EB' }]}>
+                                                    {item.name ? item.name[0].toUpperCase() : 'C'}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.beneficiaryItemName}>{item.name}</Text>
+                                                <Text style={styles.beneficiaryItemSub}>{item.phone}</Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                                        </TouchableOpacity>
+                                    )}
+                                    ListEmptyComponent={
+                                        <View style={{ padding: 24, alignItems: 'center' }}>
+                                            <Text style={{ color: '#94A3B8', fontSize: 13 }}>No phonebook contacts found</Text>
+                                        </View>
+                                    }
+                                />
+                            )
+                        )}
                     </View>
                 </View>
             </Modal>
 
-            {/* Confirmation Modal */}
+            {/* Transaction Confirmation Modal */}
             <TransactionConfirmationModal
                 visible={showConfirmation}
                 onClose={() => setShowConfirmation(false)}
@@ -747,15 +1101,16 @@ function AirtimeScreenContent() {
                     setShowConfirmation(false);
                     setTimeout(() => setShowSecurityModal(true), 300);
                 }}
-                title="Tabbatar da Sayen Kati"
+                title="Confirm Airtime Purchase"
                 network={network || 'mtn'}
                 details={[
-                    { label: 'Aiki', value: 'Siyan Katin Waya (Airtime)' },
-                    { label: 'Layin Sadarwa', value: activeNetworkObj.name },
-                    { label: 'Lambar Waya', value: phoneNumber },
-                    { label: 'Kudin Kati (Face Value)', value: `₦${formatCurrency(numAmount)}`, isAmount: true },
-                    { label: `Ragi / Cashback (${(discountRate * 100).toFixed(0)}%)`, value: `-₦${formatCurrency(discountSavings)}`, isDiscount: true },
-                    { label: 'Kudin da za a Cire a Wallet', value: `₦${formatCurrency(netPayable)}`, isTotal: true },
+                    { label: 'Service', value: 'Instant Airtime Recharge' },
+                    { label: 'Carrier Network', value: activeNetworkObj.name },
+                    { label: 'Recipient Phone', value: phoneNumber },
+                    { label: 'Airtime Value', value: `₦${formatCurrency(numAmount)}`, isAmount: true },
+                    { label: `Cashback Discount (${(discountRate * 100).toFixed(0)}%)`, value: `-₦${formatCurrency(discountSavings)}`, isDiscount: true },
+                    { label: 'Auto-Renewal Schedule', value: autoRenewalEnabled ? `Enabled (${renewalFrequency.toUpperCase()})` : 'Disabled (One-Time)' },
+                    { label: 'Net Amount to Pay', value: `₦${formatCurrency(netPayable)}`, isTotal: true },
                 ]}
             />
 
@@ -766,8 +1121,8 @@ function AirtimeScreenContent() {
                 onSuccess={() => {
                     processTransaction();
                 }}
-                title="Shigar da PIN na Tsaro"
-                description={`Tabbatar da biyan ₦${formatCurrency(netPayable)} domin katin ${activeNetworkObj.name} na ${phoneNumber}`}
+                title="Authorize Transaction"
+                description={`Enter your security PIN to authorize ₦${formatCurrency(netPayable)} airtime top-up for ${phoneNumber}`}
                 requiredFor="purchase"
             />
         </View>
@@ -777,8 +1132,8 @@ function AirtimeScreenContent() {
 export default function AirtimeScreen() {
     return (
         <ErrorBoundary 
-            fallbackTitle="Airtime - Kuskure Wajen Budewa" 
-            fallbackSubtitle="An samu dan tsaiko wajen nuna wannan shafin. Da fatan za a danna maballin da ke kasa domin sake gwadawa."
+            fallbackTitle="Unable to Load Airtime" 
+            fallbackSubtitle="An unexpected issue occurred while rendering the airtime screen. Please tap below to retry."
         >
             <AirtimeScreenContent />
         </ErrorBoundary>
@@ -787,10 +1142,21 @@ export default function AirtimeScreen() {
 
 const styles = StyleSheet.create({
     headerContainer: {
-        paddingBottom: 16,
+        paddingBottom: 18,
         paddingHorizontal: 16,
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    ambientGlow: {
+        position: 'absolute',
+        top: -40,
+        right: -40,
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
     },
     webContainer: {
         alignSelf: 'center',
@@ -809,37 +1175,53 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.12)',
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
     },
     headerTitle: {
-        color: '#ffffff',
+        color: '#FFFFFF',
         fontSize: 17,
         fontWeight: '900',
         letterSpacing: 0.2,
     },
     headerSubtitle: {
-        color: '#94a3b8',
+        color: '#94A3B8',
         fontSize: 11,
-        marginTop: 1,
+        fontWeight: '600',
     },
     balancePill: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
-        paddingLeft: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        paddingLeft: 8,
         paddingRight: 6,
-        paddingVertical: 5,
-        borderRadius: 18,
+        paddingVertical: 4,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.16)',
+        borderColor: 'rgba(255, 255, 255, 0.18)',
         gap: 6,
     },
+    balanceIconWrap: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: 'rgba(245, 158, 11, 0.18)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    balancePillLabel: {
+        color: '#94A3B8',
+        fontSize: 8.5,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
     balancePillText: {
-        color: '#ffffff',
+        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '800',
     },
     balancePlusWrap: {
-        backgroundColor: '#f5a623',
+        backgroundColor: '#F59E0B',
         width: 18,
         height: 18,
         borderRadius: 9,
@@ -853,31 +1235,46 @@ const styles = StyleSheet.create({
     guaranteeCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f0fdf4',
         borderWidth: 1,
-        borderColor: '#bbf7d0',
-        borderRadius: 14,
-        padding: 10,
+        borderColor: '#A7F3D0',
+        borderRadius: 16,
+        padding: 12,
         marginBottom: 16,
-        gap: 10,
+        gap: 12,
+        shadowColor: '#059669',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
     },
     guaranteeIconWrap: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#dcfce7',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#D1FAE5',
         justifyContent: 'center',
         alignItems: 'center',
     },
     guaranteeTitle: {
-        color: '#15803d',
-        fontSize: 11.5,
+        color: '#065F46',
+        fontSize: 12,
         fontWeight: '800',
     },
+    guaranteePill: {
+        backgroundColor: '#D1FAE5',
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 6,
+    },
+    guaranteePillText: {
+        color: '#047857',
+        fontSize: 8,
+        fontWeight: '900',
+    },
     guaranteeSubtitle: {
-        color: '#166534',
-        fontSize: 10,
-        marginTop: 1,
+        color: '#047857',
+        fontSize: 10.5,
+        marginTop: 2,
         lineHeight: 14,
     },
     recentsSection: {
@@ -886,41 +1283,65 @@ const styles = StyleSheet.create({
     recentItemChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 12,
+        borderColor: '#E2E8F0',
+        borderRadius: 14,
         paddingHorizontal: 10,
         paddingVertical: 6,
-        gap: 6,
+        gap: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 3,
+        elevation: 1,
     },
     recentLogoWrap: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        backgroundColor: '#f1f5f9',
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
         justifyContent: 'center',
         alignItems: 'center',
     },
     recentPhoneText: {
-        fontSize: 11,
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: '#0F172A',
+    },
+    recentNetworkText: {
+        fontSize: 9,
         fontWeight: '700',
-        color: '#334155',
+        color: '#64748B',
     },
     sectionContainer: {
         marginBottom: 16,
     },
     sectionLabel: {
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '800',
-        color: '#334155',
-        marginBottom: 8,
+        color: '#1E293B',
+    },
+    sectionSublabel: {
+        fontSize: 10.5,
+        fontWeight: '600',
+        color: '#64748B',
     },
     labelRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 8,
+    },
+    cashbackBadgeWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    cashbackBadgeTop: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#D97706',
     },
     validBadge: {
         flexDirection: 'row',
@@ -930,12 +1351,26 @@ const styles = StyleSheet.create({
     validBadgeText: {
         fontSize: 10.5,
         fontWeight: '700',
-        color: '#16a34a',
+        color: '#059669',
     },
-    cashbackHighlight: {
-        fontSize: 11,
+    digitCounter: {
+        fontSize: 10.5,
+        fontWeight: '600',
+        color: '#94A3B8',
+    },
+    discountPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+        gap: 4,
+    },
+    discountPillText: {
+        fontSize: 10.5,
         fontWeight: '800',
-        color: '#16a34a',
+        color: '#059669',
     },
     networksRow: {
         flexDirection: 'row',
@@ -943,30 +1378,52 @@ const styles = StyleSheet.create({
     },
     networkCard: {
         flex: 1,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         borderWidth: 1.5,
-        borderColor: '#e2e8f0',
+        borderColor: '#E2E8F0',
         borderRadius: 14,
         paddingVertical: 10,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1.5 },
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    networkTopBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        opacity: 0.4,
+    },
+    networkTopBarActive: {
+        opacity: 1,
+        height: 3.5,
     },
     networkCardActive: {
-        borderColor: '#0d1b3e',
+        borderColor: '#0D1B3E',
         backgroundColor: 'rgba(13, 27, 62, 0.03)',
+        shadowColor: '#0D1B3E',
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 3,
     },
     networkLogoContainer: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#F8FAFC',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 4,
     },
     networkLogoContainerActive: {
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
     },
     networkLogoImage: {
         width: 24,
@@ -975,58 +1432,65 @@ const styles = StyleSheet.create({
     networkCardName: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#64748b',
+        color: '#64748B',
     },
     networkCardNameActive: {
-        color: '#0d1b3e',
+        color: '#0D1B3E',
         fontWeight: '900',
     },
-    cashbackBadge: {
-        backgroundColor: '#f1f5f9',
+    cashbackTag: {
+        backgroundColor: '#F1F5F9',
         paddingHorizontal: 4,
         paddingVertical: 1.5,
         borderRadius: 4,
         marginTop: 3,
     },
-    cashbackBadgeActive: {
-        backgroundColor: '#fef3c7',
+    cashbackTagActive: {
+        backgroundColor: '#FEF3C7',
     },
-    cashbackBadgeText: {
+    cashbackTagText: {
         fontSize: 8,
         fontWeight: '800',
-        color: '#64748b',
+        color: '#64748B',
     },
-    cashbackBadgeTextActive: {
-        color: '#b45309',
+    cashbackTagTextActive: {
+        color: '#B45309',
     },
     activeCheckmark: {
         position: 'absolute',
-        top: -4,
-        right: -4,
-        backgroundColor: '#0d1b3e',
-        width: 15,
-        height: 15,
-        borderRadius: 7.5,
+        top: 4,
+        right: 4,
+        backgroundColor: '#0D1B3E',
+        width: 14,
+        height: 14,
+        borderRadius: 7,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: '#ffffff',
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         borderWidth: 1.5,
-        borderColor: '#e2e8f0',
+        borderColor: '#E2E8F0',
         borderRadius: 14,
-        height: 48,
+        height: 50,
         paddingHorizontal: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.02,
+        shadowRadius: 3,
+        elevation: 1,
     },
     inputContainerFocused: {
-        borderColor: '#0d1b3e',
+        borderColor: '#0D1B3E',
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#0D1B3E',
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
     },
     inputContainerSuccess: {
-        borderColor: '#16a34a',
+        borderColor: '#059669',
     },
     inputLogoWrapper: {
         width: 26,
@@ -1039,27 +1503,31 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         fontWeight: '700',
-        color: '#0f172a',
+        color: '#0F172A',
     },
     mePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: 'rgba(13, 27, 62, 0.08)',
         paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderRadius: 8,
         marginRight: 6,
     },
     mePillText: {
-        fontSize: 10,
+        fontSize: 10.5,
         fontWeight: '800',
-        color: '#0d1b3e',
+        color: '#0D1B3E',
     },
     contactBookBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#f1f5f9',
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#F1F5F9',
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     saveBeneficiaryRow: {
         flexDirection: 'row',
@@ -1070,20 +1538,20 @@ const styles = StyleSheet.create({
     },
     saveBeneficiaryText: {
         fontSize: 11,
-        color: '#64748b',
+        color: '#64748B',
         fontWeight: '600',
     },
     nairaSymbol: {
         fontSize: 18,
         fontWeight: '900',
-        color: '#64748b',
+        color: '#64748B',
         marginRight: 6,
     },
     amountInput: {
         flex: 1,
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '800',
-        color: '#0f172a',
+        color: '#0F172A',
     },
     presetsGrid: {
         flexDirection: 'row',
@@ -1093,34 +1561,164 @@ const styles = StyleSheet.create({
     },
     presetChip: {
         width: '31.5%',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         borderWidth: 1.5,
-        borderColor: '#e2e8f0',
-        borderRadius: 10,
-        paddingVertical: 8,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        paddingVertical: 9,
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.02,
+        shadowRadius: 2,
+        elevation: 1,
     },
     presetChipActive: {
-        backgroundColor: '#0d1b3e',
-        borderColor: '#0d1b3e',
+        backgroundColor: '#0D1B3E',
+        borderColor: '#0D1B3E',
     },
     presetChipText: {
-        fontSize: 12.5,
+        fontSize: 13,
         fontWeight: '700',
         color: '#334155',
     },
     presetChipTextActive: {
-        color: '#ffffff',
+        color: '#FFFFFF',
         fontWeight: '900',
     },
-    summaryCard: {
-        backgroundColor: '#ffffff',
+    // Auto-Renewal Section
+    autoRenewalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
         borderWidth: 1.5,
-        borderColor: '#e2e8f0',
-        borderRadius: 14,
+        borderColor: '#DBEAFE',
         padding: 14,
         marginBottom: 16,
+        shadowColor: '#2563EB',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1,
+    },
+    autoRenewalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    autoRenewalIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#EFF6FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    autoRenewalTitle: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        color: '#1E3A8A',
+    },
+    autoRenewalSubtitle: {
+        fontSize: 10.5,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    frequencyPickerWrap: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    frequencyLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#334155',
+        marginBottom: 8,
+    },
+    frequencyButtonsRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 10,
+    },
+    frequencyBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    frequencyBtnActive: {
+        borderColor: '#2563EB',
+        backgroundColor: '#EFF6FF',
+    },
+    frequencyBtnText: {
+        fontSize: 11.5,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    frequencyBtnTextActive: {
+        color: '#2563EB',
+        fontWeight: '800',
+    },
+    scheduleInfoNote: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        borderRadius: 8,
+        padding: 8,
+    },
+    scheduleInfoText: {
+        fontSize: 10.5,
+        color: '#1D4ED8',
+        fontWeight: '600',
+        flex: 1,
+    },
+    // Order Summary
+    summaryCard: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 16,
+        shadowColor: '#0D1B3E',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    summaryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    summaryHeaderTitle: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: '#0F172A',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    summaryNetworkTag: {
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    summaryNetworkTagText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#475569',
     },
     summaryRow: {
         flexDirection: 'row',
@@ -1130,74 +1728,94 @@ const styles = StyleSheet.create({
     },
     summaryLabel: {
         fontSize: 11.5,
-        color: '#64748b',
+        color: '#64748B',
         fontWeight: '600',
     },
     summaryValue: {
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '700',
-        color: '#0f172a',
+        color: '#0F172A',
     },
     summaryDivider: {
         height: 1,
-        backgroundColor: '#f1f5f9',
+        backgroundColor: '#F1F5F9',
         marginVertical: 6,
     },
     totalPayableLabel: {
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '800',
-        color: '#0f172a',
+        color: '#0F172A',
+    },
+    totalPayableSub: {
+        fontSize: 9.5,
+        color: '#94A3B8',
+        fontWeight: '500',
+        marginTop: 1,
     },
     totalPayableValue: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '900',
-        color: '#0d1b3e',
+        color: '#0D1B3E',
     },
     balanceStatusWrap: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 5,
         marginTop: 8,
         paddingTop: 8,
         borderTopWidth: 1,
-        borderTopColor: '#f8fafc',
+        borderTopColor: '#F8FAFC',
+    },
+    balanceStatusWrapError: {
+        backgroundColor: '#FEF2F2',
+        padding: 6,
+        borderRadius: 8,
     },
     balanceStatusText: {
         fontSize: 10.5,
         fontWeight: '700',
-        color: '#16a34a',
+        color: '#059669',
     },
     payButton: {
-        height: 48,
-        borderRadius: 14,
+        height: 50,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 4,
     },
     payButtonText: {
-        color: '#ffffff',
+        color: '#FFFFFF',
         fontSize: 15,
         fontWeight: '800',
+        letterSpacing: 0.2,
     },
     trustFooter: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
+        gap: 5,
+        paddingVertical: 4,
     },
     trustFooterText: {
         fontSize: 10,
-        color: '#94a3b8',
+        color: '#94A3B8',
+        fontWeight: '600',
     },
+    // Modals
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
     modalSheet: {
-        backgroundColor: '#ffffff',
-        borderTopLeftRadius: 22,
-        borderTopRightRadius: 22,
-        maxHeight: '65%',
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '75%',
         padding: 16,
     },
     modalSheetHeader: {
@@ -1207,53 +1825,103 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     modalSheetTitle: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '800',
-        color: '#0f172a',
+        color: '#0F172A',
+    },
+    openSystemContactsBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 12,
+        gap: 8,
+    },
+    openSystemContactsText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#0D1B3E',
+    },
+    modalTabsRow: {
+        flexDirection: 'row',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 10,
+        padding: 3,
+        marginBottom: 12,
+    },
+    modalTabBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 7,
+        borderRadius: 8,
+    },
+    modalTabBtnActive: {
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    modalTabBtnText: {
+        fontSize: 11.5,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    modalTabBtnTextActive: {
+        color: '#0D1B3E',
+        fontWeight: '800',
     },
     modalSearchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f1f5f9',
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        height: 38,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 40,
         marginBottom: 12,
     },
     modalSearchInput: {
         flex: 1,
         fontSize: 13,
-        color: '#0f172a',
+        color: '#0F172A',
     },
     beneficiaryListItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
+        paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+        borderBottomColor: '#F1F5F9',
         gap: 10,
     },
     beneficiaryAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         backgroundColor: 'rgba(13, 27, 62, 0.08)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     beneficiaryAvatarText: {
-        fontSize: 13,
+        fontSize: 13.5,
         fontWeight: '800',
-        color: '#0d1b3e',
+        color: '#0D1B3E',
     },
     beneficiaryItemName: {
-        fontSize: 12.5,
+        fontSize: 13,
         fontWeight: '700',
-        color: '#0f172a',
+        color: '#0F172A',
     },
     beneficiaryItemSub: {
         fontSize: 11,
-        color: '#64748b',
+        color: '#64748B',
         marginTop: 1,
     },
 });
