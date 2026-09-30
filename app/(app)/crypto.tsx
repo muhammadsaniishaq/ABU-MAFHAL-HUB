@@ -5248,15 +5248,6 @@ const s = StyleSheet.create({
         borderStyle: 'dashed',
         marginVertical: 12,
     },
-    receiptDetailsTable: {
-        backgroundColor: '#F8FAFC',
-        borderRadius: 14,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        marginBottom: 14,
-        gap: 6,
-    },
     receiptTableRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
