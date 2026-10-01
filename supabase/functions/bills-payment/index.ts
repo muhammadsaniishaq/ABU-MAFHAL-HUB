@@ -246,27 +246,10 @@ Deno.serve(async (req: Request) => {
                 }
             }
 
-            // 3. Profit-Safe Defaults: Guarantee admin maintains positive margin against VTU wholesale cost
-            if (sellDiscount === 0) {
-                const defaultDiscounts: Record<string, number> = {
-                    MTN: 1.0,     // Provider gives ~2.5% -> Admin profit = ~1.5%
-                    GLO: 2.0,     // Provider gives ~3.5% -> Admin profit = ~1.5%
-                    AIRTEL: 1.0,  // Provider gives ~2.5% -> Admin profit = ~1.5%
-                    '9MOBILE': 2.0, // Provider gives ~3.5% -> Admin profit = ~1.5%
-                };
-                sellDiscount = defaultDiscounts[netName] || 1.0;
-            }
-
-            // 4. Strict Profit Protection Cap: Ensure selling discount never wipes out admin profit margin
-            const maxSellDiscount: Record<string, number> = {
-                MTN: 1.5,      // Bigi wholesale discount is ~2.5% -> Admin keeps >= 1.0% profit
-                GLO: 2.5,      // Bigi wholesale discount is ~3.5%-4.0% -> Admin keeps >= 1.0%-1.5% profit
-                AIRTEL: 1.5,   // Bigi wholesale discount is ~2.5% -> Admin keeps >= 1.0% profit
-                '9MOBILE': 2.5 // Bigi wholesale discount is ~3.5%-4.0% -> Admin keeps >= 1.0%-1.5% profit
-            };
-            const cap = maxSellDiscount[netName] || 1.5;
-            if (sellDiscount > cap) {
-                sellDiscount = cap;
+            // 3. Default Discount: Defaults to 0% (Face value).
+            // Prevents loss when API provider deducts full 100% face value (e.g. BigiSub deducts N100 for N100 airtime).
+            if (sellDiscount === undefined || sellDiscount === null || isNaN(sellDiscount)) {
+                sellDiscount = 0;
             }
 
             if (sellDiscount > 0) {

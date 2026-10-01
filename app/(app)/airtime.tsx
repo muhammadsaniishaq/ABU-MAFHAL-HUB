@@ -44,7 +44,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         name: 'MTN', 
         code: '01', 
         color: '#FFCC00', 
-        defaultDiscount: 0.01, // 1% user discount -> Admin preserves healthy profit
+        defaultDiscount: 0, // Face value by default (guarantees zero margin loss)
         prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'],
         ussdBalance: '*310#',
         ussdData: '*323#',
@@ -55,7 +55,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         name: 'Glo', 
         code: '02', 
         color: '#0F6A37', 
-        defaultDiscount: 0.02, // 2% user discount -> Admin preserves healthy profit
+        defaultDiscount: 0, // Face value by default (guarantees zero margin loss)
         prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'],
         ussdBalance: '*310#',
         ussdData: '*323#',
@@ -66,7 +66,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         name: 'Airtel', 
         code: '04', 
         color: '#FF0000', 
-        defaultDiscount: 0.01, // 1% user discount -> Admin preserves healthy profit
+        defaultDiscount: 0, // Face value by default (guarantees zero margin loss)
         prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'],
         ussdBalance: '*310#',
         ussdData: '*323#',
@@ -77,7 +77,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         name: '9mobile', 
         code: '03', 
         color: '#006B3E', 
-        defaultDiscount: 0.02, // 2% user discount -> Admin preserves healthy profit
+        defaultDiscount: 0, // Face value by default (guarantees zero margin loss)
         prefixes: ['0809', '0818', '0817', '0909', '0908'],
         ussdBalance: '*310#',
         ussdData: '*323#',
@@ -88,7 +88,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         name: 'VITEL', 
         code: '05', 
         color: '#6366F1', 
-        defaultDiscount: 0.01,
+        defaultDiscount: 0,
         prefixes: ['070', '091'],
         ussdBalance: '*310#',
         ussdData: '*323#',
@@ -710,7 +710,7 @@ function AirtimeScreenContent() {
                             {NETWORKS_DATA.map((net) => {
                                 const isSelected = network === net.id;
                                 const rate = customDiscounts[net.id] !== undefined ? customDiscounts[net.id] : net.defaultDiscount;
-                                const discountLabel = `${Math.round(rate * 100)}% OFF`;
+                                const discountLabel = rate > 0 ? `${Math.round(rate * 100)}% OFF` : 'Instant VTU';
 
                                 return (
                                     <TouchableOpacity
@@ -736,8 +736,8 @@ function AirtimeScreenContent() {
                                             {net.name}
                                         </Text>
                                         
-                                        <View style={[styles.cashbackTag, isSelected && styles.cashbackTagActive]}>
-                                            <Text style={[styles.cashbackTagText, isSelected && styles.cashbackTagTextActive]}>
+                                        <View style={[styles.cashbackTag, isSelected && styles.cashbackTagActive, rate === 0 && { backgroundColor: '#F1F5F9' }]}>
+                                            <Text style={[styles.cashbackTagText, isSelected && styles.cashbackTagTextActive, rate === 0 && { color: '#475569' }]}>
                                                 {discountLabel}
                                             </Text>
                                         </View>
@@ -879,7 +879,7 @@ function AirtimeScreenContent() {
                     <View style={styles.sectionContainer}>
                         <View style={styles.labelRow}>
                             <Text style={styles.sectionLabel}>Top-Up Amount</Text>
-                            {numAmount > 0 && (
+                            {discountSavings > 0 && (
                                 <View style={styles.discountPill}>
                                     <Ionicons name="sparkles" size={11} color="#059669" />
                                     <Text style={styles.discountPillText}>
@@ -1021,14 +1021,23 @@ function AirtimeScreenContent() {
                                 <Text style={styles.summaryValue}>₦{formatCurrency(numAmount)}</Text>
                             </View>
 
-                            <View style={styles.summaryRow}>
-                                <Text style={[styles.summaryLabel, { color: '#059669' }]}>
-                                    Instant Cashback Discount ({discountPercentage}% OFF)
-                                </Text>
-                                <Text style={[styles.summaryValue, { color: '#059669', fontWeight: '800' }]}>
-                                    -₦{formatCurrency(discountSavings)}
-                                </Text>
-                            </View>
+                            {discountSavings > 0 ? (
+                                <View style={styles.summaryRow}>
+                                    <Text style={[styles.summaryLabel, { color: '#059669' }]}>
+                                        Instant Cashback Discount ({discountPercentage}% OFF)
+                                    </Text>
+                                    <Text style={[styles.summaryValue, { color: '#059669', fontWeight: '800' }]}>
+                                        -₦{formatCurrency(discountSavings)}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View style={styles.summaryRow}>
+                                    <Text style={styles.summaryLabel}>Convenience / Service Fee</Text>
+                                    <Text style={[styles.summaryValue, { color: '#059669', fontWeight: '700' }]}>
+                                        FREE (₦0.00)
+                                    </Text>
+                                </View>
+                            )}
 
                             {autoRenewalEnabled && (
                                 <View style={styles.summaryRow}>
