@@ -524,16 +524,35 @@ export default function CryptoScreen() {
 
     const openReceiptForGasOrder = (ord: any) => {
         const gasNet = GAS_NETWORKS.find(g => g.currency.toLowerCase() === ord.gas_type?.toLowerCase() || g.symbol.toLowerCase() === ord.gas_type?.toLowerCase()) || GAS_NETWORKS[0];
-        const hash = ord.tx_hash || ord.reference || ('0x' + (ord.id ? ord.id.replace(/-/g, '') : '') + '97230922fcaae8').slice(0, 66);
-        const txId = ord.reference || ord.id || ('qu8y' + Math.random().toString(36).substring(2, 10));
-        const recipient = ord.wallet_address || '';
-        // Guaranteed valid on-chain link (Addresses never 404 on blockchain explorers)
-        const explorerUrl = recipient && gasNet.explorerAddress 
-            ? `${gasNet.explorerAddress}${recipient}` 
-            : `${gasNet.explorerTx}${hash}`;
+        const hash = ord.tx_hash || ord.reference || '';
+        const txId = ord.provider_tx_id || ord.reference || ord.id || '';
+        const recipient = (ord.wallet_address || '').trim();
+
+        // Guaranteed valid on-chain link (Full Addresses never 404 on blockchain explorers)
+        let explorerUrl = '';
+        if (gasNet.symbol === 'TON') {
+            explorerUrl = hash && hash.length > 20 && !hash.startsWith('0x') && !hash.includes('-')
+                ? `https://tonviewer.com/transaction/${hash}`
+                : `https://tonviewer.com/${recipient}`;
+        } else if (recipient && gasNet.explorerAddress) {
+            explorerUrl = `${gasNet.explorerAddress}${recipient}`;
+        } else if (hash && gasNet.explorerTx) {
+            explorerUrl = `${gasNet.explorerTx}${hash}`;
+        } else {
+            explorerUrl = `https://tonviewer.com/${recipient}`;
+        }
+
+        const feeLabels: Record<string, string> = {
+            'TON': '~0.005 TON (Network Fee Included)',
+            'TRX': '~1.5 TRX (Energy Included)',
+            'BNB': '~0.0005 BNB (Gas Included)',
+            'SOL': '~0.00005 SOL (Gas Included)',
+            'POL': '~0.01 POL (Gas Included)',
+        };
+        const networkFeeLabel = feeLabels[gasNet.symbol] || 'Included in Total (₦0 Extra)';
 
         setSelectedTx({
-            type: 'Gas fee',
+            type: 'Gas Refill',
             symbol: gasNet.symbol,
             icon: gasNet.icon,
             networkName: gasNet.networkName,
@@ -541,10 +560,10 @@ export default function CryptoScreen() {
             date: ord.created_at ? new Date(ord.created_at) : new Date(),
             recipient: recipient,
             amountSent: `${ord.amount_gas} ${gasNet.symbol}`,
-            amountPaid: `₦${Number(ord.amount_fiat || 0).toLocaleString()}`,
+            amountPaid: ord.payment_method === 'USDT' ? `$${Number(ord.amount_fiat || 0).toFixed(4)} USDT` : `₦${Number(ord.amount_fiat || 0).toLocaleString()}`,
             paidFrom: 'Abu Mafhal Hub wallet',
-            networkFee: `0.15 ${gasNet.symbol} ≈ $0.15`,
-            txHash: hash,
+            networkFee: networkFeeLabel,
+            txHash: hash || (txId ? `Ref: ${txId}` : 'Processing on blockchain'),
             explorerUrl: explorerUrl,
             txId: txId,
         });
@@ -567,28 +586,51 @@ export default function CryptoScreen() {
             iconUrl = foundGas.icon;
         }
 
-        const recipientMatch = desc.match(/to\s+([A-Za-z0-9]+)/i);
-        const recipient = recipientMatch ? recipientMatch[1] : (tx.recipient || '0xA26F35...89fFDd');
-        const hashMatch = desc.match(/Hash:\s*([0-9a-zA-Zx]+)/i);
-        const txHash = hashMatch ? hashMatch[1] : (tx.tx_hash || tx.reference || ('0x' + (tx.id ? tx.id.replace(/-/g, '') : '') + '97230922fcaae8').slice(0, 66));
-        const txId = tx.reference || tx.id || ('qu8y' + Math.random().toString(36).substring(2, 10));
+        // Match both 'to' and '→' including dashes and underscores for TON and EVM
+        const recipientMatch = desc.match(/(?:to|→)\s*([A-Za-z0-9_-]+)/i);
+        const recipient = recipientMatch ? recipientMatch[1] : (tx.recipient || '');
+        const hashMatch = desc.match(/Hash:\s*([0-9a-zA-Zx_-]+)/i);
+        const txHash = hashMatch ? hashMatch[1] : (tx.tx_hash || tx.reference || '');
+        const txId = tx.reference || tx.id || '';
 
-        // Use recipient address explorer URL so users never face a 404
-        const explorerUrl = recipient ? `${explorerBase}${recipient}` : `${foundGas?.explorerTx || 'https://tronscan.org/#/transaction/'}${txHash}`;
+        let explorerUrl = '';
+        if (symbol === 'TON') {
+            explorerUrl = recipient ? `https://tonviewer.com/${recipient}` : (foundGas?.explorerAddress || 'https://tonviewer.com/');
+        } else if (recipient && foundGas?.explorerAddress) {
+            explorerUrl = `${foundGas.explorerAddress}${recipient}`;
+        } else if (txHash && foundGas?.explorerTx) {
+            explorerUrl = `${foundGas.explorerTx}${txHash}`;
+        } else {
+            explorerUrl = `https://tonviewer.com/${recipient}`;
+        }
+
+        const feeLabels: Record<string, string> = {
+            'TON': '~0.005 TON (Network Fee Included)',
+            'TRX': '~1.5 TRX (Energy Included)',
+            'BNB': '~0.0005 BNB (Gas Included)',
+            'SOL': '~0.00005 SOL (Gas Included)',
+            'POL': '~0.01 POL (Gas Included)',
+        };
+        const networkFeeLabel = feeLabels[symbol] || 'Included in Total (₦0 Extra)';
+
+        const gasAmountMatch = desc.match(/(?:Gas Refill:|Purchased)\s*([0-9.]+)\s*([A-Za-z0-9]+)/i);
+        const displayedAmount = isGas && gasAmountMatch 
+            ? `${gasAmountMatch[1]} ${gasAmountMatch[2].toUpperCase()}`
+            : (isGas ? `0.05 ${symbol}` : `₦${Number(tx.amount || 0).toLocaleString()}`);
 
         setSelectedTx({
-            type: isGas ? 'Gas fee' : (tx.type ? tx.type.replace(/_/g, ' ') : 'Crypto Transfer'),
+            type: isGas ? 'Gas Refill' : (tx.type ? tx.type.replace(/_/g, ' ') : 'Crypto Transfer'),
             symbol: symbol,
             icon: iconUrl,
             networkName: netName,
             status: tx.status === 'completed' || tx.status === 'successful' || !tx.status ? 'Successful' : tx.status,
             date: tx.created_at ? new Date(tx.created_at) : new Date(),
             recipient: recipient,
-            amountSent: isGas ? `${desc.match(/Purchased\s+([0-9.]+)/i)?.[1] || '1.85'} ${symbol}` : `₦${Number(tx.amount || 0).toLocaleString()}`,
+            amountSent: displayedAmount,
             amountPaid: `₦${Number(tx.amount || 0).toLocaleString()}`,
             paidFrom: 'Abu Mafhal Hub wallet',
-            networkFee: `0.15 ${symbol} ≈ $0.15`,
-            txHash: txHash,
+            networkFee: networkFeeLabel,
+            txHash: txHash || (txId ? `Ref: ${txId}` : 'Processing on blockchain'),
             explorerUrl: explorerUrl,
             txId: txId,
         });
@@ -616,16 +658,16 @@ export default function CryptoScreen() {
                 if (txGas && Array.isArray(txGas) && txGas.length > 0) {
                     const mapped = txGas.map(t => {
                         const desc = t.description || '';
-                        const gasTypeMatch = desc.match(/Purchased\s+([0-9.]+)\s+([A-Za-z0-9]+)\s+Gas/i);
-                        const walletMatch = desc.match(/to\s+([A-Za-z0-9]+)/i);
+                        const gasTypeMatch = desc.match(/(?:Purchased|Gas Refill:)\s*([0-9.]+)\s*([A-Za-z0-9]+)/i);
+                        const walletMatch = desc.match(/(?:to|→)\s*([A-Za-z0-9_-]+)/i);
                         return {
                             id: t.id,
                             user_id: t.user_id,
-                            gas_type: gasTypeMatch ? gasTypeMatch[2].toLowerCase() : 'trx',
-                            amount_gas: gasTypeMatch ? parseFloat(gasTypeMatch[1]) : 15,
+                            gas_type: gasTypeMatch ? gasTypeMatch[2].toLowerCase() : 'ton',
+                            amount_gas: gasTypeMatch ? parseFloat(gasTypeMatch[1]) : 0.05,
                             wallet_address: walletMatch ? walletMatch[1] : (t.reference || 'Wallet'),
                             amount_fiat: t.amount,
-                            status: 'completed',
+                            status: t.status || 'completed',
                             created_at: t.created_at,
                             reference: t.reference,
                         };
