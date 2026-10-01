@@ -40,7 +40,7 @@ export class BigiClient {
 
         console.log(`[BigiClient] Dispatching Airtime: Network=${networkId}, Phone=${formattedPhone}, Amount=${roundedAmount}`);
 
-        const res = await fetch(`${this.baseUrl}/vtu/airtime/purchase/`, {
+        let res = await fetch(`${this.baseUrl}/vtu/airtime/purchase/`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify({
@@ -51,6 +51,20 @@ export class BigiClient {
                 pin: this.pin
             })
         });
+
+        if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${this.baseUrl}/vtu/airtime/purchase`, {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify({
+                    network: networkId,
+                    phone_number: formattedPhone,
+                    amount: roundedAmount,
+                    airtime_type: "vtu",
+                    pin: this.pin
+                })
+            });
+        }
 
         const data = await res.json().catch(() => null);
         console.log(`[BigiClient] Airtime Response (Status ${res.status}):`, JSON.stringify(data));

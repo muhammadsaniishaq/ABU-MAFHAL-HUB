@@ -36,7 +36,7 @@ export class BilalsadasubClient {
      */
     async buyAirtime(network: string, phone: string, amount: number, requestId: string) {
         const networkId = this.getNetworkId(network);
-        const res = await fetch(`${this.baseUrl}/api/topup`, {
+        let res = await fetch(`${this.baseUrl}/api/topup/`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify({
@@ -48,7 +48,21 @@ export class BilalsadasubClient {
             })
         });
 
-        const data = await res.json();
+        if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${this.baseUrl}/api/topup`, {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify({
+                    network: networkId,
+                    phone: phone,
+                    amount: amount,
+                    airtime_type: "VTU",
+                    "request-id": requestId
+                })
+            });
+        }
+
+        const data = await res.json().catch(() => null);
 
         if (data && (data.status === 'success' || data.status === 'process')) {
             return {
@@ -57,7 +71,7 @@ export class BilalsadasubClient {
                 message: data.message || 'Airtime top-up successful'
             };
         } else {
-            throw new Error(data.message || data.error || 'Failed to buy airtime via Bilalsadasub');
+            throw new Error(data?.message || data?.error || `Failed to buy airtime via Bilalsadasub (HTTP ${res.status})`);
         }
     }
 

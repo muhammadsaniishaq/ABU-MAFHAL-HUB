@@ -94,6 +94,8 @@ Deno.serve(async (req: Request) => {
                 }
             });
         }
+
+        const settingsMap: Record<string, string> = secretsMap;
             
         const ckUserId = secretsMap['CLUBKONNECT_USER_ID'] || secretsMap['CLUBKONNECT_USER'] || Deno.env.get('CLUBKONNECT_USER_ID') || 'CK101269551';
         const ckApiKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || secretsMap['CLUBKONNECT_PASS'] || Deno.env.get('CLUBKONNECT_API_KEY') || '';
@@ -364,17 +366,23 @@ Deno.serve(async (req: Request) => {
             if (type === 'airtime' || type === 'data') {
                 let vendorOrder: string[] = [];
 
-                if (type === 'airtime') {
-                    // For Airtime: Always prioritize BigiSub API as primary rail
-                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
-                } else if (vtuVendor && vtuVendor.includes(',')) {
+                if (vtuVendor && vtuVendor.includes(',')) {
                     vendorOrder = vtuVendor.split(',').map((v: string) => v.trim()).filter(Boolean);
-                } else if (vtuVendor === 'bigi') {
-                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                } else if (vtuVendor === 'bilalsadasub') {
+                    vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
                 } else if (vtuVendor === 'clubkonnect') {
                     vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
+                } else if (vtuVendor === 'bigi') {
+                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
                 } else {
-                    vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
+                    // Smart default fallback order based on configured secrets
+                    if (bigiToken && bigiPin) {
+                        vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                    } else if (bilalToken) {
+                        vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
+                    } else {
+                        vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
+                    }
                 }
 
                 let lastError: any = null;
@@ -406,7 +414,7 @@ Deno.serve(async (req: Request) => {
                         }
 
                         const statusStr = String(result?.status || result?.msg || '').toUpperCase();
-                        const isExplicitFailed = statusStr.includes('FAIL') || statusStr.includes('ERR') || statusStr.includes('REJECT');
+                        const isExplicitFailed = statusStr.includes('FAIL') || statusStr.includes('ERR') || statusStr.includes('REJECT') || statusStr.includes('CANCEL') || statusStr.includes('INVALID');
                         const isSuccessStatus = !isExplicitFailed && (statusStr.includes('RECEIVED') || statusStr.includes('COMPLETED') || statusStr.includes('SUCCESS') || statusStr === '00' || statusStr === '0' || statusStr === '200');
 
                         if (result && isSuccessStatus) {
