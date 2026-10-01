@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Modal, FlatList, Switch, StyleSheet, LayoutAnimation } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Modal, FlatList, Switch, StyleSheet, LayoutAnimation, Linking } from 'react-native';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -6,6 +6,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Contacts from 'expo-contacts';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { createAppNotification } from '../../services/notificationsHelper';
@@ -28,18 +29,71 @@ const NETWORK_LOGOS: Record<string, any> = {
 interface NetworkItem {
     id: string;
     name: string;
+    code: string;
     color: string;
-    cashback: string;
-    discountRate: number;
+    defaultDiscount: number; // e.g. 0.01 for 1%
     prefixes: string[];
+    ussdBalance: string;
+    ussdData: string;
+    ussdBorrow: string;
 }
 
 const NETWORKS_DATA: NetworkItem[] = [
-    { id: 'mtn', name: 'MTN', color: '#FFCC00', cashback: '2% OFF', discountRate: 0.02, prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
-    { id: 'glo', name: 'Glo', color: '#0F6A37', cashback: '3% OFF', discountRate: 0.03, prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
-    { id: 'airtel', name: 'Airtel', color: '#FF0000', cashback: '2% OFF', discountRate: 0.02, prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
-    { id: '9mobile', name: '9mobile', color: '#006B3E', cashback: '3% OFF', discountRate: 0.03, prefixes: ['0809', '0818', '0817', '0909', '0908'] },
-    { id: 'vitel', name: 'VITEL', color: '#6366F1', cashback: '2% OFF', discountRate: 0.02, prefixes: ['070', '091'] },
+    { 
+        id: 'mtn', 
+        name: 'MTN', 
+        code: '01', 
+        color: '#FFCC00', 
+        defaultDiscount: 0.01, // 1% user discount -> Admin preserves healthy profit
+        prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'],
+        ussdBalance: '*310#',
+        ussdData: '*323#',
+        ussdBorrow: '*303#'
+    },
+    { 
+        id: 'glo', 
+        name: 'Glo', 
+        code: '02', 
+        color: '#0F6A37', 
+        defaultDiscount: 0.02, // 2% user discount -> Admin preserves healthy profit
+        prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'],
+        ussdBalance: '*310#',
+        ussdData: '*323#',
+        ussdBorrow: '*303#'
+    },
+    { 
+        id: 'airtel', 
+        name: 'Airtel', 
+        code: '04', 
+        color: '#FF0000', 
+        defaultDiscount: 0.01, // 1% user discount -> Admin preserves healthy profit
+        prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'],
+        ussdBalance: '*310#',
+        ussdData: '*323#',
+        ussdBorrow: '*303#'
+    },
+    { 
+        id: '9mobile', 
+        name: '9mobile', 
+        code: '03', 
+        color: '#006B3E', 
+        defaultDiscount: 0.02, // 2% user discount -> Admin preserves healthy profit
+        prefixes: ['0809', '0818', '0817', '0909', '0908'],
+        ussdBalance: '*310#',
+        ussdData: '*323#',
+        ussdBorrow: '*303#'
+    },
+    { 
+        id: 'vitel', 
+        name: 'VITEL', 
+        code: '05', 
+        color: '#6366F1', 
+        defaultDiscount: 0.01,
+        prefixes: ['070', '091'],
+        ussdBalance: '*310#',
+        ussdData: '*323#',
+        ussdBorrow: '*303#'
+    },
 ];
 
 const PRESETS = [100, 200, 500, 1000, 2000, 5000];
@@ -56,8 +110,12 @@ const formatCurrency = (val: number | string | null | undefined): string => {
 
 const cleanNigerianPhone = (raw: string): string => {
     let p = (raw || '').replace(/\D/g, '');
-    if (p.startsWith('234') && p.length === 13) {
+    if (p.startsWith('2340') && p.length === 14) {
+        p = '0' + p.slice(4);
+    } else if (p.startsWith('234') && p.length === 13) {
         p = '0' + p.slice(3);
+    } else if (p.length === 10 && !p.startsWith('0')) {
+        p = '0' + p;
     }
     if (p.length > 11 && p.startsWith('0')) {
         p = p.slice(0, 11);
@@ -85,19 +143,26 @@ function AirtimeScreenContent() {
     const [userPhone, setUserPhone] = useState<string | null>(null);
     const [recents, setRecents] = useState<any[]>([]);
     
+    // Dynamic Pricing / Profit-Safe Discounts
+    const [customDiscounts, setCustomDiscounts] = useState<Record<string, number>>({});
+    
     // Beneficiary & Device Contacts states
     const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
     const [showContactModal, setShowContactModal] = useState(false);
-    const [contactModalTab, setContactModalTab] = useState<'beneficiaries' | 'phonebook'>('beneficiaries');
+    const [contactModalTab, setContactModalTab] = useState<'phonebook' | 'beneficiaries'>('phonebook');
     const [deviceContacts, setDeviceContacts] = useState<any[]>([]);
     const [loadingDeviceContacts, setLoadingDeviceContacts] = useState(false);
     const [contactSearch, setContactSearch] = useState('');
+    const [contactsPermissionGranted, setContactsPermissionGranted] = useState<boolean | null>(null);
     const [saveBeneficiary, setSaveBeneficiary] = useState(false);
 
     // Auto-Renewal states
     const [autoRenewalEnabled, setAutoRenewalEnabled] = useState(false);
     const [renewalFrequency, setRenewalFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
     
+    // Quick USSD Guide Modal
+    const [showUssdModal, setShowUssdModal] = useState(false);
+
     // Modals
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [showSecurityModal, setShowSecurityModal] = useState(false);
@@ -108,6 +173,7 @@ function AirtimeScreenContent() {
 
     useEffect(() => {
         fetchData();
+        fetchDynamicRates();
     }, []);
 
     const fetchData = async () => {
@@ -155,6 +221,30 @@ function AirtimeScreenContent() {
         }
     };
 
+    // Fetch dynamic rates configured by Admin to protect profit
+    const fetchDynamicRates = async () => {
+        try {
+            const { data: settings } = await supabase.from('app_settings').select('key, value');
+            if (settings && Array.isArray(settings)) {
+                const discounts: Record<string, number> = {};
+                settings.forEach(s => {
+                    if (s.key && s.key.startsWith('AIRTIME_DISCOUNT_')) {
+                        const netKey = s.key.replace('AIRTIME_DISCOUNT_', '').toLowerCase();
+                        const val = parseFloat(s.value);
+                        if (!isNaN(val) && val >= 0 && val <= 5) {
+                            discounts[netKey] = val / 100;
+                        }
+                    }
+                });
+                if (Object.keys(discounts).length > 0) {
+                    setCustomDiscounts(discounts);
+                }
+            }
+        } catch (e) {
+            console.warn("Dynamic rate check note:", e);
+        }
+    };
+
     // Auto-detect Network by prefix
     const detectNetwork = useCallback((phone: string) => {
         const cleanPhone = phone.replace(/\D/g, '');
@@ -193,8 +283,67 @@ function AirtimeScreenContent() {
         setNetwork(netId);
     };
 
-    // Device Contacts Picker
-    const handlePickDeviceContact = async () => {
+    // Load device contacts from phonebook
+    const loadDeviceContacts = async (forceRequest = false) => {
+        setLoadingDeviceContacts(true);
+        try {
+            let status = 'undetermined';
+            if (forceRequest) {
+                const req = await Contacts.requestPermissionsAsync();
+                status = req.status;
+            } else {
+                const check = await Contacts.getPermissionsAsync();
+                status = check.status;
+                if (status !== 'granted') {
+                    const req = await Contacts.requestPermissionsAsync();
+                    status = req.status;
+                }
+            }
+
+            setContactsPermissionGranted(status === 'granted');
+
+            if (status === 'granted') {
+                const { data } = await Contacts.getContactsAsync({
+                    fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+                    pageSize: 600,
+                });
+                if (data && Array.isArray(data)) {
+                    const validList: any[] = [];
+                    const seenPhones = new Set<string>();
+                    data.forEach(c => {
+                        if (c.phoneNumbers && Array.isArray(c.phoneNumbers)) {
+                            c.phoneNumbers.forEach((pn: any) => {
+                                const cleaned = cleanNigerianPhone(pn.number || '');
+                                if (cleaned && cleaned.length === 11 && !seenPhones.has(cleaned)) {
+                                    seenPhones.add(cleaned);
+                                    validList.push({
+                                        id: `${c.id || Math.random()}-${cleaned}`,
+                                        name: c.name || pn.label || 'Contact',
+                                        phone: cleaned
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    validList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    setDeviceContacts(validList);
+                }
+            }
+        } catch (e) {
+            console.warn("Device contacts loading note:", e);
+        } finally {
+            setLoadingDeviceContacts(false);
+        }
+    };
+
+    // Open Contact Modal and immediately fetch contacts
+    const handleOpenContactModal = () => {
+        setShowContactModal(true);
+        loadDeviceContacts(false);
+    };
+
+    // Direct Native Contact Picker Launch
+    const handleLaunchNativeContactPicker = async () => {
         try {
             if (Platform.OS === 'web') {
                 setShowContactModal(true);
@@ -202,65 +351,37 @@ function AirtimeScreenContent() {
             }
 
             const { status } = await Contacts.requestPermissionsAsync();
+            setContactsPermissionGranted(status === 'granted');
+
             if (status !== 'granted') {
                 Alert.alert(
-                    "Permission Required",
+                    "Contacts Permission Needed",
                     "Please allow contacts access in settings to select numbers directly from your address book.",
                     [
-                        { text: "View Saved Beneficiaries", onPress: () => setShowContactModal(true) },
+                        { text: "View In-App List", onPress: () => setShowContactModal(true) },
                         { text: "Cancel", style: "cancel" }
                     ]
                 );
                 return;
             }
 
-            // Direct native contact picker
             const contact = await Contacts.presentContactPickerAsync();
             if (contact && contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-                const selectedPhone = contact.phoneNumbers[0].number || '';
-                const cleaned = cleanNigerianPhone(selectedPhone);
+                const rawPhone = contact.phoneNumbers[0].number || '';
+                const cleaned = cleanNigerianPhone(rawPhone);
                 if (cleaned) {
                     setPhoneNumber(cleaned);
                     detectNetwork(cleaned);
+                    setShowContactModal(false);
                     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
                 }
             } else if (contact) {
-                Alert.alert("No Number Found", "The selected contact does not have a saved phone number.");
+                Alert.alert("No Phone Number", "The contact you selected does not have a valid mobile number.");
             }
         } catch (err: any) {
-            console.warn("Contact picker error:", err);
+            console.warn("Native picker fallback:", err);
             setShowContactModal(true);
-        }
-    };
-
-    // Load device contacts into modal list
-    const loadDeviceContacts = async () => {
-        if (deviceContacts.length > 0) return;
-        setLoadingDeviceContacts(true);
-        try {
-            const { status } = await Contacts.requestPermissionsAsync();
-            if (status === 'granted') {
-                const { data } = await Contacts.getContactsAsync({
-                    fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
-                    sort: Contacts.SortTypes.FirstName,
-                    pageSize: 150,
-                });
-                if (data && Array.isArray(data)) {
-                    const validList = data
-                        .filter(c => c.phoneNumbers && c.phoneNumbers.length > 0)
-                        .map(c => ({
-                            id: c.id,
-                            name: c.name || 'Unknown Contact',
-                            phone: cleanNigerianPhone(c.phoneNumbers![0].number || '')
-                        }))
-                        .filter(c => c.phone.length >= 10);
-                    setDeviceContacts(validList);
-                }
-            }
-        } catch (e) {
-            console.warn("Error fetching device contacts:", e);
-        } finally {
-            setLoadingDeviceContacts(false);
+            loadDeviceContacts(true);
         }
     };
 
@@ -269,9 +390,12 @@ function AirtimeScreenContent() {
         return NETWORKS_DATA.find(n => n.id === network) || NETWORKS_DATA[0];
     }, [network]);
 
-    // Financial calculations
+    // Financial calculations (Profit-Preserving)
     const numAmount = Number(amount || 0);
-    const discountRate = activeNetworkObj.discountRate || 0.02;
+    const discountRate = customDiscounts[network] !== undefined 
+        ? customDiscounts[network] 
+        : activeNetworkObj.defaultDiscount;
+    const discountPercentage = Math.round(discountRate * 100);
     const discountSavings = Math.round(numAmount * discountRate);
     const netPayable = Math.max(0, numAmount - discountSavings);
     const isSufficientBalance = balance !== null && balance >= netPayable;
@@ -288,7 +412,7 @@ function AirtimeScreenContent() {
             return;
         }
         if (phoneNumber.length !== 11) {
-            Alert.alert("Incomplete Number", `Phone number has ${phoneNumber.length}/11 digits. Please enter an 11-digit phone number.`);
+            Alert.alert("Incomplete Number", `Phone number has ${phoneNumber.length}/11 digits. Please enter a full 11-digit phone number.`);
             return;
         }
 
@@ -407,6 +531,15 @@ function AirtimeScreenContent() {
         }
     };
 
+    const handleDialUssd = (code: string) => {
+        try {
+            Linking.openURL(`tel:${encodeURIComponent(code)}`);
+        } catch {
+            Clipboard.setStringAsync(code);
+            Alert.alert("Code Copied", `Copied ${code} to clipboard.`);
+        }
+    };
+
     const isWeb = Platform.OS === 'web';
     const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 36 : 22) + 10;
 
@@ -461,6 +594,27 @@ function AirtimeScreenContent() {
                         <View style={styles.balancePlusWrap}>
                             <Ionicons name="add" size={12} color="#0D1B3E" />
                         </View>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Sub-Header Quick Action Bar */}
+                <View style={styles.headerQuickBar}>
+                    <TouchableOpacity 
+                        onPress={() => router.push('/(app)/history')} 
+                        style={styles.headerQuickItem}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="receipt-outline" size={12} color="#F59E0B" />
+                        <Text style={styles.headerQuickText}>Recharge History</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        onPress={() => setShowUssdModal(true)} 
+                        style={styles.headerQuickItem}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="keypad-outline" size={12} color="#60A5FA" />
+                        <Text style={styles.headerQuickText}>Carrier USSD Codes</Text>
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
@@ -546,15 +700,18 @@ function AirtimeScreenContent() {
                     <View style={styles.sectionContainer}>
                         <View style={styles.labelRow}>
                             <Text style={styles.sectionLabel}>Select Mobile Network</Text>
-                            <View style={styles.cashbackBadgeWrap}>
-                                <Ionicons name="sparkles" size={11} color="#D97706" />
-                                <Text style={styles.cashbackBadgeTop}>Instant Cashback Available</Text>
+                            <View style={styles.networkHealthPill}>
+                                <View style={styles.greenPulseDot} />
+                                <Text style={styles.networkHealthText}>API Server Live</Text>
                             </View>
                         </View>
                         
                         <View style={styles.networksRow}>
                             {NETWORKS_DATA.map((net) => {
                                 const isSelected = network === net.id;
+                                const rate = customDiscounts[net.id] !== undefined ? customDiscounts[net.id] : net.defaultDiscount;
+                                const discountLabel = `${Math.round(rate * 100)}% OFF`;
+
                                 return (
                                     <TouchableOpacity
                                         key={net.id}
@@ -581,7 +738,7 @@ function AirtimeScreenContent() {
                                         
                                         <View style={[styles.cashbackTag, isSelected && styles.cashbackTagActive]}>
                                             <Text style={[styles.cashbackTagText, isSelected && styles.cashbackTagTextActive]}>
-                                                {net.cashback}
+                                                {discountLabel}
                                             </Text>
                                         </View>
                                         
@@ -607,6 +764,44 @@ function AirtimeScreenContent() {
                                 </View>
                             ) : (
                                 <Text style={styles.digitCounter}>{phoneNumber.length}/11 digits</Text>
+                            )}
+                        </View>
+
+                        {/* Phone Quick Actions Bar */}
+                        <View style={styles.phoneQuickActionsRow}>
+                            <TouchableOpacity 
+                                onPress={handleLaunchNativeContactPicker}
+                                style={styles.phoneQuickBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="people-outline" size={13} color="#0D1B3E" />
+                                <Text style={styles.phoneQuickBtnText}>Choose from Contacts</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setContactModalTab('beneficiaries');
+                                    setShowContactModal(true);
+                                }}
+                                style={styles.phoneQuickBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="bookmark-outline" size={13} color="#0D1B3E" />
+                                <Text style={styles.phoneQuickBtnText}>Saved ({beneficiaries.length})</Text>
+                            </TouchableOpacity>
+
+                            {Boolean(userPhone && phoneNumber !== userPhone) && (
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        try { Haptics.selectionAsync(); } catch {}
+                                        handlePhoneChange(userPhone || '');
+                                    }}
+                                    style={[styles.phoneQuickBtn, styles.phoneQuickBtnHighlight]}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="person" size={12} color="#0D1B3E" />
+                                    <Text style={styles.phoneQuickBtnText}>My Line</Text>
+                                </TouchableOpacity>
                             )}
                         </View>
 
@@ -652,9 +847,9 @@ function AirtimeScreenContent() {
                                 </TouchableOpacity>
                             )}
 
-                            {/* Native Phonebook & Beneficiaries Selector */}
+                            {/* Address Book Contact Picker Button */}
                             <TouchableOpacity 
-                                onPress={handlePickDeviceContact}
+                                onPress={handleOpenContactModal}
                                 style={styles.contactBookBtn}
                                 activeOpacity={0.7}
                             >
@@ -688,7 +883,7 @@ function AirtimeScreenContent() {
                                 <View style={styles.discountPill}>
                                     <Ionicons name="sparkles" size={11} color="#059669" />
                                     <Text style={styles.discountPillText}>
-                                        Save ₦{formatCurrency(discountSavings)} ({activeNetworkObj.cashback})
+                                        Save ₦{formatCurrency(discountSavings)} ({discountPercentage}% OFF)
                                     </Text>
                                 </View>
                             )}
@@ -828,7 +1023,7 @@ function AirtimeScreenContent() {
 
                             <View style={styles.summaryRow}>
                                 <Text style={[styles.summaryLabel, { color: '#059669' }]}>
-                                    Instant Cashback ({activeNetworkObj.cashback})
+                                    Instant Cashback Discount ({discountPercentage}% OFF)
                                 </Text>
                                 <Text style={[styles.summaryValue, { color: '#059669', fontWeight: '800' }]}>
                                     -₦{formatCurrency(discountSavings)}
@@ -877,12 +1072,30 @@ function AirtimeScreenContent() {
                         </View>
                     )}
 
+                    {/* Low Balance Quick Top-Up Banner */}
+                    {Boolean(balance !== null && numAmount > 0 && !isSufficientBalance) && (
+                        <TouchableOpacity
+                            onPress={() => router.push('/(app)/wallet')}
+                            style={styles.lowBalanceBanner}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="wallet" size={18} color="#D97706" />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.lowBalanceTitle}>Wallet Balance Low</Text>
+                                <Text style={styles.lowBalanceSub}>You need ₦{formatCurrency(netPayable - (balance || 0))} more. Tap to add funds.</Text>
+                            </View>
+                            <View style={styles.fundNowBtn}>
+                                <Text style={styles.fundNowBtnText}>Fund</Text>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+
                     {/* 6. Primary Action Button */}
                     <TouchableOpacity
                         onPress={handleInitiatePurchase}
                         disabled={!canSubmit}
                         activeOpacity={0.85}
-                        style={{ marginTop: 12, marginBottom: 16 }}
+                        style={{ marginTop: 8, marginBottom: 16 }}
                     >
                         <LinearGradient
                             colors={!canSubmit ? ['#CBD5E1', '#94A3B8'] : ['#060D21', '#0D1B3E', '#F59E0B']}
@@ -934,10 +1147,7 @@ function AirtimeScreenContent() {
 
                         {/* Direct Native Picker Action Button */}
                         <TouchableOpacity
-                            onPress={() => {
-                                setShowContactModal(false);
-                                handlePickDeviceContact();
-                            }}
+                            onPress={handleLaunchNativeContactPicker}
                             style={styles.openSystemContactsBtn}
                             activeOpacity={0.8}
                         >
@@ -948,6 +1158,27 @@ function AirtimeScreenContent() {
 
                         {/* Modal Tabs */}
                         <View style={styles.modalTabsRow}>
+                            <TouchableOpacity
+                                onPress={() => setContactModalTab('phonebook')}
+                                style={[
+                                    styles.modalTabBtn,
+                                    contactModalTab === 'phonebook' && styles.modalTabBtnActive
+                                ]}
+                            >
+                                <Ionicons 
+                                    name="book" 
+                                    size={14} 
+                                    color={contactModalTab === 'phonebook' ? '#0D1B3E' : '#64748B'} 
+                                    style={{ marginRight: 6 }} 
+                                />
+                                <Text style={[
+                                    styles.modalTabBtnText,
+                                    contactModalTab === 'phonebook' && styles.modalTabBtnTextActive
+                                ]}>
+                                    Phone Contacts ({deviceContacts.length})
+                                </Text>
+                            </TouchableOpacity>
+
                             <TouchableOpacity
                                 onPress={() => setContactModalTab('beneficiaries')}
                                 style={[
@@ -965,31 +1196,7 @@ function AirtimeScreenContent() {
                                     styles.modalTabBtnText,
                                     contactModalTab === 'beneficiaries' && styles.modalTabBtnTextActive
                                 ]}>
-                                    Saved Beneficiaries ({beneficiaries.length})
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setContactModalTab('phonebook');
-                                    loadDeviceContacts();
-                                }}
-                                style={[
-                                    styles.modalTabBtn,
-                                    contactModalTab === 'phonebook' && styles.modalTabBtnActive
-                                ]}
-                            >
-                                <Ionicons 
-                                    name="book" 
-                                    size={14} 
-                                    color={contactModalTab === 'phonebook' ? '#0D1B3E' : '#64748B'} 
-                                    style={{ marginRight: 6 }} 
-                                />
-                                <Text style={[
-                                    styles.modalTabBtnText,
-                                    contactModalTab === 'phonebook' && styles.modalTabBtnTextActive
-                                ]}>
-                                    Device Contacts
+                                    Saved ({beneficiaries.length})
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1011,7 +1218,71 @@ function AirtimeScreenContent() {
                             )}
                         </View>
 
-                        {contactModalTab === 'beneficiaries' ? (
+                        {contactModalTab === 'phonebook' ? (
+                            loadingDeviceContacts ? (
+                                <View style={{ padding: 32, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#0D1B3E" />
+                                    <Text style={{ marginTop: 8, color: '#64748B', fontSize: 12 }}>Loading device contacts...</Text>
+                                </View>
+                            ) : contactsPermissionGranted === false ? (
+                                <View style={{ padding: 24, alignItems: 'center' }}>
+                                    <Ionicons name="lock-closed-outline" size={32} color="#94A3B8" />
+                                    <Text style={{ color: '#0F172A', fontSize: 14, fontWeight: '700', marginTop: 8 }}>
+                                        Contacts Access Restricted
+                                    </Text>
+                                    <Text style={{ color: '#64748B', fontSize: 12, textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
+                                        Please enable contacts permission to choose numbers from your address book.
+                                    </Text>
+                                    <TouchableOpacity 
+                                        onPress={() => loadDeviceContacts(true)} 
+                                        style={styles.grantPermissionBtn}
+                                    >
+                                        <Text style={styles.grantPermissionBtnText}>Grant Permission</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <FlatList
+                                    data={deviceContacts.filter(c =>
+                                        (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) ||
+                                        (c.phone || '').includes(contactSearch)
+                                    )}
+                                    keyExtractor={(item) => item.id || item.phone}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.beneficiaryListItem}
+                                            onPress={() => {
+                                                setPhoneNumber(item.phone);
+                                                detectNetwork(item.phone);
+                                                setShowContactModal(false);
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={[styles.beneficiaryAvatar, { backgroundColor: '#EFF6FF' }]}>
+                                                <Text style={[styles.beneficiaryAvatarText, { color: '#2563EB' }]}>
+                                                    {item.name ? item.name[0].toUpperCase() : 'C'}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.beneficiaryItemName}>{item.name}</Text>
+                                                <Text style={styles.beneficiaryItemSub}>{item.phone}</Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                                        </TouchableOpacity>
+                                    )}
+                                    ListEmptyComponent={
+                                        <View style={{ padding: 24, alignItems: 'center' }}>
+                                            <Text style={{ color: '#94A3B8', fontSize: 13 }}>No phonebook contacts found</Text>
+                                            <TouchableOpacity 
+                                                onPress={() => loadDeviceContacts(true)} 
+                                                style={{ marginTop: 8 }}
+                                            >
+                                                <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 12 }}>Reload Contacts</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    }
+                                />
+                            )
+                        ) : (
                             <FlatList
                                 data={beneficiaries.filter(b => 
                                     (b.name || '').toLowerCase().includes(contactSearch.toLowerCase()) ||
@@ -1046,49 +1317,77 @@ function AirtimeScreenContent() {
                                     </View>
                                 }
                             />
-                        ) : (
-                            loadingDeviceContacts ? (
-                                <View style={{ padding: 32, alignItems: 'center' }}>
-                                    <ActivityIndicator size="small" color="#0D1B3E" />
-                                    <Text style={{ marginTop: 8, color: '#64748B', fontSize: 12 }}>Loading device contacts...</Text>
-                                </View>
-                            ) : (
-                                <FlatList
-                                    data={deviceContacts.filter(c =>
-                                        (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) ||
-                                        (c.phone || '').includes(contactSearch)
-                                    )}
-                                    keyExtractor={(item) => item.id || item.phone}
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={styles.beneficiaryListItem}
-                                            onPress={() => {
-                                                setPhoneNumber(item.phone);
-                                                detectNetwork(item.phone);
-                                                setShowContactModal(false);
-                                            }}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={[styles.beneficiaryAvatar, { backgroundColor: '#EFF6FF' }]}>
-                                                <Text style={[styles.beneficiaryAvatarText, { color: '#2563EB' }]}>
-                                                    {item.name ? item.name[0].toUpperCase() : 'C'}
-                                                </Text>
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={styles.beneficiaryItemName}>{item.name}</Text>
-                                                <Text style={styles.beneficiaryItemSub}>{item.phone}</Text>
-                                            </View>
-                                            <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-                                        </TouchableOpacity>
-                                    )}
-                                    ListEmptyComponent={
-                                        <View style={{ padding: 24, alignItems: 'center' }}>
-                                            <Text style={{ color: '#94A3B8', fontSize: 13 }}>No phonebook contacts found</Text>
-                                        </View>
-                                    }
-                                />
-                            )
                         )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Carrier USSD Modal */}
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={showUssdModal}
+                onRequestClose={() => setShowUssdModal(false)}
+            >
+                <View style={styles.modalBackdrop}>
+                    <View style={[styles.modalSheet, isWeb && { maxWidth: 480, alignSelf: 'center', width: '100%' }]}>
+                        <View style={styles.modalSheetHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="keypad" size={20} color="#2563EB" />
+                                <Text style={styles.modalSheetTitle}>Carrier USSD Codes</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowUssdModal(false)}>
+                                <Ionicons name="close" size={22} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+                            Official Nigeria regulatory USSD shortcuts. Tap to dial or copy.
+                        </Text>
+
+                        <View style={{ gap: 8 }}>
+                            <TouchableOpacity 
+                                onPress={() => handleDialUssd(activeNetworkObj.ussdBalance)}
+                                style={styles.ussdRowCard}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.ussdActionTitle}>Check Airtime Balance</Text>
+                                    <Text style={styles.ussdActionSub}>{activeNetworkObj.name} Universal Code</Text>
+                                </View>
+                                <View style={styles.ussdCodePill}>
+                                    <Text style={styles.ussdCodeText}>{activeNetworkObj.ussdBalance}</Text>
+                                    <Ionicons name="call" size={12} color="#2563EB" style={{ marginLeft: 4 }} />
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => handleDialUssd(activeNetworkObj.ussdData)}
+                                style={styles.ussdRowCard}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.ussdActionTitle}>Check Data Balance</Text>
+                                    <Text style={styles.ussdActionSub}>{activeNetworkObj.name} Universal Code</Text>
+                                </View>
+                                <View style={styles.ussdCodePill}>
+                                    <Text style={styles.ussdCodeText}>{activeNetworkObj.ussdData}</Text>
+                                    <Ionicons name="call" size={12} color="#2563EB" style={{ marginLeft: 4 }} />
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => handleDialUssd(activeNetworkObj.ussdBorrow)}
+                                style={styles.ussdRowCard}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.ussdActionTitle}>Borrow Airtime / Emergency</Text>
+                                    <Text style={styles.ussdActionSub}>{activeNetworkObj.name} Emergency Credit</Text>
+                                </View>
+                                <View style={styles.ussdCodePill}>
+                                    <Text style={styles.ussdCodeText}>{activeNetworkObj.ussdBorrow}</Text>
+                                    <Ionicons name="call" size={12} color="#2563EB" style={{ marginLeft: 4 }} />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -1108,7 +1407,7 @@ function AirtimeScreenContent() {
                     { label: 'Carrier Network', value: activeNetworkObj.name },
                     { label: 'Recipient Phone', value: phoneNumber },
                     { label: 'Airtime Value', value: `₦${formatCurrency(numAmount)}`, isAmount: true },
-                    { label: `Cashback Discount (${(discountRate * 100).toFixed(0)}%)`, value: `-₦${formatCurrency(discountSavings)}`, isDiscount: true },
+                    { label: `Cashback Discount (${discountPercentage}%)`, value: `-₦${formatCurrency(discountSavings)}`, isDiscount: true },
                     { label: 'Auto-Renewal Schedule', value: autoRenewalEnabled ? `Enabled (${renewalFrequency.toUpperCase()})` : 'Disabled (One-Time)' },
                     { label: 'Net Amount to Pay', value: `₦${formatCurrency(netPayable)}`, isTotal: true },
                 ]}
@@ -1142,7 +1441,7 @@ export default function AirtimeScreen() {
 
 const styles = StyleSheet.create({
     headerContainer: {
-        paddingBottom: 18,
+        paddingBottom: 16,
         paddingHorizontal: 16,
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,
@@ -1227,6 +1526,29 @@ const styles = StyleSheet.create({
         borderRadius: 9,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    headerQuickBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 14,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    headerQuickItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
+    },
+    headerQuickText: {
+        color: '#E2E8F0',
+        fontSize: 10.5,
+        fontWeight: '700',
     },
     scrollContent: {
         padding: 16,
@@ -1333,15 +1655,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 8,
     },
-    cashbackBadgeWrap: {
+    networkHealthPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 3,
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 10,
+        gap: 4,
     },
-    cashbackBadgeTop: {
-        fontSize: 10.5,
+    greenPulseDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#059669',
+    },
+    networkHealthText: {
+        fontSize: 9.5,
         fontWeight: '700',
-        color: '#D97706',
+        color: '#059669',
     },
     validBadge: {
         flexDirection: 'row',
@@ -1466,6 +1798,38 @@ const styles = StyleSheet.create({
         borderRadius: 7,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    phoneQuickActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+        flexWrap: 'wrap',
+    },
+    phoneQuickBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 8,
+        gap: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.02,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    phoneQuickBtnHighlight: {
+        backgroundColor: 'rgba(13, 27, 62, 0.06)',
+        borderColor: '#CBD5E1',
+    },
+    phoneQuickBtnText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#0D1B3E',
     },
     inputContainer: {
         flexDirection: 'row',
@@ -1776,6 +2140,38 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#059669',
     },
+    lowBalanceBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1.5,
+        borderColor: '#FDE68A',
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 16,
+        gap: 10,
+    },
+    lowBalanceTitle: {
+        color: '#92400E',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    lowBalanceSub: {
+        color: '#B45309',
+        fontSize: 10.5,
+        marginTop: 1,
+    },
+    fundNowBtn: {
+        backgroundColor: '#D97706',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    fundNowBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '800',
+    },
     payButton: {
         height: 50,
         borderRadius: 16,
@@ -1815,7 +2211,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: '75%',
+        maxHeight: '80%',
         padding: 16,
     },
     modalSheetHeader: {
@@ -1832,9 +2228,9 @@ const styles = StyleSheet.create({
     openSystemContactsBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#EFF6FF',
         borderWidth: 1.5,
-        borderColor: '#E2E8F0',
+        borderColor: '#BFDBFE',
         borderRadius: 12,
         paddingHorizontal: 12,
         paddingVertical: 10,
@@ -1843,9 +2239,9 @@ const styles = StyleSheet.create({
     },
     openSystemContactsText: {
         flex: 1,
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#0D1B3E',
+        fontSize: 12.5,
+        fontWeight: '800',
+        color: '#1D4ED8',
     },
     modalTabsRow: {
         flexDirection: 'row',
@@ -1923,5 +2319,51 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#64748B',
         marginTop: 1,
+    },
+    grantPermissionBtn: {
+        backgroundColor: '#0D1B3E',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    grantPermissionBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    ussdRowCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        padding: 12,
+    },
+    ussdActionTitle: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    ussdActionSub: {
+        fontSize: 10.5,
+        color: '#64748B',
+        marginTop: 1,
+    },
+    ussdCodePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    ussdCodeText: {
+        color: '#1D4ED8',
+        fontSize: 12,
+        fontWeight: '800',
     },
 });

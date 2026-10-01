@@ -219,14 +219,59 @@ Deno.serve(async (req: Request) => {
             amountToCharge = Number(data.amount);
             if (amountToCharge < 50) throw new Error("Minimum Airtime is N50");
 
-            const { data: config } = await supabaseClient
-                .from('airtime_configs')
-                .select('sell_percentage')
-                .eq('network', networkCode === '01' ? 'MTN' : networkCode === '02' ? 'GLO' : networkCode === '03' ? '9MOBILE' : 'AIRTEL')
-                .maybeSingle();
-            
-            if (config?.sell_percentage) {
-                 amountToCharge -= (amountToCharge * (Number(config.sell_percentage) / 100));
+            const netName = networkCode === '01' ? 'MTN' : networkCode === '02' ? 'GLO' : networkCode === '03' ? '9MOBILE' : 'AIRTEL';
+            let sellDiscount = 0;
+
+            // 1. Check airtime_configs if available
+            try {
+                const { data: config } = await supabaseClient
+                    .from('airtime_configs')
+                    .select('sell_percentage')
+                    .eq('network', netName)
+                    .maybeSingle();
+                if (config && config.sell_percentage !== null && config.sell_percentage !== undefined) {
+                    sellDiscount = Number(config.sell_percentage);
+                }
+            } catch {}
+
+            // 2. Check app_settings if not in airtime_configs
+            if (sellDiscount === 0) {
+                const settingKey = `AIRTIME_DISCOUNT_${netName}`;
+                const appSettingVal = settingsMap?.[settingKey] || settingsMap?.['AIRTIME_USER_DISCOUNT'];
+                if (appSettingVal) {
+                    const parsed = parseFloat(appSettingVal);
+                    if (!isNaN(parsed) && parsed >= 0 && parsed <= 5) {
+                        sellDiscount = parsed;
+                    }
+                }
+            }
+
+            // 3. Profit-Safe Defaults: Guarantee admin maintains positive margin against VTU wholesale cost
+            if (sellDiscount === 0) {
+                const defaultDiscounts: Record<string, number> = {
+                    MTN: 1.0,     // Provider gives ~2.5% -> Admin profit = ~1.5%
+                    GLO: 2.0,     // Provider gives ~3.5% -> Admin profit = ~1.5%
+                    AIRTEL: 1.0,  // Provider gives ~2.5% -> Admin profit = ~1.5%
+                    '9MOBILE': 2.0, // Provider gives ~3.5% -> Admin profit = ~1.5%
+                };
+                sellDiscount = defaultDiscounts[netName] || 1.0;
+            }
+
+            // 4. Strict Profit Protection Cap: Ensure selling discount never wipes out admin profit margin
+            const maxSellDiscount: Record<string, number> = {
+                MTN: 1.5,      // Bigi wholesale discount is ~2.5% -> Admin keeps >= 1.0% profit
+                GLO: 2.5,      // Bigi wholesale discount is ~3.5%-4.0% -> Admin keeps >= 1.0%-1.5% profit
+                AIRTEL: 1.5,   // Bigi wholesale discount is ~2.5% -> Admin keeps >= 1.0% profit
+                '9MOBILE': 2.5 // Bigi wholesale discount is ~3.5%-4.0% -> Admin keeps >= 1.0%-1.5% profit
+            };
+            const cap = maxSellDiscount[netName] || 1.5;
+            if (sellDiscount > cap) {
+                sellDiscount = cap;
+            }
+
+            if (sellDiscount > 0) {
+                amountToCharge -= (amountToCharge * (sellDiscount / 100));
+                amountToCharge = Math.round(amountToCharge * 100) / 100;
             }
 
             providerParams = { network: networkCode, phone: data.phone, amount: Number(data.amount) };
