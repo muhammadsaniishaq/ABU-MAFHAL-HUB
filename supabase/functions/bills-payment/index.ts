@@ -218,6 +218,7 @@ Deno.serve(async (req: Request) => {
         } else if (type === 'airtime') {
             amountToCharge = Number(data.amount);
             if (amountToCharge < 50) throw new Error("Minimum Airtime is N50");
+            if (amountToCharge > 50000) throw new Error("Maximum Airtime is N50,000 per transaction");
 
             const netName = networkCode === '01' ? 'MTN' : networkCode === '02' ? 'GLO' : networkCode === '03' ? '9MOBILE' : 'AIRTEL';
             let sellDiscount = 0;

@@ -400,7 +400,7 @@ function AirtimeScreenContent() {
     const netPayable = Math.max(0, numAmount - discountSavings);
     const isSufficientBalance = balance !== null && balance >= netPayable;
     const isPhoneComplete = phoneNumber.length === 11;
-    const canSubmit = isPhoneComplete && numAmount >= 50 && isSufficientBalance && !loading;
+    const canSubmit = isPhoneComplete && numAmount >= 50 && numAmount <= 50000 && isSufficientBalance && !loading;
 
     const handleInitiatePurchase = () => {
         if (!network) {
@@ -409,6 +409,10 @@ function AirtimeScreenContent() {
         }
         if (!numAmount || numAmount < 50) {
             Alert.alert("Invalid Amount", "Minimum airtime purchase is ₦50. Please enter an amount of ₦50 or higher.");
+            return;
+        }
+        if (numAmount > 50000) {
+            Alert.alert("Maximum Limit Exceeded", "Maximum airtime purchase per transaction is ₦50,000. Please enter ₦50,000 or less.");
             return;
         }
         if (phoneNumber.length !== 11) {
