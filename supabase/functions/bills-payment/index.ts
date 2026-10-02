@@ -411,10 +411,11 @@ Deno.serve(async (req: Request) => {
                                 result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
                             }
                         } else if (vendor === 'clubkonnect' && ckUserId && ckApiKey) {
+                            const ckClient = new ClubKonnectClient(ckUserId, ckApiKey);
                             if (type === 'airtime') {
-                                result = await client.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
+                                result = await ckClient.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
                             } else {
-                                result = await client.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                                result = await ckClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
                             }
                         } else {
                             continue;
@@ -443,9 +444,11 @@ Deno.serve(async (req: Request) => {
                     throw lastError;
                 }
             } else if (type === 'smile') {
-                result = await client.buySmile(providerParams.network as string, providerParams.planId as string, providerParams.phone as string, requestId);
+                const ckClient = new ClubKonnectClient(ckUserId, ckApiKey);
+                result = await ckClient.buySmile(providerParams.network as string, providerParams.planId as string, providerParams.phone as string, requestId);
             } else if (type === 'education') {
-                result = await client.buyEPin(providerParams.examType as string, providerParams.phone as string, requestId, providerParams.profileId as string);
+                const ckClient = new ClubKonnectClient(ckUserId, ckApiKey);
+                result = await ckClient.buyEPin(providerParams.examType as string, providerParams.phone as string, requestId, providerParams.profileId as string);
             } else if (type === 'recharge_pin_purchase') {
                 if (bigiToken && bigiPin) {
                     const bigiClient = new BigiClient(bigiToken, bigiPin);

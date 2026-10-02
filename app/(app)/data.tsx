@@ -202,6 +202,21 @@ const T = {
   indigo:  '#4F46E5',
 };
 
+
+const cleanNigerianPhone = (raw: string): string => {
+    let p = (raw || '').replace(/\D/g, '');
+    if (p.startsWith('2340') && p.length === 14) {
+        p = '0' + p.slice(4);
+    } else if (p.startsWith('234') && p.length === 13) {
+        p = '0' + p.slice(3);
+    } else if (p.length === 10 && !p.startsWith('0')) {
+        p = '0' + p;
+    }
+    if (p.length > 11 && p.startsWith('0')) {
+        p = p.slice(0, 11);
+    }
+    return p;
+};
 export default function DataScreen() {
     const [network, setNetwork] = useState('');
     const [networksData, setNetworksData] = useState(NETWORKS_DATA);
@@ -238,7 +253,9 @@ export default function DataScreen() {
     // UI states
     const [balance, setBalance] = useState<number | null>(null);
     const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
-    const [showBeneficiaryModal, setShowBeneficiaryModal] = useState(false);
+    const [contactModalTab, setContactModalTab] = useState<'phonebook' | 'beneficiaries'>('phonebook');
+    const [loadingDeviceContacts, setLoadingDeviceContacts] = useState(false);
+    const [contactsPermissionGranted, setContactsPermissionGranted] = useState<boolean | null>(null);
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [planFilter, setPlanFilter] = useState<'All' | 'Favorites' | 'Daily' | 'Weekly' | 'Monthly'>('All');
@@ -288,6 +305,102 @@ export default function DataScreen() {
             loadFavorites()
         ]).catch(e => console.warn('Data init error:', e));
     }, []);
+
+    const loadDeviceContacts = async (forceRequest = false) => {
+        setLoadingDeviceContacts(true);
+        try {
+            let status = 'undetermined';
+            if (forceRequest) {
+                const req = await Contacts.requestPermissionsAsync();
+                status = req.status;
+            } else {
+                const check = await Contacts.getPermissionsAsync();
+                status = check.status;
+                if (status !== 'granted') {
+                    const req = await Contacts.requestPermissionsAsync();
+                    status = req.status;
+                }
+            }
+
+            setContactsPermissionGranted(status === 'granted');
+
+            if (status === 'granted') {
+                const { data } = await Contacts.getContactsAsync({
+                    fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+                    pageSize: 600,
+                });
+                if (data && Array.isArray(data)) {
+                    const validList: any[] = [];
+                    const seenPhones = new Set<string>();
+                    data.forEach(c => {
+                        if (c.phoneNumbers && Array.isArray(c.phoneNumbers)) {
+                            c.phoneNumbers.forEach((pn: any) => {
+                                const cleaned = cleanNigerianPhone(pn.number || '');
+                                if (cleaned && cleaned.length === 11 && !seenPhones.has(cleaned)) {
+                                    seenPhones.add(cleaned);
+                                    validList.push({
+                                        id: `${c.id || Math.random()}-${cleaned}`,
+                                        name: c.name || pn.label || 'Contact',
+                                        phone: cleaned
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    validList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    setDeviceContacts(validList);
+                }
+            }
+        } catch (e) {
+            console.warn("Device contacts loading note:", e);
+        } finally {
+            setLoadingDeviceContacts(false);
+        }
+    };
+
+    // Open Contact Modal and immediately fetch contacts
+    const handleOpenContactModal = () => {
+        handleOpenContactModal();
+        loadDeviceContacts(false);
+    };
+
+    
+    // Direct Native Contact Picker Launch
+    const handleLaunchNativeContactPicker = async () => {
+        try {
+            if (Platform.OS === 'web') {
+                handleOpenContactModal();
+                return;
+            }
+            const { status } = await Contacts.requestPermissionsAsync();
+            setContactsPermissionGranted(status === 'granted');
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Contacts Permission Needed',
+                    'Please allow contacts access in settings to select numbers directly from your address book.',
+                    [
+                        { text: 'View In-App List', onPress: () => handleOpenContactModal() },
+                        { text: 'Cancel', style: 'cancel' }
+                    ]
+                );
+                return;
+            }
+            const contact = await Contacts.presentContactPickerAsync();
+            if (contact && contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+                const rawPhone = contact.phoneNumbers[0].number || '';
+                const cleaned = cleanNigerianPhone(rawPhone);
+                if (cleaned) {
+                    setPhoneNumber(cleaned);
+                    detectNetwork(cleaned);
+                    setShowContactModal(false);
+                    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                }
+            } else if (contact) {
+                Alert.alert('No Phone Number', 'The contact you selected does not have a valid mobile number.');
+            }
+        } catch (e) { console.warn(e); }
+    };
+
 
     const loadFavorites = async () => {
         try {
@@ -374,7 +487,7 @@ export default function DataScreen() {
 
                 if (data.length > 0) {
                     setDeviceContacts(data.filter(c => c.phoneNumbers && c.phoneNumbers.length > 0));
-                    setShowContactModal(true);
+                    handleOpenContactModal();
                 } else {
                     Alert.alert("No Contacts", "Your contact list is empty.");
                 }
@@ -559,7 +672,7 @@ export default function DataScreen() {
                         name: recipientName || `Data Beneficiary`,
                         bank_name: NETWORKS_DATA.find(n => n.id === network)?.name || network,
                         type: 'data'
-                    }).catch(e => console.log(e));
+                    }).then(({error}: any) => { if (error) console.log(error) });
                 }
 
                 // Send Notification
@@ -764,7 +877,7 @@ export default function DataScreen() {
                                 <TouchableOpacity 
                                     onPress={() => {
                                         setGiftingBeneficiaryActive(false);
-                                        setShowBeneficiaryModal(true);
+                                        handleOpenContactModal();
                                     }}
                                     style={s.beneficiaryBtn}
                                     activeOpacity={0.7}
@@ -1405,7 +1518,7 @@ export default function DataScreen() {
                                     <TouchableOpacity 
                                         onPress={() => {
                                             setGiftingBeneficiaryActive(true);
-                                            setShowBeneficiaryModal(true);
+                                            handleOpenContactModal();
                                         }}
                                         style={s.giftBeneficiaryBtn}
                                         activeOpacity={0.7}
@@ -1512,9 +1625,6 @@ export default function DataScreen() {
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
-
-            {BeneficiaryModal()}
-            {ContactPickerModal()}
 
             <TransactionConfirmationModal
                 visible={showConfirmation}
@@ -1639,195 +1749,9 @@ export default function DataScreen() {
         );
     }
 
-    function BeneficiaryModal() {
-        const filteredBens = beneficiaries.filter(b => 
-            (b.name || '').toLowerCase().includes(beneficiarySearch.toLowerCase()) || 
-            (b.account_number || '').includes(beneficiarySearch) ||
-            (b.bank_name || '').toLowerCase().includes(beneficiarySearch.toLowerCase())
-        );
+    
 
-        return (
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={showBeneficiaryModal}
-                onRequestClose={() => { setShowBeneficiaryModal(false); setBeneficiarySearch(''); }}
-            >
-                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                    <View 
-                        className="bg-white rounded-t-3xl h-[60%] p-5"
-                        style={isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
-                    >
-                        <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-xl font-bold text-gray-800">Select Beneficiary</Text>
-                            <TouchableOpacity onPress={() => { setShowBeneficiaryModal(false); setBeneficiarySearch(''); }}>
-                                <Ionicons name="close-circle" size={28} color="#9CA3AF" />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Beneficiary Search Input */}
-                        <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: '#f1f5f9',
-                            borderRadius: 14,
-                            paddingHorizontal: 12,
-                            height: 44,
-                            marginBottom: 16,
-                            borderWidth: 1.5,
-                            borderColor: '#e2e8f0',
-                        }}>
-                            <Ionicons name="search-outline" size={16} color="#94a3b8" />
-                            <TextInput 
-                                style={{ flex: 1, marginLeft: 8, fontSize: 13, color: '#0d1b3e', fontWeight: '500' }}
-                                placeholder="Search by name or number..."
-                                placeholderTextColor="#94a3b8"
-                                value={beneficiarySearch}
-                                onChangeText={setBeneficiarySearch}
-                            />
-                            {beneficiarySearch.length > 0 && (
-                                <TouchableOpacity onPress={() => setBeneficiarySearch('')}>
-                                    <Ionicons name="close-circle" size={16} color="#D1D5DB" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        
-                        <FlatList
-                            data={filteredBens}
-                            keyExtractor={item => item.id}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    className="flex-row items-center p-4 border-b border-gray-100"
-                                    onPress={() => {
-                                        if (giftingBeneficiaryActive) {
-                                            setRecipientName(item.name || '');
-                                            handlePhoneChange(item.account_number);
-                                            setGiftingBeneficiaryActive(false);
-                                        } else {
-                                            handlePhoneChange(item.account_number);
-                                        }
-                                        setShowBeneficiaryModal(false);
-                                        setBeneficiarySearch('');
-                                    }}
-                                >
-                                    <LinearGradient
-                                        colors={['#f4f6fb', '#e2e8f0']}
-                                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
-                                    >
-                                        <Text style={{ color: '#0d1b3e', fontWeight: '800', fontSize: 14 }}>{item.name ? item.name[0].toUpperCase() : 'B'}</Text>
-                                    </LinearGradient>
-                                    <View style={{ flex: 1 }}>
-                                        <Text className="font-bold text-gray-800" numberOfLines={1}>{item.name}</Text>
-                                        <Text className="text-gray-500 text-xs" numberOfLines={1}>{item.bank_name} - {item.account_number}</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            )}
-                            ListEmptyComponent={
-                                <View className="items-center py-10">
-                                    <Text className="text-gray-400">No beneficiaries found</Text>
-                                </View>
-                            }
-                        />
-                    </View>
-                </View>
-            </Modal>
-        );
-    }
-
-    function ContactPickerModal() {
-        const filteredContacts = deviceContacts.filter(c => 
-            (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) ||
-            (c.phoneNumbers && c.phoneNumbers.some(p => p.number?.includes(contactSearch)))
-        );
-
-        return (
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={showContactModal}
-                onRequestClose={() => { setShowContactModal(false); setContactSearch(''); }}
-            >
-                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                    <View 
-                        className="bg-white rounded-t-3xl h-[70%] p-5"
-                        style={isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
-                    >
-                        <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-xl font-bold text-gray-800">Select Contact</Text>
-                            <TouchableOpacity onPress={() => { setShowContactModal(false); setContactSearch(''); }}>
-                                <Ionicons name="close-circle" size={28} color="#9CA3AF" />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Contact Search Input */}
-                        <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: '#f1f5f9',
-                            borderRadius: 14,
-                            paddingHorizontal: 12,
-                            height: 44,
-                            marginBottom: 16,
-                            borderWidth: 1.5,
-                            borderColor: '#e2e8f0',
-                        }}>
-                            <Ionicons name="search-outline" size={16} color="#94a3b8" />
-                            <TextInput 
-                                style={{ flex: 1, marginLeft: 8, fontSize: 13, color: '#0d1b3e', fontWeight: '500' }}
-                                placeholder="Search contacts..."
-                                placeholderTextColor="#94a3b8"
-                                value={contactSearch}
-                                onChangeText={setContactSearch}
-                            />
-                            {contactSearch.length > 0 && (
-                                <TouchableOpacity onPress={() => setContactSearch('')}>
-                                    <Ionicons name="close-circle" size={16} color="#D1D5DB" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        
-                        <FlatList
-                            data={filteredContacts}
-                            keyExtractor={(item, index) => item.id || String(index)}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    className="flex-row items-center p-4 border-b border-gray-100"
-                                    onPress={() => {
-                                        let phone = item.phoneNumbers?.[0]?.number || '';
-                                        phone = phone.replace(/\D/g, '');
-                                        if (phone.startsWith('234')) phone = '0' + phone.substring(3);
-                                        if (phone.length > 11) phone = phone.slice(-11);
-                                        
-                                        handlePhoneChange(phone);
-                                        if (item.name) setRecipientName(item.name);
-                                        
-                                        setShowContactModal(false);
-                                        setContactSearch('');
-                                    }}
-                                >
-                                    <LinearGradient
-                                        colors={['#f0fdf4', '#bbf7d0']}
-                                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
-                                    >
-                                        <Text style={{ color: '#166534', fontWeight: '800', fontSize: 14 }}>{item.name ? item.name[0].toUpperCase() : '#'}</Text>
-                                    </LinearGradient>
-                                    <View style={{ flex: 1 }}>
-                                        <Text className="font-bold text-gray-800" numberOfLines={1}>{item.name || 'Unknown'}</Text>
-                                        <Text className="text-gray-500 text-xs" numberOfLines={1}>{item.phoneNumbers?.[0]?.number}</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            )}
-                            ListEmptyComponent={
-                                <View className="items-center py-10">
-                                    <Text className="text-gray-400">No contacts found</Text>
-                                </View>
-                            }
-                        />
-                    </View>
-                </View>
-            </Modal>
-        );
-    }
+    
 }
 
 const s = StyleSheet.create({
