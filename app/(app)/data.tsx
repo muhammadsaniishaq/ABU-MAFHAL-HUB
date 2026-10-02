@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import * as Contacts from 'expo-contacts';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { DataPlan } from '../../services/partners';
@@ -250,6 +251,7 @@ export default function DataScreen() {
     const [autoRenew, setAutoRenew] = useState(false);
     const [isGift, setIsGift] = useState(false);
     const [recipientName, setRecipientName] = useState('');
+    const [isSaveBeneficiary, setIsSaveBeneficiary] = useState(false);
     const [showEstimator, setShowEstimator] = useState(false);
     const [socialHours, setSocialHours] = useState(0);
     const [streamingHours, setStreamingHours] = useState(0);
@@ -357,6 +359,45 @@ export default function DataScreen() {
         detectNetwork(text);
     };
 
+    const handlePickContact = async () => {
+        try {
+            const { status } = await Contacts.requestPermissionsAsync();
+            if (status === 'granted') {
+                const { data } = await Contacts.getContactsAsync({
+                    fields: [Contacts.Fields.PhoneNumbers],
+                });
+
+                if (data.length > 0) {
+                    // Let's create a temporary list for simple alert selection
+                    // If you want a full modal, we'd map it. But a simple fallback is best if the native picker isn't used
+                    const contact = data.find(c => c.phoneNumbers && c.phoneNumbers.length > 0);
+                    if (contact && contact.phoneNumbers) {
+                        let phone = contact.phoneNumbers[0].number || '';
+                        phone = phone.replace(/\D/g, '');
+                        // If it starts with 234, convert to 0
+                        if (phone.startsWith('234')) {
+                            phone = '0' + phone.substring(3);
+                        }
+                        handlePhoneChange(phone);
+                        if (contact.name) {
+                            setRecipientName(contact.name);
+                        }
+                        Alert.alert("Contact Selected", `Selected ${contact.name || phone}`);
+                    } else {
+                        Alert.alert("No Contacts", "Could not find a contact with a valid phone number.");
+                    }
+                } else {
+                    Alert.alert("No Contacts", "Your contact list is empty.");
+                }
+            } else {
+                Alert.alert('Permission Denied', 'Permission to access contacts was denied.');
+            }
+        } catch (error) {
+            console.log('Error fetching contacts:', error);
+            Alert.alert('Error', 'Failed to open contacts.');
+        }
+    };
+
     // Fetch plans when network changes
     useEffect(() => {
         if (network) {
@@ -454,7 +495,16 @@ export default function DataScreen() {
         try {
             const mappedPlans = await api.data.getPlans(netId);
             // Sort data plans neatly in ascending order by volume (e.g. 500MB, 1GB, 2GB, 5GB...) and price
-            const sorted = [...mappedPlans].sort((a, b) => {
+            const sorted = [...mappedPlans].map(plan => {
+                // Strip vendor tags from names for smooth UI
+                const cleanName = (plan.name || '').replace(/\[BILAL\]|\[BIGI\]|\[CLUBKONNECT\]|\[GLO\]|\[MTN\]|\[AIRTEL\]|\[9MOBILE\]/gi, '').trim();
+                const cleanOriginalName = (plan.originalName || plan.name || '').replace(/\[BILAL\]|\[BIGI\]|\[CLUBKONNECT\]|\[GLO\]|\[MTN\]|\[AIRTEL\]|\[9MOBILE\]/gi, '').trim();
+                return {
+                    ...plan,
+                    name: cleanName,
+                    originalName: cleanOriginalName
+                };
+            }).sort((a, b) => {
                 const volA = parseVolumeToGB(a.volume, a.originalName || a.name);
                 const volB = parseVolumeToGB(b.volume, b.originalName || b.name);
                 if (volA !== volB) return volA - volB;
@@ -511,6 +561,18 @@ export default function DataScreen() {
             });
 
             if (result.success) {
+                // Save Beneficiary if requested
+                if (isSaveBeneficiary && phoneNumber) {
+                    await supabase.from('beneficiaries').insert({
+                        user_id: user.id,
+                        account_number: phoneNumber,
+                        phone_number: phoneNumber,
+                        name: recipientName || `Data Beneficiary`,
+                        bank_name: NETWORKS_DATA.find(n => n.id === network)?.name || network,
+                        type: 'data'
+                    }).catch(e => console.log(e));
+                }
+
                 // Send Notification
                 await createAppNotification(
                     user.id,
@@ -719,6 +781,14 @@ export default function DataScreen() {
                                     activeOpacity={0.7}
                                 >
                                     <Ionicons name="people" size={16} color="#0056D2" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={handlePickContact}
+                                    style={[s.beneficiaryBtn, { marginLeft: 4, backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="call" size={16} color="#16a34a" />
                                 </TouchableOpacity>
 
                                 {phoneNumber.length > 0 && (
@@ -1352,6 +1422,26 @@ export default function DataScreen() {
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons name="people" size={18} color="#0056D2" />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {/* Save Beneficiary Toggle */}
+                            {purchaseMode === 'others' && (
+                                <View style={[s.optionRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 12, marginTop: 12 }]}>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="person-add-outline" size={16} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                            <Text style={s.optionTitle}>Save as Beneficiary</Text>
+                                        </View>
+                                        <Text style={s.optionDesc}>Save this number for easy access next time</Text>
+                                    </View>
+                                    <TouchableOpacity 
+                                        onPress={() => setIsSaveBeneficiary(!isSaveBeneficiary)}
+                                        style={[s.customSwitch, isSaveBeneficiary ? s.customSwitchOn : s.customSwitchOff]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={[s.customSwitchThumb, isSaveBeneficiary ? s.customSwitchThumbOn : s.customSwitchThumbOff]} />
                                     </TouchableOpacity>
                                 </View>
                             )}

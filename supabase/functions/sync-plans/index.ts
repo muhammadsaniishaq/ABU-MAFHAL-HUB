@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
                             networksData[net.canonical] = plansList.map((p: any) => ({
                                 PRODUCT_ID: (p.plan_id || p.id).toString(),
                                 PRODUCT_AMOUNT: (p.amount || p.price || 0).toString(),
-                                PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'} [BILAL]`,
+                                PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'}`,
                                 validity: p.plan_day || '30 days',
                                 volume: p.plan_name || ''
                             }));
@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
                                 networksData[net.canonical] = bigiRes.data.map((p: any) => ({
                                     PRODUCT_ID: p.id.toString(),
                                     PRODUCT_AMOUNT: p.amount.toString(),
-                                    PRODUCT_NAME: `${p.size} ${p.plantype} - ${p.validity} [BIGI]`,
+                                    PRODUCT_NAME: `${p.size} ${p.plantype} - ${p.validity}`,
                                     validity: p.validity,
                                     volume: p.size
                                 }));

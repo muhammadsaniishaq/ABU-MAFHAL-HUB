@@ -422,12 +422,12 @@ Deno.serve(async (req: Request) => {
                             break;
                         } else {
                             console.warn(`[Bills] Vendor ${vendor} returned non-success result:`, JSON.stringify(result));
-                            lastError = new Error(result?.message || result?.msg || `Vendor ${vendor} did not confirm delivery`);
+                            lastError = new Error(result?.message || result?.msg || `Transaction failed at provider network`);
                             result = null;
                         }
                     } catch (err: any) {
                         console.warn(`[Bills] Vendor ${vendor} failed: ${err.message}. Trying next fallback provider...`);
-                        lastError = err;
+                        lastError = new Error(err.message || "Transaction failed at provider network");
                         result = null;
                     }
                 }
@@ -555,8 +555,13 @@ Deno.serve(async (req: Request) => {
             }
 
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Provider transaction failed";
+            let errorMessage = error instanceof Error ? error.message : "Provider transaction failed";
             console.error("[Bills] Execution Failed:", errorMessage);
+            
+            // Mask vendor name
+            if (errorMessage.toLowerCase().includes('clubkonnect') || errorMessage.toLowerCase().includes('bilalsadasub') || errorMessage.toLowerCase().includes('bigi')) {
+                errorMessage = "Transaction could not be completed at this time by the provider network";
+            }
             
             // Strict guarantee: User balance was NEVER deducted because deduction only happens after provider confirmation
             return new Response(JSON.stringify({ 
