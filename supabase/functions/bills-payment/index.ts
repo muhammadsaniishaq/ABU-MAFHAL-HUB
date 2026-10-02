@@ -366,22 +366,29 @@ Deno.serve(async (req: Request) => {
             if (type === 'airtime' || type === 'data') {
                 let vendorOrder: string[] = [];
 
-                if (vtuVendor && vtuVendor.includes(',')) {
-                    vendorOrder = vtuVendor.split(',').map((v: string) => v.trim()).filter(Boolean);
-                } else if (vtuVendor === 'bilalsadasub') {
-                    vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
-                } else if (vtuVendor === 'clubkonnect') {
-                    vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
-                } else if (vtuVendor === 'bigi') {
-                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                if (type === 'data') {
+                    // CRITICAL: Data plans have vendor-specific IDs! 
+                    // Never fallback to a different vendor because plan ID '2' on Bilalsadasub might cost N100 but plan ID '2' on Bigi might cost N2000!
+                    vendorOrder = vtuVendor ? [vtuVendor.split(',')[0].trim()] : ['bilalsadasub'];
                 } else {
-                    // Smart default fallback order based on configured secrets
-                    if (bigiToken && bigiPin) {
-                        vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
-                    } else if (bilalToken) {
+                    // Airtime can safely fallback because amounts are generic
+                    if (vtuVendor && vtuVendor.includes(',')) {
+                        vendorOrder = vtuVendor.split(',').map((v: string) => v.trim()).filter(Boolean);
+                    } else if (vtuVendor === 'bilalsadasub') {
                         vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
-                    } else {
+                    } else if (vtuVendor === 'clubkonnect') {
                         vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
+                    } else if (vtuVendor === 'bigi') {
+                        vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                    } else {
+                        // Smart default fallback order based on configured secrets
+                        if (bigiToken && bigiPin) {
+                            vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                        } else if (bilalToken) {
+                            vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
+                        } else {
+                            vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
+                        }
                     }
                 }
 

@@ -268,6 +268,11 @@ export default function DataScreen() {
     // Plan Type Dropdown State
     const [planTypeFilter, setPlanTypeFilter] = useState<string>('All');
     const [showPlanTypeModal, setShowPlanTypeModal] = useState(false);
+
+    // Contact Picker State
+    const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
+    const [showContactModal, setShowContactModal] = useState(false);
+    const [contactSearch, setContactSearch] = useState('');
     
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
@@ -368,24 +373,8 @@ export default function DataScreen() {
                 });
 
                 if (data.length > 0) {
-                    // Let's create a temporary list for simple alert selection
-                    // If you want a full modal, we'd map it. But a simple fallback is best if the native picker isn't used
-                    const contact = data.find(c => c.phoneNumbers && c.phoneNumbers.length > 0);
-                    if (contact && contact.phoneNumbers) {
-                        let phone = contact.phoneNumbers[0].number || '';
-                        phone = phone.replace(/\D/g, '');
-                        // If it starts with 234, convert to 0
-                        if (phone.startsWith('234')) {
-                            phone = '0' + phone.substring(3);
-                        }
-                        handlePhoneChange(phone);
-                        if (contact.name) {
-                            setRecipientName(contact.name);
-                        }
-                        Alert.alert("Contact Selected", `Selected ${contact.name || phone}`);
-                    } else {
-                        Alert.alert("No Contacts", "Could not find a contact with a valid phone number.");
-                    }
+                    setDeviceContacts(data.filter(c => c.phoneNumbers && c.phoneNumbers.length > 0));
+                    setShowContactModal(true);
                 } else {
                     Alert.alert("No Contacts", "Your contact list is empty.");
                 }
@@ -1525,6 +1514,7 @@ export default function DataScreen() {
             </KeyboardAvoidingView>
 
             {BeneficiaryModal()}
+            {ContactPickerModal()}
 
             <TransactionConfirmationModal
                 visible={showConfirmation}
@@ -1735,6 +1725,101 @@ export default function DataScreen() {
                             ListEmptyComponent={
                                 <View className="items-center py-10">
                                     <Text className="text-gray-400">No beneficiaries found</Text>
+                                </View>
+                            }
+                        />
+                    </View>
+                </View>
+            </Modal>
+        );
+    }
+
+    function ContactPickerModal() {
+        const filteredContacts = deviceContacts.filter(c => 
+            (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) ||
+            (c.phoneNumbers && c.phoneNumbers.some(p => p.number?.includes(contactSearch)))
+        );
+
+        return (
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={showContactModal}
+                onRequestClose={() => { setShowContactModal(false); setContactSearch(''); }}
+            >
+                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <View 
+                        className="bg-white rounded-t-3xl h-[70%] p-5"
+                        style={isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
+                    >
+                        <View className="flex-row justify-between items-center mb-4">
+                            <Text className="text-xl font-bold text-gray-800">Select Contact</Text>
+                            <TouchableOpacity onPress={() => { setShowContactModal(false); setContactSearch(''); }}>
+                                <Ionicons name="close-circle" size={28} color="#9CA3AF" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Contact Search Input */}
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#f1f5f9',
+                            borderRadius: 14,
+                            paddingHorizontal: 12,
+                            height: 44,
+                            marginBottom: 16,
+                            borderWidth: 1.5,
+                            borderColor: '#e2e8f0',
+                        }}>
+                            <Ionicons name="search-outline" size={16} color="#94a3b8" />
+                            <TextInput 
+                                style={{ flex: 1, marginLeft: 8, fontSize: 13, color: '#0d1b3e', fontWeight: '500' }}
+                                placeholder="Search contacts..."
+                                placeholderTextColor="#94a3b8"
+                                value={contactSearch}
+                                onChangeText={setContactSearch}
+                            />
+                            {contactSearch.length > 0 && (
+                                <TouchableOpacity onPress={() => setContactSearch('')}>
+                                    <Ionicons name="close-circle" size={16} color="#D1D5DB" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        
+                        <FlatList
+                            data={filteredContacts}
+                            keyExtractor={(item, index) => item.id || String(index)}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    className="flex-row items-center p-4 border-b border-gray-100"
+                                    onPress={() => {
+                                        let phone = item.phoneNumbers?.[0]?.number || '';
+                                        phone = phone.replace(/\D/g, '');
+                                        if (phone.startsWith('234')) phone = '0' + phone.substring(3);
+                                        if (phone.length > 11) phone = phone.slice(-11);
+                                        
+                                        handlePhoneChange(phone);
+                                        if (item.name) setRecipientName(item.name);
+                                        
+                                        setShowContactModal(false);
+                                        setContactSearch('');
+                                    }}
+                                >
+                                    <LinearGradient
+                                        colors={['#f0fdf4', '#bbf7d0']}
+                                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
+                                    >
+                                        <Text style={{ color: '#166534', fontWeight: '800', fontSize: 14 }}>{item.name ? item.name[0].toUpperCase() : '#'}</Text>
+                                    </LinearGradient>
+                                    <View style={{ flex: 1 }}>
+                                        <Text className="font-bold text-gray-800" numberOfLines={1}>{item.name || 'Unknown'}</Text>
+                                        <Text className="text-gray-500 text-xs" numberOfLines={1}>{item.phoneNumbers?.[0]?.number}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                                <View className="items-center py-10">
+                                    <Text className="text-gray-400">No contacts found</Text>
                                 </View>
                             }
                         />
