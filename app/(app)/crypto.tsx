@@ -843,6 +843,26 @@ export default function CryptoScreen() {
         return totalPortfolioUsd * getUsdtToNgnRate('sell');
     }, [totalPortfolioUsd, getUsdtToNgnRate]);
 
+    const portfolioPnl = useMemo(() => {
+        let totalVal = 0;
+        let weightedChange = 0;
+        SUPPORTED_ASSETS.forEach(asset => {
+            const bal = cryptoBalances[asset.symbol] || 0;
+            const price = getAssetPriceUsd(asset.symbol);
+            const val = bal * price;
+            totalVal += val;
+            const rate = assetsRates.find(r => r.symbol?.toUpperCase() === asset.symbol);
+            const chg = rate?.percent_change_24h ?? 0;
+            weightedChange += val * (chg / 100);
+        });
+        const percent = totalVal > 0 ? (weightedChange / totalVal) * 100 : (assetsRates[0]?.percent_change_24h ?? 0);
+        return {
+            amountUsd: weightedChange,
+            percent: percent,
+            isPositive: (totalVal > 0 ? weightedChange : percent) >= 0,
+        };
+    }, [cryptoBalances, getAssetPriceUsd, assetsRates]);
+
     // ─── Filtered Assets ───────────────────────────────────────────────────────
     const filteredAssets = useMemo(() => {
         return SUPPORTED_ASSETS.filter(asset => {
@@ -1722,46 +1742,60 @@ export default function CryptoScreen() {
         <View style={s.container}>
             <StatusBar style="light" />
 
-            {/* CURVED ROYAL NAVY TOP HEADER */}
+            {/* COMPACT CURVED ROYAL NAVY TOP HEADER */}
             <LinearGradient
                 colors={[C.navyDark, C.navyMid]}
-                style={[s.headerContainer, { paddingTop: Math.max(insets.top, 24) + 8 }, isWeb && s.webContainer]}
+                style={[s.headerContainer, { paddingTop: Math.max(insets.top, 16) + 4 }, isWeb && s.webContainer]}
             >
                 <View style={s.headerTopRow}>
-                    <TouchableOpacity onPress={() => router.replace('/dashboard')} style={s.backBtn} activeOpacity={0.7}>
-                        <Ionicons name="arrow-back" size={20} color={C.white} />
-                    </TouchableOpacity>
-                    
-                    <View style={s.headerTitleWrap}>
-                        <Text style={s.headerTitle}>Crypto Hub</Text>
-                        <View style={s.nowPaymentsBadge}>
-                            <View style={s.greenLivePulse} />
-                            <Text style={s.nowPaymentsBadgeText}>NOWPayments Live ⚡</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <TouchableOpacity onPress={() => router.replace('/dashboard')} style={s.backBtn} activeOpacity={0.7}>
+                            <Ionicons name="arrow-back" size={18} color={C.white} />
+                        </TouchableOpacity>
+                        <View>
+                            <Text style={s.headerTitle}>Crypto Hub</Text>
+                            <View style={s.nowPaymentsBadge}>
+                                <View style={s.greenLivePulse} />
+                                <Text style={s.nowPaymentsBadgeText}>12 Chains Live ⚡</Text>
+                            </View>
                         </View>
                     </View>
 
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                        <TouchableOpacity onPress={() => setActiveModal('converter')} style={s.headerIconBtn} activeOpacity={0.7}>
-                            <Ionicons name="calculator-outline" size={16} color={C.white} />
+                    {/* USEFUL QUICK CRYPTO UTILITY SHORTCUTS */}
+                    <View style={{ flexDirection: 'row', gap: 5 }}>
+                        <TouchableOpacity 
+                            onPress={() => {
+                                setDepositAsset('USDT');
+                                setDepositNetworkIdx(0);
+                                setActiveModal('deposit');
+                            }} 
+                            style={s.headerIconBtn} 
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="qr-code-outline" size={15} color={C.white} />
                         </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => setActiveModal('addressBook')} style={s.headerIconBtn} activeOpacity={0.7}>
+                            <Ionicons name="bookmarks-outline" size={15} color={C.white} />
+                        </TouchableOpacity>
+
                         <TouchableOpacity onPress={() => setActiveModal('priceAlert')} style={s.headerIconBtn} activeOpacity={0.7}>
-                            <Ionicons name="notifications-outline" size={16} color={C.white} />
+                            <Ionicons name="notifications-outline" size={15} color={C.white} />
+                            {priceAlerts.length > 0 && <View style={s.alertDot} />}
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={handleSharePortfolio} style={s.headerIconBtn} activeOpacity={0.7}>
-                            <Ionicons name="share-social-outline" size={16} color={C.white} />
-                        </TouchableOpacity>
+
                         <TouchableOpacity onPress={onRefresh} style={s.headerIconBtn} activeOpacity={0.7}>
-                            <Ionicons name="reload" size={16} color={C.white} />
+                            <Ionicons name="reload" size={14} color={C.white} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* CLEAN TOTAL PORTFOLIO BALANCE CARD WITH INNER CRYPTO DECORATIONS */}
+                {/* COMPACT PORTFOLIO BALANCE CARD WITH INNER CRYPTO ACCENTS */}
                 <View style={s.heroCard}>
                     {/* Subtle Inner Crypto Watermark Background */}
                     <View style={s.heroWatermarkWrap} pointerEvents="none">
-                        <Ionicons name="logo-bitcoin" size={130} color="rgba(217, 119, 6, 0.04)" style={{ position: 'absolute', right: -20, top: -25 }} />
-                        <Ionicons name="shield-checkmark" size={70} color="rgba(5, 150, 105, 0.03)" style={{ position: 'absolute', right: 90, bottom: -15 }} />
+                        <Ionicons name="logo-bitcoin" size={110} color="rgba(217, 119, 6, 0.04)" style={{ position: 'absolute', right: -15, top: -20 }} />
+                        <Ionicons name="shield-checkmark" size={60} color="rgba(5, 150, 105, 0.03)" style={{ position: 'absolute', right: 80, bottom: -10 }} />
                     </View>
 
                     {/* Live Network & Escrow Status Strip */}
@@ -1776,9 +1810,9 @@ export default function CryptoScreen() {
                     </View>
 
                     <View style={s.heroTop}>
-                        <View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={s.heroSub}>Total Crypto Portfolio</Text>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <Text style={s.heroSub}>Total Portfolio</Text>
                                 {/* Currency Switch */}
                                 <TouchableOpacity 
                                     onPress={() => setCurrencyDisplay(currencyDisplay === 'USD' ? 'NGN' : 'USD')}
@@ -1788,6 +1822,14 @@ export default function CryptoScreen() {
                                     <Text style={s.currencyToggleText}>{currencyDisplay}</Text>
                                     <Ionicons name="swap-horizontal" size={10} color={C.gold} />
                                 </TouchableOpacity>
+
+                                {/* 24h P&L Profit/Loss Feature Badge */}
+                                <View style={[s.pnlPill, portfolioPnl.isPositive ? s.pnlPillPos : s.pnlPillNeg]}>
+                                    <Text style={[s.pnlText, { color: portfolioPnl.isPositive ? C.emerald : C.rose }]}>
+                                        {portfolioPnl.isPositive ? '▲ +' : '▼ '}
+                                        ${Math.abs(portfolioPnl.amountUsd).toFixed(2)} ({portfolioPnl.isPositive ? '+' : ''}{portfolioPnl.percent.toFixed(1)}%) 24h
+                                    </Text>
+                                </View>
                             </View>
 
                             <Text style={s.heroMainBalance}>
@@ -3944,22 +3986,22 @@ const s = StyleSheet.create({
         maxWidth: 720,
     },
     headerContainer: {
-        paddingHorizontal: 16,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        paddingHorizontal: 14,
+        paddingBottom: 10,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
     },
     headerTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        marginBottom: 8,
     },
     backBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -3968,52 +4010,86 @@ const s = StyleSheet.create({
     },
     headerTitle: {
         color: C.white,
-        fontSize: 17,
+        fontSize: 15.5,
         fontWeight: '800',
+        letterSpacing: 0.2,
     },
     nowPaymentsBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-        marginTop: 2,
+        backgroundColor: 'rgba(5, 150, 105, 0.25)',
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 6,
+        marginTop: 1,
+        borderWidth: 0.5,
+        borderColor: 'rgba(52, 211, 153, 0.4)',
     },
     greenLivePulse: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
         backgroundColor: '#34D399',
         marginRight: 4,
     },
     nowPaymentsBadgeText: {
-        color: C.white,
-        fontSize: 8.5,
+        color: '#A7F3D0',
+        fontSize: 8,
         fontWeight: '700',
     },
     headerIconBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
+    },
+    alertDot: {
+        position: 'absolute',
+        top: 5,
+        right: 5,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#EF4444',
     },
     heroCard: {
         backgroundColor: C.card,
-        borderRadius: 20,
-        padding: 16,
-        marginTop: 4,
+        borderRadius: 18,
+        padding: 13,
+        marginTop: 2,
         borderWidth: 1,
         borderColor: C.cardBorder,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
         overflow: 'hidden',
         position: 'relative',
+    },
+    pnlPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 6,
+    },
+    pnlPillPos: {
+        backgroundColor: C.emeraldBg,
+        borderColor: C.emeraldBorder,
+        borderWidth: 0.5,
+    },
+    pnlPillNeg: {
+        backgroundColor: C.roseBg,
+        borderColor: C.roseBorder,
+        borderWidth: 0.5,
+    },
+    pnlText: {
+        fontSize: 9.5,
+        fontWeight: '800',
     },
     heroWatermarkWrap: {
         position: 'absolute',
