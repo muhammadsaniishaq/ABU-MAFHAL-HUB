@@ -1826,7 +1826,7 @@ export default function CryptoScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* 6 CLEAN CORE FINTECH ACTIONS */}
+                    {/* 4 CLEAN PRIMARY FINTECH ACTIONS (Zero Clutter, Zero Duplication) */}
                     <View style={s.quickActionsRow}>
                         <TouchableOpacity 
                             onPress={() => {
@@ -1838,7 +1838,7 @@ export default function CryptoScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={[s.actionIconWrap, { backgroundColor: C.emeraldBg, borderColor: C.emeraldBorder }]}>
-                                <Ionicons name="arrow-down" size={17} color={C.emerald} />
+                                <Ionicons name="arrow-down" size={18} color={C.emerald} />
                             </View>
                             <Text style={s.actionText}>Deposit</Text>
                         </TouchableOpacity>
@@ -1853,20 +1853,9 @@ export default function CryptoScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={[s.actionIconWrap, { backgroundColor: C.goldBg, borderColor: '#FDE68A' }]}>
-                                <Ionicons name="arrow-up" size={17} color={C.gold} />
+                                <Ionicons name="arrow-up" size={18} color={C.gold} />
                             </View>
                             <Text style={s.actionText}>Send</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={() => setActiveTab('gas')}
-                            style={s.actionButton}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[s.actionIconWrap, { backgroundColor: '#ECFDF5', borderColor: '#6EE7B7' }]}>
-                                <Ionicons name="speedometer" size={17} color={C.emerald} />
-                            </View>
-                            <Text style={[s.actionText, { color: C.emerald, fontWeight: '800' }]}>Gas ⛽</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
@@ -1878,7 +1867,7 @@ export default function CryptoScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={[s.actionIconWrap, { backgroundColor: C.blueBg, borderColor: '#BFDBFE' }]}>
-                                <Ionicons name="card-outline" size={17} color={C.blue} />
+                                <Ionicons name="card-outline" size={18} color={C.blue} />
                             </View>
                             <Text style={s.actionText}>Buy</Text>
                         </TouchableOpacity>
@@ -1892,20 +1881,9 @@ export default function CryptoScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={[s.actionIconWrap, { backgroundColor: C.purpleBg, borderColor: '#DDD6FE' }]}>
-                                <Ionicons name="cash-outline" size={17} color={C.purple} />
+                                <Ionicons name="cash-outline" size={18} color={C.purple} />
                             </View>
                             <Text style={s.actionText}>Sell</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={() => setActiveTab('trade')}
-                            style={s.actionButton}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[s.actionIconWrap, { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' }]}>
-                                <Ionicons name="swap-horizontal" size={17} color={C.textMain} />
-                            </View>
-                            <Text style={s.actionText}>Swap</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1984,147 +1962,7 @@ export default function CryptoScreen() {
                 {/* ─── TAB 1: ASSETS LIST (With Search & Filter) ───────────────── */}
                 {activeTab === 'assets' && (
                     <View>
-                        {/* ─── CRYPTO ECOSYSTEM & SERVICES HUB (Arranged Modern Features) ─── */}
-                        <View style={s.featuresHubSection}>
-                            <View style={s.featuresHubHeaderRow}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="apps" size={14} color={C.navyDark} />
-                                    <Text style={s.featuresHubTitle}>Crypto Services & Features</Text>
-                                </View>
-                                <View style={s.featuresHubStatusPill}>
-                                    <View style={s.greenLivePulse} />
-                                    <Text style={s.featuresHubStatusText}>Instant ⚡</Text>
-                                </View>
-                            </View>
 
-                            <View style={s.featuresHubGrid}>
-                                {/* 1. Gas Station */}
-                                <TouchableOpacity 
-                                    onPress={() => setActiveTab('gas')} 
-                                    style={s.featureHubCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                                        <Ionicons name="speedometer" size={17} color={C.emerald} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={s.featureHubCardTitle}>Gas Station</Text>
-                                            <View style={[s.featureMiniBadge, { backgroundColor: '#ECFDF5' }]}>
-                                                <Text style={[s.featureMiniBadgeText, { color: C.emerald }]}>TRX/TON</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.featureHubCardDesc}>Refill energy & gas</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {/* 2. Instant Swap */}
-                                <TouchableOpacity 
-                                    onPress={() => setActiveTab('trade')} 
-                                    style={s.featureHubCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
-                                        <Ionicons name="swap-horizontal" size={17} color={C.blue} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={s.featureHubCardTitle}>DEX Swap</Text>
-                                            <View style={[s.featureMiniBadge, { backgroundColor: '#EFF6FF' }]}>
-                                                <Text style={[s.featureMiniBadgeText, { color: C.blue }]}>Zero Slip</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.featureHubCardDesc}>Auto coin swaps</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {/* 3. Buy with Naira */}
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        setBuyAsset('USDT');
-                                        setActiveModal('buy');
-                                    }} 
-                                    style={s.featureHubCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
-                                        <Ionicons name="card" size={17} color={C.purple} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={s.featureHubCardTitle}>Buy Crypto</Text>
-                                            <View style={[s.featureMiniBadge, { backgroundColor: '#F5F3FF' }]}>
-                                                <Text style={[s.featureMiniBadgeText, { color: C.purple }]}>Naira ₦</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.featureHubCardDesc}>Direct wallet funding</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {/* 4. Sell for Cash */}
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        setSellAsset('USDT');
-                                        setActiveModal('sell');
-                                    }} 
-                                    style={s.featureHubCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
-                                        <Ionicons name="cash" size={17} color={C.gold} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={s.featureHubCardTitle}>Sell to Bank</Text>
-                                            <View style={[s.featureMiniBadge, { backgroundColor: '#FFFBEB' }]}>
-                                                <Text style={[s.featureMiniBadgeText, { color: C.gold }]}>Instant</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.featureHubCardDesc}>Cashout to wallet</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {/* 5. Live Calculator */}
-                                <TouchableOpacity 
-                                    onPress={() => setActiveModal('converter')} 
-                                    style={s.featureHubCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#ECFEFF', borderColor: '#A5F3FC' }]}>
-                                        <Ionicons name="calculator" size={17} color={C.cyan} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={s.featureHubCardTitle}>Calculator</Text>
-                                            <View style={[s.featureMiniBadge, { backgroundColor: '#ECFEFF' }]}>
-                                                <Text style={[s.featureMiniBadgeText, { color: C.cyan }]}>Live Rate</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.featureHubCardDesc}>NGN &bull; USD rates</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {/* 6. Price Alerts */}
-                                <TouchableOpacity 
-                                    onPress={() => setActiveModal('priceAlert')} 
-                                    style={s.featureHubCard}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-                                        <Ionicons name="notifications" size={17} color={C.rose} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={s.featureHubCardTitle}>Price Alerts</Text>
-                                            <View style={[s.featureMiniBadge, { backgroundColor: '#FEF2F2' }]}>
-                                                <Text style={[s.featureMiniBadgeText, { color: C.rose }]}>Smart</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={s.featureHubCardDesc}>Push & Email alerts</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
 
                         {/* Search Bar */}
                         <View style={s.searchBar}>
