@@ -343,46 +343,60 @@ export const CoingeckoCryptoExchange: CryptoExchange = {
 export const BinanceCryptoExchange: CryptoExchange = {
     getRates: async (ids) => {
         try {
-            // Binance uses symbols like BTCUSDT, ETHUSDT
-            // Map our ids to Binance symbols (approximate)
-            const symbolMap: Record<string, string> = {
-                'bitcoin': 'BTCUSDT',
-                'ethereum': 'ETHUSDT',
-                'tether': 'USDTUSD',
-                'solana': 'SOLUSDT',
-                'binancecoin': 'BNBUSDT',
-                'ripple': 'XRPUSDT',
-                'cardano': 'ADAUSDT',
-                'dogecoin': 'DOGEUSDT'
+            const symbolToIdMap: Record<string, { id: string; symbol: string; name: string; image?: string }> = {
+                'BTCUSDT': { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png' },
+                'ETHUSDT': { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', image: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png' },
+                'USDTUSDC': { id: 'tether', symbol: 'USDT', name: 'Tether USD', image: 'https://assets.coingecko.com/coins/images/325/large/Tether.png' },
+                'SOLUSDT': { id: 'solana', symbol: 'SOL', name: 'Solana', image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png' },
+                'BNBUSDT': { id: 'binancecoin', symbol: 'BNB', name: 'BNB Chain', image: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png' },
+                'TRXUSDT': { id: 'tron', symbol: 'TRX', name: 'Tron', image: 'https://assets.coingecko.com/coins/images/1094/large/tron-logo.png' },
+                'TONUSDT': { id: 'the-open-network', symbol: 'TON', name: 'Toncoin', image: 'https://assets.coingecko.com/coins/images/17980/large/ton_symbol.png' },
+                'XRPUSDT': { id: 'ripple', symbol: 'XRP', name: 'XRP', image: 'https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png' },
+                'ADAUSDT': { id: 'cardano', symbol: 'ADA', name: 'Cardano', image: 'https://assets.coingecko.com/coins/images/975/large/cardano.png' },
+                'DOGEUSDT': { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', image: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png' },
+                'POLUSDT': { id: 'matic-network', symbol: 'POL', name: 'Polygon', image: 'https://assets.coingecko.com/coins/images/4713/large/polygon.png' },
             };
 
+            const symbols = Object.keys(symbolToIdMap);
+            // Binance batch 24hr ticker API
+            const response = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(symbols))}`);
+            if (!response.ok) throw new Error("Binance API returned non-200");
+
+            const data = await response.json();
+            if (!Array.isArray(data)) throw new Error("Invalid Binance ticker array");
+
             const rates: CryptoRate[] = [];
+            data.forEach((item: any) => {
+                const meta = symbolToIdMap[item.symbol];
+                if (meta) {
+                    rates.push({
+                        id: meta.id,
+                        symbol: meta.symbol,
+                        name: meta.name,
+                        price_usd: meta.symbol === 'USDT' ? 1.00 : parseFloat(item.lastPrice || '0'),
+                        percent_change_24h: parseFloat(item.priceChangePercent || '0'),
+                        last_updated: new Date().toISOString(),
+                        image: meta.image
+                    });
+                }
+            });
 
-            // Binance Tick Price API (Public)
-            for (const id of ids) {
-                const symbol = symbolMap[id];
-                if (!symbol) continue;
-
-                // Example: https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT
-                const response = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
-                const data = await response.json();
-
+            // Ensure USDT always present at 1.00 USD
+            if (!rates.find(r => r.symbol === 'USDT')) {
                 rates.push({
-                    id,
-                    symbol: id === 'bitcoin' ? 'BTC' : id === 'ethereum' ? 'ETH' : id === 'tether' ? 'USDT' : 'SOL',
-                    name: id.charAt(0).toUpperCase() + id.slice(1),
-                    price_usd: parseFloat(data.lastPrice),
-                    percent_change_24h: parseFloat(data.priceChangePercent),
-                    last_updated: new Date().toISOString()
+                    id: 'tether',
+                    symbol: 'USDT',
+                    name: 'Tether USD',
+                    price_usd: 1.00,
+                    percent_change_24h: 0.01,
+                    last_updated: new Date().toISOString(),
+                    image: 'https://assets.coingecko.com/coins/images/325/large/Tether.png'
                 });
             }
-            // If empty, fallback
-            if (rates.length === 0) return CoingeckoCryptoExchange.getRates(ids);
-            return rates;
 
+            return rates;
         } catch (error) {
-            console.warn("Binance API Error (Falling back to CoinGecko)", error);
-            // Fallback to CoinGecko if Binance fails
+            console.warn("Binance Batch API Error, falling back to CoinGecko:", error);
             return CoingeckoCryptoExchange.getRates(ids);
         }
     },

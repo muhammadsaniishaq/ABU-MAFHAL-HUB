@@ -60,9 +60,17 @@ export default function CryptoManagerScreen() {
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [isFetchingData, setIsFetchingData] = useState(false);
 
-    // Fee settings local state
+    // Fee & Rate settings local state
     const [feeTrc20, setFeeTrc20] = useState('');
+    const [feeBep20, setFeeBep20] = useState('');
+    const [feeErc20, setFeeErc20] = useState('');
     const [feeBtc, setFeeBtc] = useState('');
+    const [feeEth, setFeeEth] = useState('');
+    const [withdrawProfitMargin, setWithdrawProfitMargin] = useState('');
+    const [rateUsdtBuy, setRateUsdtBuy] = useState('');
+    const [rateUsdtSell, setRateUsdtSell] = useState('');
+    const [swapFeePercent, setSwapFeePercent] = useState('');
+
     const [searchQuery, setSearchQuery] = useState('');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -80,8 +88,25 @@ export default function CryptoManagerScreen() {
 
     useEffect(() => {
         setFeeTrc20(settings.crypto_fee_trc20_usdt || '1.5');
+        setFeeBep20(settings.crypto_fee_bep20_usdt || '1.0');
+        setFeeErc20(settings.crypto_fee_erc20_usdt || '12.0');
         setFeeBtc(settings.crypto_fee_btc || '0.0005');
-    }, [settings.crypto_fee_trc20_usdt, settings.crypto_fee_btc]);
+        setFeeEth(settings.crypto_fee_eth || '0.002');
+        setWithdrawProfitMargin(settings.crypto_withdraw_profit_margin || '0.5');
+        setRateUsdtBuy(settings.crypto_rate_usdt_buy || '1480');
+        setRateUsdtSell(settings.crypto_rate_usdt_sell || '1460');
+        setSwapFeePercent(settings.crypto_swap_fee_percent || '1.5');
+    }, [
+        settings.crypto_fee_trc20_usdt,
+        settings.crypto_fee_bep20_usdt,
+        settings.crypto_fee_erc20_usdt,
+        settings.crypto_fee_btc,
+        settings.crypto_fee_eth,
+        settings.crypto_withdraw_profit_margin,
+        settings.crypto_rate_usdt_buy,
+        settings.crypto_rate_usdt_sell,
+        settings.crypto_swap_fee_percent
+    ]);
 
     const showToast = (msg: string) => {
         setToastMsg(msg);
@@ -137,9 +162,16 @@ export default function CryptoManagerScreen() {
 
     const handleSaveFees = () => {
         updateSetting('crypto_fee_trc20_usdt', feeTrc20);
+        updateSetting('crypto_fee_bep20_usdt', feeBep20);
+        updateSetting('crypto_fee_erc20_usdt', feeErc20);
         updateSetting('crypto_fee_btc', feeBtc);
-        Alert.alert('Success 🎉', 'Crypto Transaction Fees Updated!');
-        showToast("Fees Updated! ⚡");
+        updateSetting('crypto_fee_eth', feeEth);
+        updateSetting('crypto_withdraw_profit_margin', withdrawProfitMargin);
+        updateSetting('crypto_rate_usdt_buy', rateUsdtBuy);
+        updateSetting('crypto_rate_usdt_sell', rateUsdtSell);
+        updateSetting('crypto_swap_fee_percent', swapFeePercent);
+        Alert.alert('Success 🎉', 'Crypto Rates, Fees & Profit Margins Saved!');
+        showToast("Rates & Fees Updated! ⚡");
     };
 
     const copyText = (text: string, label: string) => {
@@ -497,9 +529,50 @@ export default function CryptoManagerScreen() {
                         <View style={{ gap: 10 }}>
                             <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 2 }}>Crypto Exchange Fees & Profit Margins</Text>
 
-                            <View style={{ backgroundColor: L.card, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder }}>
-                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT TRC20 Transaction Fee</Text>
-                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Fixed network fee deducted on USDT payouts.</Text>
+                            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder }}>
+                                <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>🪙 Platform Exchange Rates (NGN)</Text>
+                                
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT Buy Rate (User Pays)</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Naira rate when user buys USDT / Crypto from platform.</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 11, fontWeight: 'bold', marginRight: 4 }}>₦</Text>
+                                    <TextInput
+                                        value={rateUsdtBuy}
+                                        onChangeText={setRateUsdtBuy}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>NGN / USDT</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT Sell Rate (User Receives)</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Naira rate when user sells USDT / Crypto to platform.</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 14 }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 11, fontWeight: 'bold', marginRight: 4 }}>₦</Text>
+                                    <TextInput
+                                        value={rateUsdtSell}
+                                        onChangeText={setRateUsdtSell}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>NGN / USDT</Text>
+                                </View>
+
+                                <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>🛡️ Network Fees & Admin Profit Markups</Text>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Withdraw Admin Profit Margin</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Extra platform profit added on top of network fee (kar ya zama free).</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={withdrawProfitMargin}
+                                        onChangeText={setWithdrawProfitMargin}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.emerald, fontSize: 9, fontWeight: 'bold' }}>+ PROFIT</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT TRC20 Base Fee</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
                                     <TextInput
                                         value={feeTrc20}
@@ -510,9 +583,30 @@ export default function CryptoManagerScreen() {
                                     <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>USDT</Text>
                                 </View>
 
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT BEP20 (Binance Smart Chain) Fee</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={feeBep20}
+                                        onChangeText={setFeeBep20}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>USDT</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT ERC20 (Ethereum) Fee</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={feeErc20}
+                                        onChangeText={setFeeErc20}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>USDT</Text>
+                                </View>
+
                                 <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Bitcoin (BTC) Transaction Fee</Text>
-                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Network miner fee for BTC transfers.</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
                                     <TextInput
                                         value={feeBtc}
                                         onChangeText={setFeeBtc}
@@ -522,12 +616,35 @@ export default function CryptoManagerScreen() {
                                     <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>BTC</Text>
                                 </View>
 
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Ethereum (ETH) Transaction Fee</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={feeEth}
+                                        onChangeText={setFeeEth}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>ETH</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Instant Swap Platform Fee (%)</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Service fee deducted on crypto-to-crypto swaps.</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 14 }}>
+                                    <TextInput
+                                        value={swapFeePercent}
+                                        onChangeText={setSwapFeePercent}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.emerald, fontSize: 9, fontWeight: 'bold' }}>% FEE</Text>
+                                </View>
+
                                 <TouchableOpacity 
                                     onPress={handleSaveFees}
-                                    style={{ backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}
+                                    style={{ backgroundColor: L.navyHeader, paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
                                 >
-                                    <Ionicons name="save-outline" size={14} color={L.gold} />
-                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Save Fee Settings</Text>
+                                    <Ionicons name="save-outline" size={16} color={L.gold} />
+                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Save All Rates & Fee Settings</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>

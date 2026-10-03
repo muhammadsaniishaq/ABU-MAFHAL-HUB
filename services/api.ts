@@ -888,12 +888,12 @@ export const api = {
 
             return result;
         },
-        generateDepositAddress: async (userId: string, network: string, currency: string) => {
+        generateDepositAddress: async (userId: string, network: string, currency: string, regenerate?: boolean, amountUsd?: number) => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Not authenticated");
 
             const { data, error } = await supabase.functions.invoke('generate-crypto-address', {
-                body: { network, currency },
+                body: { network, currency, regenerate, amountUsd },
             });
 
             if (error) {
@@ -902,14 +902,27 @@ export const api = {
             if (data?.error) {
                 throw new Error(data.error);
             }
-            return data; // { address: '...', isNew: true/false }
+            return data; // { address: '...', payment_id: '...', isNew: true/false }
         },
-        withdraw: async (network: string, address: string, amountUsdt: number) => {
+        verifyDeposit: async (params?: { payment_id?: string; address?: string; currency?: string }) => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Not authenticated");
+
+            const { data, error } = await supabase.functions.invoke('verify-crypto-deposit', {
+                body: params || {},
+            });
+
+            if (error) {
+                throw new Error(`Verification request failed: ${error.message}`);
+            }
+            return data;
+        },
+        withdraw: async (network: string, address: string, amountUsdt: number, asset?: string, clientFee?: number) => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Not authenticated");
 
             const { data, error } = await supabase.functions.invoke('crypto-withdraw', {
-                body: { network, address, amountUsdt },
+                body: { network, address, amountUsdt, asset: asset || 'usdt', clientFee },
             });
 
             if (error) {

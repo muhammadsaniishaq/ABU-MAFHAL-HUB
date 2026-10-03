@@ -1,6 +1,6 @@
 
-import nodemailer from "nodemailer";
-import { SupabaseClient } from "@supabase/supabase-js";
+import nodemailer from "npm:nodemailer@6.9.13";
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 export const sendEmail = async (
     to: string, 

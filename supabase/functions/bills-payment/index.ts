@@ -568,9 +568,14 @@ Deno.serve(async (req: Request) => {
             let errorMessage = error instanceof Error ? error.message : "Provider transaction failed";
             console.error("[Bills] Execution Failed:", errorMessage);
             
-            // Mask vendor name
+            // Mask vendor name from error
             if (errorMessage.toLowerCase().includes('clubkonnect') || errorMessage.toLowerCase().includes('bilalsadasub') || errorMessage.toLowerCase().includes('bigi')) {
                 errorMessage = "Transaction could not be completed at this time by the provider network";
+            }
+            
+            // Vendor-side insufficient balance — not the user's fault
+            if (errorMessage.toLowerCase().includes('insufficient balance') || errorMessage.toLowerCase().includes('low balance') || errorMessage.toLowerCase().includes('not enough balance')) {
+                errorMessage = "Service is temporarily unavailable. Please try again later or contact support";
             }
             
             // Strict guarantee: User balance was NEVER deducted because deduction only happens after provider confirmation

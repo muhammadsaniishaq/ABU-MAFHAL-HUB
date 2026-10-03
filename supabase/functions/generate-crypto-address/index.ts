@@ -24,59 +24,69 @@ serve(async (req: Request) => {
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
         if (userError || !user) throw new Error('Invalid token');
 
-        const { network, currency } = await req.json();
+        const { network, currency, regenerate, amountUsd } = await req.json();
 
         if (!network || !currency) {
             throw new Error('Network and currency are required');
         }
 
-        // Check if user already has an address for this network/currency
-        const { data: existingAddress } = await supabaseAdmin
-            .from('crypto_addresses')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('network', network.toUpperCase())
-            .eq('currency', currency.toLowerCase())
-            .eq('is_active', true)
-            .maybeSingle();
+        const normCurrency = currency.toLowerCase().trim();
+        const normNetwork = network.toUpperCase().trim();
 
-        if (existingAddress) {
-            return new Response(JSON.stringify({ address: existingAddress.address, isNew: false }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
+        // Check if user already has an active address for this network/currency combo (unless regenerate requested)
+        if (!regenerate) {
+            const { data: existingAddress } = await supabaseAdmin
+                .from('crypto_addresses')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('network', normNetwork)
+                .eq('currency', normCurrency)
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (existingAddress) {
+                return new Response(JSON.stringify({ 
+                    address: existingAddress.address, 
+                    payment_id: existingAddress.payment_id,
+                    network: existingAddress.network,
+                    currency: existingAddress.currency,
+                    isNew: false 
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+            }
         }
 
         // Get NowPayments API Key from system secrets or env
-        let NOWPAYMENTS_API_KEY = Deno.env.get('NOWPAYMENTS_API_KEY');
+        let NOWPAYMENTS_API_KEY = Deno.env.get('NOWPAYMENTS_API_KEY') || Deno.env.get('NOWPAYMENTS_KEY');
         if (!NOWPAYMENTS_API_KEY) {
-            const { data: secret } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'NOWPAYMENTS_API_KEY').maybeSingle();
-            if (secret && secret.value) NOWPAYMENTS_API_KEY = secret.value;
+            const { data: secrets } = await supabaseAdmin
+                .from('system_secrets')
+                .select('key, value')
+                .in('key', ['NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY']);
+
+            if (secrets && secrets.length > 0) {
+                const found = secrets.find(s => s.value && s.value.trim().length > 0);
+                if (found) NOWPAYMENTS_API_KEY = found.value.trim();
+            }
         }
 
         if (!NOWPAYMENTS_API_KEY) {
-            throw new Error('Payment gateway not configured');
+            throw new Error('NowPayments Gateway is not configured. Please contact administrator.');
         }
 
-        // Generate address via NowPayments API
-        // Using dynamic payment address generation instead of just /payment to allow indefinite usage
-        const body = {
-            currency: currency.toLowerCase(),
-            ipn_callback_url: `${supabaseUrl}/functions/v1/crypto-webhook`
-        };
+        // Standard deposit nominal price amount (default $5 or $10 so test deposits match easily)
+        const nominalAmount = amountUsd && Number(amountUsd) > 0 ? Number(amountUsd) : 5;
 
-        // Note: For a true permanent deposit address, /payment creates an invoice. 
-        // NowPayments requires minimum amounts for invoices, but we'll use it since it's the standard integration for non-custodial.
-        // If they want permanent addresses, they usually need NowPayments Custody.
-        // We'll proceed with /payment and a dummy amount, OR just /payment without amount if supported.
-        // A better approach for NowPayments without amount is to create a static address if they have custody enabled.
-        // Since the user is setting up, /payment is safest. We will set a generic price amount.
         const paymentBody = {
-            price_amount: 1000,
+            price_amount: nominalAmount,
             price_currency: 'usd',
-            pay_currency: currency.toLowerCase(),
+            pay_currency: normCurrency,
             ipn_callback_url: `${supabaseUrl}/functions/v1/crypto-webhook`,
             order_id: `crypto_dep_${user.id}_${Date.now()}`,
-            order_description: `Deposit for user ${user.id}`
+            order_description: `Deposit for user ${user.id} on Abu Mafhal Hub`
         };
 
         const response = await fetch('https://api.nowpayments.io/v1/payment', {
@@ -91,36 +101,61 @@ serve(async (req: Request) => {
         const data = await response.json();
 
         if (!response.ok || !data.pay_address) {
-            console.error('NowPayments Error:', data);
-            throw new Error('Failed to generate crypto address from provider');
+            console.error('[NowPayments Address Gen Error]:', data);
+            throw new Error(data.message || 'Failed to generate crypto address from provider');
         }
 
         const newAddress = data.pay_address;
-        const paymentId = data.payment_id;
+        const paymentId = String(data.payment_id || '');
+
+        // If regenerate was true, deactivate older addresses for this currency/network
+        if (regenerate) {
+            await supabaseAdmin
+                .from('crypto_addresses')
+                .update({ is_active: false })
+                .eq('user_id', user.id)
+                .eq('network', normNetwork)
+                .eq('currency', normCurrency);
+        }
 
         // Save to database
         const { error: insertError } = await supabaseAdmin
             .from('crypto_addresses')
-            .insert({
+            .upsert({
                 user_id: user.id,
-                network: network.toUpperCase(),
-                currency: currency.toLowerCase(),
+                network: normNetwork,
+                currency: normCurrency,
                 address: newAddress,
-                payment_id: String(paymentId),
-                provider: 'nowpayments'
-            });
+                payment_id: paymentId,
+                provider: 'nowpayments',
+                is_active: true
+            }, { onConflict: 'user_id,network,currency' });
 
         if (insertError) {
             console.error('Failed to save address to DB', insertError);
-            throw new Error('Failed to save address');
+            // Fallback insert if upsert constraint mismatch
+            await supabaseAdmin.from('crypto_addresses').insert({
+                user_id: user.id,
+                network: normNetwork,
+                currency: normCurrency,
+                address: newAddress,
+                payment_id: paymentId,
+                provider: 'nowpayments'
+            });
         }
 
-        return new Response(JSON.stringify({ address: newAddress, isNew: true }), {
+        return new Response(JSON.stringify({ 
+            address: newAddress, 
+            payment_id: paymentId,
+            network: normNetwork,
+            currency: normCurrency,
+            isNew: true 
+        }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
     } catch (error: any) {
-        console.error(error);
+        console.error('[Generate Crypto Address Error]:', error);
         return new Response(JSON.stringify({ error: error.message || 'Unknown error' }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -412,8 +412,11 @@ export default function CryptoScreen() {
     const [depositAsset, setDepositAsset] = useState<string>('USDT');
     const [depositNetworkIdx, setDepositNetworkIdx] = useState<number>(0);
     const [depositAddress, setDepositAddress] = useState<string>('');
+    const [depositPaymentId, setDepositPaymentId] = useState<string | null>(null);
     const [depositLoading, setDepositLoading] = useState<boolean>(false);
     const [depositCopied, setDepositCopied] = useState<boolean>(false);
+    const [verifyingDeposit, setVerifyingDeposit] = useState<boolean>(false);
+    const [depositSuccessNotice, setDepositSuccessNotice] = useState<string | null>(null);
 
     // Withdraw / Send State (Dual Mode: External Blockchain OR Internal Abu Mafhal 0 Gas)
     const [sendMode, setSendMode] = useState<'external' | 'internal'>('external');
@@ -484,6 +487,31 @@ export default function CryptoScreen() {
             console.warn('initUserData error:', e);
         }
     };
+
+    // ─── Realtime Subscriptions for Instant Deposit Detection ──────────────────
+    useEffect(() => {
+        if (!userId) return;
+
+        const channel = supabase
+            .channel(`realtime-crypto-${userId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'crypto_balances', filter: `user_id=eq.${userId}` }, () => {
+                fetchUserBalances(userId);
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, (payload: any) => {
+                fetchCryptoTransactions(userId);
+                if (payload?.new && payload.new.type === 'crypto_deposit') {
+                    if (Platform.OS !== 'web') {
+                        try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                    }
+                    Alert.alert("Deposit Credited! 💰", `${payload.new.description || 'Your crypto deposit has arrived!'}`);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [userId]);
 
     const formatReceiptDate = (d: Date | string) => {
         try {
@@ -691,7 +719,18 @@ export default function CryptoScreen() {
                 const map: Record<string, number> = {};
                 cBals.forEach(b => {
                     if (b.asset) {
-                        map[b.asset.toUpperCase()] = Number(b.balance) || 0;
+                        let norm = b.asset.toUpperCase().trim();
+                        if (norm.startsWith('USDT')) norm = 'USDT';
+                        else if (norm.startsWith('USDC')) norm = 'USDC';
+                        else if (norm.startsWith('ETH')) norm = 'ETH';
+                        else if (norm.startsWith('BNB')) norm = 'BNB';
+                        else if (norm.startsWith('SOL')) norm = 'SOL';
+                        else if (norm.startsWith('TRX')) norm = 'TRX';
+                        else if (norm.startsWith('TON')) norm = 'TON';
+                        else if (norm.startsWith('BTC')) norm = 'BTC';
+
+                        const val = Number(b.balance) || 0;
+                        map[norm] = (map[norm] || 0) + val;
                     }
                 });
                 setCryptoBalances(map);
@@ -767,6 +806,27 @@ export default function CryptoScreen() {
         }
         return Number(settings?.crypto_rate_usdt_sell) || 1460;
     }, [settings]);
+
+    const getCoinToNgnRate = useCallback((symbol: string, type: 'buy' | 'sell'): number => {
+        const sym = (symbol || 'USDT').toLowerCase().trim();
+        // 1. Direct admin configured rate from settings (e.g. crypto_rate_btc_buy, crypto_rate_usdt_buy)
+        const customRateKey = `crypto_rate_${sym}_${type}`;
+        if (settings && settings[customRateKey]) {
+            const parsed = Number(settings[customRateKey]);
+            if (!isNaN(parsed) && parsed > 0) return parsed;
+        }
+
+        // 2. Base USDT rate
+        const usdtNgnRate = getUsdtToNgnRate(type);
+        if (sym === 'usdt' || sym === 'usdc') {
+            return usdtNgnRate;
+        }
+
+        // 3. Dynamic market price with admin profit spread
+        const coinUsdPrice = getAssetPriceUsd(symbol);
+        const marginFactor = type === 'buy' ? 1.015 : 0.985;
+        return Math.round(coinUsdPrice * usdtNgnRate * marginFactor);
+    }, [settings, getUsdtToNgnRate, getAssetPriceUsd]);
 
     const totalPortfolioUsd = useMemo(() => {
         let total = 0;
@@ -1001,8 +1061,8 @@ export default function CryptoScreen() {
         } catch {}
     };
 
-    // ─── Real NOWPayments Deposit Address Generation ───────────────────────────
-    const loadNowPaymentsAddress = async (assetSym: string, netIndex: number) => {
+    // ─── Real NOWPayments Deposit Address Generation & On-Demand Verification ────
+    const loadNowPaymentsAddress = async (assetSym: string, netIndex: number, regenerate = false) => {
         if (!userId) return;
         const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === assetSym);
         if (!assetObj) return;
@@ -1010,10 +1070,12 @@ export default function CryptoScreen() {
 
         setDepositLoading(true);
         setDepositCopied(false);
+        setDepositSuccessNotice(null);
         try {
-            const res = await api.crypto.generateDepositAddress(userId, netObj.network, netObj.currency);
+            const res = await api.crypto.generateDepositAddress(userId, netObj.network, netObj.currency, regenerate);
             if (res && res.address) {
                 setDepositAddress(res.address);
+                if (res.payment_id) setDepositPaymentId(String(res.payment_id));
             } else {
                 throw new Error("No address returned by NOWPayments gateway");
             }
@@ -1025,6 +1087,43 @@ export default function CryptoScreen() {
             );
         } finally {
             setDepositLoading(false);
+        }
+    };
+
+    const handleVerifyDeposit = async () => {
+        if (!userId) return;
+        setVerifyingDeposit(true);
+        try {
+            const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === depositAsset);
+            const netObj = assetObj?.networks[depositNetworkIdx] || assetObj?.networks[0];
+
+            const res = await api.crypto.verifyDeposit({
+                payment_id: depositPaymentId || undefined,
+                address: depositAddress || undefined,
+                currency: netObj?.currency
+            });
+
+            if (res?.success && (res.credited > 0 || res.newBalance !== undefined)) {
+                if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                const msg = `Deposit of +${res.credited || ''} ${res.asset ? res.asset.toUpperCase() : depositAsset} confirmed and credited!`;
+                setDepositSuccessNotice(msg);
+                Alert.alert("Deposit Confirmed! 🎉", msg);
+                await fetchUserBalances(userId);
+                await fetchCryptoTransactions(userId);
+            } else if (res?.alreadyCredited) {
+                Alert.alert("Already Credited", res.message || "This deposit is already credited in your wallet balance.");
+                await fetchUserBalances(userId);
+            } else if (res?.pending) {
+                Alert.alert("Pending on Blockchain", res.message || "Your deposit was detected and is confirming on the blockchain. It will credit automatically upon final confirmation.");
+            } else {
+                Alert.alert("Deposit Status", res?.message || "No incoming confirmed transaction found yet. If you just sent the funds, please allow 1-3 minutes for blockchain nodes to broadcast it.");
+            }
+        } catch (err: any) {
+            Alert.alert("Verification Error", err.message || "Could not check deposit status right now.");
+        } finally {
+            setVerifyingDeposit(false);
         }
     };
 
@@ -1087,16 +1186,27 @@ export default function CryptoScreen() {
         }
     };
 
+    const getNetworkWithdrawFee = (netName: string, assetSym: string): number => {
+        const profitMargin = Number(settings?.crypto_withdraw_profit_margin) || 0.5;
+        let baseFee = 1.0;
+        if (netName === 'TRC20') baseFee = Number(settings?.crypto_fee_trc20_usdt) || 1.5;
+        else if (netName === 'BEP20') baseFee = Number(settings?.crypto_fee_bep20_usdt) || 1.0;
+        else if (netName === 'ERC20') baseFee = Number(settings?.crypto_fee_erc20_usdt) || 12.0;
+        else if (netName === 'POLYGON') baseFee = 0.8;
+        else if (netName === 'SOL') baseFee = 0.8;
+        else if (netName === 'BTC') return Number((Number(settings?.crypto_fee_btc) || 0.0004).toFixed(6));
+        else if (netName === 'ETH') return Number((Number(settings?.crypto_fee_eth) || 0.002).toFixed(6));
+        else if (netName === 'TRX') baseFee = 1.5;
+        else if (netName === 'TON') baseFee = 0.05;
+        return Number((baseFee + profitMargin).toFixed(4));
+    };
+
     const handleInitiateSend = () => {
         const amt = parseFloat(withdrawAmount.trim());
         const currentBal = cryptoBalances[withdrawAsset] || 0;
 
         if (isNaN(amt) || amt <= 0) {
             Alert.alert("Invalid Amount", "Please enter a valid amount to send.");
-            return;
-        }
-        if (amt > currentBal) {
-            Alert.alert("Insufficient Balance", `You only have ${currentBal.toFixed(4)} ${withdrawAsset} available.`);
             return;
         }
 
@@ -1107,15 +1217,29 @@ export default function CryptoScreen() {
             }
             const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset);
             const netObj = assetObj?.networks[withdrawNetworkIdx] || assetObj?.networks[0];
-
-            setSecurityDescription(`Authorize payout of ${amt} ${withdrawAsset} to ${withdrawAddress.slice(0, 8)}... (${netObj?.label}) via NOWPayments`);
             const targetNetwork = netObj?.network || 'TRC20';
+            const fee = getNetworkWithdrawFee(targetNetwork, withdrawAsset);
+            const totalRequired = amt + fee;
+
+            if (totalRequired > currentBal) {
+                Alert.alert(
+                    "Insufficient Balance", 
+                    `Total required: ${totalRequired.toFixed(4)} ${withdrawAsset} (Amount: ${amt} + Network Fee: ${fee} ${withdrawAsset}). You only have ${currentBal.toFixed(4)} available.`
+                );
+                return;
+            }
+
+            setSecurityDescription(`Authorize payout of ${amt} ${withdrawAsset} (+ ${fee} fee) to ${withdrawAddress.slice(0, 8)}... (${netObj?.label}) via NOWPayments`);
             const targetAddr = withdrawAddress.trim();
-            pendingSecurityActionRef.current = () => executeExternalWithdrawal(targetNetwork, targetAddr, amt);
-            setSecurityAction(() => () => executeExternalWithdrawal(targetNetwork, targetAddr, amt));
+            pendingSecurityActionRef.current = () => executeExternalWithdrawal(targetNetwork, targetAddr, amt, fee);
+            setSecurityAction(() => () => executeExternalWithdrawal(targetNetwork, targetAddr, amt, fee));
             setShowSecurityModal(true);
         } else {
-            // Internal Transfer
+            // Internal Transfer (0 Fee)
+            if (amt > currentBal) {
+                Alert.alert("Insufficient Balance", `You only have ${currentBal.toFixed(4)} ${withdrawAsset} available.`);
+                return;
+            }
             if (!transferResolvedRecipient || !transferResolvedRecipient.id) {
                 Alert.alert("Recipient Required", "Please enter an Abu Mafhal user phone number or username.");
                 return;
@@ -1128,37 +1252,31 @@ export default function CryptoScreen() {
         }
     };
 
-    const executeExternalWithdrawal = async (networkName: string, destAddr: string, amountNum: number) => {
+    const executeExternalWithdrawal = async (networkName: string, destAddr: string, amountNum: number, feeNum = 1.5) => {
         setWithdrawing(true);
         try {
-            const res = await api.crypto.withdraw(networkName, destAddr, amountNum);
-            if (res && res.success) {
+            const res = await api.crypto.withdraw(networkName, destAddr, amountNum, withdrawAsset.toLowerCase(), feeNum);
+            if (res && (res.success || res.payoutId)) {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
                 Alert.alert(
                     "Withdrawal Dispatched 🚀", 
-                    `Successfully dispatched payout of ${amountNum} ${withdrawAsset} to ${destAddr.slice(0, 10)}... Processing via NOWPayments gateway.`
+                    `Successfully dispatched payout of ${amountNum} ${withdrawAsset} to ${destAddr.slice(0, 10)}... (Fee: ${feeNum} ${withdrawAsset}). Processing via NOWPayments gateway.`
                 );
                 setActiveModal(null);
                 setWithdrawAddress('');
                 setWithdrawAmount('');
                 if (userId) {
-                    await createAppNotification(
-                        userId,
-                        "Crypto Withdrawal Dispatched",
-                        `Your withdrawal of ${amountNum} ${withdrawAsset} has been submitted to the blockchain via NOWPayments.`,
-                        "crypto",
-                        "high"
-                    );
                     fetchUserBalances(userId);
                     fetchCryptoTransactions(userId);
                 }
             } else {
-                throw new Error(res?.message || "Withdrawal failed to process");
+                throw new Error(res?.error || res?.message || "Withdrawal failed to process");
             }
         } catch (err: any) {
-            Alert.alert("Withdrawal Failed", err.message || "Failed to execute payout. Please try again.");
+            Alert.alert("Withdrawal Failed", err.message || "Failed to execute payout. Your funds remain safe.");
+            if (userId) fetchUserBalances(userId);
         } finally {
             setWithdrawing(false);
         }
@@ -1244,10 +1362,8 @@ export default function CryptoScreen() {
             return;
         }
 
-        const usdtRate = getUsdtToNgnRate('buy');
-        const assetPriceUsd = getAssetPriceUsd(buyAsset);
-        const amountUsdt = costNgn / usdtRate;
-        const amountCrypto = amountUsdt / assetPriceUsd;
+        const coinBuyRate = getCoinToNgnRate(buyAsset, 'buy');
+        const amountCrypto = costNgn / (coinBuyRate || 1);
 
         setBuying(true);
         try {
@@ -1261,7 +1377,7 @@ export default function CryptoScreen() {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
-                Alert.alert("Purchase Complete 🎉", `You bought ${amountCrypto.toFixed(6)} ${buyAsset} for ₦${costNgn.toLocaleString()}!`);
+                Alert.alert("Purchase Complete 🎉", `You bought ${amountCrypto.toFixed(6)} ${buyAsset} for ₦${costNgn.toLocaleString()}! (Rate: ₦${coinBuyRate.toLocaleString()})`);
                 setActiveModal(null);
                 setBuyNgnAmount('10000');
                 if (userId) {
@@ -1299,10 +1415,8 @@ export default function CryptoScreen() {
             return;
         }
 
-        const usdtRate = getUsdtToNgnRate('sell');
-        const assetPriceUsd = getAssetPriceUsd(sellAsset);
-        const totalUsd = cryptoAmt * assetPriceUsd;
-        const expectedNgn = Math.floor(totalUsd * usdtRate);
+        const coinSellRate = getCoinToNgnRate(sellAsset, 'sell');
+        const expectedNgn = Math.floor(cryptoAmt * (coinSellRate || 1));
 
         setSelling(true);
         try {
@@ -1316,7 +1430,7 @@ export default function CryptoScreen() {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
-                Alert.alert("Sold Successfully 💰", `Sold ${cryptoAmt} ${sellAsset} for ₦${expectedNgn.toLocaleString()} credited to your Naira wallet!`);
+                Alert.alert("Sold Successfully 💰", `Sold ${cryptoAmt} ${sellAsset} for ₦${expectedNgn.toLocaleString()} credited to your Naira wallet! (Rate: ₦${coinSellRate.toLocaleString()})`);
                 setActiveModal(null);
                 setSellCryptoAmount('10');
                 if (userId) {
@@ -1641,12 +1755,29 @@ export default function CryptoScreen() {
                     </View>
                 </View>
 
-                {/* CLEAN TOTAL PORTFOLIO BALANCE CARD */}
+                {/* CLEAN TOTAL PORTFOLIO BALANCE CARD WITH INNER CRYPTO DECORATIONS */}
                 <View style={s.heroCard}>
+                    {/* Subtle Inner Crypto Watermark Background */}
+                    <View style={s.heroWatermarkWrap} pointerEvents="none">
+                        <Ionicons name="logo-bitcoin" size={130} color="rgba(217, 119, 6, 0.04)" style={{ position: 'absolute', right: -20, top: -25 }} />
+                        <Ionicons name="shield-checkmark" size={70} color="rgba(5, 150, 105, 0.03)" style={{ position: 'absolute', right: 90, bottom: -15 }} />
+                    </View>
+
+                    {/* Live Network & Escrow Status Strip */}
+                    <View style={s.heroLiveTickerRow}>
+                        <View style={s.greenLivePulse} />
+                        <Text style={s.heroLiveTickerText}>Multi-Chain Live Escrow &bull; 0.4s Fast Settlement</Text>
+                        <View style={{ flex: 1 }} />
+                        <View style={s.heroNetworkCountBadge}>
+                            <Ionicons name="flash" size={10} color={C.gold} />
+                            <Text style={s.heroNetworkCountText}>12 Networks</Text>
+                        </View>
+                    </View>
+
                     <View style={s.heroTop}>
                         <View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={s.heroSub}>Total Crypto Valuation</Text>
+                                <Text style={s.heroSub}>Total Crypto Portfolio</Text>
                                 {/* Currency Switch */}
                                 <TouchableOpacity 
                                     onPress={() => setCurrencyDisplay(currencyDisplay === 'USD' ? 'NGN' : 'USD')}
@@ -1689,6 +1820,10 @@ export default function CryptoScreen() {
                         <Text style={s.fiatVaultText}>
                             Naira Wallet: <Text style={{ color: C.textMain, fontWeight: '800' }}>₦{nairaBalance.toLocaleString()}</Text>
                         </Text>
+                        <View style={{ flex: 1 }} />
+                        <TouchableOpacity onPress={() => router.push('/fund-wallet' as any)} activeOpacity={0.7}>
+                            <Text style={{ color: C.blue, fontSize: 10.5, fontWeight: '700' }}>Fund +</Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* 6 CLEAN CORE FINTECH ACTIONS */}
@@ -1776,6 +1911,38 @@ export default function CryptoScreen() {
                 </View>
             </LinearGradient>
 
+            {/* LIVE MARKET TICKER TAPE (Crypto Marquee Ribbon) */}
+            <View style={[s.tickerTapeContainer, isWeb && s.webContainer]}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tickerTapeScroll}>
+                    {['BTC', 'ETH', 'SOL', 'TON', 'TRX', 'BNB', 'USDT'].map((sym) => {
+                        const rate = assetsRates.find(r => r.symbol?.toUpperCase() === sym);
+                        const price = getAssetPriceUsd(sym);
+                        const chg = rate?.percent_change_24h ?? 0;
+                        const isUp = chg >= 0;
+                        return (
+                            <TouchableOpacity
+                                key={sym}
+                                onPress={() => {
+                                    const asset = SUPPORTED_ASSETS.find(a => a.symbol === sym);
+                                    if (asset) {
+                                        setSelectedCoinDetail(asset);
+                                        setActiveModal('assetDetail');
+                                    }
+                                }}
+                                style={s.tickerTapePill}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={s.tickerTapeSym}>{sym}</Text>
+                                <Text style={s.tickerTapePrice}>${price >= 1 ? price.toLocaleString() : price.toFixed(4)}</Text>
+                                <Text style={[s.tickerTapeChange, { color: isUp ? C.emerald : C.rose }]}>
+                                    {isUp ? '▲' : '▼'}{Math.abs(chg).toFixed(1)}%
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+            </View>
+
             {/* CLEAN 4 TABS */}
             <View style={[s.tabBarContainer, isWeb && s.webContainer]}>
                 {[
@@ -1817,6 +1984,148 @@ export default function CryptoScreen() {
                 {/* ─── TAB 1: ASSETS LIST (With Search & Filter) ───────────────── */}
                 {activeTab === 'assets' && (
                     <View>
+                        {/* ─── CRYPTO ECOSYSTEM & SERVICES HUB (Arranged Modern Features) ─── */}
+                        <View style={s.featuresHubSection}>
+                            <View style={s.featuresHubHeaderRow}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="apps" size={14} color={C.navyDark} />
+                                    <Text style={s.featuresHubTitle}>Crypto Services & Features</Text>
+                                </View>
+                                <View style={s.featuresHubStatusPill}>
+                                    <View style={s.greenLivePulse} />
+                                    <Text style={s.featuresHubStatusText}>Instant ⚡</Text>
+                                </View>
+                            </View>
+
+                            <View style={s.featuresHubGrid}>
+                                {/* 1. Gas Station */}
+                                <TouchableOpacity 
+                                    onPress={() => setActiveTab('gas')} 
+                                    style={s.featureHubCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+                                        <Ionicons name="speedometer" size={17} color={C.emerald} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={s.featureHubCardTitle}>Gas Station</Text>
+                                            <View style={[s.featureMiniBadge, { backgroundColor: '#ECFDF5' }]}>
+                                                <Text style={[s.featureMiniBadgeText, { color: C.emerald }]}>TRX/TON</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.featureHubCardDesc}>Refill energy & gas</Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* 2. Instant Swap */}
+                                <TouchableOpacity 
+                                    onPress={() => setActiveTab('trade')} 
+                                    style={s.featureHubCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+                                        <Ionicons name="swap-horizontal" size={17} color={C.blue} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={s.featureHubCardTitle}>DEX Swap</Text>
+                                            <View style={[s.featureMiniBadge, { backgroundColor: '#EFF6FF' }]}>
+                                                <Text style={[s.featureMiniBadgeText, { color: C.blue }]}>Zero Slip</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.featureHubCardDesc}>Auto coin swaps</Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* 3. Buy with Naira */}
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setBuyAsset('USDT');
+                                        setActiveModal('buy');
+                                    }} 
+                                    style={s.featureHubCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
+                                        <Ionicons name="card" size={17} color={C.purple} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={s.featureHubCardTitle}>Buy Crypto</Text>
+                                            <View style={[s.featureMiniBadge, { backgroundColor: '#F5F3FF' }]}>
+                                                <Text style={[s.featureMiniBadgeText, { color: C.purple }]}>Naira ₦</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.featureHubCardDesc}>Direct wallet funding</Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* 4. Sell for Cash */}
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setSellAsset('USDT');
+                                        setActiveModal('sell');
+                                    }} 
+                                    style={s.featureHubCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+                                        <Ionicons name="cash" size={17} color={C.gold} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={s.featureHubCardTitle}>Sell to Bank</Text>
+                                            <View style={[s.featureMiniBadge, { backgroundColor: '#FFFBEB' }]}>
+                                                <Text style={[s.featureMiniBadgeText, { color: C.gold }]}>Instant</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.featureHubCardDesc}>Cashout to wallet</Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* 5. Live Calculator */}
+                                <TouchableOpacity 
+                                    onPress={() => setActiveModal('converter')} 
+                                    style={s.featureHubCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#ECFEFF', borderColor: '#A5F3FC' }]}>
+                                        <Ionicons name="calculator" size={17} color={C.cyan} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={s.featureHubCardTitle}>Calculator</Text>
+                                            <View style={[s.featureMiniBadge, { backgroundColor: '#ECFEFF' }]}>
+                                                <Text style={[s.featureMiniBadgeText, { color: C.cyan }]}>Live Rate</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.featureHubCardDesc}>NGN &bull; USD rates</Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* 6. Price Alerts */}
+                                <TouchableOpacity 
+                                    onPress={() => setActiveModal('priceAlert')} 
+                                    style={s.featureHubCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.featureHubIconWrap, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+                                        <Ionicons name="notifications" size={17} color={C.rose} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={s.featureHubCardTitle}>Price Alerts</Text>
+                                            <View style={[s.featureMiniBadge, { backgroundColor: '#FEF2F2' }]}>
+                                                <Text style={[s.featureMiniBadgeText, { color: C.rose }]}>Smart</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.featureHubCardDesc}>Push & Email alerts</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
                         {/* Search Bar */}
                         <View style={s.searchBar}>
                             <Ionicons name="search" size={16} color={C.textMuted} />
@@ -1858,10 +2167,11 @@ export default function CryptoScreen() {
                             {filteredAssets.map((asset) => {
                                 const bal = cryptoBalances[asset.symbol] || 0;
                                 const livePrice = getAssetPriceUsd(asset.symbol);
-                                const valUsd = bal * livePrice;
+                                const valNgn = Math.floor(livePrice * getUsdtToNgnRate('sell'));
                                 const marketData = assetsRates.find(r => r.symbol?.toUpperCase() === asset.symbol);
                                 const change24h = marketData?.percent_change_24h ?? 0;
                                 const isPos = change24h >= 0;
+                                const topNetwork = asset.networks[0]?.network || 'CHAIN';
 
                                 return (
                                     <TouchableOpacity
@@ -1888,7 +2198,12 @@ export default function CryptoScreen() {
                                             </TouchableOpacity>
                                             <Image source={{ uri: asset.icon }} style={s.assetLogo} />
                                             <View>
-                                                <Text style={s.assetSymbol}>{asset.symbol}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                    <Text style={s.assetSymbol}>{asset.symbol}</Text>
+                                                    <View style={s.assetNetworkBadge}>
+                                                        <Text style={s.assetNetworkBadgeText}>{topNetwork}</Text>
+                                                    </View>
+                                                </View>
                                                 <Text style={s.assetName}>{asset.name}</Text>
                                             </View>
                                         </View>
@@ -1898,7 +2213,10 @@ export default function CryptoScreen() {
                                                 {bal.toLocaleString(undefined, { maximumFractionDigits: 6 })}
                                             </Text>
                                             <View style={s.priceChangeRow}>
-                                                <Text style={s.assetPriceText}>${livePrice.toLocaleString()}</Text>
+                                                <View style={{ alignItems: 'flex-end', marginRight: 4 }}>
+                                                    <Text style={s.assetPriceText}>${livePrice >= 1 ? livePrice.toLocaleString() : livePrice.toFixed(4)}</Text>
+                                                    <Text style={s.assetPriceNgnText}>≈ ₦{valNgn.toLocaleString()}</Text>
+                                                </View>
                                                 <View style={[s.percentPill, isPos ? s.percentPillPositive : s.percentPillNegative]}>
                                                     <Text style={[s.percentText, { color: isPos ? C.emerald : C.rose }]}>
                                                         {isPos ? '+' : ''}{change24h.toFixed(1)}%
@@ -2615,10 +2933,46 @@ export default function CryptoScreen() {
                                 </View>
                             </TouchableOpacity>
 
+                            {/* DEPOSIT SUCCESS OR ACTIVE NOTICE */}
+                            {depositSuccessNotice ? (
+                                <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 10, padding: 12, marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Ionicons name="checkmark-circle" size={20} color={C.emerald} />
+                                    <Text style={{ color: '#065F46', fontSize: 12, fontWeight: '700', flex: 1 }}>{depositSuccessNotice}</Text>
+                                </View>
+                            ) : null}
+
+                            {/* ON-DEMAND VERIFY BUTTON */}
+                            <TouchableOpacity 
+                                onPress={handleVerifyDeposit}
+                                disabled={verifyingDeposit || depositLoading || !depositAddress}
+                                style={[s.primaryModalSubmit, { backgroundColor: C.emerald, marginTop: 12, marginBottom: 4 }]}
+                                activeOpacity={0.85}
+                            >
+                                {verifyingDeposit ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                        <Text style={s.primaryModalText}>Checking Blockchain & Gateway...</Text>
+                                    </View>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                        <Ionicons name="refresh-circle-outline" size={18} color="#FFFFFF" />
+                                        <Text style={s.primaryModalText}>I Have Sent Deposit &bull; Check Status ⚡</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => loadNowPaymentsAddress(depositAsset, depositNetworkIdx, true)}
+                                disabled={depositLoading || verifyingDeposit}
+                                style={{ alignItems: 'center', paddingVertical: 6, marginBottom: 8 }}
+                            >
+                                <Text style={{ fontSize: 11, color: C.navyDark, fontWeight: '600' }}>🔄 Generate Fresh Address / Invoice</Text>
+                            </TouchableOpacity>
+
                             <View style={s.depositWarning}>
                                 <Text style={s.depositWarningText}>
                                     Send only {depositAsset} via {SUPPORTED_ASSETS.find(a => a.symbol === depositAsset)?.networks[depositNetworkIdx]?.label}. 
-                                    Credits automatically after 1 blockchain confirmation via NOWPayments IPN.
+                                    Deposit Fee: 0% (FREE). Credits automatically upon blockchain confirmation or via 'Check Status'.
                                 </Text>
                             </View>
 
@@ -2816,20 +3170,39 @@ export default function CryptoScreen() {
                                 <Text style={s.inputCurrencySuffix}>{withdrawAsset}</Text>
                             </View>
 
-                            <View style={s.withdrawEstimateBox}>
-                                <View style={s.withdrawEstimateRow}>
-                                    <Text style={s.withdrawEstimateLabel}>Estimated Value</Text>
-                                    <Text style={s.withdrawEstimateValue}>
-                                        ≈ ${(parseFloat(withdrawAmount || '0') * getAssetPriceUsd(withdrawAsset)).toFixed(2)} USD
-                                    </Text>
-                                </View>
-                                <View style={s.withdrawEstimateRow}>
-                                    <Text style={s.withdrawEstimateLabel}>Network Fee</Text>
-                                    <Text style={[s.withdrawEstimateValue, { color: C.emerald }]}>
-                                        {sendMode === 'internal' ? 'FREE (₦0.00)' : 'NOWPayments Automated'}
-                                    </Text>
-                                </View>
-                            </View>
+                            {(() => {
+                                const selectedNetObj = SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset)?.networks[withdrawNetworkIdx];
+                                const netKey = selectedNetObj?.network || 'TRC20';
+                                const activeFee = sendMode === 'internal' ? 0 : getNetworkWithdrawFee(netKey, withdrawAsset);
+                                const numAmt = parseFloat(withdrawAmount || '0') || 0;
+                                const totalAmt = numAmt > 0 ? (numAmt + activeFee) : 0;
+
+                                return (
+                                    <View style={s.withdrawEstimateBox}>
+                                        <View style={s.withdrawEstimateRow}>
+                                            <Text style={s.withdrawEstimateLabel}>Amount to Send</Text>
+                                            <Text style={s.withdrawEstimateValue}>
+                                                {numAmt} {withdrawAsset} (≈ ${(numAmt * getAssetPriceUsd(withdrawAsset)).toFixed(2)})
+                                            </Text>
+                                        </View>
+                                        <View style={s.withdrawEstimateRow}>
+                                            <Text style={s.withdrawEstimateLabel}>Network / Gas Fee</Text>
+                                            <Text style={[s.withdrawEstimateValue, { color: activeFee === 0 ? C.emerald : C.navyDark, fontWeight: '700' }]}>
+                                                {activeFee === 0 ? 'FREE (₦0.00)' : `${activeFee} ${withdrawAsset}`}
+                                            </Text>
+                                        </View>
+                                        <View style={[s.withdrawEstimateRow, { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 6, marginTop: 4 }]}>
+                                            <Text style={[s.withdrawEstimateLabel, { fontWeight: '700', color: C.navyDark }]}>Total Deducted</Text>
+                                            <Text style={[s.withdrawEstimateValue, { fontWeight: '800', color: C.navyDark, fontSize: 13 }]}>
+                                                {totalAmt.toFixed(4)} {withdrawAsset}
+                                            </Text>
+                                        </View>
+                                        <Text style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>
+                                            🛡️ 100% automated refund rollback if network or gateway fails.
+                                        </Text>
+                                    </View>
+                                );
+                            })()}
 
                             <TouchableOpacity
                                 onPress={handleInitiateSend}
@@ -3791,6 +4164,186 @@ const s = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 10,
         elevation: 4,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    heroWatermarkWrap: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        overflow: 'hidden',
+    },
+    heroLiveTickerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(248, 250, 252, 0.9)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    heroLiveTickerText: {
+        color: C.textSub,
+        fontSize: 9.5,
+        fontWeight: '700',
+        marginLeft: 4,
+    },
+    heroNetworkCountBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 6,
+    },
+    heroNetworkCountText: {
+        color: C.gold,
+        fontSize: 8.5,
+        fontWeight: '800',
+    },
+    tickerTapeContainer: {
+        backgroundColor: C.card,
+        paddingVertical: 7,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+    },
+    tickerTapeScroll: {
+        paddingHorizontal: 12,
+        gap: 8,
+    },
+    tickerTapePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 5,
+    },
+    tickerTapeSym: {
+        color: C.navyDark,
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    tickerTapePrice: {
+        color: C.textMain,
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    tickerTapeChange: {
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
+    featuresHubSection: {
+        backgroundColor: C.card,
+        borderRadius: 16,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
+        elevation: 2,
+    },
+    featuresHubHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    featuresHubTitle: {
+        color: C.navyDark,
+        fontSize: 12,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    featuresHubStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        gap: 4,
+    },
+    featuresHubStatusText: {
+        color: C.emerald,
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    featuresHubGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    featureHubCard: {
+        width: '48.5%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        padding: 9,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 8,
+    },
+    featureHubIconWrap: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+    },
+    featureHubCardTitle: {
+        color: C.textMain,
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    featureHubCardDesc: {
+        color: C.textMuted,
+        fontSize: 8.5,
+        fontWeight: '500',
+        marginTop: 1,
+    },
+    featureMiniBadge: {
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    featureMiniBadgeText: {
+        fontSize: 7.5,
+        fontWeight: '900',
+    },
+    assetNetworkBadge: {
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    assetNetworkBadgeText: {
+        color: C.textSub,
+        fontSize: 8,
+        fontWeight: '800',
+    },
+    assetPriceNgnText: {
+        color: C.textMuted,
+        fontSize: 9,
+        fontWeight: '600',
     },
     heroTop: {
         flexDirection: 'row',
