@@ -397,13 +397,36 @@ export default function DataScreen() {
         }
     };
 
-    // Open Contact Modal and immediately fetch contacts
+    // Open Beneficiary / Contact Modal
     const handleOpenContactModal = () => {
-        handleOpenContactModal();
+        setShowContactModal(true);
         loadDeviceContacts(false);
     };
 
-    
+    // Quick Paste from Clipboard
+    const handlePasteFromClipboard = async () => {
+        try {
+            const clip = await Clipboard.getStringAsync();
+            if (clip) {
+                const cleaned = cleanNigerianPhone(clip);
+                if (cleaned && cleaned.length === 11) {
+                    setPhoneNumber(cleaned);
+                    detectNetwork(cleaned);
+                    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                    showBrandAlert("Phone Pasted", `Pasted: ${cleaned}`, "success");
+                } else if (cleaned) {
+                    setPhoneNumber(cleaned);
+                    detectNetwork(cleaned);
+                    showBrandAlert("Partial Number", `Pasted: ${cleaned}. Please ensure it is 11 digits.`, "info");
+                } else {
+                    showBrandAlert("Invalid Clipboard", "No valid mobile number found in clipboard.", "warning");
+                }
+            } else {
+                showBrandAlert("Clipboard Empty", "Nothing found in clipboard.", "info");
+            }
+        } catch (_) {}
+    };
+
     // Direct Native Contact Picker Launch
     const handleLaunchNativeContactPicker = async () => {
         try {
@@ -914,31 +937,50 @@ export default function DataScreen() {
                                     onChangeText={handlePhoneChange}
                                     maxLength={11}
                                 />
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        setGiftingBeneficiaryActive(false);
-                                        handleOpenContactModal();
-                                    }}
-                                    style={s.beneficiaryBtn}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="people" size={16} color="#0056D2" />
-                                </TouchableOpacity>
+                                {phoneNumber.length === 0 ? (
+                                    <TouchableOpacity 
+                                        onPress={handlePasteFromClipboard}
+                                        style={[s.beneficiaryBtn, { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' }]}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="clipboard-outline" size={15} color="#475569" />
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity onPress={() => handlePhoneChange('')} style={s.clearBtn}>
+                                        <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                                    </TouchableOpacity>
+                                )}
 
                                 <TouchableOpacity 
-                                    onPress={handlePickContact}
+                                    onPress={handleLaunchNativeContactPicker}
                                     style={[s.beneficiaryBtn, { marginLeft: 4, backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="call" size={16} color="#16a34a" />
+                                    <Ionicons name="person-add" size={15} color="#16a34a" />
                                 </TouchableOpacity>
 
-                                {phoneNumber.length > 0 && (
-                                    <TouchableOpacity onPress={() => handlePhoneChange('')} style={s.clearBtn}>
-                                        <Ionicons name="close-circle" size={16} color="#D1D5DB" />
+                                {beneficiaries.length > 0 && (
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setGiftingBeneficiaryActive(false);
+                                            handleOpenContactModal();
+                                        }}
+                                        style={[s.beneficiaryBtn, { marginLeft: 4 }]}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="people" size={15} color="#0056D2" />
                                     </TouchableOpacity>
                                 )}
                             </View>
+
+                            {phoneNumber.length === 11 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, paddingHorizontal: 4 }}>
+                                    <Ionicons name="checkmark-circle" size={13} color="#16a34a" style={{ marginRight: 4 }} />
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#16a34a' }}>
+                                        {network ? `${networksData.find(n => n.id === network)?.name || network.toUpperCase()} Active` : '11-digit Valid Number'}
+                                    </Text>
+                                </View>
+                            )}
 
                             {/* Quick Beneficiaries Chips */}
                             {beneficiaries.length > 0 && (
@@ -975,28 +1017,93 @@ export default function DataScreen() {
                         </View>
                     )}
 
-                    {/* USSD Check Codes Collapsible Card */}
-                    <View style={s.ussdContainer}>
+                    {/* Modern Smart Utilities Bar */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 12 }}>
                         <TouchableOpacity 
                             onPress={() => {
                                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                                 setShowUssdGuide(!showUssdGuide);
+                                if (!showUssdGuide) {
+                                    setShowEstimator(false);
+                                    setShowRolloverTips(false);
+                                }
                             }}
-                            style={s.ussdHeader}
+                            style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                paddingVertical: 8,
+                                paddingHorizontal: 4,
+                                borderRadius: 12,
+                                backgroundColor: showUssdGuide ? '#0d1b3e' : '#ffffff',
+                                borderWidth: 1.5,
+                                borderColor: showUssdGuide ? '#0d1b3e' : '#e2e8f0',
+                            }}
                             activeOpacity={0.8}
                         >
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="help-circle-outline" size={16} color="#d97706" style={{ marginRight: 6 }} />
-                                <Text style={s.ussdHeaderTitle}>USSD Balance Check Codes</Text>
-                            </View>
-                            <Ionicons 
-                                name={showUssdGuide ? "chevron-up" : "chevron-down"} 
-                                size={16} 
-                                color="#64748b" 
-                            />
+                            <Ionicons name="flash-outline" size={13} color={showUssdGuide ? '#f5a623' : '#d97706'} style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: showUssdGuide ? '#ffffff' : '#334155' }}>USSD Codes</Text>
                         </TouchableOpacity>
 
-                        {showUssdGuide && (
+                        <TouchableOpacity 
+                            onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setShowEstimator(!showEstimator);
+                                if (!showEstimator) {
+                                    setShowUssdGuide(false);
+                                    setShowRolloverTips(false);
+                                }
+                            }}
+                            style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                paddingVertical: 8,
+                                paddingHorizontal: 4,
+                                borderRadius: 12,
+                                backgroundColor: showEstimator ? '#0d1b3e' : '#ffffff',
+                                borderWidth: 1.5,
+                                borderColor: showEstimator ? '#0d1b3e' : '#e2e8f0',
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="calculator-outline" size={13} color={showEstimator ? '#60a5fa' : '#2563eb'} style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: showEstimator ? '#ffffff' : '#334155' }}>Estimator</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setShowRolloverTips(!showRolloverTips);
+                                if (!showRolloverTips) {
+                                    setShowUssdGuide(false);
+                                    setShowEstimator(false);
+                                }
+                            }}
+                            style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                paddingVertical: 8,
+                                paddingHorizontal: 4,
+                                borderRadius: 12,
+                                backgroundColor: showRolloverTips ? '#0d1b3e' : '#ffffff',
+                                borderWidth: 1.5,
+                                borderColor: showRolloverTips ? '#0d1b3e' : '#e2e8f0',
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="shield-checkmark-outline" size={13} color={showRolloverTips ? '#4ade80' : '#16a34a'} style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: showRolloverTips ? '#ffffff' : '#334155' }}>Rollover</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* USSD Check Codes Content */}
+                    {showUssdGuide && (
+                        <View style={[s.ussdContainer, { marginTop: 0, marginBottom: 12 }]}>
                             <View style={s.ussdContent}>
                                 {[
                                     { net: 'MTN', code: '*323#', legacy: '*312*4#' },
@@ -1034,28 +1141,9 @@ export default function DataScreen() {
                         )}
                     </View>
 
-                    {/* Data Usage Estimator Collapsible Card */}
-                    <View style={s.estimatorContainer}>
-                        <TouchableOpacity 
-                            onPress={() => {
-                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                                setShowEstimator(!showEstimator);
-                            }}
-                            style={s.estimatorHeader}
-                            activeOpacity={0.8}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="calculator-outline" size={16} color="#0d1b3e" style={{ marginRight: 6 }} />
-                                <Text style={s.estimatorHeaderTitle}>Data Usage Estimator & Recommendations</Text>
-                            </View>
-                            <Ionicons 
-                                name={showEstimator ? "chevron-up" : "chevron-down"} 
-                                size={16} 
-                                color="#64748b" 
-                            />
-                        </TouchableOpacity>
-
-                        {showEstimator && (
+                    {/* Data Usage Estimator Content */}
+                    {showEstimator && (
+                        <View style={[s.estimatorContainer, { marginTop: 0, marginBottom: 12 }]}>
                             <View style={s.estimatorContent}>
                                 <Text style={s.estimatorIntro}>
                                     Adjust your daily usage estimation below to find the best data bundle.
@@ -1186,6 +1274,27 @@ export default function DataScreen() {
                                 <Text style={s.recommendationBannerCloseText}>Clear</Text>
                             </TouchableOpacity>
                         </View>
+                    {/* Data Rollover Guard Content */}
+                    {showRolloverTips && (
+                        <View style={[s.rolloverContainer, { marginTop: 0, marginBottom: 12 }]}>
+                            <View style={s.rolloverContent}>
+                                <Text style={s.rolloverText}>
+                                    Don't lose your unused data! Most networks support rolling over your remaining balance if you purchase a new bundle before the current one expires:
+                                </Text>
+                                <View style={s.rolloverTipItem}>
+                                    <Text style={s.rolloverBullet}>•</Text>
+                                    <Text style={s.rolloverTipText}>
+                                        <Text style={{ fontWeight: '800' }}>MTN & Airtel</Text>: Renew with any plan within 24 hours of expiration to auto-merge balances.
+                                    </Text>
+                                </View>
+                                <View style={s.rolloverTipItem}>
+                                    <Text style={s.rolloverBullet}>•</Text>
+                                    <Text style={s.rolloverTipText}>
+                                        <Text style={{ fontWeight: '800' }}>Glo</Text>: Supports full rollover if you renew with a plan of equal or higher value.
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
                     )}
 
                     {/* Data Plans Grid */}
@@ -1199,24 +1308,75 @@ export default function DataScreen() {
                             {plans.length > 0 && (
                                 <View style={{ marginBottom: 20 }}>
                                 
-                                    {/* Plan Type Dropdown */}
-                                    <View style={s.sectionHeader}>
-                                        <Ionicons name="list-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                                        <Text style={s.sectionTitle}>Select Plan Type</Text>
-                                    </View>
-                                    <TouchableOpacity 
-                                        style={s.dropdownBtn}
-                                        onPress={() => setShowPlanTypeModal(true)}
-                                        activeOpacity={0.8}
-                                    >
+                                    {/* Modern Plan Type Horizontal Selector */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Ionicons name="cellular" size={18} color="#0056D2" style={{ marginRight: 8 }} />
-                                            <Text style={s.dropdownBtnText}>
-                                                {planTypeFilter === 'All' ? 'All Plan Types (SME, CG, Direct...)' : `${planTypeFilter} Plans`}
-                                            </Text>
+                                            <Ionicons name="layers-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                            <Text style={s.sectionTitle}>Plan Category</Text>
                                         </View>
-                                        <Ionicons name="chevron-down" size={20} color="#64748b" />
-                                    </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            onPress={() => setShowPlanTypeModal(true)}
+                                            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2 }}
+                                        >
+                                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#0056D2', marginRight: 2 }}>
+                                                {planTypeFilter === 'All' ? 'More Types' : `${planTypeFilter} Active`}
+                                            </Text>
+                                            <Ionicons name="chevron-forward" size={13} color="#0056D2" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 12 }}>
+                                        {[
+                                            { id: 'All', label: 'All Plans', icon: 'apps-outline' },
+                                            { id: 'SME', label: 'SME', icon: 'business-outline' },
+                                            { id: 'CG', label: 'Corporate (CG)', icon: 'briefcase-outline' },
+                                            { id: 'GIFTING', label: 'Gifting', icon: 'gift-outline' },
+                                            { id: 'DIRECT', label: 'Direct', icon: 'flash-outline' },
+                                            { id: 'MEGA', label: 'Mega Data', icon: 'rocket-outline' },
+                                        ].map((t) => {
+                                            const isActive = planTypeFilter === t.id;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={t.id}
+                                                    onPress={() => {
+                                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                                        setPlanTypeFilter(t.id);
+                                                    }}
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        backgroundColor: isActive ? '#0d1b3e' : '#ffffff',
+                                                        borderWidth: 1.5,
+                                                        borderColor: isActive ? '#0d1b3e' : '#e2e8f0',
+                                                        paddingHorizontal: 12,
+                                                        paddingVertical: 7,
+                                                        borderRadius: 20,
+                                                        marginRight: 6,
+                                                        shadowColor: '#000',
+                                                        shadowOffset: { width: 0, height: 1 },
+                                                        shadowOpacity: isActive ? 0.1 : 0.02,
+                                                        shadowRadius: 2,
+                                                        elevation: isActive ? 2 : 1,
+                                                    }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons 
+                                                        name={t.icon as any} 
+                                                        size={12} 
+                                                        color={isActive ? '#f5a623' : '#64748b'} 
+                                                        style={{ marginRight: 5 }} 
+                                                    />
+                                                    <Text style={{
+                                                        fontSize: 11,
+                                                        fontWeight: isActive ? '800' : '600',
+                                                        color: isActive ? '#ffffff' : '#334155'
+                                                    }}>
+                                                        {t.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
 
                                     {/* Search Bar */}
                                     <View style={{
@@ -1589,63 +1749,66 @@ export default function DataScreen() {
                             )}
                         </View>
                     )}
-
-                    {/* Data Rollover Guard collapsible guide */}
-                    <View style={s.rolloverContainer}>
-                        <TouchableOpacity 
-                            onPress={() => {
-                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                                setShowRolloverTips(!showRolloverTips);
-                            }}
-                            style={s.rolloverHeader}
-                            activeOpacity={0.8}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="shield-half-outline" size={16} color="#16a34a" style={{ marginRight: 6 }} />
-                                <Text style={s.rolloverHeaderTitle}>Data Rollover Guard 🛡️</Text>
-                            </View>
-                            <Ionicons 
-                                name={showRolloverTips ? "chevron-up" : "chevron-down"} 
-                                size={14} 
-                                color="#64748b" 
-                            />
-                        </TouchableOpacity>
-
-                        {showRolloverTips && (
-                            <View style={s.rolloverContent}>
-                                <Text style={s.rolloverText}>
-                                    Don't lose your unused data! Most networks support rolling over your remaining balance if you purchase a new bundle before the current one expires:
-                                </Text>
-                                <View style={s.rolloverTipItem}>
-                                    <Text style={s.rolloverBullet}>•</Text>
-                                    <Text style={s.rolloverTipText}>
-                                        <Text style={{ fontWeight: '800' }}>MTN & Airtel</Text>: Renew with any plan within 24 hours of expiration to auto-merge balances.
-                                    </Text>
-                                </View>
-                                <View style={s.rolloverTipItem}>
-                                    <Text style={s.rolloverBullet}>•</Text>
-                                    <Text style={s.rolloverTipText}>
-                                        <Text style={{ fontWeight: '800' }}>Glo</Text>: Supports full rollover if you renew with a plan of equal or higher value.
-                                    </Text>
-                                </View>
-                                <Text style={[s.rolloverText, { fontStyle: 'italic', marginTop: 6, color: '#16a34a' }]}>
-                                    Activate the Auto-Renew toggle above to automatically protect your data balance!
-                                </Text>
-                            </View>
-                        )}
-                    </View>
                 </ScrollView>
 
-                {/* Bottom Floating Button */}
+                {/* Bottom Floating Bar */}
                 <View style={[s.bottomButtonWrapper, isWeb && s.webPageContainer]}>
+                    {selectedPlan && (
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            backgroundColor: '#ffffff',
+                            borderRadius: 14,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            marginBottom: 8,
+                            borderWidth: 1,
+                            borderColor: '#e2e8f0',
+                        }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0d1b3e' }} numberOfLines={1}>
+                                    {selectedPlan.name}
+                                </Text>
+                                <Text style={{ fontSize: 10, color: '#64748b' }}>
+                                    Validity: {selectedPlan.validity || '30 Days'}
+                                </Text>
+                            </View>
+
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0d1b3e' }}>
+                                    ₦{selectedPlan.price.toLocaleString()}
+                                </Text>
+                                {balance !== null && (
+                                    balance < selectedPlan.price ? (
+                                        <TouchableOpacity 
+                                            onPress={() => router.push('/(app)/wallet')}
+                                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                                        >
+                                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#dc2626' }}>
+                                                Low (₦{balance.toLocaleString()}) • Top Up
+                                            </Text>
+                                            <Ionicons name="add-circle" size={12} color="#dc2626" style={{ marginLeft: 2 }} />
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <Text style={{ fontSize: 10, fontWeight: '600', color: '#16a34a' }}>
+                                            ₦{(balance - selectedPlan.price).toLocaleString()} left after pay
+                                        </Text>
+                                    )
+                                )}
+                            </View>
+                        </View>
+                    )}
+
                     <TouchableOpacity
                         style={[
                             s.purchaseBtn,
-                            network && phoneNumber.length === 11 && selectedPlan && { shadowColor: '#d97706', shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
+                            network && phoneNumber.length === 11 && selectedPlan && { shadowColor: '#d97706', shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
                             !(network && phoneNumber.length === 11 && selectedPlan && !loadingPurchase) && { backgroundColor: '#cbd5e1', shadowOpacity: 0 }
                         ]}
                         onPress={handlePurchase}
                         disabled={!network || phoneNumber.length !== 11 || !selectedPlan || loadingPurchase}
+                        activeOpacity={0.85}
                     >
                         {loadingPurchase ? (
                             <ActivityIndicator color="white" />
@@ -1657,7 +1820,7 @@ export default function DataScreen() {
                                 end={{ x: 1, y: 0 }}
                             >
                                 <Text style={s.purchaseBtnText}>
-                                    {selectedPlan ? `Pay ₦${selectedPlan.price.toLocaleString()}` : 'Purchase Bundle'}
+                                    {selectedPlan ? `Confirm & Pay ₦${selectedPlan.price.toLocaleString()}` : 'Select a Bundle to Continue'}
                                 </Text>
                                 <Ionicons name="arrow-forward" size={16} color="white" style={{ marginLeft: 6 }} />
                             </LinearGradient>
@@ -1721,8 +1884,280 @@ export default function DataScreen() {
             />
             
             {PlanTypeModal()}
+            {ContactModal()}
         </View>
     );
+
+    function ContactModal() {
+        const filteredBeneficiaries = beneficiaries.filter(b => {
+            const query = (contactSearch || '').toLowerCase();
+            return (b.name || '').toLowerCase().includes(query) || (b.phone || '').includes(query);
+        });
+
+        const filteredDeviceContacts = (deviceContacts || []).filter((c: any) => {
+            const query = (contactSearch || '').toLowerCase();
+            return (c.name || '').toLowerCase().includes(query) || (c.phone || '').includes(query);
+        });
+
+        const handleSelectRecipient = (phoneVal: string, nameVal?: string) => {
+            const cleaned = cleanNigerianPhone(phoneVal);
+            if (cleaned) {
+                setPhoneNumber(cleaned);
+                detectNetwork(cleaned);
+                if (nameVal) setRecipientName(nameVal);
+                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                setShowContactModal(false);
+            }
+        };
+
+        return (
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={showContactModal}
+                onRequestClose={() => setShowContactModal(false)}
+            >
+                <TouchableOpacity 
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+                    activeOpacity={1}
+                    onPress={() => setShowContactModal(false)}
+                >
+                    <View 
+                        style={{
+                            backgroundColor: '#ffffff',
+                            borderTopLeftRadius: 28,
+                            borderTopRightRadius: 28,
+                            padding: 20,
+                            maxHeight: '82%',
+                            width: '100%',
+                            maxWidth: 600,
+                            alignSelf: 'center',
+                        }} 
+                        onStartShouldSetResponder={() => true}
+                    >
+                        {/* Modal Header */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                            <View>
+                                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0d1b3e' }}>Select Contact</Text>
+                                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Choose from saved beneficiaries or phonebook</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowContactModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                <Ionicons name="close-circle" size={28} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Tabs: Beneficiaries vs Phone Contacts */}
+                        <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 14 }}>
+                            <TouchableOpacity
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 9,
+                                    borderRadius: 10,
+                                    alignItems: 'center',
+                                    backgroundColor: contactModalTab === 'beneficiaries' ? '#ffffff' : 'transparent',
+                                    shadowColor: contactModalTab === 'beneficiaries' ? '#000' : 'transparent',
+                                    shadowOpacity: contactModalTab === 'beneficiaries' ? 0.06 : 0,
+                                    shadowRadius: 4,
+                                    elevation: contactModalTab === 'beneficiaries' ? 2 : 0,
+                                }}
+                                onPress={() => setContactModalTab('beneficiaries')}
+                            >
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: contactModalTab === 'beneficiaries' ? '#0056D2' : '#64748b' }}>
+                                    Saved ({beneficiaries.length})
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 9,
+                                    borderRadius: 10,
+                                    alignItems: 'center',
+                                    backgroundColor: contactModalTab === 'phonebook' ? '#ffffff' : 'transparent',
+                                    shadowColor: contactModalTab === 'phonebook' ? '#000' : 'transparent',
+                                    shadowOpacity: contactModalTab === 'phonebook' ? 0.06 : 0,
+                                    shadowRadius: 4,
+                                    elevation: contactModalTab === 'phonebook' ? 2 : 0,
+                                }}
+                                onPress={() => {
+                                    setContactModalTab('phonebook');
+                                    if (deviceContacts.length === 0) {
+                                        loadDeviceContacts(false);
+                                    }
+                                }}
+                            >
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: contactModalTab === 'phonebook' ? '#0056D2' : '#64748b' }}>
+                                    Phone Contacts ({deviceContacts.length})
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Search Bar */}
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#f8fafc',
+                            borderWidth: 1,
+                            borderColor: '#e2e8f0',
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            marginBottom: 12,
+                        }}>
+                            <Ionicons name="search" size={18} color="#94a3b8" />
+                            <TextInput
+                                style={{ flex: 1, marginLeft: 8, fontSize: 14, color: '#0f172a' }}
+                                placeholder="Search by name or number..."
+                                placeholderTextColor="#94a3b8"
+                                value={contactSearch}
+                                onChangeText={setContactSearch}
+                                autoCapitalize="none"
+                            />
+                            {contactSearch.length > 0 && (
+                                <TouchableOpacity onPress={() => setContactSearch('')}>
+                                    <Ionicons name="close-circle" size={18} color="#cbd5e1" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* List Content */}
+                        {contactModalTab === 'beneficiaries' ? (
+                            filteredBeneficiaries.length === 0 ? (
+                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                    <Ionicons name="people-outline" size={44} color="#cbd5e1" />
+                                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginTop: 10 }}>
+                                        {contactSearch ? 'No matching saved beneficiaries' : 'No saved beneficiaries yet'}
+                                    </Text>
+                                    <Text style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
+                                        Save frequent recipients during checkout or browse your device contacts.
+                                    </Text>
+                                </View>
+                            ) : (
+                                <FlatList
+                                    data={filteredBeneficiaries}
+                                    keyExtractor={(item, index) => item.id ? String(item.id) : `b-${index}`}
+                                    style={{ maxHeight: 360 }}
+                                    keyboardShouldPersistTaps="handled"
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                paddingVertical: 12,
+                                                borderBottomWidth: 1,
+                                                borderBottomColor: '#f1f5f9',
+                                            }}
+                                            onPress={() => handleSelectRecipient(item.phone, item.name)}
+                                        >
+                                            <View style={{
+                                                width: 40,
+                                                height: 40,
+                                                borderRadius: 20,
+                                                backgroundColor: '#eff6ff',
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                marginRight: 12,
+                                            }}>
+                                                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0056D2' }}>
+                                                    {(item.name || 'B').charAt(0).toUpperCase()}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>{item.name || 'Beneficiary'}</Text>
+                                                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{item.phone}</Text>
+                                            </View>
+                                            {item.network && (
+                                                <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginRight: 8 }}>
+                                                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>{item.network.toUpperCase()}</Text>
+                                                </View>
+                                            )}
+                                            <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            )
+                        ) : (
+                            // Phone Contacts Tab
+                            loadingDeviceContacts ? (
+                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#0056D2" />
+                                    <Text style={{ fontSize: 13, color: '#64748b', marginTop: 10 }}>Reading device contacts...</Text>
+                                </View>
+                            ) : contactsPermissionGranted === false ? (
+                                <View style={{ paddingVertical: 36, alignItems: 'center', paddingHorizontal: 20 }}>
+                                    <Ionicons name="lock-closed-outline" size={42} color="#f59e0b" />
+                                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#0f172a', marginTop: 10, textAlign: 'center' }}>
+                                        Contacts Permission Required
+                                    </Text>
+                                    <Text style={{ fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+                                        Grant access to easily select mobile numbers from your phone address book.
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={{ backgroundColor: '#0056D2', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 }}
+                                        onPress={() => loadDeviceContacts(true)}
+                                    >
+                                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>Grant Permission</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : filteredDeviceContacts.length === 0 ? (
+                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                    <Ionicons name="call-outline" size={44} color="#cbd5e1" />
+                                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginTop: 10 }}>
+                                        {contactSearch ? 'No matching phone contacts' : 'No phone contacts found'}
+                                    </Text>
+                                    <TouchableOpacity 
+                                        style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center' }}
+                                        onPress={() => loadDeviceContacts(true)}
+                                    >
+                                        <Ionicons name="refresh" size={16} color="#0056D2" style={{ marginRight: 4 }} />
+                                        <Text style={{ color: '#0056D2', fontWeight: '700', fontSize: 13 }}>Refresh Contacts</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <FlatList
+                                    data={filteredDeviceContacts}
+                                    keyExtractor={(item) => item.id}
+                                    style={{ maxHeight: 360 }}
+                                    keyboardShouldPersistTaps="handled"
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                paddingVertical: 11,
+                                                borderBottomWidth: 1,
+                                                borderBottomColor: '#f1f5f9',
+                                            }}
+                                            onPress={() => handleSelectRecipient(item.phone, item.name)}
+                                        >
+                                            <View style={{
+                                                width: 38,
+                                                height: 38,
+                                                borderRadius: 19,
+                                                backgroundColor: '#f1f5f9',
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                marginRight: 12,
+                                            }}>
+                                                <Text style={{ fontSize: 15, fontWeight: '700', color: '#475569' }}>
+                                                    {(item.name || 'C').charAt(0).toUpperCase()}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>{item.name}</Text>
+                                                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{item.phone}</Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            )
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+        );
+    }
 
     function PlanTypeModal() {
         // Dynamically get available types from current loaded plans & DB plan_type
