@@ -349,6 +349,8 @@ export default function CryptoScreen() {
     const [assetsRates, setAssetsRates] = useState<CryptoRate[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | 'swap'>('buy');
+    const [sidebarVisible, setSidebarVisible] = useState(false);
+    const [userProfile, setUserProfile] = useState<{ full_name?: string; username?: string; email?: string } | null>(null);
 
     useEffect(() => {
         if (tab === 'gas') setActiveTab('gas');
@@ -478,6 +480,13 @@ export default function CryptoScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
             setUserId(user.id);
+
+            const { data: prof } = await supabase.from('profiles').select('full_name, username').eq('id', user.id).single();
+            setUserProfile({
+                full_name: prof?.full_name || user.user_metadata?.full_name || 'Crypto Trader',
+                username: prof?.username || user.email?.split('@')[0] || 'user',
+                email: user.email || '',
+            });
 
             await Promise.all([
                 fetchUserBalances(user.id),
@@ -1742,27 +1751,345 @@ export default function CryptoScreen() {
         <View style={s.container}>
             <StatusBar style="light" />
 
-            {/* COMPACT CURVED ROYAL NAVY TOP HEADER */}
+            {/* ═══════════════════════════════════════════════════════════════════
+                SIDEBAR NAVIGATION DRAWER (Slide-In Modern Hub Menu)
+            ═══════════════════════════════════════════════════════════════════ */}
+            <Modal
+                visible={sidebarVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSidebarVisible(false)}
+            >
+                <View style={s.sidebarModalOverlay}>
+                    {/* Drawer Content Panel */}
+                    <View style={s.sidebarDrawer}>
+                        <LinearGradient
+                            colors={['#070E22', '#0D1B3E', '#142258']}
+                            style={s.sidebarHeaderGrad}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <View style={s.sidebarUserRow}>
+                                    <View style={s.sidebarAvatar}>
+                                        <Text style={s.sidebarAvatarText}>
+                                            {(userProfile?.full_name || 'U').charAt(0).toUpperCase()}
+                                        </Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.sidebarUserName} numberOfLines={1}>
+                                            {userProfile?.full_name || 'Crypto Trader'}
+                                        </Text>
+                                        <Text style={s.sidebarUserSub} numberOfLines={1}>
+                                            @{userProfile?.username || 'user'}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity onPress={() => setSidebarVisible(false)} style={s.sidebarCloseBtn} activeOpacity={0.7}>
+                                    <Ionicons name="close" size={17} color={C.white} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Universal Wallet ID Pill */}
+                            <TouchableOpacity
+                                onPress={async () => {
+                                    if (userId) {
+                                        await Clipboard.setStringAsync(userId);
+                                        if (Platform.OS !== 'web') {
+                                            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                                        }
+                                        Alert.alert("Wallet ID Copied", userId);
+                                    }
+                                }}
+                                style={s.sidebarWalletPill}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={s.sidebarWalletPillText}>
+                                    ID: {userId ? `${userId.slice(0, 8)}...${userId.slice(-6)}` : '0x82...7b'}
+                                </Text>
+                                <Ionicons name="copy-outline" size={12} color="#94A3B8" />
+                            </TouchableOpacity>
+
+                            {/* Balance Card in Sidebar */}
+                            <View style={s.sidebarBalanceBox}>
+                                <Text style={s.sidebarBalanceLabel}>PORTFOLIO VALUATION</Text>
+                                <Text style={s.sidebarBalanceVal}>
+                                    ${totalPortfolioUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                                </Text>
+                                <Text style={{ color: '#CBD5E1', fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                                    ≈ ₦{totalPortfolioNgn.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} NGN
+                                </Text>
+                            </View>
+                        </LinearGradient>
+
+                        {/* Navigation Items Scroll */}
+                        <ScrollView style={s.sidebarScroll} showsVerticalScrollIndicator={false}>
+                            {/* Fast Action Row */}
+                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSidebarVisible(false);
+                                        setDepositAsset('USDT');
+                                        setDepositNetworkIdx(0);
+                                        setActiveModal('deposit');
+                                    }}
+                                    style={[s.sidebarQuickBtn, { backgroundColor: C.emeraldBg, borderColor: C.emeraldBorder }]}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="arrow-down-circle" size={15} color={C.emerald} />
+                                    <Text style={[s.sidebarQuickBtnText, { color: C.emerald }]}>Deposit</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSidebarVisible(false);
+                                        setWithdrawAsset('USDT');
+                                        setWithdrawNetworkIdx(0);
+                                        setActiveModal('withdraw');
+                                    }}
+                                    style={[s.sidebarQuickBtn, { backgroundColor: C.goldBg, borderColor: '#FDE68A' }]}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="arrow-up-circle" size={15} color={C.gold} />
+                                    <Text style={[s.sidebarQuickBtnText, { color: C.gold }]}>Send</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={s.sidebarSectionTitle}>PORTFOLIO & ASSETS</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveTab('assets');
+                                    setCoinCategoryFilter('all');
+                                }}
+                                style={[s.sidebarNavItem, activeTab === 'assets' && s.sidebarNavItemActive]}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                                    <Ionicons name="wallet-outline" size={15} color={C.blue} />
+                                </View>
+                                <Text style={s.sidebarNavText}>All Assets & Coins</Text>
+                                <View style={[s.sidebarNavBadge, { backgroundColor: '#EFF6FF' }]}>
+                                    <Text style={[s.sidebarNavBadgeText, { color: C.blue }]}>{SUPPORTED_ASSETS.length}</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveTab('assets');
+                                    setCoinCategoryFilter('watchlist');
+                                }}
+                                style={s.sidebarNavItem}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: C.goldBg }]}>
+                                    <Ionicons name="star-outline" size={15} color={C.gold} />
+                                </View>
+                                <Text style={s.sidebarNavText}>My Watchlist</Text>
+                                <View style={[s.sidebarNavBadge, { backgroundColor: C.goldBg }]}>
+                                    <Text style={[s.sidebarNavBadgeText, { color: C.gold }]}>{favorites.length}</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <Text style={s.sidebarSectionTitle}>TRADING DESK</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveTab('trade');
+                                    setTradeMode('buy');
+                                }}
+                                style={s.sidebarNavItem}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                                    <Ionicons name="card-outline" size={15} color={C.purple} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Buy Crypto (Naira)</Text>
+                                <View style={[s.sidebarNavBadge, { backgroundColor: '#F5F3FF' }]}>
+                                    <Text style={[s.sidebarNavBadgeText, { color: C.purple }]}>Instant</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveTab('trade');
+                                    setTradeMode('sell');
+                                }}
+                                style={s.sidebarNavItem}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: C.emeraldBg }]}>
+                                    <Ionicons name="cash-outline" size={15} color={C.emerald} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Sell to Bank (Cashout)</Text>
+                                <View style={[s.sidebarNavBadge, { backgroundColor: C.emeraldBg }]}>
+                                    <Text style={[s.sidebarNavBadgeText, { color: C.emerald }]}>24/7</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveTab('trade');
+                                    setTradeMode('swap');
+                                }}
+                                style={s.sidebarNavItem}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                                    <Ionicons name="swap-horizontal" size={15} color={C.blue} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Cross-Chain DEX Swap</Text>
+                                <View style={[s.sidebarNavBadge, { backgroundColor: '#EFF6FF' }]}>
+                                    <Text style={[s.sidebarNavBadgeText, { color: C.blue }]}>Zero Slip</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <Text style={s.sidebarSectionTitle}>WEB3 & NETWORKS</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveTab('gas');
+                                }}
+                                style={[s.sidebarNavItem, activeTab === 'gas' && s.sidebarNavItemActive]}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: C.emeraldBg }]}>
+                                    <Ionicons name="speedometer-outline" size={15} color={C.emerald} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Gas Station Refill</Text>
+                                <View style={[s.sidebarNavBadge, { backgroundColor: C.emeraldBg }]}>
+                                    <Text style={[s.sidebarNavBadgeText, { color: C.emerald }]}>TRX/BNB/SOL</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveModal('addressBook');
+                                }}
+                                style={s.sidebarNavItem}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: '#F1F5F9' }]}>
+                                    <Ionicons name="bookmarks-outline" size={15} color={C.navyDark} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Whitelisted Wallets</Text>
+                                <View style={[s.sidebarNavBadge, { backgroundColor: '#F1F5F9' }]}>
+                                    <Text style={[s.sidebarNavBadgeText, { color: C.textSub }]}>{savedWallets.length}</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveModal('priceAlert');
+                                }}
+                                style={s.sidebarNavItem}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: '#FEF2F2' }]}>
+                                    <Ionicons name="notifications-outline" size={15} color={C.rose} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Price Alerts</Text>
+                                {priceAlerts.length > 0 && (
+                                    <View style={[s.sidebarNavBadge, { backgroundColor: '#FEF2F2' }]}>
+                                        <Text style={[s.sidebarNavBadgeText, { color: C.rose }]}>{priceAlerts.length} Active</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveModal('converter');
+                                }}
+                                style={s.sidebarNavItem}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: '#ECFEFF' }]}>
+                                    <Ionicons name="calculator-outline" size={15} color={C.cyan} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Rate Calculator</Text>
+                            </TouchableOpacity>
+
+                            <Text style={s.sidebarSectionTitle}>ACTIVITY & STATEMENTS</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSidebarVisible(false);
+                                    setActiveTab('history');
+                                }}
+                                style={[s.sidebarNavItem, activeTab === 'history' && s.sidebarNavItemActive]}
+                            >
+                                <View style={[s.sidebarNavIconWrap, { backgroundColor: '#F8FAFC' }]}>
+                                    <Ionicons name="receipt-outline" size={15} color={C.navyDark} />
+                                </View>
+                                <Text style={s.sidebarNavText}>Transaction History</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+
+                        {/* Footer */}
+                        <View style={s.sidebarFooter}>
+                            <View style={s.sidebarGatewayStatus}>
+                                <View style={s.greenLivePulse} />
+                                <Text style={s.sidebarGatewayText}>NOWPayments Gateway &bull; 12 Chains Active</Text>
+                            </View>
+                            <Text style={{ color: C.textMuted, fontSize: 9.5, fontWeight: '600' }}>
+                                Abu Mafhal Hub v2.4.0 &bull; Secure Multi-Chain Escrow
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Touch backdrop to close */}
+                    <TouchableOpacity
+                        style={{ flex: 1 }}
+                        activeOpacity={1}
+                        onPress={() => setSidebarVisible(false)}
+                    />
+                </View>
+            </Modal>
+
+            {/* MODERN DECORATED CURVED ROYAL NAVY TOP HEADER */}
             <LinearGradient
-                colors={[C.navyDark, C.navyMid]}
+                colors={['#070E22', '#0D1B3E', '#142258']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={[s.headerContainer, { paddingTop: Math.max(insets.top, 16) + 4 }, isWeb && s.webContainer]}
             >
                 <View style={s.headerTopRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <TouchableOpacity onPress={() => router.replace('/dashboard')} style={s.backBtn} activeOpacity={0.7}>
-                            <Ionicons name="arrow-back" size={18} color={C.white} />
+                        {/* SIDEBAR HAMBURGER MENU BUTTON */}
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (Platform.OS !== 'web') {
+                                    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                }
+                                setSidebarVisible(true);
+                            }}
+                            style={s.hamburgerBtn}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="menu" size={20} color={C.white} />
+                            <View style={s.hamburgerDot} />
                         </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => router.replace('/dashboard')} style={s.backBtn} activeOpacity={0.7}>
+                            <Ionicons name="arrow-back" size={17} color={C.white} />
+                        </TouchableOpacity>
+
                         <View>
-                            <Text style={s.headerTitle}>Crypto Hub</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                <Text style={s.headerTitle}>CRYPTO HUB</Text>
+                                <View style={s.headerVipPill}>
+                                    <Text style={s.headerVipText}>PRO</Text>
+                                </View>
+                            </View>
                             <View style={s.nowPaymentsBadge}>
                                 <View style={s.greenLivePulse} />
-                                <Text style={s.nowPaymentsBadgeText}>12 Chains Live ⚡</Text>
+                                <Text style={s.nowPaymentsBadgeText}>12 Chains Active &bull; 0.4s ⚡</Text>
                             </View>
                         </View>
                     </View>
 
                     {/* USEFUL QUICK CRYPTO UTILITY SHORTCUTS */}
-                    <View style={{ flexDirection: 'row', gap: 5 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        {/* Live Ping Chip */}
+                        <View style={s.livePingChip}>
+                            <View style={s.livePingDot} />
+                            <Text style={s.livePingText}>42ms</Text>
+                        </View>
+
                         <TouchableOpacity 
                             onPress={() => {
                                 setDepositAsset('USDT');
@@ -3997,6 +4324,61 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 8,
     },
+    hamburgerBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.18)',
+        position: 'relative',
+    },
+    hamburgerDot: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#34D399',
+    },
+    headerVipPill: {
+        backgroundColor: 'rgba(217, 119, 6, 0.25)',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 0.5,
+        borderColor: 'rgba(217, 119, 6, 0.5)',
+    },
+    headerVipText: {
+        color: '#FCD34D',
+        fontSize: 7.5,
+        fontWeight: '900',
+    },
+    livePingChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 8,
+        borderWidth: 0.5,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    livePingDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#34D399',
+        marginRight: 4,
+    },
+    livePingText: {
+        color: '#E2E8F0',
+        fontSize: 9,
+        fontWeight: '700',
+    },
     backBtn: {
         width: 32,
         height: 32,
@@ -4054,6 +4436,179 @@ const s = StyleSheet.create({
         height: 6,
         borderRadius: 3,
         backgroundColor: '#EF4444',
+    },
+    // Sidebar Drawer Menu Styles
+    sidebarModalOverlay: {
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    },
+    sidebarDrawer: {
+        width: 310,
+        maxWidth: '85%',
+        height: '100%',
+        backgroundColor: C.card,
+        shadowColor: '#000',
+        shadowOffset: { width: 4, height: 0 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        elevation: 16,
+    },
+    sidebarHeaderGrad: {
+        paddingTop: Platform.OS === 'ios' ? 48 : 28,
+        paddingBottom: 16,
+        paddingHorizontal: 16,
+    },
+    sidebarUserRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        flex: 1,
+    },
+    sidebarAvatar: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    sidebarAvatarText: {
+        color: C.white,
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    sidebarUserName: {
+        color: C.white,
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    sidebarUserSub: {
+        color: '#94A3B8',
+        fontSize: 11,
+        marginTop: 1,
+    },
+    sidebarCloseBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    sidebarWalletPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        marginTop: 10,
+        borderWidth: 0.5,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    sidebarWalletPillText: {
+        color: '#CBD5E1',
+        fontSize: 10.5,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    sidebarBalanceBox: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 10,
+        padding: 10,
+        marginTop: 10,
+    },
+    sidebarBalanceLabel: {
+        color: '#94A3B8',
+        fontSize: 9.5,
+        fontWeight: '700',
+    },
+    sidebarBalanceVal: {
+        color: C.white,
+        fontSize: 15.5,
+        fontWeight: '900',
+        marginTop: 2,
+    },
+    sidebarScroll: {
+        flex: 1,
+        paddingHorizontal: 12,
+        paddingTop: 10,
+    },
+    sidebarQuickBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 6,
+    },
+    sidebarQuickBtnText: {
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    sidebarSectionTitle: {
+        color: C.textMuted,
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.8,
+        marginTop: 10,
+        marginBottom: 4,
+        paddingHorizontal: 8,
+    },
+    sidebarNavItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 9,
+        paddingHorizontal: 10,
+        borderRadius: 10,
+        marginBottom: 2,
+    },
+    sidebarNavItemActive: {
+        backgroundColor: C.blueBg,
+    },
+    sidebarNavIconWrap: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    sidebarNavText: {
+        flex: 1,
+        color: C.textMain,
+        fontSize: 12.5,
+        fontWeight: '700',
+    },
+    sidebarNavBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    sidebarNavBadgeText: {
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    sidebarFooter: {
+        padding: 12,
+        borderTopWidth: 1,
+        borderTopColor: C.borderSubtle,
+        backgroundColor: C.bg,
+    },
+    sidebarGatewayStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    sidebarGatewayText: {
+        color: C.textSub,
+        fontSize: 9.5,
+        fontWeight: '700',
     },
     heroCard: {
         backgroundColor: C.card,
@@ -4843,49 +5398,47 @@ const s = StyleSheet.create({
         fontSize: 8.5,
         fontWeight: '800',
     },
-    // Modals
+    // Full Page Expansive Screen Styles ("budewa da girmansa yana bude page dinsa")
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.6)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 16,
+        backgroundColor: C.bg,
     },
     modalCard: {
-        backgroundColor: C.card,
-        borderRadius: 20,
-        padding: 18,
+        flex: 1,
+        backgroundColor: C.bg,
         width: '100%',
-        maxWidth: 390,
-        maxHeight: '90%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.15,
-        shadowRadius: 16,
-        elevation: 10,
+        maxWidth: 720,
+        alignSelf: 'center',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 44 : 12,
+        paddingBottom: 24,
     },
     webModalCard: {
-        maxWidth: 420,
+        maxWidth: 720,
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingBottom: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 2,
         borderBottomWidth: 1,
         borderBottomColor: C.borderSubtle,
-        marginBottom: 12,
+        marginBottom: 14,
     },
     modalTitle: {
         color: C.textMain,
-        fontSize: 15,
-        fontWeight: '800',
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: 0.2,
     },
     modalCloseBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: C.inputBg,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: C.card,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
         alignItems: 'center',
         justifyContent: 'center',
     },
