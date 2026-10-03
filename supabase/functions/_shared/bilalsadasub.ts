@@ -31,17 +31,26 @@ export class BilalsadasubClient {
         return 1;
     }
 
+    private cleanPhone(phone: string): string {
+        let p = (phone || '').replace(/\D/g, '');
+        if (p.startsWith('234') && p.length === 13) {
+            p = '0' + p.slice(3);
+        }
+        return p;
+    }
+
     /**
      * Buy Airtime via Bilalsadasub
      */
     async buyAirtime(network: string, phone: string, amount: number, requestId: string) {
         const networkId = this.getNetworkId(network);
+        const formattedPhone = this.cleanPhone(phone);
         let res = await fetch(`${this.baseUrl}/api/topup/`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify({
                 network: networkId,
-                phone: phone,
+                phone: formattedPhone,
                 amount: amount,
                 airtime_type: "VTU",
                 "request-id": requestId
@@ -54,7 +63,7 @@ export class BilalsadasubClient {
                 headers: this.getHeaders(),
                 body: JSON.stringify({
                     network: networkId,
-                    phone: phone,
+                    phone: formattedPhone,
                     amount: amount,
                     airtime_type: "VTU",
                     "request-id": requestId
@@ -64,10 +73,11 @@ export class BilalsadasubClient {
 
         const data = await res.json().catch(() => null);
 
-        if (data && (data.status === 'success' || data.status === 'process')) {
+        const statusStr = (data?.status || data?.Status || '').toString().toLowerCase();
+        if (data && (statusStr === 'success' || statusStr === 'successful' || statusStr === 'process' || statusStr === 'completed' || data.success === true)) {
             return {
                 status: 'ORDER_COMPLETED',
-                orderid: data['request-id'] || requestId,
+                orderid: data['request-id'] || data.ident || requestId,
                 message: data.message || 'Airtime top-up successful'
             };
         } else {
@@ -80,31 +90,56 @@ export class BilalsadasubClient {
      */
     async buyData(network: string, phone: string, planId: string, requestId: string) {
         const networkId = this.getNetworkId(network);
+        const formattedPhone = this.cleanPhone(phone);
         const cleanPlanId = (planId || '').toString().replace(/^[^\d]+/, '');
         const planInt = parseInt(cleanPlanId || planId, 10);
+        const finalPlanId = isNaN(planInt) ? planId : planInt;
 
-        const res = await fetch(`${this.baseUrl}/api/data`, {
+        const payload = {
+            network: networkId,
+            phone: formattedPhone,
+            data_plan: finalPlanId,
+            bypass: false,
+            "request-id": requestId
+        };
+
+        console.log(`[Bilalsadasub] Dispatching Data: Network=${networkId}, Phone=${formattedPhone}, Plan=${finalPlanId}`);
+
+        let res = await fetch(`${this.baseUrl}/api/data/`, {
             method: 'POST',
             headers: this.getHeaders(),
-            body: JSON.stringify({
-                network: networkId,
-                phone: phone,
-                data_plan: isNaN(planInt) ? planId : planInt,
-                bypass: false,
-                "request-id": requestId
-            })
+            body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${this.baseUrl}/api/data`, {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify(payload)
+            });
+        }
 
-        if (data && (data.status === 'success' || data.status === 'process')) {
+        const data = await res.json().catch(() => null);
+        console.log(`[Bilalsadasub] Data Response (HTTP ${res.status}):`, JSON.stringify(data));
+
+        const statusStr = (data?.status || data?.Status || '').toString().toLowerCase();
+        const isSuccess = data && (
+            statusStr === 'success' ||
+            statusStr === 'successful' ||
+            statusStr === 'process' ||
+            statusStr === 'completed' ||
+            data.success === true
+        );
+
+        if (isSuccess) {
             return {
                 status: 'ORDER_COMPLETED',
-                orderid: data['request-id'] || requestId,
+                orderid: data['request-id'] || data.ident || data.id || requestId,
                 message: data.message || 'Data purchase successful'
             };
         } else {
-            throw new Error(data.message || data.error || 'Failed to buy data via Bilalsadasub');
+            const errorMsg = data?.message || data?.error || data?.detail || `Failed to buy data via Bilalsadasub (HTTP ${res.status})`;
+            throw new Error(errorMsg);
         }
     }
 

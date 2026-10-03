@@ -99,16 +99,16 @@ Deno.serve(async (req: Request) => {
             
         const ckUserId = secretsMap['CLUBKONNECT_USER_ID'] || secretsMap['CLUBKONNECT_USER'] || Deno.env.get('CLUBKONNECT_USER_ID') || 'CK101269551';
         const ckApiKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || secretsMap['CLUBKONNECT_PASS'] || Deno.env.get('CLUBKONNECT_API_KEY') || '';
-        const bigiToken = secretsMap['BIGI_API_TOKEN'] || secretsMap['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || '';
-        const bigiPin = secretsMap['BIGI_API_PIN'] || secretsMap['BIGI_PIN'] || Deno.env.get('BIGI_API_PIN') || '';
-        const bilalToken = secretsMap['BILALSADASUB_TOKEN'] || secretsMap['BILAL_TOKEN'] || secretsMap['BILALSADASUB_API_KEY'] || secretsMap['BILAL_API_KEY'] || Deno.env.get('BILALSADASUB_TOKEN') || '';
+        const bigiToken = secretsMap['BIGI_API_TOKEN'] || secretsMap['BIGI_TOKEN'] || secretsMap['BIGISUB_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || Deno.env.get('BIGI_TOKEN') || '';
+        const bigiPin = secretsMap['BIGI_API_PIN'] || secretsMap['BIGI_PIN'] || secretsMap['BIGISUB_PIN'] || Deno.env.get('BIGI_API_PIN') || Deno.env.get('BIGI_PIN') || '';
+        const bilalToken = secretsMap['BILALSADASUB_TOKEN'] || secretsMap['BILAL_TOKEN'] || secretsMap['BILALSADASUB_API_KEY'] || secretsMap['BILAL_API_KEY'] || secretsMap['BILAL_API_TOKEN'] || secretsMap['BILAL_KEY'] || Deno.env.get('BILALSADASUB_TOKEN') || Deno.env.get('BILAL_TOKEN') || '';
 
         // Fetch VTU vendor from app_settings
         const { data: settingsData } = await rpcClient
             .from('app_settings')
             .select('key, value')
             .eq('key', 'vtu_vendor');
-        let vtuVendor = (settingsData && settingsData.length > 0 && settingsData[0].value) ? settingsData[0].value.toLowerCase() : '';
+        let vtuVendor = (settingsData && settingsData.length > 0 && settingsData[0].value) ? (typeof settingsData[0].value === 'string' ? settingsData[0].value.toLowerCase() : (settingsData[0].value?.vendor || '').toLowerCase()) : '';
 
         // Allow explicit override via request body vendor parameter if supplied
         if (data && data.vendor) {
@@ -117,8 +117,8 @@ Deno.serve(async (req: Request) => {
 
         // Smart fail-safe fallback: If no vendor explicitly saved in app_settings, pick configured vendor from system_secrets
         if (!vtuVendor) {
-            if (bigiToken) vtuVendor = 'bigi';
-            else if (bilalToken) vtuVendor = 'bilalsadasub';
+            if (bilalToken) vtuVendor = 'bilalsadasub';
+            else if (bigiToken) vtuVendor = 'bigi';
             else vtuVendor = 'clubkonnect';
         }
 
@@ -206,16 +206,18 @@ Deno.serve(async (req: Request) => {
 
         let providerParams: Record<string, string | number> = {};
 
+        let planVendor = '';
         if (type === 'data') {
-            const { data: plan, error: planError } = await supabaseClient
+            const { data: plan, error: planError } = await rpcClient
                 .from('data_plans')
                 .select('*')
                 .eq('plan_id', data.planId)
-                .single();
+                .maybeSingle();
             
             if (planError || !plan) throw new Error(`Invalid Data Plan: ${data.planId}`);
             
-            amountToCharge = plan.selling_price;
+            amountToCharge = Number(plan.selling_price);
+            planVendor = (plan.api_vendor || '').toLowerCase();
             providerParams = { network: networkCode, phone: data.phone, planId: plan.plan_id };
         } else if (type === 'airtime') {
             amountToCharge = Number(data.amount);
@@ -368,8 +370,18 @@ Deno.serve(async (req: Request) => {
 
                 if (type === 'data') {
                     // CRITICAL: Data plans have vendor-specific IDs! 
-                    // Never fallback to a different vendor because plan ID '2' on Bilalsadasub might cost N100 but plan ID '2' on Bigi might cost N2000!
-                    vendorOrder = vtuVendor ? [vtuVendor.split(',')[0].trim()] : ['bilalsadasub'];
+                    // Never fallback to an arbitrary vendor because plan IDs differ across providers!
+                    const preferredVendor = (planVendor || (data && data.vendor) || vtuVendor || '').toLowerCase().trim();
+                    if (preferredVendor) {
+                        vendorOrder = [preferredVendor.split(',')[0].trim()];
+                    } else if (bilalToken) {
+                        vendorOrder = ['bilalsadasub'];
+                    } else if (bigiToken && bigiPin) {
+                        vendorOrder = ['bigi'];
+                    } else {
+                        vendorOrder = ['clubkonnect'];
+                    }
+                    console.log(`[Bills] Resolved Data Vendor: ${vendorOrder[0]} (PlanVendor: ${planVendor || 'none'}, ReqVendor: ${data?.vendor || 'none'})`);
                 } else {
                     // Airtime can safely fallback because amounts are generic
                     if (vtuVendor && vtuVendor.includes(',')) {

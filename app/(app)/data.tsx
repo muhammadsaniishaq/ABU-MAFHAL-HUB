@@ -15,6 +15,7 @@ import { createAppNotification } from '../../services/notificationsHelper';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
+import BrandAlertModal, { AlertType, BrandAlertState } from '../../components/BrandAlertModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { validateNigerianPhone } from '../../utils/securityUtils';
 
@@ -226,6 +227,44 @@ export default function DataScreen() {
     const [loadingPlans, setLoadingPlans] = useState(false);
     const [loadingPurchase, setLoadingPurchase] = useState(false);
     
+    // Smooth Brand Alert State
+    const [brandAlert, setBrandAlert] = useState<BrandAlertState>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+        buttonText: 'OK',
+    });
+
+    const showBrandAlert = useCallback((
+        title: string, 
+        message: string, 
+        type: AlertType = 'info', 
+        buttonText: string = 'OK', 
+        onConfirm?: () => void,
+        showCancel: boolean = false,
+        cancelText: string = 'Cancel',
+        onCancel?: () => void
+    ) => {
+        try {
+            if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (_) {}
+
+        setBrandAlert({
+            visible: true,
+            title,
+            message,
+            type,
+            buttonText,
+            onConfirm,
+            showCancel,
+            cancelText,
+            onCancel
+        });
+    }, []);
+    
     // Fetch dynamic networks (Merge with base NETWORKS_DATA to ensure VITEL is never removed)
     useEffect(() => {
         const fetchNetworks = async () => {
@@ -375,13 +414,14 @@ export default function DataScreen() {
             const { status } = await Contacts.requestPermissionsAsync();
             setContactsPermissionGranted(status === 'granted');
             if (status !== 'granted') {
-                Alert.alert(
+                showBrandAlert(
                     'Contacts Permission Needed',
                     'Please allow contacts access in settings to select numbers directly from your address book.',
-                    [
-                        { text: 'View In-App List', onPress: () => handleOpenContactModal() },
-                        { text: 'Cancel', style: 'cancel' }
-                    ]
+                    'warning',
+                    'View In-App List',
+                    () => handleOpenContactModal(),
+                    true,
+                    'Cancel'
                 );
                 return;
             }
@@ -396,7 +436,7 @@ export default function DataScreen() {
                     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
                 }
             } else if (contact) {
-                Alert.alert('No Phone Number', 'The contact you selected does not have a valid mobile number.');
+                showBrandAlert('No Phone Number', 'The contact you selected does not have a valid mobile number.', 'warning');
             }
         } catch (e) { console.warn(e); }
     };
@@ -489,14 +529,14 @@ export default function DataScreen() {
                     setDeviceContacts(data.filter(c => c.phoneNumbers && c.phoneNumbers.length > 0));
                     handleOpenContactModal();
                 } else {
-                    Alert.alert("No Contacts", "Your contact list is empty.");
+                    showBrandAlert("No Contacts", "Your contact list is empty.", "info");
                 }
             } else {
-                Alert.alert('Permission Denied', 'Permission to access contacts was denied.');
+                showBrandAlert('Permission Denied', 'Permission to access contacts was denied.', 'warning');
             }
         } catch (error) {
             console.log('Error fetching contacts:', error);
-            Alert.alert('Error', 'Failed to open contacts.');
+            showBrandAlert('Error', 'Failed to open contacts.', 'error');
         }
     };
 
@@ -577,7 +617,7 @@ export default function DataScreen() {
              const phone = parts[1];
              setPhoneNumber(phone);
              detectNetwork(phone);
-             Alert.alert("Quick Load", `Phone number ${phone} loaded. Please select your plan.`);
+             showBrandAlert("Quick Load", `Phone number ${phone} loaded. Please select your plan.`, "info");
         }
     };
 
@@ -615,7 +655,7 @@ export default function DataScreen() {
             setPlans(sorted);
         } catch (error) {
             console.error(error);
-            Alert.alert("Error", "Failed to load data plans. Please try again.");
+            showBrandAlert("Data Plans", "Failed to load data plans. Please try again.", "error");
             setPlans([]);
         } finally {
             setLoadingPlans(false);
@@ -624,18 +664,18 @@ export default function DataScreen() {
 
     const handlePurchase = () => {
         if (!network || !phoneNumber || !selectedPlan) {
-            Alert.alert("Missing Details", "Please select a network, data plan, and enter a phone number.");
+            showBrandAlert("Missing Details", "Please select a network, data plan, and enter a phone number.", "warning");
             return;
         }
 
         if (phoneNumber.length !== 11) {
-            Alert.alert("Incomplete Phone Number", `Phone number is incomplete (${phoneNumber.length}/11 digits). Please enter all 11 digits.`);
+            showBrandAlert("Incomplete Phone Number", `Phone number is incomplete (${phoneNumber.length}/11 digits). Please enter all 11 digits.`, "warning");
             return;
         }
 
         const phoneValidation = validateNigerianPhone(phoneNumber);
         if (!phoneValidation.isValid) {
-            Alert.alert("Invalid Phone Number", phoneValidation.error || "Please enter a valid 11-digit Nigerian mobile phone number.");
+            showBrandAlert("Invalid Phone Number", phoneValidation.error || "Please enter a valid 11-digit Nigerian mobile phone number.", "warning");
             return;
         }
 
@@ -696,7 +736,7 @@ export default function DataScreen() {
             }
         } catch (error: any) {
             console.error(error);
-            Alert.alert("Error", error.message || "Something went wrong");
+            showBrandAlert("Purchase Failed", error.message || "Something went wrong", "error");
         } finally {
             setLoadingPurchase(false);
         }
@@ -974,7 +1014,7 @@ export default function DataScreen() {
                                                 style={s.ussdActionBtn} 
                                                 onPress={async () => {
                                                     await Clipboard.setStringAsync(item.code);
-                                                    Alert.alert("Copied", `${item.code} copied to clipboard!`);
+                                                    showBrandAlert("Copied", `${item.code} copied to clipboard!`, "success");
                                                 }}
                                             >
                                                 <Ionicons name="copy-outline" size={13} color="#0d1b3e" />
@@ -1658,6 +1698,26 @@ export default function DataScreen() {
                 title="Authorize Purchase"
                 description={selectedPlan ? `Confirm purchase of ${selectedPlan.name} for ${phoneNumber} @ ₦${selectedPlan.price}` : "Enter PIN"}
                 requiredFor="purchase"
+            />
+
+            <BrandAlertModal
+                visible={brandAlert.visible}
+                title={brandAlert.title}
+                message={brandAlert.message}
+                type={brandAlert.type}
+                buttonText={brandAlert.buttonText || 'OK'}
+                onClose={() => {
+                    const cb = brandAlert.onConfirm;
+                    setBrandAlert(prev => ({ ...prev, visible: false }));
+                    if (cb) cb();
+                }}
+                showCancel={brandAlert.showCancel}
+                cancelText={brandAlert.cancelText}
+                onCancel={() => {
+                    const cb = brandAlert.onCancel;
+                    setBrandAlert(prev => ({ ...prev, visible: false }));
+                    if (cb) cb();
+                }}
             />
             
             {PlanTypeModal()}
