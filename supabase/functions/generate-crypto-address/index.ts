@@ -59,13 +59,17 @@ serve(async (req: Request) => {
             }
         }
 
-        // Get NowPayments API Key from system secrets or env
+        // Get NowPayments API Key from system secrets, app_settings, or env
         let NOWPAYMENTS_API_KEY = Deno.env.get('NOWPAYMENTS_API_KEY') || Deno.env.get('NOWPAYMENTS_KEY');
         if (!NOWPAYMENTS_API_KEY) {
             const { data: secrets } = await supabaseAdmin
                 .from('system_secrets')
                 .select('key, value')
-                .in('key', ['NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY']);
+                .in('key', [
+                    'NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY', 
+                    'nowpayments_api_key', 'nowpayments_key',
+                    'NOWPAYMENTS_TOKEN', 'nowpayments_token'
+                ]);
 
             if (secrets && secrets.length > 0) {
                 const found = secrets.find(s => s.value && s.value.trim().length > 0);
@@ -74,14 +78,50 @@ serve(async (req: Request) => {
         }
 
         if (!NOWPAYMENTS_API_KEY) {
-            throw new Error('NowPayments Gateway is not configured. Please contact administrator.');
+            const { data: appSettings } = await supabaseAdmin
+                .from('app_settings')
+                .select('key, value')
+                .in('key', ['NOWPAYMENTS_API_KEY', 'nowpayments_api_key', 'nowpayments_token'])
+                .maybeSingle();
+
+            if (appSettings?.value) {
+                NOWPAYMENTS_API_KEY = typeof appSettings.value === 'string' 
+                    ? appSettings.value.trim() 
+                    : (appSettings.value.key || appSettings.value.api_key || '');
+            }
         }
 
-        // Standard deposit nominal price amount (default $5 or $10 so test deposits match easily)
-        const nominalAmount = amountUsd && Number(amountUsd) > 0 ? Number(amountUsd) : 5;
+        if (!NOWPAYMENTS_API_KEY) {
+            throw new Error('NowPayments Gateway is not configured in Admin Vault. Please set NOWPAYMENTS_API_KEY.');
+        }
+
+        // Calculate safe price_amount to strictly satisfy NowPayments minimum payment limit
+        let targetAmountUsd = amountUsd && Number(amountUsd) > 0 ? Number(amountUsd) : 10;
+
+        try {
+            // Query NOWPayments minimum amount endpoint for this currency pair
+            const minRes = await fetch(`https://api.nowpayments.io/v1/min-amount?currency_from=usd&currency_to=${normCurrency}`, {
+                headers: { 'x-api-key': NOWPAYMENTS_API_KEY }
+            });
+            if (minRes.ok) {
+                const minData = await minRes.json();
+                const minAmt = Number(minData.min_amount || minData.fiat_equivalent || 0);
+                if (minAmt > 0) {
+                    // Buffer by 15% + $2 to ensure zero AMOUNT_TOO_SMALL rejections
+                    targetAmountUsd = Math.max(targetAmountUsd, Math.ceil(minAmt * 1.15) + 2);
+                }
+            }
+        } catch (minErr) {
+            console.warn('[NowPayments] Min-amount query warning:', minErr);
+            // Safe fallback minimums per asset if min-amount query fails
+            if (normCurrency === 'btc') targetAmountUsd = Math.max(targetAmountUsd, 25);
+            else if (normCurrency.startsWith('eth')) targetAmountUsd = Math.max(targetAmountUsd, 20);
+            else if (normCurrency === 'sol') targetAmountUsd = Math.max(targetAmountUsd, 15);
+            else if (normCurrency === 'bnb' || normCurrency.startsWith('bnb')) targetAmountUsd = Math.max(targetAmountUsd, 15);
+        }
 
         const paymentBody = {
-            price_amount: nominalAmount,
+            price_amount: targetAmountUsd,
             price_currency: 'usd',
             pay_currency: normCurrency,
             ipn_callback_url: `${supabaseUrl}/functions/v1/crypto-webhook`,
@@ -102,7 +142,8 @@ serve(async (req: Request) => {
 
         if (!response.ok || !data.pay_address) {
             console.error('[NowPayments Address Gen Error]:', data);
-            throw new Error(data.message || 'Failed to generate crypto address from provider');
+            const errDetail = data.message || data.error || (typeof data === 'string' ? data : 'Provider address error');
+            throw new Error(`NowPayments: ${errDetail}`);
         }
 
         const newAddress = data.pay_address;

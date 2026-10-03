@@ -84,13 +84,17 @@ serve(async (req: Request) => {
             });
         }
 
-        // Fetch NowPayments API Key
+        // Fetch NowPayments API Key (env → system_secrets → app_settings)
         let NOWPAYMENTS_API_KEY = Deno.env.get('NOWPAYMENTS_API_KEY') || Deno.env.get('NOWPAYMENTS_KEY');
         if (!NOWPAYMENTS_API_KEY) {
             const { data: secrets } = await supabaseAdmin
                 .from('system_secrets')
                 .select('key, value')
-                .in('key', ['NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY']);
+                .in('key', [
+                    'NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY',
+                    'nowpayments_api_key', 'nowpayments_key',
+                    'NOWPAYMENTS_TOKEN', 'nowpayments_token'
+                ]);
 
             if (secrets && secrets.length > 0) {
                 const found = secrets.find(s => s.value && s.value.trim().length > 0);
@@ -99,7 +103,20 @@ serve(async (req: Request) => {
         }
 
         if (!NOWPAYMENTS_API_KEY) {
-            throw new Error('NowPayments gateway is not configured.');
+            const { data: appSetting } = await supabaseAdmin
+                .from('app_settings')
+                .select('value')
+                .in('key', ['NOWPAYMENTS_API_KEY', 'nowpayments_api_key', 'nowpayments_token'])
+                .maybeSingle();
+            if (appSetting?.value) {
+                NOWPAYMENTS_API_KEY = typeof appSetting.value === 'string'
+                    ? appSetting.value.trim()
+                    : (appSetting.value.key || appSetting.value.api_key || '');
+            }
+        }
+
+        if (!NOWPAYMENTS_API_KEY) {
+            throw new Error('NowPayments gateway is not configured. Set NOWPAYMENTS_API_KEY in Admin Vault.');
         }
 
         // Query NowPayments API for this payment
