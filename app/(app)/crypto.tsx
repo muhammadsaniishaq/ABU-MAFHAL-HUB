@@ -348,6 +348,7 @@ export default function CryptoScreen() {
     const [currencyDisplay, setCurrencyDisplay] = useState<'USD' | 'NGN'>('USD');
     const [assetsRates, setAssetsRates] = useState<CryptoRate[]>([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | 'swap'>('buy');
 
     useEffect(() => {
         if (tab === 'gas') setActiveTab('gas');
@@ -1826,7 +1827,7 @@ export default function CryptoScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* 4 CLEAN PRIMARY FINTECH ACTIONS (Zero Clutter, Zero Duplication) */}
+                    {/* 2 PRIMARY CORE WALLET ACTIONS (Zero Clutter, Zero Duplication) */}
                     <View style={s.quickActionsRow}>
                         <TouchableOpacity 
                             onPress={() => {
@@ -1838,9 +1839,9 @@ export default function CryptoScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={[s.actionIconWrap, { backgroundColor: C.emeraldBg, borderColor: C.emeraldBorder }]}>
-                                <Ionicons name="arrow-down" size={18} color={C.emerald} />
+                                <Ionicons name="arrow-down" size={20} color={C.emerald} />
                             </View>
-                            <Text style={s.actionText}>Deposit</Text>
+                            <Text style={s.actionText}>Deposit Crypto</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
@@ -1853,37 +1854,9 @@ export default function CryptoScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={[s.actionIconWrap, { backgroundColor: C.goldBg, borderColor: '#FDE68A' }]}>
-                                <Ionicons name="arrow-up" size={18} color={C.gold} />
+                                <Ionicons name="arrow-up" size={20} color={C.gold} />
                             </View>
-                            <Text style={s.actionText}>Send</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={() => {
-                                setBuyAsset('USDT');
-                                setActiveModal('buy');
-                            }}
-                            style={s.actionButton}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[s.actionIconWrap, { backgroundColor: C.blueBg, borderColor: '#BFDBFE' }]}>
-                                <Ionicons name="card-outline" size={18} color={C.blue} />
-                            </View>
-                            <Text style={s.actionText}>Buy</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={() => {
-                                setSellAsset('USDT');
-                                setActiveModal('sell');
-                            }}
-                            style={s.actionButton}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[s.actionIconWrap, { backgroundColor: C.purpleBg, borderColor: '#DDD6FE' }]}>
-                                <Ionicons name="cash-outline" size={18} color={C.purple} />
-                            </View>
-                            <Text style={s.actionText}>Sell</Text>
+                            <Text style={s.actionText}>Send / Transfer</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1921,12 +1894,12 @@ export default function CryptoScreen() {
                 </ScrollView>
             </View>
 
-            {/* CLEAN 4 TABS */}
+            {/* CLEAN 4 DISTINCT TABS */}
             <View style={[s.tabBarContainer, isWeb && s.webContainer]}>
                 {[
                     { id: 'assets', label: 'Assets' },
-                    { id: 'gas', label: 'Gas Station ⛽' },
-                    { id: 'trade', label: 'Swap' },
+                    { id: 'trade', label: 'Trade' },
+                    { id: 'gas', label: 'Gas ⛽' },
                     { id: 'history', label: 'History' },
                 ].map(t => {
                     const isActive = activeTab === t.id;
@@ -2358,120 +2331,344 @@ export default function CryptoScreen() {
                     </View>
                 )}
 
-                {/* ─── TAB 3: INSTANT DEX SWAP ─────────────────────────────────── */}
+                {/* ─── TAB 2: UNIFIED TRADING DESK (Buy, Sell, Swap) ──────────── */}
                 {activeTab === 'trade' && (
                     <View style={s.swapContainer}>
-                        <View style={s.swapCard}>
-                            <View style={s.swapHeader}>
-                                <Text style={s.swapTitle}>Instant Crypto Swap</Text>
-                                <View style={s.zeroFeeBadge}>
-                                    <Text style={s.zeroFeeBadgeText}>0% Fee</Text>
+                        {/* 3-WAY TRADING SEGMENT TOGGLE */}
+                        <View style={s.tradeSegmentRow}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (Platform.OS !== 'web') {
+                                        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                    }
+                                    setTradeMode('buy');
+                                }}
+                                style={[s.tradeSegmentBtn, tradeMode === 'buy' && s.tradeSegmentBtnActive]}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="card-outline" size={15} color={tradeMode === 'buy' ? C.white : C.navyDark} />
+                                <Text style={[s.tradeSegmentText, tradeMode === 'buy' && s.tradeSegmentTextActive]}>Buy (₦)</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (Platform.OS !== 'web') {
+                                        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                    }
+                                    setTradeMode('sell');
+                                }}
+                                style={[s.tradeSegmentBtn, tradeMode === 'sell' && s.tradeSegmentBtnActive]}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="cash-outline" size={15} color={tradeMode === 'sell' ? C.white : C.navyDark} />
+                                <Text style={[s.tradeSegmentText, tradeMode === 'sell' && s.tradeSegmentTextActive]}>Sell (₦)</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (Platform.OS !== 'web') {
+                                        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                    }
+                                    setTradeMode('swap');
+                                }}
+                                style={[s.tradeSegmentBtn, tradeMode === 'swap' && s.tradeSegmentBtnActive]}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="swap-horizontal" size={15} color={tradeMode === 'swap' ? C.white : C.navyDark} />
+                                <Text style={[s.tradeSegmentText, tradeMode === 'swap' && s.tradeSegmentTextActive]}>Swap (🔄)</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* MODE 1: BUY CRYPTO WITH NAIRA */}
+                        {tradeMode === 'buy' && (
+                            <View style={s.swapCard}>
+                                <View style={s.swapHeader}>
+                                    <Text style={s.swapTitle}>Buy Crypto with Naira</Text>
+                                    <View style={s.zeroFeeBadge}>
+                                        <Text style={s.zeroFeeBadgeText}>Instant Funding</Text>
+                                    </View>
                                 </View>
+                                <Text style={s.swapSubtitle}>
+                                    Purchase crypto directly with your Naira balance at verified live market rates.
+                                </Text>
+
+                                <View style={s.fiatBalanceCard}>
+                                    <Text style={s.fiatBalanceLabel}>Naira Wallet Balance:</Text>
+                                    <Text style={s.fiatBalanceAmount}>₦{nairaBalance.toLocaleString()}</Text>
+                                </View>
+
+                                <Text style={s.fieldLabel}>CHOOSE CRYPTO TO BUY:</Text>
+                                <View style={s.networkOptionsRow}>
+                                    {['USDT', 'BTC', 'ETH', 'SOL', 'TON', 'TRX'].map(sym => (
+                                        <TouchableOpacity
+                                            key={sym}
+                                            onPress={() => setBuyAsset(sym)}
+                                            style={[s.networkChip, buyAsset === sym && s.networkChipActive]}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={[s.networkChipText, buyAsset === sym && s.networkChipTextActive]}>
+                                                {sym}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <Text style={s.fieldLabel}>AMOUNT IN NAIRA (₦):</Text>
+                                <View style={s.modalInputWrap}>
+                                    <Text style={s.nairaPrefix}>₦</Text>
+                                    <TextInput
+                                        value={buyNgnAmount}
+                                        onChangeText={setBuyNgnAmount}
+                                        keyboardType="numeric"
+                                        placeholder="10,000"
+                                        placeholderTextColor={C.textMuted}
+                                        style={s.modalTextInput}
+                                    />
+                                </View>
+
+                                <View style={[s.gasPresetRow, { marginTop: 8 }]}>
+                                    {['5000', '10000', '25000', '50000', '100000'].map(amt => (
+                                        <TouchableOpacity
+                                            key={amt}
+                                            onPress={() => setBuyNgnAmount(amt)}
+                                            style={[s.gasPresetChip, buyNgnAmount === amt && s.gasPresetChipActive]}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={[s.gasPresetText, buyNgnAmount === amt && s.gasPresetTextActive]}>
+                                                ₦{(parseInt(amt) / 1000)}k
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <View style={s.tradeSummaryBox}>
+                                    <View style={s.tradeSummaryRow}>
+                                        <Text style={s.tradeSummaryLabel}>Live Buy Rate</Text>
+                                        <Text style={s.tradeSummaryValue}>1 USDT ≈ ₦{getUsdtToNgnRate('buy')}</Text>
+                                    </View>
+                                    <View style={s.tradeSummaryRow}>
+                                        <Text style={s.tradeSummaryLabel}>You Receive</Text>
+                                        <Text style={[s.tradeSummaryValue, { color: C.emerald, fontWeight: '800' }]}>
+                                            {((parseFloat(buyNgnAmount || '0') / getUsdtToNgnRate('buy')) / getAssetPriceUsd(buyAsset)).toFixed(6)} {buyAsset}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={handleBuySubmit}
+                                    disabled={buying}
+                                    style={s.swapSubmitButton}
+                                    activeOpacity={0.85}
+                                >
+                                    {buying ? (
+                                        <ActivityIndicator color={C.white} size="small" />
+                                    ) : (
+                                        <Text style={s.swapSubmitText}>Confirm Buy {buyAsset}</Text>
+                                    )}
+                                </TouchableOpacity>
                             </View>
+                        )}
 
-                            <Text style={s.swapSubtitle}>
-                                Swap directly between any supported crypto assets at live market prices.
-                            </Text>
+                        {/* MODE 2: SELL CRYPTO TO NAIRA */}
+                        {tradeMode === 'sell' && (
+                            <View style={s.swapCard}>
+                                <View style={s.swapHeader}>
+                                    <Text style={s.swapTitle}>Sell Crypto to Naira</Text>
+                                    <View style={s.zeroFeeBadge}>
+                                        <Text style={s.zeroFeeBadgeText}>Instant Payout</Text>
+                                    </View>
+                                </View>
+                                <Text style={s.swapSubtitle}>
+                                    Cash out crypto instantly into your main Naira balance at live exchange rates.
+                                </Text>
 
-                            {/* "YOU PAY" BOX */}
-                            <View style={s.swapInputBox}>
-                                <View style={s.swapBoxHeader}>
-                                    <Text style={s.swapBoxLabel}>YOU PAY</Text>
+                                <View style={s.fiatBalanceCard}>
+                                    <Text style={s.fiatBalanceLabel}>Available {sellAsset} Balance:</Text>
+                                    <Text style={s.fiatBalanceAmount}>
+                                        {(cryptoBalances[sellAsset] || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} {sellAsset}
+                                    </Text>
+                                </View>
+
+                                <Text style={s.fieldLabel}>CHOOSE CRYPTO TO SELL:</Text>
+                                <View style={s.networkOptionsRow}>
+                                    {['USDT', 'BTC', 'ETH', 'SOL', 'TON', 'TRX'].map(sym => (
+                                        <TouchableOpacity
+                                            key={sym}
+                                            onPress={() => setSellAsset(sym)}
+                                            style={[s.networkChip, sellAsset === sym && s.networkChipActive]}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={[s.networkChipText, sellAsset === sym && s.networkChipTextActive]}>
+                                                {sym}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 4 }}>
+                                    <Text style={s.fieldLabel}>AMOUNT TO SELL ({sellAsset}):</Text>
                                     <TouchableOpacity 
-                                        onPress={() => setSwapAmount((cryptoBalances[swapFrom] || 0).toString())}
+                                        onPress={() => setSellCryptoAmount((cryptoBalances[sellAsset] || 0).toString())}
                                         style={s.maxPill}
                                     >
-                                        <Text style={s.maxPillText}>
-                                            MAX: {(cryptoBalances[swapFrom] || 0).toFixed(4)}
-                                        </Text>
+                                        <Text style={s.maxPillText}>MAX: {(cryptoBalances[sellAsset] || 0).toFixed(4)}</Text>
                                     </TouchableOpacity>
                                 </View>
 
-                                <View style={s.swapInputRow}>
+                                <View style={s.modalInputWrap}>
                                     <TextInput
-                                        value={swapAmount}
-                                        onChangeText={setSwapAmount}
+                                        value={sellCryptoAmount}
+                                        onChangeText={setSellCryptoAmount}
                                         keyboardType="numeric"
                                         placeholder="0.00"
                                         placeholderTextColor={C.textMuted}
-                                        style={s.swapAmountInput}
+                                        style={s.modalTextInput}
                                     />
-                                    
-                                    <View style={s.assetSelectorRow}>
-                                        {['USDT', 'BTC', 'ETH', 'SOL'].map(sym => (
-                                            <TouchableOpacity
-                                                key={sym}
-                                                onPress={() => setSwapFrom(sym)}
-                                                style={[s.assetChip, swapFrom === sym && s.assetChipActive]}
-                                            >
-                                                <Text style={[s.assetChipText, swapFrom === sym && s.assetChipTextActive]}>
-                                                    {sym}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                    <Text style={s.inputCurrencySuffix}>{sellAsset}</Text>
+                                </View>
+
+                                <View style={s.tradeSummaryBox}>
+                                    <View style={s.tradeSummaryRow}>
+                                        <Text style={s.tradeSummaryLabel}>Live Sell Rate</Text>
+                                        <Text style={s.tradeSummaryValue}>1 USDT ≈ ₦{getUsdtToNgnRate('sell')}</Text>
+                                    </View>
+                                    <View style={s.tradeSummaryRow}>
+                                        <Text style={s.tradeSummaryLabel}>Credited to Naira Wallet</Text>
+                                        <Text style={[s.tradeSummaryValue, { color: C.emerald, fontWeight: '800' }]}>
+                                            ₦{Math.floor((parseFloat(sellCryptoAmount || '0') * getAssetPriceUsd(sellAsset)) * getUsdtToNgnRate('sell')).toLocaleString()} NGN
+                                        </Text>
                                     </View>
                                 </View>
-                            </View>
 
-                            {/* FLIP PAIR BUTTON */}
-                            <View style={s.flipRow}>
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        const prevFrom = swapFrom;
-                                        setSwapFrom(swapTo);
-                                        setSwapTo(prevFrom);
-                                    }}
-                                    style={s.flipButton}
-                                    activeOpacity={0.8}
+                                <TouchableOpacity
+                                    onPress={handleSellSubmit}
+                                    disabled={selling}
+                                    style={s.swapSubmitButton}
+                                    activeOpacity={0.85}
                                 >
-                                    <Ionicons name="swap-vertical" size={16} color={C.navyDark} />
+                                    {selling ? (
+                                        <ActivityIndicator color={C.white} size="small" />
+                                    ) : (
+                                        <Text style={s.swapSubmitText}>Confirm Sell & Cashout</Text>
+                                    )}
                                 </TouchableOpacity>
                             </View>
+                        )}
 
-                            {/* "YOU RECEIVE" BOX */}
-                            <View style={s.swapInputBox}>
-                                <View style={s.swapBoxHeader}>
-                                    <Text style={s.swapBoxLabel}>YOU RECEIVE (ESTIMATED)</Text>
-                                    <Text style={s.liveRateQuoteText}>
-                                        1 {swapFrom} ≈ {((getAssetPriceUsd(swapFrom) / getAssetPriceUsd(swapTo))).toFixed(6)} {swapTo}
-                                    </Text>
-                                </View>
-
-                                <View style={s.swapInputRow}>
-                                    <Text style={s.swapCalculatedOutput}>
-                                        {((parseFloat(swapAmount || '0') * getAssetPriceUsd(swapFrom)) / getAssetPriceUsd(swapTo)).toFixed(6)}
-                                    </Text>
-                                    
-                                    <View style={s.assetSelectorRow}>
-                                        {['BTC', 'ETH', 'USDT', 'SOL'].map(sym => (
-                                            <TouchableOpacity
-                                                key={sym}
-                                                onPress={() => setSwapTo(sym)}
-                                                style={[s.assetChip, swapTo === sym && s.assetChipActive]}
-                                            >
-                                                <Text style={[s.assetChipText, swapTo === sym && s.assetChipTextActive]}>
-                                                    {sym}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
+                        {/* MODE 3: INSTANT DEX SWAP */}
+                        {tradeMode === 'swap' && (
+                            <View style={s.swapCard}>
+                                <View style={s.swapHeader}>
+                                    <Text style={s.swapTitle}>Instant Crypto Swap</Text>
+                                    <View style={s.zeroFeeBadge}>
+                                        <Text style={s.zeroFeeBadgeText}>0% Fee</Text>
                                     </View>
                                 </View>
-                            </View>
 
-                            {/* EXECUTE SWAP BUTTON */}
-                            <TouchableOpacity
-                                onPress={handleSwapSubmit}
-                                disabled={swapping}
-                                style={s.swapSubmitButton}
-                                activeOpacity={0.85}
-                            >
-                                {swapping ? (
-                                    <ActivityIndicator color={C.white} size="small" />
-                                ) : (
-                                    <Text style={s.swapSubmitText}>Execute Swap</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
+                                <Text style={s.swapSubtitle}>
+                                    Swap directly between any supported crypto assets at live market prices.
+                                </Text>
+
+                                {/* "YOU PAY" BOX */}
+                                <View style={s.swapInputBox}>
+                                    <View style={s.swapBoxHeader}>
+                                        <Text style={s.swapBoxLabel}>YOU PAY</Text>
+                                        <TouchableOpacity 
+                                            onPress={() => setSwapAmount((cryptoBalances[swapFrom] || 0).toString())}
+                                            style={s.maxPill}
+                                        >
+                                            <Text style={s.maxPillText}>
+                                                MAX: {(cryptoBalances[swapFrom] || 0).toFixed(4)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={s.swapInputRow}>
+                                        <TextInput
+                                            value={swapAmount}
+                                            onChangeText={setSwapAmount}
+                                            keyboardType="numeric"
+                                            placeholder="0.00"
+                                            placeholderTextColor={C.textMuted}
+                                            style={s.swapAmountInput}
+                                        />
+                                        
+                                        <View style={s.assetSelectorRow}>
+                                            {['USDT', 'BTC', 'ETH', 'SOL'].map(sym => (
+                                                <TouchableOpacity
+                                                    key={sym}
+                                                    onPress={() => setSwapFrom(sym)}
+                                                    style={[s.assetChip, swapFrom === sym && s.assetChipActive]}
+                                                >
+                                                    <Text style={[s.assetChipText, swapFrom === sym && s.assetChipTextActive]}>
+                                                        {sym}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* FLIP PAIR BUTTON */}
+                                <View style={s.flipRow}>
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            const prevFrom = swapFrom;
+                                            setSwapFrom(swapTo);
+                                            setSwapTo(prevFrom);
+                                        }}
+                                        style={s.flipButton}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="swap-vertical" size={16} color={C.navyDark} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* "YOU RECEIVE" BOX */}
+                                <View style={s.swapInputBox}>
+                                    <View style={s.swapBoxHeader}>
+                                        <Text style={s.swapBoxLabel}>YOU RECEIVE (ESTIMATED)</Text>
+                                        <Text style={s.liveRateQuoteText}>
+                                            1 {swapFrom} ≈ {((getAssetPriceUsd(swapFrom) / getAssetPriceUsd(swapTo))).toFixed(6)} {swapTo}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.swapInputRow}>
+                                        <Text style={s.swapCalculatedOutput}>
+                                            {((parseFloat(swapAmount || '0') * getAssetPriceUsd(swapFrom)) / getAssetPriceUsd(swapTo)).toFixed(6)}
+                                        </Text>
+                                        
+                                        <View style={s.assetSelectorRow}>
+                                            {['BTC', 'ETH', 'USDT', 'SOL'].map(sym => (
+                                                <TouchableOpacity
+                                                    key={sym}
+                                                    onPress={() => setSwapTo(sym)}
+                                                    style={[s.assetChip, swapTo === sym && s.assetChipActive]}
+                                                >
+                                                    <Text style={[s.assetChipText, swapTo === sym && s.assetChipTextActive]}>
+                                                        {sym}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* EXECUTE SWAP BUTTON */}
+                                <TouchableOpacity
+                                    onPress={handleSwapSubmit}
+                                    disabled={swapping}
+                                    style={s.swapSubmitButton}
+                                    activeOpacity={0.85}
+                                >
+                                    {swapping ? (
+                                        <ActivityIndicator color={C.white} size="small" />
+                                    ) : (
+                                        <Text style={s.swapSubmitText}>Execute Swap</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -2618,8 +2815,8 @@ export default function CryptoScreen() {
                                     </Text>
                                 </View>
 
-                                {/* 3 Direct Action Buttons */}
-                                <View style={{ gap: 8, marginTop: 14 }}>
+                                {/* Clean Unified Action Buttons (Zero Duplication) */}
+                                <View style={{ gap: 10, marginTop: 14 }}>
                                     <TouchableOpacity
                                         onPress={() => {
                                             setDepositAsset(selectedCoinDetail.symbol);
@@ -2647,35 +2844,15 @@ export default function CryptoScreen() {
                                     <TouchableOpacity
                                         onPress={() => {
                                             setBuyAsset(selectedCoinDetail.symbol);
-                                            setActiveModal('buy');
+                                            setSellAsset(selectedCoinDetail.symbol);
+                                            setSwapFrom(selectedCoinDetail.symbol);
+                                            setActiveModal(null);
+                                            setActiveTab('trade');
                                         }}
                                         style={[s.coinActionBtn, { backgroundColor: C.blueBg, borderColor: '#BFDBFE' }]}
                                     >
-                                        <Ionicons name="card-outline" size={18} color={C.blue} />
-                                        <Text style={[s.coinActionBtnText, { color: C.blue }]}>Buy {selectedCoinDetail.symbol} with Naira</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setAlertCoin(selectedCoinDetail.symbol);
-                                            setAlertTargetPrice(getAssetPriceUsd(selectedCoinDetail.symbol).toString());
-                                            setActiveModal('priceAlert');
-                                        }}
-                                        style={[s.coinActionBtn, { backgroundColor: C.inputBg, borderColor: C.cardBorder }]}
-                                    >
-                                        <Ionicons name="notifications-outline" size={18} color={C.navyDark} />
-                                        <Text style={[s.coinActionBtnText, { color: C.navyDark }]}>Set Price Alert 🔔</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setCalcCoin(selectedCoinDetail.symbol);
-                                            setActiveModal('converter');
-                                        }}
-                                        style={[s.coinActionBtn, { backgroundColor: C.inputBg, borderColor: C.cardBorder }]}
-                                    >
-                                        <Ionicons name="calculator-outline" size={18} color={C.navyDark} />
-                                        <Text style={[s.coinActionBtnText, { color: C.navyDark }]}>Live Converter & Calculator 🧮</Text>
+                                        <Ionicons name="swap-horizontal" size={18} color={C.blue} />
+                                        <Text style={[s.coinActionBtnText, { color: C.blue }]}>Trade (Buy / Sell / Swap)</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -3059,163 +3236,7 @@ export default function CryptoScreen() {
                 </KeyboardAvoidingView>
             </Modal>
 
-            {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 4: BUY CRYPTO WITH NAIRA WALLET
-            ═══════════════════════════════════════════════════════════════════ */}
-            <Modal visible={activeModal === 'buy'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
-                    <View style={[s.modalCard, isWeb && s.webModalCard]}>
-                        <View style={s.modalHeader}>
-                            <Text style={s.modalTitle}>Buy Crypto with Naira</Text>
-                            <TouchableOpacity onPress={() => setActiveModal(null)} style={s.modalCloseBtn}>
-                                <Ionicons name="close" size={18} color={C.textSub} />
-                            </TouchableOpacity>
-                        </View>
 
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            <View style={s.fiatBalanceCard}>
-                                <Text style={s.fiatBalanceLabel}>Naira Wallet Balance:</Text>
-                                <Text style={s.fiatBalanceAmount}>₦{nairaBalance.toLocaleString()}</Text>
-                            </View>
-
-                            <Text style={s.fieldLabel}>CHOOSE CRYPTO TO BUY:</Text>
-                            <View style={s.networkOptionsRow}>
-                                {['USDT', 'BTC', 'ETH', 'SOL'].map(sym => (
-                                    <TouchableOpacity
-                                        key={sym}
-                                        onPress={() => setBuyAsset(sym)}
-                                        style={[s.networkChip, buyAsset === sym && s.networkChipActive]}
-                                    >
-                                        <Text style={[s.networkChipText, buyAsset === sym && s.networkChipTextActive]}>
-                                            {sym}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            <Text style={s.fieldLabel}>AMOUNT (₦):</Text>
-                            <View style={s.modalInputWrap}>
-                                <Text style={s.nairaPrefix}>₦</Text>
-                                <TextInput
-                                    value={buyNgnAmount}
-                                    onChangeText={setBuyNgnAmount}
-                                    keyboardType="numeric"
-                                    placeholder="10,000"
-                                    placeholderTextColor={C.textMuted}
-                                    style={s.modalTextInput}
-                                />
-                            </View>
-
-                            <View style={s.tradeSummaryBox}>
-                                <View style={s.tradeSummaryRow}>
-                                    <Text style={s.tradeSummaryLabel}>Live Rate</Text>
-                                    <Text style={s.tradeSummaryValue}>1 USDT ≈ ₦{getUsdtToNgnRate('buy')}</Text>
-                                </View>
-                                <View style={s.tradeSummaryRow}>
-                                    <Text style={s.tradeSummaryLabel}>You Receive</Text>
-                                    <Text style={[s.tradeSummaryValue, { color: C.emerald, fontWeight: '800' }]}>
-                                        {((parseFloat(buyNgnAmount || '0') / getUsdtToNgnRate('buy')) / getAssetPriceUsd(buyAsset)).toFixed(6)} {buyAsset}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <TouchableOpacity
-                                onPress={handleBuySubmit}
-                                disabled={buying}
-                                style={s.primaryModalSubmit}
-                                activeOpacity={0.85}
-                            >
-                                {buying ? (
-                                    <ActivityIndicator color={C.white} size="small" />
-                                ) : (
-                                    <Text style={s.primaryModalText}>Confirm Purchase</Text>
-                                )}
-                            </TouchableOpacity>
-                        </ScrollView>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
-
-            {/* ═══════════════════════════════════════════════════════════════════
-                MODAL 5: SELL CRYPTO TO NAIRA WALLET
-            ═══════════════════════════════════════════════════════════════════ */}
-            <Modal visible={activeModal === 'sell'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
-                    <View style={[s.modalCard, isWeb && s.webModalCard]}>
-                        <View style={s.modalHeader}>
-                            <Text style={s.modalTitle}>Sell Crypto to Naira</Text>
-                            <TouchableOpacity onPress={() => setActiveModal(null)} style={s.modalCloseBtn}>
-                                <Ionicons name="close" size={18} color={C.textSub} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            <Text style={s.fieldLabel}>CHOOSE CRYPTO TO SELL:</Text>
-                            <View style={s.networkOptionsRow}>
-                                {['USDT', 'BTC', 'ETH', 'SOL'].map(sym => (
-                                    <TouchableOpacity
-                                        key={sym}
-                                        onPress={() => setSellAsset(sym)}
-                                        style={[s.networkChip, sellAsset === sym && s.networkChipActive]}
-                                    >
-                                        <Text style={[s.networkChipText, sellAsset === sym && s.networkChipTextActive]}>
-                                            {sym}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 4 }}>
-                                <Text style={s.fieldLabel}>AMOUNT OF {sellAsset}:</Text>
-                                <TouchableOpacity 
-                                    onPress={() => setSellCryptoAmount((cryptoBalances[sellAsset] || 0).toString())}
-                                    style={s.maxPill}
-                                >
-                                    <Text style={s.maxPillText}>MAX: {(cryptoBalances[sellAsset] || 0).toFixed(4)}</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={s.modalInputWrap}>
-                                <TextInput
-                                    value={sellCryptoAmount}
-                                    onChangeText={setSellCryptoAmount}
-                                    keyboardType="numeric"
-                                    placeholder="0.00"
-                                    placeholderTextColor={C.textMuted}
-                                    style={s.modalTextInput}
-                                />
-                                <Text style={s.inputCurrencySuffix}>{sellAsset}</Text>
-                            </View>
-
-                            <View style={s.tradeSummaryBox}>
-                                <View style={s.tradeSummaryRow}>
-                                    <Text style={s.tradeSummaryLabel}>Live Cashout Rate</Text>
-                                    <Text style={s.tradeSummaryValue}>1 USDT ≈ ₦{getUsdtToNgnRate('sell')}</Text>
-                                </View>
-                                <View style={s.tradeSummaryRow}>
-                                    <Text style={s.tradeSummaryLabel}>Credited to Naira Wallet</Text>
-                                    <Text style={[s.tradeSummaryValue, { color: C.emerald, fontWeight: '800' }]}>
-                                        ₦{Math.floor((parseFloat(sellCryptoAmount || '0') * getAssetPriceUsd(sellAsset)) * getUsdtToNgnRate('sell')).toLocaleString()} NGN
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <TouchableOpacity
-                                onPress={handleSellSubmit}
-                                disabled={selling}
-                                style={s.primaryModalSubmit}
-                                activeOpacity={0.85}
-                            >
-                                {selling ? (
-                                    <ActivityIndicator color={C.white} size="small" />
-                                ) : (
-                                    <Text style={s.primaryModalText}>Confirm & Sell</Text>
-                                )}
-                            </TouchableOpacity>
-                        </ScrollView>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
 
             {/* ═══════════════════════════════════════════════════════════════════
                 MODAL 6: ADDRESS BOOK (WHITELISTED WALLETS)
@@ -3636,32 +3657,21 @@ export default function CryptoScreen() {
                                 </View>
                             </View>
 
-                            {/* Action Shortcuts */}
+                            {/* Action Shortcut to Trade Desk */}
                             <View style={{ gap: 8, marginTop: 12 }}>
                                 <TouchableOpacity
                                     onPress={() => {
                                         setBuyAsset(calcCoin);
-                                        setBuyNgnAmount(Math.floor(converterValues.convertedNgn || 10000).toString());
-                                        setActiveModal('buy');
+                                        setSellAsset(calcCoin);
+                                        setSwapFrom(calcCoin);
+                                        setActiveModal(null);
+                                        setActiveTab('trade');
                                     }}
                                     style={[s.primaryModalSubmit, { backgroundColor: C.blueBg, borderWidth: 1, borderColor: '#BFDBFE' }]}
                                     activeOpacity={0.85}
                                 >
-                                    <Ionicons name="card-outline" size={16} color={C.blue} style={{ marginRight: 6 }} />
-                                    <Text style={[s.primaryModalText, { color: C.blue }]}>Buy {calcCoin} with Naira</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setSwapTo(calcCoin);
-                                        setActiveModal(null);
-                                        setActiveTab('trade');
-                                    }}
-                                    style={[s.primaryModalSubmit, { backgroundColor: C.purpleBg, borderWidth: 1, borderColor: '#DDD6FE' }]}
-                                    activeOpacity={0.85}
-                                >
-                                    <Ionicons name="swap-horizontal" size={16} color={C.purple} style={{ marginRight: 6 }} />
-                                    <Text style={[s.primaryModalText, { color: C.purple }]}>Instant Swap to {calcCoin}</Text>
+                                    <Ionicons name="swap-horizontal" size={16} color={C.blue} style={{ marginRight: 6 }} />
+                                    <Text style={[s.primaryModalText, { color: C.blue }]}>Open Trade Desk for {calcCoin}</Text>
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>
@@ -4450,6 +4460,37 @@ const s = StyleSheet.create({
     coinActionBtnText: {
         fontSize: 13,
         fontWeight: '800',
+    },
+    // Unified Trade Desk Styles
+    tradeSegmentRow: {
+        flexDirection: 'row',
+        backgroundColor: C.card,
+        borderRadius: 14,
+        padding: 4,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: C.cardBorder,
+        gap: 6,
+    },
+    tradeSegmentBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 10,
+        gap: 6,
+    },
+    tradeSegmentBtnActive: {
+        backgroundColor: C.navyDark,
+    },
+    tradeSegmentText: {
+        color: C.textSub,
+        fontSize: 12.5,
+        fontWeight: '700',
+    },
+    tradeSegmentTextActive: {
+        color: C.white,
     },
     // Swap Tab Styles
     swapContainer: {
