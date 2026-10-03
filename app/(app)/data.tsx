@@ -1138,8 +1138,8 @@ export default function DataScreen() {
                                     </View>
                                 ))}
                             </View>
-                        )}
-                    </View>
+                        </View>
+                    )}
 
                     {/* Data Usage Estimator Content */}
                     {showEstimator && (
@@ -1252,8 +1252,8 @@ export default function DataScreen() {
                                     );
                                 })()}
                             </View>
-                        )}
-                    </View>
+                        </View>
+                    )}
 
                     {/* Recommendation Banner */}
                     {minVolumeFilter !== null && (
@@ -1274,6 +1274,7 @@ export default function DataScreen() {
                                 <Text style={s.recommendationBannerCloseText}>Clear</Text>
                             </TouchableOpacity>
                         </View>
+                    )}
                     {/* Data Rollover Guard Content */}
                     {showRolloverTips && (
                         <View style={[s.rolloverContainer, { marginTop: 0, marginBottom: 12 }]}>
