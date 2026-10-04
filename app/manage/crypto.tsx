@@ -212,15 +212,6 @@ export default function CryptoManagerScreen() {
         { id: 'networks', label: 'Nodes RPC', icon: 'server-outline' }
     ];
 
-    if (loading) {
-        return (
-            <View style={{ flex: 1, backgroundColor: L.bg, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator color={L.goldDk} size="small" />
-                <Text style={{ color: L.navyHeader, marginTop: 10, fontSize: 10, fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase' }}>Loading Crypto Command...</Text>
-            </View>
-        );
-    }
-
     return (
         <View style={{ flex: 1, backgroundColor: L.bg }}>
             <Stack.Screen options={{ headerShown: false }} />
@@ -251,6 +242,7 @@ export default function CryptoManagerScreen() {
                             <View style={{ backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <Ionicons name="logo-bitcoin" size={12} color={L.gold} />
                                 <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Crypto Core</Text>
+                                {loading && <ActivityIndicator size="small" color={L.gold} style={{ marginLeft: 3, transform: [{ scale: 0.7 }] }} />}
                             </View>
                             <TouchableOpacity onPress={() => router.push('/manage/api')} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                                 <Ionicons name="key" size={12} color={L.gold} />

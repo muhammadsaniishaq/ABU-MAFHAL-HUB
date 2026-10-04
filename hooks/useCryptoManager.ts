@@ -26,68 +26,71 @@ export function useCryptoManager() {
     const fetchStats = async () => {
         try {
             setLoading(true);
-            // Count pending crypto withdrawals
-            const { count: pendingWithdrawals } = await supabase
-                .from('transactions')
-                .select('*', { count: 'exact', head: true })
-                .eq('type', 'crypto_withdrawal')
-                .eq('status', 'pending');
-            
-            // Count P2P states
-            const { count: p2pPending } = await supabase.from('p2p_orders').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-            const { count: p2pCompleted } = await supabase.from('p2p_orders').select('*', { count: 'exact', head: true }).eq('status', 'completed');
-            const { count: p2pDisputed } = await supabase.from('p2p_orders').select('*', { count: 'exact', head: true }).eq('status', 'disputed');
 
-            // Fetch Real Financial Stats (Sum of completed transactions in 24h)
+            // Fetch concurrently with safe timeouts
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
-            const { data: volumeData } = await supabase.from('transactions').select('amount').eq('status', 'completed').gte('created_at', yesterday.toISOString());
-            const volume24h = volumeData ? volumeData.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) : 0;
 
-            // Fetch 7D Revenue (Simulated via a margin fee table or generic calculation)
             const lastWeek = new Date();
             lastWeek.setDate(lastWeek.getDate() - 7);
-            const { data: revenueData } = await supabase.from('transactions').select('amount').eq('status', 'completed').gte('created_at', lastWeek.toISOString());
-            const revenue7d = revenueData ? revenueData.reduce((acc, curr) => acc + ((Number(curr.amount) || 0) * 0.015), 0) : 0; // Assuming 1.5% average platform fee
 
-            // Calculate Total Liquidity from user wallets
-            const { data: walletsData } = await supabase.from('user_wallets').select('usdt_balance, btc_balance, eth_balance, fiat_balance');
+            const [
+                pendingRes,
+                p2pPendingRes,
+                p2pCompRes,
+                p2pDispRes,
+                volRes,
+                revRes,
+                walletsRes
+            ] = await Promise.allSettled([
+                supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'crypto_withdrawal').eq('status', 'pending'),
+                supabase.from('p2p_orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+                supabase.from('p2p_orders').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+                supabase.from('p2p_orders').select('*', { count: 'exact', head: true }).eq('status', 'disputed'),
+                supabase.from('transactions').select('amount').eq('status', 'completed').gte('created_at', yesterday.toISOString()),
+                supabase.from('transactions').select('amount').eq('status', 'completed').gte('created_at', lastWeek.toISOString()),
+                supabase.from('user_wallets').select('usdt_balance, btc_balance, eth_balance, fiat_balance').limit(100)
+            ]);
+
+            const pendingWithdrawals = pendingRes.status === 'fulfilled' ? pendingRes.value.count || 0 : 0;
+            const p2pPending = p2pPendingRes.status === 'fulfilled' ? p2pPendingRes.value.count || 0 : 0;
+            const p2pCompleted = p2pCompRes.status === 'fulfilled' ? p2pCompRes.value.count || 0 : 0;
+            const p2pDisputed = p2pDispRes.status === 'fulfilled' ? p2pDispRes.value.count || 0 : 0;
+
+            const volumeData = volRes.status === 'fulfilled' ? volRes.value.data : null;
+            const volume24h = volumeData ? volumeData.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0) : 0;
+
+            const revenueData = revRes.status === 'fulfilled' ? revRes.value.data : null;
+            const revenue7d = revenueData ? revenueData.reduce((acc: number, curr: any) => acc + ((Number(curr.amount) || 0) * 0.015), 0) : 0;
+
+            const walletsData = walletsRes.status === 'fulfilled' ? walletsRes.value.data : null;
+
             let liquidity = 0;
             let btcPrice = 85000;
             let ethPrice = 3000;
-            let usdtPrice = 1;
-
-            try {
-                const liveRates = await api.crypto.getRates(['bitcoin', 'ethereum', 'tether']);
-                const btc = liveRates.find(r => r.symbol.toLowerCase() === 'btc');
-                const eth = liveRates.find(r => r.symbol.toLowerCase() === 'eth');
-                if (btc) btcPrice = btc.price_usd;
-                if (eth) ethPrice = eth.price_usd;
-                setLivePrices({ btc: btcPrice, eth: ethPrice });
-            } catch (err) {
-                console.log("Could not fetch coingecko rates, using fallback prices.");
-            }
 
             if (walletsData) {
-                walletsData.forEach((w) => {
+                walletsData.forEach((w: any) => {
                     liquidity += Number(w.usdt_balance) || 0;
                     liquidity += (Number(w.btc_balance) || 0) * btcPrice;
                     liquidity += (Number(w.eth_balance) || 0) * ethPrice;
-                    liquidity += (Number(w.fiat_balance) || 0) / 1600; // Approx NGN to USD
+                    liquidity += (Number(w.fiat_balance) || 0) / 1600;
                 });
             }
 
             setStats({
-                pendingWithdrawals: pendingWithdrawals || 0,
-                p2pCompleted: p2pCompleted || 0,
-                p2pPending: p2pPending || 0,
-                p2pDisputed: p2pDisputed || 0,
+                pendingWithdrawals,
+                p2pCompleted,
+                p2pPending,
+                p2pDisputed,
                 totalVolume24h: volume24h,
                 totalRevenue7d: revenue7d,
                 totalLiquidity: liquidity
             });
         } catch (e) {
             console.log("Error fetching crypto stats:", e);
+        } finally {
+            setLoading(false);
         }
     };
 
