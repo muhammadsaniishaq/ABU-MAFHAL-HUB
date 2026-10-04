@@ -307,11 +307,13 @@ export const CoingeckoCryptoExchange: CryptoExchange = {
             
             // Realistic Fallback Data (So UI looks good even offline/limited)
             const fallbackData: Record<string, any> = {
-                'bitcoin': { price: 64230.50, change: 1.2, symbol: 'BTC', name: 'Bitcoin', image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png' },
-                'ethereum': { price: 3450.12, change: -0.5, symbol: 'ETH', name: 'Ethereum', image: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png' },
+                'bitcoin': { price: 87500.00, change: 1.4, symbol: 'BTC', name: 'Bitcoin', image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png' },
+                'ethereum': { price: 3100.00, change: -0.8, symbol: 'ETH', name: 'Ethereum', image: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png' },
                 'tether': { price: 1.00, change: 0.01, symbol: 'USDT', name: 'Tether', image: 'https://assets.coingecko.com/coins/images/325/large/Tether.png' },
-                'solana': { price: 145.60, change: 5.4, symbol: 'SOL', name: 'Solana', image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png' },
-                'binancecoin': { price: 590.20, change: 0.8, symbol: 'BNB', name: 'BNB', image: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png' },
+                'the-open-network': { price: 1.54, change: 2.4, symbol: 'TON', name: 'Gram (TON)', image: 'https://assets.coingecko.com/coins/images/17980/large/ton_symbol.png' },
+                'solana': { price: 185.00, change: 3.2, symbol: 'SOL', name: 'Solana', image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png' },
+                'binancecoin': { price: 620.00, change: 0.9, symbol: 'BNB', name: 'BNB', image: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png' },
+                'tron': { price: 0.22, change: 1.1, symbol: 'TRX', name: 'Tron', image: 'https://assets.coingecko.com/coins/images/1094/large/tron-logo.png' },
                 'ripple': { price: 0.62, change: -1.2, symbol: 'XRP', name: 'XRP', image: 'https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png' },
                 'cardano': { price: 0.45, change: 0.2, symbol: 'ADA', name: 'Cardano', image: 'https://assets.coingecko.com/coins/images/975/large/cardano.png' },
                 'dogecoin': { price: 0.16, change: 8.5, symbol: 'DOGE', name: 'Dogecoin', image: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png' }
@@ -350,7 +352,7 @@ export const BinanceCryptoExchange: CryptoExchange = {
                 'SOLUSDT': { id: 'solana', symbol: 'SOL', name: 'Solana', image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png' },
                 'BNBUSDT': { id: 'binancecoin', symbol: 'BNB', name: 'BNB Chain', image: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png' },
                 'TRXUSDT': { id: 'tron', symbol: 'TRX', name: 'Tron', image: 'https://assets.coingecko.com/coins/images/1094/large/tron-logo.png' },
-                'TONUSDT': { id: 'the-open-network', symbol: 'TON', name: 'Toncoin', image: 'https://assets.coingecko.com/coins/images/17980/large/ton_symbol.png' },
+                'TONUSDT': { id: 'the-open-network', symbol: 'TON', name: 'Gram (TON)', image: 'https://assets.coingecko.com/coins/images/17980/large/ton_symbol.png' },
                 'XRPUSDT': { id: 'ripple', symbol: 'XRP', name: 'XRP', image: 'https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png' },
                 'ADAUSDT': { id: 'cardano', symbol: 'ADA', name: 'Cardano', image: 'https://assets.coingecko.com/coins/images/975/large/cardano.png' },
                 'DOGEUSDT': { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', image: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png' },
