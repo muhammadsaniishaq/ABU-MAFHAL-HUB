@@ -127,10 +127,13 @@ serve(async (req: Request) => {
             else if (normCurrency === 'bnb' || normCurrency.startsWith('bnb')) targetAmountUsd = Math.max(targetAmountUsd, 15);
         }
 
+        let payCurrency = normCurrency;
+        if (payCurrency === 'gram' || payCurrency === 'gramton') payCurrency = 'ton';
+
         const paymentBody = {
             price_amount: targetAmountUsd,
             price_currency: 'usd',
-            pay_currency: normCurrency,
+            pay_currency: payCurrency,
             ipn_callback_url: `${supabaseUrl}/functions/v1/crypto-webhook`,
             order_id: `crypto_dep_${user.id}_${Date.now()}`,
             order_description: `Deposit for user ${user.id} on Abu Mafhal Hub`
