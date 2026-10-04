@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     require_email_verif: false,
     force_app_update: false,
     min_app_version: '1.0.5',
-    latest_app_version: '1.0.7',
+    latest_app_version: '1.0.8',
     play_store_url: 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub',
     app_store_url: 'https://apps.apple.com/app/abu-mafhal-sub',
     apk_download_url: '',
