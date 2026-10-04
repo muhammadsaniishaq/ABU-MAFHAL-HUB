@@ -47,15 +47,21 @@ serve(async (req: Request) => {
                 .maybeSingle();
 
             if (existingAddress) {
-                return new Response(JSON.stringify({ 
-                    address: existingAddress.address, 
-                    payment_id: existingAddress.payment_id,
-                    network: existingAddress.network,
-                    currency: existingAddress.currency,
-                    isNew: false 
-                }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                });
+                // Ensure address was created recently (within 24h) to avoid expired NowPayments payment invoices
+                const createdAtTime = existingAddress.created_at ? new Date(existingAddress.created_at).getTime() : 0;
+                const ageMs = Date.now() - createdAtTime;
+                if (ageMs < 24 * 60 * 60 * 1000) {
+                    return new Response(JSON.stringify({ 
+                        address: existingAddress.address, 
+                        extra_id: existingAddress.extra_id || null,
+                        payment_id: existingAddress.payment_id,
+                        network: existingAddress.network,
+                        currency: existingAddress.currency,
+                        isNew: false 
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    });
+                }
             }
         }
 
@@ -117,6 +123,7 @@ serve(async (req: Request) => {
             if (normCurrency === 'btc') targetAmountUsd = Math.max(targetAmountUsd, 25);
             else if (normCurrency.startsWith('eth')) targetAmountUsd = Math.max(targetAmountUsd, 20);
             else if (normCurrency === 'sol') targetAmountUsd = Math.max(targetAmountUsd, 15);
+            else if (normCurrency === 'ton' || normCurrency === 'usdtton') targetAmountUsd = Math.max(targetAmountUsd, 5);
             else if (normCurrency === 'bnb' || normCurrency.startsWith('bnb')) targetAmountUsd = Math.max(targetAmountUsd, 15);
         }
 
@@ -147,6 +154,7 @@ serve(async (req: Request) => {
         }
 
         const newAddress = data.pay_address;
+        const extraId = data.extra_id || data.pay_extra_id || null;
         const paymentId = String(data.payment_id || '');
 
         // If regenerate was true, deactivate older addresses for this currency/network
@@ -167,6 +175,7 @@ serve(async (req: Request) => {
                 network: normNetwork,
                 currency: normCurrency,
                 address: newAddress,
+                extra_id: extraId,
                 payment_id: paymentId,
                 provider: 'nowpayments',
                 is_active: true
@@ -180,6 +189,7 @@ serve(async (req: Request) => {
                 network: normNetwork,
                 currency: normCurrency,
                 address: newAddress,
+                extra_id: extraId,
                 payment_id: paymentId,
                 provider: 'nowpayments'
             });
@@ -187,6 +197,7 @@ serve(async (req: Request) => {
 
         return new Response(JSON.stringify({ 
             address: newAddress, 
+            extra_id: extraId,
             payment_id: paymentId,
             network: normNetwork,
             currency: normCurrency,

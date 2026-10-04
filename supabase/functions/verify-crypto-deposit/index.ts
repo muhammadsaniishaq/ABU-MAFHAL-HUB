@@ -144,10 +144,14 @@ serve(async (req: Request) => {
                 status: payment.payment_status || 'waiting',
                 payment_id: String(payment_id),
                 message: payment.payment_status === 'waiting'
-                    ? "Awaiting your payment on the blockchain..."
+                    ? "Awaiting your payment on the blockchain. If you just sent it, please wait a minute for block confirmations."
                     : payment.payment_status === 'confirming'
-                    ? "Payment detected! Confirming on blockchain..."
-                    : `Current status: ${payment.payment_status}`
+                    ? "Payment detected on blockchain! Confirming blocks..."
+                    : payment.payment_status === 'expired'
+                    ? "This invoice has expired on the payment gateway. Please tap 'Generate Fresh Address' to get an active address."
+                    : payment.payment_status === 'failed'
+                    ? "Payment marked as failed by gateway. Please tap 'Generate Fresh Address' to try again."
+                    : `Payment status: ${payment.payment_status}`
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
