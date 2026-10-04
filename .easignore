@@ -1,0 +1,30 @@
+# Build output and binary archives
+*.aab
+*.apk
+*.aar
+*.keystore
+ABU_MAFHAL_SUB_*.aab
+smile_detect_library-release.aar
+
+# Dependencies
+node_modules/
+
+# Web build & assets
+dist/
+web-build/
+public/
+scratch/
+temp.txt
+
+# Backend / Supabase
+supabase/
+
+# Cache & tools
+.expo/
+.vscode/
+.git/
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
