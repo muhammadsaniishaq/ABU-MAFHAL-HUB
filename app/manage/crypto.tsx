@@ -1,6 +1,7 @@
 import { 
     View, Text, TouchableOpacity, ScrollView, Platform, 
-    ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView 
+    ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView,
+    Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -64,8 +65,12 @@ export default function CryptoManagerScreen() {
     const [feeTrc20, setFeeTrc20] = useState('');
     const [feeBep20, setFeeBep20] = useState('');
     const [feeErc20, setFeeErc20] = useState('');
+    const [feeTon, setFeeTon] = useState('');
+    const [feeSol, setFeeSol] = useState('');
     const [feeBtc, setFeeBtc] = useState('');
     const [feeEth, setFeeEth] = useState('');
+    const [depositFeePercent, setDepositFeePercent] = useState('');
+    const [depositFeeFixed, setDepositFeeFixed] = useState('');
     const [withdrawProfitMargin, setWithdrawProfitMargin] = useState('');
     const [rateUsdtBuy, setRateUsdtBuy] = useState('');
     const [rateUsdtSell, setRateUsdtSell] = useState('');
@@ -90,8 +95,12 @@ export default function CryptoManagerScreen() {
         setFeeTrc20(settings.crypto_fee_trc20_usdt || '1.5');
         setFeeBep20(settings.crypto_fee_bep20_usdt || '1.0');
         setFeeErc20(settings.crypto_fee_erc20_usdt || '12.0');
+        setFeeTon(settings.crypto_fee_ton || '0.05');
+        setFeeSol(settings.crypto_fee_sol || '0.005');
         setFeeBtc(settings.crypto_fee_btc || '0.0005');
         setFeeEth(settings.crypto_fee_eth || '0.002');
+        setDepositFeePercent(settings.crypto_deposit_fee_percent || '0');
+        setDepositFeeFixed(settings.crypto_deposit_fee_fixed || '0');
         setWithdrawProfitMargin(settings.crypto_withdraw_profit_margin || '0.5');
         setRateUsdtBuy(settings.crypto_rate_usdt_buy || '1480');
         setRateUsdtSell(settings.crypto_rate_usdt_sell || '1460');
@@ -100,8 +109,12 @@ export default function CryptoManagerScreen() {
         settings.crypto_fee_trc20_usdt,
         settings.crypto_fee_bep20_usdt,
         settings.crypto_fee_erc20_usdt,
+        settings.crypto_fee_ton,
+        settings.crypto_fee_sol,
         settings.crypto_fee_btc,
         settings.crypto_fee_eth,
+        settings.crypto_deposit_fee_percent,
+        settings.crypto_deposit_fee_fixed,
         settings.crypto_withdraw_profit_margin,
         settings.crypto_rate_usdt_buy,
         settings.crypto_rate_usdt_sell,
@@ -164,8 +177,12 @@ export default function CryptoManagerScreen() {
         updateSetting('crypto_fee_trc20_usdt', feeTrc20);
         updateSetting('crypto_fee_bep20_usdt', feeBep20);
         updateSetting('crypto_fee_erc20_usdt', feeErc20);
+        updateSetting('crypto_fee_ton', feeTon);
+        updateSetting('crypto_fee_sol', feeSol);
         updateSetting('crypto_fee_btc', feeBtc);
         updateSetting('crypto_fee_eth', feeEth);
+        updateSetting('crypto_deposit_fee_percent', depositFeePercent);
+        updateSetting('crypto_deposit_fee_fixed', depositFeeFixed);
         updateSetting('crypto_withdraw_profit_margin', withdrawProfitMargin);
         updateSetting('crypto_rate_usdt_buy', rateUsdtBuy);
         updateSetting('crypto_rate_usdt_sell', rateUsdtSell);
@@ -186,10 +203,11 @@ export default function CryptoManagerScreen() {
 
     const tabs = [
         { id: 'overview', label: 'Overview', icon: 'pie-chart-outline' },
+        { id: 'controls', label: 'Toggles & Maintenance', icon: 'toggle-outline' },
+        { id: 'rates', label: 'Fees & Rates', icon: 'options-outline' },
         { id: 'users', label: 'Wallets', icon: 'people-outline' },
         { id: 'history', label: 'Trades', icon: 'swap-horizontal-outline' },
         { id: 'withdrawals', label: `Pending (${stats.pendingWithdrawals || 0})`, icon: 'time-outline', badge: stats.pendingWithdrawals },
-        { id: 'rates', label: 'Fees & Rates', icon: 'options-outline' },
         { id: 'p2p', label: 'P2P Escrow', icon: 'shield-checkmark-outline' },
         { id: 'networks', label: 'Nodes RPC', icon: 'server-outline' }
     ];
@@ -359,6 +377,136 @@ export default function CryptoManagerScreen() {
                                         <Text style={{ color: L.textMuted, fontSize: 8 }}>{stats.p2pDisputed || 0} Disputes</Text>
                                     </View>
                                 </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* CONTROLS & MAINTENANCE TAB */}
+                    {activeTab === 'controls' && (
+                        <View style={{ gap: 12 }}>
+                            {/* Maintenance Master Mode */}
+                            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: (settings.crypto_maintenance_mode === true || settings.crypto_maintenance_mode === 'true') ? L.rose : L.cardBorder }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                        <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: (settings.crypto_maintenance_mode === true || settings.crypto_maintenance_mode === 'true') ? L.roseBg : 'rgba(255, 215, 0, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="construct-outline" size={18} color={(settings.crypto_maintenance_mode === true || settings.crypto_maintenance_mode === 'true') ? L.rose : L.goldAmber} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>CRYPTO MAINTENANCE MODE</Text>
+                                            <Text style={{ color: (settings.crypto_maintenance_mode === true || settings.crypto_maintenance_mode === 'true') ? L.rose : L.emerald, fontWeight: 'bold', fontSize: 9 }}>
+                                                {(settings.crypto_maintenance_mode === true || settings.crypto_maintenance_mode === 'true') ? '🔴 ACTIVE - CRYPTO SUSPENDED' : '🟢 INACTIVE - SYSTEM OPERATIONAL'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Switch 
+                                        value={settings.crypto_maintenance_mode === true || settings.crypto_maintenance_mode === 'true'}
+                                        onValueChange={(val) => {
+                                            updateSetting('crypto_maintenance_mode', val);
+                                            showToast(val ? "Maintenance Mode Activated 🔴" : "Maintenance Mode Deactivated 🟢");
+                                        }}
+                                        trackColor={{ false: '#CBD5E1', true: '#FECDD3' }}
+                                        thumbColor={(settings.crypto_maintenance_mode === true || settings.crypto_maintenance_mode === 'true') ? L.rose : '#F8FAFC'}
+                                    />
+                                </View>
+                                <Text style={{ color: L.textMuted, fontSize: 9, lineHeight: 13, marginTop: 4 }}>
+                                    Kunna wannan zai nuna sanarwar gyara a shafin Crypto na abokan ciniki kuma zai dakatar da cinikayya, ajiyar kudi (deposit), cire kudi (withdraw) da canji (swap) har sai an kashe.
+                                </Text>
+                            </View>
+
+                            {/* Supported Coins Toggle (Hide / Show Coin) */}
+                            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <View>
+                                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>🪙 Coin Visibility (Hide / Show)</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>Zabi coins din da za a nuna ko a boye a cikin app</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                        <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 8 }}>8 CURRENCIES</Text>
+                                    </View>
+                                </View>
+
+                                {[
+                                    { key: 'crypto_enabled_ton', name: 'Gram / TON', symbol: 'GRAM', net: 'The Open Network', icon: 'diamond-outline', color: '#0098EA' },
+                                    { key: 'crypto_enabled_usdt', name: 'Tether USD', symbol: 'USDT', net: 'Multi-Chain (TRC20/BEP20/ERC20)', icon: 'cash-outline', color: '#26A17B' },
+                                    { key: 'crypto_enabled_btc', name: 'Bitcoin', symbol: 'BTC', net: 'Bitcoin Core', icon: 'logo-bitcoin', color: '#F7931A' },
+                                    { key: 'crypto_enabled_eth', name: 'Ethereum', symbol: 'ETH', net: 'ERC20 / Mainnet', icon: 'prism-outline', color: '#627EEA' },
+                                    { key: 'crypto_enabled_sol', name: 'Solana', symbol: 'SOL', net: 'Solana SPL', icon: 'flash-outline', color: '#14F195' },
+                                    { key: 'crypto_enabled_trx', name: 'TRON', symbol: 'TRX', net: 'TRC20 Network', icon: 'triangle-outline', color: '#EF0027' },
+                                    { key: 'crypto_enabled_bnb', name: 'BNB Chain', symbol: 'BNB', net: 'BEP20 Network', icon: 'cube-outline', color: '#F3BA2F' },
+                                    { key: 'crypto_enabled_doge', name: 'Dogecoin', symbol: 'DOGE', net: 'Dogecoin Network', icon: 'paw-outline', color: '#C2A633' },
+                                ].map((coin, index) => {
+                                    const isEnabled = settings[coin.key] !== false && settings[coin.key] !== 'false';
+                                    return (
+                                        <View key={coin.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: index === 0 ? 0 : 1, borderColor: L.inputBorder }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: `${coin.color}15`, alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Ionicons name={coin.icon as any} size={15} color={coin.color} />
+                                                </View>
+                                                <View>
+                                                    <Text style={{ color: L.navyHeader, fontWeight: '800', fontSize: 10 }}>{coin.name} ({coin.symbol})</Text>
+                                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>{coin.net}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={{ color: isEnabled ? L.emerald : L.textMuted, fontSize: 8, fontWeight: 'bold' }}>
+                                                    {isEnabled ? 'VISIBLE' : 'HIDDEN'}
+                                                </Text>
+                                                <Switch 
+                                                    value={isEnabled}
+                                                    onValueChange={(val) => {
+                                                        updateSetting(coin.key, val);
+                                                        showToast(`${coin.symbol} is now ${val ? 'Visible' : 'Hidden'}! ⚡`);
+                                                    }}
+                                                    trackColor={{ false: '#E2E8F0', true: '#A7F3D0' }}
+                                                    thumbColor={isEnabled ? L.emerald : '#94A3B8'}
+                                                />
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+
+                            {/* Features Toggle (Deposit, Send, Buy, Sell, Swap, Radar) */}
+                            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <View>
+                                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>⚡ Feature Switches (Enable / Disable)</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>Ikon bude ko kulle kowacce feature a cikin manhaja</Text>
+                                    </View>
+                                </View>
+
+                                {[
+                                    { key: 'crypto_receive_enabled', name: 'Deposit / Receive Crypto', desc: 'Allows users to generate addresses & deposit', icon: 'arrow-down-circle-outline', color: '#10B981' },
+                                    { key: 'crypto_send_enabled', name: 'Send / Withdraw Crypto', desc: 'Allows users to submit crypto withdrawal requests', icon: 'arrow-up-circle-outline', color: '#E11D48' },
+                                    { key: 'crypto_buy_enabled', name: 'Instant Buy Crypto', desc: 'Allows users to buy crypto with Naira fiat', icon: 'cart-outline', color: '#0284C7' },
+                                    { key: 'crypto_sell_enabled', name: 'Instant Sell Crypto', desc: 'Allows users to liquidate crypto to Naira wallet', icon: 'trending-down-outline', color: '#F59E0B' },
+                                    { key: 'crypto_swap_enabled', name: 'Crypto Swap Engine', desc: 'Allows instant coin-to-coin exchanges', icon: 'swap-horizontal-outline', color: '#8B5CF6' },
+                                    { key: 'crypto_gas_enabled', name: 'Live Gas Radar', desc: 'Live network gas tracking & congestion widget', icon: 'speedometer-outline', color: '#EC4899' },
+                                ].map((feature, idx) => {
+                                    const isEnabled = settings[feature.key] !== false && settings[feature.key] !== 'false';
+                                    return (
+                                        <View key={feature.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: idx === 0 ? 0 : 1, borderColor: L.inputBorder }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: `${feature.color}15`, alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Ionicons name={feature.icon as any} size={15} color={feature.color} />
+                                                </View>
+                                                <View style={{ flex: 1, paddingRight: 6 }}>
+                                                    <Text style={{ color: L.navyHeader, fontWeight: '800', fontSize: 10 }}>{feature.name}</Text>
+                                                    <Text style={{ color: L.textMuted, fontSize: 8 }} numberOfLines={1}>{feature.desc}</Text>
+                                                </View>
+                                            </View>
+                                            <Switch 
+                                                value={isEnabled}
+                                                onValueChange={(val) => {
+                                                    updateSetting(feature.key, val);
+                                                    showToast(`${feature.name} ${val ? 'Enabled' : 'Disabled'}! ⚡`);
+                                                }}
+                                                trackColor={{ false: '#E2E8F0', true: '#A7F3D0' }}
+                                                thumbColor={isEnabled ? L.emerald : '#94A3B8'}
+                                            />
+                                        </View>
+                                    );
+                                })}
                             </View>
                         </View>
                     )}
@@ -560,8 +708,32 @@ export default function CryptoManagerScreen() {
 
                                 <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>🛡️ Network Fees & Admin Profit Markups</Text>
 
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Deposit Platform Fee (%)</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Admin platform percentage deducted on user crypto deposits (0% for free).</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={depositFeePercent}
+                                        onChangeText={setDepositFeePercent}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.emerald, fontSize: 9, fontWeight: 'bold' }}>% DEPOSIT FEE</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Deposit Fixed Fee (USD)</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Flat dollar fee added to deposits (e.g. 0.50 or 0).</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={depositFeeFixed}
+                                        onChangeText={setDepositFeeFixed}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>USD</Text>
+                                </View>
+
                                 <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Withdraw Admin Profit Margin</Text>
-                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Extra platform profit added on top of network fee (kar ya zama free).</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Extra platform profit added on top of network gas fee.</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
                                     <TextInput
                                         value={withdrawProfitMargin}
@@ -570,6 +742,28 @@ export default function CryptoManagerScreen() {
                                         style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
                                     />
                                     <Text style={{ color: L.emerald, fontSize: 9, fontWeight: 'bold' }}>+ PROFIT</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Gram / TON Network Fee</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={feeTon}
+                                        onChangeText={setFeeTon}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>TON</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Solana (SOL) Network Fee</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={feeSol}
+                                        onChangeText={setFeeSol}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>SOL</Text>
                                 </View>
 
                                 <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT TRC20 Base Fee</Text>

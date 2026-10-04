@@ -985,9 +985,40 @@ export default function CryptoScreen() {
         };
     }, [cryptoBalances, getAssetPriceUsd, assetsRates]);
 
+    // ─── Maintenance Mode & Coin Visibility Controls ──────────────────────────
+    const isMaintenance = settings?.crypto_maintenance_mode === true || settings?.crypto_maintenance_mode === 'true';
+
+    const checkPermission = useCallback((featureKey?: string, featureName?: string): boolean => {
+        if (isMaintenance) {
+            Alert.alert(
+                "Maintenance Mode 🛠️",
+                "Sashen Crypto yana karkashin gyaran tsari na musamman a halin yanzu. An dakatar da ajiyar kudi (deposit), cire kudi (withdraw), da ciniki na dan lokaci. Za a buɗe da zarar an kammala."
+            );
+            return false;
+        }
+        if (featureKey && (settings?.[featureKey] === false || settings?.[featureKey] === 'false')) {
+            Alert.alert(
+                `${featureName || 'Sabis'} A Kulle Yake ⚠️`,
+                `Admin ya dakatar da ayyukan ${featureName || 'wannan sashe'} a halin yanzu. Don Allah a duba anjima.`
+            );
+            return false;
+        }
+        return true;
+    }, [isMaintenance, settings]);
+
+    const isCoinEnabled = useCallback((symbol: string) => {
+        const key = `crypto_enabled_${symbol.toLowerCase()}`;
+        return settings?.[key] !== false && settings?.[key] !== 'false';
+    }, [settings]);
+
+    const activeSupportedAssets = useMemo(() => {
+        const filtered = SUPPORTED_ASSETS.filter(a => isCoinEnabled(a.symbol));
+        return filtered.length > 0 ? filtered : SUPPORTED_ASSETS;
+    }, [isCoinEnabled]);
+
     // ─── Filtered Assets ───────────────────────────────────────────────────────
     const filteredAssets = useMemo(() => {
-        return SUPPORTED_ASSETS.filter(asset => {
+        return activeSupportedAssets.filter(asset => {
             const query = coinSearchQuery.trim().toLowerCase();
             const matchesQuery = !query || 
                 asset.name.toLowerCase().includes(query) || 
@@ -1007,7 +1038,7 @@ export default function CryptoScreen() {
             }
             return true;
         });
-    }, [coinSearchQuery, coinCategoryFilter, favorites, cryptoBalances, assetsRates]);
+    }, [activeSupportedAssets, coinSearchQuery, coinCategoryFilter, favorites, cryptoBalances, assetsRates]);
 
     // ─── Favorites (Watchlist) Logic ───────────────────────────────────────────
     const loadFavorites = async () => {
@@ -1371,19 +1402,28 @@ export default function CryptoScreen() {
         }
     };
 
-    const getNetworkWithdrawFee = (netName: string, assetSym: string): number => {
-        const profitMargin = Number(settings?.crypto_withdraw_profit_margin) || 0.5;
-        let baseFee = 1.0;
-        if (netName === 'TRC20') baseFee = Number(settings?.crypto_fee_trc20_usdt) || 1.5;
-        else if (netName === 'BEP20') baseFee = Number(settings?.crypto_fee_bep20_usdt) || 1.0;
-        else if (netName === 'ERC20') baseFee = Number(settings?.crypto_fee_erc20_usdt) || 12.0;
-        else if (netName === 'POLYGON') baseFee = 0.8;
-        else if (netName === 'SOL') baseFee = 0.8;
-        else if (netName === 'BTC') return Number((Number(settings?.crypto_fee_btc) || 0.0004).toFixed(6));
-        else if (netName === 'ETH') return Number((Number(settings?.crypto_fee_eth) || 0.002).toFixed(6));
-        else if (netName === 'TRX') baseFee = 1.5;
-        else if (netName === 'TON') baseFee = 0.05;
-        return Number((baseFee + profitMargin).toFixed(4));
+    const getNetworkWithdrawFee = (netName: string, assetSym: string): { total: number; baseGas: number; platformProfit: number } => {
+        const profitMargin = Number(settings?.crypto_withdraw_profit_margin) || 0;
+        let baseFee = 0.5;
+        if (netName === 'TRC20') baseFee = Number(settings?.crypto_fee_trc20_usdt) || 1.0;
+        else if (netName === 'BEP20') baseFee = Number(settings?.crypto_fee_bep20_usdt) || 0.5;
+        else if (netName === 'ERC20') baseFee = Number(settings?.crypto_fee_erc20_usdt) || 5.0;
+        else if (netName === 'POLYGON') baseFee = 0.1;
+        else if (netName === 'SOL') baseFee = Number(settings?.crypto_fee_sol) || 0.005;
+        else if (netName === 'BTC') {
+            const btcFee = Number(settings?.crypto_fee_btc) || 0.0002;
+            return { total: btcFee, baseGas: btcFee, platformProfit: 0 };
+        } else if (netName === 'ETH') {
+            const ethFee = Number(settings?.crypto_fee_eth) || 0.001;
+            return { total: ethFee, baseGas: ethFee, platformProfit: 0 };
+        } else if (netName === 'TRX') baseFee = 1.0;
+        else if (netName === 'TON') baseFee = Number(settings?.crypto_fee_ton) || 0.05;
+
+        return {
+            total: Number((baseFee + profitMargin).toFixed(4)),
+            baseGas: baseFee,
+            platformProfit: profitMargin
+        };
     };
 
     const handleInitiateSend = () => {
@@ -1400,10 +1440,11 @@ export default function CryptoScreen() {
                 Alert.alert("Recipient Required", "Please provide a valid recipient wallet address.");
                 return;
             }
-            const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset);
+            const assetObj = activeSupportedAssets.find(a => a.symbol === withdrawAsset) || SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset);
             const netObj = assetObj?.networks[withdrawNetworkIdx] || assetObj?.networks[0];
             const targetNetwork = netObj?.network || 'TRC20';
-            const fee = getNetworkWithdrawFee(targetNetwork, withdrawAsset);
+            const feeObj = getNetworkWithdrawFee(targetNetwork, withdrawAsset);
+            const fee = feeObj.total;
             const totalRequired = amt + fee;
 
             if (totalRequired > currentBal) {
@@ -2247,7 +2288,9 @@ export default function CryptoScreen() {
 
                         <TouchableOpacity 
                             onPress={() => {
-                                setDepositAsset('USDT');
+                                if (!checkPermission('crypto_receive_enabled', 'Deposit')) return;
+                                const firstCoin = activeSupportedAssets[0]?.symbol || 'USDT';
+                                setDepositAsset(firstCoin);
                                 setDepositNetworkIdx(0);
                                 setActiveModal('deposit');
                             }} 
@@ -2271,6 +2314,42 @@ export default function CryptoScreen() {
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* ─── LIVE SYSTEM MAINTENANCE BANNER (TRIGGERED BY ADMIN) ─── */}
+                {isMaintenance && (
+                    <View style={{
+                        backgroundColor: '#FEF2F2',
+                        borderWidth: 1.5,
+                        borderColor: '#DC2626',
+                        borderRadius: 14,
+                        padding: 12,
+                        marginBottom: 12,
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                        shadowColor: '#DC2626',
+                        shadowOpacity: 0.15,
+                        shadowRadius: 8,
+                        elevation: 4
+                    }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="construct" size={18} color="#FFFFFF" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Text style={{ color: '#991B1B', fontWeight: '900', fontSize: 11, letterSpacing: 0.5 }}>
+                                    SANYA MAINTENANCE / GYARAN TSARI
+                                </Text>
+                                <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                    <Text style={{ color: '#DC2626', fontWeight: '900', fontSize: 8 }}>PAUSED</Text>
+                                </View>
+                            </View>
+                            <Text style={{ color: '#7F1D1D', fontSize: 10, lineHeight: 14, marginTop: 3, fontWeight: '500' }}>
+                                Sashen Crypto na karkashin gyara na musamman a yanzu. An dakatar da ajiyar kudi (deposit), cirewa (withdrawal), da ciniki (trade) na dan lokaci. Za a dawo nan ba da jimawa ba.
+                            </Text>
+                        </View>
+                    </View>
+                )}
 
                 {/* COMPACT PORTFOLIO BALANCE CARD WITH INNER CRYPTO ACCENTS */}
                 <View style={s.heroCard}>
@@ -2355,7 +2434,9 @@ export default function CryptoScreen() {
                     <View style={s.quickActionsRow}>
                         <TouchableOpacity 
                             onPress={() => {
-                                setDepositAsset('USDT');
+                                if (!checkPermission('crypto_receive_enabled', 'Deposit')) return;
+                                const firstCoin = activeSupportedAssets[0]?.symbol || 'USDT';
+                                setDepositAsset(firstCoin);
                                 setDepositNetworkIdx(0);
                                 setActiveModal('deposit');
                             }}
@@ -2370,7 +2451,9 @@ export default function CryptoScreen() {
 
                         <TouchableOpacity 
                             onPress={() => {
-                                setWithdrawAsset('USDT');
+                                if (!checkPermission('crypto_send_enabled', 'Withdraw / Send')) return;
+                                const firstCoin = activeSupportedAssets[0]?.symbol || 'USDT';
+                                setWithdrawAsset(firstCoin);
                                 setWithdrawNetworkIdx(0);
                                 setActiveModal('withdraw');
                             }}
@@ -2385,6 +2468,7 @@ export default function CryptoScreen() {
 
                         <TouchableOpacity 
                             onPress={() => {
+                                if (!checkPermission('crypto_swap_enabled', 'Crypto Swap')) return;
                                 setActiveTab('trade');
                                 setTradeMode('swap');
                             }}
@@ -2399,6 +2483,7 @@ export default function CryptoScreen() {
 
                         <TouchableOpacity 
                             onPress={() => {
+                                if (!checkPermission('crypto_buy_enabled', 'Buy & Sell Crypto')) return;
                                 setActiveTab('trade');
                                 setTradeMode('buy');
                             }}
@@ -2413,6 +2498,7 @@ export default function CryptoScreen() {
 
                         <TouchableOpacity 
                             onPress={() => {
+                                if (!checkPermission('crypto_gas_enabled', 'Gas Radar')) return;
                                 setActiveTab('gas');
                             }}
                             style={s.actionButton}
@@ -2998,7 +3084,7 @@ export default function CryptoScreen() {
 
                                 <Text style={s.fieldLabel}>CHOOSE CRYPTO TO BUY:</Text>
                                 <View style={s.networkOptionsRow}>
-                                    {['USDT', 'BTC', 'ETH', 'SOL', 'TON', 'TRX'].map(sym => (
+                                    {activeSupportedAssets.map(a => a.symbol).map(sym => (
                                         <TouchableOpacity
                                             key={sym}
                                             onPress={() => setBuyAsset(sym)}
@@ -3090,7 +3176,7 @@ export default function CryptoScreen() {
 
                                 <Text style={s.fieldLabel}>CHOOSE CRYPTO TO SELL:</Text>
                                 <View style={s.networkOptionsRow}>
-                                    {['USDT', 'BTC', 'ETH', 'SOL', 'TON', 'TRX'].map(sym => (
+                                    {activeSupportedAssets.map(a => a.symbol).map(sym => (
                                         <TouchableOpacity
                                             key={sym}
                                             onPress={() => setSellAsset(sym)}
@@ -3193,7 +3279,7 @@ export default function CryptoScreen() {
                                         />
                                         
                                         <View style={s.assetSelectorRow}>
-                                            {['USDT', 'BTC', 'ETH', 'SOL'].map(sym => (
+                                            {activeSupportedAssets.map(a => a.symbol).map(sym => (
                                                 <TouchableOpacity
                                                     key={sym}
                                                     onPress={() => setSwapFrom(sym)}
@@ -3238,7 +3324,7 @@ export default function CryptoScreen() {
                                         </Text>
                                         
                                         <View style={s.assetSelectorRow}>
-                                            {['BTC', 'ETH', 'USDT', 'SOL'].map(sym => (
+                                            {activeSupportedAssets.map(a => a.symbol).map(sym => (
                                                 <TouchableOpacity
                                                     key={sym}
                                                     onPress={() => setSwapTo(sym)}
@@ -3476,7 +3562,7 @@ export default function CryptoScreen() {
                         <ScrollView showsVerticalScrollIndicator={false}>
                             {/* Coin & Balance Overview Header */}
                             {(() => {
-                                const currentAssetObj = SUPPORTED_ASSETS.find(a => a.symbol === depositAsset) || SUPPORTED_ASSETS[0];
+                                const currentAssetObj = activeSupportedAssets.find(a => a.symbol === depositAsset) || activeSupportedAssets[0] || SUPPORTED_ASSETS[0];
                                 const currentNetObj = currentAssetObj.networks[depositNetworkIdx] || currentAssetObj.networks[0];
                                 const currentBal = cryptoBalances[depositAsset.toLowerCase()] || 0;
 
@@ -3563,7 +3649,7 @@ export default function CryptoScreen() {
                                                 shadowRadius: 6,
                                                 elevation: 4
                                             }}>
-                                                {SUPPORTED_ASSETS.map((asset) => {
+                                                {activeSupportedAssets.map((asset) => {
                                                     const isSelected = depositAsset === asset.symbol;
                                                     const assetBal = cryptoBalances[asset.symbol.toLowerCase()] || cryptoBalances[asset.symbol] || 0;
                                                     const price = getAssetPriceUsd(asset.symbol);
@@ -3801,13 +3887,21 @@ export default function CryptoScreen() {
                                             justifyContent: 'space-between'
                                         }}>
                                             <View style={{ gap: 4 }}>
-                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>Deposit Fee</Text>
-                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>0% (₦0 FREE)</Text>
+                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>Platform Deposit Fee</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: (Number(settings?.crypto_deposit_fee_percent) || 0) === 0 && (Number(settings?.crypto_deposit_fee_fixed) || 0) === 0 ? '#059669' : '#D97706' }}>
+                                                    {(() => {
+                                                        const p = Number(settings?.crypto_deposit_fee_percent) || 0;
+                                                        const f = Number(settings?.crypto_deposit_fee_fixed) || 0;
+                                                        if (p === 0 && f === 0) return '0% (FREE)';
+                                                        if (f > 0) return `${p}% + $${f.toFixed(2)}`;
+                                                        return `${p}%`;
+                                                    })()}
+                                                </Text>
                                                 <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600', marginTop: 4 }}>Min. Deposit</Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '800', color: C.textMain }}>{currentNetObj.minDeposit}</Text>
                                             </View>
                                             <View style={{ gap: 4, alignItems: 'flex-end' }}>
-                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>Est. Network Gas</Text>
+                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>Blockchain Gas (API)</Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '800', color: '#2563EB' }}>{currentNetObj.networkFee}</Text>
                                                 <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600', marginTop: 4 }}>Arrival Speed</Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '800', color: C.textMain }}>{currentNetObj.speed || 'Instant'}</Text>
@@ -3929,7 +4023,7 @@ export default function CryptoScreen() {
                             {/* Asset Selection */}
                             <Text style={s.fieldLabel}>SELECT COIN:</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.assetSelectorScroll}>
-                                {SUPPORTED_ASSETS.map(asset => (
+                                {activeSupportedAssets.map(asset => (
                                     <TouchableOpacity
                                         key={asset.symbol}
                                         onPress={() => {
@@ -3952,7 +4046,7 @@ export default function CryptoScreen() {
                                     {/* Destination Network */}
                                     <Text style={s.fieldLabel}>DESTINATION NETWORK:</Text>
                                     <View style={s.networkOptionsRow}>
-                                        {SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset)?.networks.map((net, i) => (
+                                        {(activeSupportedAssets.find(a => a.symbol === withdrawAsset) || SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset))?.networks.map((net, i) => (
                                             <TouchableOpacity
                                                 key={net.network}
                                                 onPress={() => setWithdrawNetworkIdx(i)}
@@ -4056,9 +4150,12 @@ export default function CryptoScreen() {
                             </View>
 
                             {(() => {
-                                const selectedNetObj = SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset)?.networks[withdrawNetworkIdx];
+                                const selectedNetObj = (activeSupportedAssets.find(a => a.symbol === withdrawAsset) || SUPPORTED_ASSETS.find(a => a.symbol === withdrawAsset))?.networks[withdrawNetworkIdx];
                                 const netKey = selectedNetObj?.network || 'TRC20';
-                                const activeFee = sendMode === 'internal' ? 0 : getNetworkWithdrawFee(netKey, withdrawAsset);
+                                const feeObj = sendMode === 'internal' 
+                                    ? { total: 0, baseGas: 0, platformProfit: 0 } 
+                                    : getNetworkWithdrawFee(netKey, withdrawAsset);
+                                const activeFee = feeObj.total;
                                 const numAmt = parseFloat(withdrawAmount || '0') || 0;
                                 const totalAmt = numAmt > 0 ? (numAmt + activeFee) : 0;
 
@@ -4071,11 +4168,19 @@ export default function CryptoScreen() {
                                             </Text>
                                         </View>
                                         <View style={s.withdrawEstimateRow}>
-                                            <Text style={s.withdrawEstimateLabel}>Network / Gas Fee</Text>
-                                            <Text style={[s.withdrawEstimateValue, { color: activeFee === 0 ? C.emerald : C.navyDark, fontWeight: '700' }]}>
-                                                {activeFee === 0 ? 'FREE (₦0.00)' : `${activeFee} ${withdrawAsset}`}
+                                            <Text style={s.withdrawEstimateLabel}>Blockchain Gas (Live API)</Text>
+                                            <Text style={[s.withdrawEstimateValue, { color: feeObj.baseGas === 0 ? C.emerald : C.navyDark, fontWeight: '700' }]}>
+                                                {feeObj.baseGas === 0 ? 'FREE (₦0.00)' : `${feeObj.baseGas} ${withdrawAsset}`}
                                             </Text>
                                         </View>
+                                        {feeObj.platformProfit > 0 && (
+                                            <View style={s.withdrawEstimateRow}>
+                                                <Text style={s.withdrawEstimateLabel}>Platform Markup (Abu Mafhal)</Text>
+                                                <Text style={[s.withdrawEstimateValue, { color: C.gold, fontWeight: '700' }]}>
+                                                    +{feeObj.platformProfit} {withdrawAsset}
+                                                </Text>
+                                            </View>
+                                        )}
                                         <View style={[s.withdrawEstimateRow, { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 6, marginTop: 4 }]}>
                                             <Text style={[s.withdrawEstimateLabel, { fontWeight: '700', color: C.navyDark }]}>Total Deducted</Text>
                                             <Text style={[s.withdrawEstimateValue, { fontWeight: '800', color: C.navyDark, fontSize: 13 }]}>
@@ -4451,7 +4556,7 @@ export default function CryptoScreen() {
                             {/* Coin Selector */}
                             <Text style={s.fieldLabel}>SELECT COIN:</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.assetSelectorScroll}>
-                                {SUPPORTED_ASSETS.map(asset => (
+                                {activeSupportedAssets.map(asset => (
                                     <TouchableOpacity
                                         key={asset.symbol}
                                         onPress={() => setCalcCoin(asset.symbol)}
@@ -4573,7 +4678,7 @@ export default function CryptoScreen() {
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={s.fieldLabel}>CHOOSE COIN:</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.assetSelectorScroll}>
-                                {SUPPORTED_ASSETS.map(asset => (
+                                {activeSupportedAssets.map(asset => (
                                     <TouchableOpacity
                                         key={asset.symbol}
                                         onPress={() => setAlertCoin(asset.symbol)}
