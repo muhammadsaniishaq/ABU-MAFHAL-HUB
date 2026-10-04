@@ -97,13 +97,13 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
         defaultRateUsd: 1.00,
         networks: [
-            { label: 'TRON (TRC20)', network: 'TRC20', currency: 'usdttrc20', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~1.0 USDT', platformFee: 'FREE (0%)', networkFee: '~1.0 USDT (TRON Gas)', explorer: 'https://tronscan.org/#/transaction/', speed: '~1-3 mins', isPopular: true },
-            { label: 'The Open Network (Gram / TON)', network: 'TON', currency: 'usdtton', minDeposit: '2 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.05 GRAM', platformFee: 'FREE (0%)', networkFee: '~0.05 GRAM (~$0.08)', explorer: 'https://tonviewer.com/transaction/', speed: 'Instant (~30s)', isPopular: true, requiresMemo: true },
-            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'usdtbsc', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.29 USDT', platformFee: 'FREE (0%)', networkFee: '~0.29 USDT (BSC Gas)', explorer: 'https://bscscan.com/tx/', speed: '~1 min', isPopular: true },
-            { label: 'Solana (SOL)', network: 'SOL', currency: 'usdtsol', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.10 USDT', platformFee: 'FREE (0%)', networkFee: '~0.10 USDT (SOL Gas)', explorer: 'https://solscan.io/tx/', speed: 'Instant (~15s)' },
-            { label: 'Polygon (POL)', network: 'POLYGON', currency: 'usdtmatic', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.10 USDT', platformFee: 'FREE (0%)', networkFee: '~0.10 USDT (POL Gas)', explorer: 'https://polygonscan.com/tx/', speed: '~2 mins' },
-            { label: 'Arbitrum One', network: 'ARBITRUM', currency: 'usdtarb', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.30 USDT', platformFee: 'FREE (0%)', networkFee: '~0.30 USDT (L2 Gas)', explorer: 'https://arbiscan.io/tx/', speed: '~1 min' },
-            { label: 'Ethereum (ERC20)', network: 'ERC20', currency: 'usdterc20', minDeposit: '20 USDT', fee: 'Platform: FREE (0%) • Gas: ~3.50 USDT', platformFee: 'FREE (0%)', networkFee: '~3.50 USDT (ETH Gas)', explorer: 'https://etherscan.io/tx/', speed: '~5 mins' },
+            { label: 'TRON (TRC20)', network: 'TRC20', currency: 'usdttrc20', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.10 USDT', platformFee: 'FREE (0%)', networkFee: '~0.10 USDT (Low Gas)', explorer: 'https://tronscan.org/#/transaction/', speed: '~1-3 mins', isPopular: true },
+            { label: 'The Open Network (Gram / TON)', network: 'TON', currency: 'usdtton', minDeposit: '2 USDT', fee: 'Platform: FREE (0%) • Gas: < $0.01', platformFee: 'FREE (0%)', networkFee: '~0.005 GRAM (< $0.01)', explorer: 'https://tonviewer.com/transaction/', speed: 'Instant (~30s)', isPopular: true, requiresMemo: true },
+            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'usdtbsc', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.05 USDT', platformFee: 'FREE (0%)', networkFee: '~0.05 USDT (Minimal)', explorer: 'https://bscscan.com/tx/', speed: '~1 min', isPopular: true },
+            { label: 'Solana (SOL)', network: 'SOL', currency: 'usdtsol', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: < $0.01', platformFee: 'FREE (0%)', networkFee: '< $0.01 (Near Zero)', explorer: 'https://solscan.io/tx/', speed: 'Instant (~15s)' },
+            { label: 'Polygon (POL)', network: 'POLYGON', currency: 'usdtmatic', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: < $0.01', platformFee: 'FREE (0%)', networkFee: '< $0.01 (Near Zero)', explorer: 'https://polygonscan.com/tx/', speed: '~2 mins' },
+            { label: 'Arbitrum One', network: 'ARBITRUM', currency: 'usdtarb', minDeposit: '5 USDT', fee: 'Platform: FREE (0%) • Gas: ~0.02 USDT', platformFee: 'FREE (0%)', networkFee: '~0.02 USDT (L2 Gas)', explorer: 'https://arbiscan.io/tx/', speed: '~1 min' },
+            { label: 'Ethereum (ERC20)', network: 'ERC20', currency: 'usdterc20', minDeposit: '20 USDT', fee: 'Platform: FREE (0%) • Gas: ~1.50 USDT', platformFee: 'FREE (0%)', networkFee: '~1.50 USDT (Standard Gas)', explorer: 'https://etherscan.io/tx/', speed: '~5 mins' },
         ]
     },
     {
@@ -112,7 +112,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
         defaultRateUsd: 87500,
         networks: [
-            { label: 'Bitcoin Mainnet', network: 'BTC', currency: 'btc', minDeposit: '0.0002 BTC', fee: 'Platform: FREE (0%) • Gas: ~0.0001 BTC', platformFee: 'FREE (0%)', networkFee: '~0.0001 BTC (Miner Fee)', explorer: 'https://mempool.space/tx/', speed: '~10-30 mins' }
+            { label: 'Bitcoin Mainnet', network: 'BTC', currency: 'btc', minDeposit: '0.0002 BTC', fee: 'Platform: FREE (0%) • Gas: Low Miner', platformFee: 'FREE (0%)', networkFee: '~0.00002 BTC (Low Miner)', explorer: 'https://mempool.space/tx/', speed: '~10-30 mins' }
         ]
     },
     {
@@ -121,9 +121,9 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
         defaultRateUsd: 3100,
         networks: [
-            { label: 'Ethereum Mainnet (ERC20)', network: 'ERC20', currency: 'eth', minDeposit: '0.005 ETH', fee: 'Platform: FREE (0%) • Gas: ~0.001 ETH', platformFee: 'FREE (0%)', networkFee: '~0.001 ETH (Mainnet Gas)', explorer: 'https://etherscan.io/tx/', speed: '~3-5 mins' },
-            { label: 'Arbitrum One', network: 'ARBITRUM', currency: 'etharb', minDeposit: '0.002 ETH', fee: 'Platform: FREE (0%) • Gas: ~0.0001 ETH', platformFee: 'FREE (0%)', networkFee: '~0.0001 ETH (L2 Gas)', explorer: 'https://arbiscan.io/tx/', speed: '~1 min', isPopular: true },
-            { label: 'Base Network', network: 'BASE', currency: 'ethbase', minDeposit: '0.002 ETH', fee: 'Platform: FREE (0%) • Gas: ~0.00008 ETH', platformFee: 'FREE (0%)', networkFee: '~0.00008 ETH (Base Gas)', explorer: 'https://basescan.org/tx/', speed: '~1 min', isPopular: true },
+            { label: 'Ethereum Mainnet (ERC20)', network: 'ERC20', currency: 'eth', minDeposit: '0.005 ETH', fee: 'Platform: FREE (0%) • Gas: Mainnet Gas', platformFee: 'FREE (0%)', networkFee: '~0.0008 ETH (Mainnet Gas)', explorer: 'https://etherscan.io/tx/', speed: '~3-5 mins' },
+            { label: 'Arbitrum One', network: 'ARBITRUM', currency: 'etharb', minDeposit: '0.002 ETH', fee: 'Platform: FREE (0%) • Gas: Minimal L2', platformFee: 'FREE (0%)', networkFee: '< 0.00005 ETH (Minimal L2)', explorer: 'https://arbiscan.io/tx/', speed: '~1 min', isPopular: true },
+            { label: 'Base Network', network: 'BASE', currency: 'ethbase', minDeposit: '0.002 ETH', fee: 'Platform: FREE (0%) • Gas: Minimal Base', platformFee: 'FREE (0%)', networkFee: '< 0.00003 ETH (Minimal Base)', explorer: 'https://basescan.org/tx/', speed: '~1 min', isPopular: true },
         ]
     },
     {
@@ -132,7 +132,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/4128/large/solana.png',
         defaultRateUsd: 185,
         networks: [
-            { label: 'Solana Mainnet', network: 'SOL', currency: 'sol', minDeposit: '0.05 SOL', fee: 'Platform: FREE (0%) • Gas: ~0.0008 SOL', platformFee: 'FREE (0%)', networkFee: '~0.0008 SOL (Network Gas)', explorer: 'https://solscan.io/tx/', speed: 'Instant (~15s)', isPopular: true }
+            { label: 'Solana Mainnet', network: 'SOL', currency: 'sol', minDeposit: '0.05 SOL', fee: 'Platform: FREE (0%) • Gas: Instant Gas', platformFee: 'FREE (0%)', networkFee: '< 0.0005 SOL (Instant Gas)', explorer: 'https://solscan.io/tx/', speed: 'Instant (~15s)', isPopular: true }
         ]
     },
     {
@@ -141,7 +141,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/1094/large/tron-logo.png',
         defaultRateUsd: 0.22,
         networks: [
-            { label: 'TRON (TRC20)', network: 'TRX', currency: 'trx', minDeposit: '20 TRX', fee: 'Platform: FREE (0%) • Gas: ~1.5 TRX', platformFee: 'FREE (0%)', networkFee: '~1.5 TRX (Energy Fee)', explorer: 'https://tronscan.org/#/transaction/', speed: '~1-2 mins', isPopular: true }
+            { label: 'TRON (TRC20)', network: 'TRX', currency: 'trx', minDeposit: '20 TRX', fee: 'Platform: FREE (0%) • Gas: Low Energy', platformFee: 'FREE (0%)', networkFee: '~0.5 TRX (Low Energy)', explorer: 'https://tronscan.org/#/transaction/', speed: '~1-2 mins', isPopular: true }
         ]
     },
     {
@@ -150,7 +150,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png',
         defaultRateUsd: 620,
         networks: [
-            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'bnbbsc', minDeposit: '0.01 BNB', fee: 'Platform: FREE (0%) • Gas: ~0.0005 BNB', platformFee: 'FREE (0%)', networkFee: '~0.0005 BNB (BSC Gas)', explorer: 'https://bscscan.com/tx/', speed: '~1 min', isPopular: true }
+            { label: 'BNB Smart Chain (BEP20)', network: 'BEP20', currency: 'bnbbsc', minDeposit: '0.01 BNB', fee: 'Platform: FREE (0%) • Gas: Low Gas', platformFee: 'FREE (0%)', networkFee: '~0.0002 BNB (Low Gas)', explorer: 'https://bscscan.com/tx/', speed: '~1 min', isPopular: true }
         ]
     },
     {
@@ -159,7 +159,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/17980/large/ton_symbol.png',
         defaultRateUsd: 1.54,
         networks: [
-            { label: 'The Open Network (Gram / TON)', network: 'TON', currency: 'ton', minDeposit: '0.5 GRAM', fee: 'Platform: FREE (0%) • Gas: ~0.05 GRAM', platformFee: 'FREE (0%)', networkFee: '~0.05 GRAM (~$0.08)', explorer: 'https://tonviewer.com/transaction/', speed: 'Instant (~30s)', isPopular: true, requiresMemo: true }
+            { label: 'The Open Network (Gram / TON)', network: 'TON', currency: 'ton', minDeposit: '0.5 GRAM', fee: 'Platform: FREE (0%) • Gas: < $0.01', platformFee: 'FREE (0%)', networkFee: '~0.005 GRAM (< $0.01)', explorer: 'https://tonviewer.com/transaction/', speed: 'Instant (~30s)', isPopular: true, requiresMemo: true }
         ]
     },
     {
@@ -168,7 +168,7 @@ const SUPPORTED_ASSETS: AssetConfig[] = [
         icon: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png',
         defaultRateUsd: 0.16,
         networks: [
-            { label: 'Dogecoin Network', network: 'DOGE', currency: 'doge', minDeposit: '15 DOGE', fee: 'Platform: FREE (0%) • Gas: ~1.0 DOGE', platformFee: 'FREE (0%)', networkFee: '~1.0 DOGE (Network Fee)', explorer: 'https://dogechain.info/tx/', speed: '~5 mins' }
+            { label: 'Dogecoin Network', network: 'DOGE', currency: 'doge', minDeposit: '15 DOGE', fee: 'Platform: FREE (0%) • Gas: Low Fee', platformFee: 'FREE (0%)', networkFee: '~0.5 DOGE (Low Fee)', explorer: 'https://dogechain.info/tx/', speed: '~5 mins' }
         ]
     }
 ];
@@ -824,11 +824,18 @@ export default function CryptoScreen() {
                         else if (norm.startsWith('BNB')) norm = 'BNB';
                         else if (norm.startsWith('SOL')) norm = 'SOL';
                         else if (norm.startsWith('TRX')) norm = 'TRX';
-                        else if (norm.startsWith('TON')) norm = 'TON';
+                        else if (norm.startsWith('TON') || norm.startsWith('GRAM')) norm = 'TON';
                         else if (norm.startsWith('BTC')) norm = 'BTC';
+                        else if (norm.startsWith('DOGE')) norm = 'DOGE';
 
                         const val = Number(b.balance) || 0;
                         map[norm] = (map[norm] || 0) + val;
+                        map[norm.toLowerCase()] = (map[norm.toLowerCase()] || 0) + val;
+
+                        if (norm === 'TON') {
+                            map['GRAM'] = (map['GRAM'] || 0) + val;
+                            map['gram'] = (map['gram'] || 0) + val;
+                        }
                     }
                 });
                 setCryptoBalances(map);
@@ -1198,8 +1205,18 @@ export default function CryptoScreen() {
     };
 
     // ─── Real NOWPayments Deposit Address Generation & On-Demand Verification ────
+    // ─── Real NOWPayments Deposit Address Generation & On-Demand Verification ────
     const loadNowPaymentsAddress = async (assetSym: string, netIndex: number, regenerate = false) => {
-        if (!userId) return;
+        let currentUid = userId;
+        if (!currentUid) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                currentUid = user.id;
+                setUserId(user.id);
+            }
+        }
+        if (!currentUid) return;
+
         const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === assetSym);
         if (!assetObj) return;
         const netObj = assetObj.networks[netIndex] || assetObj.networks[0];
@@ -1209,7 +1226,7 @@ export default function CryptoScreen() {
         setDepositMemoCopied(false);
         setDepositSuccessNotice(null);
         try {
-            const res = await api.crypto.generateDepositAddress(userId, netObj.network, netObj.currency, regenerate);
+            const res = await api.crypto.generateDepositAddress(currentUid, netObj.network, netObj.currency, regenerate);
             if (res && res.address) {
                 setDepositAddress(res.address);
                 setDepositExtraId(res.extra_id || null);
@@ -1220,7 +1237,7 @@ export default function CryptoScreen() {
         } catch (err: any) {
             console.error("Deposit address error:", err);
             Alert.alert(
-                "NOWPayments Gateway Notice", 
+                "Deposit Gateway Notice", 
                 err.message || "Failed to generate deposit address. Please verify network connectivity."
             );
         } finally {
@@ -1228,9 +1245,18 @@ export default function CryptoScreen() {
         }
     };
 
-    const handleVerifyDeposit = async () => {
-        if (!userId) return;
-        setVerifyingDeposit(true);
+    const handleVerifyDeposit = async (silent = false) => {
+        let currentUid = userId;
+        if (!currentUid) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                currentUid = user.id;
+                setUserId(user.id);
+            }
+        }
+        if (!currentUid) return;
+
+        if (!silent) setVerifyingDeposit(true);
         try {
             const assetObj = SUPPORTED_ASSETS.find(a => a.symbol === depositAsset);
             const netObj = assetObj?.networks[depositNetworkIdx] || assetObj?.networks[0];
@@ -1243,27 +1269,36 @@ export default function CryptoScreen() {
 
             if (res?.success && (res.credited > 0 || res.newBalance !== undefined)) {
                 if (Platform.OS !== 'web') {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
                 }
-                const msg = `Deposit of +${res.credited || ''} ${res.asset ? res.asset.toUpperCase() : depositAsset} confirmed and credited!`;
+                const msg = `Deposit of +${res.credited || ''} ${res.asset ? res.asset.toUpperCase() : (depositAsset === 'TON' ? 'GRAM' : depositAsset)} confirmed and credited to your wallet!`;
                 setDepositSuccessNotice(msg);
                 Alert.alert("Deposit Confirmed! 🎉", msg);
-                await fetchUserBalances(userId);
-                await fetchCryptoTransactions(userId);
+                await fetchUserBalances(currentUid);
+                await fetchCryptoTransactions(currentUid);
             } else if (res?.alreadyCredited) {
-                Alert.alert("Already Credited", res.message || "This deposit is already credited in your wallet balance.");
-                await fetchUserBalances(userId);
+                if (!silent) Alert.alert("Already Credited", res.message || "This deposit is already credited in your wallet balance.");
+                await fetchUserBalances(currentUid);
             } else if (res?.pending) {
-                Alert.alert("Pending on Blockchain", res.message || "Your deposit was detected and is confirming on the blockchain. It will credit automatically upon final confirmation.");
+                if (!silent) Alert.alert("Confirming on Blockchain ⏳", res.message || "Your deposit was detected and is confirming on the blockchain. It will credit automatically upon final confirmation.");
             } else {
-                Alert.alert("Deposit Status", res?.message || "No incoming confirmed transaction found yet. If you just sent the funds, please allow 1-3 minutes for blockchain nodes to broadcast it.");
+                if (!silent) Alert.alert("Deposit Status", res?.message || "No incoming confirmed transaction found yet. If you just sent the funds, please allow 1-3 minutes for blockchain nodes to broadcast it.");
             }
         } catch (err: any) {
-            Alert.alert("Verification Error", err.message || "Could not check deposit status right now.");
+            if (!silent) Alert.alert("Verification Notice", err.message || "Could not check deposit status right now.");
         } finally {
-            setVerifyingDeposit(false);
+            if (!silent) setVerifyingDeposit(false);
         }
     };
+
+    // Auto-detect incoming deposits every 15s while deposit modal is active
+    useEffect(() => {
+        if (activeModal !== 'deposit' || !depositPaymentId || !userId) return;
+        const timer = setInterval(() => {
+            handleVerifyDeposit(true);
+        }, 15000);
+        return () => clearInterval(timer);
+    }, [activeModal, depositPaymentId, depositAddress, userId, depositAsset, depositNetworkIdx]);
 
     useEffect(() => {
         if (activeModal === 'deposit') {
@@ -3447,16 +3482,9 @@ export default function CryptoScreen() {
 
                                 return (
                                     <>
-                                        {/* ─── SELECT COIN (MODERN LUXURY DROPDOWN) ─── */}
-                                        <View style={{ marginBottom: 12 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                                                <Text style={s.fieldLabel}>DEPOSIT ASSET (COIN):</Text>
-                                                <Text style={{ fontSize: 11, fontWeight: '700', color: C.emerald }}>
-                                                    Balance: {currentBal.toLocaleString()} {depositAsset === 'TON' ? 'GRAM' : depositAsset}
-                                                </Text>
-                                            </View>
-
-                                            {/* Coin Dropdown Trigger */}
+                                        {/* ─── COMPACT TOP ROW: COIN & NETWORK SELECTORS ─── */}
+                                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                                            {/* Coin Selector Pill */}
                                             <TouchableOpacity
                                                 onPress={() => {
                                                     setShowDepositCoinPicker(prev => !prev);
@@ -3464,123 +3492,33 @@ export default function CryptoScreen() {
                                                 }}
                                                 activeOpacity={0.8}
                                                 style={{
+                                                    flex: 1,
                                                     backgroundColor: C.inputBg,
-                                                    borderWidth: 1.5,
+                                                    borderWidth: 1,
                                                     borderColor: showDepositCoinPicker ? C.emerald : C.cardBorder,
                                                     borderRadius: 12,
-                                                    paddingHorizontal: 12,
-                                                    paddingVertical: 10,
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 9,
                                                     flexDirection: 'row',
                                                     alignItems: 'center',
                                                     justifyContent: 'space-between'
                                                 }}
                                             >
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                                    <Image source={{ uri: currentAssetObj.icon }} style={{ width: 28, height: 28, borderRadius: 14 }} />
-                                                    <View>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <Text style={{ fontSize: 14, fontWeight: '800', color: C.textMain }}>
-                                                                {currentAssetObj.symbol === 'TON' ? 'GRAM (TON)' : currentAssetObj.symbol}
-                                                            </Text>
-                                                            <View style={{ backgroundColor: '#E0E7FF', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                                                                <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#3730A3' }}>${getAssetPriceUsd(currentAssetObj.symbol).toLocaleString()}</Text>
-                                                            </View>
-                                                        </View>
-                                                        <Text style={{ fontSize: 11, color: C.textSub, fontWeight: '500' }}>
-                                                            {currentAssetObj.name}
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                    <Image source={{ uri: currentAssetObj.icon }} style={{ width: 24, height: 24, borderRadius: 12 }} />
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={{ fontSize: 13, fontWeight: '800', color: C.textMain }} numberOfLines={1}>
+                                                            {currentAssetObj.symbol === 'TON' ? 'GRAM' : currentAssetObj.symbol}
+                                                        </Text>
+                                                        <Text style={{ fontSize: 10, color: C.textSub, fontWeight: '600' }} numberOfLines={1}>
+                                                            Bal: {(cryptoBalances[depositAsset.toLowerCase()] || cryptoBalances[depositAsset] || 0).toLocaleString()}
                                                         </Text>
                                                     </View>
                                                 </View>
-                                                <Ionicons 
-                                                    name={showDepositCoinPicker ? "chevron-up" : "chevron-down"} 
-                                                    size={20} 
-                                                    color={C.navyDark} 
-                                                />
+                                                <Ionicons name={showDepositCoinPicker ? "chevron-up" : "chevron-down"} size={16} color={C.textSub} />
                                             </TouchableOpacity>
 
-                                            {/* Coin Dropdown List */}
-                                            {showDepositCoinPicker && (
-                                                <View style={{
-                                                    backgroundColor: C.card,
-                                                    borderWidth: 1.5,
-                                                    borderColor: C.cardBorder,
-                                                    borderRadius: 12,
-                                                    marginTop: 6,
-                                                    overflow: 'hidden',
-                                                    shadowColor: '#000',
-                                                    shadowOffset: { width: 0, height: 4 },
-                                                    shadowOpacity: 0.1,
-                                                    shadowRadius: 8,
-                                                    elevation: 5
-                                                }}>
-                                                    {SUPPORTED_ASSETS.map((asset) => {
-                                                        const isSelected = depositAsset === asset.symbol;
-                                                        const assetBal = cryptoBalances[asset.symbol.toLowerCase()] || 0;
-                                                        const price = getAssetPriceUsd(asset.symbol);
-
-                                                        return (
-                                                            <TouchableOpacity
-                                                                key={asset.symbol}
-                                                                onPress={() => {
-                                                                    setDepositAsset(asset.symbol);
-                                                                    setDepositNetworkIdx(0);
-                                                                    setShowDepositCoinPicker(false);
-                                                                }}
-                                                                activeOpacity={0.75}
-                                                                style={{
-                                                                    paddingHorizontal: 12,
-                                                                    paddingVertical: 10,
-                                                                    flexDirection: 'row',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'space-between',
-                                                                    borderBottomWidth: 1,
-                                                                    borderBottomColor: '#F1F5F9',
-                                                                    backgroundColor: isSelected ? '#F0FDF4' : 'transparent'
-                                                                }}
-                                                            >
-                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                                                    <Image source={{ uri: asset.icon }} style={{ width: 26, height: 26, borderRadius: 13 }} />
-                                                                    <View>
-                                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                                            <Text style={{ fontSize: 13, fontWeight: '800', color: isSelected ? '#065F46' : C.textMain }}>
-                                                                                {asset.symbol === 'TON' ? 'GRAM (TON)' : asset.symbol}
-                                                                            </Text>
-                                                                            <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>
-                                                                                {asset.name}
-                                                                            </Text>
-                                                                        </View>
-                                                                        <Text style={{ fontSize: 10, color: C.textMuted }}>
-                                                                            ${price >= 1 ? price.toLocaleString() : price.toFixed(4)} &bull; Bal: {assetBal.toLocaleString()}
-                                                                        </Text>
-                                                                    </View>
-                                                                </View>
-                                                                {isSelected ? (
-                                                                    <Ionicons name="checkmark-circle" size={18} color={C.emerald} />
-                                                                ) : (
-                                                                    <Ionicons name="chevron-forward" size={14} color={C.textMuted} />
-                                                                )}
-                                                            </TouchableOpacity>
-                                                        );
-                                                    })}
-                                                </View>
-                                            )}
-                                        </View>
-
-                                        {/* ─── SELECT NETWORK (MODERN LUXURY DROPDOWN) ─── */}
-                                        <View style={{ marginBottom: 12 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                                                <Text style={s.fieldLabel}>DEPOSIT NETWORK:</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                    <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
-                                                        <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#166534' }}>FEE: 0% FREE</Text>
-                                                    </View>
-                                                    <Text style={{ fontSize: 10, color: C.textSub, fontWeight: '600' }}>
-                                                        ({currentAssetObj.networks.length} {currentAssetObj.networks.length === 1 ? 'Option' : 'Options'})
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            {/* Network Dropdown Trigger */}
+                                            {/* Network Selector Pill */}
                                             <TouchableOpacity
                                                 onPress={() => {
                                                     setShowDepositNetworkPicker(prev => !prev);
@@ -3588,9 +3526,181 @@ export default function CryptoScreen() {
                                                 }}
                                                 activeOpacity={0.8}
                                                 style={{
+                                                    flex: 1,
                                                     backgroundColor: C.inputBg,
-                                                    borderWidth: 1.5,
+                                                    borderWidth: 1,
                                                     borderColor: showDepositNetworkPicker ? C.emerald : C.cardBorder,
+                                                    borderRadius: 12,
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 9,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between'
+                                                }}
+                                            >
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={{ fontSize: 9.5, color: C.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>NETWORK</Text>
+                                                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: C.textMain }} numberOfLines={1}>
+                                                        {currentNetObj.network}
+                                                    </Text>
+                                                </View>
+                                                <Ionicons name={showDepositNetworkPicker ? "chevron-up" : "chevron-down"} size={16} color={C.textSub} />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Coin Dropdown List */}
+                                        {showDepositCoinPicker && (
+                                            <View style={{
+                                                backgroundColor: C.card,
+                                                borderWidth: 1,
+                                                borderColor: C.cardBorder,
+                                                borderRadius: 12,
+                                                marginBottom: 12,
+                                                overflow: 'hidden',
+                                                shadowColor: '#000',
+                                                shadowOffset: { width: 0, height: 3 },
+                                                shadowOpacity: 0.08,
+                                                shadowRadius: 6,
+                                                elevation: 4
+                                            }}>
+                                                {SUPPORTED_ASSETS.map((asset) => {
+                                                    const isSelected = depositAsset === asset.symbol;
+                                                    const assetBal = cryptoBalances[asset.symbol.toLowerCase()] || cryptoBalances[asset.symbol] || 0;
+                                                    const price = getAssetPriceUsd(asset.symbol);
+
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={asset.symbol}
+                                                            onPress={() => {
+                                                                setDepositAsset(asset.symbol);
+                                                                setDepositNetworkIdx(0);
+                                                                setShowDepositCoinPicker(false);
+                                                            }}
+                                                            activeOpacity={0.75}
+                                                            style={{
+                                                                paddingHorizontal: 12,
+                                                                paddingVertical: 9,
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                borderBottomWidth: 1,
+                                                                borderBottomColor: '#F8FAFC',
+                                                                backgroundColor: isSelected ? '#F0FDF4' : 'transparent'
+                                                            }}
+                                                        >
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                                <Image source={{ uri: asset.icon }} style={{ width: 24, height: 24, borderRadius: 12 }} />
+                                                                <View>
+                                                                    <Text style={{ fontSize: 13, fontWeight: '800', color: isSelected ? '#065F46' : C.textMain }}>
+                                                                        {asset.symbol === 'TON' ? 'GRAM (TON)' : asset.symbol}
+                                                                    </Text>
+                                                                    <Text style={{ fontSize: 10, color: C.textSub }}>
+                                                                        ${price >= 1 ? price.toLocaleString() : price.toFixed(4)} &bull; Bal: {assetBal.toLocaleString()}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+                                                            {isSelected && <Ionicons name="checkmark-circle" size={18} color={C.emerald} />}
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+                                        )}
+
+                                        {/* Network Dropdown List */}
+                                        {showDepositNetworkPicker && (
+                                            <View style={{
+                                                backgroundColor: C.card,
+                                                borderWidth: 1,
+                                                borderColor: C.cardBorder,
+                                                borderRadius: 12,
+                                                marginBottom: 12,
+                                                overflow: 'hidden',
+                                                shadowColor: '#000',
+                                                shadowOffset: { width: 0, height: 3 },
+                                                shadowOpacity: 0.08,
+                                                shadowRadius: 6,
+                                                elevation: 4
+                                            }}>
+                                                {currentAssetObj.networks.map((net, i) => {
+                                                    const isSelected = depositNetworkIdx === i;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={net.network + net.currency}
+                                                            onPress={() => {
+                                                                setDepositNetworkIdx(i);
+                                                                setShowDepositNetworkPicker(false);
+                                                            }}
+                                                            activeOpacity={0.8}
+                                                            style={{
+                                                                paddingHorizontal: 12,
+                                                                paddingVertical: 9,
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                borderBottomWidth: 1,
+                                                                borderBottomColor: '#F8FAFC',
+                                                                backgroundColor: isSelected ? '#F0FDF4' : 'transparent'
+                                                            }}
+                                                        >
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: isSelected ? '#065F46' : C.textMain }}>
+                                                                    {net.label}
+                                                                </Text>
+                                                                <Text style={{ fontSize: 10.5, color: C.textSub, marginTop: 1 }}>
+                                                                    Speed: {net.speed} &bull; Min: {net.minDeposit} &bull; Gas: {net.networkFee}
+                                                                </Text>
+                                                            </View>
+                                                            {isSelected && <Ionicons name="checkmark-circle" size={18} color={C.emerald} />}
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+                                        )}
+
+                                        {/* QR CODE CONTAINER */}
+                                        <View style={{
+                                            backgroundColor: '#FFFFFF',
+                                            borderWidth: 1,
+                                            borderColor: '#E2E8F0',
+                                            borderRadius: 16,
+                                            paddingVertical: 14,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginBottom: 12,
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 2 },
+                                            shadowOpacity: 0.04,
+                                            shadowRadius: 4,
+                                            elevation: 2
+                                        }}>
+                                            {depositLoading ? (
+                                                <View style={{ paddingVertical: 36, alignItems: 'center' }}>
+                                                    <ActivityIndicator size="small" color={C.navyDark} />
+                                                    <Text style={{ fontSize: 11.5, color: C.textSub, marginTop: 8, fontWeight: '600' }}>
+                                                        Generating secure {depositAsset === 'TON' ? 'Gram' : depositAsset} address...
+                                                    </Text>
+                                                </View>
+                                            ) : (
+                                                <View style={{ alignItems: 'center' }}>
+                                                    <SafeQRCode value={depositAddress || 'https://abumafhal.com'} size={140} />
+                                                    <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 8, fontWeight: '600' }}>
+                                                        Scan QR with your crypto wallet app
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+
+                                        {/* DEPOSIT ADDRESS BOX */}
+                                        <View style={{ marginBottom: 10 }}>
+                                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.textSub, marginBottom: 4, textTransform: 'uppercase' }}>
+                                                {currentNetObj.network} Deposit Address:
+                                            </Text>
+                                            <TouchableOpacity 
+                                                onPress={handleCopyAddress} 
+                                                style={{
+                                                    backgroundColor: C.inputBg,
+                                                    borderWidth: 1,
+                                                    borderColor: depositCopied ? C.emerald : C.cardBorder,
                                                     borderRadius: 12,
                                                     paddingHorizontal: 12,
                                                     paddingVertical: 10,
@@ -3598,272 +3708,155 @@ export default function CryptoScreen() {
                                                     alignItems: 'center',
                                                     justifyContent: 'space-between'
                                                 }}
+                                                activeOpacity={0.8}
                                             >
-                                                <View style={{ flex: 1, marginRight: 8 }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                                        <Text style={{ fontSize: 13.5, fontWeight: '800', color: C.textMain }}>
-                                                            {currentNetObj.label}
-                                                        </Text>
-                                                        {currentNetObj.isPopular && (
-                                                            <View style={{ backgroundColor: '#DBEAFE', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#1E40AF' }}>POPULAR</Text>
-                                                            </View>
-                                                        )}
-                                                        {currentNetObj.requiresMemo && (
-                                                            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#D97706' }}>MEMO REQUIRED</Text>
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
-                                                        <Text style={{ fontSize: 11, color: C.textSub, fontWeight: '600' }}>
-                                                            ⚡ {currentNetObj.speed || '~1-3 mins'}
-                                                        </Text>
-                                                        <Text style={{ fontSize: 11, color: C.textSub, fontWeight: '600' }}>
-                                                            Min: {currentNetObj.minDeposit}
-                                                        </Text>
-                                                        <Text style={{ fontSize: 11, color: '#059669', fontWeight: '800' }}>
-                                                            Abu Mafhal: 0% FREE
-                                                        </Text>
-                                                        <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700' }}>
-                                                            Gas: {currentNetObj.networkFee}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                                <Ionicons 
-                                                    name={showDepositNetworkPicker ? "chevron-up" : "chevron-down"} 
-                                                    size={20} 
-                                                    color={C.navyDark} 
-                                                />
-                                            </TouchableOpacity>
-
-                                            {/* Network Dropdown List */}
-                                            {showDepositNetworkPicker && (
-                                                <View style={{
-                                                    backgroundColor: C.card,
-                                                    borderWidth: 1.5,
-                                                    borderColor: C.cardBorder,
-                                                    borderRadius: 12,
-                                                    marginTop: 6,
-                                                    overflow: 'hidden',
-                                                    shadowColor: '#000',
-                                                    shadowOffset: { width: 0, height: 4 },
-                                                    shadowOpacity: 0.1,
-                                                    shadowRadius: 8,
-                                                    elevation: 5
-                                                }}>
-                                                    {currentAssetObj.networks.map((net, i) => {
-                                                        const isSelected = depositNetworkIdx === i;
-                                                        return (
-                                                            <TouchableOpacity
-                                                                key={net.network + net.currency}
-                                                                onPress={() => {
-                                                                    setDepositNetworkIdx(i);
-                                                                    setShowDepositNetworkPicker(false);
-                                                                }}
-                                                                activeOpacity={0.8}
-                                                                style={{
-                                                                    paddingHorizontal: 12,
-                                                                    paddingVertical: 10,
-                                                                    flexDirection: 'row',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'space-between',
-                                                                    borderBottomWidth: 1,
-                                                                    borderBottomColor: '#F1F5F9',
-                                                                    backgroundColor: isSelected ? '#F0FDF4' : 'transparent'
-                                                                }}
-                                                            >
-                                                                <View style={{ flex: 1, marginRight: 8 }}>
-                                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                                                        <Text style={{ fontSize: 13, fontWeight: '800', color: isSelected ? '#065F46' : C.textMain }}>
-                                                                            {net.label}
-                                                                        </Text>
-                                                                        {net.isPopular && (
-                                                                            <View style={{ backgroundColor: '#DBEAFE', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                                                                <Text style={{ fontSize: 8.5, fontWeight: '800', color: '#1E40AF' }}>POPULAR</Text>
-                                                                            </View>
-                                                                        )}
-                                                                        {net.requiresMemo && (
-                                                                            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                                                                <Text style={{ fontSize: 8.5, fontWeight: '800', color: '#D97706' }}>MEMO</Text>
-                                                                            </View>
-                                                                        )}
-                                                                    </View>
-                                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                                                                        <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>
-                                                                            ⚡ {net.speed || '~1-3 mins'}
-                                                                        </Text>
-                                                                        <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>
-                                                                            Min: {net.minDeposit}
-                                                                        </Text>
-                                                                        <Text style={{ fontSize: 10.5, color: '#059669', fontWeight: '800' }}>
-                                                                            Deposit Fee: 0% FREE
-                                                                        </Text>
-                                                                        <Text style={{ fontSize: 10.5, color: '#2563EB', fontWeight: '700' }}>
-                                                                            Gas: {net.networkFee}
-                                                                        </Text>
-                                                                    </View>
-                                                                </View>
-                                                                {isSelected ? (
-                                                                    <Ionicons name="checkmark-circle" size={18} color={C.emerald} />
-                                                                ) : (
-                                                                    <Ionicons name="radio-button-off" size={16} color={C.textMuted} />
-                                                                )}
-                                                            </TouchableOpacity>
-                                                        );
-                                                    })}
-                                                </View>
-                                            )}
-                                        </View>
-
-                                        {/* ─── LIVE DEPOSIT SPECS BADGE ─── */}
-                                        <View style={{
-                                            backgroundColor: '#F8FAFC',
-                                            borderWidth: 1,
-                                            borderColor: '#E2E8F0',
-                                            borderRadius: 10,
-                                            paddingHorizontal: 12,
-                                            paddingVertical: 10,
-                                            marginBottom: 8,
-                                            gap: 6
-                                        }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Ionicons name="shield-checkmark" size={15} color={C.emerald} />
-                                                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.textMain }}>Abu Mafhal Deposit Fee:</Text>
-                                                </View>
-                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#059669' }}>0% (₦0 FREE)</Text>
-                                            </View>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Ionicons name="flash" size={15} color={C.gold} />
-                                                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.textMain }}>Est. Blockchain Gas Fee:</Text>
-                                                </View>
-                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#1E40AF' }}>{currentNetObj.networkFee || 'Low Network Gas'}</Text>
-                                            </View>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Ionicons name="time-outline" size={15} color={C.navyDark} />
-                                                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.textMain }}>Network & Speed:</Text>
-                                                </View>
-                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: C.navyDark }}>{currentNetObj.network} &bull; {currentNetObj.speed}</Text>
-                                            </View>
-                                        </View>
-
-                                        {/* QR CODE CONTAINER */}
-                                        <View style={[s.qrBox, { marginTop: 8 }]}>
-                                            {depositLoading ? (
-                                                <View style={s.qrLoadingBox}>
-                                                    <ActivityIndicator size="large" color={C.navyDark} />
-                                                    <Text style={s.qrLoadingText}>Generating live {depositAsset} address ({currentNetObj.label})...</Text>
-                                                </View>
-                                            ) : (
-                                                <View style={s.qrInner}>
-                                                    <SafeQRCode value={depositAddress} size={150} />
-                                                    <Text style={s.qrScanPrompt}>Scan to deposit {depositAsset} via {currentNetObj.network}</Text>
-                                                </View>
-                                            )}
-                                        </View>
-
-                                        {/* DEPOSIT ADDRESS BOX */}
-                                        <Text style={s.fieldLabel}>DEPOSIT ADDRESS ({currentNetObj.label}):</Text>
-                                        <TouchableOpacity 
-                                            onPress={handleCopyAddress} 
-                                            style={s.addressCopyBox}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={s.addressText} numberOfLines={2}>
-                                                {depositAddress || (depositLoading ? 'Generating address...' : 'Address unavailable')}
-                                            </Text>
-                                            <View style={[s.copyMiniButton, depositCopied && s.copyMiniButtonActive]}>
-                                                <Ionicons 
-                                                    name={depositCopied ? "checkmark-circle" : "copy-outline"} 
-                                                    size={14} 
-                                                    color={depositCopied ? C.emerald : C.navyDark} 
-                                                />
-                                                <Text style={[s.copyMiniButtonText, depositCopied && { color: C.emerald }]}>
-                                                    {depositCopied ? 'Copied' : 'Copy'}
+                                                <Text style={{ fontSize: 12, fontWeight: '700', color: C.textMain, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                                                    {depositAddress || (depositLoading ? 'Generating address...' : 'Generating secure address...')}
                                                 </Text>
-                                            </View>
-                                        </TouchableOpacity>
+                                                <View style={{
+                                                    backgroundColor: depositCopied ? '#ECFDF5' : '#FFFFFF',
+                                                    borderWidth: 1,
+                                                    borderColor: depositCopied ? C.emerald : '#CBD5E1',
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 4,
+                                                    borderRadius: 6,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 4
+                                                }}>
+                                                    <Ionicons 
+                                                        name={depositCopied ? "checkmark-circle" : "copy-outline"} 
+                                                        size={13} 
+                                                        color={depositCopied ? C.emerald : C.textMain} 
+                                                    />
+                                                    <Text style={{ fontSize: 11, fontWeight: '800', color: depositCopied ? C.emerald : C.textMain }}>
+                                                        {depositCopied ? 'Copied' : 'Copy'}
+                                                    </Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                        </View>
 
-                                        {/* MEMO / COMMENT BOX (CRITICAL FOR TON & OTHER TAG NETWORKS) */}
+                                        {/* MEMO / COMMENT BOX (ONLY IF NEEDED) */}
                                         {(depositExtraId || currentNetObj.requiresMemo || depositAsset === 'TON') ? (
-                                            <View style={{ marginTop: 12 }}>
+                                            <View style={{ marginBottom: 10 }}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                    <Text style={[s.fieldLabel, { marginBottom: 0 }]}>MEMO / COMMENT (REQUIRED):</Text>
-                                                    <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#D97706' }}>DO NOT OMIT</Text>
-                                                    </View>
+                                                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#92400E', textTransform: 'uppercase' }}>
+                                                        MEMO / COMMENT (Required):
+                                                    </Text>
+                                                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#D97706' }}>DO NOT OMIT</Text>
                                                 </View>
                                                 <TouchableOpacity 
                                                     onPress={handleCopyMemo} 
-                                                    style={[s.addressCopyBox, { borderColor: '#F59E0B', backgroundColor: '#FFFBEB' }]}
+                                                    style={{
+                                                        backgroundColor: '#FFFBEB',
+                                                        borderWidth: 1,
+                                                        borderColor: '#FDE68A',
+                                                        borderRadius: 12,
+                                                        paddingHorizontal: 12,
+                                                        paddingVertical: 10,
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between'
+                                                    }}
                                                     activeOpacity={0.8}
                                                 >
-                                                    <Text style={[s.addressText, { color: '#92400E', fontWeight: '800', fontSize: 14 }]}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#92400E', flex: 1, marginRight: 8 }} numberOfLines={1}>
                                                         {depositExtraId || 'Not required for this address'}
                                                     </Text>
                                                     {depositExtraId ? (
-                                                        <View style={[s.copyMiniButton, depositMemoCopied && s.copyMiniButtonActive]}>
+                                                        <View style={{
+                                                            backgroundColor: '#FEF3C7',
+                                                            borderWidth: 1,
+                                                            borderColor: '#F59E0B',
+                                                            paddingHorizontal: 10,
+                                                            paddingVertical: 4,
+                                                            borderRadius: 6,
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            gap: 4
+                                                        }}>
                                                             <Ionicons 
                                                                 name={depositMemoCopied ? "checkmark-circle" : "copy-outline"} 
-                                                                size={14} 
+                                                                size={13} 
                                                                 color={depositMemoCopied ? C.emerald : '#B45309'} 
                                                             />
-                                                            <Text style={[s.copyMiniButtonText, depositMemoCopied && { color: C.emerald }]}>
-                                                                {depositMemoCopied ? 'Copied' : 'Copy Memo'}
+                                                            <Text style={{ fontSize: 11, fontWeight: '800', color: depositMemoCopied ? C.emerald : '#B45309' }}>
+                                                                {depositMemoCopied ? 'Copied' : 'Copy'}
                                                             </Text>
                                                         </View>
                                                     ) : null}
                                                 </TouchableOpacity>
-                                                <Text style={{ fontSize: 11, color: '#B45309', marginTop: 4, lineHeight: 15, fontWeight: '500' }}>
-                                                    ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> When sending from Binance, Bybit, Tonkeeper or OKX, you must fill in both this <Text style={{ fontWeight: '700' }}>Address</Text> and <Text style={{ fontWeight: '700' }}>Memo/Comment</Text>.
-                                                </Text>
                                             </View>
                                         ) : null}
 
-                                        {/* DEPOSIT SUCCESS OR ACTIVE NOTICE */}
+                                        {/* CALM & CLEAN 2-COLUMN FEE & NETWORK INFO */}
+                                        <View style={{
+                                            backgroundColor: '#F8FAFC',
+                                            borderWidth: 1,
+                                            borderColor: '#E2E8F0',
+                                            borderRadius: 12,
+                                            padding: 10,
+                                            marginBottom: 12,
+                                            flexDirection: 'row',
+                                            justifyContent: 'space-between'
+                                        }}>
+                                            <View style={{ gap: 4 }}>
+                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>Deposit Fee</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>0% (₦0 FREE)</Text>
+                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600', marginTop: 4 }}>Min. Deposit</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: C.textMain }}>{currentNetObj.minDeposit}</Text>
+                                            </View>
+                                            <View style={{ gap: 4, alignItems: 'flex-end' }}>
+                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600' }}>Est. Network Gas</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#2563EB' }}>{currentNetObj.networkFee}</Text>
+                                                <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: '600', marginTop: 4 }}>Arrival Speed</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: C.textMain }}>{currentNetObj.speed || 'Instant'}</Text>
+                                            </View>
+                                        </View>
+
+                                        {/* DEPOSIT SUCCESS NOTICE */}
                                         {depositSuccessNotice ? (
-                                            <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 10, padding: 12, marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                <Ionicons name="checkmark-circle" size={20} color={C.emerald} />
-                                                <Text style={{ color: '#065F46', fontSize: 12, fontWeight: '700', flex: 1 }}>{depositSuccessNotice}</Text>
+                                            <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 10, padding: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <Ionicons name="checkmark-circle" size={18} color={C.emerald} />
+                                                <Text style={{ color: '#065F46', fontSize: 11.5, fontWeight: '700', flex: 1 }}>{depositSuccessNotice}</Text>
                                             </View>
                                         ) : null}
 
-                                        {/* ON-DEMAND VERIFY BUTTON */}
+                                        {/* PRIMARY VERIFY BUTTON */}
                                         <TouchableOpacity 
-                                            onPress={handleVerifyDeposit}
+                                            onPress={() => handleVerifyDeposit(false)}
                                             disabled={verifyingDeposit || depositLoading || !depositAddress}
-                                            style={[s.primaryModalSubmit, { backgroundColor: C.emerald, marginTop: 14, marginBottom: 4 }]}
+                                            style={{
+                                                backgroundColor: C.navyDark,
+                                                borderRadius: 12,
+                                                paddingVertical: 12,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                marginBottom: 8
+                                            }}
                                             activeOpacity={0.85}
                                         >
                                             {verifyingDeposit ? (
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                                     <ActivityIndicator size="small" color="#FFFFFF" />
-                                                    <Text style={s.primaryModalText}>Checking Blockchain & Gateway...</Text>
+                                                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>Checking Blockchain Confirmations...</Text>
                                                 </View>
                                             ) : (
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                     <Ionicons name="refresh-circle-outline" size={18} color="#FFFFFF" />
-                                                    <Text style={s.primaryModalText}>I Have Sent Deposit &bull; Check Status ⚡</Text>
+                                                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>I Have Sent Deposit &bull; Check Status ⚡</Text>
                                                 </View>
                                             )}
                                         </TouchableOpacity>
 
+                                        {/* FRESH ADDRESS REFRESH */}
                                         <TouchableOpacity 
                                             onPress={() => loadNowPaymentsAddress(depositAsset, depositNetworkIdx, true)}
                                             disabled={depositLoading || verifyingDeposit}
-                                            style={{ alignItems: 'center', paddingVertical: 8, marginBottom: 6 }}
+                                            style={{ alignItems: 'center', paddingVertical: 6, marginBottom: 4 }}
                                         >
-                                            <Text style={{ fontSize: 11, color: C.navyDark, fontWeight: '700' }}>🔄 Generate Fresh Address / Invoice</Text>
+                                            <Text style={{ fontSize: 11, color: C.textSub, fontWeight: '600' }}>🔄 Refresh / Generate Fresh Address</Text>
                                         </TouchableOpacity>
-
-                                        <View style={[s.depositWarning, { marginTop: 4 }]}>
-                                            <Text style={s.depositWarningText}>
-                                                Send only <Text style={{ fontWeight: '800' }}>{depositAsset === 'TON' ? 'Gram (TON)' : depositAsset}</Text> via <Text style={{ fontWeight: '800' }}>{currentNetObj.label}</Text>. Deposit Fee: <Text style={{ fontWeight: '800', color: '#065F46' }}>0% (FREE)</Text>. Minimum deposit is <Text style={{ fontWeight: '800' }}>{currentNetObj.minDeposit}</Text>. Deposits below minimum cannot be recovered.
-                                            </Text>
-                                        </View>
                                     </>
                                 );
                             })()}
