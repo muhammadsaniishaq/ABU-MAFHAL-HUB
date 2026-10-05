@@ -5,6 +5,7 @@
 *.keystore
 ABU_MAFHAL_SUB_*.aab
 smile_detect_library-release.aar
+build-archives/
 
 # Dependencies
 node_modules/
