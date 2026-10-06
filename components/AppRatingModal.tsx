@@ -8,16 +8,19 @@ import {
     StyleSheet,
     Platform,
     TouchableWithoutFeedback,
-    Dimensions
+    Dimensions,
+    BackHandler
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ratingService, PLAY_STORE_WEB_URL } from '../services/ratingService';
 import { triggerGlobalConfetti } from './CelebrationConfetti';
 import { useAppSettings } from '../hooks/useAppSettings';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const IS_SMALL_DEVICE = SCREEN_WIDTH < 360;
 
 interface AppRatingModalProps {
     customPlayStoreUrl?: string;
@@ -29,12 +32,14 @@ export default function AppRatingModal({
     onDismiss
 }: AppRatingModalProps) {
     const { settings } = useAppSettings();
+    const insets = useSafeAreaInsets();
     const [visible, setVisible] = useState(false);
     const [selectedStars, setSelectedStars] = useState(5);
     const [actionName, setActionName] = useState<string | null>(null);
 
     // Animations
-    const scaleAnim = useRef(new Animated.Value(0.85)).current;
+    const slideAnim = useRef(new Animated.Value(60)).current;
+    const scaleAnim = useRef(new Animated.Value(0.92)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
     const starScales = useRef([
         new Animated.Value(1),
@@ -47,7 +52,15 @@ export default function AppRatingModal({
 
     // Register global trigger handler with ratingService
     useEffect(() => {
-        ratingService.registerHandler((options) => {
+        ratingService.registerHandler(async (options) => {
+            // First verify user hasn't already rated
+            if (!options?.force) {
+                const state = await ratingService.getState();
+                if (state.has_rated || state.dont_ask_again) {
+                    return;
+                }
+            }
+
             if (options?.actionName) {
                 setActionName(options.actionName);
             }
@@ -60,46 +73,66 @@ export default function AppRatingModal({
         };
     }, []);
 
-    // Entrance Animation
+    // Mobile Android BackHandler integration
+    useEffect(() => {
+        if (!visible) return;
+
+        const onBackPress = () => {
+            handleClose();
+            return true;
+        };
+
+        const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        return () => subscription.remove();
+    }, [visible]);
+
+    // Entrance Animation (Mobile-First Spring & Slide)
     useEffect(() => {
         if (visible) {
-            // Pulse badge
+            // Pulse badge loop
             Animated.loop(
                 Animated.sequence([
                     Animated.timing(badgePulse, {
-                        toValue: 1.08,
-                        duration: 1200,
+                        toValue: 1.06,
+                        duration: 1000,
                         useNativeDriver: true,
                     }),
                     Animated.timing(badgePulse, {
                         toValue: 1,
-                        duration: 1200,
+                        duration: 1000,
                         useNativeDriver: true,
                     }),
                 ])
             ).start();
 
-            // Modal pop in
+            // Mobile modal entrance: slide up + spring scale + fade in
             Animated.parallel([
+                Animated.spring(slideAnim, {
+                    toValue: 0,
+                    tension: 70,
+                    friction: 8,
+                    useNativeDriver: true,
+                }),
                 Animated.spring(scaleAnim, {
                     toValue: 1,
-                    tension: 65,
-                    friction: 7,
+                    tension: 70,
+                    friction: 8,
                     useNativeDriver: true,
                 }),
                 Animated.timing(opacityAnim, {
                     toValue: 1,
-                    duration: 250,
+                    duration: 220,
                     useNativeDriver: true,
                 }),
             ]).start();
 
-            // Trigger confetti gently for 5 default stars
+            // Confetti burst on opening with 5 stars
             setTimeout(() => {
-                triggerGlobalConfetti(SCREEN_WIDTH / 2, 220);
-            }, 300);
+                triggerGlobalConfetti(SCREEN_WIDTH / 2, 200);
+            }, 250);
         } else {
-            scaleAnim.setValue(0.85);
+            slideAnim.setValue(60);
+            scaleAnim.setValue(0.92);
             opacityAnim.setValue(0);
         }
     }, [visible]);
@@ -107,7 +140,7 @@ export default function AppRatingModal({
     const handleSelectStar = (stars: number) => {
         setSelectedStars(stars);
 
-        // Haptic feedback
+        // Mobile Haptic feedback
         try {
             if (Platform.OS !== 'web') {
                 Haptics.impactAsync(
@@ -118,13 +151,13 @@ export default function AppRatingModal({
             }
         } catch (_) {}
 
-        // Animate clicked star with bounce
+        // Bounce animated star
         const targetAnim = starScales[stars - 1];
         if (targetAnim) {
             Animated.sequence([
                 Animated.timing(targetAnim, {
-                    toValue: 1.35,
-                    duration: 120,
+                    toValue: 1.3,
+                    duration: 100,
                     useNativeDriver: true,
                 }),
                 Animated.spring(targetAnim, {
@@ -138,20 +171,25 @@ export default function AppRatingModal({
 
         // Confetti for 5 stars
         if (stars === 5) {
-            triggerGlobalConfetti(SCREEN_WIDTH / 2, 220);
+            triggerGlobalConfetti(SCREEN_WIDTH / 2, 200);
         }
     };
 
     const handleClose = () => {
         Animated.parallel([
+            Animated.timing(slideAnim, {
+                toValue: 40,
+                duration: 160,
+                useNativeDriver: true,
+            }),
             Animated.timing(scaleAnim, {
-                toValue: 0.88,
-                duration: 180,
+                toValue: 0.94,
+                duration: 160,
                 useNativeDriver: true,
             }),
             Animated.timing(opacityAnim, {
                 toValue: 0,
-                duration: 180,
+                duration: 160,
                 useNativeDriver: true,
             }),
         ]).start(() => {
@@ -163,7 +201,8 @@ export default function AppRatingModal({
     const handleRateOnPlayStore = async () => {
         handleClose();
         const targetUrl = customPlayStoreUrl || settings?.play_store_url || PLAY_STORE_WEB_URL;
-        await ratingService.openPlayStore(targetUrl);
+        // PERMANENT: Marks user as rated across local storage + Supabase metadata
+        await ratingService.openPlayStore(targetUrl, selectedStars);
     };
 
     const handleSendFeedback = async () => {
@@ -178,13 +217,13 @@ export default function AppRatingModal({
     };
 
     const handleNeverAsk = async () => {
+        // PERMANENT: Never prompt this user again
         await ratingService.neverAskAgain();
         handleClose();
     };
 
     if (!visible) return null;
 
-    // Dynamic copy based on rating
     const isHighRating = selectedStars >= 4;
 
     const dynamicContent = {
@@ -248,6 +287,9 @@ export default function AppRatingModal({
         badgeColor: '#B45309',
     };
 
+    const starSize = IS_SMALL_DEVICE ? 24 : 28;
+    const starOrbSize = IS_SMALL_DEVICE ? 42 : 48;
+
     return (
         <Modal
             transparent
@@ -257,17 +299,25 @@ export default function AppRatingModal({
             statusBarTranslucent
         >
             <TouchableWithoutFeedback onPress={handleClose}>
-                <View style={s.backdrop}>
+                <View style={[s.backdrop, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
                     <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
                         <Animated.View
                             style={[
                                 s.modalCard,
                                 {
                                     opacity: opacityAnim,
-                                    transform: [{ scale: scaleAnim }],
+                                    transform: [
+                                        { translateY: slideAnim },
+                                        { scale: scaleAnim },
+                                    ],
                                 },
                             ]}
                         >
+                            {/* Mobile Drag Sheet Handle Indicator */}
+                            <View style={s.dragHandleContainer}>
+                                <View style={s.dragHandle} />
+                            </View>
+
                             {/* Header Gradient Arc */}
                             <LinearGradient
                                 colors={['#0F172A', '#1E293B', '#0d1b3e']}
@@ -278,7 +328,7 @@ export default function AppRatingModal({
                                     onPress={handleClose}
                                     style={s.closeBtn}
                                     activeOpacity={0.7}
-                                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                    hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
                                 >
                                     <Ionicons name="close" size={20} color="#94A3B8" />
                                 </TouchableOpacity>
@@ -290,7 +340,7 @@ export default function AppRatingModal({
                                         colors={['#F59E0B', '#D97706', '#B45309']}
                                         style={s.emblemOrb}
                                     >
-                                        <Text style={{ fontSize: 32 }}>{dynamicContent.emoji}</Text>
+                                        <Text style={{ fontSize: 30 }}>{dynamicContent.emoji}</Text>
                                     </LinearGradient>
                                 </View>
 
@@ -321,14 +371,14 @@ export default function AppRatingModal({
                                 </Animated.View>
                             </LinearGradient>
 
-                            {/* Body */}
+                            {/* Body Content */}
                             <View style={s.bodyContent}>
                                 <Text style={s.ratingTitle}>{dynamicContent.title}</Text>
                                 <Text style={s.ratingSubtitle}>
                                     {dynamicContent.subtitle}
                                 </Text>
 
-                                {/* Interactive Star Bar */}
+                                {/* Interactive Star Bar (Thumb-Optimized) */}
                                 <View style={s.starsRow}>
                                     {[1, 2, 3, 4, 5].map((starIndex) => {
                                         const isFilled = starIndex <= selectedStars;
@@ -354,12 +404,17 @@ export default function AppRatingModal({
                                                         }
                                                         style={[
                                                             s.starBgOrb,
+                                                            {
+                                                                width: starOrbSize,
+                                                                height: starOrbSize,
+                                                                borderRadius: starOrbSize / 2,
+                                                            },
                                                             isFilled && s.starBgOrbActive,
                                                         ]}
                                                     >
                                                         <Ionicons
                                                             name={isFilled ? 'star' : 'star-outline'}
-                                                            size={28}
+                                                            size={starSize}
                                                             color={isFilled ? '#F59E0B' : '#94A3B8'}
                                                         />
                                                     </LinearGradient>
@@ -369,15 +424,15 @@ export default function AppRatingModal({
                                     })}
                                 </View>
 
-                                {/* Star Score Label */}
+                                {/* Star Score Pill */}
                                 <View style={s.scorePill}>
-                                    <Ionicons name="sparkles" size={13} color="#D97706" />
+                                    <Ionicons name="sparkles" size={12} color="#D97706" />
                                     <Text style={s.scorePillText}>
                                         {selectedStars} / 5 Stars Selected
                                     </Text>
                                 </View>
 
-                                {/* Primary Action Button */}
+                                {/* Primary Action Button (Mobile 50px Height) */}
                                 {isHighRating ? (
                                     <TouchableOpacity
                                         activeOpacity={0.88}
@@ -392,7 +447,7 @@ export default function AppRatingModal({
                                         >
                                             <Ionicons
                                                 name="logo-google-playstore"
-                                                size={20}
+                                                size={19}
                                                 color="#FFFFFF"
                                                 style={{ marginRight: 8 }}
                                             />
@@ -421,7 +476,7 @@ export default function AppRatingModal({
                                         >
                                             <Ionicons
                                                 name="chatbubble-ellipses"
-                                                size={20}
+                                                size={19}
                                                 color="#FFFFFF"
                                                 style={{ marginRight: 8 }}
                                             />
@@ -457,20 +512,20 @@ export default function AppRatingModal({
                                             style={s.forcePlayStoreBtn}
                                         >
                                             <Text style={s.forcePlayStoreText}>
-                                                Ci gaba zuwa Play Store →
+                                                Play Store →
                                             </Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
 
-                                {/* Footer Opt-out */}
+                                {/* Footer Opt-out (Permanently Remembers!) */}
                                 <TouchableOpacity
                                     activeOpacity={0.6}
                                     onPress={handleNeverAsk}
                                     style={s.neverAskBtn}
                                 >
                                     <Text style={s.neverAskText}>
-                                        Kada a sake nunawa (Don't ask again)
+                                        Kada a sake nunawa (Never ask again)
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -485,39 +540,51 @@ export default function AppRatingModal({
 const s = StyleSheet.create({
     backdrop: {
         flex: 1,
-        backgroundColor: 'rgba(2, 6, 23, 0.72)',
+        backgroundColor: 'rgba(2, 6, 23, 0.76)',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
     },
     modalCard: {
         width: '100%',
-        maxWidth: 390,
+        maxWidth: 384,
         backgroundColor: '#FFFFFF',
         borderRadius: 28,
         overflow: 'hidden',
-        elevation: 12,
+        elevation: 14,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.3,
+        shadowRadius: 26,
         borderWidth: 1.5,
-        borderColor: 'rgba(212, 175, 55, 0.25)',
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+    },
+    dragHandleContainer: {
+        backgroundColor: '#0F172A',
+        alignItems: 'center',
+        paddingTop: 10,
+        paddingBottom: 2,
+    },
+    dragHandle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.25)',
     },
     headerGradient: {
-        paddingTop: 24,
-        paddingBottom: 20,
+        paddingTop: 16,
+        paddingBottom: 18,
         alignItems: 'center',
         position: 'relative',
     },
     closeBtn: {
         position: 'absolute',
-        top: 14,
+        top: 10,
         right: 14,
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 10,
@@ -526,26 +593,26 @@ const s = StyleSheet.create({
         position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     emblemAura: {
         position: 'absolute',
-        width: 76,
-        height: 76,
-        borderRadius: 38,
-        backgroundColor: 'rgba(245, 158, 11, 0.22)',
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: 'rgba(245, 158, 11, 0.24)',
     },
     emblemOrb: {
-        width: 66,
-        height: 66,
-        borderRadius: 33,
+        width: 62,
+        height: 62,
+        borderRadius: 31,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
         borderColor: '#FEF3C7',
         shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.45,
         shadowRadius: 10,
         elevation: 6,
     },
@@ -563,40 +630,37 @@ const s = StyleSheet.create({
         letterSpacing: 0.8,
     },
     bodyContent: {
-        paddingHorizontal: 22,
-        paddingTop: 18,
-        paddingBottom: 20,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 18,
         alignItems: 'center',
     },
     ratingTitle: {
-        fontSize: 17,
+        fontSize: IS_SMALL_DEVICE ? 15.5 : 17,
         fontWeight: '900',
         color: '#0F172A',
         textAlign: 'center',
         marginBottom: 6,
     },
     ratingSubtitle: {
-        fontSize: 12.5,
-        lineHeight: 18.5,
+        fontSize: IS_SMALL_DEVICE ? 11.5 : 12.5,
+        lineHeight: IS_SMALL_DEVICE ? 17 : 18.5,
         color: '#64748B',
         textAlign: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
         paddingHorizontal: 4,
     },
     starsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        marginBottom: 10,
+        gap: IS_SMALL_DEVICE ? 6 : 8,
+        marginBottom: 8,
     },
     starTouchable: {
-        padding: 4,
+        padding: 3,
     },
     starBgOrb: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
@@ -606,8 +670,8 @@ const s = StyleSheet.create({
         borderColor: '#FDE68A',
         shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 5,
+        shadowOpacity: 0.28,
+        shadowRadius: 6,
         elevation: 3,
     },
     scorePill: {
@@ -616,9 +680,9 @@ const s = StyleSheet.create({
         gap: 5,
         backgroundColor: '#FEF3C7',
         paddingHorizontal: 12,
-        paddingVertical: 4,
+        paddingVertical: 3.5,
         borderRadius: 20,
-        marginBottom: 18,
+        marginBottom: 16,
         borderWidth: 1,
         borderColor: '#FDE68A',
     },
@@ -636,7 +700,7 @@ const s = StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.28,
         shadowRadius: 8,
-        marginBottom: 12,
+        marginBottom: 10,
     },
     primaryBtnGradient: {
         flexDirection: 'row',
@@ -644,9 +708,10 @@ const s = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 14,
         paddingHorizontal: 16,
+        minHeight: 50,
     },
     primaryBtnText: {
-        fontSize: 14,
+        fontSize: IS_SMALL_DEVICE ? 13 : 14,
         fontWeight: '900',
         color: '#FFFFFF',
         letterSpacing: 0.3,
@@ -657,11 +722,13 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
-        marginBottom: 10,
+        marginBottom: 8,
     },
     remindLaterBtn: {
-        paddingVertical: 6,
+        paddingVertical: 8,
         paddingHorizontal: 10,
+        minHeight: 36,
+        justifyContent: 'center',
     },
     remindLaterText: {
         fontSize: 12,
@@ -669,8 +736,10 @@ const s = StyleSheet.create({
         color: '#64748B',
     },
     forcePlayStoreBtn: {
-        paddingVertical: 6,
+        paddingVertical: 8,
         paddingHorizontal: 10,
+        minHeight: 36,
+        justifyContent: 'center',
     },
     forcePlayStoreText: {
         fontSize: 11,
@@ -678,8 +747,9 @@ const s = StyleSheet.create({
         color: '#D97706',
     },
     neverAskBtn: {
-        paddingVertical: 4,
-        paddingHorizontal: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        marginTop: 2,
     },
     neverAskText: {
         fontSize: 10.5,
