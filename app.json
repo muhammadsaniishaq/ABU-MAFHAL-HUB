@@ -25,7 +25,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.muhammmadsaniishaq.abumafhalsub",
-      "versionCode": 20,
+      "versionCode": 22,
       "permissions": [
         "android.permission.READ_CONTACTS"
       ]
