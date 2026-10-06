@@ -3,7 +3,7 @@
     "name": "ABU MAFHAL SUB",
     "scheme": "abumafhalsub",
     "slug": "abu-mafhal-sub",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -25,7 +25,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.muhammmadsaniishaq.abumafhalsub",
-      "versionCode": 15,
+      "versionCode": 20,
       "permissions": [
         "android.permission.READ_CONTACTS"
       ]

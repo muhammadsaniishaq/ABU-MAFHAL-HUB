@@ -38,8 +38,8 @@ export default function AppRatingModal({
     const [actionName, setActionName] = useState<string | null>(null);
 
     // Animations
-    const slideAnim = useRef(new Animated.Value(60)).current;
-    const scaleAnim = useRef(new Animated.Value(0.92)).current;
+    const slideAnim = useRef(new Animated.Value(40)).current;
+    const scaleAnim = useRef(new Animated.Value(0.94)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
     const starScales = useRef([
         new Animated.Value(1),
@@ -53,7 +53,6 @@ export default function AppRatingModal({
     // Register global trigger handler with ratingService
     useEffect(() => {
         ratingService.registerHandler(async (options) => {
-            // First verify user hasn't already rated
             if (!options?.force) {
                 const state = await ratingService.getState();
                 if (state.has_rated || state.dont_ask_again) {
@@ -73,7 +72,7 @@ export default function AppRatingModal({
         };
     }, []);
 
-    // Mobile Android BackHandler integration
+    // Android BackHandler
     useEffect(() => {
         if (!visible) return;
 
@@ -86,53 +85,50 @@ export default function AppRatingModal({
         return () => subscription.remove();
     }, [visible]);
 
-    // Entrance Animation (Mobile-First Spring & Slide)
+    // Entrance Animation
     useEffect(() => {
         if (visible) {
-            // Pulse badge loop
             Animated.loop(
                 Animated.sequence([
                     Animated.timing(badgePulse, {
-                        toValue: 1.06,
-                        duration: 1000,
+                        toValue: 1.05,
+                        duration: 900,
                         useNativeDriver: true,
                     }),
                     Animated.timing(badgePulse, {
                         toValue: 1,
-                        duration: 1000,
+                        duration: 900,
                         useNativeDriver: true,
                     }),
                 ])
             ).start();
 
-            // Mobile modal entrance: slide up + spring scale + fade in
             Animated.parallel([
                 Animated.spring(slideAnim, {
                     toValue: 0,
-                    tension: 70,
+                    tension: 80,
                     friction: 8,
                     useNativeDriver: true,
                 }),
                 Animated.spring(scaleAnim, {
                     toValue: 1,
-                    tension: 70,
+                    tension: 80,
                     friction: 8,
                     useNativeDriver: true,
                 }),
                 Animated.timing(opacityAnim, {
                     toValue: 1,
-                    duration: 220,
+                    duration: 180,
                     useNativeDriver: true,
                 }),
             ]).start();
 
-            // Confetti burst on opening with 5 stars
             setTimeout(() => {
-                triggerGlobalConfetti(SCREEN_WIDTH / 2, 200);
-            }, 250);
+                triggerGlobalConfetti(SCREEN_WIDTH / 2, 220);
+            }, 200);
         } else {
-            slideAnim.setValue(60);
-            scaleAnim.setValue(0.92);
+            slideAnim.setValue(40);
+            scaleAnim.setValue(0.94);
             opacityAnim.setValue(0);
         }
     }, [visible]);
@@ -140,7 +136,6 @@ export default function AppRatingModal({
     const handleSelectStar = (stars: number) => {
         setSelectedStars(stars);
 
-        // Mobile Haptic feedback
         try {
             if (Platform.OS !== 'web') {
                 Haptics.impactAsync(
@@ -151,45 +146,43 @@ export default function AppRatingModal({
             }
         } catch (_) {}
 
-        // Bounce animated star
         const targetAnim = starScales[stars - 1];
         if (targetAnim) {
             Animated.sequence([
                 Animated.timing(targetAnim, {
-                    toValue: 1.3,
-                    duration: 100,
+                    toValue: 1.25,
+                    duration: 90,
                     useNativeDriver: true,
                 }),
                 Animated.spring(targetAnim, {
                     toValue: 1,
                     friction: 4,
-                    tension: 80,
+                    tension: 90,
                     useNativeDriver: true,
                 }),
             ]).start();
         }
 
-        // Confetti for 5 stars
         if (stars === 5) {
-            triggerGlobalConfetti(SCREEN_WIDTH / 2, 200);
+            triggerGlobalConfetti(SCREEN_WIDTH / 2, 220);
         }
     };
 
     const handleClose = () => {
         Animated.parallel([
             Animated.timing(slideAnim, {
-                toValue: 40,
-                duration: 160,
+                toValue: 30,
+                duration: 140,
                 useNativeDriver: true,
             }),
             Animated.timing(scaleAnim, {
-                toValue: 0.94,
-                duration: 160,
+                toValue: 0.95,
+                duration: 140,
                 useNativeDriver: true,
             }),
             Animated.timing(opacityAnim, {
                 toValue: 0,
-                duration: 160,
+                duration: 140,
                 useNativeDriver: true,
             }),
         ]).start(() => {
@@ -201,7 +194,6 @@ export default function AppRatingModal({
     const handleRateOnPlayStore = async () => {
         handleClose();
         const targetUrl = customPlayStoreUrl || settings?.play_store_url || PLAY_STORE_WEB_URL;
-        // PERMANENT: Marks user as rated across local storage + Supabase metadata
         await ratingService.openPlayStore(targetUrl, selectedStars);
     };
 
@@ -217,7 +209,6 @@ export default function AppRatingModal({
     };
 
     const handleNeverAsk = async () => {
-        // PERMANENT: Never prompt this user again
         await ratingService.neverAskAgain();
         handleClose();
     };
@@ -230,52 +221,52 @@ export default function AppRatingModal({
         5: {
             emoji: '🏆',
             title: 'Loving ABU MAFHAL SUB? 😍',
-            subtitle:
-                'Thank you for trusting us! Please take 5 seconds to rate us on Google Play. Your 5-star review means everything to us!',
-            buttonLabel: 'Rate Us on Play Store ⭐',
-            badge: 'EXCELLENT EXPERIENCE',
-            badgeBg: '#FEF3C7',
-            badgeColor: '#B45309',
+            subtitle: 'Your 5-star rating on Google Play keeps our service fast, cheap and 100% reliable!',
+            buttonLabel: 'Rate 5 Stars on Google Play ⭐',
+            badge: '5-STAR EXCELLENCE',
+            badgeBg: 'rgba(245, 158, 11, 0.15)',
+            badgeBorder: 'rgba(245, 158, 11, 0.35)',
+            badgeColor: '#F59E0B',
         },
         4: {
             emoji: '🌟',
-            title: 'Thank You for Your Support! 😊',
-            subtitle:
-                'We are glad you are enjoying our service. A quick 5-star rating on Google Play would help us grow!',
-            buttonLabel: 'Rate Us on Play Store ⭐',
-            badge: 'GREAT SERVICE',
-            badgeBg: '#ECFDF5',
-            badgeColor: '#065F46',
+            title: 'Thank You for Your Trust! 😊',
+            subtitle: 'We are glad you are enjoying our service. A quick rating on Google Play helps us grow!',
+            buttonLabel: 'Rate Us on Google Play ⭐',
+            badge: 'GREAT EXPERIENCE',
+            badgeBg: 'rgba(16, 185, 129, 0.15)',
+            badgeBorder: 'rgba(16, 185, 129, 0.35)',
+            badgeColor: '#10B981',
         },
         3: {
             emoji: '💡',
-            title: 'How Can We Do Better? 🤔',
-            subtitle:
-                'We want your experience to be 100% smooth. Tell us what we can improve, and we will work on it right away!',
-            buttonLabel: 'Send Feedback / Chat Support 💬',
-            badge: 'WE VALUE YOUR FEEDBACK',
-            badgeBg: '#EFF6FF',
-            badgeColor: '#1E40AF',
+            title: 'How Can We Improve? 🤔',
+            subtitle: 'We want your transactions to be 100% smooth. Share feedback with support right away!',
+            buttonLabel: 'Chat with Support 💬',
+            badge: 'FEEDBACK & IMPROVEMENT',
+            badgeBg: 'rgba(59, 130, 246, 0.15)',
+            badgeBorder: 'rgba(59, 130, 246, 0.35)',
+            badgeColor: '#60A5FA',
         },
         2: {
             emoji: '🙏',
-            title: 'We Are Truly Sorry! 😔',
-            subtitle:
-                'Did you experience any issue? Please chat with our 24/7 support team right away so we can resolve it for you.',
-            buttonLabel: 'Chat with Support on WhatsApp 💬',
-            badge: 'NEED HELP?',
-            badgeBg: '#FFFBEB',
-            badgeColor: '#92400E',
+            title: 'Did Something Go Wrong? 😔',
+            subtitle: 'Please chat with our 24/7 dedicated support team so we can resolve it immediately.',
+            buttonLabel: 'Chat on WhatsApp 💬',
+            badge: 'HERE TO HELP',
+            badgeBg: 'rgba(245, 158, 11, 0.15)',
+            badgeBorder: 'rgba(245, 158, 11, 0.35)',
+            badgeColor: '#F59E0B',
         },
         1: {
             emoji: '🤝',
             title: 'Let Us Fix This For You! 💔',
-            subtitle:
-                'We apologize for any trouble. Reach out to our dedicated support team on WhatsApp and we will assist you immediately.',
-            buttonLabel: 'Report Issue to Support 💬',
-            badge: 'WE ARE HERE TO HELP',
-            badgeBg: '#FEF2F2',
-            badgeColor: '#991B1B',
+            subtitle: 'We apologize for any inconvenience. Reach our support on WhatsApp for instant assistance.',
+            buttonLabel: 'Contact Dedicated Support 💬',
+            badge: 'PRIORITY SUPPORT',
+            badgeBg: 'rgba(239, 68, 68, 0.15)',
+            badgeBorder: 'rgba(239, 68, 68, 0.35)',
+            badgeColor: '#F87171',
         },
     }[selectedStars as 1 | 2 | 3 | 4 | 5] || {
         emoji: '⭐',
@@ -283,12 +274,13 @@ export default function AppRatingModal({
         subtitle: 'How was your experience using ABU MAFHAL SUB?',
         buttonLabel: 'Rate on Google Play',
         badge: 'RATING',
-        badgeBg: '#FEF3C7',
-        badgeColor: '#B45309',
+        badgeBg: 'rgba(245, 158, 11, 0.15)',
+        badgeBorder: 'rgba(245, 158, 11, 0.35)',
+        badgeColor: '#F59E0B',
     };
 
-    const starSize = IS_SMALL_DEVICE ? 24 : 28;
-    const starOrbSize = IS_SMALL_DEVICE ? 42 : 48;
+    const starSize = IS_SMALL_DEVICE ? 20 : 22;
+    const starOrbSize = IS_SMALL_DEVICE ? 34 : 38;
 
     return (
         <Modal
@@ -299,7 +291,7 @@ export default function AppRatingModal({
             statusBarTranslucent
         >
             <TouchableWithoutFeedback onPress={handleClose}>
-                <View style={[s.backdrop, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
+                <View style={[s.backdrop, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                     <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
                         <Animated.View
                             style={[
@@ -313,72 +305,64 @@ export default function AppRatingModal({
                                 },
                             ]}
                         >
-                            {/* Mobile Drag Sheet Handle Indicator */}
-                            <View style={s.dragHandleContainer}>
-                                <View style={s.dragHandle} />
-                            </View>
-
-                            {/* Header Gradient Arc */}
                             <LinearGradient
-                                colors={['#0F172A', '#1E293B', '#0d1b3e']}
-                                style={s.headerGradient}
+                                colors={['#0B132B', '#0F172A', '#16223F']}
+                                style={s.cardGradient}
                             >
-                                {/* Top Close Button */}
-                                <TouchableOpacity
-                                    onPress={handleClose}
-                                    style={s.closeBtn}
-                                    activeOpacity={0.7}
-                                    hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-                                >
-                                    <Ionicons name="close" size={20} color="#94A3B8" />
-                                </TouchableOpacity>
+                                {/* Top Header Row: Emblem + Badge + Close */}
+                                <View style={s.topBar}>
+                                    <View style={s.emblemWrap}>
+                                        <LinearGradient
+                                            colors={['#F59E0B', '#D97706']}
+                                            style={s.emblemOrb}
+                                        >
+                                            <Text style={{ fontSize: 20 }}>{dynamicContent.emoji}</Text>
+                                        </LinearGradient>
+                                    </View>
 
-                                {/* Glowing Top Emblem */}
-                                <View style={s.emblemContainer}>
-                                    <View style={s.emblemAura} />
-                                    <LinearGradient
-                                        colors={['#F59E0B', '#D97706', '#B45309']}
-                                        style={s.emblemOrb}
-                                    >
-                                        <Text style={{ fontSize: 30 }}>{dynamicContent.emoji}</Text>
-                                    </LinearGradient>
-                                </View>
-
-                                {/* Pulsing Badge */}
-                                <Animated.View
-                                    style={[
-                                        s.topBadge,
-                                        {
-                                            backgroundColor: dynamicContent.badgeBg,
-                                            transform: [{ scale: badgePulse }],
-                                        },
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name="star"
-                                        size={11}
-                                        color={dynamicContent.badgeColor}
-                                        style={{ marginRight: 4 }}
-                                    />
-                                    <Text
+                                    <Animated.View
                                         style={[
-                                            s.topBadgeText,
-                                            { color: dynamicContent.badgeColor },
+                                            s.topBadge,
+                                            {
+                                                backgroundColor: dynamicContent.badgeBg,
+                                                borderColor: dynamicContent.badgeBorder,
+                                                transform: [{ scale: badgePulse }],
+                                            },
                                         ]}
                                     >
-                                        {dynamicContent.badge}
-                                    </Text>
-                                </Animated.View>
-                            </LinearGradient>
+                                        <Ionicons
+                                            name="sparkles"
+                                            size={10}
+                                            color={dynamicContent.badgeColor}
+                                            style={{ marginRight: 4 }}
+                                        />
+                                        <Text
+                                            style={[
+                                                s.topBadgeText,
+                                                { color: dynamicContent.badgeColor },
+                                            ]}
+                                        >
+                                            {dynamicContent.badge}
+                                        </Text>
+                                    </Animated.View>
 
-                            {/* Body Content */}
-                            <View style={s.bodyContent}>
+                                    <TouchableOpacity
+                                        onPress={handleClose}
+                                        style={s.closeBtn}
+                                        activeOpacity={0.7}
+                                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                    >
+                                        <Ionicons name="close" size={17} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Title & Concise Subtitle */}
                                 <Text style={s.ratingTitle}>{dynamicContent.title}</Text>
-                                <Text style={s.ratingSubtitle}>
+                                <Text style={s.ratingSubtitle} numberOfLines={2}>
                                     {dynamicContent.subtitle}
                                 </Text>
 
-                                {/* Interactive Star Bar (Thumb-Optimized) */}
+                                {/* Compact Interactive Star Bar */}
                                 <View style={s.starsRow}>
                                     {[1, 2, 3, 4, 5].map((starIndex) => {
                                         const isFilled = starIndex <= selectedStars;
@@ -387,7 +371,7 @@ export default function AppRatingModal({
                                         return (
                                             <TouchableOpacity
                                                 key={starIndex}
-                                                activeOpacity={0.75}
+                                                activeOpacity={0.7}
                                                 onPress={() => handleSelectStar(starIndex)}
                                                 style={s.starTouchable}
                                             >
@@ -396,12 +380,7 @@ export default function AppRatingModal({
                                                         transform: [{ scale: animatedScale }],
                                                     }}
                                                 >
-                                                    <LinearGradient
-                                                        colors={
-                                                            isFilled
-                                                                ? ['#FFFBEB', '#FEF3C7']
-                                                                : ['#F8FAFC', '#F1F5F9']
-                                                        }
+                                                    <View
                                                         style={[
                                                             s.starBgOrb,
                                                             {
@@ -415,9 +394,9 @@ export default function AppRatingModal({
                                                         <Ionicons
                                                             name={isFilled ? 'star' : 'star-outline'}
                                                             size={starSize}
-                                                            color={isFilled ? '#F59E0B' : '#94A3B8'}
+                                                            color={isFilled ? '#F59E0B' : '#475569'}
                                                         />
-                                                    </LinearGradient>
+                                                    </View>
                                                 </Animated.View>
                                             </TouchableOpacity>
                                         );
@@ -426,13 +405,12 @@ export default function AppRatingModal({
 
                                 {/* Star Score Pill */}
                                 <View style={s.scorePill}>
-                                    <Ionicons name="sparkles" size={12} color="#D97706" />
                                     <Text style={s.scorePillText}>
                                         {selectedStars} / 5 Stars Selected
                                     </Text>
                                 </View>
 
-                                {/* Primary Action Button (Mobile 50px Height) */}
+                                {/* Primary Action Button (Compact 44px Height) */}
                                 {isHighRating ? (
                                     <TouchableOpacity
                                         activeOpacity={0.88}
@@ -440,26 +418,20 @@ export default function AppRatingModal({
                                         style={s.primaryBtnWrapper}
                                     >
                                         <LinearGradient
-                                            colors={['#F59E0B', '#D97706', '#B45309']}
+                                            colors={['#F59E0B', '#D97706']}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 1 }}
                                             style={s.primaryBtnGradient}
                                         >
                                             <Ionicons
                                                 name="logo-google-playstore"
-                                                size={19}
+                                                size={16}
                                                 color="#FFFFFF"
-                                                style={{ marginRight: 8 }}
+                                                style={{ marginRight: 6 }}
                                             />
                                             <Text style={s.primaryBtnText}>
                                                 {dynamicContent.buttonLabel}
                                             </Text>
-                                            <Ionicons
-                                                name="arrow-forward"
-                                                size={16}
-                                                color="#FFFFFF"
-                                                style={{ marginLeft: 6 }}
-                                            />
                                         </LinearGradient>
                                     </TouchableOpacity>
                                 ) : (
@@ -469,31 +441,25 @@ export default function AppRatingModal({
                                         style={s.primaryBtnWrapper}
                                     >
                                         <LinearGradient
-                                            colors={['#10B981', '#059669', '#047857']}
+                                            colors={['#2563EB', '#1D4ED8']}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 1 }}
                                             style={s.primaryBtnGradient}
                                         >
                                             <Ionicons
-                                                name="chatbubble-ellipses"
-                                                size={19}
+                                                name="logo-whatsapp"
+                                                size={16}
                                                 color="#FFFFFF"
-                                                style={{ marginRight: 8 }}
+                                                style={{ marginRight: 6 }}
                                             />
                                             <Text style={s.primaryBtnText}>
                                                 {dynamicContent.buttonLabel}
                                             </Text>
-                                            <Ionicons
-                                                name="arrow-forward"
-                                                size={16}
-                                                color="#FFFFFF"
-                                                style={{ marginLeft: 6 }}
-                                            />
                                         </LinearGradient>
                                     </TouchableOpacity>
                                 )}
 
-                                {/* Secondary Action Row */}
+                                {/* Secondary Actions Row */}
                                 <View style={s.secondaryActionsRow}>
                                     <TouchableOpacity
                                         activeOpacity={0.7}
@@ -509,26 +475,25 @@ export default function AppRatingModal({
                                         <TouchableOpacity
                                             activeOpacity={0.7}
                                             onPress={handleRateOnPlayStore}
-                                            style={s.forcePlayStoreBtn}
+                                            style={s.remindLaterBtn}
                                         >
-                                            <Text style={s.forcePlayStoreText}>
-                                                Go to Play Store →
+                                            <Text style={[s.remindLaterText, { color: '#F59E0B' }]}>
+                                                Play Store →
                                             </Text>
                                         </TouchableOpacity>
                                     )}
-                                </View>
 
-                                {/* Footer Opt-out (Permanently Remembers!) */}
-                                <TouchableOpacity
-                                    activeOpacity={0.6}
-                                    onPress={handleNeverAsk}
-                                    style={s.neverAskBtn}
-                                >
-                                    <Text style={s.neverAskText}>
-                                        Don't show this again
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
+                                    <TouchableOpacity
+                                        activeOpacity={0.6}
+                                        onPress={handleNeverAsk}
+                                        style={s.remindLaterBtn}
+                                    >
+                                        <Text style={s.neverAskText}>
+                                            Don't ask again
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
                         </Animated.View>
                     </TouchableWithoutFeedback>
                 </View>
@@ -540,221 +505,164 @@ export default function AppRatingModal({
 const s = StyleSheet.create({
     backdrop: {
         flex: 1,
-        backgroundColor: 'rgba(2, 6, 23, 0.76)',
+        backgroundColor: 'rgba(2, 6, 23, 0.78)',
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 16,
     },
     modalCard: {
         width: '100%',
-        maxWidth: 384,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 28,
+        maxWidth: 326,
+        borderRadius: 22,
         overflow: 'hidden',
-        elevation: 14,
+        elevation: 12,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.3,
-        shadowRadius: 26,
-        borderWidth: 1.5,
-        borderColor: 'rgba(212, 175, 55, 0.3)',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.35,
+        shadowRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.32)',
     },
-    dragHandleContainer: {
-        backgroundColor: '#0F172A',
-        alignItems: 'center',
-        paddingTop: 10,
-        paddingBottom: 2,
-    },
-    dragHandle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    },
-    headerGradient: {
+    cardGradient: {
+        paddingHorizontal: 18,
         paddingTop: 16,
-        paddingBottom: 18,
+        paddingBottom: 14,
         alignItems: 'center',
-        position: 'relative',
     },
-    closeBtn: {
-        position: 'absolute',
-        top: 10,
-        right: 14,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    topBar: {
+        width: '100%',
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
+        justifyContent: 'space-between',
+        marginBottom: 10,
     },
-    emblemContainer: {
-        position: 'relative',
+    emblemWrap: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
-    },
-    emblemAura: {
-        position: 'absolute',
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: 'rgba(245, 158, 11, 0.24)',
     },
     emblemOrb: {
-        width: 62,
-        height: 62,
-        borderRadius: 31,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
+        borderWidth: 1.5,
         borderColor: '#FEF3C7',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.45,
-        shadowRadius: 10,
-        elevation: 6,
     },
     topBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 3.5,
+        paddingHorizontal: 9,
+        paddingVertical: 3,
         borderRadius: 12,
-        marginTop: 4,
+        borderWidth: 1,
     },
     topBadgeText: {
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 0.8,
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.5,
     },
-    bodyContent: {
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 18,
+    closeBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     ratingTitle: {
-        fontSize: IS_SMALL_DEVICE ? 15.5 : 17,
-        fontWeight: '900',
-        color: '#0F172A',
+        fontSize: IS_SMALL_DEVICE ? 15 : 16,
+        fontWeight: '800',
+        color: '#FFFFFF',
         textAlign: 'center',
-        marginBottom: 6,
+        marginBottom: 4,
+        letterSpacing: 0.2,
     },
     ratingSubtitle: {
-        fontSize: IS_SMALL_DEVICE ? 11.5 : 12.5,
-        lineHeight: IS_SMALL_DEVICE ? 17 : 18.5,
-        color: '#64748B',
+        fontSize: IS_SMALL_DEVICE ? 11 : 11.5,
+        lineHeight: 16,
+        color: '#94A3B8',
         textAlign: 'center',
-        marginBottom: 14,
-        paddingHorizontal: 4,
+        marginBottom: 12,
+        paddingHorizontal: 6,
     },
     starsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: IS_SMALL_DEVICE ? 6 : 8,
+        gap: 6,
         marginBottom: 8,
     },
     starTouchable: {
-        padding: 3,
+        padding: 2,
     },
     starBgOrb: {
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: '#E2E8F0',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     starBgOrbActive: {
-        borderColor: '#FDE68A',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.28,
-        shadowRadius: 6,
-        elevation: 3,
+        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        borderColor: 'rgba(245, 158, 11, 0.45)',
     },
     scorePill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 12,
-        paddingVertical: 3.5,
-        borderRadius: 20,
-        marginBottom: 16,
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        paddingHorizontal: 10,
+        paddingVertical: 2.5,
+        borderRadius: 12,
+        marginBottom: 14,
         borderWidth: 1,
-        borderColor: '#FDE68A',
+        borderColor: 'rgba(245, 158, 11, 0.25)',
     },
     scorePillText: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: '#92400E',
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#F59E0B',
     },
     primaryBtnWrapper: {
         width: '100%',
-        borderRadius: 16,
+        borderRadius: 14,
         overflow: 'hidden',
-        elevation: 4,
-        shadowColor: '#D97706',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 8,
-        marginBottom: 10,
+        marginBottom: 8,
     },
     primaryBtnGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        minHeight: 50,
+        paddingVertical: 11,
+        paddingHorizontal: 14,
+        minHeight: 42,
     },
     primaryBtnText: {
-        fontSize: IS_SMALL_DEVICE ? 13 : 14,
-        fontWeight: '900',
+        fontSize: 13,
+        fontWeight: '800',
         color: '#FFFFFF',
-        letterSpacing: 0.3,
+        letterSpacing: 0.2,
     },
     secondaryActionsRow: {
         width: '100%',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-        marginBottom: 8,
+        justifyContent: 'space-around',
+        paddingTop: 2,
     },
     remindLaterBtn: {
-        paddingVertical: 8,
-        paddingHorizontal: 10,
-        minHeight: 36,
-        justifyContent: 'center',
+        paddingVertical: 4,
+        paddingHorizontal: 6,
     },
     remindLaterText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#64748B',
-    },
-    forcePlayStoreBtn: {
-        paddingVertical: 8,
-        paddingHorizontal: 10,
-        minHeight: 36,
-        justifyContent: 'center',
-    },
-    forcePlayStoreText: {
         fontSize: 11,
-        fontWeight: '700',
-        color: '#D97706',
-    },
-    neverAskBtn: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        marginTop: 2,
+        fontWeight: '600',
+        color: '#64748B',
     },
     neverAskText: {
         fontSize: 10.5,
-        fontWeight: '600',
-        color: '#94A3B8',
-        textDecorationLine: 'underline',
+        fontWeight: '500',
+        color: '#475569',
     },
 });

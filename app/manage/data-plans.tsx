@@ -392,16 +392,21 @@ export default function ManageDataPlans() {
     const handleApplyMarkups = async () => {
         setApplyingMarkups(true);
         try {
-            const config = configs.find(c => c.network === selectedNetwork);
+            const config = configs.find(c => c.network === selectedNetwork || 
+                ((selectedNetwork === 'vital' || selectedNetwork === 'vitel') && (c.network === 'vital' || c.network === 'vitel')));
             if (!config) {
                 showAlert("Error", `No markup configuration found for ${selectedNetwork.toUpperCase()}`, 'error');
                 return;
             }
 
-            const { data: activePlans, error: fetchErr } = await supabase
-                .from('data_plans')
-                .select('*')
-                .eq('network', selectedNetwork);
+            let planQuery = supabase.from('data_plans').select('*');
+            if (selectedNetwork === 'vital' || selectedNetwork === 'vitel') {
+                planQuery = planQuery.or('network.eq.vital,network.eq.vitel');
+            } else {
+                planQuery = planQuery.eq('network', selectedNetwork);
+            }
+
+            const { data: activePlans, error: fetchErr } = await planQuery;
 
             if (fetchErr) throw fetchErr;
             if (!activePlans || activePlans.length === 0) {

@@ -113,14 +113,30 @@ export default function SuccessScreen() {
                 <Text style={s.historyBtnText}>View in Transaction History →</Text>
             </TouchableOpacity>
 
-            {/* Rate Us on Google Play Store Button */}
+            {/* Modern Compact Rating Card ("Wajen Rate") */}
             <TouchableOpacity
-                style={s.rateAppBtn}
+                style={s.rateCard}
                 onPress={() => ratingService.triggerPrompt({ force: true, actionName: String(type || 'Payment Service') })}
-                activeOpacity={0.8}
+                activeOpacity={0.88}
             >
-                <Ionicons name="star" size={14} color="#F59E0B" />
-                <Text style={s.rateAppBtnText}>Rate Us on Google Play Store ⭐</Text>
+                <LinearGradient
+                    colors={['rgba(245, 158, 11, 0.14)', 'rgba(217, 119, 6, 0.04)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={s.rateCardGradient}
+                >
+                    <View style={s.rateCardIconWrap}>
+                        <Ionicons name="star" size={16} color="#F59E0B" />
+                    </View>
+                    <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                        <Text style={s.rateCardTitle}>Loving the instant delivery?</Text>
+                        <Text style={s.rateCardSubtitle}>Tap to rate ABU MAFHAL SUB on Google Play</Text>
+                    </View>
+                    <View style={s.rateCardBadge}>
+                        <Text style={s.rateCardBadgeText}>Rate 5★</Text>
+                        <Ionicons name="chevron-forward" size={12} color="#F59E0B" />
+                    </View>
+                </LinearGradient>
             </TouchableOpacity>
 
             {/* DUAL FORMAT RECEIPT EXPORT MODAL */}
@@ -253,21 +269,56 @@ const s = StyleSheet.create({
         fontSize: 12,
         fontWeight: '800',
     },
-    rateAppBtn: {
+    rateCard: {
+        width: '100%',
+        maxWidth: 380,
+        borderRadius: 14,
+        overflow: 'hidden',
+        marginTop: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.35)',
+    },
+    rateCardGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        marginTop: 6,
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    },
+    rateCardIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(245, 158, 11, 0.16)',
+        alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(245, 158, 11, 0.3)',
     },
-    rateAppBtnText: {
+    rateCardTitle: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 0.1,
+    },
+    rateCardSubtitle: {
+        color: '#94A3B8',
+        fontSize: 10,
+        marginTop: 1,
+    },
+    rateCardBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: 'rgba(245, 158, 11, 0.18)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+    },
+    rateCardBadgeText: {
         color: '#F59E0B',
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '800',
     },
 });

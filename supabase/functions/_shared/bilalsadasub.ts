@@ -33,8 +33,10 @@ export class BilalsadasubClient {
 
     private cleanPhone(phone: string): string {
         let p = (phone || '').replace(/\D/g, '');
-        if (p.startsWith('234') && p.length === 13) {
+        if (p.startsWith('234')) {
             p = '0' + p.slice(3);
+        } else if (p.length === 10 && !p.startsWith('0')) {
+            p = '0' + p;
         }
         return p;
     }

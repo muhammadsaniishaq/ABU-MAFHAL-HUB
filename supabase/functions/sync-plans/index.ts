@@ -87,6 +87,13 @@ Deno.serve(async (req) => {
                 .or('api_vendor.eq.vital,api_vendor.eq.vitel');
         } catch (_) {}
 
+        // Automatically deactivate legacy dummy test catalog plans (2023 plans with fixed prices)
+        try {
+            await supabaseAdmin.from('data_plans')
+                .update({ is_active: false })
+                .or('plan_id.like.%_SME,plan_id.like.%_DATA,plan_id.like.%_CG,plan_id.like.%_VITAL');
+        } catch (_) {}
+
         // Parse Request Body for Target Vendor
         const reqData = await req.json().catch(() => ({}));
         
@@ -148,13 +155,21 @@ Deno.serve(async (req) => {
                         plansList = bRes?.data || (Array.isArray(bRes) ? bRes : []);
 
                         if (Array.isArray(plansList) && plansList.length > 0) {
-                            networksData[net.canonical] = plansList.map((p: any) => ({
-                                PRODUCT_ID: (p.plan_id || p.id).toString(),
-                                PRODUCT_AMOUNT: (p.amount || p.price || 0).toString(),
-                                PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'}`,
-                                validity: p.plan_day || '30 days',
-                                volume: p.plan_name || ''
-                            }));
+                            networksData[net.canonical] = plansList.map((p: any) => {
+                                const pId = (p.plan_id || p.id).toString();
+                                const pAmount = (p.amount || p.price || 0).toString();
+                                const pDay = (p.plan_day || p.day || '30 days').toString();
+                                const pType = (p.plan_type || 'GIFTING').toString();
+                                const pName = (p.plan_name || p.name || '').toString();
+                                return {
+                                    PRODUCT_ID: pId,
+                                    PRODUCT_AMOUNT: pAmount,
+                                    PRODUCT_NAME: `${pName} (${pType}) - ${pDay} [BILAL]`,
+                                    validity: pDay,
+                                    volume: pName,
+                                    raw_plan_type: pType
+                                };
+                            });
                         }
                     } catch (err: any) {}
                 }
@@ -182,7 +197,8 @@ Deno.serve(async (req) => {
                                     PRODUCT_AMOUNT: p.amount.toString(),
                                     PRODUCT_NAME: `${p.size} ${p.plantype} - ${p.validity}`,
                                     validity: p.validity,
-                                    volume: p.size
+                                    volume: p.size,
+                                    raw_plan_type: p.plantype
                                 }));
                             }
                         } catch (err: any) {}
@@ -214,7 +230,7 @@ Deno.serve(async (req) => {
                 } catch (err: any) {}
             }
 
-            // Fallback 1: Query existing data_plans in database for this vendor
+            // Fallback: Query existing data_plans in database for this vendor if API returned empty
             if (Object.keys(networksData).length === 0) {
                 const { data: dbPlans } = await supabaseAdmin
                     .from('data_plans')
@@ -229,16 +245,11 @@ Deno.serve(async (req) => {
                             PRODUCT_ID: p.plan_id,
                             PRODUCT_AMOUNT: p.cost_price.toString(),
                             PRODUCT_NAME: p.name,
-                            validity: '30 Days',
-                            volume: p.name
+                            validity: p.validity || '30 Days',
+                            volume: p.volume || p.name
                         });
                     });
                 }
-            }
-
-            // Fallback 2: Default catalog if database and API empty
-            if (Object.keys(networksData).length === 0) {
-                networksData = JSON.parse(JSON.stringify(DEFAULT_CATALOG));
             }
 
             for (const netKey in networksData) {
@@ -251,6 +262,8 @@ Deno.serve(async (req) => {
                 else if (networkName.includes('mobile') || networkName.includes('etisalat') || networkName.includes('t2')) networkName = '9mobile';
 
                 if (!Array.isArray(plans)) continue;
+
+                const syncedPlanIdsForNet: string[] = [];
 
                 for (const item of plans) {
                     let properPlans: ClubKonnectPlan[] = [];
@@ -279,7 +292,8 @@ Deno.serve(async (req) => {
                         const rawName = plan.PRODUCT_NAME || plan.NAME || plan.TITLE || plan.PACKAGE_NAME || getVal(/name|title|package/i);
                         let name = rawName || `${networkName.toUpperCase()} ${planId}`;
 
-                        const config = configMap.get(networkName);
+                        // Config lookup with vitel / vital fallback
+                        const config = configMap.get(networkName) || configMap.get('vitel') || configMap.get('vital');
                         let finalSellingPrice = costPrice;
                         if (config) {
                             if (config.markup_type === 'percentage') {
@@ -292,33 +306,42 @@ Deno.serve(async (req) => {
 
                         const detectPlanType = (planName: string): string => {
                             const n = (planName || '').toLowerCase();
-                            if (n.includes('corporate') || n.includes('cg') || n.includes('c-g')) return 'CG';
+                            if (n.includes('corporate') || n.includes('cooperate') || n.includes('cg') || n.includes('c-g')) return 'CG';
                             if (n.includes('gifting') || n.includes('gift')) return 'GIFTING';
                             if (n.includes('promo')) return 'PROMO';
                             if (n.includes('mega')) return 'MEGA';
                             if (n.includes('night')) return 'NIGHT';
-                            if (n.includes('direct')) return 'DIRECT';
                             if (n.includes('coupon')) return 'COUPON';
                             if (n.includes('sme') || n.includes('s-m-e')) return 'SME';
+                            if (n.includes('direct')) return 'DIRECT';
                             return 'DIRECT';
                         };
+
+                        const planType = (item as any).raw_plan_type ? detectPlanType((item as any).raw_plan_type) : detectPlanType(name);
+                        const volumeVal = (item as any).volume || (plan as any).volume || name;
+                        const validityVal = (item as any).validity || (plan as any).validity || '30 Days';
 
                         const recordData: any = {
                             network: networkName,
                             plan_id: planId,
                             name: name,
-                            plan_type: detectPlanType(name),
+                            volume: volumeVal,
+                            validity: validityVal,
+                            plan_type: planType,
                             cost_price: costPrice,
                             selling_price: finalSellingPrice,
                             is_active: true,
                             api_vendor: vendor
                         };
 
-                        // Check if plan exists for this network & plan_id
+                        syncedPlanIdsForNet.push(String(planId));
+
+                        // Check if plan exists for this network, plan_id, AND vendor
                         const { data: existingPlans } = await supabaseAdmin.from('data_plans')
                             .select('id')
                             .eq('network', networkName)
-                            .eq('plan_id', planId);
+                            .eq('plan_id', planId)
+                            .eq('api_vendor', vendor);
 
                         const existingPlan = existingPlans?.[0];
                         let opError = null;
@@ -358,6 +381,29 @@ Deno.serve(async (req) => {
                             vendorBreakdown[vendor].plans.push(recordData);
                         }
                     }
+                }
+
+                // Deactivate ghost/obsolete plans for this network and vendor that are no longer in provider API
+                if (syncedPlanIdsForNet.length > 0) {
+                    try {
+                        const { data: existingVendorPlans } = await supabaseAdmin.from('data_plans')
+                            .select('id, plan_id')
+                            .eq('network', networkName)
+                            .eq('api_vendor', vendor)
+                            .eq('is_active', true);
+
+                        if (existingVendorPlans && existingVendorPlans.length > 0) {
+                            const ghostIds = existingVendorPlans
+                                .filter((p: any) => !syncedPlanIdsForNet.includes(String(p.plan_id)))
+                                .map((p: any) => p.id);
+
+                            if (ghostIds.length > 0) {
+                                await supabaseAdmin.from('data_plans')
+                                    .update({ is_active: false })
+                                    .in('id', ghostIds);
+                            }
+                        }
+                    } catch (_) {}
                 }
             }
         }

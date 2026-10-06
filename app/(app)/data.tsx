@@ -326,7 +326,7 @@ export default function DataScreen() {
     const [showPlanTypeModal, setShowPlanTypeModal] = useState(false);
 
     // Contact Picker State
-    const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
+    const [deviceContacts, setDeviceContacts] = useState<any[]>([]);
     const [showContactModal, setShowContactModal] = useState(false);
     const [contactSearch, setContactSearch] = useState('');
     
@@ -1549,6 +1549,26 @@ export default function DataScreen() {
                                                                 {planInfo.validity}
                                                             </Text>
                                                         </View>
+
+                                                        {/* Plan Type Badge (SME, CG, GIFTING, DIRECT) */}
+                                                        {plan.plan_type ? (
+                                                            <View style={{
+                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : (plan.plan_type === 'SME' ? '#ecfdf5' : plan.plan_type === 'CG' ? '#eff6ff' : '#fef3c7'),
+                                                                borderColor: isSelected ? 'rgba(255,255,255,0.3)' : (plan.plan_type === 'SME' ? '#a7f3d0' : plan.plan_type === 'CG' ? '#bfdbfe' : '#fde68a'),
+                                                                borderWidth: 1,
+                                                                paddingHorizontal: 6,
+                                                                paddingVertical: 1,
+                                                                borderRadius: 8,
+                                                            }}>
+                                                                <Text style={{
+                                                                    fontSize: 9,
+                                                                    fontWeight: '700',
+                                                                    color: isSelected ? '#ffffff' : (plan.plan_type === 'SME' ? '#047857' : plan.plan_type === 'CG' ? '#1d4ed8' : '#b45309'),
+                                                                }}>
+                                                                    {plan.plan_type}
+                                                                </Text>
+                                                            </View>
+                                                        ) : null}
 
                                                         {/* Cost Badge for GB plans or Quick Pass for MB plans */}
                                                         {costPerGB !== null ? (

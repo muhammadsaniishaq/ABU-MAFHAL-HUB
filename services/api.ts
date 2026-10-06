@@ -147,14 +147,15 @@ export const api = {
                         .maybeSingle();
                     if (vendorSetting?.value) {
                         const v = typeof vendorSetting.value === 'object' ? vendorSetting.value.vendor || vendorSetting.value : vendorSetting.value;
-                        activeVendor = String(v).toLowerCase();
+                        const vStr = String(v).toLowerCase().trim();
+                        activeVendor = vStr.split(',')[0].trim() || 'bilalsadasub';
                     }
                 } catch (_) {}
 
                 let query = supabase
                     .from('data_plans')
                     .select('*')
-                    .or('is_active.eq.true,is_active.is.null')
+                    .eq('is_active', true)
                     .order('cost_price', { ascending: true });
 
                 if (netLower === 'vitel' || netLower === 'vital') {
@@ -163,11 +164,33 @@ export const api = {
                     query = query.ilike('network', netLower);
                 }
 
-                const { data: plans, error } = await query;
+                // Strictly fetch plans for the active primary vendor first to prevent cross-vendor pricing discrepancies
+                let { data: plans, error } = await query.eq('api_vendor', activeVendor);
 
-                if (error) throw new Error(error.message);
+                // If activeVendor has no plans for this network, fallback to any active plans
+                if (!plans || plans.length === 0) {
+                    let fallbackQuery = supabase
+                        .from('data_plans')
+                        .select('*')
+                        .eq('is_active', true)
+                        .order('cost_price', { ascending: true });
+                    if (netLower === 'vitel' || netLower === 'vital') {
+                        fallbackQuery = fallbackQuery.or('network.ilike.vitel,network.ilike.vital,network.eq.vitel,network.eq.vital');
+                    } else {
+                        fallbackQuery = fallbackQuery.ilike('network', netLower);
+                    }
+                    const fallbackRes = await fallbackQuery;
+                    plans = fallbackRes.data || [];
+                }
 
-                let resultPlans = plans || [];
+                let resultPlans = (plans || []).filter(p => {
+                    const pid = String(p.plan_id || '');
+                    // Exclude legacy hardcoded test/catalog plans
+                    if (pid.includes('_SME') || pid.includes('_DATA') || pid.includes('_CG') || pid.includes('_VITAL')) {
+                        return false;
+                    }
+                    return true;
+                });
 
                 const mappedPlans = resultPlans.map(p => ({
                     id: p.plan_id,

@@ -198,27 +198,123 @@ Deno.serve(async (req: Request) => {
         const client = new ClubKonnectClient(ckUserId, ckApiKey);
         const requestId = data.requestId || `REQ-${Date.now()}`;
 
+        // Helper: Resolve canonical network identifier
+        const resolveCanonicalNetwork = (net: string): string => {
+            const s = (net || '').toString().toLowerCase().trim();
+            if (s.includes('mtn') || s === '01' || s === '1') return 'mtn';
+            if (s.includes('glo') || s === '02' || s === '3') return 'glo';
+            if (s.includes('airtel') || s === '04' || s === '2') return 'airtel';
+            if (s.includes('9mobile') || s.includes('etisalat') || s.includes('t2') || s === '03' || s === '4') return '9mobile';
+            if (s.includes('vit') || s === '05' || s === '5') return 'vital';
+            return s;
+        };
+
+        const targetNetwork = resolveCanonicalNetwork(data.network);
+
         const getNetworkCode = (net: string): '01' | '02' | '03' | '04' | string => {
+            const canonical = resolveCanonicalNetwork(net);
             const map: Record<string, '01' | '02' | '03' | '04'> = { 'mtn': '01', 'glo': '02', '9mobile': '03', 'airtel': '04' };
-            return map[net?.toLowerCase()] || net;
+            return map[canonical] || canonical;
         };
         const networkCode = getNetworkCode(data.network);
+
+        // Sanitize phone number strictly for Nigerian networks
+        let formattedPhone = (data.phone || '').toString().replace(/\D/g, '');
+        if (formattedPhone.startsWith('234')) {
+            formattedPhone = '0' + formattedPhone.slice(3);
+        } else if (formattedPhone.length === 10 && !formattedPhone.startsWith('0')) {
+            formattedPhone = '0' + formattedPhone;
+        }
+
+        if (type === 'data' || type === 'airtime') {
+            if (formattedPhone.length !== 11 || !formattedPhone.startsWith('0')) {
+                throw new Error(`Invalid recipient phone number: ${data.phone}. Must be a valid 11-digit Nigerian number (e.g. 08012345678).`);
+            }
+        }
 
         let providerParams: Record<string, string | number> = {};
 
         let planVendor = '';
         if (type === 'data') {
-            const { data: plan, error: planError } = await rpcClient
+            const rawPlanId = String(data.planId || '').trim();
+            const requestedVendor = (data.vendor || '').toString().toLowerCase().trim();
+
+            console.log(`[Bills] Searching Data Plan: ID="${rawPlanId}", Network="${targetNetwork}", Vendor="${requestedVendor || 'any'}"`);
+
+            // 1. Scope query by Network + Plan ID + Active status to prevent cross-network collisions
+            let query = rpcClient
                 .from('data_plans')
                 .select('*')
-                .eq('plan_id', data.planId)
-                .maybeSingle();
+                .eq('plan_id', rawPlanId)
+                .eq('is_active', true);
+
+            if (targetNetwork === 'vital') {
+                query = query.or('network.ilike.vital,network.ilike.vitel');
+            } else {
+                query = query.ilike('network', targetNetwork);
+            }
+
+            if (requestedVendor) {
+                query = query.ilike('api_vendor', requestedVendor);
+            }
+
+            let { data: matchingPlans, error: searchError } = await query;
+
+            // 2. Fallback: If requested vendor didn't match, search without vendor filter on same network
+            if ((!matchingPlans || matchingPlans.length === 0) && requestedVendor) {
+                let fallbackQuery = rpcClient
+                    .from('data_plans')
+                    .select('*')
+                    .eq('plan_id', rawPlanId)
+                    .eq('is_active', true);
+                if (targetNetwork === 'vital') {
+                    fallbackQuery = fallbackQuery.or('network.ilike.vital,network.ilike.vitel');
+                } else {
+                    fallbackQuery = fallbackQuery.ilike('network', targetNetwork);
+                }
+                const fallbackRes = await fallbackQuery;
+                matchingPlans = fallbackRes.data;
+            }
+
+            // 3. Fallback: Check if client provided the table UUID (id)
+            if (!matchingPlans || matchingPlans.length === 0) {
+                const { data: uuidPlan } = await rpcClient
+                    .from('data_plans')
+                    .select('*')
+                    .eq('id', rawPlanId)
+                    .maybeSingle();
+                if (uuidPlan) {
+                    matchingPlans = [uuidPlan];
+                }
+            }
+
+            const plan = (matchingPlans && matchingPlans.length > 0) ? matchingPlans[0] : null;
+
+            if (!plan) {
+                throw new Error(`Data plan "${rawPlanId}" not found or inactive for ${targetNetwork.toUpperCase()}.`);
+            }
+
+            const costPrice = Number(plan.cost_price || 0);
+            let sellingPrice = Number(plan.selling_price || 0);
+
+            // PROFIT SHIELD ("KARIYAR HASARA"):
+            // Guarantee that we never sell below provider cost price.
+            if (sellingPrice < costPrice) {
+                console.warn(`[Bills] Profit Shield: Selling price ₦${sellingPrice} is below cost ₦${costPrice} for ${plan.name}. Adjusting.`);
+                sellingPrice = costPrice;
+            }
+
+            amountToCharge = sellingPrice;
+            planVendor = (plan.api_vendor || requestedVendor || 'bilalsadasub').toLowerCase();
             
-            if (planError || !plan) throw new Error(`Invalid Data Plan: ${data.planId}`);
-            
-            amountToCharge = Number(plan.selling_price);
-            planVendor = (plan.api_vendor || '').toLowerCase();
-            providerParams = { network: networkCode, phone: data.phone, planId: plan.plan_id };
+            providerParams = { 
+                network: targetNetwork, 
+                networkCode: networkCode, 
+                phone: formattedPhone, 
+                planId: plan.plan_id 
+            };
+
+            console.log(`[Bills] Data Plan Resolved: "${plan.name}" (${plan.network.toUpperCase()}) | Selling: ₦${amountToCharge} | Cost: ₦${costPrice} | Vendor: ${planVendor}`);
         } else if (type === 'airtime') {
             amountToCharge = Number(data.amount);
             if (amountToCharge < 50) throw new Error("Minimum Airtime is N50");
@@ -262,7 +358,7 @@ Deno.serve(async (req: Request) => {
                 amountToCharge = Math.round(amountToCharge * 100) / 100;
             }
 
-            providerParams = { network: networkCode, phone: data.phone, amount: Number(data.amount) };
+            providerParams = { network: networkCode, phone: formattedPhone, amount: Number(data.amount) };
         } else if (type === 'smile') {
              amountToCharge = Number(data.amount);
              if (amountToCharge < 100) throw new Error("Invalid Smile Amount");
@@ -501,8 +597,19 @@ Deno.serve(async (req: Request) => {
                         amount: amountToCharge
                     });
 
-                    if (deductError) {
-                        console.error("[Bills] Critical: Vendor dispatched, but balance deduction failed:", deductError.message);
+                    if (deductError || deductResult?.success === false) {
+                        console.error("[Bills] Critical: deduct_balance RPC failed:", deductError?.message || deductResult?.error);
+                        try {
+                            // Direct service-role deduction fallback to guarantee no financial loss
+                            const { data: prof } = await rpcClient.from('profiles').select('balance').eq('id', userId).single();
+                            if (prof) {
+                                const newBal = Math.max(0, Number(prof.balance || 0) - amountToCharge);
+                                await rpcClient.from('profiles').update({ balance: newBal }).eq('id', userId);
+                                console.log(`[Bills] Fallback balance deduction applied for user ${userId}: ${prof.balance} -> ${newBal}`);
+                            }
+                        } catch (fallbackErr: any) {
+                            console.error("[Bills] Fallback deduction error:", fallbackErr.message);
+                        }
                     } else {
                         console.log(`[Bills] Balance Deducted successfully for user ${userId}. Amount: ₦${amountToCharge}`);
                     }
