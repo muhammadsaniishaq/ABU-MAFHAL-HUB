@@ -835,7 +835,7 @@ export default function UserProfileScreen() {
                                             <Text style={{ color: L.goldAmber, fontSize: 7.5, fontWeight: '900' }}>5-STARS</Text>
                                         </View>
                                     </View>
-                                    <Text style={{ color: L.textMuted, fontSize: 9 }}>Bamu taurari a Play Store don nuna jin daɗi</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 9 }}>Leave a 5-star review on Google Play Store</Text>
                                 </View>
                             </View>
                             <Ionicons name="chevron-forward" size={14} color={L.textMuted} />

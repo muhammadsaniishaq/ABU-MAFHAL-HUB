@@ -120,7 +120,7 @@ export default function SuccessScreen() {
                 activeOpacity={0.8}
             >
                 <Ionicons name="star" size={14} color="#F59E0B" />
-                <Text style={s.rateAppBtnText}>Bamu Taurari a Google Play Store ⭐</Text>
+                <Text style={s.rateAppBtnText}>Rate Us on Google Play Store ⭐</Text>
             </TouchableOpacity>
 
             {/* DUAL FORMAT RECEIPT EXPORT MODAL */}

@@ -229,59 +229,59 @@ export default function AppRatingModal({
     const dynamicContent = {
         5: {
             emoji: '🏆',
-            title: 'Madalla! Muna Alfahari Da Kai! 😍',
+            title: 'Loving ABU MAFHAL SUB? 😍',
             subtitle:
-                'Godiya marar iyaka da amincewarka da ABU MAFHAL SUB. Da fatan zaka bamu taurari 5 a Google Play Store domin karfafawa manhajarka gwiwa!',
-            buttonLabel: 'Bamu Taurari a Play Store ⭐',
+                'Thank you for trusting us! Please take 5 seconds to rate us on Google Play. Your 5-star review means everything to us!',
+            buttonLabel: 'Rate Us on Play Store ⭐',
             badge: 'EXCELLENT EXPERIENCE',
             badgeBg: '#FEF3C7',
             badgeColor: '#B45309',
         },
         4: {
             emoji: '🌟',
-            title: 'Nagari Sosai! Mun Gode! 😊',
+            title: 'Thank You for Your Support! 😊',
             subtitle:
-                "Muna matukar jin dadin yadda kake cin moriyar sabis dinmu. Taimaka mana da taurari a Play Store domin sauran 'yan uwa su amfana!",
-            buttonLabel: 'Bamu Taurari a Play Store ⭐',
+                'We are glad you are enjoying our service. A quick 5-star rating on Google Play would help us grow!',
+            buttonLabel: 'Rate Us on Play Store ⭐',
             badge: 'GREAT SERVICE',
             badgeBg: '#ECFDF5',
             badgeColor: '#065F46',
         },
         3: {
             emoji: '💡',
-            title: 'Da Kyau! Yaya Za Mu Inganta? 🤔',
+            title: 'How Can We Do Better? 🤔',
             subtitle:
-                "Muna son jin ra'ayinka don mu kara inganta ayyukanmu. Sanar da mu abinda kake son mu kyautata domin ka ji dadi 100%.",
-            buttonLabel: 'Tura Mana Shawara / Korafe 💬',
-            badge: 'WE WANT TO IMPROVE',
+                'We want your experience to be 100% smooth. Tell us what we can improve, and we will work on it right away!',
+            buttonLabel: 'Send Feedback / Chat Support 💬',
+            badge: 'WE VALUE YOUR FEEDBACK',
             badgeBg: '#EFF6FF',
             badgeColor: '#1E40AF',
         },
         2: {
             emoji: '🙏',
-            title: 'Muna Neman Afuwa! 😔',
+            title: 'We Are Truly Sorry! 😔',
             subtitle:
-                'Yi hakuri idan ka fuskanci wata matsala ko tsaiko. Da fatan zaka sanar da mu kai tsaye ta WhatsApp/Support don mu warware maka nan take!',
-            buttonLabel: 'Tuntuɓi Support Nan Take 💬',
+                'Did you experience any issue? Please chat with our 24/7 support team right away so we can resolve it for you.',
+            buttonLabel: 'Chat with Support on WhatsApp 💬',
             badge: 'NEED HELP?',
             badgeBg: '#FFFBEB',
             badgeColor: '#92400E',
         },
         1: {
             emoji: '🤝',
-            title: 'Kayi Hakuri, Za Mu Gyara! 💔',
+            title: 'Let Us Fix This For You! 💔',
             subtitle:
-                'Kada ka damu, muna nan don taimaka maka. Tuntuɓi sashen tallafinmu kai tsaye domin mu gano matsalar tare da magance ta cikin gaggawa.',
-            buttonLabel: 'Aiko Kuka ta WhatsApp 💬',
-            badge: 'URGENT ASSISTANCE',
+                'We apologize for any trouble. Reach out to our dedicated support team on WhatsApp and we will assist you immediately.',
+            buttonLabel: 'Report Issue to Support 💬',
+            badge: 'WE ARE HERE TO HELP',
             badgeBg: '#FEF2F2',
             badgeColor: '#991B1B',
         },
     }[selectedStars as 1 | 2 | 3 | 4 | 5] || {
         emoji: '⭐',
-        title: 'Bamu Ra\'ayinka!',
-        subtitle: 'Yaya ka ji dadin amfani da ABU MAFHAL SUB?',
-        buttonLabel: 'Bamu Taurari a Play Store',
+        title: 'Rate Your Experience',
+        subtitle: 'How was your experience using ABU MAFHAL SUB?',
+        buttonLabel: 'Rate on Google Play',
         badge: 'RATING',
         badgeBg: '#FEF3C7',
         badgeColor: '#B45309',
@@ -501,7 +501,7 @@ export default function AppRatingModal({
                                         style={s.remindLaterBtn}
                                     >
                                         <Text style={s.remindLaterText}>
-                                            Wani Lokaci (Remind Later)
+                                            Maybe Later
                                         </Text>
                                     </TouchableOpacity>
 
@@ -512,7 +512,7 @@ export default function AppRatingModal({
                                             style={s.forcePlayStoreBtn}
                                         >
                                             <Text style={s.forcePlayStoreText}>
-                                                Play Store →
+                                                Go to Play Store →
                                             </Text>
                                         </TouchableOpacity>
                                     )}
@@ -525,7 +525,7 @@ export default function AppRatingModal({
                                     style={s.neverAskBtn}
                                 >
                                     <Text style={s.neverAskText}>
-                                        Kada a sake nunawa (Never ask again)
+                                        Don't show this again
                                     </Text>
                                 </TouchableOpacity>
                             </View>

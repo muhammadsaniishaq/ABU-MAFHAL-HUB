@@ -253,7 +253,7 @@ export const ratingService = {
             });
 
             const msg = encodeURIComponent(
-                `Sannu ABU MAFHAL SUB Support, ina son bada shawara / korafi kan manhaja (Rating: ${rating || 3} Stars).`
+                `Hello ABU MAFHAL SUB Support, I would like to share feedback/report an issue regarding the app (Rating: ${rating || 3} Stars).`
             );
             const waUrl = `whatsapp://send?phone=${supportPhone}&text=${msg}`;
             const canWa = await Linking.canOpenURL(waUrl);
