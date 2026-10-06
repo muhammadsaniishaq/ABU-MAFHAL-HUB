@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { trackGooglePurchaseConversion } from '../services/googleAds';
 import { ReceiptData } from '../services/receiptGenerator';
 import ReceiptExportModal from '../components/ReceiptExportModal';
+import { ratingService } from '../services/ratingService';
+import AppRatingModal from '../components/AppRatingModal';
 
 const G = {
   navyDark: '#020617',
@@ -24,11 +26,14 @@ export default function SuccessScreen() {
     const { amount, type, id, reference, description } = params;
     const [exportModalVisible, setExportModalVisible] = useState(false);
 
-    // Trigger Google Ads conversion tracking on successful purchase
+    // Trigger Google Ads conversion tracking and in-app rating prompt
     useEffect(() => {
         const numericAmount = amount ? Number(String(amount).replace(/[^0-9.-]+/g, '')) : 0;
         trackGooglePurchaseConversion(String(id || reference || ''), numericAmount);
-    }, [amount, id, reference]);
+
+        // Record successful action to prompt rating when appropriate
+        ratingService.recordSuccessfulAction(String(type || 'Payment Service'));
+    }, [amount, id, reference, type]);
 
     // Prevent back button from going back to form
     useEffect(() => {
@@ -108,12 +113,25 @@ export default function SuccessScreen() {
                 <Text style={s.historyBtnText}>View in Transaction History →</Text>
             </TouchableOpacity>
 
+            {/* Rate Us on Google Play Store Button */}
+            <TouchableOpacity
+                style={s.rateAppBtn}
+                onPress={() => ratingService.triggerPrompt({ force: true, actionName: String(type || 'Payment Service') })}
+                activeOpacity={0.8}
+            >
+                <Ionicons name="star" size={14} color="#F59E0B" />
+                <Text style={s.rateAppBtnText}>Bamu Taurari a Google Play Store ⭐</Text>
+            </TouchableOpacity>
+
             {/* DUAL FORMAT RECEIPT EXPORT MODAL */}
             <ReceiptExportModal
                 visible={exportModalVisible}
                 onClose={() => setExportModalVisible(false)}
                 receiptData={receiptPayload}
             />
+
+            {/* IN-APP RATING MODAL */}
+            <AppRatingModal />
         </LinearGradient>
     );
 }
@@ -233,6 +251,23 @@ const s = StyleSheet.create({
     historyBtnText: {
         color: '#DAA520',
         fontSize: 12,
+        fontWeight: '800',
+    },
+    rateAppBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        marginTop: 6,
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    rateAppBtnText: {
+        color: '#F59E0B',
+        fontSize: 11.5,
         fontWeight: '800',
     },
 });

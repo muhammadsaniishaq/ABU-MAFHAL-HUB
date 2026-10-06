@@ -12,6 +12,7 @@ import WebDesktopSidebar from '../../components/WebDesktopSidebar';
 import WebDesktopHeader from '../../components/WebDesktopHeader';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppRatingModal from '../../components/AppRatingModal';
 
 const LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 
@@ -279,6 +280,9 @@ export default function AppLayout() {
                     </Animated.View>
                 </View>
             )}
+
+            {/* In-App Google Play Rating & Feedback Modal */}
+            <AppRatingModal customPlayStoreUrl={settings?.play_store_url} />
         </View>
     );
 }

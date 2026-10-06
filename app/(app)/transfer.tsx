@@ -36,6 +36,7 @@ import DynamicBanners from '../../components/DynamicBanners';
 import { createAppNotification } from '../../services/notificationsHelper';
 import { ReceiptData, shareReceiptFile } from '../../services/receiptGenerator';
 import ReceiptExportModal from '../../components/ReceiptExportModal';
+import { ratingService } from '../../services/ratingService';
 import ViewShot from 'react-native-view-shot';
 import { ABU_MAFHAL_LOGO_B64 } from '../../assets/images/logoB64';
 
@@ -3262,6 +3263,7 @@ export default function TransferScreen() {
                                         onPress={() => {
                                             setSuccessModalVisible(false);
                                             fetchUserData();
+                                            ratingService.recordSuccessfulAction('Bank Transfer');
                                         }}
                                         style={s.closeSheetBtn}
                                         activeOpacity={0.8}

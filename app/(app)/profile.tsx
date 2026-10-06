@@ -14,6 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import { decode } from 'base64-arraybuffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ratingService } from '../../services/ratingService';
 
 const CACHE_KEY = '@profile_data_v11';
 
@@ -806,6 +807,35 @@ export default function UserProfileScreen() {
                                         </View>
                                     </View>
                                     <Text style={{ color: L.textMuted, fontSize: 9 }}>4-digit PIN, login password, 2FA & biometrics</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
+                        </TouchableOpacity>
+
+                        {/* 3. Rate Us on Google Play Store */}
+                        <TouchableOpacity 
+                            onPress={() => ratingService.triggerPrompt({ force: true, actionName: 'Profile Menu' })} 
+                            style={{ 
+                                flexDirection: 'row', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                paddingVertical: 9,
+                                borderTopWidth: 1,
+                                borderColor: '#F1F5F9'
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: L.goldBg, borderWidth: 1, borderColor: L.goldBorder, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="star" size={16} color={L.goldAmber} />
+                                </View>
+                                <View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '800' }}>Rate on Google Play</Text>
+                                        <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, borderWidth: 1, borderColor: L.goldBorder }}>
+                                            <Text style={{ color: L.goldAmber, fontSize: 7.5, fontWeight: '900' }}>5-STARS</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={{ color: L.textMuted, fontSize: 9 }}>Bamu taurari a Play Store don nuna jin daɗi</Text>
                                 </View>
                             </View>
                             <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
