@@ -10,7 +10,6 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { decode } from 'base64-arraybuffer';
 
 const COLORS = {
@@ -140,26 +139,7 @@ export default function ManageCAC() {
       const fileUri = `${FileSystem.documentDirectory}${filename}`;
       const { uri } = await FileSystem.downloadAsync(url, fileUri);
       
-      const isImage = uri.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
-      
-      let savedToGallery = false;
-      if (isImage) {
-        try {
-          const { status } = await MediaLibrary.requestPermissionsAsync();
-          if (status === 'granted') {
-            await MediaLibrary.saveToLibraryAsync(uri);
-            Alert.alert('Success', 'Image saved directly to your phone gallery!');
-            savedToGallery = true;
-          }
-        } catch (mediaErr) {
-          console.log("MediaLibrary failed, falling back to Sharing:", mediaErr);
-        }
-      }
-      
-      // Fallback for non-images, denied permission, or MediaLibrary crash
-      if (!savedToGallery) {
-        await Sharing.shareAsync(uri, { dialogTitle: 'Download / Save Document' });
-      }
+      await Sharing.shareAsync(uri, { dialogTitle: 'Download / Save Document' });
     } catch (e: any) {
       console.log("Download Error:", e);
       Alert.alert('Download Error', e.message || 'Could not download the file.');

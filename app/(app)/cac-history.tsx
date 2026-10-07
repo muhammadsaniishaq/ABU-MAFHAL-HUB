@@ -7,7 +7,6 @@ import { supabase } from '../../services/supabase';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 
 const COLORS = {
   navy: '#0E1A2E',
@@ -119,25 +118,7 @@ export default function CACHistory() {
       const fileUri = `${FileSystem.documentDirectory}${filename}`;
       const { uri } = await FileSystem.downloadAsync(url, fileUri);
       
-      const isImage = uri.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
-      
-      let savedToGallery = false;
-      if (isImage) {
-        try {
-          const { status } = await MediaLibrary.requestPermissionsAsync();
-          if (status === 'granted') {
-            await MediaLibrary.saveToLibraryAsync(uri);
-            Alert.alert('Success', 'Image saved directly to your phone gallery!');
-            savedToGallery = true;
-          }
-        } catch (mediaErr) {
-          console.log("MediaLibrary failed, falling back to Sharing:", mediaErr);
-        }
-      }
-      
-      if (!savedToGallery) {
-        await Sharing.shareAsync(uri, { dialogTitle: 'Download / Save Document' });
-      }
+      await Sharing.shareAsync(uri, { dialogTitle: 'Download / Save Document' });
     } catch (e: any) {
       console.log("Download Error:", e);
       Alert.alert('Download Error', e.message || 'Could not download the file.');
