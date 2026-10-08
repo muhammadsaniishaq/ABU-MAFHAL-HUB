@@ -69,32 +69,32 @@ export default function AppLayout() {
             <Tabs.Screen name="history" options={{ title: 'History' }} />
             <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
             
-            {/* Hidden service screens - tab bar will show when these are active */}
-            <Tabs.Screen name="referrals" options={{ href: null }} />
-            <Tabs.Screen name="social-boost" options={{ href: null }} />
-            <Tabs.Screen name="social-orders" options={{ href: null }} />
-            <Tabs.Screen name="data" options={{ href: null }} />
-            <Tabs.Screen name="airtime" options={{ href: null }} />
-            <Tabs.Screen name="airtime-to-cash" options={{ href: null }} />
-            <Tabs.Screen name="bills" options={{ href: null }} />
-            <Tabs.Screen name="education" options={{ href: null }} />
-            <Tabs.Screen name="bvn-services/index" options={{ href: null }} />
-            <Tabs.Screen name="nin-services/index" options={{ href: null }} />
+            {/* Service & transaction screens - hide bottom tab bar so submit buttons and forms are fully visible */}
+            <Tabs.Screen name="referrals" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="social-boost" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="social-orders" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="data" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="airtime" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="airtime-to-cash" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bills" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="education" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
-            <Tabs.Screen name="kyc" options={{ href: null }} />
-            <Tabs.Screen name="virtual-cards" options={{ href: null }} />
-            <Tabs.Screen name="transfer" options={{ href: null }} />
-            <Tabs.Screen name="saved-cards" options={{ href: null }} />
-            <Tabs.Screen name="beneficiaries" options={{ href: null }} />
-            <Tabs.Screen name="support" options={{ href: null }} />
-            <Tabs.Screen name="cac-services" options={{ href: null }} />
-            <Tabs.Screen name="cac-history" options={{ href: null }} />
-            <Tabs.Screen name="bulk-sms" options={{ href: null }} />
-            <Tabs.Screen name="recharge-pin" options={{ href: null }} />
-            <Tabs.Screen name="smile" options={{ href: null }} />
-            <Tabs.Screen name="reviews" options={{ href: null }} />
-            <Tabs.Screen name="about" options={{ href: null }} />
-            <Tabs.Screen name="tickets/index" options={{ href: null }} />
+            <Tabs.Screen name="kyc" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="virtual-cards" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="transfer" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="saved-cards" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="beneficiaries" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="support" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="cac-services" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="cac-history" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bulk-sms" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="recharge-pin" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="smile" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="reviews" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="about" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="tickets/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="tickets/[id]" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         </Tabs>
     );

@@ -219,6 +219,7 @@ const cleanNigerianPhone = (raw: string): string => {
     return p;
 };
 export default function DataScreen() {
+    const insets = useSafeAreaInsets();
     const [network, setNetwork] = useState('');
     const [networksData, setNetworksData] = useState(NETWORKS_DATA);
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -1773,7 +1774,11 @@ export default function DataScreen() {
                 </ScrollView>
 
                 {/* Bottom Floating Bar */}
-                <View style={[s.bottomButtonWrapper, isWeb && s.webPageContainer]}>
+                <View style={[
+                    s.bottomButtonWrapper,
+                    { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 16) + 12 },
+                    isWeb && s.webPageContainer
+                ]}>
                     {selectedPlan && (
                         <View style={{
                             flexDirection: 'row',
@@ -2668,7 +2673,7 @@ const s = StyleSheet.create({
   bottomButtonWrapper: {
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 90 : 75,
+    paddingBottom: 16,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',

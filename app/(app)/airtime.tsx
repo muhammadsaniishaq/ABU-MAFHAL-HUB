@@ -631,6 +631,7 @@ function AirtimeScreenContent() {
                     style={{ flex: 1 }}
                     contentContainerStyle={[
                         styles.scrollContent,
+                        { paddingBottom: Math.max(insets.bottom, 24) + 60 },
                         isWeb && { maxWidth: 640, alignSelf: 'center', width: '100%' }
                     ]}
                     showsVerticalScrollIndicator={false}
