@@ -234,12 +234,31 @@ export default function RootLayout() {
                     code = u.searchParams.get('code');
                     accessToken = u.searchParams.get('access_token');
                     refreshToken = u.searchParams.get('refresh_token');
+                    const refParam = u.searchParams.get('ref') || u.searchParams.get('referral') || u.searchParams.get('referrer') || u.searchParams.get('code');
+                    if (refParam && typeof refParam === 'string' && refParam.trim()) {
+                        let cleanRef = refParam.trim();
+                        if (cleanRef.includes('ref=')) {
+                            const m = cleanRef.match(/ref=([A-Za-z0-9_-]+)/i);
+                            if (m && m[1]) cleanRef = m[1];
+                        }
+                        AsyncStorage.setItem('pending_referral_code', cleanRef.toUpperCase()).catch(() => {});
+                    }
                 } catch {
                     const parsed = Linking.parse(normalized);
                     const q = parsed.queryParams || {};
                     code = Array.isArray(q.code) ? q.code[0] : (q.code as string);
                     accessToken = Array.isArray(q.access_token) ? q.access_token[0] : (q.access_token as string);
                     refreshToken = Array.isArray(q.refresh_token) ? q.refresh_token[0] : (q.refresh_token as string);
+                    const rawRef = q.ref || q.referral || q.referrer || q.code;
+                    const refParam = Array.isArray(rawRef) ? rawRef[0] : (rawRef as string);
+                    if (refParam && typeof refParam === 'string' && refParam.trim()) {
+                        let cleanRef = refParam.trim();
+                        if (cleanRef.includes('ref=')) {
+                            const m = cleanRef.match(/ref=([A-Za-z0-9_-]+)/i);
+                            if (m && m[1]) cleanRef = m[1];
+                        }
+                        AsyncStorage.setItem('pending_referral_code', cleanRef.toUpperCase()).catch(() => {});
+                    }
                 }
 
                 if (code) {

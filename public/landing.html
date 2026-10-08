@@ -1576,8 +1576,64 @@
       alert("Apple App Store: Coming Soon! 🚀\n\nManhajar Abu Mafhal Sub ta iOS (iPhone/iPad) tana nan tafe nan kusa!\n\nA halin yanzu zaku iya sauke manhajar Android a Google Play ko amfani da yanar gizon mu a browser.");
     }
 
-    // Dynamic app_settings sync from Supabase
+    // Dynamic app_settings sync & Universal Referral Tracking from Supabase
     document.addEventListener("DOMContentLoaded", function() {
+      // 1. Referral Tracking from URL or Storage
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlRef = urlParams.get('ref') || urlParams.get('referral') || urlParams.get('code') || '';
+      if (urlRef) {
+        try {
+          const cleanRef = urlRef.trim().toUpperCase();
+          localStorage.setItem('pending_referral_code', cleanRef);
+          sessionStorage.setItem('pending_referral_code', cleanRef);
+        } catch (_) {}
+      }
+
+      let activeRef = '';
+      try {
+        activeRef = (urlRef || localStorage.getItem('pending_referral_code') || '').trim().toUpperCase();
+      } catch (_) {
+        activeRef = urlRef.trim().toUpperCase();
+      }
+
+      function applyReferralTracking(playBaseUrl) {
+        if (!activeRef) return;
+
+        // Sync all Signup & Login links
+        document.querySelectorAll('a[href="/signup"], a[href="/login"], a[href="signup"], a[href="login"]').forEach(el => {
+          const href = el.getAttribute('href');
+          if (href && !href.includes('ref=')) {
+            el.href = href + (href.includes('?') ? '&' : '?') + 'ref=' + encodeURIComponent(activeRef);
+          }
+        });
+
+        // Sync all Google Play Store links with official install referrer
+        document.querySelectorAll('.js-playstore-link, #playstore-btn, #hero-playstore-btn, a[href*="play.google.com"]').forEach(el => {
+          const base = playBaseUrl || el.getAttribute('href') || 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub';
+          const cleanBase = base.split('&referrer=')[0].split('?referrer=')[0];
+          el.href = cleanBase + (cleanBase.includes('?') ? '&' : '?') + 'referrer=ref%3D' + encodeURIComponent(activeRef);
+
+          el.onclick = function() {
+            try {
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(activeRef);
+              }
+            } catch (_) {}
+          };
+        });
+
+        // Show welcome banner for referred visitor
+        if (!document.getElementById('referral-banner')) {
+          const banner = document.createElement('div');
+          banner.id = 'referral-banner';
+          banner.style.cssText = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg, #0F172A, #1E293B); color:#FDE047; padding:10px 18px; border-radius:99px; font-size:12px; font-weight:800; border:1.5px solid #F59E0B; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; gap:8px;';
+          banner.innerHTML = '<span>🎁 An gayyace ku daga <strong>@' + activeRef + '</strong>! Sauke App ko yi rijista don samun bonus!</span><button onclick="this.parentElement.remove()" style="background:none; border:none; color:#FFFFFF; font-size:14px; cursor:pointer; margin-left:6px;">✕</button>';
+          document.body.appendChild(banner);
+        }
+      }
+
+      applyReferralTracking();
+
       const settingsUrl = 'https://uagcxrtdqttayulvgpwg.supabase.co/rest/v1/app_settings?select=key,value';
       const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ2N4cnRkcXR0YXl1bHZncHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2Mzc3OTIsImV4cCI6MjA4NDIxMzc5Mn0.7AzXKou9G3tHFIduDL5TQ3fkski6P9CBGdlqfi_pMI8';
       
@@ -1594,9 +1650,13 @@
         const appStore = settings.find(s => s.key === 'app_store_url');
         const appStoreStatus = settings.find(s => s.key === 'app_store_status');
 
+        let currentPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub';
         if (playStore && playStore.value) {
+          currentPlayStoreUrl = playStore.value;
           document.querySelectorAll('.js-playstore-link').forEach(el => el.href = playStore.value);
         }
+
+        applyReferralTracking(currentPlayStoreUrl);
 
         if (appStore && appStore.value && appStoreStatus && appStoreStatus.value === 'live') {
           document.querySelectorAll('.js-appstore-link').forEach(el => {

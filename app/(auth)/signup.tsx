@@ -113,7 +113,7 @@ export default function SignupScreen() {
             } catch (e) {}
         }
         if (codeFromUrl) {
-            const clean = String(codeFromUrl).trim();
+            const clean = String(codeFromUrl).trim().toUpperCase();
             setReferralCode(clean);
             AsyncStorage.setItem('pending_referral_code', clean).catch(() => {});
             if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
@@ -121,10 +121,74 @@ export default function SignupScreen() {
             }
         } else {
             AsyncStorage.getItem('pending_referral_code').then((saved) => {
-                if (saved && saved.trim()) setReferralCode(saved.trim());
+                if (saved && saved.trim()) {
+                    setReferralCode(saved.trim().toUpperCase());
+                } else if (Platform.OS !== 'web') {
+                    // Mobile Smart Clipboard Auto-Capture for Google Play installs
+                    Clipboard.getStringAsync().then((clipText) => {
+                        if (clipText && clipText.trim()) {
+                            const trimmed = clipText.trim();
+                            let extracted = '';
+                            if (trimmed.includes('ref=')) {
+                                const m = trimmed.match(/ref=([A-Za-z0-9_-]+)/i);
+                                if (m && m[1]) extracted = m[1];
+                            } else if (trimmed.includes('referrer=')) {
+                                const m = trimmed.match(/referrer=([A-Za-z0-9_%-]+)/i);
+                                if (m && m[1]) {
+                                    const decoded = decodeURIComponent(m[1]);
+                                    const subMatch = decoded.match(/ref=([A-Za-z0-9_-]+)/i);
+                                    extracted = subMatch ? subMatch[1] : decoded;
+                                }
+                            } else if (/^[A-Za-z0-9_-]{3,20}$/.test(trimmed) && !trimmed.includes(' ') && !trimmed.includes('@')) {
+                                extracted = trimmed;
+                            }
+                            if (extracted) {
+                                const cleanExtracted = extracted.toUpperCase();
+                                setReferralCode(cleanExtracted);
+                                AsyncStorage.setItem('pending_referral_code', cleanExtracted).catch(() => {});
+                            }
+                        }
+                    }).catch(() => {});
+                }
             }).catch(() => {});
         }
     }, [params.ref, params.referral, params.code]);
+
+    // Live Referrer Verification State
+    const [referrerInfo, setReferrerInfo] = useState<{ name: string; username: string } | null>(null);
+    const [checkingReferrer, setCheckingReferrer] = useState(false);
+
+    useEffect(() => {
+        const clean = referralCode.trim();
+        if (clean.length < 3) {
+            setReferrerInfo(null);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setCheckingReferrer(true);
+            try {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('full_name, username')
+                    .or(`username.ilike."${clean}",referral_code.ilike."${clean}",custom_id.ilike."${clean}"`)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (data) {
+                    setReferrerInfo({ name: data.full_name || 'Member', username: data.username || clean });
+                } else {
+                    setReferrerInfo(null);
+                }
+            } catch (e) {
+                // Ignore transient query errors
+            } finally {
+                setCheckingReferrer(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [referralCode]);
 
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -1311,12 +1375,28 @@ export default function SignupScreen() {
                                     )}
                                 </View>
 
-                                {/* Applied Referral Code Badge Indicator */}
+                                {/* Applied Referral Code Badge Indicator with Live Verified Referrer */}
                                 {referralCode.trim().length > 0 && (
-                                    <View style={[styles.referralBadgeBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: '#10B981' }]}>
-                                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                                        <Text style={[styles.referralBadgeText, { color: isDark ? '#6EE7B7' : '#047857' }]}>
-                                            Referral Applied: <Text style={{ fontWeight: '900' }}>{referralCode.trim().toUpperCase()}</Text> 🎉
+                                    <View style={[
+                                        styles.referralBadgeBox, 
+                                        { 
+                                            backgroundColor: referrerInfo ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5') : (isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7'), 
+                                            borderColor: referrerInfo ? '#10B981' : '#F59E0B' 
+                                        }
+                                    ]}>
+                                        <Ionicons 
+                                            name={referrerInfo ? "checkmark-circle" : (checkingReferrer ? "sync" : "gift")} 
+                                            size={14} 
+                                            color={referrerInfo ? "#10B981" : "#F59E0B"} 
+                                        />
+                                        <Text style={[styles.referralBadgeText, { color: referrerInfo ? (isDark ? '#6EE7B7' : '#047857') : (isDark ? '#FDE047' : '#92400E') }]}>
+                                            {referrerInfo 
+                                                ? `✓ Referrer Verified: @${referrerInfo.username} (${referrerInfo.name}) — 100% Active! 🎉` 
+                                                : (checkingReferrer 
+                                                    ? `Checking code "${referralCode.trim().toUpperCase()}"...` 
+                                                    : `Referral Applied: ${referralCode.trim().toUpperCase()} 🎁`
+                                                )
+                                            }
                                         </Text>
                                     </View>
                                 )}

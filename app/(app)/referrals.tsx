@@ -12,6 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { supabase } from '../../services/supabase';
 import { useAuthTheme } from '../../hooks/useAuthTheme';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 interface Referral {
     id: string;
@@ -159,8 +160,13 @@ export default function ReferralsScreen() {
         fetchReferralData();
     }, [fetchReferralData]);
 
+    const { settings } = useAppSettings();
+    const [copiedPlayLink, setCopiedPlayLink] = useState(false);
+
     const activeCode = stats.code || 'USER';
     const referralLink = `${stats.baseUrl}/signup?ref=${encodeURIComponent(activeCode)}`;
+    const playStoreBase = settings?.play_store_url || 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub';
+    const playStoreReferralLink = `${playStoreBase}&referrer=ref%3D${encodeURIComponent(activeCode)}`;
 
     const copyToClipboard = async () => {
         await Clipboard.setStringAsync(activeCode);
@@ -173,21 +179,28 @@ export default function ReferralsScreen() {
         await Clipboard.setStringAsync(referralLink);
         setCopiedLink(true);
         setTimeout(() => setCopiedLink(false), 2500);
-        Alert.alert("Link Copied! 🔗", `Referral link copied to clipboard:\n${referralLink}`);
+        Alert.alert("Web Link Copied! 🔗", `Referral website link copied to clipboard:\n${referralLink}`);
+    };
+
+    const copyPlayLinkToClipboard = async () => {
+        await Clipboard.setStringAsync(playStoreReferralLink);
+        setCopiedPlayLink(true);
+        setTimeout(() => setCopiedPlayLink(false), 2500);
+        Alert.alert("Play Store Link Copied! 📱", `Google Play Store referral link copied to clipboard:\n${playStoreReferralLink}`);
     };
 
     const getShareMessage = () => {
         if (selectedTemplate === 2) {
             return rewardAmount > 0
-                ? `🎁 CLAIM YOUR ₦${rewardAmount} WELCOME BONUS!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\nUse my direct registration link:\n${referralLink}\n\nOr enter code "${activeCode}" at signup! ⚡`
-                : `🎁 REGISTER NOW ON ABU MAFHAL SUB!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\nUse my direct registration link:\n${referralLink}\n\nOr enter code "${activeCode}" at signup! ⚡`;
+                ? `🎁 CLAIM YOUR ₦${rewardAmount} WELCOME BONUS!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\n📲 Download Android App (Google Play):\n${playStoreReferralLink}\n\n🌐 Or Register on Website:\n${referralLink}\n\n🔑 Referral Code: "${activeCode}" ⚡`
+                : `🎁 REGISTER NOW ON ABU MAFHAL SUB!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\n📲 Download Android App (Google Play):\n${playStoreReferralLink}\n\n🌐 Or Register on Website:\n${referralLink}\n\n🔑 Referral Code: "${activeCode}" ⚡`;
         }
         if (selectedTemplate === 3) {
             return rewardAmount > 0
-                ? `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nEarn ₦${rewardAmount} cash per referral + 0.5% lifetime commissions on data purchases on Abu Mafhal Sub.\n\nRegister now:\n${referralLink}\n\nCode: ${activeCode} 🚀`
-                : `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nStart your VTU reselling business on Abu Mafhal Sub & earn lifetime commissions!\n\nRegister now:\n${referralLink}\n\nCode: ${activeCode} 🚀`;
+                ? `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nEarn ₦${rewardAmount} cash per referral + 0.5% lifetime commissions on data purchases on Abu Mafhal Sub.\n\n📲 Download Android App (Google Play):\n${playStoreReferralLink}\n\n🌐 Or Register on Website:\n${referralLink}\n\n🔑 Referral Code: "${activeCode}" 🚀`
+                : `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nStart your VTU reselling business on Abu Mafhal Sub & earn lifetime commissions!\n\n📲 Download Android App (Google Play):\n${playStoreReferralLink}\n\n🌐 Or Register on Website:\n${referralLink}\n\n🔑 Referral Code: "${activeCode}" 🚀`;
         }
-        return `🚀 Join me on Abu Mafhal Sub for cheap data, airtime, VTU services & instant cashbacks!\n\nSign up using my link:\n${referralLink}\n\nOr enter code "${activeCode}" during registration! 🎉`;
+        return `🚀 Join me on Abu Mafhal Sub for cheap data, airtime, VTU services & instant cashbacks!\n\n📲 Download Android App (Google Play):\n${playStoreReferralLink}\n\n🌐 Or Sign Up on Website:\n${referralLink}\n\n🔑 Referral Code: "${activeCode}" 🎉`;
     };
 
     const shareNative = async () => {
@@ -451,19 +464,52 @@ export default function ReferralsScreen() {
                         ))}
                     </View>
 
-                    {/* Copy Link & Social Share Buttons */}
-                    <View style={styles.shareBtnRow}>
+                    {/* Dual Action: Web Link vs Google Play Store Link */}
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                         <TouchableOpacity 
-                            onPress={copyLinkToClipboard} 
-                            style={[styles.actionBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: theme.borderPrimary }]}
+                            onPress={copyPlayLinkToClipboard} 
+                            style={[styles.actionBtn, { flex: 1, backgroundColor: isDark ? 'rgba(0, 195, 255, 0.15)' : '#E0F2FE', borderColor: '#0284C7' }]}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name={copiedLink ? "checkmark" : "link"} size={15} color={theme.textPrimary} />
-                            <Text style={[styles.actionBtnText, { color: theme.textPrimary }]}>
-                                {copiedLink ? "Copied!" : "Copy Link"}
+                            <Ionicons name={copiedPlayLink ? "checkmark-circle" : "logo-google-playstore"} size={15} color="#0284C7" />
+                            <Text style={[styles.actionBtnText, { color: isDark ? '#38BDF8' : '#0369A1', fontWeight: '800' }]} numberOfLines={1}>
+                                {copiedPlayLink ? "Copied!" : "Play Store Link 📱"}
                             </Text>
                         </TouchableOpacity>
 
+                        <TouchableOpacity 
+                            onPress={copyLinkToClipboard} 
+                            style={[styles.actionBtn, { flex: 1, backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: theme.borderPrimary }]}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name={copiedLink ? "checkmark-circle" : "link"} size={15} color={theme.textPrimary} />
+                            <Text style={[styles.actionBtnText, { color: theme.textPrimary, fontWeight: '800' }]} numberOfLines={1}>
+                                {copiedLink ? "Copied!" : "Web Link 🌐"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Google Play Tracking Verified Badge */}
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+                        borderWidth: 1,
+                        borderColor: '#10B981',
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 10,
+                        marginBottom: 10
+                    }}>
+                        <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+                        <Text style={{ flex: 1, color: isDark ? '#6EE7B7' : '#065F46', fontSize: 10.5, fontWeight: '700' }}>
+                            Google Play Store Tracking: Friends downloading via your link or entering code <Text style={{ fontWeight: '900' }}>{activeCode}</Text> earn you ₦{rewardAmount} cash rewards 100%!
+                        </Text>
+                    </View>
+
+                    {/* Social Share Buttons */}
+                    <View style={styles.shareBtnRow}>
                         <TouchableOpacity 
                             onPress={shareWhatsApp} 
                             style={[styles.actionBtn, { backgroundColor: '#25D366', borderColor: '#25D366' }]}
