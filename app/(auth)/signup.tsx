@@ -22,6 +22,7 @@ import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { useAuthTheme } from '../../hooks/useAuthTheme';
 import Mascot3D from '../../components/Mascot3D';
+import AppStoreBadges from '../../components/AppStoreBadges';
 import { validateNigerianPhone, isPotentialXssPayload, sanitizeText } from '../../utils/securityUtils';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -1393,6 +1394,9 @@ export default function SignupScreen() {
                                         <Text style={[styles.signupLinkText, { color: '#F59E0B' }]}> Sign In</Text>
                                     </TouchableOpacity>
                                 </View>
+
+                                {/* App Download Badges (Google Play & App Store Coming Soon) */}
+                                <AppStoreBadges />
 
                             </View>
 

@@ -556,16 +556,83 @@
     .download-text p { font-size: 15px; color: var(--text-mid); margin-bottom: 28px; }
     .app-buttons { display: flex; gap: 14px; flex-wrap: wrap; }
     .app-btn {
-      display: flex; align-items: center; gap: 12px;
-      background: var(--navy); border-radius: var(--radius);
-      padding: 12px 22px; text-decoration: none;
-      transition: all var(--transition); min-width: 160px;
+      display: flex; align-items: center; gap: 14px;
+      background: linear-gradient(135deg, #071126 0%, #0d1e44 100%);
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius);
+      padding: 12px 24px; text-decoration: none;
+      transition: all var(--transition); min-width: 175px;
+      position: relative;
+      box-shadow: 0 4px 18px rgba(7, 17, 38, 0.25);
     }
-    .app-btn:hover { background: var(--navy-light); transform: translateY(-2px); box-shadow: var(--shadow); }
-    .app-btn svg { width: 28px; height: 28px; flex-shrink: 0; fill: var(--white); }
-    .app-btn-text { color: var(--white); }
-    .app-btn-text small { display: block; font-size: 9px; font-weight: 400; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
-    .app-btn-text strong { font-size: 15px; font-weight: 700; }
+    .app-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 28px rgba(7, 17, 38, 0.4);
+    }
+    .app-btn-google:hover {
+      border-color: rgba(0, 195, 255, 0.5);
+      box-shadow: 0 10px 28px rgba(0, 195, 255, 0.22);
+    }
+    .app-btn-apple:hover {
+      border-color: rgba(245, 166, 35, 0.55);
+      box-shadow: 0 10px 28px rgba(245, 166, 35, 0.2);
+    }
+    .app-btn svg { width: 28px; height: 28px; flex-shrink: 0; }
+    .app-btn-text { color: var(--white); text-align: left; }
+    .app-btn-text small { display: block; font-size: 8.5px; font-weight: 700; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.8px; }
+    .app-btn-text strong { font-size: 15.5px; font-weight: 800; letter-spacing: 0.2px; line-height: 1.2; }
+    .app-btn-google .app-btn-text small { color: #38bdf8; }
+    .app-btn-apple .app-btn-text small { color: #cbd5e1; }
+    .store-badge-soon {
+      position: absolute;
+      top: -10px;
+      right: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: linear-gradient(135deg, #f5a623, #d97706);
+      color: #0d1b3e;
+      font-size: 8.5px;
+      font-weight: 900;
+      padding: 2.5px 8.5px;
+      border-radius: 99px;
+      letter-spacing: 0.6px;
+      box-shadow: 0 3px 10px rgba(245,166,35,0.5);
+      border: 1px solid #fef3c7;
+      white-space: nowrap;
+    }
+    .badge-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #0d1b3e;
+      display: inline-block;
+    }
+    .btn-hero-app {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #071126 0%, #0d1e44 100%);
+      color: #ffffff;
+      border: 1.5px solid rgba(0, 195, 255, 0.35);
+      padding: 12px 22px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all var(--transition);
+      box-shadow: 0 4px 16px rgba(7, 17, 38, 0.25);
+    }
+    .btn-hero-app:hover {
+      background: linear-gradient(135deg, #091736 0%, #122858 100%);
+      color: #ffffff;
+      border-color: rgba(0, 195, 255, 0.7);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 195, 255, 0.3);
+    }
+    .btn-hero-app svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
 
     .download-qr {
       display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -867,6 +934,33 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </span>
           </a>
+          <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" rel="noopener noreferrer" class="btn-hero-app js-playstore-link" id="hero-playstore-btn" title="Download on Google Play">
+            <svg viewBox="0 0 512 560" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:22px;flex-shrink:0;">
+              <defs>
+                <linearGradient id="heroBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00C3FF"/>
+                  <stop offset="100%" stop-color="#0072F5"/>
+                </linearGradient>
+                <linearGradient id="heroGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00F076"/>
+                  <stop offset="100%" stop-color="#00B84D"/>
+                </linearGradient>
+                <linearGradient id="heroYellow" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FFDE00"/>
+                  <stop offset="100%" stop-color="#FFA000"/>
+                </linearGradient>
+                <linearGradient id="heroRed" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FF3A44"/>
+                  <stop offset="100%" stop-color="#D91624"/>
+                </linearGradient>
+              </defs>
+              <path d="M32.5 10.2C24.1 14.8 19 23.5 19 33.7V478.3C19 488.5 24.1 497.2 32.5 501.8L278.4 256Z" fill="url(#heroBlue)"/>
+              <path d="M278.4 256L32.5 501.8C37.8 504.8 44.1 506.2 50.8 502.5L380.6 312.2Z" fill="url(#heroRed)"/>
+              <path d="M380.6 199.8L50.8 9.5C44.1 5.8 37.8 7.2 32.5 10.2L278.4 256Z" fill="url(#heroGreen)"/>
+              <path d="M278.4 256L380.6 199.8L442.2 235.3C459.3 245.2 459.3 266.8 442.2 276.7L380.6 312.2Z" fill="url(#heroYellow)"/>
+            </svg>
+            <span>Google Play</span>
+          </a>
           <a href="#services" class="btn-secondary" id="hero-explore-btn">
             Explore Services
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -1109,18 +1203,40 @@
         <h2>Experience the power of <span>convenience.</span></h2>
         <p>Download the Mafhal Sub app today.</p>
         <div class="app-buttons">
-          <a href="#" class="app-btn" id="playstore-btn" aria-label="Get it on Google Play">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3.18 23.5c.23.13.48.2.73.2.18 0 .36-.04.53-.11l11.04-6.37L12.5 14.3 3.18 23.5zm14.3-8.28L5.14 8.53 3.18.5c-.23.13-.4.34-.49.6-.06.18-.09.37-.09.57v21.66c0 .2.03.39.09.57.09.26.26.47.49.6l12.3-9.28zm1.18-.68L15.84 12.5l2.82-2.04 4.05 2.34c.57.33.57.85 0 1.18l-4.05 2.34zm-4.55-3.31L3.08.52C3.26.44 3.44.4 3.62.4c.26 0 .51.07.73.2l12.36 7.14-2.6 3.49z"/>
+          <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" rel="noopener noreferrer" class="app-btn app-btn-google js-playstore-link" id="playstore-btn" aria-label="Get it on Google Play">
+            <svg viewBox="0 0 512 560" xmlns="http://www.w3.org/2000/svg" style="width:28px;height:30px;flex-shrink:0;">
+              <defs>
+                <linearGradient id="dlPlayBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00C3FF"/>
+                  <stop offset="100%" stop-color="#0072F5"/>
+                </linearGradient>
+                <linearGradient id="dlPlayGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00F076"/>
+                  <stop offset="100%" stop-color="#00B84D"/>
+                </linearGradient>
+                <linearGradient id="dlPlayYellow" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FFDE00"/>
+                  <stop offset="100%" stop-color="#FFA000"/>
+                </linearGradient>
+                <linearGradient id="dlPlayRed" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FF3A44"/>
+                  <stop offset="100%" stop-color="#D91624"/>
+                </linearGradient>
+              </defs>
+              <path d="M32.5 10.2C24.1 14.8 19 23.5 19 33.7V478.3C19 488.5 24.1 497.2 32.5 501.8L278.4 256Z" fill="url(#dlPlayBlue)"/>
+              <path d="M278.4 256L32.5 501.8C37.8 504.8 44.1 506.2 50.8 502.5L380.6 312.2Z" fill="url(#dlPlayRed)"/>
+              <path d="M380.6 199.8L50.8 9.5C44.1 5.8 37.8 7.2 32.5 10.2L278.4 256Z" fill="url(#dlPlayGreen)"/>
+              <path d="M278.4 256L380.6 199.8L442.2 235.3C459.3 245.2 459.3 266.8 442.2 276.7L380.6 312.2Z" fill="url(#dlPlayYellow)"/>
             </svg>
             <div class="app-btn-text">
-              <small>Get it on</small>
+              <small>GET IT ON</small>
               <strong>Google Play</strong>
             </div>
           </a>
-          <a href="#" class="app-btn" id="appstore-btn" aria-label="Download on the App Store">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+          <a href="javascript:void(0)" onclick="handleAppStoreClick(event)" class="app-btn app-btn-apple js-appstore-link" id="appstore-btn" aria-label="Download on the App Store">
+            <span class="store-badge-soon"><span class="badge-dot"></span> COMING SOON</span>
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:26px;height:26px;flex-shrink:0;">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="#FFFFFF"/>
             </svg>
             <div class="app-btn-text">
               <small>Download on the</small>
@@ -1387,6 +1503,14 @@
         </div>
       </a>
 
+      <!-- Option: Google Play Download -->
+      <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" rel="noopener noreferrer" class="js-playstore-link" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+        <span style="font-size:11px;font-weight:700;color:var(--navy);background:var(--white);padding:6px 12px;border-radius:12px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);white-space:nowrap;">Get Android App 📱</span>
+        <div style="width:44px;height:44px;border-radius:50%;background:#10B981;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(16,185,129,0.4);transition:transform 0.2s ease;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff"><path d="M3.18 23.5c.23.13.48.2.73.2.18 0 .36-.04.53-.11l11.04-6.37L12.5 14.3 3.18 23.5zm14.3-8.28L5.14 8.53 3.18.5c-.23.13-.4.34-.49.6-.06.18-.09.37-.09.57v21.66c0 .2.03.39.09.57.09.26.26.47.49.6l12.3-9.28zm1.18-.68L15.84 12.5l2.82-2.04 4.05 2.34c.57.33.57.85 0 1.18l-4.05 2.34zm-4.55-3.31L3.08.52C3.26.44 3.44.4 3.62.4c.26 0 .51.07.73.2l12.36 7.14-2.6 3.49z"/></svg>
+        </div>
+      </a>
+
       <!-- Option 2: Support Center -->
       <a href="/login" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
         <span style="font-size:11px;font-weight:700;color:var(--navy);background:var(--white);padding:6px 12px;border-radius:12px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);white-space:nowrap;">Help &amp; Tickets 🎧</span>
@@ -1445,6 +1569,47 @@
         }, 250);
       }
     }
+
+    // ── App Store & Play Store Handlers ──
+    function handleAppStoreClick(e) {
+      if (e) e.preventDefault();
+      alert("Apple App Store: Coming Soon! 🚀\n\nManhajar Abu Mafhal Sub ta iOS (iPhone/iPad) tana nan tafe nan kusa!\n\nA halin yanzu zaku iya sauke manhajar Android a Google Play ko amfani da yanar gizon mu a browser.");
+    }
+
+    // Dynamic app_settings sync from Supabase
+    document.addEventListener("DOMContentLoaded", function() {
+      const settingsUrl = 'https://uagcxrtdqttayulvgpwg.supabase.co/rest/v1/app_settings?select=key,value';
+      const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ2N4cnRkcXR0YXl1bHZncHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2Mzc3OTIsImV4cCI6MjA4NDIxMzc5Mn0.7AzXKou9G3tHFIduDL5TQ3fkski6P9CBGdlqfi_pMI8';
+      
+      fetch(settingsUrl, {
+        headers: {
+          'apikey': key,
+          'Authorization': 'Bearer ' + key
+        }
+      })
+      .then(r => r.json())
+      .then(settings => {
+        if (!settings || !Array.isArray(settings)) return;
+        const playStore = settings.find(s => s.key === 'play_store_url');
+        const appStore = settings.find(s => s.key === 'app_store_url');
+        const appStoreStatus = settings.find(s => s.key === 'app_store_status');
+
+        if (playStore && playStore.value) {
+          document.querySelectorAll('.js-playstore-link').forEach(el => el.href = playStore.value);
+        }
+
+        if (appStore && appStore.value && appStoreStatus && appStoreStatus.value === 'live') {
+          document.querySelectorAll('.js-appstore-link').forEach(el => {
+            el.href = appStore.value;
+            el.removeAttribute('onclick');
+            el.target = '_blank';
+            el.rel = 'noopener noreferrer';
+          });
+          document.querySelectorAll('.store-badge-soon').forEach(el => el.style.display = 'none');
+        }
+      })
+      .catch(err => console.log('Notice: default store links active'));
+    });
   </script>
 </body>
 </html>

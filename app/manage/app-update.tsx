@@ -122,6 +122,7 @@ export default function AdminAppUpdate() {
   const [forceAppUpdate, setForceAppUpdate] = useState(false);
   const [playStoreUrl, setPlayStoreUrl] = useState(DEFAULT_PLAY_STORE_URL);
   const [appStoreUrl, setAppStoreUrl] = useState('https://apps.apple.com/app/abu-mafhal-sub');
+  const [appStoreStatus, setAppStoreStatus] = useState<'coming_soon' | 'live'>('coming_soon');
   const [apkDownloadUrl, setApkDownloadUrl] = useState('');
   const [appUpdateMessage, setAppUpdateMessage] = useState(AI_RELEASE_PRESETS[0].notes);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -153,6 +154,7 @@ export default function AdminAppUpdate() {
           if (s.key === 'force_app_update') setForceAppUpdate(s.value === 'true');
           if (s.key === 'play_store_url') setPlayStoreUrl(s.value || DEFAULT_PLAY_STORE_URL);
           if (s.key === 'app_store_url') setAppStoreUrl(s.value || 'https://apps.apple.com/app/abu-mafhal-sub');
+          if (s.key === 'app_store_status') setAppStoreStatus(s.value === 'live' ? 'live' : 'coming_soon');
           if (s.key === 'apk_download_url') setApkDownloadUrl(s.value || '');
           if (s.key === 'app_update_message' && s.value) setAppUpdateMessage(s.value);
           if (s.key === 'app_logo') {
@@ -300,6 +302,7 @@ export default function AdminAppUpdate() {
         { key: 'force_app_update', value: String(forceAppUpdate) },
         { key: 'play_store_url', value: playStoreUrl.trim() },
         { key: 'app_store_url', value: appStoreUrl.trim() },
+        { key: 'app_store_status', value: appStoreStatus },
         { key: 'apk_download_url', value: apkDownloadUrl.trim() },
         { key: 'app_update_message', value: appUpdateMessage.trim() },
       ];
@@ -598,6 +601,23 @@ export default function AdminAppUpdate() {
                 autoCapitalize="none"
               />
             </View>
+          </View>
+
+          <View style={[s.toggleRow, { marginTop: 4, marginBottom: 16 }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={s.toggleTitle}>Apple App Store Live Status</Text>
+              <Text style={s.toggleSub}>
+                {appStoreStatus === 'live'
+                  ? '🟢 Live: Users tap directly to App Store'
+                  : '⏳ Coming Soon: Users see "Coming Soon" badge with notification'}
+              </Text>
+            </View>
+            <Switch
+              value={appStoreStatus === 'live'}
+              onValueChange={(val: boolean) => setAppStoreStatus(val ? 'live' : 'coming_soon')}
+              trackColor={{ false: '#CBD5E1', true: C.gold }}
+              thumbColor="#FFFFFF"
+            />
           </View>
 
           <View style={s.inputGroup}>

@@ -78,6 +78,8 @@ export default function AdminSettings() {
     const [minAppVersion, setMinAppVersion] = useState('1.0.4');
     const [latestAppVersion, setLatestAppVersion] = useState('1.0.4');
     const [playStoreUrl, setPlayStoreUrl] = useState('https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub');
+    const [appStoreUrl, setAppStoreUrl] = useState('https://apps.apple.com/app/abu-mafhal-sub');
+    const [appStoreStatus, setAppStoreStatus] = useState<'coming_soon' | 'live'>('coming_soon');
     const [appUpdateMessage, setAppUpdateMessage] = useState('');
     const [allowBiometrics, setAllowBiometrics] = useState(true);
     const [autoApproveKyc, setAutoApproveKyc] = useState(false);
@@ -200,6 +202,8 @@ export default function AdminSettings() {
                     if (s.key === 'min_app_version') setMinAppVersion(s.value || '1.0.4');
                     if (s.key === 'latest_app_version') setLatestAppVersion(s.value || '1.0.4');
                     if (s.key === 'play_store_url') setPlayStoreUrl(s.value || 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub');
+                    if (s.key === 'app_store_url') setAppStoreUrl(s.value || 'https://apps.apple.com/app/abu-mafhal-sub');
+                    if (s.key === 'app_store_status') setAppStoreStatus(s.value === 'live' ? 'live' : 'coming_soon');
                     if (s.key === 'app_update_message') setAppUpdateMessage(s.value || '');
                     if (s.key === 'allow_biometrics') setAllowBiometrics(s.value === 'true');
                     if (s.key === 'auto_approve_kyc') setAutoApproveKyc(s.value === 'true');
@@ -363,6 +367,8 @@ export default function AdminSettings() {
                 { key: 'min_app_version', value: minAppVersion },
                 { key: 'latest_app_version', value: latestAppVersion },
                 { key: 'play_store_url', value: playStoreUrl },
+                { key: 'app_store_url', value: appStoreUrl },
+                { key: 'app_store_status', value: appStoreStatus },
                 { key: 'app_update_message', value: appUpdateMessage },
                 { key: 'allow_biometrics', value: String(allowBiometrics) },
                 { key: 'auto_approve_kyc', value: String(autoApproveKyc) },
@@ -595,10 +601,24 @@ export default function AdminSettings() {
                                 placeholder="e.g. 1.0.4" 
                             />
                             <InputRow 
-                                label="Play Store URL" 
+                                label="Play Store URL (Android)" 
                                 value={playStoreUrl} 
                                 onChangeText={setPlayStoreUrl} 
                                 placeholder="https://play.google.com/store/apps/details?id=..." 
+                            />
+                            <InputRow 
+                                label="Apple App Store URL (iOS)" 
+                                value={appStoreUrl} 
+                                onChangeText={setAppStoreUrl} 
+                                placeholder="https://apps.apple.com/app/abu-mafhal-sub" 
+                            />
+                            <ToggleRow 
+                                title="Apple App Store Live Status" 
+                                subtitle={appStoreStatus === 'live' ? 'App Store link is LIVE (Active)' : 'Marked as COMING SOON (Default)'}
+                                icon="logo-apple" 
+                                color="#F59E0B" 
+                                value={appStoreStatus === 'live'} 
+                                onValueChange={(val: boolean) => setAppStoreStatus(val ? 'live' : 'coming_soon')}
                             />
                             <InputRow 
                                 label="Update Release Notes" 

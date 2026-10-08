@@ -20,6 +20,7 @@ import { supabase, processOAuthReturn } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { useAuthTheme } from '../../hooks/useAuthTheme';
 import Mascot3D from '../../components/Mascot3D';
+import AppStoreBadges from '../../components/AppStoreBadges';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -816,6 +817,9 @@ export default function LoginScreen() {
                                         <Text style={[styles.signupLinkText, { color: '#F59E0B' }]}> Create Account</Text>
                                     </TouchableOpacity>
                                 </View>
+
+                                {/* App Download Badges (Google Play & App Store Coming Soon) */}
+                                <AppStoreBadges />
 
                             </View>
 
