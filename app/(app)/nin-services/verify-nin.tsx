@@ -70,6 +70,7 @@ export default function VerifyNINScreen() {
     const [historyList, setHistoryList] = useState<any[]>([]);
     const viewShotRef = useRef<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState<'verify' | 'history'>('verify');
     
     // Additional Premium States
     const [userBalance, setUserBalance] = useState<number | null>(null);
@@ -2435,311 +2436,1009 @@ switch(selectedLayout) {
                 </View>
             </Modal>
 
-            <LinearGradient colors={['#ffffff', '#f1f5f9']} style={[styles.headerGradient, { paddingTop: insets.top > 0 ? insets.top + 10 : 24, borderBottomWidth: 1, borderColor: '#e2e8f0' }]}>
-                <Text style={[styles.headerTitle, { color: '#0f172a' }]}>Verify Identity</Text>
-            </LinearGradient>
+            {/* Executive Top Navigation Header */}
+            <View style={[styles.customHeader, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
+                <TouchableOpacity 
+                    onPress={() => router.back()} 
+                    style={styles.headerBackBtn}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="arrow-back" size={20} color="#0f172a" />
+                </TouchableOpacity>
 
-            <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: 12 }} contentContainerStyle={styles.scrollContent}>
-                
-                {/* Wallet Balance widget */}
-                <View style={styles.walletBar}>
-                    <View style={styles.walletLeft}>
-                        <Ionicons name="wallet-outline" size={20} color="#060d21" />
-                        <View style={{ marginLeft: 8 }}>
-                            <Text style={styles.walletLabel}>Tantancewa Balance</Text>
-                            <Text style={styles.walletVal}>
-                                {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Loading...'}
-                            </Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity 
-                        style={styles.fundBtn}
-                        onPress={() => router.push('/(app)/wallet')}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="add-circle" size={14} color="#ffffff" />
-                        <Text style={styles.fundBtnText}>Fund</Text>
-                    </TouchableOpacity>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                    <Text style={styles.headerTitleText}>Verify NIN Slip</Text>
+                    <Text style={styles.headerSubText}>NIMC Official Verification & Printing</Text>
                 </View>
-                {/* 1. SLIP LAYOUT */}
-                <View style={styles.card}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.stepBadge}>
-                            <Text style={styles.stepBadgeText}>1</Text>
-                        </View>
-                        <Text style={styles.cardTitle}>Slip Layout</Text>
+
+                <TouchableOpacity 
+                    style={styles.headerWalletPill}
+                    onPress={() => router.push('/(app)/wallet')}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="wallet-outline" size={13} color="#d97706" />
+                    <Text style={styles.headerWalletText}>
+                        {userBalance !== null ? `₦${userBalance.toLocaleString()}` : '...'}
+                    </Text>
+                    <View style={styles.headerWalletPlus}>
+                        <Ionicons name="add" size={12} color="#ffffff" />
                     </View>
-                    <View style={styles.layoutGrid}>
-                        {layouts.map((layout) => {
-                            const isSelected = selectedLayout === layout.id;
+                </TouchableOpacity>
+            </View>
+
+            {/* Segmented Mode Tabs: [ Tantance & Buga ] vs [ Tarihin Buga ] */}
+            <View style={styles.tabContainer}>
+                <TouchableOpacity 
+                    style={[styles.tabButton, activeTab === 'verify' && styles.tabButtonActive]}
+                    onPress={() => setActiveTab('verify')}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons 
+                        name="id-card-outline" 
+                        size={15} 
+                        color={activeTab === 'verify' ? '#d97706' : '#64748b'} 
+                    />
+                    <Text style={[styles.tabButtonText, activeTab === 'verify' && styles.tabButtonTextActive]}>
+                        Tantance & Buga
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
+                    onPress={() => setActiveTab('history')}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons 
+                        name="time-outline" 
+                        size={15} 
+                        color={activeTab === 'history' ? '#d97706' : '#64748b'} 
+                    />
+                    <Text style={[styles.tabButtonText, activeTab === 'history' && styles.tabButtonTextActive]}>
+                        Tarihin Buga {historyList.length > 0 ? `(${historyList.length})` : ''}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+                style={{ flex: 1, paddingHorizontal: 14 }} 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 24) + 60 }]}
+                showsVerticalScrollIndicator={false}
+            >
+                {activeTab === 'verify' ? (
+                    <>
+                        {/* 1. SLIP LAYOUT SELECTION */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeader}>
+                                <View style={styles.stepBadge}>
+                                    <Text style={styles.stepBadgeText}>1</Text>
+                                </View>
+                                <View>
+                                    <Text style={styles.cardTitle}>Zaɓi Tsarin Katin NIN</Text>
+                                    <Text style={styles.cardSubtitle}>Zaɓi salon katin da kake son bugawa</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.layoutGrid}>
+                                {layouts.map((layout) => {
+                                    const isSelected = selectedLayout === layout.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={layout.id}
+                                            onPress={() => setSelectedLayout(layout.id)}
+                                            style={[
+                                                styles.layoutButton,
+                                                isSelected ? styles.layoutButtonSelected : styles.layoutButtonUnselected
+                                            ]}
+                                            activeOpacity={0.8}
+                                        >
+                                            {/* Top Selection Pill */}
+                                            <View style={[
+                                                styles.badgeContainer,
+                                                isSelected ? styles.badgeSelected : styles.badgeUnselected
+                                            ]}>
+                                                {isSelected && (
+                                                    <Ionicons name="checkmark-circle" size={11} color="#d97706" style={{ marginRight: 2 }} />
+                                                )}
+                                                <Text style={[
+                                                    styles.badgeText,
+                                                    isSelected ? styles.badgeTextSelected : styles.badgeTextUnselected
+                                                ]}>
+                                                    {(layout as any).badge}
+                                                </Text>
+                                            </View>
+
+                                            {/* Preview Box */}
+                                            <View style={[
+                                                styles.layoutIconBox,
+                                                isSelected && { borderColor: '#fde68a', backgroundColor: '#fffbeb' }
+                                            ]}>
+                                                {(layout as any).image && (
+                                                    <Image 
+                                                        source={(layout as any).image} 
+                                                        style={styles.layoutImage}
+                                                        resizeMode="contain" 
+                                                    />
+                                                )}
+                                            </View>
+
+                                            <Text 
+                                                style={[
+                                                    styles.layoutLabel,
+                                                    isSelected ? styles.layoutLabelSelected : styles.layoutLabelUnselected
+                                                ]} 
+                                                numberOfLines={1}
+                                            >
+                                                {layout.name}
+                                            </Text>
+
+                                            <View style={[
+                                                styles.pricePill,
+                                                isSelected ? styles.pricePillSelected : styles.pricePillUnselected
+                                            ]}>
+                                                <Text style={[
+                                                    styles.layoutPrice,
+                                                    isSelected ? styles.layoutPriceSelected : styles.layoutPriceUnselected
+                                                ]}>
+                                                    ₦{layout.price.toLocaleString()}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
+
+                        {/* 2. SUPPLY ID & VERIFY */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeader}>
+                                <View style={styles.stepBadge}>
+                                    <Text style={styles.stepBadgeText}>2</Text>
+                                </View>
+                                <View>
+                                    <Text style={styles.cardTitle}>Shigar da Lambar NIN</Text>
+                                    <Text style={styles.cardSubtitle}>Lamba 11 ta katin shaidar ɗan ƙasa</Text>
+                                </View>
+                            </View>
                             
-                            return (
-                                <TouchableOpacity
-                                    key={layout.id}
-                                    onPress={() => setSelectedLayout(layout.id)}
-                                    style={[
-                                        styles.layoutButton,
-                                        isSelected ? styles.layoutButtonSelected : styles.layoutButtonUnselected
-                                    ]}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[
-                                        styles.badgeContainer,
-                                        isSelected ? styles.badgeSelected : styles.badgeUnselected
-                                    ]}>
-                                        <Text style={[
-                                            styles.badgeText,
-                                            isSelected ? styles.badgeTextSelected : styles.badgeTextUnselected
-                                        ]}>
-                                            {(layout as any).badge}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.layoutIconBox}>
-                                        {(layout as any).image && (
-                                            <Image 
-                                                source={(layout as any).image} 
-                                                style={styles.layoutImage}
-                                                resizeMode="contain" 
-                                            />
-                                        )}
-                                    </View>
-                                    <Text 
-                                        style={[
-                                            styles.layoutLabel,
-                                            isSelected ? styles.layoutLabelSelected : styles.layoutLabelUnselected
-                                        ]} 
-                                        numberOfLines={2}
-                                    >
-                                        {layout.name}
-                                    </Text>
-                                    <Text 
-                                        style={[
-                                            styles.layoutPrice,
-                                            isSelected ? styles.layoutPriceSelected : styles.layoutPriceUnselected
-                                        ]}
-                                    >
-                                        ₦{layout.price}
-                                    </Text>
-                                </TouchableOpacity>
-                            )
-                        })}
-                    </View>
-                </View>
-
-                {/* 2. SUPPLY ID & VERIFY */}
-                <View style={styles.card}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.stepBadge}>
-                            <Text style={styles.stepBadgeText}>2</Text>
-                        </View>
-                        <Text style={styles.cardTitle}>Enter Details</Text>
-                    </View>
-                    
-                    <View style={{ marginBottom: 12 }}>
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="keypad" size={16} color="#94a3b8" />
-                            <TextInput
-                                placeholder="Enter 11-Digit NIN"
-                                placeholderTextColor="#94a3b8"
-                                style={styles.input}
-                                keyboardType="number-pad" 
-                                maxLength={11} 
-                                value={nin} 
-                                onChangeText={setNin} 
-                                editable={!loading}
-                            />
-                            {nin.length > 0 && (
-                                <Text style={[
-                                    styles.lenIndicator,
-                                    nin.length === 11 ? styles.lenIndicatorSuccess : styles.lenIndicatorWarning
-                                ]}>
-                                    {nin.length}/11
-                                </Text>
-                            )}
-                            <TouchableOpacity 
-                                style={styles.pasteBtn} 
-                                onPress={handlePaste}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name="clipboard-outline" size={14} color="#060d21" />
-                                <Text style={styles.pasteBtnText}>Paste</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* Custom Checkbox area */}
-                    <TouchableOpacity 
-                        onPress={() => setConsent(!consent)} 
-                        activeOpacity={0.8}
-                        style={styles.consentContainer}
-                    >
-                        <View style={[
-                            styles.checkboxBox, 
-                            consent ? styles.checkboxBoxSelected : styles.checkboxBoxUnselected
-                        ]}>
-                            {consent && <Ionicons name="checkmark" size={12} color="#ffffff" />}
-                        </View>
-                        <Text style={styles.consentText}>
-                            I confirm that I have obtained consent to verify this identity.
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* Verify Button */}
-                    <TouchableOpacity 
-                        onPress={handleVerify} 
-                        disabled={loading || nin.length !== 11 || !consent} 
-                        style={[
-                            styles.verifyButton,
-                            (loading || nin.length !== 11 || !consent) ? styles.verifyButtonDisabled : styles.verifyButtonActive
-                        ]}
-                        activeOpacity={0.8}
-                    >
-                        {loading ? <ActivityIndicator color="#f5a623" size="small" /> : (
-                            <>
-                                <Text style={styles.verifyButtonText}>VERIFY NIN</Text>
-                                {!consent && <Text style={styles.verifyButtonSubtext}>(tick consent first)</Text>}
-                            </>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
-                {/* FAQ / Guidelines Section */}
-                <View style={styles.card}>
-                    <View style={styles.historyHeader}>
-                        <Ionicons name="help-circle" size={16} color="#f5a623" />
-                        <Text style={styles.historyTitle}>FAQ & Guidelines</Text>
-                    </View>
-                    {faqs.map((faq, idx) => {
-                        const isExpanded = expandedFaq === idx;
-                        return (
-                            <View key={idx} style={styles.faqItem}>
-                                <TouchableOpacity 
-                                    style={styles.faqHeader} 
-                                    onPress={() => setExpandedFaq(isExpanded ? null : idx)}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={styles.faqQuestion}>{faq.q}</Text>
-                                    <Ionicons 
-                                        name={isExpanded ? "chevron-up" : "chevron-down"} 
-                                        size={14} 
-                                        color="#64748b" 
+                            <View style={{ marginBottom: 12 }}>
+                                <View style={[styles.inputContainer, nin.length === 11 && styles.inputContainerValid]}>
+                                    <Ionicons name="keypad-outline" size={18} color={nin.length === 11 ? '#10b981' : '#94a3b8'} />
+                                    <TextInput
+                                        placeholder="Shigar da lambar NIN (11 digits)"
+                                        placeholderTextColor="#94a3b8"
+                                        style={styles.input}
+                                        keyboardType="number-pad" 
+                                        maxLength={11} 
+                                        value={nin} 
+                                        onChangeText={setNin} 
+                                        editable={!loading}
                                     />
-                                </TouchableOpacity>
-                                {isExpanded && (
-                                    <Text style={styles.faqAnswer}>{faq.a}</Text>
-                                )}
-                            </View>
-                        );
-                    })}
-                </View>
-
-                {/* ID Analytics / Verification Stats Widget */}
-                {historyList.length > 0 && (
-                    <View style={styles.statsCard}>
-                        <View style={styles.statsHeader}>
-                            <Ionicons name="analytics" size={16} color="#f5a623" />
-                            <Text style={styles.statsTitle}>Verification Stats</Text>
-                        </View>
-                        <View style={styles.statsGrid}>
-                            <View style={styles.statBox}>
-                                <Text style={styles.statNum}>{historyList.length}</Text>
-                                <Text style={styles.statLabel}>Total Prints</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statBox}>
-                                <Text style={styles.statNum}>
-                                    {historyList.filter(item => item.layout === 'premium').length}
-                                </Text>
-                                <Text style={styles.statLabel}>Premium</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statBox}>
-                                <Text style={styles.statNum}>
-                                    {historyList.filter(item => item.layout === 'standard').length}
-                                </Text>
-                                <Text style={styles.statLabel}>Standard</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statBox}>
-                                <Text style={styles.statNum}>
-                                    {historyList.filter(item => ['regular', 'info'].includes(item.layout)).length}
-                                </Text>
-                                <Text style={styles.statLabel}>Other Slips</Text>
-                            </View>
-                        </View>
-                    </View>
-                )}
-
-                {/* Search Bar for past reprints */}
-                {historyList.length > 0 && (
-                    <View style={styles.searchContainer}>
-                        <Ionicons name="search" size={16} color="#94a3b8" />
-                        <TextInput
-                            placeholder="Search past prints (Name or NIN)..."
-                            placeholderTextColor="#94a3b8"
-                            style={styles.searchInput}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={16} color="#94a3b8" />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                )}
-
-                {/* 3. RECENT VERIFICATIONS */}
-                {filteredHistory.length > 0 && (
-                    <View style={styles.card}>
-                        <View style={styles.historyHeader}>
-                            <Ionicons name="time" size={16} color="#f5a623" />
-                            <Text style={styles.historyTitle}>Recent Prints (Reprint)</Text>
-                        </View>
-
-                        <View style={{ flexDirection: 'column' }}>
-                            {filteredHistory.map((item) => (
-                                <View key={item.id} style={styles.historyItem}>
+                                    {nin.length > 0 && (
+                                        <View style={[
+                                            styles.lenBadge,
+                                            nin.length === 11 ? styles.lenBadgeSuccess : styles.lenBadgeDefault
+                                        ]}>
+                                            <Text style={[
+                                                styles.lenIndicator,
+                                                nin.length === 11 ? styles.lenIndicatorSuccess : styles.lenIndicatorWarning
+                                            ]}>
+                                                {nin.length}/11
+                                            </Text>
+                                        </View>
+                                    )}
                                     <TouchableOpacity 
-                                        onPress={() => {
-                                            setSelectedLayout(item.layout);
-                                            setNin(item.nin);
-                                            setResult({ status: 'success', data: item.data });
-                                        }}
-                                        style={styles.historyItemLeft}
+                                        style={styles.pasteBtn} 
+                                        onPress={handlePaste}
                                         activeOpacity={0.7}
                                     >
-                                        <View style={styles.historyIconContainer}>
-                                            <Ionicons name="document-text" size={16} color="#060d21" />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.historyName}>{item.name}</Text>
-                                            <Text style={styles.historyMeta}>NIN: {item.nin} • {item.layout.toUpperCase()}</Text>
-                                        </View>
+                                        <Ionicons name="clipboard-outline" size={13} color="#0f172a" />
+                                        <Text style={styles.pasteBtnText}>Paste</Text>
                                     </TouchableOpacity>
+                                </View>
+                            </View>
 
-                                    <View style={styles.historyRight}>
-                                        <Text style={styles.historyDate}>{item.date.split(',')[0]}</Text>
+                            {/* Consent Checkbox */}
+                            <TouchableOpacity 
+                                onPress={() => setConsent(!consent)} 
+                                activeOpacity={0.8}
+                                style={styles.consentContainer}
+                            >
+                                <View style={[
+                                    styles.checkboxBox, 
+                                    consent ? styles.checkboxBoxSelected : styles.checkboxBoxUnselected
+                                ]}>
+                                    {consent && <Ionicons name="checkmark" size={13} color="#ffffff" />}
+                                </View>
+                                <Text style={styles.consentText}>
+                                    Na tabbatar na sami izinin mamallakin wannan NIN don tantance bayanan sa daga NIMC.
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Verify Button (Modern Vibrant Gradient) */}
+                            {(() => {
+                                const activeItem = layouts.find(l => l.id === selectedLayout) || layouts[0];
+                                const currentPrice = activeItem ? activeItem.price : 100;
+                                const isValid = !loading && nin.length === 11 && consent;
+
+                                return (
+                                    <TouchableOpacity 
+                                        onPress={handleVerify} 
+                                        disabled={!isValid} 
+                                        activeOpacity={0.85}
+                                        style={styles.verifyBtnWrapper}
+                                    >
+                                        <LinearGradient
+                                            colors={isValid ? ['#f59e0b', '#d97706'] : ['#e2e8f0', '#cbd5e1']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.verifyButton}
+                                        >
+                                            {loading ? (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <ActivityIndicator color="#ffffff" size="small" />
+                                                    <Text style={[styles.verifyButtonText, { marginLeft: 8 }]}>Ana Tantancewa...</Text>
+                                                </View>
+                                            ) : (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Ionicons name="shield-checkmark" size={18} color={isValid ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
+                                                    <Text style={[styles.verifyButtonText, !isValid && { color: '#64748b' }]}>
+                                                        Tantance & Buga Kati • ₦{currentPrice.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                );
+                            })()}
+                        </View>
+
+                        {/* FAQ / Guidelines Section */}
+                        <View style={styles.card}>
+                            <View style={styles.historyHeader}>
+                                <Ionicons name="help-circle" size={16} color="#d97706" />
+                                <Text style={styles.historyTitle}>Tambayoyi & Jagora (FAQ)</Text>
+                            </View>
+                            {faqs.map((faq, idx) => {
+                                const isExpanded = expandedFaq === idx;
+                                return (
+                                    <View key={idx} style={styles.faqItem}>
                                         <TouchableOpacity 
-                                            onPress={() => deleteHistoryItem(item.id)}
-                                            style={styles.deleteButton}
+                                            style={styles.faqHeader} 
+                                            onPress={() => setExpandedFaq(isExpanded ? null : idx)}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                                            <Text style={styles.faqQuestion}>{faq.q}</Text>
+                                            <Ionicons 
+                                                name={isExpanded ? "chevron-up" : "chevron-down"} 
+                                                size={14} 
+                                                color="#64748b" 
+                                            />
                                         </TouchableOpacity>
+                                        {isExpanded && (
+                                            <Text style={styles.faqAnswer}>{faq.a}</Text>
+                                        )}
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </>
+                ) : (
+                    <>
+                        {/* ID Analytics / Verification Stats Widget */}
+                        {historyList.length > 0 && (
+                            <View style={styles.statsCard}>
+                                <View style={styles.statsHeader}>
+                                    <Ionicons name="analytics" size={15} color="#d97706" />
+                                    <Text style={styles.statsTitle}>Takaitaccen Tarihin Buga Kati</Text>
+                                </View>
+                                <View style={styles.statsGrid}>
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statNum}>{historyList.length}</Text>
+                                        <Text style={styles.statLabel}>Duka (Total)</Text>
+                                    </View>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statNum}>
+                                            {historyList.filter(item => item.layout === 'premium').length}
+                                        </Text>
+                                        <Text style={styles.statLabel}>Premium</Text>
+                                    </View>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statNum}>
+                                            {historyList.filter(item => item.layout === 'standard').length}
+                                        </Text>
+                                        <Text style={styles.statLabel}>Standard</Text>
+                                    </View>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statNum}>
+                                            {historyList.filter(item => ['regular', 'info'].includes(item.layout)).length}
+                                        </Text>
+                                        <Text style={styles.statLabel}>Sauran Slips</Text>
                                     </View>
                                 </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
+                            </View>
+                        )}
 
+                        {/* Search Bar for past reprints */}
+                        {historyList.length > 0 && (
+                            <View style={styles.searchContainer}>
+                                <Ionicons name="search" size={16} color="#94a3b8" />
+                                <TextInput
+                                    placeholder="Nemo a tarihi (Suna ko NIN)..."
+                                    placeholderTextColor="#94a3b8"
+                                    style={styles.searchInput}
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                />
+                                {searchQuery.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+
+                        {/* RECENT VERIFICATIONS LIST */}
+                        {filteredHistory.length > 0 ? (
+                            <View style={styles.card}>
+                                <View style={styles.historyHeader}>
+                                    <Ionicons name="time" size={16} color="#d97706" />
+                                    <Text style={styles.historyTitle}>Katunan da aka Buga a Baya</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'column' }}>
+                                    {filteredHistory.map((item) => (
+                                        <View key={item.id} style={styles.historyItem}>
+                                            <TouchableOpacity 
+                                                onPress={() => {
+                                                    setSelectedLayout(item.layout);
+                                                    setNin(item.nin);
+                                                    setResult({ status: 'success', data: item.data });
+                                                }}
+                                                style={styles.historyItemLeft}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={styles.historyIconContainer}>
+                                                    <Ionicons name="document-text" size={16} color="#d97706" />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.historyName}>{item.name}</Text>
+                                                    <Text style={styles.historyMeta}>
+                                                        NIN: {item.nin} • {item.layout.toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            </TouchableOpacity>
+
+                                            <View style={styles.historyRight}>
+                                                <TouchableOpacity 
+                                                    onPress={() => {
+                                                        setSelectedLayout(item.layout);
+                                                        setNin(item.nin);
+                                                        setResult({ status: 'success', data: item.data });
+                                                    }}
+                                                    style={styles.reprintBtn}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Ionicons name="print-outline" size={12} color="#0f172a" />
+                                                    <Text style={styles.reprintBtnText}>Buga</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity 
+                                                    onPress={() => deleteHistoryItem(item.id)}
+                                                    style={styles.deleteButton}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Ionicons name="trash-outline" size={13} color="#dc2626" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={styles.emptyCard}>
+                                <View style={styles.emptyIconCircle}>
+                                    <Ionicons name="document-text-outline" size={32} color="#94a3b8" />
+                                </View>
+                                <Text style={styles.emptyTitle}>
+                                    {searchQuery ? 'Babu sakamakon binciken' : 'Babu Tarihin Buga Kati'}
+                                </Text>
+                                <Text style={styles.emptySub}>
+                                    {searchQuery ? 'Babu wani katin da yayi daidai da binciken ka.' : 'Duk katin da ka tantance zai fito a nan domin sake saukewa ko bugawa kyauta a kowane lokaci.'}
+                                </Text>
+                                {!searchQuery && (
+                                    <TouchableOpacity 
+                                        style={styles.emptyActionBtn}
+                                        onPress={() => setActiveTab('verify')}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={styles.emptyActionBtnText}>Tantance Katin Yanzu</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+                    </>
+                )}
             </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+    },
+    customHeader: {
+        backgroundColor: '#ffffff',
+        paddingHorizontal: 16,
+        paddingBottom: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    headerBackBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitleText: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: '#0f172a',
+        letterSpacing: -0.3,
+    },
+    headerSubText: {
+        fontSize: 11,
+        color: '#64748b',
+        fontWeight: '500',
+        marginTop: 1,
+    },
+    headerWalletPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fffbeb',
+        borderWidth: 1,
+        borderColor: '#fde68a',
+        paddingVertical: 5,
+        paddingLeft: 8,
+        paddingRight: 6,
+        borderRadius: 20,
+    },
+    headerWalletText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#b45309',
+        marginHorizontal: 5,
+    },
+    headerWalletPlus: {
+        backgroundColor: '#d97706',
+        borderRadius: 10,
+        width: 16,
+        height: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#e2e8f0',
+        padding: 4,
+        marginHorizontal: 14,
+        marginTop: 12,
+        marginBottom: 8,
+        borderRadius: 14,
+    },
+    tabButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 9,
+        borderRadius: 11,
+    },
+    tabButtonActive: {
+        backgroundColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    tabButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#64748b',
+        marginLeft: 6,
+    },
+    tabButtonTextActive: {
+        color: '#0f172a',
+        fontWeight: '800',
+    },
+    scrollContent: {
+        paddingTop: 6,
+    },
+    card: {
+        backgroundColor: '#ffffff',
+        borderRadius: 18,
+        padding: 16,
+        shadowColor: '#64748b',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1.5,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    stepBadge: {
+        backgroundColor: '#fef3c7',
+        borderWidth: 1,
+        borderColor: '#fde68a',
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    stepBadgeText: {
+        color: '#d97706',
+        fontWeight: '900',
+        fontSize: 12,
+    },
+    cardTitle: {
+        color: '#0f172a',
+        fontWeight: '800',
+        fontSize: 13.5,
+        letterSpacing: -0.2,
+    },
+    cardSubtitle: {
+        color: '#64748b',
+        fontSize: 10.5,
+        fontWeight: '500',
+        marginTop: 1,
+    },
+    layoutGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        width: '100%',
+    },
+    layoutButton: {
+        borderRadius: 16,
+        padding: 10,
+        marginBottom: 12,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1.5,
+        width: '48.5%',
+        minHeight: 124,
+        backgroundColor: '#ffffff',
+    },
+    layoutButtonSelected: {
+        backgroundColor: '#ffffff',
+        borderColor: '#d97706',
+        shadowColor: '#d97706',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    layoutButtonUnselected: {
+        backgroundColor: '#ffffff',
+        borderColor: '#e2e8f0',
+    },
+    badgeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-end',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    badgeSelected: {
+        backgroundColor: '#fef3c7',
+    },
+    badgeUnselected: {
+        backgroundColor: '#f1f5f9',
+    },
+    badgeText: {
+        fontSize: 8.5,
+        fontWeight: '800',
+    },
+    badgeTextSelected: {
+        color: '#b45309',
+    },
+    badgeTextUnselected: {
+        color: '#64748b',
+    },
+    layoutIconBox: {
+        width: '100%',
+        height: 48,
+        marginVertical: 4,
+        backgroundColor: '#f8fafc',
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    layoutImage: {
+        width: '90%',
+        height: '90%',
+    },
+    layoutLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        textAlign: 'center',
+        marginTop: 2,
+    },
+    layoutLabelSelected: {
+        color: '#0f172a',
+    },
+    layoutLabelUnselected: {
+        color: '#475569',
+    },
+    pricePill: {
+        marginTop: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    pricePillSelected: {
+        backgroundColor: '#fef3c7',
+    },
+    pricePillUnselected: {
+        backgroundColor: '#f8fafc',
+    },
+    layoutPrice: {
+        fontSize: 10,
+        fontWeight: '900',
+        textAlign: 'center',
+    },
+    layoutPriceSelected: {
+        color: '#b45309',
+    },
+    layoutPriceUnselected: {
+        color: '#64748b',
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        height: 50,
+        marginBottom: 8,
+    },
+    inputContainerValid: {
+        borderColor: '#10b981',
+        backgroundColor: '#f0fdf4',
+    },
+    input: {
+        flex: 1,
+        marginLeft: 10,
+        color: '#0f172a',
+        fontWeight: '700',
+        fontSize: 14,
+        letterSpacing: 1.2,
+    },
+    lenBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        marginRight: 6,
+    },
+    lenBadgeDefault: {
+        backgroundColor: '#f1f5f9',
+    },
+    lenBadgeSuccess: {
+        backgroundColor: '#dcfce7',
+    },
+    lenIndicator: {
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    lenIndicatorSuccess: {
+        color: '#15803d',
+    },
+    lenIndicatorWarning: {
+        color: '#64748b',
+    },
+    pasteBtn: {
+        backgroundColor: '#e2e8f0',
+        borderRadius: 8,
+        paddingHorizontal: 9,
+        height: 30,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pasteBtnText: {
+        color: '#0f172a',
+        fontWeight: '800',
+        fontSize: 10.5,
+        marginLeft: 3,
+    },
+    consentContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+        paddingHorizontal: 2,
+        marginTop: 6,
+    },
+    consentText: {
+        color: '#475569',
+        fontSize: 11,
+        flex: 1,
+        fontWeight: '500',
+        lineHeight: 16,
+    },
+    checkboxBox: {
+        width: 19,
+        height: 19,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        marginTop: 1,
+    },
+    checkboxBoxSelected: {
+        backgroundColor: '#d97706',
+        borderColor: '#d97706',
+    },
+    checkboxBoxUnselected: {
+        backgroundColor: '#ffffff',
+        borderColor: '#cbd5e1',
+    },
+    verifyBtnWrapper: {
+        borderRadius: 14,
+        overflow: 'hidden',
+        shadowColor: '#d97706',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    verifyButton: {
+        height: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+    },
+    verifyButtonText: {
+        fontWeight: '900',
+        color: '#ffffff',
+        fontSize: 13.5,
+        letterSpacing: 0.3,
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    historyTitle: {
+        color: '#0f172a',
+        fontWeight: '800',
+        fontSize: 13,
+        letterSpacing: -0.2,
+        marginLeft: 6,
+    },
+    faqItem: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+        paddingVertical: 11,
+    },
+    faqHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+    },
+    faqQuestion: {
+        color: '#1e293b',
+        fontWeight: '700',
+        fontSize: 12,
+        flex: 1,
+        marginRight: 10,
+    },
+    faqAnswer: {
+        color: '#64748b',
+        fontSize: 11,
+        marginTop: 6,
+        lineHeight: 17,
+        fontWeight: '500',
+    },
+    statsCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 18,
+        padding: 16,
+        shadowColor: '#64748b',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1.5,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    statsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    statsTitle: {
+        color: '#0f172a',
+        fontWeight: '800',
+        fontSize: 12,
+        letterSpacing: -0.2,
+        marginLeft: 6,
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    statBox: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    statNum: {
+        fontSize: 17,
+        fontWeight: '900',
+        color: '#0f172a',
+    },
+    statLabel: {
+        fontSize: 9.5,
+        color: '#64748b',
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    statDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#f1f5f9',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        height: 44,
+        marginBottom: 12,
+    },
+    searchInput: {
+        flex: 1,
+        marginLeft: 8,
+        color: '#0f172a',
+        fontWeight: '600',
+        fontSize: 12.5,
+    },
+    historyItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    historyItemLeft: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 8,
+    },
+    historyIconContainer: {
+        backgroundColor: '#fffbeb',
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        borderWidth: 1,
+        borderColor: '#fef3c7',
+    },
+    historyName: {
+        color: '#0f172a',
+        fontWeight: '800',
+        fontSize: 12.5,
+    },
+    historyMeta: {
+        color: '#64748b',
+        fontWeight: '600',
+        fontSize: 10,
+        marginTop: 2,
+    },
+    historyRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    reprintBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f1f5f9',
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 8,
+        marginRight: 8,
+    },
+    reprintBtnText: {
+        fontSize: 10.5,
+        fontWeight: '800',
+        color: '#0f172a',
+        marginLeft: 4,
+    },
+    deleteButton: {
+        padding: 6,
+        borderRadius: 8,
+        backgroundColor: '#fef2f2',
+    },
+    emptyCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 18,
+        padding: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+        marginTop: 8,
+    },
+    emptyIconCircle: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#f8fafc',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    emptyTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#0f172a',
+        marginBottom: 6,
+    },
+    emptySub: {
+        fontSize: 11,
+        color: '#64748b',
+        textAlign: 'center',
+        lineHeight: 16,
+        maxWidth: 260,
+    },
+    emptyActionBtn: {
+        marginTop: 16,
+        backgroundColor: '#d97706',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    emptyActionBtnText: {
+        color: '#ffffff',
+        fontWeight: '800',
+        fontSize: 11.5,
+    },
     loaderOverlay: {
         flex: 1,
         backgroundColor: 'rgba(5, 11, 20, 0.75)',
@@ -2848,470 +3547,5 @@ const styles = StyleSheet.create({
         color: '#ffffff',
         fontWeight: '800',
         fontSize: 13,
-    },
-    statsCard: {
-        backgroundColor: '#ffffff',
-        borderRadius: 20,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-    },
-    statsHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    statsTitle: {
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 12,
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-        marginLeft: 6,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    statBox: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    statNum: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#0d1b3e',
-    },
-    statLabel: {
-        fontSize: 9,
-        color: '#64748b',
-        fontWeight: '700',
-        marginTop: 2,
-    },
-    statDivider: {
-        width: 1,
-        height: 28,
-        backgroundColor: '#f1f5f9',
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 16,
-        paddingHorizontal: 12,
-        height: 48,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 0.5,
-    },
-    searchInput: {
-        flex: 1,
-        marginLeft: 8,
-        color: '#1e293b',
-        fontWeight: '600',
-        fontSize: 13,
-    },
-    walletBar: {
-        backgroundColor: '#ffffff',
-        borderRadius: 18,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-    },
-    walletLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    walletLabel: {
-        fontSize: 9.5,
-        color: '#64748b',
-        fontWeight: '700',
-        textTransform: 'uppercase',
-    },
-    walletVal: {
-        fontSize: 15,
-        fontWeight: '900',
-        color: '#060d21',
-        marginTop: 1,
-    },
-    fundBtn: {
-        backgroundColor: '#060d21',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 32,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    fundBtnText: {
-        color: '#ffffff',
-        fontWeight: '800',
-        fontSize: 11,
-        marginLeft: 4,
-    },
-    badgeContainer: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        borderRadius: 6,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        zIndex: 5,
-    },
-    badgeSelected: {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    badgeUnselected: {
-        backgroundColor: '#f1f5f9',
-    },
-    badgeText: {
-        fontSize: 8.5,
-        fontWeight: '900',
-    },
-    badgeTextSelected: {
-        color: '#ffffff',
-    },
-    badgeTextUnselected: {
-        color: '#64748b',
-    },
-    lenIndicator: {
-        fontSize: 10,
-        fontWeight: '800',
-        marginRight: 8,
-    },
-    lenIndicatorSuccess: {
-        color: '#10b981',
-    },
-    lenIndicatorWarning: {
-        color: '#f5a623',
-    },
-    pasteBtn: {
-        backgroundColor: '#e2e8f0',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        height: 28,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    pasteBtnText: {
-        color: '#060d21',
-        fontWeight: '800',
-        fontSize: 10,
-        marginLeft: 3,
-    },
-    faqItem: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
-        paddingVertical: 10,
-    },
-    faqHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-    },
-    faqQuestion: {
-        color: '#1e293b',
-        fontWeight: '800',
-        fontSize: 11.5,
-        flex: 1,
-        marginRight: 10,
-    },
-    faqAnswer: {
-        color: '#64748b',
-        fontSize: 11,
-        marginTop: 6,
-        lineHeight: 16,
-        fontWeight: '500',
-    },
-    container: {
-        flex: 1,
-        backgroundColor: '#f8fafc',
-    },
-    headerGradient: {
-        paddingTop: 16,
-        paddingBottom: 40,
-        paddingHorizontal: 16,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-    },
-    headerTitle: {
-        color: '#ffffff',
-        fontSize: 20,
-        fontWeight: '900',
-        letterSpacing: -0.5,
-    },
-    scrollContent: {
-        paddingBottom: 80,
-    },
-    card: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    stepBadge: {
-        backgroundColor: '#f5a623',
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
-    },
-    stepBadgeText: {
-        color: '#060d21',
-        fontWeight: '900',
-        fontSize: 10,
-    },
-    cardTitle: {
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 13,
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-    },
-    layoutGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        width: '100%',
-    },
-    layoutButton: {
-        borderRadius: 16,
-        padding: 10,
-        marginBottom: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1.5,
-        width: '48.5%',
-        minHeight: 110,
-        backgroundColor: '#ffffff',
-    },
-    layoutButtonSelected: {
-        backgroundColor: '#060d21',
-        borderColor: '#060d21',
-    },
-    layoutButtonUnselected: {
-        backgroundColor: '#f8fafc',
-        borderColor: '#e2e8f0',
-    },
-    layoutIconBox: {
-        width: '100%',
-        height: 48,
-        marginBottom: 8,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 1,
-        elevation: 0.5,
-    },
-    layoutImage: {
-        width: '90%',
-        height: '90%',
-    },
-    layoutLabel: {
-        fontSize: 10.5,
-        fontWeight: '800',
-        marginBottom: 4,
-        textAlign: 'center',
-        lineHeight: 13,
-    },
-    layoutLabelSelected: {
-        color: '#ffffff',
-    },
-    layoutLabelUnselected: {
-        color: '#334155',
-    },
-    layoutPrice: {
-        fontSize: 9,
-        fontWeight: '900',
-        textAlign: 'center',
-    },
-    layoutPriceSelected: {
-        color: '#f5a623',
-    },
-    layoutPriceUnselected: {
-        color: '#64748b',
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 48,
-        marginBottom: 8,
-    },
-    input: {
-        flex: 1,
-        marginLeft: 8,
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 14,
-        letterSpacing: 1.5,
-    },
-    consentContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        paddingHorizontal: 4,
-        marginTop: 8,
-    },
-    consentText: {
-        color: '#475569',
-        fontSize: 11,
-        flex: 1,
-        fontWeight: '600',
-        lineHeight: 15,
-    },
-    checkboxBox: {
-        width: 18,
-        height: 18,
-        borderRadius: 4,
-        borderWidth: 1.5,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 10,
-    },
-    checkboxBoxSelected: {
-        backgroundColor: '#060d21',
-        borderColor: '#060d21',
-    },
-    checkboxBoxUnselected: {
-        backgroundColor: '#ffffff',
-        borderColor: '#cbd5e1',
-    },
-    verifyButton: {
-        height: 48,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        width: '100%',
-    },
-    verifyButtonActive: {
-        backgroundColor: '#060d21',
-    },
-    verifyButtonDisabled: {
-        backgroundColor: 'rgba(6, 13, 33, 0.5)',
-    },
-    verifyButtonText: {
-        fontWeight: '800',
-        color: '#ffffff',
-        fontSize: 13,
-        letterSpacing: 0.5,
-    },
-    verifyButtonSubtext: {
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 9,
-        marginLeft: 6,
-    },
-    historyHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    historyTitle: {
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 13,
-        letterSpacing: 0.5,
-        marginLeft: 6,
-    },
-    historyItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
-    },
-    historyItemLeft: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 8,
-    },
-    historyIconContainer: {
-        backgroundColor: '#f8fafc',
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 10,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-    },
-    historyName: {
-        color: '#1e293b',
-        fontWeight: '800',
-        fontSize: 12,
-    },
-    historyMeta: {
-        color: '#64748b',
-        fontWeight: '600',
-        fontSize: 10,
-        marginTop: 1,
-    },
-    historyRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    historyDate: {
-        color: '#94a3b8',
-        fontWeight: '600',
-        fontSize: 9,
-        marginRight: 10,
-    },
-    deleteButton: {
-        padding: 6,
-        borderRadius: 8,
-        backgroundColor: '#fef2f2',
     },
 });

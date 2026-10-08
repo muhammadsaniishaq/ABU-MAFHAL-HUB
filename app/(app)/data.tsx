@@ -333,7 +333,6 @@ export default function DataScreen() {
     
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
-    const insets = useSafeAreaInsets();
     const headerTopPadding = Math.max(insets.top, Platform.OS === 'android' ? 32 : 20) + 12;
 
     // Initial Data Load (Parallel Execution)
