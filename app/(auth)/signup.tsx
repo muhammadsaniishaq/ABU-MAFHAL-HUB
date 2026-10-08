@@ -867,7 +867,7 @@ export default function SignupScreen() {
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                         bounces={false}
-                        scrollEnabled={height < 680}
+                        scrollEnabled={true}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* Top Control Bar with Prestigious Brand, Support & Theme Toggle */}
@@ -922,6 +922,17 @@ export default function SignupScreen() {
                             </View>
 
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                                {/* Direct App Download Header Action */}
+                                <TouchableOpacity
+                                    onPress={() => Linking.openURL(settings?.play_store_url || 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub')}
+                                    style={[styles.supportHeaderBtn, { backgroundColor: isDark ? 'rgba(0, 195, 255, 0.15)' : '#E0F2FE', borderColor: '#0284C7' }]}
+                                    activeOpacity={0.8}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                    <Ionicons name="logo-google-playstore" size={13} color="#0284C7" />
+                                    <Text style={[styles.supportHeaderBtnText, { color: isDark ? '#38BDF8' : '#0369A1' }]}>App</Text>
+                                </TouchableOpacity>
+
                                 {/* WhatsApp Quick Support Header Action */}
                                 <TouchableOpacity
                                     onPress={() => Linking.openURL('https://wa.me/2348001234567?text=Hello%20ABUMAFHAL%20Support')}
