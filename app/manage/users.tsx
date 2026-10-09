@@ -100,14 +100,37 @@ interface KycRequest {
     updated_at?: string;
 }
 
+interface CryptoBalance {
+    id?: string;
+    user_id: string;
+    asset: string;
+    balance: number;
+    updated_at?: string;
+}
+
+interface CryptoAddress {
+    id?: string;
+    user_id: string;
+    network: string;
+    currency: string;
+    address: string;
+    is_active?: boolean;
+    created_at?: string;
+}
+
 interface Transaction {
     id: string;
+    user_id?: string;
     amount: number;
     type: string;
     status: string;
     created_at: string;
     description?: string;
     reference?: string;
+    gateway_reference?: string;
+    channel?: string;
+    fee?: number;
+    metadata?: any;
 }
 
 interface LoginLog {
@@ -134,15 +157,29 @@ export default function UserManagement() {
     
     // Selection & Modal States
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-    const [modalTab, setModalTab] = useState<'overview' | 'kyc' | 'controls' | 'notify' | 'logs'>('overview');
+    const [modalTab, setModalTab] = useState<'overview' | 'crypto' | 'transactions' | 'kyc' | 'controls' | 'notify' | 'logs'>('overview');
     
-    // Dynamic User History States
+    // Dynamic User History & Crypto States
     const [userTransactions, setUserTransactions] = useState<Transaction[]>([]);
+    const [userCryptoBalances, setUserCryptoBalances] = useState<CryptoBalance[]>([]);
+    const [userCryptoAddresses, setUserCryptoAddresses] = useState<CryptoAddress[]>([]);
     const [userVirtualCards, setUserVirtualCards] = useState<UserVirtualCard[]>([]);
     const [userKycRequests, setUserKycRequests] = useState<KycRequest[]>([]);
     const [userLogs, setUserLogs] = useState<LoginLog[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [unmaskedCardIds, setUnmaskedCardIds] = useState<Record<string, boolean>>({});
+
+    // Transaction Filtering & Detailed Inspection
+    const [txFilterType, setTxFilterType] = useState<'all' | 'credit' | 'debit' | 'crypto' | 'bills'>('all');
+    const [txSearch, setTxSearch] = useState('');
+    const [selectedTransactionDetails, setSelectedTransactionDetails] = useState<Transaction | null>(null);
+
+    // Crypto Admin Direct Funding / Debit States
+    const [cryptoFundingModal, setCryptoFundingModal] = useState(false);
+    const [cryptoFundAsset, setCryptoFundAsset] = useState('USDT');
+    const [cryptoFundAmount, setCryptoFundAmount] = useState('');
+    const [cryptoFundIsDebit, setCryptoFundIsDebit] = useState(false);
+    const [cryptoFundProcessing, setCryptoFundProcessing] = useState(false);
 
     const [showSecurity, setShowSecurity] = useState(false);
     const [pendingAction, setPendingAction] = useState<{ 
@@ -562,20 +599,36 @@ export default function UserManagement() {
         }
     };
 
-    // Fetch Real User History
+    // Fetch Real User History & Crypto
     const fetchUserHistory = async (userId: string) => {
         setLoadingHistory(true);
         try {
-            // 1. Fetch User Financial Transactions
+            // 1. Fetch User Financial Transactions (up to 100 recent for full audit)
             const { data: txData } = await supabase
                 .from('transactions')
                 .select('*')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false })
-                .limit(20);
+                .limit(100);
             setUserTransactions(txData || []);
 
-            // 2. Fetch User Purchased Virtual Cards
+            // 2. Fetch User Crypto Balances
+            const { data: cryptoBals } = await supabase
+                .from('crypto_balances')
+                .select('*')
+                .eq('user_id', userId)
+                .order('asset', { ascending: true });
+            setUserCryptoBalances(cryptoBals || []);
+
+            // 3. Fetch User Crypto Deposit Addresses
+            const { data: cryptoAddrs } = await supabase
+                .from('crypto_addresses')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+            setUserCryptoAddresses(cryptoAddrs || []);
+
+            // 4. Fetch User Purchased Virtual Cards
             const { data: cardsData } = await supabase
                 .from('user_virtual_cards')
                 .select('*')
@@ -583,7 +636,7 @@ export default function UserManagement() {
                 .order('created_at', { ascending: false });
             setUserVirtualCards(cardsData || []);
 
-            // 3. Fetch User KYC Requests
+            // 5. Fetch User KYC Requests
             const { data: kycData } = await supabase
                 .from('kyc_requests')
                 .select('*')
@@ -592,11 +645,102 @@ export default function UserManagement() {
             setUserKycRequests(kycData || []);
         } catch (error) {
             setUserTransactions([]);
+            setUserCryptoBalances([]);
+            setUserCryptoAddresses([]);
             setUserVirtualCards([]);
             setUserKycRequests([]);
         } finally {
             setLoadingHistory(false);
         }
+    };
+
+    const handleDirectCryptoFundOrDebit = async (isDebit: boolean, asset: string, amount: number) => {
+        if (!selectedUser || amount <= 0) return;
+        setCryptoFundProcessing(true);
+        try {
+            const cleanAsset = asset.toLowerCase();
+            const { data: existing } = await supabase
+                .from('crypto_balances')
+                .select('*')
+                .eq('user_id', selectedUser.id)
+                .ilike('asset', cleanAsset)
+                .maybeSingle();
+
+            const currentBal = Number(existing?.balance || 0);
+            const newBal = isDebit ? Math.max(0, currentBal - amount) : currentBal + amount;
+
+            if (existing) {
+                await supabase
+                    .from('crypto_balances')
+                    .update({ balance: newBal, updated_at: new Date().toISOString() })
+                    .eq('id', existing.id);
+            } else {
+                await supabase
+                    .from('crypto_balances')
+                    .insert({
+                        user_id: selectedUser.id,
+                        asset: cleanAsset,
+                        balance: newBal,
+                    });
+            }
+
+            // Record audit transaction in database
+            await supabase.from('transactions').insert({
+                user_id: selectedUser.id,
+                amount: amount,
+                type: `crypto_${isDebit ? 'debit' : 'credit'}`,
+                status: 'completed',
+                description: `Admin Crypto ${isDebit ? 'Debit' : 'Credit'} (${asset.toUpperCase()})`,
+                reference: `adm_crypto_${Date.now()}`
+            });
+
+            Alert.alert(
+                "Crypto Balance Updated ⚡",
+                `Successfully ${isDebit ? 'debited' : 'funded'} ${amount} ${asset.toUpperCase()} for ${selectedUser.full_name}.\nNew Balance: ${newBal} ${asset.toUpperCase()}`
+            );
+            setCryptoFundingModal(false);
+            setCryptoFundAmount('');
+            fetchUserHistory(selectedUser.id);
+        } catch (e: any) {
+            Alert.alert("Crypto Update Error", e.message || "Failed to update crypto balance.");
+        } finally {
+            setCryptoFundProcessing(false);
+        }
+    };
+
+    const getAssetPriceUSD = (asset: string): number => {
+        const a = (asset || '').toUpperCase();
+        if (a.includes('USDT') || a.includes('USDC') || a.includes('USD')) return 1;
+        if (a.includes('BTC')) return 65000;
+        if (a.includes('ETH')) return 3400;
+        if (a.includes('SOL')) return 150;
+        if (a.includes('BNB')) return 580;
+        return 1;
+    };
+
+    const getFilteredTransactions = () => {
+        let list = [...userTransactions];
+        if (txFilterType === 'credit') {
+            list = list.filter(t => t.type?.toLowerCase().includes('topup') || t.type?.toLowerCase().includes('fund') || t.type?.toLowerCase().includes('credit'));
+        } else if (txFilterType === 'debit') {
+            list = list.filter(t => !t.type?.toLowerCase().includes('topup') && !t.type?.toLowerCase().includes('fund') && !t.type?.toLowerCase().includes('credit'));
+        } else if (txFilterType === 'crypto') {
+            list = list.filter(t => t.type?.toLowerCase().includes('crypto') || t.description?.toLowerCase().includes('crypto') || t.reference?.toLowerCase().includes('crypto'));
+        } else if (txFilterType === 'bills') {
+            list = list.filter(t => t.type?.toLowerCase().includes('data') || t.type?.toLowerCase().includes('airtime') || t.type?.toLowerCase().includes('cable') || t.type?.toLowerCase().includes('bill') || t.type?.toLowerCase().includes('electricity'));
+        }
+
+        if (txSearch.trim()) {
+            const q = txSearch.toLowerCase().trim();
+            list = list.filter(t => 
+                (t.reference && t.reference.toLowerCase().includes(q)) ||
+                (t.description && t.description.toLowerCase().includes(q)) ||
+                (t.type && t.type.toLowerCase().includes(q)) ||
+                (t.amount && t.amount.toString().includes(q)) ||
+                (t.status && t.status.toLowerCase().includes(q))
+            );
+        }
+        return list;
     };
 
     const generateForensics = (userId: string) => {
@@ -1212,9 +1356,11 @@ Metadata:
                     </LinearGradient>
 
                     {/* Navigation Tabs */}
-                    <View style={s.modalTabBar}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 42, backgroundColor: T.card, borderBottomWidth: 1, borderBottomColor: T.border }} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
                         {[
                             { key: 'overview', label: 'Overview', icon: 'wallet-outline' },
+                            { key: 'crypto', label: `Crypto (${userCryptoBalances.length})`, icon: 'logo-bitcoin' },
+                            { key: 'transactions', label: `Transactions (${userTransactions.length})`, icon: 'receipt-outline' },
                             { key: 'kyc', label: 'Identity & KYC', icon: 'finger-print-outline' },
                             { key: 'controls', label: 'Controls', icon: 'options-outline' },
                             { key: 'notify', label: 'Notify', icon: 'chatbubble-ellipses-outline' },
@@ -1223,13 +1369,13 @@ Metadata:
                             <TouchableOpacity
                                 key={t.key}
                                 onPress={() => setModalTab(t.key as any)}
-                                style={[s.modalTabItem, modalTab === t.key ? s.modalTabItemActive : null]}
+                                style={[s.modalTabItem, modalTab === t.key ? s.modalTabItemActive : null, { paddingHorizontal: 14 }]}
                             >
                                 <Ionicons name={t.icon as any} size={14} color={modalTab === t.key ? T.navyDark : T.textSub} />
-                                <Text style={[s.modalTabText, modalTab === t.key ? { color: T.navyDark } : null]}>{t.label}</Text>
+                                <Text style={[s.modalTabText, modalTab === t.key ? { color: T.navyDark, fontWeight: '900' } : null]}>{t.label}</Text>
                             </TouchableOpacity>
                         ))}
-                    </View>
+                    </ScrollView>
 
                     <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
                         {/* TAB 1: OVERVIEW & WALLET FUNDING */}
@@ -1449,6 +1595,113 @@ Metadata:
                                     })
                                 )}
 
+                                {/* Crypto Portfolio Snapshot in Overview */}
+                                <View style={s.controlCard}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="logo-bitcoin" size={16} color={T.goldDark} />
+                                            <Text style={s.sectionHeading}>Crypto Portfolio Snapshot</Text>
+                                        </View>
+                                        <TouchableOpacity 
+                                            onPress={() => setModalTab('crypto')}
+                                            style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+                                        >
+                                            <Text style={{ fontSize: 11, fontWeight: '800', color: T.goldDark }}>Manage Crypto</Text>
+                                            <Ionicons name="chevron-forward" size={12} color={T.goldDark} />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {loadingHistory ? (
+                                        <ActivityIndicator size="small" color={T.navyDark} />
+                                    ) : userCryptoBalances.length === 0 ? (
+                                        <View style={{ paddingVertical: 10, alignItems: 'center' }}>
+                                            <Text style={{ fontSize: 11, color: T.textSub, marginBottom: 8 }}>User has no recorded cryptocurrency holdings.</Text>
+                                            <TouchableOpacity 
+                                                onPress={() => { setCryptoFundIsDebit(false); setCryptoFundingModal(true); }}
+                                                style={{ backgroundColor: T.navyDark, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                            >
+                                                <Ionicons name="flash" size={12} color={T.gold} />
+                                                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>+ Credit First Crypto Asset</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <View>
+                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                                                {userCryptoBalances.map(b => (
+                                                    <View key={b.id || b.asset} style={{ backgroundColor: T.bg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: T.border, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Text style={{ fontWeight: '900', color: T.goldDark, fontSize: 11 }}>{b.asset?.toUpperCase()}:</Text>
+                                                        <Text style={{ fontWeight: '800', color: T.navyDark, fontSize: 11 }}>{Number(b.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                            <TouchableOpacity 
+                                                onPress={() => setModalTab('crypto')}
+                                                style={{ backgroundColor: T.goldBg, borderWidth: 1, borderColor: T.goldDark, paddingVertical: 6, borderRadius: 8, alignItems: 'center' }}
+                                            >
+                                                <Text style={{ color: T.goldDark, fontSize: 11, fontWeight: '900' }}>View Detailed Crypto Holdings & Addresses ➔</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Recent Transactions Preview in Overview */}
+                                <View style={s.controlCard}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="receipt-outline" size={16} color={T.navyDark} />
+                                            <Text style={s.sectionHeading}>Recent Transactions ({userTransactions.length})</Text>
+                                        </View>
+                                        <TouchableOpacity 
+                                            onPress={() => setModalTab('transactions')}
+                                            style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+                                        >
+                                            <Text style={{ fontSize: 11, fontWeight: '800', color: T.navyDark }}>View Ledger</Text>
+                                            <Ionicons name="chevron-forward" size={12} color={T.navyDark} />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {loadingHistory ? (
+                                        <ActivityIndicator size="small" color={T.navyDark} />
+                                    ) : userTransactions.length === 0 ? (
+                                        <Text style={{ fontSize: 11, color: T.textSub, textAlign: 'center', paddingVertical: 8 }}>No transactions on record.</Text>
+                                    ) : (
+                                        <View>
+                                            {userTransactions.slice(0, 3).map((tx, idx) => (
+                                                <TouchableOpacity 
+                                                    key={tx.id || idx}
+                                                    onPress={() => setSelectedTransactionDetails(tx)}
+                                                    style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: idx < 2 ? 1 : 0, borderBottomColor: T.border }}
+                                                >
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                        <Ionicons 
+                                                            name={tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('credit') ? 'arrow-down-circle' : 'arrow-up-circle'} 
+                                                            size={18} 
+                                                            color={tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('credit') ? T.success : T.danger} 
+                                                        />
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={{ fontSize: 11, fontWeight: '800', color: T.navyDark }} numberOfLines={1}>
+                                                                {tx.description || tx.type || 'Transaction'}
+                                                            </Text>
+                                                            <Text style={{ fontSize: 9.5, color: T.textSub }}>
+                                                                {new Date(tx.created_at).toLocaleDateString()} • {tx.status}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text style={{ fontSize: 11.5, fontWeight: '900', color: tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('credit') ? T.success : T.navyDark }}>
+                                                        {tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('credit') ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                            <TouchableOpacity 
+                                                onPress={() => setModalTab('transactions')}
+                                                style={{ marginTop: 8, backgroundColor: T.navyDark, paddingVertical: 7, borderRadius: 8, alignItems: 'center' }}
+                                            >
+                                                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>Inspect Full Transaction Ledger ➔</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+
                                 {/* Quick Info Card */}
                                 <Text style={s.sectionHeading}>Account Quick Summary</Text>
                                 <View style={s.infoListCard}>
@@ -1469,6 +1722,356 @@ Metadata:
                                         <Text style={s.infoValue}>{new Date(selectedUser?.created_at || '').toLocaleDateString()}</Text>
                                     </View>
                                 </View>
+                            </View>
+                        )}
+
+                        {/* TAB: CRYPTO CENTER (Full Holdings, Valuation, Deposit Addresses, Direct Credit/Debit) */}
+                        {modalTab === 'crypto' && (
+                            <View style={{ padding: 14 }}>
+                                {/* Crypto Valuation Banner */}
+                                <LinearGradient
+                                    colors={['#0A1128', '#1E293B']}
+                                    style={s.cryptoValuationCard}
+                                >
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="logo-bitcoin" size={16} color={T.gold} />
+                                            <Text style={s.cryptoValuationLabel}>ESTIMATED CRYPTO HOLDINGS</Text>
+                                        </View>
+                                        <View style={[s.statusBadge, selectedUser?.crypto_enabled ? s.statusBadgeActive : s.statusBadgeSuspended]}>
+                                            <Text style={[s.statusBadgeText, selectedUser?.crypto_enabled ? { color: T.success } : { color: T.danger }]}>
+                                                {selectedUser?.crypto_enabled ? 'CRYPTO ENABLED ⚡' : 'CRYPTO LOCKED 🔒'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <Text style={s.cryptoValuationUsd}>
+                                        ${userCryptoBalances.reduce((acc, b) => acc + (Number(b.balance || 0) * getAssetPriceUSD(b.asset)), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Text>
+                                    <Text style={s.cryptoValuationNgn}>
+                                        ≈ ₦{(userCryptoBalances.reduce((acc, b) => acc + (Number(b.balance || 0) * getAssetPriceUSD(b.asset)), 0) * 1500).toLocaleString('en-US', { maximumFractionDigits: 0 })} NGN Est.
+                                    </Text>
+
+                                    {/* Action Buttons Row */}
+                                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setCryptoFundIsDebit(false);
+                                                setCryptoFundingModal(true);
+                                            }}
+                                            style={s.cryptoFundActionBtn}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Ionicons name="arrow-down-circle" size={15} color="#FFFFFF" />
+                                            <Text style={s.cryptoFundActionBtnText}>+ Direct Credit Crypto</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setCryptoFundIsDebit(true);
+                                                setCryptoFundingModal(true);
+                                            }}
+                                            style={s.cryptoDebitActionBtn}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Ionicons name="arrow-up-circle" size={15} color="#FFFFFF" />
+                                            <Text style={s.cryptoDebitActionBtnText}>- Direct Debit Crypto</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </LinearGradient>
+
+                                {/* Asset Breakdown Cards */}
+                                <Text style={s.sectionHeading}>Asset Balances ({userCryptoBalances.length > 0 ? userCryptoBalances.length : 'Supported'}) 🪙</Text>
+                                {loadingHistory ? (
+                                    <ActivityIndicator size="small" color={T.navyDark} style={{ marginVertical: 12 }} />
+                                ) : (
+                                    <View style={{ gap: 8 }}>
+                                        {(userCryptoBalances.length > 0 
+                                            ? userCryptoBalances 
+                                            : [
+                                                { id: '1', asset: 'USDT', balance: 0 },
+                                                { id: '2', asset: 'BTC', balance: 0 },
+                                                { id: '3', asset: 'ETH', balance: 0 },
+                                                { id: '4', asset: 'SOL', balance: 0 }
+                                            ]
+                                        ).map((assetItem, index) => {
+                                            const sym = assetItem.asset.toUpperCase();
+                                            const bal = Number(assetItem.balance || 0);
+                                            const priceUsd = getAssetPriceUSD(sym);
+                                            const valUsd = bal * priceUsd;
+                                            const valNgn = valUsd * 1500;
+
+                                            return (
+                                                <View key={assetItem.id || index} style={s.cryptoAssetCard}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                            <View style={s.cryptoIconBubble}>
+                                                                <Ionicons 
+                                                                    name={sym.includes('BTC') ? "logo-bitcoin" : sym.includes('ETH') ? "cube-outline" : sym.includes('SOL') ? "flash-outline" : "cash-outline"} 
+                                                                    size={18} 
+                                                                    color={T.goldDark} 
+                                                                />
+                                                            </View>
+                                                            <View>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                                    <Text style={s.cryptoSymbolText}>{sym}</Text>
+                                                                    <View style={s.networkChip}>
+                                                                        <Text style={s.networkChipText}>{sym === 'USDT' ? 'TRC20 / BEP20' : sym === 'BTC' ? 'NATIVE BITCOIN' : 'MAINNET'}</Text>
+                                                                    </View>
+                                                                </View>
+                                                                <Text style={s.cryptoBalSub}>
+                                                                    ≈ ${valUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (₦{valNgn.toLocaleString('en-US', { maximumFractionDigits: 0 })})
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+
+                                                        <View style={{ alignItems: 'flex-end' }}>
+                                                            <Text style={s.cryptoBalValue}>
+                                                                {bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                                                            </Text>
+                                                            <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                                                                <TouchableOpacity
+                                                                    onPress={() => {
+                                                                        setCryptoFundAsset(sym);
+                                                                        setCryptoFundIsDebit(false);
+                                                                        setCryptoFundingModal(true);
+                                                                    }}
+                                                                    style={s.quickAdjustCredit}
+                                                                >
+                                                                    <Text style={s.quickAdjustText}>+ Credit</Text>
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity
+                                                                    onPress={() => {
+                                                                        setCryptoFundAsset(sym);
+                                                                        setCryptoFundIsDebit(true);
+                                                                        setCryptoFundingModal(true);
+                                                                    }}
+                                                                    style={s.quickAdjustDebit}
+                                                                >
+                                                                    <Text style={s.quickAdjustText}>- Debit</Text>
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+
+                                {/* User Dedicated Deposit Addresses Section */}
+                                <Text style={[s.sectionHeading, { marginTop: 16 }]}>User Crypto Deposit Addresses ({userCryptoAddresses.length}) 📬</Text>
+                                {loadingHistory ? (
+                                    <ActivityIndicator size="small" color={T.navyDark} />
+                                ) : userCryptoAddresses.length === 0 ? (
+                                    <View style={s.noCardsCard}>
+                                        <Ionicons name="qr-code-outline" size={32} color={T.navyDark} />
+                                        <Text style={s.noCardsTitle}>No Crypto Addresses Found</Text>
+                                        <Text style={s.noCardsSub}>User has not generated any crypto deposit address yet.</Text>
+                                    </View>
+                                ) : (
+                                    <View style={{ gap: 8 }}>
+                                        {userCryptoAddresses.map((addr) => (
+                                            <View key={addr.id} style={s.cryptoAddressCard}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <View style={s.networkBadge}>
+                                                            <Text style={s.networkBadgeText}>{(addr.network || 'TRC20').toUpperCase()}</Text>
+                                                        </View>
+                                                        <Text style={{ fontWeight: '800', color: T.navyDark, fontSize: 12 }}>
+                                                            {(addr.currency || 'USDT').toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={[s.statusBadge, addr.is_active !== false ? s.statusBadgeActive : s.statusBadgeSuspended]}>
+                                                        <Text style={[s.statusBadgeText, addr.is_active !== false ? { color: T.success } : { color: T.danger }]}>
+                                                            {addr.is_active !== false ? 'ACTIVE' : 'INACTIVE'}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+
+                                                <View style={s.addressBox}>
+                                                    <Text style={s.addressText} numberOfLines={1} ellipsizeMode="middle">
+                                                        {addr.address}
+                                                    </Text>
+                                                    <TouchableOpacity 
+                                                        onPress={() => copyToClipboard(addr.address, 'Deposit Address')}
+                                                        style={s.copyAddressBtn}
+                                                    >
+                                                        <Ionicons name="copy-outline" size={14} color={T.navyDark} />
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                                                    <Text style={{ fontSize: 9.5, color: T.textSub }}>
+                                                        Created: {addr.created_at ? new Date(addr.created_at).toLocaleDateString() : 'Recent'}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 9.5, color: T.goldDark, fontWeight: '700' }}>
+                                                        Instant Scan & Deposit
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+                        )}
+
+                        {/* TAB: TRANSACTIONS (Ledger, Search, Filters, Detail Inspector) */}
+                        {modalTab === 'transactions' && (
+                            <View style={{ padding: 14 }}>
+                                {/* Ledger KPI Stats Strip */}
+                                <View style={s.txKpiRow}>
+                                    <View style={s.txKpiCard}>
+                                        <Text style={s.txKpiLabel}>TOTAL TXNS</Text>
+                                        <Text style={s.txKpiVal}>{userTransactions.length}</Text>
+                                    </View>
+                                    <View style={s.txKpiCard}>
+                                        <Text style={[s.txKpiLabel, { color: T.success }]}>TOTAL INFLOW (+)</Text>
+                                        <Text style={[s.txKpiVal, { color: T.success }]}>
+                                            ₦{userTransactions
+                                                .filter(t => t.type?.toLowerCase().includes('topup') || t.type?.toLowerCase().includes('fund') || t.type?.toLowerCase().includes('credit'))
+                                                .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+                                                .toLocaleString()}
+                                        </Text>
+                                    </View>
+                                    <View style={s.txKpiCard}>
+                                        <Text style={[s.txKpiLabel, { color: T.danger }]}>TOTAL OUTFLOW (-)</Text>
+                                        <Text style={[s.txKpiVal, { color: T.danger }]}>
+                                            ₦{userTransactions
+                                                .filter(t => !t.type?.toLowerCase().includes('topup') && !t.type?.toLowerCase().includes('fund') && !t.type?.toLowerCase().includes('credit'))
+                                                .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+                                                .toLocaleString()}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Transaction Search Bar */}
+                                <View style={s.txSearchBar}>
+                                    <Ionicons name="search" size={15} color={T.navyDark} />
+                                    <TextInput 
+                                        placeholder="Search by reference, service, or amount..."
+                                        placeholderTextColor={T.textSub}
+                                        style={s.txSearchInput}
+                                        value={txSearch}
+                                        onChangeText={setTxSearch}
+                                    />
+                                    {txSearch.length > 0 && (
+                                        <TouchableOpacity onPress={() => setTxSearch('')}>
+                                            <Ionicons name="close-circle" size={16} color={T.textSub} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                {/* Transaction Filter Chips */}
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginVertical: 8 }}>
+                                    {[
+                                        { key: 'all', label: `All (${userTransactions.length})` },
+                                        { key: 'credit', label: 'Credits (+)' },
+                                        { key: 'debit', label: 'Debits (-)' },
+                                        { key: 'crypto', label: 'Crypto ⚡' },
+                                        { key: 'bills', label: 'Bills & Data 📱' }
+                                    ].map(f => (
+                                        <TouchableOpacity
+                                            key={f.key}
+                                            onPress={() => setTxFilterType(f.key as any)}
+                                            style={[s.txFilterChip, txFilterType === f.key ? s.txFilterChipActive : null]}
+                                        >
+                                            <Text style={[s.txFilterChipText, txFilterType === f.key ? { color: '#FFFFFF' } : { color: T.navyDark }]}>
+                                                {f.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+
+                                {/* Transactions Ledger List */}
+                                <Text style={s.sectionHeading}>Transaction History ({getFilteredTransactions().length}) 📑</Text>
+                                {loadingHistory ? (
+                                    <ActivityIndicator size="small" color={T.navyDark} style={{ marginVertical: 20 }} />
+                                ) : getFilteredTransactions().length === 0 ? (
+                                    <View style={s.noCardsCard}>
+                                        <Ionicons name="receipt-outline" size={32} color={T.navyDark} />
+                                        <Text style={s.noCardsTitle}>No Transactions Found</Text>
+                                        <Text style={s.noCardsSub}>
+                                            {txSearch ? `No matches found for "${txSearch}".` : 'No transactions recorded under this category.'}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <View style={{ gap: 8 }}>
+                                        {getFilteredTransactions().map((tx) => {
+                                            const isCredit = tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('fund') || tx.type?.toLowerCase().includes('credit');
+                                            const isCrypto = tx.type?.toLowerCase().includes('crypto') || tx.description?.toLowerCase().includes('crypto');
+                                            const status = (tx.status || 'completed').toLowerCase();
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={tx.id}
+                                                    onPress={() => setSelectedTransactionDetails(tx)}
+                                                    style={s.txFullCard}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                                            <View style={[
+                                                                s.txDirectionBubble,
+                                                                isCrypto 
+                                                                    ? { backgroundColor: '#FEF3C7' } 
+                                                                    : isCredit 
+                                                                    ? { backgroundColor: '#ECFDF5' } 
+                                                                    : { backgroundColor: '#FEE2E2' }
+                                                            ]}>
+                                                                <Ionicons 
+                                                                    name={isCrypto ? 'logo-bitcoin' : isCredit ? 'arrow-down' : 'arrow-up'} 
+                                                                    size={16} 
+                                                                    color={isCrypto ? T.goldDark : isCredit ? T.success : T.danger} 
+                                                                />
+                                                            </View>
+
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={s.txTitleFull} numberOfLines={1}>
+                                                                    {tx.description || tx.type || 'Transaction'}
+                                                                </Text>
+                                                                <Text style={s.txMetaText} numberOfLines={1}>
+                                                                    REF: {tx.reference || tx.id?.slice(0, 10)} • {new Date(tx.created_at).toLocaleString()}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+
+                                                        <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                                                            <Text style={[s.txAmountFull, isCredit ? { color: T.success } : { color: T.navyDark }]}>
+                                                                {isCredit ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
+                                                            </Text>
+                                                            <View style={[
+                                                                s.txStatusPill,
+                                                                status === 'completed' || status === 'successful' 
+                                                                    ? s.txStatusCompleted 
+                                                                    : status === 'pending' 
+                                                                    ? s.txStatusPending 
+                                                                    : s.txStatusFailed
+                                                            ]}>
+                                                                <Text style={[
+                                                                    s.txStatusPillText,
+                                                                    status === 'completed' || status === 'successful' 
+                                                                        ? { color: T.success } 
+                                                                        : status === 'pending' 
+                                                                        ? { color: T.warning } 
+                                                                        : { color: T.danger }
+                                                                ]}>
+                                                                    {status.toUpperCase()}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+
+                                                    {/* Footer with Inspector hint */}
+                                                    <View style={s.txCardFooter}>
+                                                        <Text style={s.txCardFooterText}>Tap to inspect receipt & audit details</Text>
+                                                        <Ionicons name="chevron-forward" size={12} color={T.goldDark} />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                )}
                             </View>
                         )}
 
@@ -2049,6 +2652,275 @@ Metadata:
         </Modal>
     );
 
+    // Full Forensic Transaction Detail Inspection Modal
+    const renderTransactionDetailsModal = () => {
+        if (!selectedTransactionDetails) return null;
+        const tx = selectedTransactionDetails;
+        const isCredit = tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('fund') || tx.type?.toLowerCase().includes('credit');
+        const status = (tx.status || 'completed').toLowerCase();
+
+        return (
+            <Modal
+                visible={!!selectedTransactionDetails}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setSelectedTransactionDetails(null)}
+            >
+                <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
+                    <View style={s.txDetailModalCard}>
+                        <View style={s.txDetailHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="receipt" size={20} color={T.gold} />
+                                <Text style={s.txDetailTitle}>Transaction Forensic Receipt</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setSelectedTransactionDetails(null)} style={s.iconCircleBtn}>
+                                <Ionicons name="close" size={18} color={T.navyDark} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                            <View style={[
+                                s.receiptStatusBanner,
+                                status === 'completed' || status === 'successful' 
+                                    ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
+                                    : status === 'pending'
+                                    ? { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }
+                                    : { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }
+                            ]}>
+                                <Ionicons 
+                                    name={status === 'completed' || status === 'successful' ? "checkmark-circle" : status === 'pending' ? "hourglass" : "alert-circle"} 
+                                    size={30} 
+                                    color={status === 'completed' || status === 'successful' ? T.success : status === 'pending' ? T.warning : T.danger} 
+                                />
+                                <Text style={s.receiptAmountText}>
+                                    {isCredit ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
+                                </Text>
+                                <Text style={[
+                                    s.receiptStatusLabel,
+                                    { color: status === 'completed' || status === 'successful' ? T.success : status === 'pending' ? T.warning : T.danger }
+                                ]}>
+                                    {status.toUpperCase()}
+                                </Text>
+                            </View>
+
+                            <View style={s.receiptTable}>
+                                <View style={s.receiptRow}>
+                                    <Text style={s.receiptRowLabel}>Service / Type</Text>
+                                    <Text style={s.receiptRowVal}>{tx.type || 'N/A'}</Text>
+                                </View>
+                                <View style={s.receiptRow}>
+                                    <Text style={s.receiptRowLabel}>Description</Text>
+                                    <Text style={[s.receiptRowVal, { flex: 1, textAlign: 'right' }]}>{tx.description || 'No description'}</Text>
+                                </View>
+                                <View style={s.receiptRow}>
+                                    <Text style={s.receiptRowLabel}>Transaction Ref</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={[s.receiptRowVal, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11 }]}>{tx.reference || 'N/A'}</Text>
+                                        {tx.reference && (
+                                            <TouchableOpacity onPress={() => copyToClipboard(tx.reference || '', 'Reference')}>
+                                                <Ionicons name="copy-outline" size={14} color={T.goldDark} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                </View>
+                                {tx.gateway_reference && (
+                                    <View style={s.receiptRow}>
+                                        <Text style={s.receiptRowLabel}>Gateway Ref</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={[s.receiptRowVal, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11 }]}>{tx.gateway_reference}</Text>
+                                            <TouchableOpacity onPress={() => copyToClipboard(tx.gateway_reference || '', 'Gateway Ref')}>
+                                                <Ionicons name="copy-outline" size={14} color={T.goldDark} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                )}
+                                <View style={s.receiptRow}>
+                                    <Text style={s.receiptRowLabel}>Transaction ID</Text>
+                                    <Text style={[s.receiptRowVal, { fontSize: 10, color: T.textSub }]}>{tx.id}</Text>
+                                </View>
+                                <View style={s.receiptRow}>
+                                    <Text style={s.receiptRowLabel}>Timestamp</Text>
+                                    <Text style={s.receiptRowVal}>{new Date(tx.created_at).toLocaleString()}</Text>
+                                </View>
+                                <View style={s.receiptRow}>
+                                    <Text style={s.receiptRowLabel}>Fee / Charge</Text>
+                                    <Text style={s.receiptRowVal}>₦{Number(tx.fee || 0).toLocaleString()}</Text>
+                                </View>
+                            </View>
+
+                            {tx.metadata && (
+                                <View style={{ marginTop: 12 }}>
+                                    <Text style={s.sectionHeading}>Gateway Payload / Metadata</Text>
+                                    <View style={s.metadataBox}>
+                                        <Text style={s.metadataText}>
+                                            {typeof tx.metadata === 'object' ? JSON.stringify(tx.metadata, null, 2) : String(tx.metadata)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                                <TouchableOpacity
+                                    onPress={() => copyToClipboard(tx.reference || tx.id, 'Transaction Reference')}
+                                    style={s.receiptCopyBtn}
+                                >
+                                    <Ionicons name="copy" size={14} color={T.navyDark} />
+                                    <Text style={s.receiptCopyBtnText}>Copy Reference</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => setSelectedTransactionDetails(null)}
+                                    style={s.receiptCloseBtn}
+                                >
+                                    <Text style={s.receiptCloseBtnText}>Close Receipt</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </BlurView>
+            </Modal>
+        );
+    };
+
+    // Executive Direct Crypto Funding & Debit Modal
+    const renderCryptoFundingModal = () => (
+        <Modal
+            visible={cryptoFundingModal}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => !cryptoFundProcessing && setCryptoFundingModal(false)}
+        >
+            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
+                <View style={s.createUserCard}>
+                    <View style={s.createUserHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="logo-bitcoin" size={20} color={T.gold} />
+                            <Text style={s.createUserTitle}>Direct Crypto Adjuster ⚡</Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setCryptoFundingModal(false)}
+                            disabled={cryptoFundProcessing}
+                            style={s.iconCircleBtn}
+                        >
+                            <Ionicons name="close" size={18} color={T.navyDark} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                        <Text style={{ fontSize: 12, color: T.textSub, marginBottom: 12 }}>
+                            Directly credit or debit crypto assets for <Text style={{ fontWeight: '800', color: T.navyDark }}>{selectedUser?.full_name || selectedUser?.email}</Text>.
+                        </Text>
+
+                        <View style={s.fundingToggleRow}>
+                            <TouchableOpacity
+                                onPress={() => setCryptoFundIsDebit(false)}
+                                style={[s.fundingTogglePill, !cryptoFundIsDebit ? s.fundingTogglePillActiveFund : null]}
+                            >
+                                <Ionicons name="arrow-down-circle" size={16} color={!cryptoFundIsDebit ? '#FFFFFF' : T.success} />
+                                <Text style={[s.fundingToggleText, !cryptoFundIsDebit ? { color: '#FFFFFF' } : { color: T.success }]}>
+                                    + Credit / Fund
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setCryptoFundIsDebit(true)}
+                                style={[s.fundingTogglePill, cryptoFundIsDebit ? s.fundingTogglePillActiveDebit : null]}
+                            >
+                                <Ionicons name="arrow-up-circle" size={16} color={cryptoFundIsDebit ? '#FFFFFF' : T.danger} />
+                                <Text style={[s.fundingToggleText, cryptoFundIsDebit ? { color: '#FFFFFF' } : { color: T.danger }]}>
+                                    - Debit / Deduct
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={[s.fieldLabel, { marginTop: 12 }]}>Select Cryptocurrency Asset</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 6 }}>
+                            {['USDT', 'BTC', 'ETH', 'SOL', 'BNB'].map(sym => (
+                                <TouchableOpacity
+                                    key={sym}
+                                    onPress={() => setCryptoFundAsset(sym)}
+                                    style={[
+                                        s.presetChip,
+                                        cryptoFundAsset === sym ? { backgroundColor: T.navyDark, borderColor: T.gold } : null
+                                    ]}
+                                >
+                                    <Text style={[
+                                        s.presetChipText,
+                                        cryptoFundAsset === sym ? { color: '#FFFFFF', fontWeight: '900' } : null
+                                    ]}>
+                                        {sym}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={[s.fieldLabel, { marginTop: 8 }]}>Amount in {cryptoFundAsset}</Text>
+                        <View style={s.amountInputContainer}>
+                            <Text style={[s.nairaSymbol, { fontSize: 13, color: T.goldDark }]}>{cryptoFundAsset}</Text>
+                            <TextInput
+                                placeholder={`Enter ${cryptoFundAsset} amount (e.g. 10)`}
+                                placeholderTextColor={T.textSub}
+                                keyboardType="numeric"
+                                style={s.customAmountInput}
+                                value={cryptoFundAmount}
+                                onChangeText={setCryptoFundAmount}
+                            />
+                            {cryptoFundAmount.length > 0 && (
+                                <TouchableOpacity onPress={() => setCryptoFundAmount('')} style={{ padding: 4 }}>
+                                    <Ionicons name="close-circle" size={18} color={T.textSub} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        <View style={s.presetRow}>
+                            {['5', '10', '25', '50', '100', '500'].map(val => (
+                                <TouchableOpacity
+                                    key={val}
+                                    onPress={() => setCryptoFundAmount(val)}
+                                    style={[s.presetChip, cryptoFundAmount === val ? s.presetChipActive : null]}
+                                >
+                                    <Text style={[s.presetChipText, cryptoFundAmount === val ? { color: '#FFFFFF' } : { color: T.navyDark }]}>
+                                        +{val}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                const amt = Number(cryptoFundAmount);
+                                if (isNaN(amt) || amt <= 0) {
+                                    Alert.alert("Invalid Amount", "Please enter a valid positive number.");
+                                    return;
+                                }
+                                handleDirectCryptoFundOrDebit(cryptoFundIsDebit, cryptoFundAsset, amt);
+                            }}
+                            disabled={cryptoFundProcessing || !cryptoFundAmount || Number(cryptoFundAmount) <= 0}
+                            style={[
+                                s.executeFundingBtn,
+                                cryptoFundIsDebit ? { backgroundColor: T.danger } : { backgroundColor: T.success },
+                                (!cryptoFundAmount || Number(cryptoFundAmount) <= 0) ? { opacity: 0.5 } : { opacity: 1 }
+                            ]}
+                        >
+                            {cryptoFundProcessing ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name={cryptoFundIsDebit ? "arrow-up-circle" : "checkmark-circle"} size={20} color="#FFFFFF" />
+                                    <Text style={s.executeFundingBtnText}>
+                                        {cryptoFundIsDebit 
+                                            ? `CONFIRM DEBIT ${cryptoFundAmount ? `(${cryptoFundAmount} ${cryptoFundAsset})` : ''}`
+                                            : `CONFIRM CREDIT ${cryptoFundAmount ? `(${cryptoFundAmount} ${cryptoFundAsset})` : ''}`
+                                        }
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </BlurView>
+        </Modal>
+    );
+
     return (
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} /> 
@@ -2281,6 +3153,12 @@ Metadata:
                                     <Text style={s.badgeVerifiedText}>Tier {item.kyc_tier || 1} Verified</Text>
                                 </View>
                             )}
+                            {item.crypto_enabled && (
+                                <View style={[s.badgeVerified, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+                                    <Ionicons name="logo-bitcoin" size={10} color="#D97706" />
+                                    <Text style={[s.badgeVerifiedText, { color: '#B45309', fontWeight: '900' }]}>CRYPTO</Text>
+                                </View>
+                            )}
                         </View>
 
                         {/* Section 3: Bottom Vault Balance Bar */}
@@ -2317,6 +3195,8 @@ Metadata:
             {renderUserModal()}
             {renderCreateUserModal()}
             {renderManualVaModal()}
+            {renderTransactionDetailsModal()}
+            {renderCryptoFundingModal()}
 
             {/* Admin Verification Modal */}
             <SecurityModal 
@@ -3478,6 +4358,401 @@ const s = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '900',
+    },
+
+    // Crypto Modern Styles
+    cryptoValuationCard: {
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1.5,
+        borderColor: T.gold,
+    },
+    cryptoValuationLabel: {
+        color: T.gold,
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    cryptoValuationUsd: {
+        color: '#FFFFFF',
+        fontSize: 26,
+        fontWeight: '900',
+        marginTop: 4,
+    },
+    cryptoValuationNgn: {
+        color: '#94A3B8',
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    cryptoFundActionBtn: {
+        flex: 1,
+        backgroundColor: T.success,
+        paddingVertical: 9,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    cryptoFundActionBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    cryptoDebitActionBtn: {
+        flex: 1,
+        backgroundColor: T.danger,
+        paddingVertical: 9,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    cryptoDebitActionBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    cryptoAssetCard: {
+        backgroundColor: T.card,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    cryptoIconBubble: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: T.bg,
+        borderWidth: 1,
+        borderColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cryptoSymbolText: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: T.navyDark,
+    },
+    networkChip: {
+        backgroundColor: T.bg,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    networkChipText: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: T.textSub,
+    },
+    cryptoBalSub: {
+        fontSize: 10,
+        color: T.textSub,
+        marginTop: 2,
+    },
+    cryptoBalValue: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: T.navyDark,
+    },
+    quickAdjustCredit: {
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    quickAdjustDebit: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    quickAdjustText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: T.navyDark,
+    },
+    cryptoAddressCard: {
+        backgroundColor: T.card,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    networkBadge: {
+        backgroundColor: T.navyDark,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    networkBadgeText: {
+        color: T.gold,
+        fontSize: 9,
+        fontWeight: '900',
+    },
+    addressBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: T.bg,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginVertical: 4,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    addressText: {
+        flex: 1,
+        fontSize: 11,
+        color: T.navyDark,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    copyAddressBtn: {
+        padding: 4,
+        marginLeft: 6,
+    },
+
+    // Transaction Ledger Styles
+    txKpiRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 10,
+    },
+    txKpiCard: {
+        flex: 1,
+        backgroundColor: T.card,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        alignItems: 'center',
+    },
+    txKpiLabel: {
+        fontSize: 8.5,
+        fontWeight: '800',
+        color: T.textSub,
+        marginBottom: 2,
+    },
+    txKpiVal: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: T.navyDark,
+    },
+    txSearchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.card,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: T.border,
+        gap: 8,
+    },
+    txSearchInput: {
+        flex: 1,
+        fontSize: 12,
+        color: T.textMain,
+        padding: 0,
+    },
+    txFilterChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 20,
+        backgroundColor: T.card,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    txFilterChipActive: {
+        backgroundColor: T.navyDark,
+        borderColor: T.gold,
+    },
+    txFilterChipText: {
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    txFullCard: {
+        backgroundColor: T.card,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    txDirectionBubble: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    txTitleFull: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.navyDark,
+    },
+    txMetaText: {
+        fontSize: 9.5,
+        color: T.textSub,
+        marginTop: 2,
+    },
+    txAmountFull: {
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    txStatusPill: {
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+        marginTop: 3,
+        alignSelf: 'flex-end',
+    },
+    txStatusCompleted: {
+        backgroundColor: '#ECFDF5',
+    },
+    txStatusPending: {
+        backgroundColor: '#FEF3C7',
+    },
+    txStatusFailed: {
+        backgroundColor: '#FEE2E2',
+    },
+    txStatusPillText: {
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    txCardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 8,
+        paddingTop: 6,
+        borderTopWidth: 1,
+        borderTopColor: T.border,
+    },
+    txCardFooterText: {
+        fontSize: 9.5,
+        color: T.goldDark,
+        fontWeight: '700',
+    },
+
+    // Transaction Details Modal Styles
+    txDetailModalCard: {
+        width: '92%',
+        maxWidth: 580,
+        alignSelf: 'center',
+        maxHeight: '85%',
+        backgroundColor: T.card,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: T.gold,
+        overflow: 'hidden',
+    },
+    txDetailHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        backgroundColor: T.bg,
+    },
+    txDetailTitle: {
+        color: T.navyDark,
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    receiptStatusBanner: {
+        alignItems: 'center',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 14,
+    },
+    receiptAmountText: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: T.navyDark,
+        marginTop: 6,
+    },
+    receiptStatusLabel: {
+        fontSize: 11,
+        fontWeight: '900',
+        marginTop: 2,
+        letterSpacing: 0.5,
+    },
+    receiptTable: {
+        backgroundColor: T.bg,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        gap: 10,
+    },
+    receiptRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    receiptRowLabel: {
+        fontSize: 11,
+        color: T.textSub,
+        fontWeight: '700',
+    },
+    receiptRowVal: {
+        fontSize: 11,
+        color: T.navyDark,
+        fontWeight: '800',
+    },
+    metadataBox: {
+        backgroundColor: '#0F172A',
+        borderRadius: 8,
+        padding: 10,
+        marginTop: 6,
+    },
+    metadataText: {
+        color: '#38BDF8',
+        fontSize: 9.5,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    receiptCopyBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: 8,
+        backgroundColor: T.goldBg,
+        borderWidth: 1,
+        borderColor: T.goldDark,
+    },
+    receiptCopyBtnText: {
+        color: T.navyDark,
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    receiptCloseBtn: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 8,
+        backgroundColor: T.navyDark,
+    },
+    receiptCloseBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
     },
 });
 
