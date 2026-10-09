@@ -214,9 +214,9 @@ export default function TrackingScreen() {
     };
 
     const faqs = [
-        { q: 'Menene Personalization?', a: 'Personalization wani tsari ne na kamala katin NIN da kuma buga ainihin katin wanda hukumar NIMC ke gudanarwa.' },
-        { q: 'Yaya ake biyan kuɗin wannan sabis?', a: 'Ana cire kuɗi kaɗan daga balance ɗinka na tantancewa da zarar an sami nasarar runing personalization check.' },
-        { q: 'Zan iya sake duba personalization na baya?', a: 'Ee, tarihin dukan personalization ɗin da ka gudanar yana nan a ƙasan shafin don sauƙin reprint ko duba status na baya.' }
+        { q: 'What is Personalization Tracking?', a: 'Personalization is the official NIMC process of generating and printing the physical National Identity Card.' },
+        { q: 'How is this service charged?', a: 'Your verification wallet is only debited upon successful tracking status check.' },
+        { q: 'Can I check past tracking requests?', a: 'Yes. All tracking inquiries are saved in Recent History for status verification and receipt reprints.' }
     ];
 
     const filteredHistory = historyList.filter(item => {
@@ -478,7 +478,7 @@ export default function TrackingScreen() {
                     <View style={styles.walletLeft}>
                         <Ionicons name="wallet-outline" size={20} color="#060d21" />
                         <View style={{ marginLeft: 8 }}>
-                            <Text style={styles.walletLabel}>Tantancewa Balance</Text>
+                            <Text style={styles.walletLabel}>Verification Balance</Text>
                             <Text style={styles.walletVal}>
                                 {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Loading...'}
                             </Text>

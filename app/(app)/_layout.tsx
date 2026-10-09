@@ -78,8 +78,27 @@ export default function AppLayout() {
             <Tabs.Screen name="airtime-to-cash" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="bills" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="education" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            {/* BVN Service screens */}
             <Tabs.Screen name="bvn-services/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/verify" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/premium-slip" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/retrieval" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/vnin-to-nibss" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/modification" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/enrollment" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="bvn-services/history" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+
+            {/* NIN Service screens */}
             <Tabs.Screen name="nin-services/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/verify-nin" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/verify-phone" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/demographic" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/validation" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/modification" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/delink" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/ipe-clearance" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/tracking" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="nin-services/history" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="kyc" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="virtual-cards" options={{ href: null, tabBarStyle: { display: 'none' } }} />

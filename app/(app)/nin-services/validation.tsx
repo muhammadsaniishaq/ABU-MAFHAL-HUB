@@ -248,9 +248,9 @@ export default function ValidationScreen() {
     };
 
     const faqs = [
-        { q: 'Menene Validation?', a: 'NIN Validation wani tsari ne na daidaitawa da kuma tabbatar da ingancin lambar NIN dinka a kan uwar garken hukumar NIMC lokacin da ta samu wata matsala ko aka canza mata wani bayani.' },
-        { q: 'Yaya ake biyan kuɗin wannan sabis?', a: 'Ana cire kuɗi kaɗan daga balance ɗinka na tantancewa da zarar an sami nasarar runing validation.' },
-        { q: 'Zan iya sake duba validation na baya?', a: 'Ee, tarihin dukan validation ɗin da ka gudanar yana nan a ƙasan shafin don sauƙin reprint ko duba status na baya.' }
+        { q: 'What is NIN Validation?', a: 'NIN Validation resolves synchronization errors, database mismatch, or missing record issues on the central NIMC database.' },
+        { q: 'How is this service charged?', a: 'Your verification wallet is only debited upon successful submission of the validation request.' },
+        { q: 'Can I view previous validation requests?', a: 'Yes. All submitted validation requests are logged below in Recent History for status checks and receipt reprints.' }
     ];
 
     const filteredHistory = historyList.filter(item => {
@@ -512,7 +512,7 @@ export default function ValidationScreen() {
                     <View style={styles.walletLeft}>
                         <Ionicons name="wallet-outline" size={20} color="#060d21" />
                         <View style={{ marginLeft: 8 }}>
-                            <Text style={styles.walletLabel}>Tantancewa Balance</Text>
+                            <Text style={styles.walletLabel}>Verification Balance</Text>
                             <Text style={styles.walletVal}>
                                 {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Loading...'}
                             </Text>

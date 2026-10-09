@@ -240,9 +240,9 @@ export default function IPEClearanceScreen() {
     };
 
     const faqs = [
-        { q: "Menene IPE Clearance?", a: "IPE Clearance wani tsari ne na tantance ingancin lambar NIN ko Tracking ID don tabbatar da cewa babu wata matsala game da bayanan aikin ma'aikaci kafin a ɗauke shi aiki." },
-        { q: "Yaya ake biyan kuɗin wannan sabis?", a: "Ana cire kuɗi kaɗan daga balance ɗinka na tantancewa da zarar an sami nasarar runing clearance." },
-        { q: "Zan iya sake duba clearance na baya?", a: "Ee, tarihin dukan clearance ɗin da ka gudanar yana nan a ƙasan shafin don sauƙin reprint ko duba status na baya." }
+        { q: "What is IPE Clearance?", a: "IPE Clearance is the official identity vetting and pre-employment compliance check verifying candidate records with NIMC." },
+        { q: "How is this service charged?", a: "Your verification wallet is only debited upon successful execution of the clearance check." },
+        { q: "Can I review past clearance results?", a: "Yes. All previous clearance checks are logged in Recent History for status verification and receipt reprints." }
     ];
 
     const filteredHistory = historyList.filter(item => {
@@ -462,7 +462,7 @@ export default function IPEClearanceScreen() {
                     <View style={styles.walletLeft}>
                         <Ionicons name="wallet-outline" size={20} color="#060d21" />
                         <View style={{ marginLeft: 8 }}>
-                            <Text style={styles.walletLabel}>Tantancewa Balance</Text>
+                            <Text style={styles.walletLabel}>Verification Balance</Text>
                             <Text style={styles.walletVal}>
                                 {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Loading...'}
                             </Text>

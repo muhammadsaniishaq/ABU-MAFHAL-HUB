@@ -260,8 +260,10 @@ export default function VerifyPhoneScreen() {
             } else {
                 const msg = response.message || 'Unable to verify this phone number. Please check and try again.';
                 const lowerMsg = msg.toLowerCase();
-                if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
-                    showAlert('Service Unavailable', 'This verification service is temporarily unavailable. Please try again later.', 'warning');
+                if (lowerMsg.includes('provider api wallet') || lowerMsg.includes('agenthub developer account') || lowerMsg.includes('provider balance')) {
+                    showAlert('Provider Gateway Balance Low', 'The provider API wallet balance on agenthub.ng is exhausted. Please top up your provider wallet at https://agenthub.ng to enable live verifications.', 'warning');
+                } else if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
+                    showAlert('Insufficient Wallet Balance', msg, 'warning');
                 } else if (lowerMsg.includes('unauthorized') || lowerMsg.includes('auth')) {
                     showAlert('Session Expired', 'Please log out and log in again, then retry.', 'error');
                 } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
@@ -966,9 +968,9 @@ export default function VerifyPhoneScreen() {
     };
 
     const faqs = [
-        { q: 'Yaya tsarin binciken yake aiki?', a: 'Zaɓi siffar katin da kake so (Layout), sanya lambar wayar da ke da alaƙa da NIN, sannan danna Lookup Phone. Tsarin zai zaƙulo bayanan mutumin nan take.' },
-        { q: 'Akwai kuɗi a wannan binciken?', a: 'Ee, ana cire kuɗi gwargwadon siffar katin da ka zaɓa. Ana cire kuɗin ne kawai idan an samu nasarar zaƙulo bayanan katin.' },
-        { q: 'Zan iya sake sauke katin da na riga na biya?', a: 'Haka ne! Dukan katunan da ka fitar a baya suna nan a ajiye a rukunin "Recent Lookups". Zaka iya sake duba su ko sauke su (PDF ko PNG) kyauta.' }
+        { q: 'How does phone verification work?', a: 'Select your desired slip layout, enter the 11-digit phone number linked to the NIN, and tap Lookup Phone. The verified record is retrieved instantly.' },
+        { q: 'What is the verification fee?', a: 'The fee depends on the selected layout. Your wallet is debited only upon successful record retrieval.' },
+        { q: 'Can I re-download previous slips?', a: 'Yes. All verified slips are saved under Recent Lookups for free lifetime re-downloads (PDF or PNG).' }
     ];
 
     // Filter history based on search
@@ -1229,7 +1231,7 @@ export default function VerifyPhoneScreen() {
                     <View style={styles.walletLeft}>
                         <Ionicons name="wallet-outline" size={20} color="#060d21" />
                         <View style={{ marginLeft: 8 }}>
-                            <Text style={styles.walletLabel}>Tantancewa Balance</Text>
+                            <Text style={styles.walletLabel}>Verification Balance</Text>
                             <Text style={styles.walletVal}>
                                 {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Loading...'}
                             </Text>

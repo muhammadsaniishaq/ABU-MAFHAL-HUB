@@ -74,13 +74,6 @@ export default function VerifyNINScreen() {
     
     // Additional Premium States
     const [userBalance, setUserBalance] = useState<number | null>(null);
-    const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-
-    const faqs = [
-        { q: 'Yaya wannan tsarin yake aiki?', a: 'Zaɓi katin da kake buƙata (Premium, Standard, Regular ko Info), rubuta lambar NIN ɗinka guda 11, sannan ka danna Verify. Katinka zai fito nan take cikin tsari na zamani don saukewa ko bugawa.' },
-        { q: 'Nawa ne kuɗin tantancewa?', a: 'Kuɗin kowane tsari yana nan a rubuce a ƙasan kowane kati. Za a cire kuɗin ne kawai idan an samu nasarar tantance lambar.' },
-        { q: 'Zan iya sake sauke katin da na riga na biya?', a: 'Haka ne! Dukan katunan da ka fitar a baya suna nan a ajiye a cikin rukunin "Recent Prints" (Tarihi). Zaka iya sake duba su ko sauke su (PDF ko PNG) kyauta ba tare da an sake cire ko sisi ba.' }
-    ];
 
     const fetchWalletBalance = async () => {
         try {
@@ -2166,8 +2159,10 @@ export default function VerifyNINScreen() {
             } else {
                 const msg = response.message || 'Unable to verify this NIN. Please check the number and try again.';
                 const lowerMsg = msg.toLowerCase();
-                if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
-                    showAlert('Service Unavailable', 'This verification service is temporarily unavailable. Please try again later.', 'warning');
+                if (lowerMsg.includes('provider api wallet') || lowerMsg.includes('agenthub developer account') || lowerMsg.includes('provider balance')) {
+                    showAlert('Provider Gateway Balance Low', 'The provider API wallet balance on agenthub.ng is exhausted. Please top up your provider wallet at https://agenthub.ng to enable live verifications.', 'warning');
+                } else if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
+                    showAlert('Insufficient Wallet Balance', msg, 'warning');
                 } else if (lowerMsg.includes('unauthorized') || lowerMsg.includes('auth')) {
                     showAlert('Session Expired', 'Please log out and log in again, then retry.', 'error');
                 } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
@@ -2456,7 +2451,7 @@ switch(selectedLayout) {
                     onPress={() => router.push('/(app)/wallet')}
                     activeOpacity={0.8}
                 >
-                    <Ionicons name="wallet-outline" size={13} color="#d97706" />
+                    <Ionicons name="wallet-outline" size={13} color="#059669" />
                     <Text style={styles.headerWalletText}>
                         {userBalance !== null ? `₦${userBalance.toLocaleString()}` : '...'}
                     </Text>
@@ -2466,7 +2461,7 @@ switch(selectedLayout) {
                 </TouchableOpacity>
             </View>
 
-            {/* Segmented Mode Tabs: [ Tantance & Buga ] vs [ Tarihin Buga ] */}
+            {/* Segmented Mode Tabs: [ Verify & Print ] vs [ Reprint History ] */}
             <View style={styles.tabContainer}>
                 <TouchableOpacity 
                     style={[styles.tabButton, activeTab === 'verify' && styles.tabButtonActive]}
@@ -2476,10 +2471,10 @@ switch(selectedLayout) {
                     <Ionicons 
                         name="id-card-outline" 
                         size={15} 
-                        color={activeTab === 'verify' ? '#d97706' : '#64748b'} 
+                        color={activeTab === 'verify' ? '#059669' : '#64748b'} 
                     />
                     <Text style={[styles.tabButtonText, activeTab === 'verify' && styles.tabButtonTextActive]}>
-                        Tantance & Buga
+                        Verify & Print
                     </Text>
                 </TouchableOpacity>
 
@@ -2491,10 +2486,10 @@ switch(selectedLayout) {
                     <Ionicons 
                         name="time-outline" 
                         size={15} 
-                        color={activeTab === 'history' ? '#d97706' : '#64748b'} 
+                        color={activeTab === 'history' ? '#059669' : '#64748b'} 
                     />
                     <Text style={[styles.tabButtonText, activeTab === 'history' && styles.tabButtonTextActive]}>
-                        Tarihin Buga {historyList.length > 0 ? `(${historyList.length})` : ''}
+                        Reprint History {historyList.length > 0 ? `(${historyList.length})` : ''}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -2513,8 +2508,8 @@ switch(selectedLayout) {
                                     <Text style={styles.stepBadgeText}>1</Text>
                                 </View>
                                 <View>
-                                    <Text style={styles.cardTitle}>Zaɓi Tsarin Katin NIN</Text>
-                                    <Text style={styles.cardSubtitle}>Zaɓi salon katin da kake son bugawa</Text>
+                                    <Text style={styles.cardTitle}>Select Slip Layout</Text>
+                                    <Text style={styles.cardSubtitle}>Choose your desired slip format</Text>
                                 </View>
                             </View>
 
@@ -2537,7 +2532,7 @@ switch(selectedLayout) {
                                                 isSelected ? styles.badgeSelected : styles.badgeUnselected
                                             ]}>
                                                 {isSelected && (
-                                                    <Ionicons name="checkmark-circle" size={11} color="#d97706" style={{ marginRight: 2 }} />
+                                                    <Ionicons name="checkmark-circle" size={11} color="#059669" style={{ marginRight: 2 }} />
                                                 )}
                                                 <Text style={[
                                                     styles.badgeText,
@@ -2550,12 +2545,12 @@ switch(selectedLayout) {
                                             {/* Preview Box */}
                                             <View style={[
                                                 styles.layoutIconBox,
-                                                isSelected && { borderColor: '#fde68a', backgroundColor: '#fffbeb' }
+                                                isSelected && { borderColor: '#a7f3d0', backgroundColor: '#f0fdf4' }
                                             ]}>
                                                 {(layout as any).image && (
                                                     <Image 
                                                         source={(layout as any).image} 
-                                                        style={styles.layoutImage}
+                                                        style={styles.layoutImage} 
                                                         resizeMode="contain" 
                                                     />
                                                 )}
@@ -2595,8 +2590,8 @@ switch(selectedLayout) {
                                     <Text style={styles.stepBadgeText}>2</Text>
                                 </View>
                                 <View>
-                                    <Text style={styles.cardTitle}>Shigar da Lambar NIN</Text>
-                                    <Text style={styles.cardSubtitle}>Lamba 11 ta katin shaidar ɗan ƙasa</Text>
+                                    <Text style={styles.cardTitle}>National Identification Number</Text>
+                                    <Text style={styles.cardSubtitle}>Enter 11-digit verified identity number</Text>
                                 </View>
                             </View>
                             
@@ -2604,7 +2599,7 @@ switch(selectedLayout) {
                                 <View style={[styles.inputContainer, nin.length === 11 && styles.inputContainerValid]}>
                                     <Ionicons name="keypad-outline" size={18} color={nin.length === 11 ? '#10b981' : '#94a3b8'} />
                                     <TextInput
-                                        placeholder="Shigar da lambar NIN (11 digits)"
+                                        placeholder="Enter 11-digit NIN"
                                         placeholderTextColor="#94a3b8"
                                         style={styles.input}
                                         keyboardType="number-pad" 
@@ -2650,7 +2645,7 @@ switch(selectedLayout) {
                                     {consent && <Ionicons name="checkmark" size={13} color="#ffffff" />}
                                 </View>
                                 <Text style={styles.consentText}>
-                                    Na tabbatar na sami izinin mamallakin wannan NIN don tantance bayanan sa daga NIMC.
+                                    I confirm that authorized consent has been obtained from the ID owner for this verification.
                                 </Text>
                             </TouchableOpacity>
 
@@ -2668,7 +2663,7 @@ switch(selectedLayout) {
                                         style={styles.verifyBtnWrapper}
                                     >
                                         <LinearGradient
-                                            colors={isValid ? ['#f59e0b', '#d97706'] : ['#e2e8f0', '#cbd5e1']}
+                                            colors={isValid ? ['#059669', '#047857'] : ['#e2e8f0', '#cbd5e1']}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
                                             style={styles.verifyButton}
@@ -2676,13 +2671,13 @@ switch(selectedLayout) {
                                             {loading ? (
                                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                     <ActivityIndicator color="#ffffff" size="small" />
-                                                    <Text style={[styles.verifyButtonText, { marginLeft: 8 }]}>Ana Tantancewa...</Text>
+                                                    <Text style={[styles.verifyButtonText, { marginLeft: 8 }]}>Verifying...</Text>
                                                 </View>
                                             ) : (
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                                     <Ionicons name="shield-checkmark" size={18} color={isValid ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
                                                     <Text style={[styles.verifyButtonText, !isValid && { color: '#64748b' }]}>
-                                                        Tantance & Buga Kati • ₦{currentPrice.toLocaleString()}
+                                                        Verify & Generate Slip • ₦{currentPrice.toLocaleString()}
                                                     </Text>
                                                 </View>
                                             )}
@@ -2692,34 +2687,24 @@ switch(selectedLayout) {
                             })()}
                         </View>
 
-                        {/* FAQ / Guidelines Section */}
+                        {/* Guidelines Section (Clean, Minimal, Executive) */}
                         <View style={styles.card}>
                             <View style={styles.historyHeader}>
-                                <Ionicons name="help-circle" size={16} color="#d97706" />
-                                <Text style={styles.historyTitle}>Tambayoyi & Jagora (FAQ)</Text>
+                                <Ionicons name="shield-checkmark" size={16} color="#059669" />
+                                <Text style={styles.historyTitle}>Verification Guidelines</Text>
                             </View>
-                            {faqs.map((faq, idx) => {
-                                const isExpanded = expandedFaq === idx;
-                                return (
-                                    <View key={idx} style={styles.faqItem}>
-                                        <TouchableOpacity 
-                                            style={styles.faqHeader} 
-                                            onPress={() => setExpandedFaq(isExpanded ? null : idx)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={styles.faqQuestion}>{faq.q}</Text>
-                                            <Ionicons 
-                                                name={isExpanded ? "chevron-up" : "chevron-down"} 
-                                                size={14} 
-                                                color="#64748b" 
-                                            />
-                                        </TouchableOpacity>
-                                        {isExpanded && (
-                                            <Text style={styles.faqAnswer}>{faq.a}</Text>
-                                        )}
-                                    </View>
-                                );
-                            })}
+                            <View style={styles.guidelineRow}>
+                                <Ionicons name="checkmark-circle" size={14} color="#059669" style={{ marginTop: 2, marginRight: 8 }} />
+                                <Text style={styles.guidelineText}>Official NIMC database verification with instant biometric details.</Text>
+                            </View>
+                            <View style={styles.guidelineRow}>
+                                <Ionicons name="checkmark-circle" size={14} color="#059669" style={{ marginTop: 2, marginRight: 8 }} />
+                                <Text style={styles.guidelineText}>Instant slip download in both high-resolution PDF and PNG formats.</Text>
+                            </View>
+                            <View style={styles.guidelineRow}>
+                                <Ionicons name="checkmark-circle" size={14} color="#059669" style={{ marginTop: 2, marginRight: 8 }} />
+                                <Text style={styles.guidelineText}>All generated slips are securely saved in Reprint History for free lifetime access.</Text>
+                            </View>
                         </View>
                     </>
                 ) : (
@@ -2728,13 +2713,13 @@ switch(selectedLayout) {
                         {historyList.length > 0 && (
                             <View style={styles.statsCard}>
                                 <View style={styles.statsHeader}>
-                                    <Ionicons name="analytics" size={15} color="#d97706" />
-                                    <Text style={styles.statsTitle}>Takaitaccen Tarihin Buga Kati</Text>
+                                    <Ionicons name="analytics" size={15} color="#059669" />
+                                    <Text style={styles.statsTitle}>Verification Analytics</Text>
                                 </View>
                                 <View style={styles.statsGrid}>
                                     <View style={styles.statBox}>
                                         <Text style={styles.statNum}>{historyList.length}</Text>
-                                        <Text style={styles.statLabel}>Duka (Total)</Text>
+                                        <Text style={styles.statLabel}>Total</Text>
                                     </View>
                                     <View style={styles.statDivider} />
                                     <View style={styles.statBox}>
@@ -2755,7 +2740,7 @@ switch(selectedLayout) {
                                         <Text style={styles.statNum}>
                                             {historyList.filter(item => ['regular', 'info'].includes(item.layout)).length}
                                         </Text>
-                                        <Text style={styles.statLabel}>Sauran Slips</Text>
+                                        <Text style={styles.statLabel}>Other Slips</Text>
                                     </View>
                                 </View>
                             </View>
@@ -2766,7 +2751,7 @@ switch(selectedLayout) {
                             <View style={styles.searchContainer}>
                                 <Ionicons name="search" size={16} color="#94a3b8" />
                                 <TextInput
-                                    placeholder="Nemo a tarihi (Suna ko NIN)..."
+                                    placeholder="Search history by name or NIN..."
                                     placeholderTextColor="#94a3b8"
                                     style={styles.searchInput}
                                     value={searchQuery}
@@ -2784,8 +2769,8 @@ switch(selectedLayout) {
                         {filteredHistory.length > 0 ? (
                             <View style={styles.card}>
                                 <View style={styles.historyHeader}>
-                                    <Ionicons name="time" size={16} color="#d97706" />
-                                    <Text style={styles.historyTitle}>Katunan da aka Buga a Baya</Text>
+                                    <Ionicons name="time" size={16} color="#059669" />
+                                    <Text style={styles.historyTitle}>Past Verifications</Text>
                                 </View>
 
                                 <View style={{ flexDirection: 'column' }}>
@@ -2801,7 +2786,7 @@ switch(selectedLayout) {
                                                 activeOpacity={0.7}
                                             >
                                                 <View style={styles.historyIconContainer}>
-                                                    <Ionicons name="document-text" size={16} color="#d97706" />
+                                                    <Ionicons name="document-text" size={16} color="#059669" />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={styles.historyName}>{item.name}</Text>
@@ -2822,7 +2807,7 @@ switch(selectedLayout) {
                                                     activeOpacity={0.7}
                                                 >
                                                     <Ionicons name="print-outline" size={12} color="#0f172a" />
-                                                    <Text style={styles.reprintBtnText}>Buga</Text>
+                                                    <Text style={styles.reprintBtnText}>Reprint</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity 
                                                     onPress={() => deleteHistoryItem(item.id)}
@@ -2842,10 +2827,10 @@ switch(selectedLayout) {
                                     <Ionicons name="document-text-outline" size={32} color="#94a3b8" />
                                 </View>
                                 <Text style={styles.emptyTitle}>
-                                    {searchQuery ? 'Babu sakamakon binciken' : 'Babu Tarihin Buga Kati'}
+                                    {searchQuery ? 'No Results Found' : 'No Past Verifications'}
                                 </Text>
                                 <Text style={styles.emptySub}>
-                                    {searchQuery ? 'Babu wani katin da yayi daidai da binciken ka.' : 'Duk katin da ka tantance zai fito a nan domin sake saukewa ko bugawa kyauta a kowane lokaci.'}
+                                    {searchQuery ? 'No records match your search criteria.' : 'All verified identity cards and slips will appear here for instant, free re-download.'}
                                 </Text>
                                 {!searchQuery && (
                                     <TouchableOpacity 
@@ -2853,7 +2838,7 @@ switch(selectedLayout) {
                                         onPress={() => setActiveTab('verify')}
                                         activeOpacity={0.8}
                                     >
-                                        <Text style={styles.emptyActionBtnText}>Tantance Katin Yanzu</Text>
+                                        <Text style={styles.emptyActionBtnText}>Verify New NIN</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -2915,11 +2900,11 @@ const styles = StyleSheet.create({
     headerWalletText: {
         fontSize: 11,
         fontWeight: '800',
-        color: '#b45309',
+        color: '#059669',
         marginHorizontal: 5,
     },
     headerWalletPlus: {
-        backgroundColor: '#d97706',
+        backgroundColor: '#059669',
         borderRadius: 10,
         width: 16,
         height: 16,
@@ -2983,9 +2968,9 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     stepBadge: {
-        backgroundColor: '#fef3c7',
+        backgroundColor: '#ecfdf5',
         borderWidth: 1,
-        borderColor: '#fde68a',
+        borderColor: '#a7f3d0',
         width: 26,
         height: 26,
         borderRadius: 13,
@@ -2994,7 +2979,7 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     stepBadgeText: {
-        color: '#d97706',
+        color: '#059669',
         fontWeight: '900',
         fontSize: 12,
     },
@@ -3029,8 +3014,8 @@ const styles = StyleSheet.create({
     },
     layoutButtonSelected: {
         backgroundColor: '#ffffff',
-        borderColor: '#d97706',
-        shadowColor: '#d97706',
+        borderColor: '#059669',
+        shadowColor: '#059669',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.12,
         shadowRadius: 6,
@@ -3049,7 +3034,7 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     badgeSelected: {
-        backgroundColor: '#fef3c7',
+        backgroundColor: '#ecfdf5',
     },
     badgeUnselected: {
         backgroundColor: '#f1f5f9',
@@ -3059,7 +3044,7 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
     badgeTextSelected: {
-        color: '#b45309',
+        color: '#059669',
     },
     badgeTextUnselected: {
         color: '#64748b',
@@ -3099,7 +3084,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     pricePillSelected: {
-        backgroundColor: '#fef3c7',
+        backgroundColor: '#ecfdf5',
     },
     pricePillUnselected: {
         backgroundColor: '#f8fafc',
@@ -3110,7 +3095,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     layoutPriceSelected: {
-        color: '#b45309',
+        color: '#059669',
     },
     layoutPriceUnselected: {
         color: '#64748b',
@@ -3200,8 +3185,8 @@ const styles = StyleSheet.create({
         marginTop: 1,
     },
     checkboxBoxSelected: {
-        backgroundColor: '#d97706',
-        borderColor: '#d97706',
+        backgroundColor: '#059669',
+        borderColor: '#059669',
     },
     checkboxBoxUnselected: {
         backgroundColor: '#ffffff',
@@ -3210,7 +3195,7 @@ const styles = StyleSheet.create({
     verifyBtnWrapper: {
         borderRadius: 14,
         overflow: 'hidden',
-        shadowColor: '#d97706',
+        shadowColor: '#059669',
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.25,
         shadowRadius: 6,
@@ -3240,30 +3225,17 @@ const styles = StyleSheet.create({
         letterSpacing: -0.2,
         marginLeft: 6,
     },
-    faqItem: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
-        paddingVertical: 11,
-    },
-    faqHeader: {
+    guidelineRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
+        alignItems: 'flex-start',
+        marginBottom: 8,
     },
-    faqQuestion: {
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 12,
-        flex: 1,
-        marginRight: 10,
-    },
-    faqAnswer: {
-        color: '#64748b',
+    guidelineText: {
         fontSize: 11,
-        marginTop: 6,
-        lineHeight: 17,
+        color: '#475569',
         fontWeight: '500',
+        lineHeight: 16,
+        flex: 1,
     },
     statsCard: {
         backgroundColor: '#ffffff',
