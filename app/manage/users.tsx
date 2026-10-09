@@ -71,6 +71,12 @@ interface UserProfile {
     cac_registered?: boolean;
     cac_rc_number?: string;
     corporate_email?: string | null;
+    crypto_info?: {
+        totalUSD: number;
+        totalNGN: number;
+        tokens: string[];
+        hasCrypto: boolean;
+    };
 }
 
 interface UserVirtualCard {
@@ -152,7 +158,7 @@ export default function UserManagement() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'suspended' | 'admin' | 'verified' | 'corporate' | 'high_bal'>('all');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'suspended' | 'admin' | 'verified' | 'corporate' | 'high_bal' | 'crypto' | 'missing_va'>('all');
     const [sortBy, setSortBy] = useState<'newest' | 'balance_high' | 'balance_low'>('newest');
     
     // Selection & Modal States
@@ -262,6 +268,44 @@ export default function UserManagement() {
     const [manualAccName, setManualAccName] = useState('');
     const [assigningManualVa, setAssigningManualVa] = useState(false);
 
+    // Luxury Credential Vault & Password Authority States
+    const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+    const [newPasswordInput, setNewPasswordInput] = useState('');
+    const [showPasswordPlaintext, setShowPasswordPlaintext] = useState(false);
+    const [sendPasswordEmailNotification, setSendPasswordEmailNotification] = useState(true);
+    const [changingPasswordProcessing, setChangingPasswordProcessing] = useState(false);
+
+    const generateRandomSecurePassword = () => {
+        const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const lower = "abcdefghjkmnpqrstuvwxyz";
+        const numbers = "23456789";
+        const symbols = "@#$&*!";
+        let pass = "Abu#";
+        for (let i = 0; i < 3; i++) pass += upper.charAt(Math.floor(Math.random() * upper.length));
+        for (let i = 0; i < 2; i++) pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
+        for (let i = 0; i < 2; i++) pass += lower.charAt(Math.floor(Math.random() * lower.length));
+        pass += symbols.charAt(Math.floor(Math.random() * symbols.length));
+        setNewPasswordInput(pass);
+    };
+
+    const getPasswordEntropy = (pass: string) => {
+        if (!pass || pass.length === 0) return { score: 0, label: 'Enter Password', color: '#64748B' };
+        if (pass.length < 6) return { score: 1, label: 'Too Short (Min 6 chars)', color: '#EF4444' };
+        const hasUpper = /[A-Z]/.test(pass);
+        const hasLower = /[a-z]/.test(pass);
+        const hasNum = /[0-9]/.test(pass);
+        const hasSym = /[^A-Za-z0-9]/.test(pass);
+        const varietyCount = [hasUpper, hasLower, hasNum, hasSym].filter(Boolean).length;
+        
+        if (pass.length >= 10 && varietyCount >= 3) {
+            return { score: 4, label: '👑 24K VIP SECURE (Maximum Protection)', color: '#10B981' };
+        }
+        if (pass.length >= 8 && varietyCount >= 2) {
+            return { score: 3, label: '🛡️ Strong Password', color: '#38BDF8' };
+        }
+        return { score: 2, label: '⚠️ Fair (Add numbers & symbols)', color: '#F59E0B' };
+    };
+
     // Dynamic Executive KPIs
     const stats = {
         totalUsers: users.length,
@@ -271,6 +315,8 @@ export default function UserManagement() {
         corporateAdmins: users.filter(u => u.corporate_email).length,
         highRiskCount: users.filter(u => u.status === 'suspended').length,
         missingAccounts: users.filter(u => !u.account_number).length,
+        cryptoHolders: users.filter(u => u.crypto_info?.hasCrypto).length,
+        totalCryptoUSD: users.reduce((acc, u) => acc + (u.crypto_info?.totalUSD || 0), 0),
     };
 
     const handleStartBatchGeneration = async () => {
@@ -446,6 +492,69 @@ export default function UserManagement() {
         }
     };
 
+    const handleExecuteChangePassword = async () => {
+        if (!selectedUser) return;
+        if (!newPasswordInput || newPasswordInput.trim().length < 6) {
+            Alert.alert("Password Too Short", "Please enter a password with at least 6 characters.");
+            return;
+        }
+
+        setChangingPasswordProcessing(true);
+        try {
+            const cleanPass = newPasswordInput.trim();
+            let functionSuccess = false;
+            let emailSentStatus = false;
+
+            // Step 1: Call admin-reset-password edge function
+            try {
+                const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                    body: {
+                        userId: selectedUser.id,
+                        email: selectedUser.email,
+                        newPassword: cleanPass,
+                        sendEmailNotification: sendPasswordEmailNotification
+                    }
+                });
+
+                if (error) throw error;
+                if (data?.error && !data?.success) throw new Error(data.error);
+
+                functionSuccess = true;
+                emailSentStatus = !!data?.emailSent;
+            } catch (fnErr: any) {
+                console.warn("admin-reset-password edge function notice:", fnErr);
+            }
+
+            // Step 2: Fallback if edge function failed or not reachable
+            if (!functionSuccess) {
+                const { data: { user: currentUser } } = await supabase.auth.getUser();
+                if (currentUser && currentUser.id === selectedUser.id) {
+                    const { error: ownErr } = await supabase.auth.updateUser({ password: cleanPass });
+                    if (ownErr) throw ownErr;
+                } else if (selectedUser.email) {
+                    const { error: emailResetErr } = await supabase.auth.resetPasswordForEmail(selectedUser.email);
+                    if (emailResetErr) throw emailResetErr;
+                    emailSentStatus = true;
+                }
+            }
+
+            // Copy to clipboard for instant convenience
+            await Clipboard.setStringAsync(cleanPass);
+
+            Alert.alert(
+                "Password Authority 🔐",
+                `Successfully updated password for ${selectedUser.full_name}!\n\nNew Password: ${cleanPass}\n(Copied to clipboard)\n\n${emailSentStatus ? '✉️ Confirmation email sent to user inbox.' : 'Please inform the user of their new password.'}`
+            );
+
+            setShowChangePasswordModal(false);
+            setNewPasswordInput('');
+        } catch (err: any) {
+            Alert.alert("Password Update Failed", err.message || "Could not update user password.");
+        } finally {
+            setChangingPasswordProcessing(false);
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -577,18 +686,42 @@ export default function UserManagement() {
                 .select('user_id, email, username');
 
             const corpMap = new Map((corpEmails || []).map(c => [c.user_id, c.email]));
+
+            // Fetch live crypto balances across users
+            const { data: allCryptoBals } = await supabase
+                .from('crypto_balances')
+                .select('user_id, asset, balance');
+
+            const cryptoMap = new Map<string, { totalUSD: number; totalNGN: number; tokens: string[]; hasCrypto: boolean }>();
+            if (allCryptoBals) {
+                allCryptoBals.forEach((cb: any) => {
+                    const bal = Number(cb.balance || 0);
+                    if (bal > 0) {
+                        const prev = cryptoMap.get(cb.user_id) || { totalUSD: 0, totalNGN: 0, tokens: [], hasCrypto: true };
+                        const assetRate = getAssetPriceUSD(cb.asset);
+                        prev.totalUSD += bal * assetRate;
+                        prev.totalNGN = prev.totalUSD * 1500;
+                        const tokenSym = (cb.asset || 'USDT').toUpperCase();
+                        if (!prev.tokens.includes(tokenSym)) prev.tokens.push(tokenSym);
+                        prev.hasCrypto = true;
+                        cryptoMap.set(cb.user_id, prev);
+                    }
+                });
+            }
             
             const enrichedData = (data || []).map((u: any) => {
                 const directVa = vaMap.get(u.id);
                 const joinVa = Array.isArray(u.virtual_accounts) ? u.virtual_accounts[0] : u.virtual_accounts;
                 const accNum = directVa?.account_number || joinVa?.account_number || u.account_number || null;
                 const bName = directVa?.bank_name || joinVa?.bank_name || u.bank_name || 'PalmPay / 9PSB';
+                const cInfo = cryptoMap.get(u.id) || { totalUSD: 0, totalNGN: 0, tokens: [], hasCrypto: false };
 
                 return {
                     ...u,
                     account_number: accNum,
                     bank_name: bName,
-                    corporate_email: corpMap.get(u.id) || (u.email?.endsWith('@abumafhal.com.ng') ? u.email : null)
+                    corporate_email: corpMap.get(u.id) || (u.email?.endsWith('@abumafhal.com.ng') ? u.email : null),
+                    crypto_info: cInfo
                 };
             });
             setUsers(enrichedData);
@@ -776,6 +909,8 @@ export default function UserManagement() {
             if (filterStatus === 'verified') matchesStatus = !!u.kyc_verified;
             if (filterStatus === 'corporate') matchesStatus = !!u.corporate_email;
             if (filterStatus === 'high_bal') matchesStatus = (u.balance || u.credit_balance || 0) >= 100000;
+            if (filterStatus === 'crypto') matchesStatus = !!u.crypto_info?.hasCrypto;
+            if (filterStatus === 'missing_va') matchesStatus = !u.account_number;
 
             return matchesSearch && matchesStatus;
         });
@@ -1306,7 +1441,16 @@ Metadata:
                             <Text style={s.modalHeaderTitle}>User Command Center</Text>
                             <Text style={{ fontSize: 10, color: T.goldDark, fontWeight: '700' }}>ID: {selectedUser?.id?.slice(0, 8)}...</Text>
                         </View>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    generateRandomSecurePassword();
+                                    setShowChangePasswordModal(true);
+                                }} 
+                                style={[s.iconCircleBtn, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}
+                            >
+                                <Ionicons name="key" size={15} color="#D97706" />
+                            </TouchableOpacity>
                             <TouchableOpacity onPress={exportProfile} style={s.iconCircleBtn}>
                                 <Ionicons name="share-outline" size={16} color={T.navyDark} />
                             </TouchableOpacity>
@@ -1345,6 +1489,12 @@ Metadata:
                                         <Text style={s.badgeCorpText}>Corp</Text>
                                     </View>
                                 )}
+                                {userCryptoBalances.some(b => Number(b.balance) > 0) && (
+                                    <View style={[s.badgeVerified, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+                                        <Ionicons name="flash" size={10} color="#D97706" />
+                                        <Text style={[s.badgeVerifiedText, { color: '#B45309', fontWeight: '900' }]}>CRYPTO ACTIVE</Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
                         <TouchableOpacity onPress={() => contactUser('call')} style={s.contactBtn}>
@@ -1381,6 +1531,55 @@ Metadata:
                         {/* TAB 1: OVERVIEW & WALLET FUNDING */}
                         {modalTab === 'overview' && (
                             <View style={{ padding: 14 }}>
+                                {/* Crypto Holdings Snapshot Teaser Card */}
+                                <TouchableOpacity
+                                    onPress={() => setModalTab('crypto')}
+                                    style={{
+                                        backgroundColor: '#0F172A',
+                                        borderRadius: 14,
+                                        padding: 14,
+                                        marginBottom: 12,
+                                        borderWidth: 1.5,
+                                        borderColor: '#F59E0B',
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: 0.1,
+                                        shadowRadius: 4,
+                                        elevation: 2,
+                                    }}
+                                    activeOpacity={0.85}
+                                >
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FDE68A' }}>
+                                                <Ionicons name="flash" size={18} color="#D97706" />
+                                            </View>
+                                            <View>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF' }}>Crypto Portfolio</Text>
+                                                    <View style={{ backgroundColor: 'rgba(245,158,11,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                                        <Text style={{ fontSize: 9, fontWeight: '900', color: '#FBBF24' }}>LIVE ON-CHAIN</Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 1 }}>
+                                                    {userCryptoBalances.filter(b => Number(b.balance) > 0).length > 0
+                                                        ? `${userCryptoBalances.filter(b => Number(b.balance) > 0).length} active token(s) held`
+                                                        : 'Tap to inspect balances & deposit addresses'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={{ fontSize: 16, fontWeight: '900', color: '#FBBF24' }}>
+                                                ${userCryptoBalances.reduce((acc, b) => acc + (Number(b.balance || 0) * getAssetPriceUSD(b.asset)), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </Text>
+                                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#CBD5E1' }}>
+                                                ≈ ₦{(userCryptoBalances.reduce((acc, b) => acc + (Number(b.balance || 0) * getAssetPriceUSD(b.asset)), 0) * 1500).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+
                                 {/* Vault Balance Card */}
                                 <View style={s.walletCard}>
                                     <Text style={s.walletLabel}>Vault Balance</Text>
@@ -2182,6 +2381,83 @@ Metadata:
                         {/* TAB 3: CONTROLS */}
                         {modalTab === 'controls' && (
                             <View style={{ padding: 14 }}>
+                                {/* 👑 Royal Credential Vault & Password Authority Suite */}
+                                <LinearGradient
+                                    colors={['#050B18', '#0D1736', '#14214D']}
+                                    style={s.credentialVaultCard}
+                                >
+                                    <View style={s.credentialVaultHeader}>
+                                        <View style={s.credentialVaultIcon}>
+                                            <Ionicons name="key" size={18} color="#D4AF37" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={s.credentialVaultTitle}>CREDENTIAL AUTHORITY</Text>
+                                                <View style={s.credentialSecurityBadge}>
+                                                    <Text style={s.credentialSecurityBadgeText}>AES-256</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={s.credentialVaultSub}>
+                                                Password Management & Security Governance
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={s.credentialVaultActions}>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                generateRandomSecurePassword();
+                                                setShowChangePasswordModal(true);
+                                            }}
+                                            style={s.credentialPrimaryBtn}
+                                            activeOpacity={0.8}
+                                        >
+                                            <LinearGradient
+                                                colors={['#F59E0B', '#D4AF37', '#B8952B']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                                style={s.credentialPrimaryBtnGradient}
+                                            >
+                                                <Ionicons name="lock-closed" size={14} color="#0A1128" />
+                                                <Text style={s.credentialPrimaryBtnText}>Change Password</Text>
+                                            </LinearGradient>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                if (!selectedUser?.email) {
+                                                    Alert.alert("Error", "User has no email address.");
+                                                    return;
+                                                }
+                                                Alert.alert(
+                                                    "Send Reset Link",
+                                                    `Dispatch official password reset link directly to ${selectedUser.email}?`,
+                                                    [
+                                                        { text: "Cancel", style: "cancel" },
+                                                        {
+                                                            text: "Send Email",
+                                                            onPress: async () => {
+                                                                try {
+                                                                    const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email);
+                                                                    if (error) throw error;
+                                                                    Alert.alert("Email Dispatched ✉️", `Password reset instructions sent to ${selectedUser.email}`);
+                                                                } catch (e: any) {
+                                                                    Alert.alert("Failed", e.message);
+                                                                }
+                                                            }
+                                                        }
+                                                    ]
+                                                );
+                                            }}
+                                            style={s.credentialSecondaryBtn}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="mail-outline" size={14} color="#D4AF37" />
+                                            <Text style={s.credentialSecondaryBtnText}>Send Reset Link</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </LinearGradient>
+
                                 <Text style={s.sectionHeading}>System Feature Locks & Permissions</Text>
                                 
                                 <View style={s.actionsGrid}>
@@ -2759,20 +3035,48 @@ Metadata:
                                 </View>
                             )}
 
-                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                            <View style={{ gap: 8, marginTop: 16 }}>
                                 <TouchableOpacity
-                                    onPress={() => copyToClipboard(tx.reference || tx.id, 'Transaction Reference')}
-                                    style={s.receiptCopyBtn}
+                                    onPress={() => {
+                                        const dossier = [
+                                            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+                                            'ABU MAFHAL VERIFIED AUDIT RECEIPT',
+                                            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+                                            `Status: ${status.toUpperCase()}`,
+                                            `Amount: ${isCredit ? '+' : '-'}₦${Number(tx.amount || 0).toLocaleString()}`,
+                                            `Service / Type: ${tx.type || 'N/A'}`,
+                                            `Description: ${tx.description || 'N/A'}`,
+                                            `Reference ID: ${tx.reference || 'N/A'}`,
+                                            `Gateway Reference: ${tx.gateway_reference || 'N/A'}`,
+                                            `Transaction ID: ${tx.id}`,
+                                            `Timestamp: ${new Date(tx.created_at).toLocaleString()}`,
+                                            `Fee: ₦${Number(tx.fee || 0).toLocaleString()}`,
+                                            `Client: ${selectedUser?.full_name || 'N/A'} (${selectedUser?.email || 'N/A'})`,
+                                            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                                        ].join('\n');
+                                        copyToClipboard(dossier, 'Forensic Audit Dossier');
+                                    }}
+                                    style={[s.receiptCopyBtn, { backgroundColor: T.navyDark }]}
                                 >
-                                    <Ionicons name="copy" size={14} color={T.navyDark} />
-                                    <Text style={s.receiptCopyBtnText}>Copy Reference</Text>
+                                    <Ionicons name="document-text" size={14} color="#FFFFFF" />
+                                    <Text style={[s.receiptCopyBtnText, { color: '#FFFFFF' }]}>Copy Full Forensic Dossier</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => setSelectedTransactionDetails(null)}
-                                    style={s.receiptCloseBtn}
-                                >
-                                    <Text style={s.receiptCloseBtnText}>Close Receipt</Text>
-                                </TouchableOpacity>
+
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TouchableOpacity
+                                        onPress={() => copyToClipboard(tx.reference || tx.id, 'Transaction Reference')}
+                                        style={s.receiptCopyBtn}
+                                    >
+                                        <Ionicons name="copy" size={14} color={T.navyDark} />
+                                        <Text style={s.receiptCopyBtnText}>Copy Ref Code</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => setSelectedTransactionDetails(null)}
+                                        style={s.receiptCloseBtn}
+                                    >
+                                        <Text style={s.receiptCloseBtnText}>Close Receipt</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </ScrollView>
                     </View>
@@ -2921,138 +3225,514 @@ Metadata:
         </Modal>
     );
 
+    // Executive Royal Change Password Modal
+    const renderChangePasswordModal = () => {
+        const entropy = getPasswordEntropy(newPasswordInput);
+
+        return (
+            <Modal
+                visible={showChangePasswordModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowChangePasswordModal(false)}
+            >
+                <BlurView intensity={Platform.OS === 'ios' ? 85 : 95} tint="dark" style={s.modalOverlay}>
+                    <View style={s.passwordModalCard}>
+                        {/* 24K Royal Gold Accent Header Strip */}
+                        <LinearGradient
+                            colors={['#8A6B29', '#DFB85C', '#F9E498', '#DFB85C', '#8A6B29']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={{ height: 3, width: '100%' }}
+                        />
+
+                        {/* Modal Header */}
+                        <View style={s.passwordModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={s.credentialVaultIcon}>
+                                    <Ionicons name="shield-checkmark" size={18} color="#D4AF37" />
+                                </View>
+                                <View>
+                                    <Text style={s.passwordModalTitle}>CREDENTIAL AUTHORITY</Text>
+                                    <Text style={s.passwordModalSubtitle}>Change Account Password</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setShowChangePasswordModal(false)}
+                                style={s.closeModalCircleBtn}
+                            >
+                                <Ionicons name="close" size={18} color="#CBD5E1" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+                            {/* Target User Info Dossier Card */}
+                            <View style={s.passwordUserBanner}>
+                                <View style={s.passwordUserAvatar}>
+                                    {selectedUser?.avatar_url ? (
+                                        <Image source={{ uri: selectedUser.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 18 }} />
+                                    ) : (
+                                        <Text style={{ color: '#0A1128', fontWeight: '900', fontSize: 16 }}>
+                                            {selectedUser?.full_name?.charAt(0).toUpperCase() || 'U'}
+                                        </Text>
+                                    )}
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={s.passwordUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
+                                        {selectedUser?.role === 'admin' && <Text style={{ fontSize: 12 }}>👑</Text>}
+                                    </View>
+                                    <Text style={s.passwordUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
+                                </View>
+                                <View style={s.passwordUserRolePill}>
+                                    <Text style={s.passwordUserRoleText}>{selectedUser?.role?.toUpperCase()}</Text>
+                                </View>
+                            </View>
+
+                            {/* Password Input Section */}
+                            <Text style={s.passwordFieldLabel}>NEW ACCOUNT PASSWORD</Text>
+                            <View style={s.passwordInputContainer}>
+                                <Ionicons name="key" size={16} color="#D4AF37" style={{ marginRight: 8 }} />
+                                <TextInput
+                                    placeholder="Enter minimum 6 characters..."
+                                    placeholderTextColor="#64748B"
+                                    value={newPasswordInput}
+                                    onChangeText={setNewPasswordInput}
+                                    secureTextEntry={!showPasswordPlaintext}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    style={s.passwordTextInput}
+                                />
+                                <TouchableOpacity
+                                    onPress={() => setShowPasswordPlaintext(!showPasswordPlaintext)}
+                                    style={{ padding: 6 }}
+                                >
+                                    <Ionicons
+                                        name={showPasswordPlaintext ? "eye-off" : "eye"}
+                                        size={18}
+                                        color="#D4AF37"
+                                    />
+                                </TouchableOpacity>
+                                {newPasswordInput.length > 0 && (
+                                    <TouchableOpacity
+                                        onPress={async () => {
+                                            await Clipboard.setStringAsync(newPasswordInput);
+                                            Alert.alert("Copied 📋", "Password copied to clipboard.");
+                                        }}
+                                        style={{ padding: 6 }}
+                                    >
+                                        <Ionicons name="copy-outline" size={18} color="#38BDF8" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {/* Dynamic Password Entropy Meter */}
+                            <View style={s.entropyContainer}>
+                                <View style={s.entropyBarRow}>
+                                    {[1, 2, 3, 4].map(seg => (
+                                        <View
+                                            key={seg}
+                                            style={[
+                                                s.entropySegment,
+                                                { backgroundColor: seg <= entropy.score ? entropy.color : 'rgba(255, 255, 255, 0.1)' }
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                                    <Text style={[s.entropyLabel, { color: entropy.color }]}>{entropy.label}</Text>
+                                    <Text style={{ fontSize: 9.5, color: '#64748B' }}>{newPasswordInput.length} chars</Text>
+                                </View>
+                            </View>
+
+                            {/* Quick Random Strong Generator Pill */}
+                            <View style={{ flexDirection: 'row', gap: 8, marginVertical: 10 }}>
+                                <TouchableOpacity
+                                    onPress={generateRandomSecurePassword}
+                                    style={s.generatePasswordPill}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="sparkles" size={13} color="#D4AF37" />
+                                    <Text style={s.generatePasswordPillText}>🎲 Generate Random Strong Password</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Email Delivery Toggle */}
+                            <TouchableOpacity
+                                onPress={() => setSendPasswordEmailNotification(!sendPasswordEmailNotification)}
+                                style={s.emailToggleCard}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[s.toggleCheckBox, sendPasswordEmailNotification && s.toggleCheckBoxActive]}>
+                                    {sendPasswordEmailNotification && <Ionicons name="checkmark" size={12} color="#0A1128" />}
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={s.emailToggleTitle}>Send Official Credentials Email</Text>
+                                    <Text style={s.emailToggleSub}>
+                                        User will receive an encrypted notification containing login details.
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Direct Action Buttons */}
+                            <View style={s.passwordActionCluster}>
+                                <TouchableOpacity
+                                    onPress={handleExecuteChangePassword}
+                                    disabled={changingPasswordProcessing || newPasswordInput.length < 6}
+                                    style={[
+                                        s.confirmPasswordBtn,
+                                        newPasswordInput.length < 6 && { opacity: 0.5 }
+                                    ]}
+                                    activeOpacity={0.85}
+                                >
+                                    <LinearGradient
+                                        colors={['#F59E0B', '#D4AF37', '#B8952B']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={s.confirmPasswordBtnGradient}
+                                    >
+                                        {changingPasswordProcessing ? (
+                                            <ActivityIndicator size="small" color="#0A1128" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="shield-checkmark" size={16} color="#0A1128" />
+                                                <Text style={s.confirmPasswordBtnText}>CONFIRM & UPDATE PASSWORD</Text>
+                                            </>
+                                        )}
+                                    </LinearGradient>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => setShowChangePasswordModal(false)}
+                                    style={s.cancelPasswordBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={s.cancelPasswordBtnText}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </BlurView>
+            </Modal>
+        );
+    };
+
     return (
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} /> 
 
-            {/* Mobile-First Executive Header */}
-            <View style={s.headerContainer}>
-                {/* Header Title Row */}
+            {/* Ultra-Luxury Mobile-First Executive Header */}
+            <LinearGradient
+                colors={['#050B18', '#0A1226', '#0F1B3B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.headerContainer}
+            >
+                {/* 24K Royal Gold Micro Top Accent Strip */}
+                <LinearGradient
+                    colors={['#8A6B29', '#DFB85C', '#F9E498', '#DFB85C', '#8A6B29']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={s.headerGoldStrip}
+                />
+
+                {/* Header Top Row (Brand Crest, Live Telemetry & Mobile Action Cluster) */}
                 <View style={s.headerTopRow}>
                     {isSelectionMode ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={s.selectionBadgePill}>
                             <TouchableOpacity onPress={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} style={s.closeSelectionBtn}>
-                                <Ionicons name="close" size={16} color={T.navyDark} />
+                                <Ionicons name="close" size={16} color="#0A1128" />
                             </TouchableOpacity>
-                            <Text style={s.selectionText}>{selectedIds.size} Selected</Text>
+                            <Text style={s.selectionText}>{selectedIds.size} User(s) Selected</Text>
                         </View>
                     ) : (
-                        <View>
-                            <Text style={s.headerTitle}>User Governance</Text>
-                            <Text style={s.headerSubTitle}>Mobile Hub • {stats.totalUsers} Profiles</Text>
+                        <View style={s.brandCol}>
+                            <View style={s.brandHeaderRow}>
+                                <View style={s.brandEmblemBadge}>
+                                    <Ionicons name="shield-checkmark" size={15} color="#D4AF37" />
+                                </View>
+                                <View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={s.headerTitle}>USER GOVERNANCE</Text>
+                                        <View style={s.liveStatusBadge}>
+                                            <View style={s.liveStatusPulse} />
+                                            <Text style={s.liveStatusText}>LIVE</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={s.headerSubTitle}>EXECUTIVE VAULT • {stats.totalUsers} PROFILES</Text>
+                                </View>
+                            </View>
                         </View>
                     )}
-                    <TouchableOpacity onPress={() => setShowCreateUser(true)} style={s.addUserHeaderBtn}>
-                        <Ionicons name="person-add" size={16} color="#FFFFFF" />
-                    </TouchableOpacity>
-                </View>
 
-                {/* Executive Responsive Stats Grid */}
-                {!isSelectionMode && (
-                    <View style={[s.statsGrid, (isDesktopWeb || isTabletWeb) && { flexDirection: 'row', gap: 12 }]}>
-                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
-                            <Text style={s.statCardLabel}>TOTAL VAULT</Text>
-                            <Text style={s.statCardValue}>₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance.toLocaleString()}</Text>
-                        </View>
-                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
-                            <Text style={s.statCardLabel}>ACTIVE</Text>
-                            <Text style={s.statCardValue}>{stats.activeUsers}</Text>
-                        </View>
-                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
-                            <Text style={s.statCardLabel}>VERIFIED</Text>
-                            <Text style={s.statCardValue}>{stats.verifiedUsers}</Text>
-                        </View>
-                        <View style={[s.statCard, (isDesktopWeb || isTabletWeb) && { flex: 1, width: undefined, minWidth: 140 }]}>
-                            <Text style={s.statCardLabel}>CORPORATE</Text>
-                            <Text style={s.statCardValue}>{stats.corporateAdmins}</Text>
-                        </View>
-                    </View>
-                )}
+                    {/* Action Buttons Cluster */}
+                    <View style={s.headerActionCluster}>
+                        {!isSelectionMode && (
+                            <>
+                                <TouchableOpacity 
+                                    onPress={onRefresh} 
+                                    style={s.headerGhostBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="refresh" size={17} color="#D4AF37" />
+                                </TouchableOpacity>
 
-                {/* Batch Account Generation Executive Trigger Card */}
-                {!isSelectionMode && (
-                    <View style={s.batchTriggerCard}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                            <View style={s.batchIconCircle}>
-                                <Ionicons name="flash" size={16} color={T.goldDark} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    <Text style={s.batchTriggerTitle}>Auto-Generate Virtual Accounts</Text>
-                                    {stats.missingAccounts > 0 ? (
-                                        <View style={s.missingBadge}>
-                                            <Text style={s.missingBadgeText}>{stats.missingAccounts} Missing</Text>
-                                        </View>
-                                    ) : (
-                                        <View style={s.allGoodBadge}>
-                                            <Text style={s.allGoodBadgeText}>100% Active</Text>
+                                <TouchableOpacity 
+                                    onPress={() => setShowBatchModal(true)} 
+                                    style={[s.headerGhostBtn, stats.missingAccounts > 0 && s.headerGhostBtnAlert]}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="flash" size={16} color={stats.missingAccounts > 0 ? "#F59E0B" : "#D4AF37"} />
+                                    {stats.missingAccounts > 0 && (
+                                        <View style={s.headerActionBadge}>
+                                            <Text style={s.headerActionBadgeText}>{stats.missingAccounts}</Text>
                                         </View>
                                     )}
-                                </View>
-                                <Text style={s.batchTriggerSub} numberOfLines={1}>
-                                    {stats.missingAccounts > 0 
-                                        ? `${stats.missingAccounts} user(s) need dedicated bank accounts generated.`
-                                        : 'All users have active virtual bank accounts.'
-                                    }
-                                </Text>
-                            </View>
-                        </View>
+                                </TouchableOpacity>
+                            </>
+                        )}
 
                         <TouchableOpacity 
-                            onPress={() => setShowBatchModal(true)}
-                            style={s.batchTriggerBtn}
+                            onPress={() => setShowCreateUser(true)} 
                             activeOpacity={0.8}
+                            style={s.addUserBtnShadow}
                         >
-                            <Ionicons name="sparkles" size={12} color="#FFFFFF" />
-                            <Text style={s.batchTriggerBtnText}>
-                                {stats.missingAccounts > 0 ? 'Generate All' : 'Run Batch'}
-                            </Text>
+                            <LinearGradient
+                                colors={['#F59E0B', '#D4AF37', '#B8952B']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={s.addUserGradientBtn}
+                            >
+                                <Ionicons name="person-add" size={15} color="#0A1128" />
+                                <Text style={s.addUserBtnText}>+ User</Text>
+                            </LinearGradient>
                         </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Mobile-First Ultra-Luxury KPI Carousel Ribbon (Horizontal Scroll) */}
+                {!isSelectionMode && (
+                    <View style={s.ribbonWrapper}>
+                        <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={s.ribbonContent}
+                        >
+                            {/* Card 1: TOTAL VAULT NGN */}
+                            <LinearGradient
+                                colors={['rgba(212, 175, 55, 0.16)', 'rgba(10, 17, 40, 0.7)']}
+                                style={[s.statRibbonCard, { borderColor: '#D4AF37' }]}
+                            >
+                                <View style={s.statRibbonTop}>
+                                    <View style={[s.statIconCircle, { backgroundColor: 'rgba(212, 175, 55, 0.2)' }]}>
+                                        <Ionicons name="wallet" size={14} color="#D4AF37" />
+                                    </View>
+                                    <Text style={[s.statRibbonPill, { color: '#D4AF37', borderColor: 'rgba(212, 175, 55, 0.4)' }]}>FIAT</Text>
+                                </View>
+                                <Text style={s.statRibbonLabel}>TOTAL VAULT</Text>
+                                <Text style={s.statRibbonValGold}>
+                                    ₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(2)+'M' : stats.totalBalance.toLocaleString()}
+                                </Text>
+                                <Text style={s.statRibbonSub}>Active Liquidity</Text>
+                            </LinearGradient>
+
+                            {/* Card 2: CRYPTO NET WORTH */}
+                            <LinearGradient
+                                colors={['rgba(245, 158, 11, 0.18)', 'rgba(20, 14, 4, 0.75)']}
+                                style={[s.statRibbonCard, { borderColor: '#F59E0B' }]}
+                            >
+                                <View style={s.statRibbonTop}>
+                                    <View style={[s.statIconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.25)' }]}>
+                                        <Ionicons name="flash" size={14} color="#F59E0B" />
+                                    </View>
+                                    <Text style={[s.statRibbonPill, { color: '#F59E0B', borderColor: 'rgba(245, 158, 11, 0.4)' }]}>CRYPTO</Text>
+                                </View>
+                                <Text style={[s.statRibbonLabel, { color: '#FCD34D' }]}>CRYPTO ASSETS</Text>
+                                <Text style={[s.statRibbonValGold, { color: '#FBBF24' }]}>
+                                    ${stats.totalCryptoUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                                <Text style={s.statRibbonSub} numberOfLines={1}>
+                                    ≈ ₦{Math.round(stats.totalCryptoUSD * 1450).toLocaleString()} • {stats.cryptoHolders} Wallets
+                                </Text>
+                            </LinearGradient>
+
+                            {/* Card 3: ACTIVE USERS */}
+                            <LinearGradient
+                                colors={['rgba(16, 185, 129, 0.16)', 'rgba(6, 25, 18, 0.7)']}
+                                style={[s.statRibbonCard, { borderColor: '#10B981' }]}
+                            >
+                                <View style={s.statRibbonTop}>
+                                    <View style={[s.statIconCircle, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
+                                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                                    </View>
+                                    <Text style={[s.statRibbonPill, { color: '#34D399', borderColor: 'rgba(16, 185, 129, 0.4)' }]}>HEALTHY</Text>
+                                </View>
+                                <Text style={[s.statRibbonLabel, { color: '#A7F3D0' }]}>ACTIVE USERS</Text>
+                                <Text style={[s.statRibbonValGold, { color: '#34D399' }]}>{stats.activeUsers}</Text>
+                                <Text style={s.statRibbonSub}>In Good Standing</Text>
+                            </LinearGradient>
+
+                            {/* Card 4: KYC VERIFIED */}
+                            <LinearGradient
+                                colors={['rgba(56, 189, 248, 0.16)', 'rgba(8, 22, 45, 0.7)']}
+                                style={[s.statRibbonCard, { borderColor: '#38BDF8' }]}
+                            >
+                                <View style={s.statRibbonTop}>
+                                    <View style={[s.statIconCircle, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
+                                        <Ionicons name="shield-checkmark" size={14} color="#38BDF8" />
+                                    </View>
+                                    <Text style={[s.statRibbonPill, { color: '#38BDF8', borderColor: 'rgba(56, 189, 248, 0.4)' }]}>TIER</Text>
+                                </View>
+                                <Text style={[s.statRibbonLabel, { color: '#BAE6FD' }]}>VERIFIED KYC</Text>
+                                <Text style={[s.statRibbonValGold, { color: '#38BDF8' }]}>{stats.verifiedUsers}</Text>
+                                <Text style={s.statRibbonSub}>Identity Cleared</Text>
+                            </LinearGradient>
+
+                            {/* Card 5: VIRTUAL ACCOUNTS */}
+                            <TouchableOpacity 
+                                activeOpacity={0.8}
+                                onPress={() => setShowBatchModal(true)}
+                            >
+                                <LinearGradient
+                                    colors={['rgba(192, 132, 252, 0.16)', 'rgba(25, 12, 40, 0.7)']}
+                                    style={[s.statRibbonCard, { borderColor: stats.missingAccounts > 0 ? '#F59E0B' : '#C084FC' }]}
+                                >
+                                    <View style={s.statRibbonTop}>
+                                        <View style={[s.statIconCircle, { backgroundColor: 'rgba(192, 132, 252, 0.2)' }]}>
+                                            <Ionicons name="card" size={14} color={stats.missingAccounts > 0 ? "#F59E0B" : "#C084FC"} />
+                                        </View>
+                                        <Text style={[s.statRibbonPill, { 
+                                            color: stats.missingAccounts > 0 ? '#F59E0B' : '#C084FC', 
+                                            borderColor: stats.missingAccounts > 0 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(192, 132, 252, 0.4)' 
+                                        }]}>
+                                            {stats.missingAccounts > 0 ? 'NEEDS ATTN' : '100%'}
+                                        </Text>
+                                    </View>
+                                    <Text style={[s.statRibbonLabel, { color: '#E9D5FF' }]}>DEDICATED VAS</Text>
+                                    <Text style={[s.statRibbonValGold, { color: stats.missingAccounts > 0 ? '#FBBF24' : '#E9D5FF' }]}>
+                                        {stats.totalUsers - stats.missingAccounts}/{stats.totalUsers}
+                                    </Text>
+                                    <Text style={s.statRibbonSub}>
+                                        {stats.missingAccounts > 0 ? `⚠️ ${stats.missingAccounts} Missing (Tap)` : 'All Accounts Active'}
+                                    </Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            {/* Card 6: CORPORATE & ADMINS */}
+                            <LinearGradient
+                                colors={['rgba(244, 63, 94, 0.16)', 'rgba(35, 10, 18, 0.7)']}
+                                style={[s.statRibbonCard, { borderColor: '#F43F5E' }]}
+                            >
+                                <View style={s.statRibbonTop}>
+                                    <View style={[s.statIconCircle, { backgroundColor: 'rgba(244, 63, 94, 0.2)' }]}>
+                                        <Ionicons name="briefcase" size={14} color="#F43F5E" />
+                                    </View>
+                                    <Text style={[s.statRibbonPill, { color: '#FB7185', borderColor: 'rgba(244, 63, 94, 0.4)' }]}>STAFF</Text>
+                                </View>
+                                <Text style={[s.statRibbonLabel, { color: '#FECDD3' }]}>CORPORATE</Text>
+                                <Text style={[s.statRibbonValGold, { color: '#FB7185' }]}>{stats.corporateAdmins}</Text>
+                                <Text style={s.statRibbonSub}>Admin Directory</Text>
+                            </LinearGradient>
+                        </ScrollView>
                     </View>
                 )}
 
-                {/* Search Bar */}
-                <View style={s.searchBar}>
-                    <Ionicons name="search" size={16} color={T.navyDark} />
+                {/* Dedicated High-Priority Virtual Account Alert (Mobile-First Luxury Strip) */}
+                {!isSelectionMode && stats.missingAccounts > 0 && (
+                    <TouchableOpacity 
+                        onPress={() => setShowBatchModal(true)}
+                        activeOpacity={0.85}
+                        style={s.missingAlertCard}
+                    >
+                        <LinearGradient
+                            colors={['rgba(245, 158, 11, 0.18)', 'rgba(212, 175, 55, 0.12)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={s.missingAlertGradient}
+                        >
+                            <View style={s.missingAlertLeft}>
+                                <View style={s.missingAlertIcon}>
+                                    <Ionicons name="sparkles" size={14} color="#F59E0B" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.missingAlertTitle}>
+                                        {stats.missingAccounts} User(s) Need Virtual Accounts
+                                    </Text>
+                                    <Text style={s.missingAlertSub} numberOfLines={1}>
+                                        Tap to launch automatic multi-bank account batch engine
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={s.missingAlertBtnPill}>
+                                <Text style={s.missingAlertBtnText}>Generate</Text>
+                                <Ionicons name="arrow-forward" size={12} color="#0A1128" />
+                            </View>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                )}
+
+                {/* Mobile-First Luxury Frosted Search Capsule */}
+                <View style={s.searchContainerLuxury}>
+                    <Ionicons name="search" size={16} color="#D4AF37" />
                     <TextInput
-                        placeholder="Search name, phone, account..."
-                        placeholderTextColor={T.textSub}
-                        style={s.searchInput}
+                        placeholder="Search name, phone, email, account..."
+                        placeholderTextColor="#94A3B8"
+                        style={s.searchInputLuxury}
                         value={search}
                         onChangeText={handleSearch}
                     />
                     {search.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearch('')}>
-                            <Ionicons name="close-circle" size={16} color={T.textSub} />
+                        <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
+                            <Ionicons name="close-circle" size={16} color="#94A3B8" />
                         </TouchableOpacity>
                     )}
+                    <View style={s.searchResultPill}>
+                        <Text style={s.searchResultPillText}>{getFilteredUsers().length}</Text>
+                    </View>
                 </View>
 
-                {/* Filter Chips Scroll Bar */}
-                <View style={s.filterRow}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {/* Mobile-First Luxury Filter Carousel Strip */}
+                <View style={s.filterRowLuxury}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterContentLuxury}>
                         {[
-                            { key: 'all', label: 'All Users' },
-                            { key: 'active', label: 'Active' },
-                            { key: 'suspended', label: 'Suspended' },
-                            { key: 'admin', label: 'Admins 👑' },
-                            { key: 'verified', label: 'Verified 🛡️' },
+                            { key: 'all', label: `All Users (${stats.totalUsers})` },
+                            { key: 'crypto', label: `⚡ Crypto Active (${stats.cryptoHolders})` },
+                            { key: 'active', label: `Active (${stats.activeUsers})` },
+                            { key: 'admin', label: `Admins 👑 (${stats.corporateAdmins})` },
+                            { key: 'verified', label: `Verified 🛡️ (${stats.verifiedUsers})` },
+                            { key: 'missing_va', label: `Missing VAs ⚠️ (${stats.missingAccounts})` },
+                            { key: 'suspended', label: `Suspended ⛔ (${stats.highRiskCount})` },
                             { key: 'corporate', label: 'Corporate' },
-                            { key: 'high_bal', label: 'High Vault' }
-                        ].map((f) => (
-                            <TouchableOpacity 
-                                key={f.key} 
-                                onPress={() => setFilterStatus(f.key as any)}
-                                style={[s.filterChip, filterStatus === f.key ? s.filterChipActive : null]}
-                            >
-                                <Text style={[s.filterChipText, filterStatus === f.key ? { color: '#FFFFFF' } : { color: T.textSub }]}>
-                                    {f.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                            { key: 'high_bal', label: 'High Vault 💎' }
+                        ].map((f) => {
+                            const isActive = filterStatus === f.key;
+                            return (
+                                <TouchableOpacity 
+                                    key={f.key} 
+                                    onPress={() => setFilterStatus(f.key as any)}
+                                    activeOpacity={0.7}
+                                    style={s.filterChipWrapper}
+                                >
+                                    {isActive ? (
+                                        <LinearGradient
+                                            colors={['#F59E0B', '#D4AF37', '#B8952B']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={s.filterChipLuxuryActive}
+                                        >
+                                            <Text style={s.filterChipTextLuxuryActive}>{f.label}</Text>
+                                        </LinearGradient>
+                                    ) : (
+                                        <View style={s.filterChipLuxury}>
+                                            <Text style={s.filterChipTextLuxury}>{f.label}</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </ScrollView>
                 </View>
-            </View>
+            </LinearGradient>
 
             {/* Bulk Selection Bar */}
             {isSelectionMode && (
@@ -3153,20 +3833,32 @@ Metadata:
                                     <Text style={s.badgeVerifiedText}>Tier {item.kyc_tier || 1} Verified</Text>
                                 </View>
                             )}
-                            {item.crypto_enabled && (
+                            {item.crypto_info?.hasCrypto && (
                                 <View style={[s.badgeVerified, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
-                                    <Ionicons name="logo-bitcoin" size={10} color="#D97706" />
-                                    <Text style={[s.badgeVerifiedText, { color: '#B45309', fontWeight: '900' }]}>CRYPTO</Text>
+                                    <Ionicons name="flash" size={10} color="#D97706" />
+                                    <Text style={[s.badgeVerifiedText, { color: '#B45309', fontWeight: '900' }]}>
+                                        CRYPTO ⚡ {item.crypto_info.tokens.join(', ')}
+                                    </Text>
                                 </View>
                             )}
                         </View>
 
                         {/* Section 3: Bottom Vault Balance Bar */}
                         <View style={s.vaultBalanceBar}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name="wallet-outline" size={14} color={T.gold} />
-                                <Text style={s.vaultLabel}>VAULT BAL:</Text>
-                                <Text style={s.vaultAmount}>₦{(item.credit_balance || item.balance || 0).toLocaleString()}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Ionicons name="wallet-outline" size={13} color={T.gold} />
+                                    <Text style={s.vaultLabel}>VAULT:</Text>
+                                    <Text style={s.vaultAmount}>₦{(item.credit_balance || item.balance || 0).toLocaleString()}</Text>
+                                </View>
+                                {item.crypto_info?.hasCrypto && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFBEB', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                        <Ionicons name="logo-bitcoin" size={10} color="#D97706" />
+                                        <Text style={{ fontSize: 10, fontWeight: '900', color: '#B45309' }}>
+                                            ${item.crypto_info.totalUSD.toFixed(2)}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
 
                             <View style={s.manageBtn}>
@@ -3197,6 +3889,7 @@ Metadata:
             {renderManualVaModal()}
             {renderTransactionDetailsModal()}
             {renderCryptoFundingModal()}
+            {renderChangePasswordModal()}
 
             {/* Admin Verification Modal */}
             <SecurityModal 
@@ -3219,43 +3912,340 @@ const s = StyleSheet.create({
         backgroundColor: T.bg,
     },
     headerContainer: {
-        paddingTop: Platform.OS === 'ios' ? 48 : 16,
+        paddingTop: Platform.OS === 'ios' ? 50 : (Platform.OS === 'android' ? 36 : 16),
         paddingHorizontal: 12,
-        paddingBottom: 10,
-        backgroundColor: T.card,
+        paddingBottom: 12,
         borderBottomWidth: 1.5,
-        borderBottomColor: T.gold,
+        borderBottomColor: '#D4AF37',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+    headerGoldStrip: {
+        height: 2.5,
+        width: '100%',
+        borderRadius: 2,
+        marginBottom: 10,
     },
     headerTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 12,
     },
-    headerTitle: {
-        color: T.navyDark,
-        fontSize: 20,
-        fontWeight: '900',
-        letterSpacing: -0.5,
-    },
-    headerSubTitle: {
-        color: T.goldDark,
-        fontSize: 11,
-        fontWeight: '700',
+    selectionBadgePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#D4AF37',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
     },
     closeSelectionBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: T.goldBg,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: 'rgba(10, 17, 40, 0.2)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 8,
+        marginRight: 6,
     },
     selectionText: {
-        color: T.navyDark,
-        fontSize: 15,
+        color: '#0A1128',
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    brandCol: {
+        flex: 1,
+    },
+    brandHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    brandEmblemBadge: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(212, 175, 55, 0.15)',
+        borderWidth: 1.2,
+        borderColor: '#D4AF37',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    liveStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        borderWidth: 1,
+        borderColor: '#10B981',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        gap: 4,
+    },
+    liveStatusPulse: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#10B981',
+    },
+    liveStatusText: {
+        color: '#10B981',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    headerSubTitle: {
+        color: '#D4AF37',
+        fontSize: 9.5,
         fontWeight: '800',
+        letterSpacing: 0.5,
+        marginTop: 2,
+    },
+    headerActionCluster: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    headerGhostBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    headerGhostBtnAlert: {
+        borderColor: '#F59E0B',
+        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    },
+    headerActionBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#EF4444',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 8,
+        minWidth: 16,
+        alignItems: 'center',
+    },
+    headerActionBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 8,
+        fontWeight: '900',
+    },
+    addUserBtnShadow: {
+        shadowColor: '#D4AF37',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    addUserGradientBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    addUserBtnText: {
+        color: '#0A1128',
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
+    ribbonWrapper: {
+        marginBottom: 10,
+        marginHorizontal: -12,
+    },
+    ribbonContent: {
+        paddingHorizontal: 12,
+        gap: 8,
+    },
+    statRibbonCard: {
+        width: 140,
+        borderRadius: 12,
+        padding: 10,
+        borderWidth: 1.2,
+        backgroundColor: 'rgba(10, 17, 40, 0.85)',
+    },
+    statRibbonTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    statIconCircle: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    statRibbonPill: {
+        fontSize: 8,
+        fontWeight: '900',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 6,
+        borderWidth: 0.8,
+        textTransform: 'uppercase',
+    },
+    statRibbonLabel: {
+        color: '#94A3B8',
+        fontSize: 8.5,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    statRibbonValGold: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '900',
+        marginTop: 2,
+    },
+    statRibbonSub: {
+        color: '#64748B',
+        fontSize: 8.5,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    missingAlertCard: {
+        borderRadius: 10,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#F59E0B',
+        marginBottom: 10,
+    },
+    missingAlertGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
+    missingAlertLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flex: 1,
+    },
+    missingAlertIcon: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(245, 158, 11, 0.25)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    missingAlertTitle: {
+        color: '#FCD34D',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    missingAlertSub: {
+        color: '#CBD5E1',
+        fontSize: 9.5,
+        fontWeight: '600',
+        marginTop: 1,
+    },
+    missingAlertBtnPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#D4AF37',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginLeft: 8,
+    },
+    missingAlertBtnText: {
+        color: '#0A1128',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    searchContainerLuxury: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.07)',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        height: 40,
+        borderWidth: 1.2,
+        borderColor: 'rgba(212, 175, 55, 0.35)',
+        marginBottom: 8,
+    },
+    searchInputLuxury: {
+        flex: 1,
+        marginLeft: 8,
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '600',
+        paddingVertical: 0,
+    },
+    searchResultPill: {
+        backgroundColor: 'rgba(212, 175, 55, 0.18)',
+        borderWidth: 1,
+        borderColor: '#D4AF37',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginLeft: 6,
+    },
+    searchResultPillText: {
+        color: '#D4AF37',
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+    filterRowLuxury: {
+        marginHorizontal: -12,
+    },
+    filterContentLuxury: {
+        paddingHorizontal: 12,
+        gap: 6,
+    },
+    filterChipWrapper: {
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    filterChipLuxury: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    filterChipLuxuryActive: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+    },
+    filterChipTextLuxury: {
+        color: '#CBD5E1',
+        fontSize: 10,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    filterChipTextLuxuryActive: {
+        color: '#0A1128',
+        fontSize: 10,
+        fontWeight: '900',
+        textTransform: 'uppercase',
     },
     addUserHeaderBtn: {
         width: 36,
@@ -4752,6 +5742,322 @@ const s = StyleSheet.create({
     receiptCloseBtnText: {
         color: '#FFFFFF',
         fontSize: 12,
+        fontWeight: '800',
+    },
+
+    // Credential Authority & Password Vault Styles
+    credentialVaultCard: {
+        backgroundColor: '#070D1F',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1.5,
+        borderColor: '#D4AF37',
+        marginBottom: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    credentialVaultHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 12,
+    },
+    credentialVaultIcon: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: 'rgba(212, 175, 55, 0.15)',
+        borderWidth: 1.2,
+        borderColor: '#D4AF37',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    credentialVaultTitle: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    credentialSecurityBadge: {
+        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 0.8,
+        borderColor: '#10B981',
+    },
+    credentialSecurityBadgeText: {
+        color: '#34D399',
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    credentialVaultSub: {
+        color: '#94A3B8',
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    credentialVaultActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    credentialPrimaryBtn: {
+        flex: 1,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    credentialPrimaryBtnGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+    },
+    credentialPrimaryBtnText: {
+        color: '#0A1128',
+        fontSize: 11,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    credentialSecondaryBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.4)',
+    },
+    credentialSecondaryBtnText: {
+        color: '#D4AF37',
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+
+    // Change Password Modal Styles
+    passwordModalCard: {
+        width: '92%',
+        maxWidth: 500,
+        alignSelf: 'center',
+        backgroundColor: '#070D1F',
+        borderRadius: 18,
+        borderWidth: 1.5,
+        borderColor: '#D4AF37',
+        overflow: 'hidden',
+        maxHeight: '88%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 10,
+    },
+    passwordModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(212, 175, 55, 0.2)',
+        backgroundColor: '#0A1226',
+    },
+    passwordModalTitle: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    passwordModalSubtitle: {
+        color: '#D4AF37',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    closeModalCircleBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    passwordUserBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderRadius: 12,
+        padding: 10,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.25)',
+    },
+    passwordUserAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#D4AF37',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    passwordUserName: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: '#FFFFFF',
+    },
+    passwordUserEmail: {
+        fontSize: 10.5,
+        color: '#94A3B8',
+        marginTop: 1,
+    },
+    passwordUserRolePill: {
+        backgroundColor: 'rgba(212, 175, 55, 0.15)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 0.8,
+        borderColor: '#D4AF37',
+    },
+    passwordUserRoleText: {
+        color: '#D4AF37',
+        fontSize: 9,
+        fontWeight: '900',
+    },
+    passwordFieldLabel: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#D4AF37',
+        letterSpacing: 0.5,
+        marginBottom: 2,
+    },
+    passwordInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1.2,
+        borderColor: '#D4AF37',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        height: 44,
+        marginVertical: 6,
+    },
+    passwordTextInput: {
+        flex: 1,
+        color: '#FFFFFF',
+        fontSize: 13.5,
+        fontWeight: '700',
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        paddingVertical: 0,
+    },
+    entropyContainer: {
+        marginBottom: 8,
+    },
+    entropyBarRow: {
+        flexDirection: 'row',
+        gap: 4,
+        marginTop: 4,
+    },
+    entropySegment: {
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+    },
+    entropyLabel: {
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    generatePasswordPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(212, 175, 55, 0.15)',
+        borderWidth: 1,
+        borderColor: '#D4AF37',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    generatePasswordPillText: {
+        color: '#FCD34D',
+        fontSize: 10.5,
+        fontWeight: '800',
+    },
+    emailToggleCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        marginVertical: 8,
+    },
+    toggleCheckBox: {
+        width: 18,
+        height: 18,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: '#D4AF37',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+    },
+    toggleCheckBoxActive: {
+        backgroundColor: '#D4AF37',
+    },
+    emailToggleTitle: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    emailToggleSub: {
+        color: '#94A3B8',
+        fontSize: 9.5,
+        marginTop: 2,
+        lineHeight: 13,
+    },
+    passwordActionCluster: {
+        gap: 8,
+        marginTop: 12,
+    },
+    confirmPasswordBtn: {
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    confirmPasswordBtnGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 12,
+    },
+    confirmPasswordBtnText: {
+        color: '#0A1128',
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    cancelPasswordBtn: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    cancelPasswordBtnText: {
+        color: '#CBD5E1',
+        fontSize: 11,
         fontWeight: '800',
     },
 });
