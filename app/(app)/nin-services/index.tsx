@@ -22,12 +22,12 @@ interface ServiceItem {
 }
 
 const ALL_SERVICES: ServiceItem[] = [
-  // 1. Instant Automated API Services (AgentHub Instant Execution)
+  // 1. Instant Automated API Services
   {
     id: 'nin',
     pricingId: 'nin_premium',
-    title: 'Verify & Print NIN Slip',
-    desc: 'Digital ID Card, Standard & Regular Slips',
+    title: 'Verify & Print Slip',
+    desc: 'Digital ID cards & official slips',
     icon: 'finger-print',
     color: '#059669',
     bgColor: '#ECFDF5',
@@ -38,8 +38,8 @@ const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'phone',
     pricingId: 'nin_phone',
-    title: 'Verify by Phone Number',
-    desc: 'Find linked NIN records via active SIM',
+    title: 'Verify by Phone',
+    desc: 'Lookup by phone number',
     icon: 'call',
     color: '#0D9488',
     bgColor: '#F0FDFA',
@@ -50,8 +50,8 @@ const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'bvn',
     pricingId: 'vnin_val',
-    title: 'BVN Validation & VNIN Link',
-    desc: 'Generate BVN cards & link virtual identity',
+    title: 'BVN & VNIN Link',
+    desc: 'Validate BVN & link identity',
     icon: 'card',
     color: '#0284C7',
     bgColor: '#F0F9FF',
@@ -60,12 +60,12 @@ const ALL_SERVICES: ServiceItem[] = [
     badge: 'INSTANT API',
   },
 
-  // 2. Assisted Desk & NIMC Requests (Manual / Officer Processing)
+  // 2. Assisted Desk & NIMC Requests
   {
     id: 'demo',
     pricingId: 'nin_verify',
     title: 'Demographic Search',
-    desc: 'Lookup NIN by Full Name and Date of Birth',
+    desc: 'Lookup by Name & Date of Birth',
     icon: 'people',
     color: '#475569',
     bgColor: '#F1F5F9',
@@ -77,7 +77,7 @@ const ALL_SERVICES: ServiceItem[] = [
     id: 'mod',
     pricingId: 'nin_mod_name',
     title: 'NIN Modification',
-    desc: 'Update Name, Phone, Address or Date of Birth',
+    desc: 'Update bio & contact details',
     icon: 'create',
     color: '#D97706',
     bgColor: '#FEF3C7',
@@ -88,8 +88,8 @@ const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'val',
     pricingId: 'nin_val_norecord',
-    title: 'NIN Validation (No-Record)',
-    desc: 'Resolve database sync & missing record errors',
+    title: 'NIN Validation',
+    desc: 'Fix record sync errors',
     icon: 'checkmark-circle',
     color: '#2563EB',
     bgColor: '#EFF6FF',
@@ -100,8 +100,8 @@ const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'delink',
     pricingId: 'nin_mod_phone',
-    title: 'Delink Phone Number',
-    desc: 'Remove old mobile numbers from NIN profile',
+    title: 'Delink Phone',
+    desc: 'Remove old mobile numbers',
     icon: 'cut',
     color: '#DC2626',
     bgColor: '#FEF2F2',
@@ -113,7 +113,7 @@ const ALL_SERVICES: ServiceItem[] = [
     id: 'ipe',
     pricingId: 'ipe_clearance',
     title: 'IPE Clearance',
-    desc: 'Official pre-employment & institutional clearance',
+    desc: 'Pre-employment & institutional',
     icon: 'briefcase',
     color: '#4F46E5',
     bgColor: '#EEF2FF',
@@ -124,8 +124,8 @@ const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'track',
     pricingId: 'pers_status',
-    title: 'Personalization Tracking',
-    desc: 'Check processing status and Tracking ID',
+    title: 'Tracking Status',
+    desc: 'Check request progress',
     icon: 'shield-checkmark',
     color: '#0891B2',
     bgColor: '#ECFEFF',
@@ -254,12 +254,12 @@ export default function NINServicesScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
-      {/* Modern Royal Luxury Header */}
+      {/* Fresh Executive Header */}
       <LinearGradient
         colors={['#0F172A', '#1E293B']}
         style={[
           styles.headerGradient,
-          { paddingTop: Math.max(insets.top, 20) + 8, paddingBottom: 20 },
+          { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 18 },
         ]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -276,7 +276,7 @@ export default function NINServicesScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="time-outline" size={14} color="#10B981" style={{ marginRight: 4 }} />
-              <Text style={styles.historyBtnTxt}>Reprint History</Text>
+              <Text style={styles.historyBtnTxt}>History</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -285,18 +285,15 @@ export default function NINServicesScreen() {
           <View style={styles.statusPill}>
             <View style={[styles.statusDot, globalNINStatus === 'maintenance' && { backgroundColor: '#F59E0B' }]} />
             <Text style={styles.statusPillTxt}>
-              {globalNINStatus === 'maintenance' ? 'GATEWAY UNDER MAINTENANCE' : 'NIMC VERIFIED GATEWAY'}
+              {globalNINStatus === 'maintenance' ? 'GATEWAY MAINTENANCE' : 'NIMC SECURE GATEWAY'}
             </Text>
           </View>
 
           <Text style={styles.headerTitle}>National Identity Services</Text>
-          <Text style={styles.headerSubtitle}>
-            Official instant verification, verified slip printing & certified desk services
-          </Text>
         </View>
       </LinearGradient>
 
-      {/* Main Content ScrollView */}
+      {/* Main Content */}
       <ScrollView
         style={styles.content}
         contentContainerStyle={[
@@ -310,7 +307,7 @@ export default function NINServicesScreen() {
           <View style={styles.globalMaintBanner}>
             <Ionicons name="construct-outline" size={18} color="#B45309" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.globalMaintTitle}>Routine Gateway Maintenance</Text>
+              <Text style={styles.globalMaintTitle}>Gateway Maintenance</Text>
               <Text style={styles.globalMaintDesc}>{globalNINMsg}</Text>
             </View>
           </View>
@@ -333,7 +330,7 @@ export default function NINServicesScreen() {
               <View style={styles.heroTopRow}>
                 <View style={styles.heroBadge}>
                   <Ionicons name="flash" size={11} color="#059669" style={{ marginRight: 4 }} />
-                  <Text style={styles.heroBadgeTxt}>INSTANT API • SLIP V2</Text>
+                  <Text style={styles.heroBadgeTxt}>INSTANT API</Text>
                 </View>
                 {heroMaint ? (
                   <View style={styles.maintPill}>
@@ -342,14 +339,14 @@ export default function NINServicesScreen() {
                 ) : (
                   <View style={styles.instantSpeedPill}>
                     <Ionicons name="sparkles" size={10} color="#059669" style={{ marginRight: 3 }} />
-                    <Text style={styles.instantSpeedTxt}>PDF & PNG Ready</Text>
+                    <Text style={styles.instantSpeedTxt}>PDF & PNG</Text>
                   </View>
                 )}
               </View>
 
               <View style={styles.heroBody}>
                 <View style={styles.heroIconBox}>
-                  <Ionicons name="finger-print" size={28} color="#059669" />
+                  <Ionicons name="finger-print" size={26} color="#059669" />
                 </View>
                 <View style={styles.heroTextWrap}>
                   <Text style={styles.heroTitle}>{heroService.title}</Text>
@@ -364,7 +361,7 @@ export default function NINServicesScreen() {
                   <Text style={styles.formatChip}>Regular</Text>
                 </View>
                 <View style={styles.heroActionBtn}>
-                  <Text style={styles.heroActionTxt}>Verify Now</Text>
+                  <Text style={styles.heroActionTxt}>Verify</Text>
                   <Ionicons name="arrow-forward" size={13} color="#FFFFFF" />
                 </View>
               </View>
@@ -372,12 +369,12 @@ export default function NINServicesScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Section 1: Automated Instant Services (AgentHub API) */}
+        {/* Section 1: Automated Instant Services */}
         {instantServices.filter(s => s.id !== 'nin').length > 0 && (
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="flash-outline" size={15} color="#059669" style={{ marginRight: 6 }} />
-              <Text style={[styles.sectionTitle, { color: '#059669' }]}>Automated Instant Services</Text>
+              <Ionicons name="flash-outline" size={14} color="#059669" style={{ marginRight: 6 }} />
+              <Text style={[styles.sectionTitle, { color: '#059669' }]}>Instant Verification</Text>
             </View>
 
             <View style={styles.cardList}>
@@ -388,12 +385,12 @@ export default function NINServicesScreen() {
           </View>
         )}
 
-        {/* Section 2: Assisted Desk & NIMC Requests (Manual / Desk Clearance) */}
+        {/* Section 2: Assisted Desk Services */}
         {deskServices.length > 0 && (
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="briefcase-outline" size={15} color="#0F172A" style={{ marginRight: 6 }} />
-              <Text style={styles.sectionTitle}>Assisted Desk & NIMC Requests</Text>
+              <Ionicons name="briefcase-outline" size={14} color="#475569" style={{ marginRight: 6 }} />
+              <Text style={styles.sectionTitle}>Assisted Services</Text>
             </View>
 
             <View style={styles.cardList}>
@@ -402,21 +399,19 @@ export default function NINServicesScreen() {
           </View>
         )}
 
-        {/* Support Card */}
+        {/* Fresh Minimalist Support Strip */}
         <View style={styles.supportBanner}>
           <View style={styles.supportLeft}>
-            <Text style={styles.supportTitle}>Need Support?</Text>
-            <Text style={styles.supportDesc}>
-              Our identity verification desk is available 24/7 for assistance.
-            </Text>
+            <Ionicons name="headset-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
+            <Text style={styles.supportTitle}>Need Help?</Text>
           </View>
           <TouchableOpacity
             style={styles.supportButton}
             activeOpacity={0.8}
             onPress={() => router.push('/(app)/support')}
           >
-            <Ionicons name="chatbubbles" size={15} color="#059669" style={{ marginRight: 4 }} />
             <Text style={styles.supportBtnTxt}>Contact Support</Text>
+            <Ionicons name="chevron-forward" size={12} color="#059669" style={{ marginLeft: 2 }} />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -438,7 +433,7 @@ export default function NINServicesScreen() {
         key={service.id}
         onPress={() => handleServicePress(service)}
         style={[styles.serviceRow, isMaint && styles.serviceRowMaint]}
-        activeOpacity={0.82}
+        activeOpacity={0.78}
       >
         <View style={[styles.serviceIconWrap, { backgroundColor: service.bgColor }]}>
           <Ionicons name={service.icon} size={18} color={isMaint ? '#B45309' : service.color} />
@@ -467,7 +462,7 @@ export default function NINServicesScreen() {
           </View>
         ) : (
           <View style={styles.chevronBox}>
-            <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+            <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
           </View>
         )}
       </TouchableOpacity>
@@ -482,14 +477,14 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   backButton: {
     width: 36,
@@ -509,9 +504,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16,185,129,0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.35)',
+    borderColor: 'rgba(16,185,129,0.3)',
   },
   historyBtnTxt: {
     color: '#6EE7B7',
@@ -528,9 +523,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.12)',
     marginBottom: 6,
   },
   statusDot: {
@@ -542,28 +537,22 @@ const styles = StyleSheet.create({
   },
   statusPillTxt: {
     color: '#E2E8F0',
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
     letterSpacing: -0.2,
-  },
-  headerSubtitle: {
-    color: '#94A3B8',
-    fontSize: 11.5,
-    marginTop: 2,
-    lineHeight: 16,
   },
 
   content: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingTop: 14,
   },
 
@@ -591,41 +580,41 @@ const styles = StyleSheet.create({
 
   // Hero Card
   heroCard: {
-    borderRadius: 20,
-    marginBottom: 20,
+    borderRadius: 18,
+    marginBottom: 16,
     overflow: 'hidden',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#A7F3D0',
     shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   heroGradient: {
-    padding: 16,
+    padding: 14,
   },
   heroTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
   heroBadgeTxt: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '900',
     color: '#059669',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   instantSpeedPill: {
     flexDirection: 'row',
@@ -633,12 +622,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFDF5',
     paddingHorizontal: 7,
     paddingVertical: 2.5,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
   instantSpeedTxt: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '800',
     color: '#059669',
   },
@@ -646,52 +635,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   heroIconBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1.2,
     borderColor: '#A7F3D0',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   heroTextWrap: {
     flex: 1,
   },
   heroTitle: {
-    fontSize: 15.5,
+    fontSize: 15,
     fontWeight: '900',
     color: '#0F172A',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   heroDesc: {
     fontSize: 11,
     fontWeight: '500',
     color: '#64748B',
-    lineHeight: 15,
+    lineHeight: 14,
   },
   heroFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(5,150,105,0.12)',
+    borderTopColor: 'rgba(5,150,105,0.1)',
   },
   heroFormatsRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
   },
   formatChip: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '700',
     color: '#065F46',
     backgroundColor: '#DCFCE7',
@@ -704,69 +688,69 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#059669',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
     gap: 4,
   },
   heroActionTxt: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '800',
   },
 
   // Section Styles
   sectionWrap: {
-    marginBottom: 18,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     paddingHorizontal: 2,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#475569',
     textTransform: 'uppercase',
-    letterSpacing: 0.7,
+    letterSpacing: 0.6,
   },
   cardList: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
     overflow: 'hidden',
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1.5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   serviceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#F8FAFC',
   },
   serviceRowMaint: {
     backgroundColor: '#FFFDF7',
   },
   serviceIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   serviceTextCol: {
     flex: 1,
   },
   serviceRowTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#0F172A',
   },
@@ -774,41 +758,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     borderRadius: 4,
-    borderWidth: 1,
+    borderWidth: 0.8,
     borderColor: '#A7F3D0',
     gap: 2,
   },
   instantTagTxt: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: '800',
     color: '#059669',
   },
   deskTag: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     borderRadius: 4,
-    borderWidth: 1,
+    borderWidth: 0.8,
     borderColor: '#E2E8F0',
   },
   deskTagTxt: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: '800',
     color: '#64748B',
   },
   serviceRowDesc: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '500',
     color: '#64748B',
-    lineHeight: 14,
+    lineHeight: 13,
   },
   chevronBox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F8FAFC',
@@ -816,13 +800,13 @@ const styles = StyleSheet.create({
   maintPill: {
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 6,
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     borderRadius: 6,
-    borderWidth: 1,
+    borderWidth: 0.8,
     borderColor: '#FDE68A',
   },
   maintPillText: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: '900',
     color: '#B45309',
   },
@@ -833,40 +817,35 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 6,
+    borderColor: '#F1F5F9',
+    marginTop: 4,
   },
   supportLeft: {
-    flex: 1,
-    paddingRight: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   supportTitle: {
     color: '#0F172A',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-  },
-  supportDesc: {
-    color: '#64748B',
-    fontSize: 10.5,
-    marginTop: 2,
-    lineHeight: 14,
   },
   supportButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
   supportBtnTxt: {
     color: '#059669',
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: '800',
   },
 });

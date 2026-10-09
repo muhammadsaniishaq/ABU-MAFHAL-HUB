@@ -2438,12 +2438,11 @@ switch(selectedLayout) {
                     style={styles.headerBackBtn}
                     activeOpacity={0.7}
                 >
-                    <Ionicons name="arrow-back" size={20} color="#0f172a" />
+                    <Ionicons name="arrow-back" size={18} color="#0f172a" />
                 </TouchableOpacity>
 
                 <View style={{ flex: 1, marginHorizontal: 10 }}>
-                    <Text style={styles.headerTitleText}>Verify NIN Slip</Text>
-                    <Text style={styles.headerSubText}>NIMC Official Verification & Printing</Text>
+                    <Text style={styles.headerTitleText}>Verify NIN</Text>
                 </View>
 
                 <TouchableOpacity 
@@ -2456,12 +2455,12 @@ switch(selectedLayout) {
                         {userBalance !== null ? `₦${userBalance.toLocaleString()}` : '...'}
                     </Text>
                     <View style={styles.headerWalletPlus}>
-                        <Ionicons name="add" size={12} color="#ffffff" />
+                        <Ionicons name="add" size={11} color="#ffffff" />
                     </View>
                 </TouchableOpacity>
             </View>
 
-            {/* Segmented Mode Tabs: [ Verify & Print ] vs [ Reprint History ] */}
+            {/* Segmented Mode Tabs */}
             <View style={styles.tabContainer}>
                 <TouchableOpacity 
                     style={[styles.tabButton, activeTab === 'verify' && styles.tabButtonActive]}
@@ -2470,11 +2469,11 @@ switch(selectedLayout) {
                 >
                     <Ionicons 
                         name="id-card-outline" 
-                        size={15} 
+                        size={14} 
                         color={activeTab === 'verify' ? '#059669' : '#64748b'} 
                     />
                     <Text style={[styles.tabButtonText, activeTab === 'verify' && styles.tabButtonTextActive]}>
-                        Verify & Print
+                        Verify
                     </Text>
                 </TouchableOpacity>
 
@@ -2485,11 +2484,11 @@ switch(selectedLayout) {
                 >
                     <Ionicons 
                         name="time-outline" 
-                        size={15} 
+                        size={14} 
                         color={activeTab === 'history' ? '#059669' : '#64748b'} 
                     />
                     <Text style={[styles.tabButtonText, activeTab === 'history' && styles.tabButtonTextActive]}>
-                        Reprint History {historyList.length > 0 ? `(${historyList.length})` : ''}
+                        History {historyList.length > 0 ? `(${historyList.length})` : ''}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -2507,10 +2506,7 @@ switch(selectedLayout) {
                                 <View style={styles.stepBadge}>
                                     <Text style={styles.stepBadgeText}>1</Text>
                                 </View>
-                                <View>
-                                    <Text style={styles.cardTitle}>Select Slip Layout</Text>
-                                    <Text style={styles.cardSubtitle}>Choose your desired slip format</Text>
-                                </View>
+                                <Text style={styles.cardTitle}>Select Format</Text>
                             </View>
 
                             <View style={styles.layoutGrid}>
@@ -2589,13 +2585,10 @@ switch(selectedLayout) {
                                 <View style={styles.stepBadge}>
                                     <Text style={styles.stepBadgeText}>2</Text>
                                 </View>
-                                <View>
-                                    <Text style={styles.cardTitle}>National Identification Number</Text>
-                                    <Text style={styles.cardSubtitle}>Enter 11-digit verified identity number</Text>
-                                </View>
+                                <Text style={styles.cardTitle}>Identity Number</Text>
                             </View>
                             
-                            <View style={{ marginBottom: 12 }}>
+                            <View style={{ marginBottom: 10 }}>
                                 <View style={[styles.inputContainer, nin.length === 11 && styles.inputContainerValid]}>
                                     <Ionicons name="keypad-outline" size={18} color={nin.length === 11 ? '#10b981' : '#94a3b8'} />
                                     <TextInput
@@ -2642,14 +2635,14 @@ switch(selectedLayout) {
                                     styles.checkboxBox, 
                                     consent ? styles.checkboxBoxSelected : styles.checkboxBoxUnselected
                                 ]}>
-                                    {consent && <Ionicons name="checkmark" size={13} color="#ffffff" />}
+                                    {consent && <Ionicons name="checkmark" size={12} color="#ffffff" />}
                                 </View>
                                 <Text style={styles.consentText}>
-                                    I confirm that authorized consent has been obtained from the ID owner for this verification.
+                                    I confirm authorized consent from the ID owner.
                                 </Text>
                             </TouchableOpacity>
 
-                            {/* Verify Button (Modern Vibrant Gradient) */}
+                            {/* Verify Button */}
                             {(() => {
                                 const activeItem = layouts.find(l => l.id === selectedLayout) || layouts[0];
                                 const currentPrice = activeItem ? activeItem.price : 100;
@@ -2675,7 +2668,7 @@ switch(selectedLayout) {
                                                 </View>
                                             ) : (
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <Ionicons name="shield-checkmark" size={18} color={isValid ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
+                                                    <Ionicons name="shield-checkmark" size={16} color={isValid ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
                                                     <Text style={[styles.verifyButtonText, !isValid && { color: '#64748b' }]}>
                                                         Verify & Generate Slip • ₦{currentPrice.toLocaleString()}
                                                     </Text>
@@ -2687,24 +2680,10 @@ switch(selectedLayout) {
                             })()}
                         </View>
 
-                        {/* Guidelines Section (Clean, Minimal, Executive) */}
-                        <View style={styles.card}>
-                            <View style={styles.historyHeader}>
-                                <Ionicons name="shield-checkmark" size={16} color="#059669" />
-                                <Text style={styles.historyTitle}>Verification Guidelines</Text>
-                            </View>
-                            <View style={styles.guidelineRow}>
-                                <Ionicons name="checkmark-circle" size={14} color="#059669" style={{ marginTop: 2, marginRight: 8 }} />
-                                <Text style={styles.guidelineText}>Official NIMC database verification with instant biometric details.</Text>
-                            </View>
-                            <View style={styles.guidelineRow}>
-                                <Ionicons name="checkmark-circle" size={14} color="#059669" style={{ marginTop: 2, marginRight: 8 }} />
-                                <Text style={styles.guidelineText}>Instant slip download in both high-resolution PDF and PNG formats.</Text>
-                            </View>
-                            <View style={styles.guidelineRow}>
-                                <Ionicons name="checkmark-circle" size={14} color="#059669" style={{ marginTop: 2, marginRight: 8 }} />
-                                <Text style={styles.guidelineText}>All generated slips are securely saved in Reprint History for free lifetime access.</Text>
-                            </View>
+                        {/* Sleek Trust Badge */}
+                        <View style={styles.trustBadge}>
+                            <Ionicons name="shield-checkmark" size={13} color="#059669" />
+                            <Text style={styles.trustBadgeText}>NIMC Encrypted Gateway • Instant PDF & PNG</Text>
                         </View>
                     </>
                 ) : (
@@ -3225,17 +3204,23 @@ const styles = StyleSheet.create({
         letterSpacing: -0.2,
         marginLeft: 6,
     },
-    guidelineRow: {
+    trustBadge: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f0fdf4',
+        borderWidth: 1,
+        borderColor: '#bbf7d0',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 14,
+        gap: 6,
+        marginTop: 2,
     },
-    guidelineText: {
+    trustBadgeText: {
         fontSize: 11,
-        color: '#475569',
-        fontWeight: '500',
-        lineHeight: 16,
-        flex: 1,
+        fontWeight: '700',
+        color: '#15803d',
     },
     statsCard: {
         backgroundColor: '#ffffff',
