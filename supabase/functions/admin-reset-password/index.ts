@@ -67,6 +67,19 @@ Deno.serve(async (req: Request) => {
             throw updateError;
         }
 
+        // Persist password record into profiles table for Super Admin reference
+        try {
+            await supabaseAdmin
+                .from('profiles')
+                .update({ 
+                    account_password: newPassword, 
+                    temp_password: newPassword 
+                })
+                .eq('id', targetUserId);
+        } catch (dbErr) {
+            console.warn("[admin-reset-password] Profile password persist notice:", dbErr);
+        }
+
         // Get user profile for personalized email
         const { data: userProfile } = await supabaseAdmin
             .from('profiles')
