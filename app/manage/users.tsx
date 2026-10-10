@@ -50,7 +50,9 @@ interface UserProfile {
     last_login?: string;
     kyc_verified?: boolean;
     transfer_limit?: number;
+    daily_limit?: number;
     single_tx_limit?: number;
+    transaction_pin?: string;
     admin_notes?: string;
     account_number?: string;
     bank_name?: string;
@@ -274,6 +276,97 @@ export default function UserManagement() {
     const [showPasswordPlaintext, setShowPasswordPlaintext] = useState(false);
     const [sendPasswordEmailNotification, setSendPasswordEmailNotification] = useState(true);
     const [changingPasswordProcessing, setChangingPasswordProcessing] = useState(false);
+    const [sendingDirectResetEmail, setSendingDirectResetEmail] = useState(false);
+    const [customPinInput, setCustomPinInput] = useState('');
+    const [resetPinProcessing, setResetPinProcessing] = useState(false);
+    const [showCustomPinBox, setShowCustomPinBox] = useState(false);
+
+    const handleDirectEmailResetDispatch = async () => {
+        if (!selectedUser?.email) {
+            Alert.alert("Babu Email", "Wannan mai asusun ba shi da adireshin email a tsarinmu.");
+            return;
+        }
+        setSendingDirectResetEmail(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email);
+            if (error) throw error;
+            Alert.alert(
+                "An Tura Sakon Email ✉️",
+                `An aika da link na sake password kai-tsaye zuwa ga ${selectedUser.email}.\nMai asusun zai iya danna link din ya sauya kalmar sirri da kanshi.`
+            );
+        } catch (err: any) {
+            Alert.alert("Aika Email Ya Gaza", err.message || "An samu matsala wajen tura sakon email.");
+        } finally {
+            setSendingDirectResetEmail(false);
+        }
+    };
+
+    const handleResetTransactionPin = async (pinValue: string = '1234') => {
+        if (!selectedUser) return;
+        const cleanPin = pinValue.trim();
+        if (cleanPin.length !== 4 || isNaN(Number(cleanPin))) {
+            Alert.alert("Lambar PIN Mara Kyau", "Dole ne lambar PIN ta kasance lambobi 4 daidai (misali 1234).");
+            return;
+        }
+        setResetPinProcessing(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ transaction_pin: cleanPin })
+                .eq('id', selectedUser.id);
+            if (error) throw error;
+            setSelectedUser({ ...selectedUser, transaction_pin: cleanPin });
+            Alert.alert(
+                "Transaction PIN An Sabunta 🔢",
+                `An yi nasarar saita lambar Transaction PIN ta ${selectedUser.full_name} zuwa: ${cleanPin}\n\nKa sanar da mai asusun sabuwar lambar tasa.`
+            );
+            setShowCustomPinBox(false);
+            setCustomPinInput('');
+        } catch (err: any) {
+            Alert.alert("Saita PIN Ya Gaza", err.message || "An samu matsala wajen canza PIN.");
+        } finally {
+            setResetPinProcessing(false);
+        }
+    };
+
+    const handleToggleSecurityFreeze = async () => {
+        if (!selectedUser) return;
+        const newStatus = selectedUser.status === 'active' ? 'suspended' : 'active';
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ status: newStatus })
+                .eq('id', selectedUser.id);
+            if (error) throw error;
+            setSelectedUser({ ...selectedUser, status: newStatus });
+            setUsers(users.map(u => u.id === selectedUser.id ? { ...u, status: newStatus } : u));
+            Alert.alert(
+                newStatus === 'suspended' ? "An Kulle Asusu ❄️" : "An Bude Asusu 🟢",
+                `Asusun ${selectedUser.full_name} yanzu yana: ${newStatus === 'suspended' ? 'FROZEN / A KULLE (An hana duk wani hada-hada)' : 'ACTIVE / BUDE (Komai na aiki normal)'}.`
+            );
+        } catch (err: any) {
+            Alert.alert("Matsalar Sauya Tsaro", err.message);
+        }
+    };
+
+    const handleSetDailyLimit = async (limitVal: number) => {
+        if (!selectedUser) return;
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ transfer_limit: limitVal, daily_limit: limitVal })
+                .eq('id', selectedUser.id);
+            if (error) throw error;
+            setSelectedUser({ ...selectedUser, transfer_limit: limitVal, daily_limit: limitVal });
+            setUsers(users.map(u => u.id === selectedUser.id ? { ...u, transfer_limit: limitVal, daily_limit: limitVal } : u));
+            Alert.alert(
+                "Iyakar Tura Kudi An Saita 🛡️",
+                `Iyakar tura kudi ta rana (Daily Limit) ga ${selectedUser.full_name} yanzu: ${limitVal >= 100000000 ? 'Unlimited ♾️' : '₦' + limitVal.toLocaleString()}`
+            );
+        } catch (err: any) {
+            Alert.alert("Matsala", err.message);
+        }
+    };
 
     const generateRandomSecurePassword = () => {
         const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -1444,7 +1537,8 @@ Metadata:
                         <View style={{ flexDirection: 'row', gap: 6 }}>
                             <TouchableOpacity 
                                 onPress={() => {
-                                    generateRandomSecurePassword();
+                                    setNewPasswordInput('');
+                                    setShowPasswordPlaintext(false);
                                     setShowChangePasswordModal(true);
                                 }} 
                                 style={[s.iconCircleBtn, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}
@@ -1460,53 +1554,74 @@ Metadata:
                         </View>
                     </View>
 
-                    {/* Executive Deep Navy Banner */}
-                    <LinearGradient colors={[T.navyDark, T.navyMid]} style={s.modalHeroBanner}>
-                        <View style={s.modalAvatarWrapper}>
-                            {selectedUser?.avatar_url ? (
-                                <Image source={{ uri: selectedUser.avatar_url }} style={s.modalAvatarImage} resizeMode="cover" />
-                            ) : (
-                                <Text style={s.modalAvatarText}>{selectedUser?.full_name?.charAt(0).toUpperCase()}</Text>
+                    {/* Executive Deep Navy Banner with Clean Multi-Tier Arrangement (Zero Overlaps) */}
+                    <LinearGradient colors={[T.navyDark, '#0B1530', T.navyMid]} style={s.modalHeroBanner}>
+                        {/* Tier 1: Avatar, Identity & Direct Contact Action Pills */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                                <View style={s.modalAvatarWrapper}>
+                                    {selectedUser?.avatar_url ? (
+                                        <Image source={{ uri: selectedUser.avatar_url }} style={s.modalAvatarImage} resizeMode="cover" />
+                                    ) : (
+                                        <Text style={s.modalAvatarText}>{selectedUser?.full_name?.charAt(0).toUpperCase()}</Text>
+                                    )}
+                                </View>
+                                <View style={{ marginLeft: 10, flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={s.modalUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
+                                        {selectedUser?.role === 'admin' && <Text style={{ fontSize: 13 }}>👑</Text>}
+                                    </View>
+                                    <Text style={s.modalUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
+                                    <Text style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 1 }}>
+                                        {selectedUser?.phone || 'No phone attached'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <TouchableOpacity onPress={() => contactUser('call')} style={s.contactBtn}>
+                                    <Ionicons name="call" size={15} color={T.gold} />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.contactBtn, { backgroundColor: T.successBg, borderColor: T.success }]}>
+                                    <Ionicons name="logo-whatsapp" size={16} color={T.success} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Tier 2: Responsive Badges Ribbon (Separated to eliminate collisions) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                            <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
+                                <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: T.success } : { color: T.danger }]}>
+                                    {selectedUser?.status?.toUpperCase()}
+                                </Text>
+                            </View>
+                            <View style={s.badgeVerified}>
+                                <Ionicons name="shield-checkmark" size={10} color={T.info} />
+                                <Text style={s.badgeVerifiedText}>Tier {selectedUser?.kyc_tier || 1}</Text>
+                            </View>
+                            {selectedUser?.account_number && (
+                                <View style={[s.badgeVerified, { backgroundColor: 'rgba(212, 175, 55, 0.15)', borderColor: 'rgba(212, 175, 55, 0.4)' }]}>
+                                    <Ionicons name="card" size={10} color={T.gold} />
+                                    <Text style={[s.badgeVerifiedText, { color: T.gold }]}>{selectedUser.account_number}</Text>
+                                </View>
+                            )}
+                            {selectedUser?.corporate_email && (
+                                <View style={s.badgeCorp}>
+                                    <Ionicons name="at-circle" size={10} color={T.warning} />
+                                    <Text style={s.badgeCorpText}>Corp</Text>
+                                </View>
+                            )}
+                            {userCryptoBalances.some(b => Number(b.balance) > 0) && (
+                                <View style={[s.badgeVerified, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+                                    <Ionicons name="flash" size={10} color="#D97706" />
+                                    <Text style={[s.badgeVerifiedText, { color: '#B45309', fontWeight: '900' }]}>CRYPTO ACTIVE</Text>
+                                </View>
                             )}
                         </View>
-                        <View style={{ marginLeft: 12, flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={s.modalUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
-                                {selectedUser?.role === 'admin' && <Text style={{ fontSize: 14 }}>👑</Text>}
-                            </View>
-                            <Text style={s.modalUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
-                                    <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: T.success } : { color: T.danger }]}>{selectedUser?.status}</Text>
-                                </View>
-                                <View style={s.badgeVerified}>
-                                    <Ionicons name="shield-checkmark" size={10} color={T.info} />
-                                    <Text style={s.badgeVerifiedText}>Tier {selectedUser?.kyc_tier || 1}</Text>
-                                </View>
-                                {selectedUser?.corporate_email && (
-                                    <View style={s.badgeCorp}>
-                                        <Ionicons name="at-circle" size={10} color={T.warning} />
-                                        <Text style={s.badgeCorpText}>Corp</Text>
-                                    </View>
-                                )}
-                                {userCryptoBalances.some(b => Number(b.balance) > 0) && (
-                                    <View style={[s.badgeVerified, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
-                                        <Ionicons name="flash" size={10} color="#D97706" />
-                                        <Text style={[s.badgeVerifiedText, { color: '#B45309', fontWeight: '900' }]}>CRYPTO ACTIVE</Text>
-                                    </View>
-                                )}
-                            </View>
-                        </View>
-                        <TouchableOpacity onPress={() => contactUser('call')} style={s.contactBtn}>
-                            <Ionicons name="call" size={16} color={T.gold} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.contactBtn, { backgroundColor: T.successBg, borderColor: T.success }]}>
-                            <Ionicons name="logo-whatsapp" size={18} color={T.success} />
-                        </TouchableOpacity>
                     </LinearGradient>
 
-                    {/* Navigation Tabs */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 42, backgroundColor: T.card, borderBottomWidth: 1, borderBottomColor: T.border }} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {/* Navigation Tabs (Height 48 for comfortable touch and zero overlap) */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ height: 48, maxHeight: 48, backgroundColor: T.card, borderBottomWidth: 1.5, borderBottomColor: T.border }} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}>
                         {[
                             { key: 'overview', label: 'Overview', icon: 'wallet-outline' },
                             { key: 'crypto', label: `Crypto (${userCryptoBalances.length})`, icon: 'logo-bitcoin' },
@@ -2406,7 +2521,8 @@ Metadata:
                                     <View style={s.credentialVaultActions}>
                                         <TouchableOpacity
                                             onPress={() => {
-                                                generateRandomSecurePassword();
+                                                setNewPasswordInput('');
+                                                setShowPasswordPlaintext(false);
                                                 setShowChangePasswordModal(true);
                                             }}
                                             style={s.credentialPrimaryBtn}
@@ -2424,39 +2540,149 @@ Metadata:
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
-                                            onPress={() => {
-                                                if (!selectedUser?.email) {
-                                                    Alert.alert("Error", "User has no email address.");
-                                                    return;
-                                                }
-                                                Alert.alert(
-                                                    "Send Reset Link",
-                                                    `Dispatch official password reset link directly to ${selectedUser.email}?`,
-                                                    [
-                                                        { text: "Cancel", style: "cancel" },
-                                                        {
-                                                            text: "Send Email",
-                                                            onPress: async () => {
-                                                                try {
-                                                                    const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email);
-                                                                    if (error) throw error;
-                                                                    Alert.alert("Email Dispatched ✉️", `Password reset instructions sent to ${selectedUser.email}`);
-                                                                } catch (e: any) {
-                                                                    Alert.alert("Failed", e.message);
-                                                                }
-                                                            }
-                                                        }
-                                                    ]
-                                                );
-                                            }}
+                                            onPress={handleDirectEmailResetDispatch}
+                                            disabled={sendingDirectResetEmail}
                                             style={s.credentialSecondaryBtn}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="mail-outline" size={14} color="#D4AF37" />
-                                            <Text style={s.credentialSecondaryBtnText}>Send Reset Link</Text>
+                                            {sendingDirectResetEmail ? (
+                                                <ActivityIndicator size="small" color="#D4AF37" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="mail-outline" size={14} color="#D4AF37" />
+                                                    <Text style={s.credentialSecondaryBtnText}>Send Reset Link</Text>
+                                                </>
+                                            )}
                                         </TouchableOpacity>
                                     </View>
                                 </LinearGradient>
+
+                                {/* ❄️ Anti-Fraud Instant Security Freeze Suite */}
+                                <View style={[s.controlCard, { borderColor: selectedUser?.status === 'suspended' ? T.danger : 'rgba(212, 175, 55, 0.3)' }]}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View style={[s.statIconCircle, { backgroundColor: selectedUser?.status === 'suspended' ? T.dangerBg : 'rgba(16, 185, 129, 0.15)' }]}>
+                                                <Ionicons name={selectedUser?.status === 'suspended' ? "snow" : "shield-checkmark"} size={16} color={selectedUser?.status === 'suspended' ? T.danger : T.success} />
+                                            </View>
+                                            <View>
+                                                <Text style={s.sectionHeading}>Anti-Fraud Security Freeze</Text>
+                                                <Text style={{ fontSize: 10, color: T.textSub, marginTop: 1 }}>
+                                                    {selectedUser?.status === 'suspended' ? 'Current: FROZEN & LOCKED ❄️' : 'Current: UNLOCKED & ACTIVE 🟢'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={handleToggleSecurityFreeze}
+                                            style={[
+                                                s.gridBtn,
+                                                { width: 'auto', paddingHorizontal: 12, paddingVertical: 6 },
+                                                selectedUser?.status === 'active' ? s.gridBtnDanger : s.gridBtnSuccess
+                                            ]}
+                                        >
+                                            <Ionicons name={selectedUser?.status === 'active' ? "lock-closed" : "lock-open"} size={14} color={selectedUser?.status === 'active' ? T.danger : T.success} />
+                                            <Text style={[s.gridBtnText, selectedUser?.status === 'active' ? { color: T.danger } : { color: T.success }]}>
+                                                {selectedUser?.status === 'active' ? 'Freeze Now ❄️' : 'Unfreeze 🟢'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* 🛡️ Executive Daily Transfer Limit Suite */}
+                                <View style={s.controlCard}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="speedometer-outline" size={16} color={T.goldDark} />
+                                            <Text style={s.sectionHeading}>Daily Transfer Limit (Rana)</Text>
+                                        </View>
+                                        <Text style={{ fontSize: 11, fontWeight: '900', color: T.goldDark }}>
+                                            ₦{((selectedUser?.transfer_limit || selectedUser?.daily_limit || 500000) >= 100000000 ? 'Unlimited' : (selectedUser?.transfer_limit || selectedUser?.daily_limit || 500000).toLocaleString())}
+                                        </Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                        {[
+                                            { label: '₦50k', val: 50000 },
+                                            { label: '₦200k', val: 200000 },
+                                            { label: '₦500k', val: 500000 },
+                                            { label: '₦1M', val: 1000000 },
+                                            { label: 'Unlimited ♾️', val: 999999999 }
+                                        ].map(lim => {
+                                            const isCurr = (selectedUser?.transfer_limit || selectedUser?.daily_limit || 500000) === lim.val;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={lim.val}
+                                                    onPress={() => handleSetDailyLimit(lim.val)}
+                                                    style={[
+                                                        s.presetChip,
+                                                        isCurr ? s.presetChipActive : null,
+                                                        { paddingHorizontal: 10, paddingVertical: 6 }
+                                                    ]}
+                                                >
+                                                    <Text style={[s.presetChipText, isCurr ? { color: '#FFFFFF' } : { color: T.navyDark }]}>
+                                                        {lim.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+
+                                {/* 🔢 Transaction PIN Authority Suite */}
+                                <View style={s.controlCard}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="keypad" size={16} color={T.goldDark} />
+                                            <Text style={s.sectionHeading}>Transaction PIN Authority (Cire Kudi)</Text>
+                                        </View>
+                                        <Text style={{ fontSize: 10, color: T.textSub, fontWeight: '700' }}>
+                                            {selectedUser?.transaction_pin ? `PIN: ••••` : 'Default: 1234'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                                        <TouchableOpacity
+                                            onPress={() => handleResetTransactionPin('1234')}
+                                            disabled={resetPinProcessing}
+                                            style={[s.gridBtn, { flex: 1, backgroundColor: T.goldBg, borderColor: T.gold }]}
+                                        >
+                                            <Ionicons name="refresh" size={14} color={T.goldDark} />
+                                            <Text style={[s.gridBtnText, { color: T.goldDark }]}>
+                                                {resetPinProcessing ? 'Setting...' : "Reset PIN to '1234'"}
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            onPress={() => setShowCustomPinBox(!showCustomPinBox)}
+                                            style={[s.gridBtn, { flex: 1, backgroundColor: T.card, borderColor: T.border }]}
+                                        >
+                                            <Ionicons name="create-outline" size={14} color={T.navyDark} />
+                                            <Text style={s.gridBtnText}>Custom 4-Digit PIN</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {showCustomPinBox && (
+                                        <View style={{ marginTop: 8, padding: 8, backgroundColor: T.bg, borderRadius: 10, borderWidth: 1, borderColor: T.border }}>
+                                            <Text style={{ fontSize: 10, color: T.navyDark, fontWeight: '700', marginBottom: 4 }}>Enter 4-Digit Custom PIN:</Text>
+                                            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                                                <TextInput
+                                                    value={customPinInput}
+                                                    onChangeText={setCustomPinInput}
+                                                    keyboardType="numeric"
+                                                    maxLength={4}
+                                                    placeholder="e.g. 5566"
+                                                    placeholderTextColor={T.textSub}
+                                                    style={{ flex: 1, height: 36, backgroundColor: T.card, borderRadius: 8, borderWidth: 1, borderColor: T.gold, paddingHorizontal: 10, fontWeight: '900', letterSpacing: 4 }}
+                                                />
+                                                <TouchableOpacity
+                                                    onPress={() => handleResetTransactionPin(customPinInput)}
+                                                    disabled={customPinInput.length !== 4 || resetPinProcessing}
+                                                    style={{ backgroundColor: T.navyDark, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}
+                                                >
+                                                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>Save PIN</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
 
                                 <Text style={s.sectionHeading}>System Feature Locks & Permissions</Text>
                                 
@@ -2500,11 +2726,6 @@ Metadata:
                                         <Text style={[s.gridBtnText, (selectedUser?.virtual_cards_enabled ?? true) ? { color: T.info } : { color: T.textSub }]}>
                                             Cards: {(selectedUser?.virtual_cards_enabled ?? true) ? 'ON' : 'OFF'}
                                         </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={initiateResetPin} style={s.gridBtn}>
-                                        <MaterialCommunityIcons name="lock-reset" size={16} color={T.textSub} />
-                                        <Text style={s.gridBtnText}>Reset Auth PIN</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -3225,7 +3446,7 @@ Metadata:
         </Modal>
     );
 
-    // Executive Royal Change Password Modal
+    // Executive Royal Credential & Password Authority Suite (Real User Dossier)
     const renderChangePasswordModal = () => {
         const entropy = getPasswordEntropy(newPasswordInput);
 
@@ -3253,8 +3474,8 @@ Metadata:
                                     <Ionicons name="shield-checkmark" size={18} color="#D4AF37" />
                                 </View>
                                 <View>
-                                    <Text style={s.passwordModalTitle}>CREDENTIAL AUTHORITY</Text>
-                                    <Text style={s.passwordModalSubtitle}>Change Account Password</Text>
+                                    <Text style={s.passwordModalTitle}>CREDENTIAL & SECURITY AUTHORITY</Text>
+                                    <Text style={s.passwordModalSubtitle}>Asalin Bayanan Mai Asusu & Canza Kalmar Sirri</Text>
                                 </View>
                             </View>
                             <TouchableOpacity
@@ -3265,117 +3486,197 @@ Metadata:
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
-                            {/* Target User Info Dossier Card */}
-                            <View style={s.passwordUserBanner}>
-                                <View style={s.passwordUserAvatar}>
-                                    {selectedUser?.avatar_url ? (
-                                        <Image source={{ uri: selectedUser.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 18 }} />
-                                    ) : (
-                                        <Text style={{ color: '#0A1128', fontWeight: '900', fontSize: 16 }}>
-                                            {selectedUser?.full_name?.charAt(0).toUpperCase() || 'U'}
-                                        </Text>
-                                    )}
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={s.passwordUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
-                                        {selectedUser?.role === 'admin' && <Text style={{ fontSize: 12 }}>👑</Text>}
-                                    </View>
-                                    <Text style={s.passwordUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
-                                </View>
-                                <View style={s.passwordUserRolePill}>
-                                    <Text style={s.passwordUserRoleText}>{selectedUser?.role?.toUpperCase()}</Text>
-                                </View>
-                            </View>
-
-                            {/* Password Input Section */}
-                            <Text style={s.passwordFieldLabel}>NEW ACCOUNT PASSWORD</Text>
-                            <View style={s.passwordInputContainer}>
-                                <Ionicons name="key" size={16} color="#D4AF37" style={{ marginRight: 8 }} />
-                                <TextInput
-                                    placeholder="Enter minimum 6 characters..."
-                                    placeholderTextColor="#64748B"
-                                    value={newPasswordInput}
-                                    onChangeText={setNewPasswordInput}
-                                    secureTextEntry={!showPasswordPlaintext}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    style={s.passwordTextInput}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowPasswordPlaintext(!showPasswordPlaintext)}
-                                    style={{ padding: 6 }}
-                                >
-                                    <Ionicons
-                                        name={showPasswordPlaintext ? "eye-off" : "eye"}
-                                        size={18}
-                                        color="#D4AF37"
-                                    />
-                                </TouchableOpacity>
-                                {newPasswordInput.length > 0 && (
-                                    <TouchableOpacity
-                                        onPress={async () => {
-                                            await Clipboard.setStringAsync(newPasswordInput);
-                                            Alert.alert("Copied 📋", "Password copied to clipboard.");
-                                        }}
-                                        style={{ padding: 6 }}
-                                    >
-                                        <Ionicons name="copy-outline" size={18} color="#38BDF8" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            {/* Dynamic Password Entropy Meter */}
-                            <View style={s.entropyContainer}>
-                                <View style={s.entropyBarRow}>
-                                    {[1, 2, 3, 4].map(seg => (
-                                        <View
-                                            key={seg}
-                                            style={[
-                                                s.entropySegment,
-                                                { backgroundColor: seg <= entropy.score ? entropy.color : 'rgba(255, 255, 255, 0.1)' }
-                                            ]}
-                                        />
-                                    ))}
-                                </View>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                                    <Text style={[s.entropyLabel, { color: entropy.color }]}>{entropy.label}</Text>
-                                    <Text style={{ fontSize: 9.5, color: '#64748B' }}>{newPasswordInput.length} chars</Text>
-                                </View>
-                            </View>
-
-                            {/* Quick Random Strong Generator Pill */}
-                            <View style={{ flexDirection: 'row', gap: 8, marginVertical: 10 }}>
-                                <TouchableOpacity
-                                    onPress={generateRandomSecurePassword}
-                                    style={s.generatePasswordPill}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="sparkles" size={13} color="#D4AF37" />
-                                    <Text style={s.generatePasswordPillText}>🎲 Generate Random Strong Password</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Email Delivery Toggle */}
-                            <TouchableOpacity
-                                onPress={() => setSendPasswordEmailNotification(!sendPasswordEmailNotification)}
-                                style={s.emailToggleCard}
-                                activeOpacity={0.8}
+                        <ScrollView contentContainerStyle={{ padding: 14 }} showsVerticalScrollIndicator={false}>
+                            {/* 👑 ASALIN BAYANAN MAI ASUSU (Authentic Real User Identity Dossier) */}
+                            <LinearGradient
+                                colors={['#0F1B3B', '#0B1430', '#060B18']}
+                                style={s.authenticDossierCard}
                             >
-                                <View style={[s.toggleCheckBox, sendPasswordEmailNotification && s.toggleCheckBoxActive]}>
-                                    {sendPasswordEmailNotification && <Ionicons name="checkmark" size={12} color="#0A1128" />}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="finger-print-outline" size={15} color="#D4AF37" />
+                                        <Text style={{ fontSize: 11, fontWeight: '900', color: '#D4AF37', letterSpacing: 0.5 }}>
+                                            ASALIN BAYANAN MAI ASUSU
+                                        </Text>
+                                    </View>
+                                    <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
+                                        <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: T.success } : { color: T.danger }]}>
+                                            {selectedUser?.status?.toUpperCase()}
+                                        </Text>
+                                    </View>
                                 </View>
-                                <View style={{ flex: 1, marginLeft: 10 }}>
-                                    <Text style={s.emailToggleTitle}>Send Official Credentials Email</Text>
-                                    <Text style={s.emailToggleSub}>
-                                        User will receive an encrypted notification containing login details.
+
+                                {/* User Core Profile Row */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                    <View style={s.dossierAvatarWrapper}>
+                                        {selectedUser?.avatar_url ? (
+                                            <Image source={{ uri: selectedUser.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 22 }} />
+                                        ) : (
+                                            <Text style={{ color: '#0A1128', fontWeight: '900', fontSize: 18 }}>
+                                                {selectedUser?.full_name?.charAt(0).toUpperCase() || 'U'}
+                                            </Text>
+                                        )}
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={s.dossierUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
+                                            {selectedUser?.role === 'admin' && <Text style={{ fontSize: 12 }}>👑</Text>}
+                                        </View>
+                                        <TouchableOpacity 
+                                            onPress={async () => {
+                                                if (selectedUser?.email) {
+                                                    await Clipboard.setStringAsync(selectedUser.email);
+                                                    Alert.alert("An Kwafi 📋", `Email ${selectedUser.email} an kwafi.`);
+                                                }
+                                            }}
+                                            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}
+                                        >
+                                            <Ionicons name="mail" size={12} color="#38BDF8" />
+                                            <Text style={s.dossierEmailText} numberOfLines={1}>{selectedUser?.email}</Text>
+                                            <Ionicons name="copy-outline" size={11} color="#94A3B8" />
+                                        </TouchableOpacity>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                            <Ionicons name="call" size={11} color="#D4AF37" />
+                                            <Text style={s.dossierPhoneText}>{selectedUser?.phone || 'Babu lambar waya'}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Real Financial & Identity Data Grid */}
+                                <View style={s.dossierDataGrid}>
+                                    <View style={s.dossierGridItem}>
+                                        <Text style={s.dossierGridLabel}>ASALIN VAULT / BAL</Text>
+                                        <Text style={s.dossierGridValGold}>
+                                            ₦{(selectedUser?.credit_balance || selectedUser?.balance || 0).toLocaleString()}
+                                        </Text>
+                                    </View>
+                                    <View style={s.dossierGridItem}>
+                                        <Text style={s.dossierGridLabel}>VIRTUAL ACCOUNT</Text>
+                                        <Text style={s.dossierGridValWhite} numberOfLines={1}>
+                                            {selectedUser?.account_number || 'Babu Account'}
+                                        </Text>
+                                    </View>
+                                    <View style={s.dossierGridItem}>
+                                        <Text style={s.dossierGridLabel}>BANK / KYC TIER</Text>
+                                        <Text style={s.dossierGridValWhite} numberOfLines={1}>
+                                            {selectedUser?.bank_name?.slice(0, 10) || 'Palmpay'} • Tier {selectedUser?.kyc_tier || 1}
+                                        </Text>
+                                    </View>
+                                    <View style={s.dossierGridItem}>
+                                        <Text style={s.dossierGridLabel}>KWANAN RAJISTA</Text>
+                                        <Text style={s.dossierGridValSub}>
+                                            {selectedUser?.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : 'N/A'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </LinearGradient>
+
+                            {/* 🔒 Cryptographic Auth Security Explainer Notice */}
+                            <View style={s.authHashNoticeCard}>
+                                <Ionicons name="shield-half-sharp" size={16} color="#D4AF37" style={{ marginTop: 2 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.authHashNoticeTitle}>Tsaron Supabase Auth (One-Way Hash)</Text>
+                                    <Text style={s.authHashNoticeSub}>
+                                        Ba a taba ajiye tsohon password a fili ba saboda tsaron asusu (Argon2 / bcrypt hash). Zaka iya saita sabon password a kasa ko kuma ka tura masa link ta email ya canza da kanshi.
                                     </Text>
                                 </View>
-                            </TouchableOpacity>
+                            </View>
 
-                            {/* Direct Action Buttons */}
-                            <View style={s.passwordActionCluster}>
+                            {/* 🔑 Set New Account Password Form (Starts Completely Clean) */}
+                            <View style={s.passwordFormSection}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={s.passwordFieldLabel}>SHIGAR DA SABON PASSWORD</Text>
+                                    {newPasswordInput.length > 0 && (
+                                        <TouchableOpacity onPress={() => setNewPasswordInput('')}>
+                                            <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '800' }}>Share</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                <View style={s.passwordInputContainer}>
+                                    <Ionicons name="key" size={16} color="#D4AF37" style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        placeholder="Rubuta sabon password (akalla haruffa 6)..."
+                                        placeholderTextColor="#64748B"
+                                        value={newPasswordInput}
+                                        onChangeText={setNewPasswordInput}
+                                        secureTextEntry={!showPasswordPlaintext}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        style={s.passwordTextInput}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setShowPasswordPlaintext(!showPasswordPlaintext)}
+                                        style={{ padding: 6 }}
+                                    >
+                                        <Ionicons
+                                            name={showPasswordPlaintext ? "eye-off" : "eye"}
+                                            size={18}
+                                            color="#D4AF37"
+                                        />
+                                    </TouchableOpacity>
+                                    {newPasswordInput.length > 0 && (
+                                        <TouchableOpacity
+                                            onPress={async () => {
+                                                await Clipboard.setStringAsync(newPasswordInput);
+                                                Alert.alert("An Kwafi 📋", "Sabuwar kalmar sirri an kwafi zuwa clipboard.");
+                                            }}
+                                            style={{ padding: 6 }}
+                                        >
+                                            <Ionicons name="copy-outline" size={18} color="#38BDF8" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                {/* Dynamic Password Entropy Meter */}
+                                <View style={s.entropyContainer}>
+                                    <View style={s.entropyBarRow}>
+                                        {[1, 2, 3, 4].map(seg => (
+                                            <View
+                                                key={seg}
+                                                style={[
+                                                    s.entropySegment,
+                                                    { backgroundColor: seg <= entropy.score ? entropy.color : 'rgba(255, 255, 255, 0.1)' }
+                                                ]}
+                                            />
+                                        ))}
+                                    </View>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                                        <Text style={[s.entropyLabel, { color: entropy.color }]}>{entropy.label}</Text>
+                                        <Text style={{ fontSize: 9.5, color: '#64748B' }}>{newPasswordInput.length} chars</Text>
+                                    </View>
+                                </View>
+
+                                {/* Optional Quick Random Strong Generator Button */}
+                                <View style={{ flexDirection: 'row', gap: 8, marginVertical: 6 }}>
+                                    <TouchableOpacity
+                                        onPress={generateRandomSecurePassword}
+                                        style={s.generatePasswordPill}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="sparkles" size={13} color="#D4AF37" />
+                                        <Text style={s.generatePasswordPillText}>🎲 Samar Da Kakkaran Password Na Musamman</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Email Delivery Notification Toggle */}
+                                <TouchableOpacity
+                                    onPress={() => setSendPasswordEmailNotification(!sendPasswordEmailNotification)}
+                                    style={s.emailToggleCard}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.toggleCheckBox, sendPasswordEmailNotification && s.toggleCheckBoxActive]}>
+                                        {sendPasswordEmailNotification && <Ionicons name="checkmark" size={12} color="#0A1128" />}
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 10 }}>
+                                        <Text style={s.emailToggleTitle}>Tura Sakon Email Ga Mai Asusu</Text>
+                                        <Text style={s.emailToggleSub}>
+                                            Za a tura cikakken bayanin sabuwar kalmar sirri kai-tsaye zuwa ga {selectedUser?.email}.
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* Confirm & Update Password Action Button */}
                                 <TouchableOpacity
                                     onPress={handleExecuteChangePassword}
                                     disabled={changingPasswordProcessing || newPasswordInput.length < 6}
@@ -3396,20 +3697,114 @@ Metadata:
                                         ) : (
                                             <>
                                                 <Ionicons name="shield-checkmark" size={16} color="#0A1128" />
-                                                <Text style={s.confirmPasswordBtnText}>CONFIRM & UPDATE PASSWORD</Text>
+                                                <Text style={s.confirmPasswordBtnText}>TABBATAR DA SAUYA PASSWORD</Text>
                                             </>
                                         )}
                                     </LinearGradient>
                                 </TouchableOpacity>
+                            </View>
+
+                            {/* ✉️ Direct 1-Tap Password Reset Link to Real User Email */}
+                            <View style={s.emailResetDispatchCard}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={[s.statIconCircle, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                                        <Ionicons name="mail" size={15} color="#38BDF8" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 11.5, fontWeight: '900', color: '#FFFFFF' }}>
+                                            Tura Link Na Sake Password Zuwa Email
+                                        </Text>
+                                        <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>
+                                            Link zai tafi inbox na {selectedUser?.email}
+                                        </Text>
+                                    </View>
+                                </View>
 
                                 <TouchableOpacity
-                                    onPress={() => setShowChangePasswordModal(false)}
-                                    style={s.cancelPasswordBtn}
-                                    activeOpacity={0.7}
+                                    onPress={handleDirectEmailResetDispatch}
+                                    disabled={sendingDirectResetEmail}
+                                    style={s.dispatchEmailLinkBtn}
+                                    activeOpacity={0.8}
                                 >
-                                    <Text style={s.cancelPasswordBtnText}>Cancel</Text>
+                                    {sendingDirectResetEmail ? (
+                                        <ActivityIndicator size="small" color="#0A1128" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="paper-plane" size={13} color="#0A1128" />
+                                            <Text style={s.dispatchEmailLinkBtnText}>Tura Reset Link Yanzu 🚀</Text>
+                                        </>
+                                    )}
                                 </TouchableOpacity>
                             </View>
+
+                            {/* 🔢 Quick Transaction PIN Override Card */}
+                            <View style={s.pinResetDispatchCard}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="keypad" size={15} color="#D4AF37" />
+                                        <Text style={{ fontSize: 11, fontWeight: '900', color: '#D4AF37' }}>
+                                            Transaction PIN Authority (Cire Kudi)
+                                        </Text>
+                                    </View>
+                                    <Text style={{ fontSize: 9.5, color: '#94A3B8' }}>
+                                        {selectedUser?.transaction_pin ? 'PIN: Saita' : 'Babu PIN'}
+                                    </Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    <TouchableOpacity
+                                        onPress={() => handleResetTransactionPin('1234')}
+                                        disabled={resetPinProcessing}
+                                        style={s.resetDefaultPinBtn}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="refresh" size={12} color="#D4AF37" />
+                                        <Text style={s.resetDefaultPinBtnText}>Saita zuwa '1234'</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setShowCustomPinBox(!showCustomPinBox)}
+                                        style={s.resetCustomPinBtn}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="create-outline" size={12} color="#FFFFFF" />
+                                        <Text style={s.resetCustomPinBtnText}>Lambar Musamman</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {showCustomPinBox && (
+                                    <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 8 }}>
+                                        <Text style={{ fontSize: 9.5, color: '#CBD5E1', marginBottom: 4 }}>Shigar da sabon 4-digit PIN:</Text>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                                            <TextInput
+                                                value={customPinInput}
+                                                onChangeText={setCustomPinInput}
+                                                keyboardType="numeric"
+                                                maxLength={4}
+                                                placeholder="1234"
+                                                placeholderTextColor="#64748B"
+                                                style={{ flex: 1, height: 34, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 6, paddingHorizontal: 8, color: '#FFFFFF', fontWeight: '900', letterSpacing: 4 }}
+                                            />
+                                            <TouchableOpacity
+                                                onPress={() => handleResetTransactionPin(customPinInput)}
+                                                disabled={customPinInput.length !== 4 || resetPinProcessing}
+                                                style={{ backgroundColor: '#D4AF37', paddingHorizontal: 10, justifyContent: 'center', borderRadius: 6 }}
+                                            >
+                                                <Text style={{ color: '#0A1128', fontSize: 10, fontWeight: '900' }}>Ajiye</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Cancel / Close Modal Button */}
+                            <TouchableOpacity
+                                onPress={() => setShowChangePasswordModal(false)}
+                                style={s.cancelPasswordBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={s.cancelPasswordBtnText}>Rufe / Close</Text>
+                            </TouchableOpacity>
                         </ScrollView>
                     </View>
                 </BlurView>
@@ -5890,47 +6285,113 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    passwordUserBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 12,
-        padding: 10,
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.25)',
+    authenticDossierCard: {
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1.2,
+        borderColor: '#D4AF37',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
     },
-    passwordUserAvatar: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    dossierAvatarWrapper: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: '#D4AF37',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#F9E498',
     },
-    passwordUserName: {
-        fontSize: 13,
+    dossierUserName: {
+        fontSize: 14,
         fontWeight: '900',
         color: '#FFFFFF',
     },
-    passwordUserEmail: {
+    dossierEmailText: {
+        fontSize: 11,
+        color: '#38BDF8',
+        fontWeight: '600',
+    },
+    dossierPhoneText: {
         fontSize: 10.5,
-        color: '#94A3B8',
-        marginTop: 1,
+        color: '#CBD5E1',
+        fontWeight: '600',
     },
-    passwordUserRolePill: {
-        backgroundColor: 'rgba(212, 175, 55, 0.15)',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-        borderWidth: 0.8,
-        borderColor: '#D4AF37',
+    dossierDataGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 10,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(212, 175, 55, 0.25)',
+        gap: 6,
     },
-    passwordUserRoleText: {
-        color: '#D4AF37',
-        fontSize: 9,
+    dossierGridItem: {
+        flex: 1,
+        minWidth: '47%',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        padding: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    dossierGridLabel: {
+        fontSize: 8.5,
         fontWeight: '900',
+        color: '#94A3B8',
+        letterSpacing: 0.5,
+    },
+    dossierGridValGold: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: '#FBBF24',
+        marginTop: 2,
+    },
+    dossierGridValWhite: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        marginTop: 2,
+    },
+    dossierGridValSub: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#CBD5E1',
+        marginTop: 2,
+    },
+    authHashNoticeCard: {
+        flexDirection: 'row',
+        gap: 8,
+        backgroundColor: 'rgba(212, 175, 55, 0.1)',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+    },
+    authHashNoticeTitle: {
+        fontSize: 10.5,
+        fontWeight: '900',
+        color: '#FCD34D',
+    },
+    authHashNoticeSub: {
+        fontSize: 9.5,
+        color: '#CBD5E1',
+        marginTop: 2,
+        lineHeight: 14,
+    },
+    passwordFormSection: {
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     passwordFieldLabel: {
         fontSize: 10,
@@ -5953,13 +6414,13 @@ const s = StyleSheet.create({
     passwordTextInput: {
         flex: 1,
         color: '#FFFFFF',
-        fontSize: 13.5,
+        fontSize: 13,
         fontWeight: '700',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
         paddingVertical: 0,
     },
     entropyContainer: {
-        marginBottom: 8,
+        marginBottom: 6,
     },
     entropyBarRow: {
         flexDirection: 'row',
@@ -5972,7 +6433,7 @@ const s = StyleSheet.create({
         borderRadius: 2,
     },
     entropyLabel: {
-        fontSize: 10,
+        fontSize: 9.5,
         fontWeight: '900',
     },
     generatePasswordPill: {
@@ -6025,13 +6486,10 @@ const s = StyleSheet.create({
         marginTop: 2,
         lineHeight: 13,
     },
-    passwordActionCluster: {
-        gap: 8,
-        marginTop: 12,
-    },
     confirmPasswordBtn: {
         borderRadius: 10,
         overflow: 'hidden',
+        marginTop: 4,
     },
     confirmPasswordBtnGradient: {
         flexDirection: 'row',
@@ -6046,6 +6504,72 @@ const s = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.5,
     },
+    emailResetDispatchCard: {
+        backgroundColor: 'rgba(56, 189, 248, 0.08)',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(56, 189, 248, 0.3)',
+    },
+    dispatchEmailLinkBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: '#38BDF8',
+        paddingVertical: 10,
+        borderRadius: 8,
+        marginTop: 8,
+    },
+    dispatchEmailLinkBtnText: {
+        color: '#0A1128',
+        fontSize: 11,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
+    pinResetDispatchCard: {
+        backgroundColor: 'rgba(212, 175, 55, 0.08)',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+    },
+    resetDefaultPinBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(212, 175, 55, 0.2)',
+        borderWidth: 1,
+        borderColor: '#D4AF37',
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    resetDefaultPinBtnText: {
+        color: '#FCD34D',
+        fontSize: 10.5,
+        fontWeight: '800',
+    },
+    resetCustomPinBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    resetCustomPinBtnText: {
+        color: '#FFFFFF',
+        fontSize: 10.5,
+        fontWeight: '800',
+    },
     cancelPasswordBtn: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -6054,6 +6578,7 @@ const s = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.06)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.15)',
+        marginTop: 4,
     },
     cancelPasswordBtnText: {
         color: '#CBD5E1',
