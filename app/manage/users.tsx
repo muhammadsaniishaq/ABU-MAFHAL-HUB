@@ -4452,18 +4452,21 @@ Metadata:
                     ) : (
                         <View style={s.brandCol}>
                             <View style={s.brandHeaderRow}>
+                                <TouchableOpacity 
+                                    onPress={() => router.back()} 
+                                    style={s.headerBackBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="arrow-back" size={18} color="#D4AF37" />
+                                </TouchableOpacity>
                                 <View style={s.brandEmblemBadge}>
-                                    <Ionicons name="shield-checkmark" size={15} color="#D4AF37" />
+                                    <Ionicons name="people" size={16} color="#D4AF37" />
                                 </View>
-                                <View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={s.headerTitle}>USER GOVERNANCE</Text>
-                                        <View style={s.liveStatusBadge}>
-                                            <View style={s.liveStatusPulse} />
-                                            <Text style={s.liveStatusText}>LIVE</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={s.headerSubTitle}>EXECUTIVE VAULT • {stats.totalUsers} PROFILES</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.headerTitle} numberOfLines={1}>USER GOVERNANCE</Text>
+                                    <Text style={s.headerSubTitle} numberOfLines={1}>
+                                        Executive Vault • {stats.totalUsers} Profiles
+                                    </Text>
                                 </View>
                             </View>
                         </View>
@@ -4478,20 +4481,7 @@ Metadata:
                                     style={s.headerGhostBtn}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="refresh" size={17} color="#D4AF37" />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    onPress={() => setShowBatchModal(true)} 
-                                    style={[s.headerGhostBtn, stats.missingAccounts > 0 && s.headerGhostBtnAlert]}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="flash" size={16} color={stats.missingAccounts > 0 ? "#F59E0B" : "#D4AF37"} />
-                                    {stats.missingAccounts > 0 && (
-                                        <View style={s.headerActionBadge}>
-                                            <Text style={s.headerActionBadgeText}>{stats.missingAccounts}</Text>
-                                        </View>
-                                    )}
+                                    <Ionicons name="refresh" size={16} color="#D4AF37" />
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -4499,7 +4489,7 @@ Metadata:
                                     style={s.headerGhostBtn}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="download-outline" size={17} color="#D4AF37" />
+                                    <Ionicons name="download-outline" size={16} color="#D4AF37" />
                                 </TouchableOpacity>
                             </>
                         )}
@@ -4515,7 +4505,7 @@ Metadata:
                                 end={{ x: 1, y: 1 }}
                                 style={s.addUserGradientBtn}
                             >
-                                <Ionicons name="person-add" size={15} color="#0A1128" />
+                                <Ionicons name="person-add" size={14} color="#0A1128" />
                                 <Text style={s.addUserBtnText}>+ User</Text>
                             </LinearGradient>
                         </TouchableOpacity>
@@ -5052,7 +5042,18 @@ const s = StyleSheet.create({
     brandHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
+    },
+    headerBackBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 2,
     },
     brandEmblemBadge: {
         width: 36,
@@ -5070,34 +5071,11 @@ const s = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.5,
     },
-    liveStatusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-        borderWidth: 1,
-        borderColor: '#10B981',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 10,
-        gap: 4,
-    },
-    liveStatusPulse: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#10B981',
-    },
-    liveStatusText: {
-        color: '#10B981',
-        fontSize: 9,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
     headerSubTitle: {
         color: '#D4AF37',
-        fontSize: 9.5,
-        fontWeight: '800',
-        letterSpacing: 0.5,
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.3,
         marginTop: 2,
     },
     headerActionCluster: {
