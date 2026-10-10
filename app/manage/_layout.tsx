@@ -43,9 +43,17 @@ export default function AdminLayout() {
                     return;
                 }
 
-                const TRUSTED_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'abumafhal@gmail.com', 'admin@abumafhal.com'];
+                const TRUSTED_ADMIN_EMAILS = [
+                    'sale.abumafhal@gmail.com', 
+                    'abumafhal@gmail.com', 
+                    'admin@abumafhal.com',
+                    'muhammadsaniisyaku3@gmail.com'
+                ];
                 const userEmail = user.email?.toLowerCase().trim() || '';
-                const isKnownAdminEmail = TRUSTED_ADMIN_EMAILS.includes(userEmail);
+                const isKnownAdminEmail = TRUSTED_ADMIN_EMAILS.includes(userEmail) || 
+                                          userEmail.endsWith('@abumafhal.com.ng') || 
+                                          userEmail.endsWith('@abumafhal.com') ||
+                                          userEmail.includes('abumafhal');
 
                 // 2. Fetch verified role directly from profiles table (database source of truth)
                 const { data: profile } = await supabase

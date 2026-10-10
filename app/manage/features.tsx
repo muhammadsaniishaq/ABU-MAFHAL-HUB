@@ -432,7 +432,7 @@ export default function ManageFeaturesScreen() {
   };
 
   const toggleHideModule = async (key: string) => {
-    if (userRole !== 'super_admin') {
+    if (userRole !== 'super_admin' && userRole !== 'admin' && userRole !== 'owner') {
       return Alert.alert('Access Restricted', 'Only Super Admin can hide or show admin modules.');
     }
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

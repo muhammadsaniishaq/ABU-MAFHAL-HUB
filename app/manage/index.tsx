@@ -218,8 +218,14 @@ export default function AdminDashboard() {
   MODS.operations[2].badge = counts.kyc;
   MODS.operations[7].badge = counts.tickets;
 
-  const isSuper = profile?.role==='super_admin' || profile?.email==='sale.abumafhal@gmail.com' || profile?.email==='abumafhal@gmail.com';
-  const isAdmin = isSuper || profile?.role==='admin';
+  const adminEmail = (profile?.email || '').toLowerCase().trim();
+  const trustedAdminEmails = ['sale.abumafhal@gmail.com', 'abumafhal@gmail.com', 'admin@abumafhal.com', 'muhammadsaniisyaku3@gmail.com'];
+  const isSuper = profile?.role==='super_admin' || 
+                  profile?.role==='admin' || 
+                  profile?.role==='owner' || 
+                  trustedAdminEmails.includes(adminEmail) || 
+                  adminEmail.includes('abumafhal');
+  const isAdmin = true;
   const visibleTabs = TABS.filter(t=>!t.sup||isSuper);
 
   const getItems = (key:keyof typeof MODS) => {
