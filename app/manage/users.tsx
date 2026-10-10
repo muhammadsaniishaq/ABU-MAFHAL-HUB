@@ -134,6 +134,7 @@ interface Transaction {
     status: string;
     created_at: string;
     description?: string;
+    title?: string;
     reference?: string;
     gateway_reference?: string;
     channel?: string;
@@ -160,12 +161,24 @@ export default function UserManagement() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'suspended' | 'admin' | 'verified' | 'corporate' | 'high_bal' | 'crypto' | 'missing_va'>('all');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'suspended' | 'admin' | 'verified' | 'corporate' | 'high_bal' | 'crypto' | 'missing_va' | 'whale' | 'new_users' | 'unverified'>('all');
     const [sortBy, setSortBy] = useState<'newest' | 'balance_high' | 'balance_low'>('newest');
     
     // Selection & Modal States
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-    const [modalTab, setModalTab] = useState<'overview' | 'crypto' | 'transactions' | 'kyc' | 'controls' | 'notify' | 'logs'>('overview');
+    const [modalTab, setModalTab] = useState<'overview' | 'crypto' | 'transactions' | 'statement' | 'kyc' | 'controls' | 'notify' | 'logs'>('overview');
+
+    // Quick Card Action States (1-Tap Direct Execution)
+    const [quickFundTargetUser, setQuickFundTargetUser] = useState<UserProfile | null>(null);
+    const [showQuickFundModal, setShowQuickFundModal] = useState(false);
+    const [quickFundAmount, setQuickFundAmount] = useState('');
+    const [quickFundIsDebit, setQuickFundIsDebit] = useState(false);
+    const [quickFundProcessing, setQuickFundProcessing] = useState(false);
+
+    // WhatsApp Direct Support Modal State
+    const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+    const [whatsAppTargetUser, setWhatsAppTargetUser] = useState<UserProfile | null>(null);
+    const [whatsAppCustomText, setWhatsAppCustomText] = useState('');
     
     // Dynamic User History & Crypto States
     const [userTransactions, setUserTransactions] = useState<Transaction[]>([]);
@@ -280,22 +293,25 @@ export default function UserManagement() {
     const [customPinInput, setCustomPinInput] = useState('');
     const [resetPinProcessing, setResetPinProcessing] = useState(false);
     const [showCustomPinBox, setShowCustomPinBox] = useState(false);
+    const [lastSetPassword, setLastSetPassword] = useState<string | null>(null);
 
     const handleDirectEmailResetDispatch = async () => {
         if (!selectedUser?.email) {
-            Alert.alert("Babu Email", "Wannan mai asusun ba shi da adireshin email a tsarinmu.");
+            Alert.alert("No Email Found", "This user account does not have an email address linked.");
             return;
         }
         setSendingDirectResetEmail(true);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email);
+            const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email, {
+                redirectTo: 'abumafhalsub://reset-password'
+            });
             if (error) throw error;
             Alert.alert(
-                "An Tura Sakon Email ✉️",
-                `An aika da link na sake password kai-tsaye zuwa ga ${selectedUser.email}.\nMai asusun zai iya danna link din ya sauya kalmar sirri da kanshi.`
+                "Reset Link Dispatched ✉️",
+                `A password reset link has been dispatched to ${selectedUser.email}.\nThe user can click the link to reset their password.`
             );
         } catch (err: any) {
-            Alert.alert("Aika Email Ya Gaza", err.message || "An samu matsala wajen tura sakon email.");
+            Alert.alert("Dispatch Failed", err.message || "Failed to dispatch password reset email.");
         } finally {
             setSendingDirectResetEmail(false);
         }
@@ -305,7 +321,7 @@ export default function UserManagement() {
         if (!selectedUser) return;
         const cleanPin = pinValue.trim();
         if (cleanPin.length !== 4 || isNaN(Number(cleanPin))) {
-            Alert.alert("Lambar PIN Mara Kyau", "Dole ne lambar PIN ta kasance lambobi 4 daidai (misali 1234).");
+            Alert.alert("Invalid PIN Code", "Transaction PIN must be exactly 4 numeric digits (e.g. 1234).");
             return;
         }
         setResetPinProcessing(true);
@@ -317,13 +333,13 @@ export default function UserManagement() {
             if (error) throw error;
             setSelectedUser({ ...selectedUser, transaction_pin: cleanPin });
             Alert.alert(
-                "Transaction PIN An Sabunta 🔢",
-                `An yi nasarar saita lambar Transaction PIN ta ${selectedUser.full_name} zuwa: ${cleanPin}\n\nKa sanar da mai asusun sabuwar lambar tasa.`
+                "Transaction PIN Updated 🔢",
+                `Successfully updated Transaction PIN for ${selectedUser.full_name} to: ${cleanPin}\n\nPlease inform the account owner.`
             );
             setShowCustomPinBox(false);
             setCustomPinInput('');
         } catch (err: any) {
-            Alert.alert("Saita PIN Ya Gaza", err.message || "An samu matsala wajen canza PIN.");
+            Alert.alert("PIN Update Failed", err.message || "Could not update transaction PIN.");
         } finally {
             setResetPinProcessing(false);
         }
@@ -341,11 +357,11 @@ export default function UserManagement() {
             setSelectedUser({ ...selectedUser, status: newStatus });
             setUsers(users.map(u => u.id === selectedUser.id ? { ...u, status: newStatus } : u));
             Alert.alert(
-                newStatus === 'suspended' ? "An Kulle Asusu ❄️" : "An Bude Asusu 🟢",
-                `Asusun ${selectedUser.full_name} yanzu yana: ${newStatus === 'suspended' ? 'FROZEN / A KULLE (An hana duk wani hada-hada)' : 'ACTIVE / BUDE (Komai na aiki normal)'}.`
+                newStatus === 'suspended' ? "Account Frozen ❄️" : "Account Activated 🟢",
+                `The account of ${selectedUser.full_name} is now: ${newStatus === 'suspended' ? 'FROZEN / SUSPENDED (All transactions blocked)' : 'ACTIVE (Normal operations restored)'}.`
             );
         } catch (err: any) {
-            Alert.alert("Matsalar Sauya Tsaro", err.message);
+            Alert.alert("Security Update Error", err.message);
         }
     };
 
@@ -360,11 +376,11 @@ export default function UserManagement() {
             setSelectedUser({ ...selectedUser, transfer_limit: limitVal, daily_limit: limitVal });
             setUsers(users.map(u => u.id === selectedUser.id ? { ...u, transfer_limit: limitVal, daily_limit: limitVal } : u));
             Alert.alert(
-                "Iyakar Tura Kudi An Saita 🛡️",
-                `Iyakar tura kudi ta rana (Daily Limit) ga ${selectedUser.full_name} yanzu: ${limitVal >= 100000000 ? 'Unlimited ♾️' : '₦' + limitVal.toLocaleString()}`
+                "Daily Limit Configured 🛡️",
+                `Daily transfer limit for ${selectedUser.full_name} is now set to: ${limitVal >= 100000000 ? 'Unlimited ♾️' : '₦' + limitVal.toLocaleString()}`
             );
         } catch (err: any) {
-            Alert.alert("Matsala", err.message);
+            Alert.alert("Limit Update Error", err.message);
         }
     };
 
@@ -410,6 +426,255 @@ export default function UserManagement() {
         missingAccounts: users.filter(u => !u.account_number).length,
         cryptoHolders: users.filter(u => u.crypto_info?.hasCrypto).length,
         totalCryptoUSD: users.reduce((acc, u) => acc + (u.crypto_info?.totalUSD || 0), 0),
+        whalesCount: users.filter(u => (u.balance || u.credit_balance || 0) >= 200000).length,
+        newUsersCount: users.filter(u => u.created_at && (Date.now() - new Date(u.created_at).getTime()) / (1000 * 3600 * 24) <= 7).length,
+    };
+
+    // Algorithmic Security Sentinel & Fraud Trust Score (0 - 100%)
+    const calculateTrustScore = (user: UserProfile) => {
+        let score = 40;
+        if (user.kyc_verified) score += 30;
+        if (user.kyc_tier && user.kyc_tier >= 2) score += 10;
+        if (user.kyc_tier && user.kyc_tier >= 3) score += 10;
+        if (user.account_number) score += 10;
+        if (user.bvn) score += 10;
+        if (user.nin) score += 10;
+        if (user.phone) score += 5;
+        if (user.status === 'suspended') score -= 60;
+        if (user.created_at) {
+            const ageDays = (Date.now() - new Date(user.created_at).getTime()) / (1000 * 3600 * 24);
+            if (ageDays >= 14) score += 5;
+        }
+        return Math.max(10, Math.min(100, score));
+    };
+
+    const getTrustBadge = (score: number) => {
+        if (score >= 80) return { label: 'High Trust 🟢', color: '#10B981', bg: '#ECFDF5', border: '#A7F3D0' };
+        if (score >= 50) return { label: 'Standard 🟡', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
+        return { label: 'Risk Alert 🔴', color: '#EF4444', bg: '#FEF2F2', border: '#FECACA' };
+    };
+
+    // Customer Service Communication Templates
+    const whatsAppTemplates = [
+        {
+            id: 'kyc',
+            title: 'KYC & Account Verification Prompt',
+            text: (u: UserProfile) => `Hello ${u.full_name || 'Valued User'},\n\nGreetings from Abu Mafhal Hub. We noticed that your account KYC verification is currently pending.\n\nTo ensure uninterrupted services, higher transfer limits, and dedicated banking capabilities, please submit your NIN or BVN in your app settings.\n\nIf you need any assistance, feel free to reply directly to this message. Thank you!`
+        },
+        {
+            id: 'virtual_account',
+            title: 'Dedicated Bank Account Notification',
+            text: (u: UserProfile) => `Hello ${u.full_name || 'Valued User'},\n\nHere are your dedicated virtual bank account details on Abu Mafhal Hub:\n\n🏦 Bank: ${u.bank_name || 'PalmPay / 9PSB'}\n🔢 Account: ${u.account_number || 'N/A'}\n👤 Name: ${u.full_name}\n\nAny funds transferred to this dedicated account will reflect instantly in your wallet balance!`
+        },
+        {
+            id: 'security',
+            title: 'Security Advisory Notice',
+            text: (u: UserProfile) => `Security Advisory from Abu Mafhal Hub 🛡️\n\nDear ${u.full_name || 'Valued User'},\n\nPlease be reminded that no official representative of Abu Mafhal Hub will ever ask for your Transaction PIN or login Password. Keep your credentials private at all times.`
+        },
+        {
+            id: 'support',
+            title: 'Customer Care & Assistance Follow-up',
+            text: (u: UserProfile) => `Hello ${u.full_name || 'Valued User'},\n\nWe are checking in from Abu Mafhal Hub customer support (User ID: ${u.custom_id || u.id.slice(0, 8)}). How may we assist you today?`
+        }
+    ];
+
+    const launchWhatsAppWithText = (phone: string | undefined, message: string) => {
+        if (!phone) {
+            Alert.alert("No Phone Number", "This user account does not have a phone number attached.");
+            return;
+        }
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const intlPhone = cleanPhone.startsWith('0') ? '234' + cleanPhone.slice(1) : cleanPhone;
+        const encoded = encodeURIComponent(message);
+        const url = `https://wa.me/${intlPhone}?text=${encoded}`;
+        Linking.canOpenURL(url).then(supported => {
+            if (supported) Linking.openURL(url);
+            else Alert.alert("Error", "Could not open WhatsApp on this device.");
+        });
+    };
+
+    // Quick Freeze / Unfreeze from User Card
+    const handleQuickToggleFreeze = async (targetUser: UserProfile) => {
+        const newStatus = targetUser.status === 'active' ? 'suspended' : 'active';
+        Alert.alert(
+            newStatus === 'suspended' ? "Freeze Account ❄️" : "Unfreeze Account 🟢",
+            `Are you sure you want to ${newStatus === 'suspended' ? 'FREEZE' : 'UNFREEZE'} the account of ${targetUser.full_name}?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: newStatus === 'suspended' ? "Freeze Account" : "Activate Account",
+                    style: newStatus === 'suspended' ? "destructive" : "default",
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('profiles')
+                                .update({ status: newStatus })
+                                .eq('id', targetUser.id);
+                            if (error) throw error;
+                            setUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, status: newStatus } : u));
+                            if (selectedUser?.id === targetUser.id) {
+                                setSelectedUser({ ...selectedUser, status: newStatus });
+                            }
+                            Alert.alert("Status Updated", `User ${targetUser.full_name} is now ${newStatus.toUpperCase()}`);
+                        } catch (err: any) {
+                            Alert.alert("Update Error", err.message);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    // Quick 1-Tap Wallet Fund / Debit from User Card
+    const handleQuickFundSubmit = async () => {
+        if (!quickFundTargetUser) return;
+        const amt = Number(quickFundAmount);
+        if (isNaN(amt) || amt <= 0) {
+            Alert.alert("Invalid Amount", "Please enter a valid positive number.");
+            return;
+        }
+
+        setQuickFundProcessing(true);
+        try {
+            const currentBal = Number(quickFundTargetUser.credit_balance || quickFundTargetUser.balance || 0);
+            const newBal = quickFundIsDebit ? Math.max(0, currentBal - amt) : currentBal + amt;
+
+            let { error } = await supabase.from('profiles').update({
+                balance: newBal,
+                credit_balance: newBal
+            }).eq('id', quickFundTargetUser.id);
+
+            if (error) {
+                const { error: err2 } = await supabase.from('profiles').update({
+                    credit_balance: newBal
+                }).eq('id', quickFundTargetUser.id);
+                if (err2) throw err2;
+            }
+
+            try {
+                await supabase.from('transactions').insert({
+                    user_id: quickFundTargetUser.id,
+                    type: quickFundIsDebit ? 'withdrawal' : 'topup',
+                    title: `Admin Quick ${quickFundIsDebit ? 'Debit' : 'Credit'}`,
+                    amount: amt,
+                    status: 'completed',
+                    description: `Admin Quick Wallet ${quickFundIsDebit ? 'Debit' : 'Funding'}`,
+                    reference: `adm_qck_${Date.now()}`
+                });
+            } catch (_) {}
+
+            setUsers(prev => prev.map(u => u.id === quickFundTargetUser.id ? { ...u, balance: newBal, credit_balance: newBal } : u));
+            if (selectedUser?.id === quickFundTargetUser.id) {
+                setSelectedUser({ ...selectedUser, balance: newBal, credit_balance: newBal });
+            }
+
+            Alert.alert(
+                "Wallet Updated 🎉",
+                `Successfully ${quickFundIsDebit ? 'debited' : 'funded'} ₦${amt.toLocaleString()} ${quickFundIsDebit ? 'from' : 'to'} ${quickFundTargetUser.full_name}'s vault.\nNew Balance: ₦${newBal.toLocaleString()}`
+            );
+            setShowQuickFundModal(false);
+            setQuickFundAmount('');
+            setQuickFundTargetUser(null);
+        } catch (err: any) {
+            Alert.alert("Funding Failed", err.message || "Could not process wallet update.");
+        } finally {
+            setQuickFundProcessing(false);
+        }
+    };
+
+    // Filtered / All Users Export to CSV
+    const handleExportFilteredUsersCSV = async () => {
+        const filtered = getFilteredUsers();
+        if (filtered.length === 0) {
+            Alert.alert("No Users", "There are no users matching the current filter criteria.");
+            return;
+        }
+
+        let csv = "ID,Custom_ID,Full_Name,Email,Phone,Balance_NGN,Crypto_USD,Account_Number,Bank_Name,KYC_Tier,KYC_Verified,Status,Role,Joined_Date\n";
+        filtered.forEach(u => {
+            const safeName = `"${(u.full_name || '').replace(/"/g, '""')}"`;
+            const safeEmail = `"${(u.email || '').replace(/"/g, '""')}"`;
+            const safeBank = `"${(u.bank_name || '').replace(/"/g, '""')}"`;
+            const bal = u.credit_balance || u.balance || 0;
+            const cryptoUSD = u.crypto_info?.totalUSD || 0;
+            const joined = u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '';
+            csv += `${u.id},${u.custom_id || ''},${safeName},${safeEmail},${u.phone || ''},${bal},${cryptoUSD},${u.account_number || ''},${safeBank},${u.kyc_tier || 1},${u.kyc_verified ? 'YES' : 'NO'},${u.status},${u.role},${joined}\n`;
+        });
+
+        try {
+            await Share.share({
+                message: csv,
+                title: `AbuMafhal_Users_Export_${Date.now()}.csv`
+            });
+        } catch (err: any) {
+            Alert.alert("Export Error", err.message || "Could not export CSV file.");
+        }
+    };
+
+    // Official Financial Account Statement & Ledger Generator
+    const generateAccountStatementText = (user: UserProfile, txs: Transaction[]) => {
+        const totalCredit = txs
+            .filter(t => t.type?.toLowerCase().includes('topup') || t.type?.toLowerCase().includes('credit') || t.type?.toLowerCase().includes('fund'))
+            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        
+        const totalDebit = txs
+            .filter(t => !t.type?.toLowerCase().includes('topup') && !t.type?.toLowerCase().includes('credit') && !t.type?.toLowerCase().includes('fund'))
+            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        
+        const netTurnover = totalCredit - totalDebit;
+        const currentBal = Number(user.credit_balance || user.balance || 0);
+
+        let lines = [
+            `🏛️ ABU MAFHAL HUB - OFFICIAL ACCOUNT STATEMENT`,
+            `================================================`,
+            `Generated On: ${new Date().toLocaleString()}`,
+            `Audit Reference: STMT-${user.id.slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+            ``,
+            `ACCOUNT HOLDER DETAILS:`,
+            `• Full Name: ${user.full_name}`,
+            `• Custom User ID: ${user.custom_id || user.id.slice(0, 10)}`,
+            `• Email: ${user.email}`,
+            `• Phone: ${user.phone || 'N/A'}`,
+            `• Dedicated Account: ${user.account_number || 'N/A'} (${user.bank_name || 'PalmPay/9PSB'})`,
+            `• Standing Status: ${user.status.toUpperCase()} [Tier ${user.kyc_tier || 1} ${user.kyc_verified ? 'Verified' : 'Standard'}]`,
+            ``,
+            `FINANCIAL AUDIT SUMMARY:`,
+            `• Current Vault Balance: ₦${currentBal.toLocaleString()}`,
+            `• Total Inflow (Credits): ₦${totalCredit.toLocaleString()}`,
+            `• Total Outflow (Debits): ₦${totalDebit.toLocaleString()}`,
+            `• Net Ledger Volume: ₦${netTurnover.toLocaleString()}`,
+            `• Total Transactions Audited: ${txs.length}`,
+            ``,
+            `RECENT TRANSACTION LEDGER ENTRIES:`,
+            `------------------------------------------------`
+        ];
+
+        txs.slice(0, 20).forEach((t, i) => {
+            const isCred = t.type?.toLowerCase().includes('topup') || t.type?.toLowerCase().includes('credit') || t.type?.toLowerCase().includes('fund');
+            const sign = isCred ? '+' : '-';
+            const dateStr = new Date(t.created_at).toLocaleDateString();
+            lines.push(`${i + 1}. [${dateStr}] ${sign}₦${Number(t.amount || 0).toLocaleString()} | ${t.type?.toUpperCase()} | ${t.status?.toUpperCase()}`);
+            if (t.reference) lines.push(`   Ref: ${t.reference}`);
+        });
+
+        lines.push(`------------------------------------------------`);
+        lines.push(`Official Digital Verification: Authentic Abu Mafhal Ledger Signature`);
+        lines.push(`Customer Support: support@abumafhal.com.ng`);
+
+        return lines.join('\n');
+    };
+
+    const handleShareStatement = async () => {
+        if (!selectedUser) return;
+        const stmtText = generateAccountStatementText(selectedUser, userTransactions);
+        try {
+            await Share.share({
+                message: stmtText,
+                title: `AbuMafhal_Statement_${selectedUser.full_name.replace(/\s+/g, '_')}.txt`
+            });
+        } catch (e: any) {
+            Alert.alert("Share Failed", e.message || "Failed to share statement.");
+        }
     };
 
     const handleStartBatchGeneration = async () => {
@@ -633,13 +898,13 @@ export default function UserManagement() {
 
             // Copy to clipboard for instant convenience
             await Clipboard.setStringAsync(cleanPass);
+            setLastSetPassword(cleanPass);
 
             Alert.alert(
                 "Password Authority 🔐",
                 `Successfully updated password for ${selectedUser.full_name}!\n\nNew Password: ${cleanPass}\n(Copied to clipboard)\n\n${emailSentStatus ? '✉️ Confirmation email sent to user inbox.' : 'Please inform the user of their new password.'}`
             );
 
-            setShowChangePasswordModal(false);
             setNewPasswordInput('');
         } catch (err: any) {
             Alert.alert("Password Update Failed", err.message || "Could not update user password.");
@@ -1001,9 +1266,12 @@ export default function UserManagement() {
             if (filterStatus === 'admin') matchesStatus = u.role === 'admin' || u.role === 'super_admin';
             if (filterStatus === 'verified') matchesStatus = !!u.kyc_verified;
             if (filterStatus === 'corporate') matchesStatus = !!u.corporate_email;
-            if (filterStatus === 'high_bal') matchesStatus = (u.balance || u.credit_balance || 0) >= 100000;
-            if (filterStatus === 'crypto') matchesStatus = !!u.crypto_info?.hasCrypto;
-            if (filterStatus === 'missing_va') matchesStatus = !u.account_number;
+            if (filterStatus === 'whale') matchesStatus = (u.balance || u.credit_balance || 0) >= 200000;
+            if (filterStatus === 'new_users') {
+                const days = u.created_at ? (Date.now() - new Date(u.created_at).getTime()) / (1000 * 3600 * 24) : 999;
+                matchesStatus = days <= 7;
+            }
+            if (filterStatus === 'unverified') matchesStatus = !u.kyc_verified;
 
             return matchesSearch && matchesStatus;
         });
@@ -1626,6 +1894,7 @@ Metadata:
                             { key: 'overview', label: 'Overview', icon: 'wallet-outline' },
                             { key: 'crypto', label: `Crypto (${userCryptoBalances.length})`, icon: 'logo-bitcoin' },
                             { key: 'transactions', label: `Transactions (${userTransactions.length})`, icon: 'receipt-outline' },
+                            { key: 'statement', label: 'Statement 📑', icon: 'document-text-outline' },
                             { key: 'kyc', label: 'Identity & KYC', icon: 'finger-print-outline' },
                             { key: 'controls', label: 'Controls', icon: 'options-outline' },
                             { key: 'notify', label: 'Notify', icon: 'chatbubble-ellipses-outline' },
@@ -2389,6 +2658,103 @@ Metadata:
                             </View>
                         )}
 
+                        {/* TAB: FINANCIAL AUDIT & OFFICIAL STATEMENT */}
+                        {modalTab === 'statement' && (
+                            <View style={{ padding: 14 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <Text style={s.sectionHeading}>Financial Audit & Statement</Text>
+                                    <TouchableOpacity 
+                                        onPress={handleShareStatement}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.goldBg, borderWidth: 1, borderColor: T.goldDark, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
+                                    >
+                                        <Ionicons name="share-outline" size={14} color={T.goldDark} />
+                                        <Text style={{ fontSize: 11, fontWeight: '800', color: T.goldDark }}>Export Statement</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Inflow vs Outflow Cards */}
+                                {(() => {
+                                    const totalCredit = userTransactions
+                                        .filter(t => t.type?.toLowerCase().includes('topup') || t.type?.toLowerCase().includes('credit') || t.type?.toLowerCase().includes('fund'))
+                                        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                                    const totalDebit = userTransactions
+                                        .filter(t => !t.type?.toLowerCase().includes('topup') && !t.type?.toLowerCase().includes('credit') && !t.type?.toLowerCase().includes('fund'))
+                                        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                                    const net = totalCredit - totalDebit;
+
+                                    return (
+                                        <View>
+                                            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                                                <View style={{ flex: 1, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 12, padding: 12 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                                        <Ionicons name="arrow-down-circle" size={14} color="#10B981" />
+                                                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#065F46' }}>TOTAL INFLOW (CREDIT)</Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#047857' }}>₦{totalCredit.toLocaleString()}</Text>
+                                                </View>
+                                                <View style={{ flex: 1, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                                        <Ionicons name="arrow-up-circle" size={14} color="#EF4444" />
+                                                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#991B1B' }}>TOTAL OUTFLOW (DEBIT)</Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#B91C1C' }}>₦{totalDebit.toLocaleString()}</Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={{ backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Text style={{ fontSize: 11, fontWeight: '800', color: T.textSub }}>Net Ledger Turnover</Text>
+                                                    <Text style={{ fontSize: 13, fontWeight: '900', color: net >= 0 ? '#10B981' : '#EF4444' }}>
+                                                        {net >= 0 ? '+' : '-'}₦{Math.abs(net).toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                                                    <Text style={{ fontSize: 11, fontWeight: '800', color: T.textSub }}>Transactions Count</Text>
+                                                    <Text style={{ fontSize: 12, fontWeight: '800', color: T.navyDark }}>{userTransactions.length} operations</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    );
+                                })()}
+
+                                {/* Share Statement Button */}
+                                <TouchableOpacity 
+                                    onPress={handleShareStatement}
+                                    style={{ backgroundColor: T.navyDark, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}
+                                >
+                                    <Ionicons name="document-text-outline" size={16} color={T.gold} />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>Share Official Account Statement</Text>
+                                </TouchableOpacity>
+
+                                <Text style={s.sectionHeading}>Transaction Audit Ledger ({userTransactions.length})</Text>
+                                {userTransactions.length === 0 ? (
+                                    <Text style={{ fontSize: 12, color: T.textSub, textAlign: 'center', paddingVertical: 20 }}>No transaction history found for this user.</Text>
+                                ) : (
+                                    userTransactions.map((tx, idx) => {
+                                        const isCred = tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('credit') || tx.type?.toLowerCase().includes('fund');
+                                        return (
+                                            <View key={tx.id || idx} style={{ backgroundColor: '#FFFFFF', borderRadius: 10, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <View style={{ flex: 1, marginRight: 8 }}>
+                                                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>{tx.title || tx.description || tx.type}</Text>
+                                                    <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>
+                                                        {new Date(tx.created_at).toLocaleString()} • Ref: {tx.reference || 'N/A'}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '900', color: isCred ? '#10B981' : '#EF4444' }}>
+                                                        {isCred ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 9.5, fontWeight: '800', color: tx.status === 'completed' ? '#10B981' : '#F59E0B', textTransform: 'uppercase' }}>
+                                                        {tx.status || 'PENDING'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        );
+                                    })
+                                )}
+                            </View>
+                        )}
+
                         {/* TAB 2: IDENTITY, NIN, BVN & CAC VERIFICATION HISTORY */}
                         {modalTab === 'kyc' && (
                             <View style={{ padding: 14 }}>
@@ -2631,7 +2997,7 @@ Metadata:
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                             <Ionicons name="keypad" size={16} color={T.goldDark} />
-                                            <Text style={s.sectionHeading}>Transaction PIN Authority (Cire Kudi)</Text>
+                                            <Text style={s.sectionHeading}>Transaction PIN Authority (Withdrawal & Security PIN)</Text>
                                         </View>
                                         <Text style={{ fontSize: 10, color: T.textSub, fontWeight: '700' }}>
                                             {selectedUser?.transaction_pin ? `PIN: ••••` : 'Default: 1234'}
@@ -3475,7 +3841,7 @@ Metadata:
                                 </View>
                                 <View>
                                     <Text style={s.passwordModalTitle}>CREDENTIAL & SECURITY AUTHORITY</Text>
-                                    <Text style={s.passwordModalSubtitle}>Asalin Bayanan Mai Asusu & Canza Kalmar Sirri</Text>
+                                    <Text style={s.passwordModalSubtitle}>User Identity Dossier & Secure Password Authority</Text>
                                 </View>
                             </View>
                             <TouchableOpacity
@@ -3487,7 +3853,34 @@ Metadata:
                         </View>
 
                         <ScrollView contentContainerStyle={{ padding: 14 }} showsVerticalScrollIndicator={false}>
-                            {/* 👑 ASALIN BAYANAN MAI ASUSU (Authentic Real User Identity Dossier) */}
+                            {/* Recently Assigned Password Card if available */}
+                            {lastSetPassword && (
+                                <View style={{ backgroundColor: 'rgba(212, 175, 55, 0.15)', borderWidth: 1.5, borderColor: '#D4AF37', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="key" size={14} color="#D4AF37" />
+                                            <Text style={{ color: '#D4AF37', fontSize: 10.5, fontWeight: '900', letterSpacing: 0.5 }}>ACTIVE ASSIGNED PASSWORD</Text>
+                                        </View>
+                                        <TouchableOpacity 
+                                            onPress={async () => {
+                                                await Clipboard.setStringAsync(lastSetPassword);
+                                                Alert.alert("Copied 📋", "Assigned password copied to clipboard.");
+                                            }}
+                                            style={{ backgroundColor: 'rgba(212, 175, 55, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}
+                                        >
+                                            <Text style={{ color: '#FCD34D', fontSize: 10, fontWeight: '800' }}>Copy</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', letterSpacing: 1.5, marginTop: 6, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                        {lastSetPassword}
+                                    </Text>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, marginTop: 4 }}>
+                                        This password was successfully configured for this user and sent to their inbox.
+                                    </Text>
+                                </View>
+                            )}
+
+                            {/* 👑 USER IDENTITY & RECORD DOSSIER */}
                             <LinearGradient
                                 colors={['#0F1B3B', '#0B1430', '#060B18']}
                                 style={s.authenticDossierCard}
@@ -3496,7 +3889,7 @@ Metadata:
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Ionicons name="finger-print-outline" size={15} color="#D4AF37" />
                                         <Text style={{ fontSize: 11, fontWeight: '900', color: '#D4AF37', letterSpacing: 0.5 }}>
-                                            ASALIN BAYANAN MAI ASUSU
+                                            USER IDENTITY & SECURITY DOSSIER
                                         </Text>
                                     </View>
                                     <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
@@ -3526,7 +3919,7 @@ Metadata:
                                             onPress={async () => {
                                                 if (selectedUser?.email) {
                                                     await Clipboard.setStringAsync(selectedUser.email);
-                                                    Alert.alert("An Kwafi 📋", `Email ${selectedUser.email} an kwafi.`);
+                                                    Alert.alert("Copied 📋", `Email address ${selectedUser.email} copied.`);
                                                 }
                                             }}
                                             style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}
@@ -3537,7 +3930,7 @@ Metadata:
                                         </TouchableOpacity>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                                             <Ionicons name="call" size={11} color="#D4AF37" />
-                                            <Text style={s.dossierPhoneText}>{selectedUser?.phone || 'Babu lambar waya'}</Text>
+                                            <Text style={s.dossierPhoneText}>{selectedUser?.phone || 'No phone attached'}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -3545,7 +3938,7 @@ Metadata:
                                 {/* Real Financial & Identity Data Grid */}
                                 <View style={s.dossierDataGrid}>
                                     <View style={s.dossierGridItem}>
-                                        <Text style={s.dossierGridLabel}>ASALIN VAULT / BAL</Text>
+                                        <Text style={s.dossierGridLabel}>VAULT BALANCE</Text>
                                         <Text style={s.dossierGridValGold}>
                                             ₦{(selectedUser?.credit_balance || selectedUser?.balance || 0).toLocaleString()}
                                         </Text>
@@ -3553,17 +3946,17 @@ Metadata:
                                     <View style={s.dossierGridItem}>
                                         <Text style={s.dossierGridLabel}>VIRTUAL ACCOUNT</Text>
                                         <Text style={s.dossierGridValWhite} numberOfLines={1}>
-                                            {selectedUser?.account_number || 'Babu Account'}
+                                            {selectedUser?.account_number || 'No Account'}
                                         </Text>
                                     </View>
                                     <View style={s.dossierGridItem}>
-                                        <Text style={s.dossierGridLabel}>BANK / KYC TIER</Text>
+                                        <Text style={s.dossierGridLabel}>BANK & KYC TIER</Text>
                                         <Text style={s.dossierGridValWhite} numberOfLines={1}>
-                                            {selectedUser?.bank_name?.slice(0, 10) || 'Palmpay'} • Tier {selectedUser?.kyc_tier || 1}
+                                            {selectedUser?.bank_name?.slice(0, 10) || 'PalmPay'} • Tier {selectedUser?.kyc_tier || 1}
                                         </Text>
                                     </View>
                                     <View style={s.dossierGridItem}>
-                                        <Text style={s.dossierGridLabel}>KWANAN RAJISTA</Text>
+                                        <Text style={s.dossierGridLabel}>JOINED DATE</Text>
                                         <Text style={s.dossierGridValSub}>
                                             {selectedUser?.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : 'N/A'}
                                         </Text>
@@ -3575,20 +3968,20 @@ Metadata:
                             <View style={s.authHashNoticeCard}>
                                 <Ionicons name="shield-half-sharp" size={16} color="#D4AF37" style={{ marginTop: 2 }} />
                                 <View style={{ flex: 1 }}>
-                                    <Text style={s.authHashNoticeTitle}>Tsaron Supabase Auth (One-Way Hash)</Text>
+                                    <Text style={s.authHashNoticeTitle}>Cryptographic Security Architecture</Text>
                                     <Text style={s.authHashNoticeSub}>
-                                        Ba a taba ajiye tsohon password a fili ba saboda tsaron asusu (Argon2 / bcrypt hash). Zaka iya saita sabon password a kasa ko kuma ka tura masa link ta email ya canza da kanshi.
+                                        Previous passwords are encrypted with standard one-way bcrypt/Argon2 hashes. You can assign a new password directly below, view and copy it, or send a secure reset link to the user's email.
                                     </Text>
                                 </View>
                             </View>
 
-                            {/* 🔑 Set New Account Password Form (Starts Completely Clean) */}
+                            {/* 🔑 Set New Account Password Form */}
                             <View style={s.passwordFormSection}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Text style={s.passwordFieldLabel}>SHIGAR DA SABON PASSWORD</Text>
+                                    <Text style={s.passwordFieldLabel}>ASSIGN NEW PASSWORD</Text>
                                     {newPasswordInput.length > 0 && (
                                         <TouchableOpacity onPress={() => setNewPasswordInput('')}>
-                                            <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '800' }}>Share</Text>
+                                            <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '800' }}>Clear</Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -3596,7 +3989,7 @@ Metadata:
                                 <View style={s.passwordInputContainer}>
                                     <Ionicons name="key" size={16} color="#D4AF37" style={{ marginRight: 8 }} />
                                     <TextInput
-                                        placeholder="Rubuta sabon password (akalla haruffa 6)..."
+                                        placeholder="Enter new password (min. 6 characters)..."
                                         placeholderTextColor="#64748B"
                                         value={newPasswordInput}
                                         onChangeText={setNewPasswordInput}
@@ -3619,7 +4012,7 @@ Metadata:
                                         <TouchableOpacity
                                             onPress={async () => {
                                                 await Clipboard.setStringAsync(newPasswordInput);
-                                                Alert.alert("An Kwafi 📋", "Sabuwar kalmar sirri an kwafi zuwa clipboard.");
+                                                Alert.alert("Copied 📋", "Password copied to clipboard.");
                                             }}
                                             style={{ padding: 6 }}
                                         >
@@ -3647,7 +4040,7 @@ Metadata:
                                     </View>
                                 </View>
 
-                                {/* Optional Quick Random Strong Generator Button */}
+                                {/* Quick Random Strong Generator Button */}
                                 <View style={{ flexDirection: 'row', gap: 8, marginVertical: 6 }}>
                                     <TouchableOpacity
                                         onPress={generateRandomSecurePassword}
@@ -3655,7 +4048,7 @@ Metadata:
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons name="sparkles" size={13} color="#D4AF37" />
-                                        <Text style={s.generatePasswordPillText}>🎲 Samar Da Kakkaran Password Na Musamman</Text>
+                                        <Text style={s.generatePasswordPillText}>🎲 Generate High-Entropy Strong Password</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -3669,9 +4062,9 @@ Metadata:
                                         {sendPasswordEmailNotification && <Ionicons name="checkmark" size={12} color="#0A1128" />}
                                     </View>
                                     <View style={{ flex: 1, marginLeft: 10 }}>
-                                        <Text style={s.emailToggleTitle}>Tura Sakon Email Ga Mai Asusu</Text>
+                                        <Text style={s.emailToggleTitle}>Dispatch Confirmation Email to User</Text>
                                         <Text style={s.emailToggleSub}>
-                                            Za a tura cikakken bayanin sabuwar kalmar sirri kai-tsaye zuwa ga {selectedUser?.email}.
+                                            The new login credentials will be securely dispatched to {selectedUser?.email}.
                                         </Text>
                                     </View>
                                 </TouchableOpacity>
@@ -3697,7 +4090,7 @@ Metadata:
                                         ) : (
                                             <>
                                                 <Ionicons name="shield-checkmark" size={16} color="#0A1128" />
-                                                <Text style={s.confirmPasswordBtnText}>TABBATAR DA SAUYA PASSWORD</Text>
+                                                <Text style={s.confirmPasswordBtnText}>CONFIRM & UPDATE PASSWORD</Text>
                                             </>
                                         )}
                                     </LinearGradient>
@@ -3712,10 +4105,10 @@ Metadata:
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={{ fontSize: 11.5, fontWeight: '900', color: '#FFFFFF' }}>
-                                            Tura Link Na Sake Password Zuwa Email
+                                            Send Password Reset Link via Email
                                         </Text>
                                         <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>
-                                            Link zai tafi inbox na {selectedUser?.email}
+                                            Direct reset link will be dispatched to {selectedUser?.email}
                                         </Text>
                                     </View>
                                 </View>
@@ -3731,7 +4124,7 @@ Metadata:
                                     ) : (
                                         <>
                                             <Ionicons name="paper-plane" size={13} color="#0A1128" />
-                                            <Text style={s.dispatchEmailLinkBtnText}>Tura Reset Link Yanzu 🚀</Text>
+                                            <Text style={s.dispatchEmailLinkBtnText}>Send Reset Link Now 🚀</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
@@ -3743,11 +4136,11 @@ Metadata:
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Ionicons name="keypad" size={15} color="#D4AF37" />
                                         <Text style={{ fontSize: 11, fontWeight: '900', color: '#D4AF37' }}>
-                                            Transaction PIN Authority (Cire Kudi)
+                                            Transaction PIN Authority
                                         </Text>
                                     </View>
                                     <Text style={{ fontSize: 9.5, color: '#94A3B8' }}>
-                                        {selectedUser?.transaction_pin ? 'PIN: Saita' : 'Babu PIN'}
+                                        {selectedUser?.transaction_pin ? 'PIN: Configured' : 'No PIN Set'}
                                     </Text>
                                 </View>
 
@@ -3759,7 +4152,7 @@ Metadata:
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons name="refresh" size={12} color="#D4AF37" />
-                                        <Text style={s.resetDefaultPinBtnText}>Saita zuwa '1234'</Text>
+                                        <Text style={s.resetDefaultPinBtnText}>Reset to '1234'</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -3768,13 +4161,13 @@ Metadata:
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons name="create-outline" size={12} color="#FFFFFF" />
-                                        <Text style={s.resetCustomPinBtnText}>Lambar Musamman</Text>
+                                        <Text style={s.resetCustomPinBtnText}>Custom PIN</Text>
                                     </TouchableOpacity>
                                 </View>
 
                                 {showCustomPinBox && (
                                     <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 8 }}>
-                                        <Text style={{ fontSize: 9.5, color: '#CBD5E1', marginBottom: 4 }}>Shigar da sabon 4-digit PIN:</Text>
+                                        <Text style={{ fontSize: 9.5, color: '#CBD5E1', marginBottom: 4 }}>Enter custom 4-digit PIN:</Text>
                                         <View style={{ flexDirection: 'row', gap: 6 }}>
                                             <TextInput
                                                 value={customPinInput}
@@ -3790,7 +4183,7 @@ Metadata:
                                                 disabled={customPinInput.length !== 4 || resetPinProcessing}
                                                 style={{ backgroundColor: '#D4AF37', paddingHorizontal: 10, justifyContent: 'center', borderRadius: 6 }}
                                             >
-                                                <Text style={{ color: '#0A1128', fontSize: 10, fontWeight: '900' }}>Ajiye</Text>
+                                                <Text style={{ color: '#0A1128', fontSize: 10, fontWeight: '900' }}>Save</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -3803,7 +4196,223 @@ Metadata:
                                 style={s.cancelPasswordBtn}
                                 activeOpacity={0.7}
                             >
-                                <Text style={s.cancelPasswordBtnText}>Rufe / Close</Text>
+                                <Text style={s.cancelPasswordBtnText}>Close Modal</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </BlurView>
+            </Modal>
+        );
+    };
+
+    // Quick 1-Tap Direct Wallet Credit / Debit Modal
+    const renderQuickFundModal = () => {
+        if (!quickFundTargetUser) return null;
+        return (
+            <Modal
+                visible={showQuickFundModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowQuickFundModal(false)}
+            >
+                <BlurView intensity={Platform.OS === 'ios' ? 85 : 95} tint="dark" style={s.modalOverlay}>
+                    <View style={s.quickFundModalCard}>
+                        <LinearGradient
+                            colors={['#8A6B29', '#DFB85C', '#F9E498', '#DFB85C', '#8A6B29']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={{ height: 3, width: '100%' }}
+                        />
+                        <View style={s.passwordModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={s.credentialVaultIcon}>
+                                    <Ionicons name="flash" size={18} color="#D4AF37" />
+                                </View>
+                                <View>
+                                    <Text style={s.passwordModalTitle}>FAST WALLET ACTION</Text>
+                                    <Text style={s.passwordModalSubtitle}>Instant Vault Funding & Adjustment</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowQuickFundModal(false)} style={s.closeModalCircleBtn}>
+                                <Ionicons name="close" size={18} color="#CBD5E1" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ padding: 14 }}>
+                            <Text style={{ fontSize: 12, color: '#E2E8F0', marginBottom: 12 }}>
+                                Target User: <Text style={{ color: '#D4AF37', fontWeight: '900' }}>{quickFundTargetUser.full_name}</Text>
+                                {'\n'}Current Vault: <Text style={{ color: '#10B981', fontWeight: '900' }}>₦{(quickFundTargetUser.credit_balance || quickFundTargetUser.balance || 0).toLocaleString()}</Text>
+                            </Text>
+
+                            {/* Fund / Debit Toggle */}
+                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                                <TouchableOpacity 
+                                    onPress={() => setQuickFundIsDebit(false)} 
+                                    style={[
+                                        s.fundingTogglePill, 
+                                        !quickFundIsDebit ? { backgroundColor: '#10B981', borderColor: '#10B981' } : { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }
+                                    ]}
+                                >
+                                    <Ionicons name="arrow-down-circle" size={15} color={!quickFundIsDebit ? '#FFFFFF' : '#10B981'} />
+                                    <Text style={[s.fundingToggleText, { color: !quickFundIsDebit ? '#FFFFFF' : '#10B981', fontWeight: '800' }]}>Credit (+) Fund</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={() => setQuickFundIsDebit(true)} 
+                                    style={[
+                                        s.fundingTogglePill, 
+                                        quickFundIsDebit ? { backgroundColor: '#EF4444', borderColor: '#EF4444' } : { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }
+                                    ]}
+                                >
+                                    <Ionicons name="arrow-up-circle" size={15} color={quickFundIsDebit ? '#FFFFFF' : '#EF4444'} />
+                                    <Text style={[s.fundingToggleText, { color: quickFundIsDebit ? '#FFFFFF' : '#EF4444', fontWeight: '800' }]}>Debit (-) Deduct</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={s.quickFundInputWrap}>
+                                <Text style={{ fontSize: 18, color: '#D4AF37', fontWeight: '900', marginRight: 6 }}>₦</Text>
+                                <TextInput
+                                    style={s.quickFundInput}
+                                    placeholder="Enter Amount (e.g. 5000)"
+                                    placeholderTextColor="#64748B"
+                                    keyboardType="numeric"
+                                    value={quickFundAmount}
+                                    onChangeText={setQuickFundAmount}
+                                />
+                                {quickFundAmount.length > 0 && (
+                                    <TouchableOpacity onPress={() => setQuickFundAmount('')}>
+                                        <Ionicons name="close-circle" size={16} color="#64748B" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 10 }}>
+                                {['1000', '2000', '5000', '10000', '25000', '50000'].map(val => (
+                                    <TouchableOpacity 
+                                        key={val}
+                                        onPress={() => setQuickFundAmount(val)}
+                                        style={[
+                                            s.presetChip, 
+                                            quickFundAmount === val ? { backgroundColor: '#D4AF37', borderColor: '#D4AF37' } : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' }
+                                        ]}
+                                    >
+                                        <Text style={[s.presetChipText, quickFundAmount === val ? { color: '#0A1128', fontWeight: '900' } : { color: '#CBD5E1' }]}>
+                                            +₦{Number(val) >= 1000 ? (Number(val)/1000) + 'k' : val}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <TouchableOpacity 
+                                onPress={handleQuickFundSubmit}
+                                disabled={quickFundProcessing || !quickFundAmount || Number(quickFundAmount) <= 0}
+                                style={[
+                                    s.quickFundSubmitBtn,
+                                    quickFundIsDebit ? { backgroundColor: '#EF4444' } : { backgroundColor: '#10B981' },
+                                    (!quickFundAmount || Number(quickFundAmount) <= 0) && { opacity: 0.5 }
+                                ]}
+                            >
+                                {quickFundProcessing ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text style={s.quickFundSubmitBtnText}>
+                                        {quickFundIsDebit ? `CONFIRM DEBIT ₦${Number(quickFundAmount || 0).toLocaleString()}` : `CONFIRM CREDIT ₦${Number(quickFundAmount || 0).toLocaleString()}`}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </BlurView>
+            </Modal>
+        );
+    };
+
+    // Quick WhatsApp Support Assistant Modal
+    const renderWhatsAppModal = () => {
+        if (!whatsAppTargetUser) return null;
+        return (
+            <Modal
+                visible={showWhatsAppModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowWhatsAppModal(false)}
+            >
+                <BlurView intensity={Platform.OS === 'ios' ? 85 : 95} tint="dark" style={s.modalOverlay}>
+                    <View style={s.whatsAppModalCard}>
+                        <LinearGradient
+                            colors={['#059669', '#10B981', '#34D399', '#10B981', '#059669']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={{ height: 3, width: '100%' }}
+                        />
+                        <View style={s.passwordModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={[s.credentialVaultIcon, { backgroundColor: 'rgba(37, 211, 102, 0.2)', borderColor: '#25D366' }]}>
+                                    <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                                </View>
+                                <View>
+                                    <Text style={s.passwordModalTitle}>WHATSAPP ASSISTANT</Text>
+                                    <Text style={s.passwordModalSubtitle}>Customer Support & Automated Prompts</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowWhatsAppModal(false)} style={s.closeModalCircleBtn}>
+                                <Ionicons name="close" size={18} color="#CBD5E1" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView contentContainerStyle={{ padding: 14 }} showsVerticalScrollIndicator={false}>
+                            <Text style={{ fontSize: 12, color: '#E2E8F0', marginBottom: 10 }}>
+                                Target User: <Text style={{ color: '#25D366', fontWeight: '900' }}>{whatsAppTargetUser.full_name}</Text> ({whatsAppTargetUser.phone || 'No phone attached'})
+                            </Text>
+
+                            <Text style={{ fontSize: 11, fontWeight: '900', color: '#D4AF37', marginBottom: 6, letterSpacing: 0.5 }}>
+                                SELECT PRE-BUILT TEMPLATE (1-TAP DISPATCH):
+                            </Text>
+
+                            {whatsAppTemplates.map(tmpl => (
+                                <TouchableOpacity 
+                                    key={tmpl.id}
+                                    onPress={() => launchWhatsAppWithText(whatsAppTargetUser.phone, tmpl.text(whatsAppTargetUser))}
+                                    style={s.whatsAppTemplateItem}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <Text style={s.whatsAppTemplateTitle}>{tmpl.title}</Text>
+                                        <Text style={s.whatsAppTemplatePreview} numberOfLines={2}>
+                                            {tmpl.text(whatsAppTargetUser)}
+                                        </Text>
+                                    </View>
+                                    <Ionicons name="paper-plane" size={15} color="#25D366" />
+                                </TouchableOpacity>
+                            ))}
+
+                            <Text style={{ fontSize: 11, fontWeight: '900', color: '#CBD5E1', marginTop: 10, marginBottom: 6 }}>
+                                OR WRITE CUSTOM MESSAGE:
+                            </Text>
+
+                            <TextInput
+                                style={s.whatsAppCustomInput}
+                                placeholder="Type custom message to user..."
+                                placeholderTextColor="#64748B"
+                                multiline
+                                numberOfLines={3}
+                                value={whatsAppCustomText}
+                                onChangeText={setWhatsAppCustomText}
+                            />
+
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    if (!whatsAppCustomText.trim()) {
+                                        Alert.alert("Empty Message", "Please type a message or select a template.");
+                                        return;
+                                    }
+                                    launchWhatsAppWithText(whatsAppTargetUser.phone, whatsAppCustomText.trim());
+                                }}
+                                style={s.whatsAppLaunchCustomBtn}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+                                <Text style={s.whatsAppLaunchCustomBtnText}>Launch WhatsApp With Custom Message</Text>
                             </TouchableOpacity>
                         </ScrollView>
                     </View>
@@ -3883,6 +4492,14 @@ Metadata:
                                             <Text style={s.headerActionBadgeText}>{stats.missingAccounts}</Text>
                                         </View>
                                     )}
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={handleExportFilteredUsersCSV} 
+                                    style={s.headerGhostBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="download-outline" size={17} color="#D4AF37" />
                                 </TouchableOpacity>
                             </>
                         )}
@@ -4092,11 +4709,14 @@ Metadata:
                         {[
                             { key: 'all', label: `All Users (${stats.totalUsers})` },
                             { key: 'crypto', label: `⚡ Crypto Active (${stats.cryptoHolders})` },
+                            { key: 'whale', label: `Whale Vault 🐋 (${stats.whalesCount})` },
                             { key: 'active', label: `Active (${stats.activeUsers})` },
                             { key: 'admin', label: `Admins 👑 (${stats.corporateAdmins})` },
                             { key: 'verified', label: `Verified 🛡️ (${stats.verifiedUsers})` },
+                            { key: 'unverified', label: `Unverified KYC ⚠️ (${stats.totalUsers - stats.verifiedUsers})` },
                             { key: 'missing_va', label: `Missing VAs ⚠️ (${stats.missingAccounts})` },
                             { key: 'suspended', label: `Suspended ⛔ (${stats.highRiskCount})` },
+                            { key: 'new_users', label: `Recent Joined 🆕 (${stats.newUsersCount})` },
                             { key: 'corporate', label: 'Corporate' },
                             { key: 'high_bal', label: 'High Vault 💎' }
                         ].map((f) => {
@@ -4228,6 +4848,19 @@ Metadata:
                                     <Text style={s.badgeVerifiedText}>Tier {item.kyc_tier || 1} Verified</Text>
                                 </View>
                             )}
+                            {/* Algorithmic Fraud/Trust Score Badge */}
+                            {(() => {
+                                const score = calculateTrustScore(item);
+                                const badge = getTrustBadge(score);
+                                return (
+                                    <View style={[s.badgeVerified, { backgroundColor: badge.bg, borderColor: badge.border }]}>
+                                        <Ionicons name="shield-checkmark" size={10} color={badge.color} />
+                                        <Text style={[s.badgeVerifiedText, { color: badge.color, fontWeight: '800' }]}>
+                                            {score}% Trust
+                                        </Text>
+                                    </View>
+                                );
+                            })()}
                             {item.crypto_info?.hasCrypto && (
                                 <View style={[s.badgeVerified, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
                                     <Ionicons name="flash" size={10} color="#D97706" />
@@ -4261,6 +4894,65 @@ Metadata:
                                 <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
                             </View>
                         </View>
+
+                        {/* Section 4: Fast Micro-Actions Dock */}
+                        <View style={s.cardActionsDock}>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setQuickFundTargetUser(item);
+                                    setQuickFundIsDebit(false);
+                                    setQuickFundAmount('');
+                                    setShowQuickFundModal(true);
+                                }}
+                                style={s.cardDockBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="flash" size={11} color="#D4AF37" />
+                                <Text style={s.cardDockBtnText} numberOfLines={1}>Fund</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => handleQuickToggleFreeze(item)}
+                                style={[s.cardDockBtn, item.status === 'suspended' ? s.cardDockBtnActive : null]}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons 
+                                    name={item.status === 'suspended' ? "checkmark-circle" : "snow"} 
+                                    size={11} 
+                                    color={item.status === 'suspended' ? "#10B981" : "#EF4444"} 
+                                />
+                                <Text style={[s.cardDockBtnText, item.status === 'suspended' ? { color: '#10B981' } : { color: '#EF4444' }]} numberOfLines={1}>
+                                    {item.status === 'suspended' ? 'Unfreeze' : 'Freeze'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setWhatsAppTargetUser(item);
+                                    setWhatsAppCustomText('');
+                                    setShowWhatsAppModal(true);
+                                }}
+                                style={s.cardDockBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="logo-whatsapp" size={11} color="#25D366" />
+                                <Text style={s.cardDockBtnText} numberOfLines={1}>WhatsApp</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setSelectedUser(item);
+                                    setNewPasswordInput('');
+                                    setShowPasswordPlaintext(false);
+                                    setShowChangePasswordModal(true);
+                                }}
+                                style={s.cardDockBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="key" size={11} color="#38BDF8" />
+                                <Text style={s.cardDockBtnText} numberOfLines={1}>Password</Text>
+                            </TouchableOpacity>
+                        </View>
                     </TouchableOpacity>
                 )}
                 ListEmptyComponent={
@@ -4285,6 +4977,8 @@ Metadata:
             {renderTransactionDetailsModal()}
             {renderCryptoFundingModal()}
             {renderChangePasswordModal()}
+            {renderQuickFundModal()}
+            {renderWhatsAppModal()}
 
             {/* Admin Verification Modal */}
             <SecurityModal 
@@ -6584,6 +7278,149 @@ const s = StyleSheet.create({
         color: '#CBD5E1',
         fontSize: 11,
         fontWeight: '800',
+    },
+
+    // Fast Micro-Actions Dock on User Card
+    cardActionsDock: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    cardDockBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: 6,
+        paddingHorizontal: 4,
+        borderRadius: 8,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    cardDockBtnActive: {
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
+    },
+    cardDockBtnText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#334155',
+    },
+
+    // Quick Fund & WhatsApp Modals
+    quickFundModalCard: {
+        width: '90%',
+        maxWidth: 440,
+        alignSelf: 'center',
+        backgroundColor: '#070D1F',
+        borderRadius: 18,
+        borderWidth: 1.5,
+        borderColor: '#D4AF37',
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 10,
+    },
+    quickFundInputWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1.5,
+        borderColor: '#D4AF37',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 48,
+    },
+    quickFundInput: {
+        flex: 1,
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '900',
+    },
+    quickFundSubmitBtn: {
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 6,
+    },
+    quickFundSubmitBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    whatsAppModalCard: {
+        width: '92%',
+        maxWidth: 480,
+        alignSelf: 'center',
+        backgroundColor: '#070D1F',
+        borderRadius: 18,
+        borderWidth: 1.5,
+        borderColor: '#25D366',
+        overflow: 'hidden',
+        maxHeight: '85%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 10,
+    },
+    whatsAppTemplateItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(37, 211, 102, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(37, 211, 102, 0.25)',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 8,
+    },
+    whatsAppTemplateTitle: {
+        color: '#25D366',
+        fontSize: 11,
+        fontWeight: '900',
+        marginBottom: 2,
+    },
+    whatsAppTemplatePreview: {
+        color: '#94A3B8',
+        fontSize: 9.5,
+        lineHeight: 13,
+    },
+    whatsAppCustomInput: {
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderRadius: 10,
+        padding: 10,
+        color: '#FFFFFF',
+        fontSize: 11,
+        minHeight: 64,
+        textAlignVertical: 'top',
+    },
+    whatsAppLaunchCustomBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#25D366',
+        paddingVertical: 11,
+        borderRadius: 10,
+        marginTop: 10,
+    },
+    whatsAppLaunchCustomBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11.5,
+        fontWeight: '900',
     },
 });
 

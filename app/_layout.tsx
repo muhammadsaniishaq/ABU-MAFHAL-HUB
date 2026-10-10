@@ -261,13 +261,16 @@ export default function RootLayout() {
                     }
                 }
 
+                const isRecoveryFlow = normalized.includes('type=recovery') || normalized.includes('reset-password');
+                const targetRedirect = isRecoveryFlow ? '/(auth)/reset-password' : '/dashboard';
+
                 if (code) {
                     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
                     if (!error && data?.session) {
                         await AsyncStorage.setItem('has_active_session', 'true');
                         await AsyncStorage.setItem('app_unlocked', 'true');
                         setSession(data.session);
-                        router.replace('/dashboard' as any);
+                        router.replace(targetRedirect as any);
                     }
                 } else if (accessToken && refreshToken) {
                     const { data, error } = await supabase.auth.setSession({
@@ -278,7 +281,7 @@ export default function RootLayout() {
                         await AsyncStorage.setItem('has_active_session', 'true');
                         await AsyncStorage.setItem('app_unlocked', 'true');
                         setSession(data.session);
-                        router.replace('/dashboard' as any);
+                        router.replace(targetRedirect as any);
                     }
                 }
             } catch (err) {

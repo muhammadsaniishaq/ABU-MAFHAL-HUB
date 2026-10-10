@@ -85,14 +85,47 @@ export default function ResetPasswordScreen() {
         setLoading(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
+            let updateSucceeded = false;
 
             if (session?.user) {
                 const { error: authErr } = await supabase.auth.updateUser({
                     password: newPassword,
                 });
-                if (authErr && !authErr.message?.includes('session') && !authErr.message?.includes('Session')) {
-                    throw authErr;
+                if (!authErr) {
+                    updateSucceeded = true;
                 }
+            }
+
+            // Fallback via Edge Function authority if user session is absent
+            if (!updateSucceeded && email) {
+                try {
+                    const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('admin-reset-password', {
+                        body: {
+                            email: email.trim(),
+                            newPassword: newPassword,
+                            sendEmailNotification: false
+                        }
+                    });
+                    if (!edgeErr && edgeRes?.success !== false) {
+                        updateSucceeded = true;
+                    }
+                } catch (edgeEx) {
+                    console.log('admin-reset-password invocation error:', edgeEx);
+                }
+            }
+
+            if (!updateSucceeded && !session?.user) {
+                throw new Error('Unable to reset password. Please request a new 6-digit code or check your internet connection.');
+            }
+
+            // Attempt seamless sign-in with the new password
+            if (email) {
+                try {
+                    await supabase.auth.signInWithPassword({
+                        email: email.trim(),
+                        password: newPassword,
+                    });
+                } catch (_) {}
             }
 
             if (email) {
@@ -123,21 +156,9 @@ export default function ResetPasswordScreen() {
             }
         } catch (error: any) {
             console.log("Reset password warning caught:", error?.message);
-            if (error?.message?.includes('session') || error?.message?.includes('Session') || error?.message?.includes('auth')) {
-                const msg = 'Success! Your account password has been updated. Please log in with your new password.';
-                if (Platform.OS === 'web') {
-                    alert(msg);
-                    router.replace('/(auth)/login' as any);
-                } else {
-                    Alert.alert('Password Updated', msg, [
-                        { text: 'Log In Now', onPress: () => router.replace('/(auth)/login' as any) },
-                    ]);
-                }
-            } else {
-                const errMsg = error.message || 'Failed to update password. Please try again.';
-                if (Platform.OS === 'web') alert(errMsg);
-                else Alert.alert('Error', errMsg);
-            }
+            const errMsg = error.message || 'Failed to update password. Please try again.';
+            if (Platform.OS === 'web') alert(errMsg);
+            else Alert.alert('Error', errMsg);
         } finally {
             setLoading(false);
         }

@@ -130,8 +130,72 @@ export default function OTP() {
                 }
             } else {
                 // Password reset or recovery
+                const generatedResetOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, generatedResetOtp);
+                await AsyncStorage.setItem(`recovery_otp_${emailToSend}`, generatedResetOtp);
+                await AsyncStorage.setItem('latest_generated_otp', generatedResetOtp);
+
+                await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
+                await AsyncStorage.setItem(`recovery_otp_time_${emailToSend}`, String(Date.now()));
+                await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
+
+                // Dispatch branded email with the 6-digit code
+                let emailDispatched = false;
                 try {
-                    await supabase.auth.resetPasswordForEmail(cleanEmailLower);
+                    const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('send-communication', {
+                        body: {
+                            type: 'email',
+                            recipient_mode: 'single',
+                            recipient: cleanEmailLower,
+                            subject: 'Your 6-Digit Password Reset Code 🔑 - ABU MAFHAL SUB',
+                            body: `
+                                <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
+                                    <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
+                                    <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Account Password Reset</p>
+                                    <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit password reset code is:</p>
+                                    <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
+                                        ${generatedResetOtp}
+                                    </div>
+                                    <p style="color:#64748B; font-size:11px; margin-top:16px;">Enter this 6-digit code in the Abu Mafhal mobile app to set your new password. This code is valid for 15 minutes. Never share this code with anyone.</p>
+                                </div>
+                            `,
+                        },
+                    });
+                    if (!edgeErr && edgeData?.success !== false) {
+                        emailDispatched = true;
+                    }
+                } catch (edgeSendErr) {
+                    console.log('send-communication notice:', edgeSendErr);
+                }
+
+                if (!emailDispatched) {
+                    try {
+                        await supabase.functions.invoke('send-email', {
+                            body: {
+                                to: cleanEmailLower,
+                                subject: 'Your 6-Digit Password Reset Code 🔑 - ABU MAFHAL SUB',
+                                text: `Your Abu Mafhal 6-digit password reset code is: ${generatedResetOtp}. Valid for 15 minutes.`,
+                                html: `
+                                    <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
+                                        <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
+                                        <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Account Password Reset</p>
+                                        <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit password reset code is:</p>
+                                        <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
+                                            ${generatedResetOtp}
+                                        </div>
+                                        <p style="color:#64748B; font-size:11px; margin-top:16px;">Enter this 6-digit code in the Abu Mafhal mobile app to set your new password. Valid for 15 minutes.</p>
+                                    </div>
+                                `
+                            }
+                        });
+                    } catch (e2) {}
+                }
+
+                // Supabase Auth reset with app deep link
+                try {
+                    await supabase.auth.resetPasswordForEmail(cleanEmailLower, {
+                        redirectTo: 'abumafhalsub://reset-password'
+                    });
                 } catch (rErr) {
                     console.log('Reset password email note:', rErr);
                 }
@@ -395,6 +459,10 @@ export default function OTP() {
             }
 
             const isResetFlow = params.mode === 'reset-password' || params.mode === 'account-password';
+            if (isResetFlow) {
+                await AsyncStorage.setItem(`password_reset_authorized_${normalizedEmail}`, String(Date.now()));
+                await AsyncStorage.setItem(`password_reset_authorized_${(targetEmail || '').toLowerCase().trim()}`, String(Date.now()));
+            }
             const targetPath = isResetFlow ? '/(auth)/reset-password' : '/(auth)/pin-setup';
             const successMsg = isResetFlow 
                 ? 'Success! 6-digit code verified successfully. Now set your new account password.'
@@ -402,12 +470,12 @@ export default function OTP() {
 
             if (Platform.OS === 'web') {
                 alert(successMsg);
-                router.replace({ pathname: targetPath as any, params: { email: targetEmail } });
+                router.replace({ pathname: targetPath as any, params: { email: targetEmail, token: 'authorized' } });
             } else {
                 Alert.alert('Success', successMsg, [
                     { 
                         text: isResetFlow ? 'Set New Password' : 'Set New PIN', 
-                        onPress: () => router.replace({ pathname: targetPath as any, params: { email: targetEmail } }) 
+                        onPress: () => router.replace({ pathname: targetPath as any, params: { email: targetEmail, token: 'authorized' } }) 
                     },
                 ]);
             }
