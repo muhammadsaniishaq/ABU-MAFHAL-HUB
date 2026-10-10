@@ -16,17 +16,10 @@ Deno.serve(async (req: Request) => {
 
     try {
         const body = await req.json();
-        const { userId, email, newPassword, sendEmailNotification = true, adminEmail } = body;
+        const { action = 'update', userId, email, newPassword, sendEmailNotification = true, adminEmail } = body;
 
         if (!userId && !email) {
             return new Response(JSON.stringify({ success: false, error: "Missing userId or email" }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 400,
-            });
-        }
-
-        if (!newPassword || newPassword.length < 6) {
-            return new Response(JSON.stringify({ success: false, error: "Password must be at least 6 characters" }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 400,
             });
@@ -41,7 +34,7 @@ Deno.serve(async (req: Request) => {
         if (!targetUserId && targetEmail) {
             const { data: profile } = await supabaseAdmin
                 .from('profiles')
-                .select('id, email, full_name')
+                .select('id, email, full_name, account_password, temp_password')
                 .eq('email', targetEmail)
                 .maybeSingle();
 
@@ -57,10 +50,80 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        // 1. Update password in Supabase Auth via Admin API
+        // --- ACTION 1: GET REAL ACTIVE PASSWORD ---
+        if (action === 'get_password') {
+            // Check profiles table
+            const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('account_password, temp_password, plain_password')
+                .eq('id', targetUserId)
+                .maybeSingle();
+
+            let foundPassword = profile?.account_password || profile?.temp_password || profile?.plain_password;
+
+            // Check auth.users user_metadata
+            if (!foundPassword) {
+                const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+                if (authUser?.user?.user_metadata) {
+                    foundPassword = authUser.user.user_metadata.account_password || 
+                                    authUser.user.user_metadata.temp_password || 
+                                    authUser.user.user_metadata.plain_password;
+                }
+            }
+
+            if (foundPassword) {
+                return new Response(JSON.stringify({ 
+                    success: true, 
+                    password: foundPassword, 
+                    synced: true 
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200,
+                });
+            }
+
+            return new Response(JSON.stringify({ 
+                success: true, 
+                password: null, 
+                needsSync: true,
+                message: "Password is encrypted in bcrypt hash. Use sync_live_password to generate and bind live password." 
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
+
+        // --- ACTION 2: SYNC LIVE PASSWORD FOR LEGACY ACCOUNT ---
+        let passwordToSet = newPassword;
+        if (action === 'sync_live_password' && (!passwordToSet || passwordToSet.length < 6)) {
+            const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+            const lower = "abcdefghjkmnpqrstuvwxyz";
+            const numbers = "23456789";
+            let gen = "Abu#";
+            for (let i = 0; i < 3; i++) gen += upper.charAt(Math.floor(Math.random() * upper.length));
+            for (let i = 0; i < 3; i++) gen += numbers.charAt(Math.floor(Math.random() * numbers.length));
+            for (let i = 0; i < 2; i++) gen += lower.charAt(Math.floor(Math.random() * lower.length));
+            gen += "@!";
+            passwordToSet = gen;
+        }
+
+        if (!passwordToSet || passwordToSet.length < 6) {
+            return new Response(JSON.stringify({ success: false, error: "Password must be at least 6 characters" }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 400,
+            });
+        }
+
+        // 1. Update password in Supabase Auth via Admin API (and persist in user_metadata)
         const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
             targetUserId,
-            { password: newPassword }
+            { 
+                password: passwordToSet,
+                user_metadata: {
+                    account_password: passwordToSet,
+                    temp_password: passwordToSet
+                }
+            }
         );
 
         if (updateError) {
@@ -72,8 +135,8 @@ Deno.serve(async (req: Request) => {
             await supabaseAdmin
                 .from('profiles')
                 .update({ 
-                    account_password: newPassword, 
-                    temp_password: newPassword 
+                    account_password: passwordToSet, 
+                    temp_password: passwordToSet 
                 })
                 .eq('id', targetUserId);
         } catch (dbErr) {
@@ -92,10 +155,10 @@ Deno.serve(async (req: Request) => {
 
         // 2. Dispatch Email if requested and recipient email exists
         let emailSent = false;
-        if (sendEmailNotification && recipientEmail) {
+        if (sendEmailNotification && recipientEmail && action !== 'sync_live_password') {
             try {
                 const emailSubject = "🔐 Security Alert: Your Abu Mafhal Password Has Been Updated";
-                const emailText = `Hello ${recipientName},\n\nYour Abu Mafhal account password has been successfully updated by administration.\n\nYour New Password: ${newPassword}\n\nPlease log in to your account and change your password immediately if you did not request this change.\n\nBest regards,\nAbu Mafhal Security Team`;
+                const emailText = `Hello ${recipientName},\n\nYour Abu Mafhal account password has been successfully updated by administration.\n\nYour New Password: ${passwordToSet}\n\nPlease log in to your account and change your password immediately if you did not request this change.\n\nBest regards,\nAbu Mafhal Security Team`;
                 
                 const emailHtml = `
                 <div style="font-family: Arial, sans-serif; background-color: #070D1F; color: #FFFFFF; padding: 28px; border-radius: 16px; border: 1.5px solid #D4AF37; max-width: 580px; margin: 0 auto;">

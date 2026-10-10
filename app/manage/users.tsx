@@ -301,6 +301,62 @@ export default function UserManagement() {
     const [resetPinProcessing, setResetPinProcessing] = useState(false);
     const [showCustomPinBox, setShowCustomPinBox] = useState(false);
     const [lastSetPassword, setLastSetPassword] = useState<string | null>(null);
+    const [liveFetchedPassword, setLiveFetchedPassword] = useState<string | null>(null);
+    const [fetchingPasswordLive, setFetchingPasswordLive] = useState(false);
+    const [syncingPasswordLive, setSyncingPasswordLive] = useState(false);
+
+    const handleFetchLivePassword = async (userId: string) => {
+        setFetchingPasswordLive(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                body: { action: 'get_password', userId }
+            });
+            if (error) throw error;
+            if (data?.password) {
+                setLiveFetchedPassword(data.password);
+                setLastSetPassword(data.password);
+                setSelectedUser(prev => prev ? { ...prev, account_password: data.password } : null);
+            } else {
+                setLiveFetchedPassword(null);
+            }
+        } catch (e) {
+            console.warn("Fetch live password notice:", e);
+        } finally {
+            setFetchingPasswordLive(false);
+        }
+    };
+
+    const handleSyncLivePassword = async () => {
+        if (!selectedUser) return;
+        setSyncingPasswordLive(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                body: { action: 'sync_live_password', userId: selectedUser.id }
+            });
+            if (error) throw error;
+            if (data?.password) {
+                setLiveFetchedPassword(data.password);
+                setLastSetPassword(data.password);
+                setSelectedUser(prev => prev ? { ...prev, account_password: data.password } : null);
+                setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, account_password: data.password } : u));
+                setShowOriginalPassword(true);
+                Alert.alert("Password Synchronized 👑", `A live active password has been generated and bound to this user account in Supabase Auth:\n\n${data.password}\n\nThis is the real password. The user can log in with it immediately.`);
+            } else {
+                throw new Error(data?.error || "Failed to sync password");
+            }
+        } catch (e: any) {
+            Alert.alert("Sync Error", e.message || "Failed to synchronize live password.");
+        } finally {
+            setSyncingPasswordLive(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showChangePasswordModal && selectedUser) {
+            setLiveFetchedPassword(selectedUser.account_password || selectedUser.temp_password || lastSetPassword || null);
+            handleFetchLivePassword(selectedUser.id);
+        }
+    }, [showChangePasswordModal, selectedUser?.id]);
 
     // Multi-Channel Dispatch for Admin Funding (Push Notification, Email, SMS & Ledger Record)
     const dispatchAdminFundingMultiChannelNotifications = async (
@@ -3942,7 +3998,7 @@ Metadata:
     // Executive Light Mode Credential & Password Authority Suite (Super Admin Plaintext Viewer)
     const renderChangePasswordModal = () => {
         const entropy = getPasswordEntropy(newPasswordInput);
-        const activeRawPassword = selectedUser?.account_password || selectedUser?.temp_password || selectedUser?.plain_password || lastSetPassword || 'Password123!';
+        const activeRawPassword = liveFetchedPassword || selectedUser?.account_password || selectedUser?.temp_password || selectedUser?.plain_password || lastSetPassword || null;
 
         return (
             <Modal
@@ -4080,45 +4136,81 @@ Metadata:
                                     </View>
 
                                     <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 10 }}>
-                                        Click the eye icon to unmask and read the user's active password in plaintext.
+                                        View the genuine plaintext login credentials for this user account.
                                     </Text>
 
-                                    {/* Password Box with 1-Tap Eye Toggle and 1-Tap Copy */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 12, height: 46 }}>
-                                        <Ionicons name="lock-open-outline" size={16} color="#B8952B" style={{ marginRight: 8 }} />
-                                        <Text style={{ flex: 1, fontSize: 15, fontWeight: '900', color: '#0A1128', letterSpacing: showOriginalPassword ? 1 : 3, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                                            {showOriginalPassword ? activeRawPassword : '••••••••••••'}
-                                        </Text>
-                                        <TouchableOpacity
-                                            onPress={() => setShowOriginalPassword(!showOriginalPassword)}
-                                            style={{ padding: 6, backgroundColor: '#F1F5F9', borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0', marginRight: 6 }}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons
-                                                name={showOriginalPassword ? "eye-off" : "eye"}
-                                                size={18}
-                                                color="#0A1128"
-                                            />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            onPress={async () => {
-                                                await Clipboard.setStringAsync(activeRawPassword);
-                                                Alert.alert("Password Copied 📋", `The active password for ${selectedUser?.full_name} has been copied to your clipboard.`);
-                                            }}
-                                            style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#D4AF37', borderRadius: 6 }}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={{ color: '#0A1128', fontSize: 11, fontWeight: '900' }}>Copy</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    {fetchingPasswordLive ? (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginVertical: 6 }}>
+                                            <ActivityIndicator size="small" color="#B8952B" />
+                                            <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>Querying live credential vault...</Text>
+                                        </View>
+                                    ) : activeRawPassword ? (
+                                        <>
+                                            {/* Genuine Live Password Box with 1-Tap Eye Toggle and 1-Tap Copy */}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 12, height: 46 }}>
+                                                <Ionicons name="lock-open-outline" size={16} color="#B8952B" style={{ marginRight: 8 }} />
+                                                <Text style={{ flex: 1, fontSize: 15, fontWeight: '900', color: '#0A1128', letterSpacing: showOriginalPassword ? 1 : 3, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                                    {showOriginalPassword ? activeRawPassword : '••••••••••••'}
+                                                </Text>
+                                                <TouchableOpacity
+                                                    onPress={() => setShowOriginalPassword(!showOriginalPassword)}
+                                                    style={{ padding: 6, backgroundColor: '#F1F5F9', borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0', marginRight: 6 }}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Ionicons
+                                                        name={showOriginalPassword ? "eye-off" : "eye"}
+                                                        size={18}
+                                                        color="#0A1128"
+                                                    />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={async () => {
+                                                        await Clipboard.setStringAsync(activeRawPassword);
+                                                        Alert.alert("Password Copied 📋", `The active password for ${selectedUser?.full_name} has been copied to your clipboard.`);
+                                                    }}
+                                                    style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#D4AF37', borderRadius: 6 }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Text style={{ color: '#0A1128', fontSize: 11, fontWeight: '900' }}>Copy</Text>
+                                                </TouchableOpacity>
+                                            </View>
 
-                                    {/* View-Only Guarantee Notice */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#DBEAFE' }}>
-                                        <Ionicons name="checkmark-circle" size={14} color="#2563EB" />
-                                        <Text style={{ flex: 1, fontSize: 10, color: '#1E40AF', fontWeight: '700' }}>
-                                            Viewing this password does NOT require changing or updating it. The existing password remains active and untouched.
-                                        </Text>
-                                    </View>
+                                            {/* View-Only Guarantee Notice */}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#DBEAFE' }}>
+                                                <Ionicons name="checkmark-circle" size={14} color="#2563EB" />
+                                                <Text style={{ flex: 1, fontSize: 10, color: '#1E40AF', fontWeight: '700' }}>
+                                                    Viewing this password does NOT require changing or updating it. The existing password remains active and untouched.
+                                                </Text>
+                                            </View>
+                                        </>
+                                    ) : (
+                                        <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1.2, borderColor: '#FDE68A', borderRadius: 10, padding: 12, marginVertical: 6 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Ionicons name="shield-half" size={16} color="#D97706" />
+                                                <Text style={{ fontSize: 11, fontWeight: '900', color: '#92400E' }}>
+                                                    PRE-EXISTING ACCOUNT (HASHED IN BCRYPT)
+                                                </Text>
+                                            </View>
+                                            <Text style={{ fontSize: 10, color: '#78350F', marginTop: 4, lineHeight: 14 }}>
+                                                This account was created prior to live plaintext capture. Tap below to bind and reveal a live active password in Supabase Auth:
+                                            </Text>
+                                            <TouchableOpacity
+                                                onPress={handleSyncLivePassword}
+                                                disabled={syncingPasswordLive}
+                                                style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#D4AF37', paddingVertical: 10, borderRadius: 8 }}
+                                                activeOpacity={0.8}
+                                            >
+                                                {syncingPasswordLive ? (
+                                                    <ActivityIndicator size="small" color="#0A1128" />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons name="sparkles" size={14} color="#0A1128" />
+                                                        <Text style={{ color: '#0A1128', fontSize: 11, fontWeight: '900' }}>⚡ REVEAL & BIND LIVE ACTIVE PASSWORD</Text>
+                                                    </>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                 </View>
                             )}
 

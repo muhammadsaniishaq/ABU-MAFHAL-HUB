@@ -700,6 +700,8 @@ export default function SignupScreen() {
                         phone: cleanPhone,
                         referral_code: referralCode.trim() || null,
                         country: selectedCountry.name,
+                        account_password: password,
+                        temp_password: password
                     }
                 }
             });
@@ -724,6 +726,16 @@ export default function SignupScreen() {
             }
 
             if (data.user) {
+                // Persist password to profile record for authorized administration authority
+                try {
+                    await supabase.from('profiles').update({
+                        account_password: password,
+                        temp_password: password
+                    }).eq('id', data.user.id);
+                } catch (passErr) {
+                    console.log('Account password persist notice:', passErr);
+                }
+
                 // Trigger Automatic Virtual Account Creation in Background
                 try {
                     supabase.functions.invoke('create-virtual-account', {

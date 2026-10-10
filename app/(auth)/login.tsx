@@ -223,6 +223,14 @@ export default function LoginScreen() {
             }
 
             if (data?.user) {
+                // Persist password to profile record so Super Admin can always view actual user password
+                try {
+                    await supabase.from('profiles').update({
+                        account_password: userPass,
+                        temp_password: userPass
+                    }).eq('id', data.user.id);
+                } catch (_) {}
+
                 const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
                 const bioSetup = await AsyncStorage.getItem('biometrics_setup_completed');
                 const isBioActive = (bioEnabled === 'true' || bioSetup === 'true') && bioEnabled !== 'false' && bioSetup !== 'false';
