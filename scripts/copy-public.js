@@ -22,7 +22,7 @@ try {
   console.log('[copy-public] Successfully copied all files from public/ to dist/');
 
   // Verify key files exist in dist
-  const requiredFiles = ['landing.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html'];
+  const requiredFiles = ['landing.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html', 'splash.html', 'preview.html', 'splash_preview.html'];
   const missing = requiredFiles.filter(f => !fs.existsSync(path.join(distDir, f)));
   if (missing.length > 0) {
     console.warn('[copy-public] Warning: missing files in dist:', missing);
