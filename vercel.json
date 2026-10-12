@@ -44,8 +44,13 @@
     { "source": "/privacy.html", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/terms.html", "destination": "/terms.html" },
+    { "source": "/splash", "destination": "/splash_preview.html" },
+    { "source": "/preview", "destination": "/splash_preview.html" },
+    { "source": "/splash-preview", "destination": "/splash_preview.html" },
+    { "source": "/splash_preview", "destination": "/splash_preview.html" },
+    { "source": "/splash_preview.html", "destination": "/splash_preview.html" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!landing|about|contact|privacy|terms|landing-assets|_expo|assets|sw.js|manifest.json|favicon.ico|robots.txt|.*\\..*).*)", "destination": "/index.html" },
+    { "source": "/((?!landing|about|contact|privacy|terms|splash|preview|landing-assets|_expo|assets|sw.js|manifest.json|favicon.ico|robots.txt|.*\\..*).*)", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
