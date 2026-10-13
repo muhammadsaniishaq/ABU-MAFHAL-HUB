@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,30 +36,41 @@ const SLIDES = [
     categoryBg: '#FEF3C7',
     categoryTxt: '#B45309',
     categoryBorder: '#FDE68A',
+    cardVipText: '5G AUTOMATED',
     title: 'Instant 5G Data & Airtime',
-    subtitle: 'Wholesale packages for MTN, Airtel, Glo & 9mobile delivered in milliseconds.',
+    subtitle: 'Wholesale telecom bundles delivered automatically in seconds.',
     chipL: { icon: '⚡', txt: '5G Automated' },
     chipR: { icon: '💰', txt: '₦240/GB SME' },
+    footerPills: [
+      { lbl: 'MTN', bg: '#FEF3C7', txt: '#B45309' },
+      { lbl: 'AIRTEL', bg: '#EFF6FF', txt: '#1D4ED8' },
+      { lbl: 'GLO', bg: '#ECFDF5', txt: '#047857' },
+      { lbl: '9MOBILE', bg: '#FEF3C7', txt: '#B45309' },
+    ],
     features: [
-      { icon: '📶', title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated recharge' },
-      { icon: '💰', title: 'Wholesale SME Bundles', desc: 'Direct wholesale rates starting from ₦240 per GB' },
-      { icon: '🛡️', title: '99.98% Service Uptime', desc: 'Real-time API processing with 0-second delivery' },
+      { icon: '📶', isGold: false, title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated recharge' },
+      { icon: '💰', isGold: true, title: 'Direct Wholesale SME Bundles', desc: 'Cheapest direct prices starting from ₦240 per GB' },
     ],
   },
   {
     image: require('../assets/images/splash_hero_character2.gif'),
     categoryText: 'DEDICATED AUTO WALLETS',
     categoryBg: '#EFF6FF',
-    categoryTxt: '#1D4ED8',
+    categoryTxt: '#0056D2',
     categoryBorder: '#BFDBFE',
+    cardVipText: 'AUTO WALLETS',
     title: 'Dedicated Bank Accounts',
-    subtitle: 'Automated wallet funding with personal Nigerian bank account numbers.',
+    subtitle: 'Automated wallet funding with personal Nigerian bank accounts.',
     chipL: { icon: '🏦', txt: 'Moniepoint / Wema' },
     chipR: { icon: '🔒', txt: '0% Deposit Fee' },
+    footerPills: [
+      { lbl: 'MONIEPOINT', bg: '#EFF6FF', txt: '#0056D2' },
+      { lbl: 'WEMA BANK', bg: '#FEF3C7', txt: '#B45309' },
+      { lbl: '0% FEE', bg: '#ECFDF5', txt: '#047857' },
+    ],
     features: [
-      { icon: '🏦', title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema accounts in your name' },
-      { icon: '⚡', title: 'Instant 0s Auto-Credit', desc: 'Wallet is funded automatically with 0% deposit charge' },
-      { icon: '🔒', title: 'Bank-Grade Security', desc: '256-bit SSL encrypted & NDPA certified compliance' },
+      { icon: '🏦', isGold: false, title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema accounts in your name' },
+      { icon: '⚡', isGold: true, title: 'Instant 0s Auto-Credit', desc: 'Wallet is funded automatically with 0% deposit charge' },
     ],
   },
   {
@@ -67,14 +79,19 @@ const SLIDES = [
     categoryBg: '#ECFDF5',
     categoryTxt: '#047857',
     categoryBorder: '#A7F3D0',
-    title: 'Sit Back & Relax',
-    subtitle: 'Automate your utility bills, TV renewals, or resell VTU services for daily income.',
+    cardVipText: 'BILLS & PROFIT',
+    title: 'Sit Back, Relax & Profit',
+    subtitle: 'Automate utility bills or resell VTU services for daily income.',
     chipL: { icon: '💡', txt: 'Prepaid Bills' },
-    chipR: { icon: '💸', txt: '3% Cashback' },
+    chipR: { icon: '💸', txt: 'Daily Profit' },
+    footerPills: [
+      { lbl: 'NEPA TOKENS', bg: '#FEF3C7', txt: '#B45309' },
+      { lbl: 'DSTV / GOTV', bg: '#EFF6FF', txt: '#0056D2' },
+      { lbl: 'CASHBACK', bg: '#ECFDF5', txt: '#047857' },
+    ],
     features: [
-      { icon: '💡', title: 'Prepaid Electricity Tokens', desc: 'Instant meter tokens for AEDC, EKEDC, IBEDC & more' },
-      { icon: '📺', title: 'Cable TV Subscriptions', desc: 'Instant renewal for DStv, GOtv, Startimes & Showmax' },
-      { icon: '🤝', title: 'Lucrative Reseller Profits', desc: 'Save money on personal use or resell to earn daily profits' },
+      { icon: '💡', isGold: false, title: 'Prepaid Electricity & Cable TV', desc: 'Instant meter tokens for AEDC, EKEDC, DStv & GOtv' },
+      { icon: '💸', isGold: true, title: 'Reseller Profit Hub', desc: 'Save money on personal use or earn daily retail profit' },
     ],
   },
 ];
@@ -87,7 +104,7 @@ export default function SplashScreen() {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  // Floating mascot animation (smooth & peaceful)
+  // Floating mascot animation (smooth 60fps levitation)
   const floatY = useSharedValue(0);
   const chipFloat = useSharedValue(0);
 
@@ -136,9 +153,9 @@ export default function SplashScreen() {
   }, [pageIdx]);
 
   useEffect(() => {
-    slideOpacity.value = 0.35;
-    slideScale.value = 0.95;
-    slideOpacity.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
+    slideOpacity.value = 0.4;
+    slideScale.value = 0.96;
+    slideOpacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
     slideScale.value = withSpring(1, { damping: 16, stiffness: 120 });
   }, [pageIdx]);
 
@@ -260,7 +277,7 @@ export default function SplashScreen() {
     >
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* TOP SECTION: STORY PROGRESS & NAVIGATION BAR */}
+      {/* TOP SECTION: STORY PROGRESS & BRAND NAVIGATION */}
       <View style={styles.topArea}>
         <View style={styles.storyBarsRow}>
           {[0, 1, 2].map(idx => (
@@ -280,7 +297,7 @@ export default function SplashScreen() {
         <View style={styles.topNav}>
           {pageIdx > 0 ? (
             <TouchableOpacity onPress={prevSlide} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="chevron-back" size={20} color="#0F172A" />
+              <Ionicons name="chevron-back" size={20} color="#0D1B3E" />
             </TouchableOpacity>
           ) : (
             <View style={styles.backPlaceholder} />
@@ -288,7 +305,9 @@ export default function SplashScreen() {
 
           <View style={styles.brandPill}>
             <View style={styles.brandDot} />
-            <Text style={styles.brandTxt}>ABU MAFHAL SUB</Text>
+            <Text style={styles.brandTxt}>
+              ABU <Text style={{ color: '#F5A623' }}>MAFHAL</Text> SUB
+            </Text>
           </View>
 
           {pageIdx < 2 ? (
@@ -301,7 +320,7 @@ export default function SplashScreen() {
         </View>
       </View>
 
-      {/* SCROLLABLE BODY FOR ALL PHONES */}
+      {/* SCROLLABLE BODY */}
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={styles.scrollContent}
@@ -309,31 +328,62 @@ export default function SplashScreen() {
       >
         <Animated.View style={[styles.mainSection, slideAnimStyle]}>
           
-          {/* MASCOT SECTION WITH CRISP SHAPES & FLOATING CHIPS (ZERO BLUR) */}
-          <View style={styles.mascotSection}>
-            <View style={styles.vectorRing} />
-            <View style={styles.groundOval} />
-
-            {/* Left Floating Chip */}
-            <Animated.View style={[styles.luxuryChip, styles.chipLeft, chipAnimStyleL]}>
-              <Text style={styles.chipEmoji}>{currentSlide.chipL.icon}</Text>
-              <Text style={styles.chipLabel}>{currentSlide.chipL.txt}</Text>
-            </Animated.View>
-
-            {/* Right Floating Chip */}
-            <Animated.View style={[styles.luxuryChip, styles.chipRight, chipAnimStyleR]}>
-              <Text style={styles.chipEmoji}>{currentSlide.chipR.icon}</Text>
-              <Text style={styles.chipLabel}>{currentSlide.chipR.txt}</Text>
-            </Animated.View>
+          {/* ══════════════════════════════════════════════════════════════
+               HERO CENTER CARD — THE LUXURY SMART FINTECH CARD
+               ("CARD DIN MU YA ZAMA YAYI KYAU")
+               ══════════════════════════════════════════════════════════════ */}
+          <View style={styles.fintechSmartCard}>
             
-            <Animated.View style={[styles.mascotWrap, floatAnimStyle]}>
-              <Image
-                key={`slide-img-${pageIdx}`}
-                source={currentSlide.image}
-                style={styles.mascotImg}
-                resizeMode="contain"
-              />
-            </Animated.View>
+            {/* Card Header: Gold EMV Chip & VIP Status Badge */}
+            <View style={styles.smartCardTopBar}>
+              <View style={styles.emvChipWrap}>
+                <View style={styles.emvChipGold}>
+                  <View style={styles.emvChipLine} />
+                </View>
+                <Text style={styles.emvNfcWave}>)))</Text>
+              </View>
+
+              <View style={styles.cardVipBadge}>
+                <Text style={styles.cardVipBadgeTxt}>✦ {currentSlide.cardVipText}</Text>
+              </View>
+            </View>
+
+            {/* Mascot Center Arena */}
+            <View style={styles.cardMascotArena}>
+              <View style={styles.vectorRing} />
+              <View style={styles.groundOval} />
+
+              {/* Left Floating Chip */}
+              <Animated.View style={[styles.luxuryChip, styles.chipLeft, chipAnimStyleL]}>
+                <Text style={styles.chipEmoji}>{currentSlide.chipL.icon}</Text>
+                <Text style={styles.chipLabel}>{currentSlide.chipL.txt}</Text>
+              </Animated.View>
+
+              {/* Right Floating Chip */}
+              <Animated.View style={[styles.luxuryChip, styles.chipRight, chipAnimStyleR]}>
+                <Text style={styles.chipEmoji}>{currentSlide.chipR.icon}</Text>
+                <Text style={styles.chipLabel}>{currentSlide.chipR.txt}</Text>
+              </Animated.View>
+              
+              <Animated.View style={[styles.mascotWrap, floatAnimStyle]}>
+                <Image
+                  key={`slide-img-${pageIdx}`}
+                  source={currentSlide.image}
+                  style={styles.mascotImg}
+                  resizeMode="contain"
+                />
+              </Animated.View>
+            </View>
+
+            {/* Card Footer: Miniature Partner Pills */}
+            <View style={styles.smartCardFooterStrip}>
+              {currentSlide.footerPills.map((pill, idx) => (
+                <View key={idx} style={[styles.footerMicroPill, { backgroundColor: pill.bg }]}>
+                  <Text style={[styles.footerMicroPillTxt, { color: pill.txt }]}>{pill.lbl}</Text>
+                </View>
+              ))}
+            </View>
+
           </View>
 
           {/* HEADINGS & CATEGORY BADGE */}
@@ -356,11 +406,11 @@ export default function SplashScreen() {
             <Text style={styles.subtitle}>{currentSlide.subtitle}</Text>
           </View>
 
-          {/* NEAT STRUCTURED FEATURE CARDS */}
+          {/* 2 COMPACT DECORATED FEATURE CARDS (ZERO CLUTTER) */}
           <View style={styles.featuresDeck}>
             {currentSlide.features.map((feat, idx) => (
               <View key={idx} style={styles.featureCard}>
-                <View style={styles.featureIconBadge}>
+                <View style={[styles.featureIconBadge, feat.isGold && styles.featureIconBadgeGold]}>
                   <Text style={styles.featureIconTxt}>{feat.icon}</Text>
                 </View>
                 <View style={styles.featureBody}>
@@ -389,7 +439,7 @@ export default function SplashScreen() {
           {pageIdx < 2 ? (
             <TouchableOpacity onPress={nextSlide} activeOpacity={0.88} style={styles.primaryBtn}>
               <Text style={styles.primaryBtnTxt}>Next</Text>
-              <Ionicons name="chevron-forward" size={17} color="#FFFFFF" />
+              <Ionicons name="chevron-forward" size={17} color="#F5A623" />
             </TouchableOpacity>
           ) : (
             <View style={{ width: '100%', gap: 8 }}>
@@ -399,7 +449,7 @@ export default function SplashScreen() {
                 style={styles.primaryBtn}
               >
                 <Text style={styles.primaryBtnTxt}>Get Started Free</Text>
-                <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
+                <Ionicons name="arrow-forward" size={17} color="#F5A623" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -418,7 +468,7 @@ export default function SplashScreen() {
 }
 
 const styles = StyleSheet.create({
-  // SOLID PURE UNIFIED BACKGROUND (NO DIS-DIS, SEAMLESS WITH IMAGES)
+  // SOLID PURE UNIFIED BACKGROUND (100% SEAMLESS WITH GIF)
   screen: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -450,7 +500,7 @@ const styles = StyleSheet.create({
   },
   storyFill: {
     height: '100%',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#0D1B3E',
     borderRadius: 2,
   },
   topNav: {
@@ -468,10 +518,10 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
     elevation: 1,
   },
   backPlaceholder: {
@@ -483,8 +533,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+    paddingHorizontal: 13,
     paddingVertical: 5,
     borderRadius: 20,
     gap: 6,
@@ -496,9 +546,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   brandTxt: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#0D1B3E',
     letterSpacing: 0.3,
   },
   skipBtn: {
@@ -509,7 +559,7 @@ const styles = StyleSheet.create({
   skipTxt: {
     fontSize: 13.5,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#5A6385',
   },
 
   // SCROLLABLE AREA
@@ -528,37 +578,102 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // MASCOT SECTION
-  mascotSection: {
+  // ══════════════════════════════════════════════════════════════
+  // LUXURY SMART FINTECH CARD ("CARD DIN MU YA ZAMA YAYI KYAU")
+  // ══════════════════════════════════════════════════════════════
+  fintechSmartCard: {
     width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 166, 35, 0.38)',
+    borderRadius: 28,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    marginVertical: 6,
+    alignItems: 'center',
+    shadowColor: '#0D1B3E',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 3,
+  },
+  smartCardTopBar: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  emvChipWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  emvChipGold: {
+    width: 26,
+    height: 18,
+    borderRadius: 4,
+    backgroundColor: '#F59E0B',
+    borderWidth: 1,
+    borderColor: '#B45309',
+    justifyContent: 'center',
+  },
+  emvChipLine: {
+    width: '100%',
+    height: 1,
+    backgroundColor: 'rgba(180, 83, 9, 0.5)',
+  },
+  emvNfcWave: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '800',
+  },
+  cardVipBadge: {
+    backgroundColor: '#0D1B3E',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  cardVipBadgeTxt: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  // CARD ARENA
+  cardMascotArena: {
+    width: '100%',
+    height: Math.min(SH * 0.25, 205),
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginVertical: 8,
+    marginVertical: 2,
   },
   vectorRing: {
     position: 'absolute',
-    width: Math.min(SW * 0.58, 215),
-    height: Math.min(SW * 0.58, 215),
-    borderRadius: Math.min(SW * 0.58, 215) / 2,
-    backgroundColor: '#F8FAFC',
+    width: Math.min(SW * 0.54, 195),
+    height: Math.min(SW * 0.54, 195),
+    borderRadius: Math.min(SW * 0.54, 195) / 2,
+    backgroundColor: 'rgba(254, 243, 199, 0.15)',
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: 'rgba(245, 166, 35, 0.45)',
     borderStyle: 'dashed',
     zIndex: 1,
   },
   groundOval: {
     position: 'absolute',
     bottom: 2,
-    width: 125,
-    height: 10,
-    borderRadius: 5,
+    width: 120,
+    height: 9,
+    borderRadius: 4.5,
     backgroundColor: '#E2E8F0',
     zIndex: 1,
   },
   mascotWrap: {
-    width: Math.min(SW * 0.60, 225),
-    height: Math.min(SH * 0.27, 225),
+    width: Math.min(SW * 0.56, 210),
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -569,6 +684,28 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
+  // CARD FOOTER STRIP
+  smartCardFooterStrip: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(226, 232, 240, 0.7)',
+  },
+  footerMicroPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  footerMicroPillTxt: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
   // FLOATING CHIPS
   luxuryChip: {
     position: 'absolute',
@@ -577,32 +714,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 11,
-    paddingVertical: 5.5,
+    borderColor: 'rgba(245, 166, 35, 0.4)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
     gap: 5,
-    shadowColor: '#0F172A',
+    shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
   chipLeft: {
-    left: 2,
-    top: '12%',
+    left: -4,
+    top: '14%',
   },
   chipRight: {
-    right: 2,
+    right: -4,
     bottom: '16%',
   },
   chipEmoji: {
-    fontSize: 11,
+    fontSize: 10,
   },
   chipLabel: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#0D1B3E',
   },
 
   // TEXT HEADINGS
@@ -610,16 +747,17 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     paddingHorizontal: 6,
-    marginBottom: 12,
+    marginBottom: 10,
+    marginTop: 4,
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 11,
-    paddingVertical: 4.5,
+    paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   categoryBadgeTxt: {
     fontSize: 10.5,
@@ -627,27 +765,27 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   title: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#0D1B3E',
     textAlign: 'center',
     letterSpacing: -0.4,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#5A6385',
     textAlign: 'center',
-    lineHeight: 18.5,
-    maxWidth: 325,
+    lineHeight: 17.5,
+    maxWidth: 320,
   },
 
-  // STRUCTURED FEATURE CARDS
+  // COMPACT DECORATED FEATURE CARDS
   featuresDeck: {
     width: '100%',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   featureCard: {
     flexDirection: 'row',
@@ -656,9 +794,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 12,
-    shadowColor: '#0F172A',
+    shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -668,15 +806,16 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#0D1B3E',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 11,
   },
+  featureIconBadgeGold: {
+    backgroundColor: '#D97706',
+  },
   featureIconTxt: {
-    fontSize: 16,
+    fontSize: 15,
   },
   featureBody: {
     flex: 1,
@@ -684,13 +823,13 @@ const styles = StyleSheet.create({
   featurePrimaryTxt: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#0D1B3E',
     marginBottom: 1,
   },
   featureSecondaryTxt: {
     fontSize: 10.5,
-    fontWeight: '500',
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#5A6385',
     lineHeight: 14,
   },
 
@@ -698,7 +837,7 @@ const styles = StyleSheet.create({
   bottomArea: {
     width: '100%',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     zIndex: 20,
   },
   dotsRow: {
@@ -712,8 +851,8 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   dotActive: {
-    width: 22,
-    backgroundColor: '#0F172A',
+    width: 24,
+    backgroundColor: '#0D1B3E',
   },
   dotInactive: {
     width: 7,
@@ -729,14 +868,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0F172A',
-    paddingVertical: 14,
+    backgroundColor: '#0D1B3E',
+    paddingVertical: 13.5,
     borderRadius: 15,
     gap: 8,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
+    shadowColor: '#0056D2',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
     elevation: 3,
   },
   primaryBtnTxt: {
@@ -747,11 +886,11 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 5,
+    paddingVertical: 4,
   },
   secondaryBtnTxt: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#5A6385',
   },
 });

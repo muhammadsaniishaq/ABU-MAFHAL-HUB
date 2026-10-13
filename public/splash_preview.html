@@ -3,17 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ABU MAFHAL SUB — Flagship Luxury Splash & Onboarding Screen</title>
+  <title>ABU MAFHAL SUB — Flagship Luxury Splash & Onboarding</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
+    :root {
+      --brand-navy: #0D1B3E;
+      --brand-navy-deep: #070E22;
+      --brand-blue: #0056D2;
+      --brand-gold: #F5A623;
+      --brand-gold-warm: #D97706;
+      --brand-gold-light: #FEF3C7;
+      --brand-emerald: #10B981;
+      --text-main: #0D1B3E;
+      --text-muted: #5A6385;
+      --border-light: #E2E8F0;
+      --card-bg: #FFFFFF;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #F1F5F9;
-      color: #0F172A;
+      background: #F4F6FB;
+      color: var(--text-main);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -21,7 +35,7 @@
       padding: 24px 16px 60px;
     }
 
-    /* TOP INTRO */
+    /* TOP INTRO BANNER */
     .header-intro {
       text-align: center;
       margin-bottom: 20px;
@@ -29,7 +43,7 @@
     .status-pill-top {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       background: #FEF3C7;
       border: 1px solid #FDE68A;
       color: #B45309;
@@ -40,15 +54,21 @@
       letter-spacing: 0.5px;
       margin-bottom: 8px;
     }
+    .status-pill-top span.crown {
+      font-size: 12px;
+    }
     .header-intro h1 {
       font-size: 24px;
       font-weight: 900;
-      color: #0F172A;
+      color: var(--brand-navy);
       letter-spacing: -0.5px;
+    }
+    .header-intro h1 span.gold {
+      color: var(--brand-gold-warm);
     }
     .header-intro p {
       font-size: 13px;
-      color: #64748B;
+      color: var(--text-muted);
       margin-top: 4px;
     }
 
@@ -56,12 +76,12 @@
     .toolbar-box {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       background: #FFFFFF;
       padding: 6px 14px;
       border-radius: 16px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-      border: 1px solid #E2E8F0;
+      box-shadow: 0 4px 15px rgba(13, 27, 62, 0.06);
+      border: 1px solid var(--border-light);
       margin-bottom: 24px;
       flex-wrap: wrap;
       justify-content: center;
@@ -71,28 +91,28 @@
       border-radius: 10px;
       font-size: 12px;
       font-weight: 700;
-      color: #64748B;
+      color: var(--text-muted);
       background: transparent;
       border: none;
       cursor: pointer;
       transition: all 0.2s;
     }
     .t-btn:hover {
-      background: #F8FAFC;
-      color: #0F172A;
+      background: #F1F5F9;
+      color: var(--brand-navy);
     }
     .t-btn.active {
-      background: #0F172A;
+      background: linear-gradient(135deg, var(--brand-navy), var(--brand-blue));
       color: #FFFFFF;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+      box-shadow: 0 2px 8px rgba(0, 86, 210, 0.25);
     }
     .t-divider {
       width: 1px;
       height: 20px;
-      background: #E2E8F0;
+      background: var(--border-light);
     }
 
-    /* PHONE FRAME MOCKUP (FLAGSHIP FINISHING) */
+    /* PHONE FRAME MOCKUP (ULTRA PREMIUM FLAGSHIP FINISH) */
     .phone-mockup {
       position: relative;
       width: 395px;
@@ -100,7 +120,7 @@
       background: #FFFFFF;
       border-radius: 52px;
       box-shadow: 
-        0 25px 65px -15px rgba(15, 23, 42, 0.22),
+        0 25px 65px -15px rgba(13, 27, 62, 0.25),
         0 0 0 12px #FFFFFF,
         0 0 0 14px #CBD5E1;
       overflow: hidden;
@@ -110,7 +130,7 @@
       transition: width 0.3s, height 0.3s;
     }
 
-    /* SCREEN CANVAS: SEAMLESS SOLID PURE WHITE (ZERO BLUR, ZERO DIS-DIS) */
+    /* SCREEN CANVAS: SEAMLESS SOLID PURE WHITE (100% UNIFIED WITH GIF) */
     .screen-body {
       position: relative;
       flex: 1;
@@ -120,13 +140,13 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 38px 22px 28px;
+      padding: 34px 22px 26px;
       overflow-y: auto;
       scrollbar-width: none;
     }
     .screen-body::-webkit-scrollbar { display: none; }
 
-    /* TOP AREA: STORY PROGRESS & NAVIGATION */
+    /* TOP AREA: STORY PROGRESS & BRAND NAV */
     .top-section {
       width: 100%;
       display: flex;
@@ -150,7 +170,7 @@
     .story-bar-fill {
       height: 100%;
       width: 0%;
-      background: #0F172A;
+      background: linear-gradient(90deg, var(--brand-navy), var(--brand-gold));
       border-radius: 2px;
       transition: width 0.1s linear;
     }
@@ -167,12 +187,12 @@
       height: 36px;
       border-radius: 12px;
       background: #F8FAFC;
-      border: 1px solid #E2E8F0;
+      border: 1px solid var(--border-light);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 16px;
-      color: #0F172A;
+      color: var(--brand-navy);
       cursor: pointer;
       box-shadow: 0 1px 3px rgba(0,0,0,0.03);
       transition: all 0.2s;
@@ -188,30 +208,33 @@
     .brand-pill-center {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       background: #F8FAFC;
-      border: 1px solid #E2E8F0;
-      padding: 5px 12px;
+      border: 1px solid rgba(245, 166, 35, 0.3);
+      padding: 5px 13px;
       border-radius: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      box-shadow: 0 1px 4px rgba(13, 27, 62, 0.04);
     }
     .live-indicator-dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #10B981;
-      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+      background: var(--brand-emerald);
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
     }
     .brand-title-txt {
-      font-size: 11px;
+      font-size: 11.5px;
       font-weight: 800;
-      color: #0F172A;
+      color: var(--brand-navy);
       letter-spacing: 0.3px;
+    }
+    .brand-title-txt span.accent {
+      color: var(--brand-gold-warm);
     }
     .btn-skip-text {
       font-size: 13.5px;
       font-weight: 700;
-      color: #64748B;
+      color: var(--text-muted);
       cursor: pointer;
       padding: 6px 10px;
       border-radius: 8px;
@@ -220,11 +243,14 @@
       border: none;
     }
     .btn-skip-text:hover {
-      color: #0F172A;
+      color: var(--brand-navy);
       background: #F8FAFC;
     }
 
-    /* CENTER STAGE: MASCOT WITH CRISP LUXURY SHAPES (NO BLUR!) */
+    /* ══════════════════════════════════════════════════════════════════
+       HERO CENTER CARD — THE LUXURY SMART FINTECH SHOWCASE CARD
+       ("CARD DIN MU YA ZAMA YAYI KYAU")
+       ══════════════════════════════════════════════════════════════════ */
     .hero-center-stage {
       position: relative;
       width: 100%;
@@ -232,67 +258,142 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      margin: 6px 0 14px;
+      margin: 8px 0 12px;
     }
 
-    /* CRISP VECTOR ORBIT ARCH (ZERO BLUR, CRISP ELEGANT LINES) */
-    .vector-stage-ring {
+    .fintech-smart-card {
+      position: relative;
+      width: 100%;
+      background: linear-gradient(160deg, #FFFFFF 0%, #F8FAFC 60%, #FFFDF5 100%);
+      border: 1.5px solid rgba(245, 166, 35, 0.38);
+      border-radius: 28px;
+      padding: 16px 16px 14px;
+      box-shadow: 
+        0 14px 34px -10px rgba(13, 27, 62, 0.12),
+        0 2px 8px rgba(245, 166, 35, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    /* CARD HEADER: EMV CHIP & VIP STATUS */
+    .smart-card-top-bar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+      z-index: 10;
+    }
+    .emv-chip-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .emv-chip-gold {
+      width: 28px;
+      height: 20px;
+      border-radius: 5px;
+      background: linear-gradient(135deg, #F59E0B 0%, #FDE047 50%, #D97706 100%);
+      border: 1px solid #B45309;
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .emv-chip-gold::after {
+      content: '';
       position: absolute;
-      width: 215px;
-      height: 215px;
+      top: 50%; left: 0; right: 0;
+      height: 1px;
+      background: rgba(180, 83, 9, 0.5);
+    }
+    .emv-nfc-wave {
+      font-size: 11px;
+      color: #94A3B8;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .card-vip-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: linear-gradient(135deg, #0D1B3E, #0056D2);
+      color: #FFFFFF;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 6px rgba(0, 86, 210, 0.2);
+    }
+
+    /* CARD MASCOT STAGE: CRISP VECTOR ORBIT ARCH */
+    .card-mascot-arena {
+      position: relative;
+      width: 220px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 2px 0 6px;
+    }
+    .arena-vector-ring {
+      position: absolute;
+      width: 195px;
+      height: 195px;
       border-radius: 50%;
-      background: #F8FAFC;
-      border: 1.5px dashed #CBD5E1;
+      border: 1.5px dashed rgba(245, 166, 35, 0.45);
+      background: radial-gradient(circle, rgba(254, 243, 199, 0.25) 0%, rgba(255, 255, 255, 0) 70%);
       z-index: 1;
     }
-
-    /* CRISP SOLID GROUND CONTACT OVAL (ZERO BLUR) */
-    .ground-contact-oval {
+    .arena-ground-shadow {
       position: absolute;
       bottom: 2px;
-      width: 125px;
-      height: 10px;
+      width: 120px;
+      height: 9px;
       border-radius: 5px;
       background: #E2E8F0;
       z-index: 1;
     }
 
-    /* FLOATING LUXURY CHIPS (LIKE REVOLUT / APPLE HIGHLIGHTS) */
+    /* FLOATING LUXURY CHIPS */
     .luxury-chip {
       position: absolute;
       z-index: 15;
       background: #FFFFFF;
-      padding: 6px 12px;
+      padding: 5px 11px;
       border-radius: 12px;
-      border: 1.5px solid #E2E8F0;
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+      border: 1.5px solid rgba(245, 166, 35, 0.4);
+      box-shadow: 0 4px 14px rgba(13, 27, 62, 0.08);
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 10.5px;
+      gap: 5px;
+      font-size: 10px;
       font-weight: 800;
-      color: #0F172A;
-      animation: chipLevitate 3.6s ease-in-out infinite alternate;
+      color: var(--brand-navy);
+      animation: chipFloat 3.6s ease-in-out infinite alternate;
       transition: all 0.3s;
     }
     .chip-pos-left {
-      left: 2px;
-      top: 14%;
+      left: -8px;
+      top: 18%;
     }
     .chip-pos-right {
-      right: 2px;
-      bottom: 16%;
+      right: -8px;
+      bottom: 18%;
       animation-delay: 1.2s;
     }
-    @keyframes chipLevitate {
+    @keyframes chipFloat {
       0% { transform: translateY(0); }
       100% { transform: translateY(-7px); }
     }
 
     .mascot-image-box {
       position: relative;
-      width: 225px;
-      height: 225px;
+      width: 205px;
+      height: 195px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -302,30 +403,66 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
-      animation: mascotHoverSmooth 3.6s ease-in-out infinite alternate;
+      animation: mascotHover 3.6s ease-in-out infinite alternate;
     }
-    @keyframes mascotHoverSmooth {
+    @keyframes mascotHover {
       0% { transform: translateY(0); }
       100% { transform: translateY(-8px); }
     }
 
-    /* CONTENT & HEADINGS */
+    /* CARD FOOTER: REPUTABLE PILLS (MTN, MONIEPOINT, BILLS) */
+    .smart-card-footer-strip {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(226, 232, 240, 0.7);
+      z-index: 10;
+    }
+    .badge-pill-micro {
+      padding: 3px 8px;
+      border-radius: 8px;
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+    .micro-gold {
+      background: #FEF3C7;
+      color: #B45309;
+      border: 1px solid #FDE68A;
+    }
+    .micro-navy {
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border: 1px solid #BFDBFE;
+    }
+    .micro-green {
+      background: #ECFDF5;
+      color: #047857;
+      border: 1px solid #A7F3D0;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       HEADINGS & PUNCHY VALUE COPY (ZERO BORING FLUFF!)
+       ══════════════════════════════════════════════════════════════════ */
     .headings-container {
       width: 100%;
       text-align: center;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       padding: 0 4px;
     }
     .badge-category-pill {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 4.5px 12px;
+      padding: 4px 12px;
       border-radius: 20px;
       font-size: 10.5px;
       font-weight: 800;
       letter-spacing: 0.6px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       transition: all 0.3s;
     }
     .badge-gold {
@@ -333,9 +470,9 @@
       color: #B45309;
       border: 1px solid #FDE68A;
     }
-    .badge-blue {
+    .badge-navy {
       background: #EFF6FF;
-      color: #1D4ED8;
+      color: #0056D2;
       border: 1px solid #BFDBFE;
     }
     .badge-emerald {
@@ -345,56 +482,62 @@
     }
 
     .headline-main {
-      font-size: 22px;
+      font-size: 21px;
       font-weight: 900;
-      color: #0F172A;
+      color: var(--brand-navy);
       letter-spacing: -0.4px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .headline-sub {
-      font-size: 13px;
-      font-weight: 500;
-      color: #64748B;
-      line-height: 1.5;
-      max-width: 325px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      line-height: 1.45;
+      max-width: 320px;
       margin: 0 auto;
     }
 
-    /* NEAT STRUCTURED FEATURE CARDS ("TSARI ME TSABTA DA BURGEWA") */
+    /* ══════════════════════════════════════════════════════════════════
+       COMPACT DECORATED FEATURE CARDS (DECORATED, BRAND COLOR, CRISP)
+       ══════════════════════════════════════════════════════════════════ */
     .features-card-deck {
       width: 100%;
       display: flex;
       flex-direction: column;
       gap: 8px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .feature-row-card {
       display: flex;
       align-items: center;
       background: #FFFFFF;
-      border: 1.5px solid #E2E8F0;
+      border: 1.5px solid var(--border-light);
       border-radius: 14px;
-      padding: 10px 12px;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+      padding: 9px 12px;
+      box-shadow: 0 2px 6px rgba(13, 27, 62, 0.03);
       transition: all 0.2s;
     }
     .feature-row-card:hover {
-      border-color: #CBD5E1;
+      border-color: rgba(245, 166, 35, 0.5);
       transform: translateY(-1px);
-      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
+      box-shadow: 0 4px 10px rgba(13, 27, 62, 0.05);
     }
     .feature-icon-badge {
       width: 34px;
       height: 34px;
       border-radius: 10px;
-      background: #F8FAFC;
-      border: 1px solid #E2E8F0;
+      background: linear-gradient(135deg, var(--brand-navy), var(--brand-blue));
+      color: #FFFFFF;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 15px;
       margin-right: 11px;
       flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0, 86, 210, 0.2);
+    }
+    .feature-icon-badge.gold-accent {
+      background: linear-gradient(135deg, #F59E0B, #D97706);
     }
     .feature-body-text {
       flex: 1;
@@ -403,29 +546,31 @@
     .feature-primary-lbl {
       font-size: 12.5px;
       font-weight: 800;
-      color: #0F172A;
+      color: var(--brand-navy);
       margin-bottom: 1px;
     }
     .feature-secondary-lbl {
       font-size: 10.5px;
-      font-weight: 500;
-      color: #64748B;
+      font-weight: 600;
+      color: var(--text-muted);
       line-height: 1.35;
     }
     .feature-status-check {
-      color: #10B981;
+      color: var(--brand-emerald);
       font-size: 14px;
       font-weight: 800;
       padding-left: 6px;
     }
 
-    /* BOTTOM CONTROLS & ACTIONS */
+    /* ══════════════════════════════════════════════════════════════════
+       BOTTOM BAR: DOTS & LUXURY CTA BUTTON
+       ══════════════════════════════════════════════════════════════════ */
     .bottom-bar-area {
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       z-index: 20;
     }
     .pagination-dots-group {
@@ -443,9 +588,9 @@
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .p-dot.active {
-      width: 22px;
+      width: 24px;
       border-radius: 4px;
-      background: #0F172A;
+      background: linear-gradient(90deg, var(--brand-navy), var(--brand-blue));
     }
 
     .cta-buttons-stack {
@@ -458,7 +603,7 @@
       width: 100%;
       padding: 13.5px 20px;
       border-radius: 15px;
-      background: #0F172A;
+      background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-blue) 100%);
       color: #FFFFFF;
       font-size: 14.5px;
       font-weight: 800;
@@ -468,17 +613,21 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      box-shadow: 0 4px 15px rgba(15, 23, 42, 0.18);
+      box-shadow: 0 6px 20px rgba(0, 86, 210, 0.28);
       transition: all 0.2s;
     }
     .btn-cta-primary:hover {
-      background: #1E293B;
       transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(0, 86, 210, 0.35);
+    }
+    .btn-cta-primary span.arrow {
+      color: var(--brand-gold);
+      font-size: 16px;
     }
     .btn-cta-secondary {
       background: transparent;
       border: none;
-      color: #64748B;
+      color: var(--text-muted);
       font-size: 12.5px;
       font-weight: 700;
       cursor: pointer;
@@ -487,10 +636,12 @@
       transition: color 0.2s;
     }
     .btn-cta-secondary:hover {
-      color: #0F172A;
+      color: var(--brand-navy);
     }
 
-    /* GALLERY 3-SLIDE VIEW */
+    /* ══════════════════════════════════════════════════════════════════
+       GALLERY 3-SLIDE VIEW (ALL 3 SLIDES AT ONCE)
+       ══════════════════════════════════════════════════════════════════ */
     .gallery-deck {
       display: none;
       gap: 20px;
@@ -504,9 +655,9 @@
       height: 750px;
       background: #FFFFFF;
       border-radius: 42px;
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
-      border: 1px solid #E2E8F0;
-      padding: 34px 20px 24px;
+      box-shadow: 0 15px 40px rgba(13, 27, 62, 0.1);
+      border: 1px solid var(--border-light);
+      padding: 30px 18px 22px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -518,10 +669,10 @@
   <!-- TOP BANNER -->
   <div class="header-intro">
     <div class="status-pill-top">
-      <span>✦</span> FLAGSHIP FINTECH EXPERIENCE
+      <span class="crown">👑</span> ABU MAFHAL SUB &bull; OFFICIAL 5G PLATFORM
     </div>
-    <h1>ABU MAFHAL SUB — Onboarding &amp; Splash</h1>
-    <p>Seamless Solid Background &bull; Crisp Zero-Blur Stage &bull; Structured Value Features</p>
+    <h1>Modern Decorated Splash &amp; <span class="gold">VIP Card</span></h1>
+    <p>Seamless Solid Background &bull; Luxury Smart Card &bull; Zero Verbosity</p>
   </div>
 
   <!-- TOOLBAR -->
@@ -531,9 +682,9 @@
     
     <div class="t-divider"></div>
 
-    <button class="t-btn" onclick="selectSlide(0)" id="t0">1. Fast 5G Data</button>
+    <button class="t-btn" onclick="selectSlide(0)" id="t0">1. Instant 5G Data</button>
     <button class="t-btn" onclick="selectSlide(1)" id="t1">2. Auto Accounts</button>
-    <button class="t-btn" onclick="selectSlide(2)" id="t2">3. Relax &amp; Profit</button>
+    <button class="t-btn" onclick="selectSlide(2)" id="t2">3. Bills &amp; Reseller</button>
 
     <div class="t-divider"></div>
 
@@ -557,31 +708,58 @@
           
           <div class="brand-pill-center">
             <div class="live-indicator-dot"></div>
-            <span class="brand-title-txt">ABU MAFHAL SUB</span>
+            <span class="brand-title-txt">ABU <span class="accent">MAFHAL</span> SUB</span>
           </div>
 
           <button class="btn-skip-text" id="skipBtn" onclick="selectSlide(2)">Skip</button>
         </div>
       </div>
 
-      <!-- CENTER HERO STAGE: CRISP VECTOR SHAPES & FLOATING CHIPS (ZERO BLUR) -->
+      <!-- ══════════════════════════════════════════════════════════════
+           CENTER STAGE: LUXURY FINTECH SMART CARD ("CARD DIN MU")
+           ══════════════════════════════════════════════════════════════ -->
       <div class="hero-center-stage">
         
-        <!-- Crisp Vector Arc Behind Mascot -->
-        <div class="vector-stage-ring"></div>
-        <div class="ground-contact-oval"></div>
+        <div class="fintech-smart-card" id="smartCardContainer">
+          
+          <!-- Card Header: Gold EMV Chip & VIP Status Badge -->
+          <div class="smart-card-top-bar">
+            <div class="emv-chip-wrap">
+              <div class="emv-chip-gold"></div>
+              <span class="emv-nfc-wave">)))</span>
+            </div>
+            <div class="card-vip-badge" id="cardVipBadge">
+              <span>✦</span> <span id="cardVipLabel">5G AUTOMATED</span>
+            </div>
+          </div>
 
-        <!-- Floating Chips -->
-        <div class="luxury-chip chip-pos-left" id="chipL">
-          <span>⚡</span> <span id="chipLTxt">5G Automated</span>
-        </div>
-        <div class="luxury-chip chip-pos-right" id="chipR">
-          <span>💰</span> <span id="chipRTxt">₦240/GB SME</span>
-        </div>
+          <!-- Card Mascot Arena -->
+          <div class="card-mascot-arena">
+            <div class="arena-vector-ring"></div>
+            <div class="arena-ground-shadow"></div>
 
-        <!-- Mascot Illustration -->
-        <div class="mascot-image-box">
-          <img src="./splash_hero_character.gif" alt="Hero Character" class="mascot-element" id="mascotImg" />
+            <!-- Floating Chips -->
+            <div class="luxury-chip chip-pos-left" id="chipL">
+              <span>⚡</span> <span id="chipLTxt">5G Automated</span>
+            </div>
+            <div class="luxury-chip chip-pos-right" id="chipR">
+              <span>💰</span> <span id="chipRTxt">₦240/GB SME</span>
+            </div>
+
+            <!-- Mascot Illustration -->
+            <div class="mascot-image-box">
+              <img src="./splash_hero_character.gif" alt="Hero Mascot" class="mascot-element" id="mascotImg" />
+            </div>
+          </div>
+
+          <!-- Card Footer Strip: Network / Bank Badges -->
+          <div class="smart-card-footer-strip" id="cardFooterStrip">
+            <span class="badge-pill-micro micro-gold">MTN</span>
+            <span class="badge-pill-micro micro-navy">AIRTEL</span>
+            <span class="badge-pill-micro micro-green">GLO</span>
+            <span class="badge-pill-micro micro-gold">9MOBILE</span>
+          </div>
+
         </div>
 
       </div>
@@ -593,16 +771,16 @@
         </div>
         <h2 class="headline-main" id="mainTitle">Instant 5G Data &amp; Airtime</h2>
         <p class="headline-sub" id="mainSubtitle">
-          Wholesale packages for MTN, Airtel, Glo &amp; 9mobile delivered in milliseconds.
+          Wholesale telecom bundles delivered automatically in seconds.
         </p>
       </div>
 
-      <!-- STRUCTURED VALUE FEATURE CARDS ("TSARI ME TSABTA DA BURGEWA") -->
+      <!-- 2 COMPACT DECORATED FEATURE CARDS (ZERO CLUTTER) -->
       <div class="features-card-deck" id="cardsDeck">
-        <!-- Dynamically injected per slide -->
+        <!-- Injected dynamically -->
       </div>
 
-      <!-- BOTTOM NAVIGATION: 3 DOTS & CTA BUTTONS -->
+      <!-- BOTTOM NAVIGATION: 3 DOTS & CTA BUTTON -->
       <div class="bottom-bar-area">
         <div class="pagination-dots-group">
           <div class="p-dot active" id="dot0" onclick="selectSlide(0)"></div>
@@ -613,7 +791,7 @@
         <div class="cta-buttons-stack">
           <button class="btn-cta-primary" id="primaryCtaBtn" onclick="nextSlide()">
             <span id="primaryCtaLabel">Next</span>
-            <span>›</span>
+            <span class="arrow">›</span>
           </button>
           <button class="btn-cta-secondary" id="secondaryCtaBtn" style="display:none;" onclick="alert('Redirecting to Sign In Screen...')">
             Already have an account? Sign In
@@ -624,28 +802,43 @@
     </div>
   </div>
 
-  <!-- 2. GALLERY VIEW: ALL 3 SLIDES PRESENTED SIDE-BY-SIDE -->
+  <!-- 2. GALLERY VIEW: ALL 3 SLIDES SIDE-BY-SIDE -->
   <div class="gallery-deck" id="galleryView">
     
     <!-- CARD 1 -->
     <div class="gallery-card-unit">
       <div class="nav-row">
         <div class="btn-nav-back" style="visibility:hidden;">‹</div>
-        <div class="brand-pill-center"><div class="live-indicator-dot"></div><span class="brand-title-txt">ABU MAFHAL</span></div>
+        <div class="brand-pill-center"><div class="live-indicator-dot"></div><span class="brand-title-txt">ABU <span class="accent">MAFHAL</span></span></div>
         <span class="btn-skip-text">Skip</span>
       </div>
-      <div class="hero-center-stage" style="margin: 4px 0 10px;">
-        <div class="vector-stage-ring"></div>
-        <div class="ground-contact-oval"></div>
-        <div class="mascot-image-box">
-          <img src="./splash_hero_character.gif" alt="Mascot 1" class="mascot-element" />
+      
+      <div class="fintech-smart-card" style="margin: 6px 0 10px;">
+        <div class="smart-card-top-bar">
+          <div class="emv-chip-wrap"><div class="emv-chip-gold"></div><span class="emv-nfc-wave">)))</span></div>
+          <div class="card-vip-badge">✦ 5G VTU</div>
+        </div>
+        <div class="card-mascot-arena" style="height:170px;">
+          <div class="arena-vector-ring" style="width:160px;height:160px;"></div>
+          <div class="arena-ground-shadow" style="width:100px;"></div>
+          <div class="mascot-image-box" style="width:170px;height:160px;">
+            <img src="./splash_hero_character.gif" alt="Mascot 1" class="mascot-element" />
+          </div>
+        </div>
+        <div class="smart-card-footer-strip">
+          <span class="badge-pill-micro micro-gold">MTN</span>
+          <span class="badge-pill-micro micro-navy">AIRTEL</span>
+          <span class="badge-pill-micro micro-green">GLO</span>
+          <span class="badge-pill-micro micro-gold">9MOBILE</span>
         </div>
       </div>
+
       <div class="headings-container">
         <div class="badge-category-pill badge-gold">✦ 5G VTU PLATFORM</div>
-        <h3 class="headline-main" style="font-size:18px;">Instant 5G Data &amp; Airtime</h3>
-        <p class="headline-sub" style="font-size:12px;">Wholesale telecom rates delivered in milliseconds.</p>
+        <h3 class="headline-main" style="font-size:17px;">Instant 5G Data &amp; Airtime</h3>
+        <p class="headline-sub" style="font-size:11.5px;">Wholesale telecom bundles delivered in seconds.</p>
       </div>
+
       <div class="features-card-deck">
         <div class="feature-row-card">
           <div class="feature-icon-badge">📶</div>
@@ -656,14 +849,15 @@
           <div class="feature-status-check">✓</div>
         </div>
         <div class="feature-row-card">
-          <div class="feature-icon-badge">💰</div>
+          <div class="feature-icon-badge gold-accent">💰</div>
           <div class="feature-body-text">
-            <div class="feature-primary-lbl">Wholesale SME Bundles</div>
-            <div class="feature-secondary-lbl">Direct prices from ₦240 per GB</div>
+            <div class="feature-primary-lbl">Direct Wholesale SME</div>
+            <div class="feature-secondary-lbl">Cheapest rates from ₦240 per GB</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
       </div>
+
       <div class="pagination-dots-group">
         <div class="p-dot active"></div><div class="p-dot"></div><div class="p-dot"></div>
       </div>
@@ -673,21 +867,35 @@
     <div class="gallery-card-unit">
       <div class="nav-row">
         <div class="btn-nav-back">‹</div>
-        <div class="brand-pill-center"><div class="live-indicator-dot"></div><span class="brand-title-txt">ABU MAFHAL</span></div>
+        <div class="brand-pill-center"><div class="live-indicator-dot"></div><span class="brand-title-txt">ABU <span class="accent">MAFHAL</span></span></div>
         <span class="btn-skip-text">Skip</span>
       </div>
-      <div class="hero-center-stage" style="margin: 4px 0 10px;">
-        <div class="vector-stage-ring"></div>
-        <div class="ground-contact-oval"></div>
-        <div class="mascot-image-box">
-          <img src="./splash_hero_character2.gif" alt="Mascot 2" class="mascot-element" />
+
+      <div class="fintech-smart-card" style="margin: 6px 0 10px;">
+        <div class="smart-card-top-bar">
+          <div class="emv-chip-wrap"><div class="emv-chip-gold"></div><span class="emv-nfc-wave">)))</span></div>
+          <div class="card-vip-badge">✦ AUTO WALLETS</div>
+        </div>
+        <div class="card-mascot-arena" style="height:170px;">
+          <div class="arena-vector-ring" style="width:160px;height:160px;"></div>
+          <div class="arena-ground-shadow" style="width:100px;"></div>
+          <div class="mascot-image-box" style="width:170px;height:160px;">
+            <img src="./splash_hero_character2.gif" alt="Mascot 2" class="mascot-element" />
+          </div>
+        </div>
+        <div class="smart-card-footer-strip">
+          <span class="badge-pill-micro micro-navy">MONIEPOINT</span>
+          <span class="badge-pill-micro micro-gold">WEMA BANK</span>
+          <span class="badge-pill-micro micro-green">0% FEE</span>
         </div>
       </div>
+
       <div class="headings-container">
-        <div class="badge-category-pill badge-blue">✦ DEDICATED ACCOUNTS</div>
-        <h3 class="headline-main" style="font-size:18px;">Dedicated Bank Accounts</h3>
-        <p class="headline-sub" style="font-size:12px;">Automated wallet funding in your personal name.</p>
+        <div class="badge-category-pill badge-navy">✦ DEDICATED ACCOUNTS</div>
+        <h3 class="headline-main" style="font-size:17px;">Dedicated Bank Accounts</h3>
+        <p class="headline-sub" style="font-size:11.5px;">Automated wallet funding in your personal name.</p>
       </div>
+
       <div class="features-card-deck">
         <div class="feature-row-card">
           <div class="feature-icon-badge">🏦</div>
@@ -698,14 +906,15 @@
           <div class="feature-status-check">✓</div>
         </div>
         <div class="feature-row-card">
-          <div class="feature-icon-badge">⚡</div>
+          <div class="feature-icon-badge gold-accent">⚡</div>
           <div class="feature-body-text">
             <div class="feature-primary-lbl">Instant 0s Auto-Credit</div>
-            <div class="feature-secondary-lbl">Wallet funded automatically at 0% fee</div>
+            <div class="feature-secondary-lbl">Wallet funded automatically with 0% fee</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
       </div>
+
       <div class="pagination-dots-group">
         <div class="p-dot"></div><div class="p-dot active"></div><div class="p-dot"></div>
       </div>
@@ -715,32 +924,46 @@
     <div class="gallery-card-unit">
       <div class="nav-row">
         <div class="btn-nav-back">‹</div>
-        <div class="brand-pill-center"><div class="live-indicator-dot"></div><span class="brand-title-txt">ABU MAFHAL</span></div>
+        <div class="brand-pill-center"><div class="live-indicator-dot"></div><span class="brand-title-txt">ABU <span class="accent">MAFHAL</span></span></div>
         <span class="btn-skip-text" style="visibility:hidden;">Skip</span>
       </div>
-      <div class="hero-center-stage" style="margin: 4px 0 10px;">
-        <div class="vector-stage-ring"></div>
-        <div class="ground-contact-oval"></div>
-        <div class="mascot-image-box">
-          <img src="./splash_hero_character3.gif" alt="Mascot 3" class="mascot-element" />
+
+      <div class="fintech-smart-card" style="margin: 6px 0 10px;">
+        <div class="smart-card-top-bar">
+          <div class="emv-chip-wrap"><div class="emv-chip-gold"></div><span class="emv-nfc-wave">)))</span></div>
+          <div class="card-vip-badge">✦ BILLS &amp; PROFIT</div>
+        </div>
+        <div class="card-mascot-arena" style="height:170px;">
+          <div class="arena-vector-ring" style="width:160px;height:160px;"></div>
+          <div class="arena-ground-shadow" style="width:100px;"></div>
+          <div class="mascot-image-box" style="width:170px;height:160px;">
+            <img src="./splash_hero_character3.gif" alt="Mascot 3" class="mascot-element" />
+          </div>
+        </div>
+        <div class="smart-card-footer-strip">
+          <span class="badge-pill-micro micro-gold">NEPA BILLS</span>
+          <span class="badge-pill-micro micro-navy">DSTV / GOTV</span>
+          <span class="badge-pill-micro micro-green">CASHBACK</span>
         </div>
       </div>
+
       <div class="headings-container">
         <div class="badge-category-pill badge-emerald">✦ SIT BACK &amp; PROFIT</div>
-        <h3 class="headline-main" style="font-size:18px;">Sit Back &amp; Relax</h3>
-        <p class="headline-sub" style="font-size:12px;">Instant bill payments and profitable reselling.</p>
+        <h3 class="headline-main" style="font-size:17px;">Sit Back, Relax &amp; Profit</h3>
+        <p class="headline-sub" style="font-size:11.5px;">Instant bills &amp; profitable daily VTU reselling.</p>
       </div>
+
       <div class="features-card-deck">
         <div class="feature-row-card">
           <div class="feature-icon-badge">💡</div>
           <div class="feature-body-text">
             <div class="feature-primary-lbl">Prepaid Electricity &amp; TV</div>
-            <div class="feature-secondary-lbl">AEDC, EKEDC, DStv &amp; GOtv renewals</div>
+            <div class="feature-secondary-lbl">Instant meter tokens &amp; cable renewals</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
         <div class="feature-row-card">
-          <div class="feature-icon-badge">💸</div>
+          <div class="feature-icon-badge gold-accent">💸</div>
           <div class="feature-body-text">
             <div class="feature-primary-lbl">Reseller Profit Hub</div>
             <div class="feature-secondary-lbl">Save money or resell for daily earnings</div>
@@ -748,6 +971,7 @@
           <div class="feature-status-check">✓</div>
         </div>
       </div>
+
       <div class="pagination-dots-group">
         <div class="p-dot"></div><div class="p-dot"></div><div class="p-dot active"></div>
       </div>
@@ -762,41 +986,57 @@
         categoryClass: 'badge-gold',
         categoryText: 'OFFICIAL 5G VTU PLATFORM',
         title: 'Instant 5G Data & Airtime',
-        subtitle: 'Wholesale packages for MTN, Airtel, Glo & 9mobile delivered in milliseconds.',
+        subtitle: 'Wholesale telecom bundles delivered automatically in seconds.',
+        cardVipText: '5G AUTOMATED',
         chipL: { icon: '⚡', txt: '5G Automated' },
         chipR: { icon: '💰', txt: '₦240/GB SME' },
+        cardFooterHtml: `
+          <span class="badge-pill-micro micro-gold">MTN</span>
+          <span class="badge-pill-micro micro-navy">AIRTEL</span>
+          <span class="badge-pill-micro micro-green">GLO</span>
+          <span class="badge-pill-micro micro-gold">9MOBILE</span>
+        `,
         features: [
-          { icon: '📶', title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated recharge' },
-          { icon: '💰', title: 'Wholesale SME Bundles', desc: 'Direct wholesale rates starting from ₦240 per GB' },
-          { icon: '🛡️', title: '99.98% Service Uptime', desc: 'Real-time API processing with 0-second delivery' }
+          { icon: '📶', isGold: false, title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated recharge' },
+          { icon: '💰', isGold: true, title: 'Direct Wholesale SME Bundles', desc: 'Cheapest direct prices starting from ₦240 per GB' }
         ]
       },
       {
         image: './splash_hero_character2.gif',
-        categoryClass: 'badge-blue',
+        categoryClass: 'badge-navy',
         categoryText: 'DEDICATED AUTO WALLETS',
         title: 'Dedicated Bank Accounts',
-        subtitle: 'Automated wallet funding with personal Nigerian bank account numbers.',
+        subtitle: 'Automated wallet funding with personal Nigerian bank accounts.',
+        cardVipText: 'AUTO WALLETS',
         chipL: { icon: '🏦', txt: 'Moniepoint / Wema' },
         chipR: { icon: '🔒', txt: '0% Deposit Fee' },
+        cardFooterHtml: `
+          <span class="badge-pill-micro micro-navy">MONIEPOINT</span>
+          <span class="badge-pill-micro micro-gold">WEMA BANK</span>
+          <span class="badge-pill-micro micro-green">0% FEE</span>
+        `,
         features: [
-          { icon: '🏦', title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema accounts in your name' },
-          { icon: '⚡', title: 'Instant 0s Auto-Credit', desc: 'Wallet is funded automatically with 0% deposit charge' },
-          { icon: '🔒', title: 'Bank-Grade Security', desc: '256-bit SSL encrypted & NDPA certified compliance' }
+          { icon: '🏦', isGold: false, title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema accounts in your name' },
+          { icon: '⚡', isGold: true, title: 'Instant 0s Auto-Credit', desc: 'Wallet is funded automatically with 0% deposit charge' }
         ]
       },
       {
         image: './splash_hero_character3.gif',
         categoryClass: 'badge-emerald',
         categoryText: 'SIT BACK & PROFIT',
-        title: 'Sit Back & Relax',
-        subtitle: 'Automate your utility bills, TV renewals, or resell VTU services for daily income.',
+        title: 'Sit Back, Relax & Profit',
+        subtitle: 'Automate utility bills or resell VTU services for daily income.',
+        cardVipText: 'BILLS & PROFIT',
         chipL: { icon: '💡', txt: 'Prepaid Bills' },
-        chipR: { icon: '💸', txt: '3% Cashback' },
+        chipR: { icon: '💸', txt: 'Daily Profit' },
+        cardFooterHtml: `
+          <span class="badge-pill-micro micro-gold">NEPA TOKENS</span>
+          <span class="badge-pill-micro micro-navy">DSTV / GOTV</span>
+          <span class="badge-pill-micro micro-green">CASHBACK</span>
+        `,
         features: [
-          { icon: '💡', title: 'Prepaid Electricity Tokens', desc: 'Instant meter tokens for AEDC, EKEDC, IBEDC & more' },
-          { icon: '📺', title: 'Cable TV Subscriptions', desc: 'Instant renewal for DStv, GOtv, Startimes & Showmax' },
-          { icon: '🤝', title: 'Lucrative Reseller Profits', desc: 'Save money on personal use or resell to earn daily profits' }
+          { icon: '💡', isGold: false, title: 'Prepaid Electricity & Cable TV', desc: 'Instant meter tokens for AEDC, EKEDC, DStv & GOtv' },
+          { icon: '💸', isGold: true, title: 'Reseller Profit Hub', desc: 'Save money on personal use or earn daily retail profit' }
         ]
       }
     ];
@@ -811,12 +1051,16 @@
       timerVal = 0;
       const data = SLIDES_META[idx];
 
-      // Update image
+      // Update mascot image
       document.getElementById('mascotImg').src = data.image + '?t=' + Date.now();
 
       // Update chips
       document.getElementById('chipLTxt').innerText = data.chipL.txt;
       document.getElementById('chipRTxt').innerText = data.chipR.txt;
+
+      // Update VIP tag & footer on card
+      document.getElementById('cardVipLabel').innerText = data.cardVipText;
+      document.getElementById('cardFooterStrip').innerHTML = data.cardFooterHtml;
 
       // Update category badge
       const badge = document.getElementById('categoryBadge');
@@ -827,11 +1071,11 @@
       document.getElementById('mainTitle').innerText = data.title;
       document.getElementById('mainSubtitle').innerText = data.subtitle;
 
-      // Update feature cards
+      // Update 2 compact feature cards
       const deck = document.getElementById('cardsDeck');
       deck.innerHTML = data.features.map(f => `
         <div class="feature-row-card">
-          <div class="feature-icon-badge">${f.icon}</div>
+          <div class="feature-icon-badge ${f.isGold ? 'gold-accent' : ''}">${f.icon}</div>
           <div class="feature-body-text">
             <div class="feature-primary-lbl">${f.title}</div>
             <div class="feature-secondary-lbl">${f.desc}</div>
@@ -848,7 +1092,7 @@
         back.className = 'btn-nav-back';
       }
 
-      // Update buttons
+      // Update action button
       const pLabel = document.getElementById('primaryCtaLabel');
       const secBtn = document.getElementById('secondaryCtaBtn');
       const skip = document.getElementById('skipBtn');
