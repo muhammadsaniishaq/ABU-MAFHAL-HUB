@@ -31,32 +31,50 @@ const { width: SW, height: SH } = Dimensions.get('window');
 const SLIDES = [
   {
     image: require('../assets/images/splash_hero_character.gif'),
+    categoryText: 'OFFICIAL 5G VTU PLATFORM',
+    categoryBg: '#FEF3C7',
+    categoryTxt: '#B45309',
+    categoryBorder: '#FDE68A',
     title: 'Instant 5G Data & Airtime',
-    subtitle: 'Buy cheap data bundles and airtime at wholesale prices with instant automated delivery.',
+    subtitle: 'Wholesale packages for MTN, Airtel, Glo & 9mobile delivered in milliseconds.',
+    chipL: { icon: '⚡', txt: '5G Automated' },
+    chipR: { icon: '💰', txt: '₦240/GB SME' },
     features: [
-      { icon: '📶', title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile recharged in seconds' },
-      { icon: '💰', title: 'Wholesale SME Packages', desc: 'Direct wholesale rates starting from ₦240 per GB' },
-      { icon: '⚡', title: '0-Second Automated Delivery', desc: 'Real-time API processing with 99.98% uptime' },
+      { icon: '📶', title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated recharge' },
+      { icon: '💰', title: 'Wholesale SME Bundles', desc: 'Direct wholesale rates starting from ₦240 per GB' },
+      { icon: '🛡️', title: '99.98% Service Uptime', desc: 'Real-time API processing with 0-second delivery' },
     ],
   },
   {
     image: require('../assets/images/splash_hero_character2.gif'),
+    categoryText: 'DEDICATED AUTO WALLETS',
+    categoryBg: '#EFF6FF',
+    categoryTxt: '#1D4ED8',
+    categoryBorder: '#BFDBFE',
     title: 'Dedicated Bank Accounts',
-    subtitle: 'Personal Nigerian bank accounts for zero-fee, instant automated wallet funding.',
+    subtitle: 'Automated wallet funding with personal Nigerian bank account numbers.',
+    chipL: { icon: '🏦', txt: 'Moniepoint / Wema' },
+    chipR: { icon: '🔒', txt: '0% Deposit Fee' },
     features: [
-      { icon: '🏦', title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema Bank accounts in your name' },
-      { icon: '⚡', title: 'Instant 0s Auto-Credit', desc: 'Wallet is credited immediately with 0% deposit charge' },
+      { icon: '🏦', title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema accounts in your name' },
+      { icon: '⚡', title: 'Instant 0s Auto-Credit', desc: 'Wallet is funded automatically with 0% deposit charge' },
       { icon: '🔒', title: 'Bank-Grade Security', desc: '256-bit SSL encrypted & NDPA certified compliance' },
     ],
   },
   {
     image: require('../assets/images/splash_hero_character3.gif'),
+    categoryText: 'SIT BACK & PROFIT',
+    categoryBg: '#ECFDF5',
+    categoryTxt: '#047857',
+    categoryBorder: '#A7F3D0',
     title: 'Sit Back & Relax',
-    subtitle: 'Automate utility bills, TV renewals and resell VTU services for daily income.',
+    subtitle: 'Automate your utility bills, TV renewals, or resell VTU services for daily income.',
+    chipL: { icon: '💡', txt: 'Prepaid Bills' },
+    chipR: { icon: '💸', txt: '3% Cashback' },
     features: [
       { icon: '💡', title: 'Prepaid Electricity Tokens', desc: 'Instant meter tokens for AEDC, EKEDC, IBEDC & more' },
       { icon: '📺', title: 'Cable TV Subscriptions', desc: 'Instant renewal for DStv, GOtv, Startimes & Showmax' },
-      { icon: '📈', title: 'Lucrative Reseller Profits', desc: 'Save money on personal use or resell to earn daily profits' },
+      { icon: '🤝', title: 'Lucrative Reseller Profits', desc: 'Save money on personal use or resell to earn daily profits' },
     ],
   },
 ];
@@ -65,11 +83,13 @@ export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [pageIdx, setPageIdx] = useState(0);
+  const [progress, setProgress] = useState(0);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
   // Floating mascot animation (smooth & peaceful)
   const floatY = useSharedValue(0);
+  const chipFloat = useSharedValue(0);
 
   // Transition animations
   const slideOpacity = useSharedValue(1);
@@ -78,7 +98,7 @@ export default function SplashScreen() {
   useEffect(() => {
     checkAuthSession();
 
-    // Gentle floating (3.6s cycle)
+    // Gentle mascot float (3.6s cycle)
     floatY.value = withRepeat(
       withSequence(
         withTiming(-7, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
@@ -87,17 +107,51 @@ export default function SplashScreen() {
       -1,
       true
     );
+
+    // Floating chip micro-motion
+    chipFloat.value = withRepeat(
+      withSequence(
+        withTiming(-6, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      true
+    );
   }, []);
+
+  // Story progress bar auto-advance
+  useEffect(() => {
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          setPageIdx(curr => (curr < 2 ? curr + 1 : curr));
+          return 0;
+        }
+        return prev + 2;
+      });
+    }, 90);
+
+    return () => clearInterval(interval);
+  }, [pageIdx]);
 
   useEffect(() => {
     slideOpacity.value = 0.35;
     slideScale.value = 0.95;
-    slideOpacity.value = withTiming(1, { duration: 340, easing: Easing.out(Easing.cubic) });
+    slideOpacity.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
     slideScale.value = withSpring(1, { damping: 16, stiffness: 120 });
   }, [pageIdx]);
 
   const floatAnimStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: floatY.value }],
+  }));
+
+  const chipAnimStyleL = useAnimatedStyle(() => ({
+    transform: [{ translateY: chipFloat.value }],
+  }));
+
+  const chipAnimStyleR = useAnimatedStyle(() => ({
+    transform: [{ translateY: -chipFloat.value }],
   }));
 
   const slideAnimStyle = useAnimatedStyle(() => ({
@@ -206,26 +260,48 @@ export default function SplashScreen() {
     >
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* TOP NAVIGATION: BACK ARROW & SKIP */}
-      <View style={styles.topNav}>
-        {pageIdx > 0 ? (
-          <TouchableOpacity onPress={prevSlide} style={styles.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="chevron-back" size={20} color="#334155" />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backPlaceholder} />
-        )}
+      {/* TOP SECTION: STORY PROGRESS & NAVIGATION BAR */}
+      <View style={styles.topArea}>
+        <View style={styles.storyBarsRow}>
+          {[0, 1, 2].map(idx => (
+            <TouchableOpacity key={idx} onPress={() => goTo(idx)} style={styles.storyTrack}>
+              <View
+                style={[
+                  styles.storyFill,
+                  {
+                    width: pageIdx > idx ? '100%' : pageIdx === idx ? `${progress}%` : '0%',
+                  },
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {pageIdx < 2 ? (
-          <TouchableOpacity onPress={skipAll} style={styles.skipBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Text style={styles.skipTxt}>Skip</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backPlaceholder} />
-        )}
+        <View style={styles.topNav}>
+          {pageIdx > 0 ? (
+            <TouchableOpacity onPress={prevSlide} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="chevron-back" size={20} color="#0F172A" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.backPlaceholder} />
+          )}
+
+          <View style={styles.brandPill}>
+            <View style={styles.brandDot} />
+            <Text style={styles.brandTxt}>ABU MAFHAL SUB</Text>
+          </View>
+
+          {pageIdx < 2 ? (
+            <TouchableOpacity onPress={skipAll} style={styles.skipBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.skipTxt}>Skip</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.backPlaceholder} />
+          )}
+        </View>
       </View>
 
-      {/* SCROLLABLE MAIN BODY FOR CLEAN SCALING ON ALL PHONES */}
+      {/* SCROLLABLE BODY FOR ALL PHONES */}
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={styles.scrollContent}
@@ -233,10 +309,22 @@ export default function SplashScreen() {
       >
         <Animated.View style={[styles.mainSection, slideAnimStyle]}>
           
-          {/* MASCOT SECTION WITH CRISP SHAPE (ZERO BLUR FILTER) */}
+          {/* MASCOT SECTION WITH CRISP SHAPES & FLOATING CHIPS (ZERO BLUR) */}
           <View style={styles.mascotSection}>
-            <View style={styles.crispBackdropShape} />
-            <View style={styles.crispGroundOval} />
+            <View style={styles.vectorRing} />
+            <View style={styles.groundOval} />
+
+            {/* Left Floating Chip */}
+            <Animated.View style={[styles.luxuryChip, styles.chipLeft, chipAnimStyleL]}>
+              <Text style={styles.chipEmoji}>{currentSlide.chipL.icon}</Text>
+              <Text style={styles.chipLabel}>{currentSlide.chipL.txt}</Text>
+            </Animated.View>
+
+            {/* Right Floating Chip */}
+            <Animated.View style={[styles.luxuryChip, styles.chipRight, chipAnimStyleR]}>
+              <Text style={styles.chipEmoji}>{currentSlide.chipR.icon}</Text>
+              <Text style={styles.chipLabel}>{currentSlide.chipR.txt}</Text>
+            </Animated.View>
             
             <Animated.View style={[styles.mascotWrap, floatAnimStyle]}>
               <Image
@@ -248,23 +336,38 @@ export default function SplashScreen() {
             </Animated.View>
           </View>
 
-          {/* HEADINGS */}
+          {/* HEADINGS & CATEGORY BADGE */}
           <View style={styles.textSection}>
+            <View
+              style={[
+                styles.categoryBadge,
+                {
+                  backgroundColor: currentSlide.categoryBg,
+                  borderColor: currentSlide.categoryBorder,
+                },
+              ]}
+            >
+              <Text style={[styles.categoryBadgeTxt, { color: currentSlide.categoryTxt }]}>
+                ✦ {currentSlide.categoryText}
+              </Text>
+            </View>
+
             <Text style={styles.title}>{currentSlide.title}</Text>
             <Text style={styles.subtitle}>{currentSlide.subtitle}</Text>
           </View>
 
-          {/* NEAT STRUCTURED FEATURES LIST ("FEATURES KE TSARI") */}
-          <View style={styles.featuresList}>
+          {/* NEAT STRUCTURED FEATURE CARDS */}
+          <View style={styles.featuresDeck}>
             {currentSlide.features.map((feat, idx) => (
               <View key={idx} style={styles.featureCard}>
-                <View style={styles.featureIconBox}>
+                <View style={styles.featureIconBadge}>
                   <Text style={styles.featureIconTxt}>{feat.icon}</Text>
                 </View>
-                <View style={styles.featureTextBox}>
-                  <Text style={styles.featureMainTxt}>{feat.title}</Text>
-                  <Text style={styles.featureSubTxt}>{feat.desc}</Text>
+                <View style={styles.featureBody}>
+                  <Text style={styles.featurePrimaryTxt}>{feat.title}</Text>
+                  <Text style={styles.featureSecondaryTxt}>{feat.desc}</Text>
                 </View>
+                <Ionicons name="checkmark-circle" size={17} color="#10B981" />
               </View>
             ))}
           </View>
@@ -273,8 +376,7 @@ export default function SplashScreen() {
       </ScrollView>
 
       {/* BOTTOM CONTROLS & ACTIONS */}
-      <View style={styles.bottomSection}>
-        {/* 3 Pagination Dots */}
+      <View style={styles.bottomArea}>
         <View style={styles.dotsRow}>
           {[0, 1, 2].map(idx => (
             <TouchableOpacity key={idx} onPress={() => goTo(idx)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
@@ -283,7 +385,6 @@ export default function SplashScreen() {
           ))}
         </View>
 
-        {/* Buttons */}
         <View style={styles.actionRow}>
           {pageIdx < 2 ? (
             <TouchableOpacity onPress={nextSlide} activeOpacity={0.88} style={styles.primaryBtn}>
@@ -317,7 +418,7 @@ export default function SplashScreen() {
 }
 
 const styles = StyleSheet.create({
-  // SOLID UNIFIED BACKGROUND (NO DIS-DIS, SEAMLESS WITH IMAGES)
+  // SOLID PURE UNIFIED BACKGROUND (NO DIS-DIS, SEAMLESS WITH IMAGES)
   screen: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -329,32 +430,80 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 
-  // TOP NAVIGATION
-  topNav: {
+  // TOP AREA
+  topArea: {
     width: '100%',
+    gap: 12,
+    zIndex: 20,
+  },
+  storyBarsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    width: '100%',
+  },
+  storyTrack: {
+    flex: 1,
+    height: 3.5,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  storyFill: {
+    height: '100%',
+    backgroundColor: '#0F172A',
+    borderRadius: 2,
+  },
+  topNav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     height: 38,
-    zIndex: 10,
   },
   backBtn: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   backPlaceholder: {
     width: 36,
     height: 36,
   },
+  brandPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 6,
+  },
+  brandDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
+  brandTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: 0.3,
+  },
   skipBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: 8,
   },
   skipTxt: {
@@ -363,7 +512,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 
-  // SCROLL CONTENT
+  // SCROLLABLE AREA
   scrollArea: {
     flex: 1,
     width: '100%',
@@ -372,64 +521,114 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexGrow: 1,
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   mainSection: {
     width: '100%',
     alignItems: 'center',
   },
 
-  // MASCOT & CRISP BACKDROP (ZERO BLUR FILTER)
+  // MASCOT SECTION
   mascotSection: {
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginVertical: 10,
+    marginVertical: 8,
   },
-  crispBackdropShape: {
+  vectorRing: {
     position: 'absolute',
-    width: Math.min(SW * 0.58, 220),
-    height: Math.min(SW * 0.58, 220),
-    borderRadius: Math.min(SW * 0.58, 220) / 2,
+    width: Math.min(SW * 0.58, 215),
+    height: Math.min(SW * 0.58, 215),
+    borderRadius: Math.min(SW * 0.58, 215) / 2,
     backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: '#CBD5E1',
     borderStyle: 'dashed',
     zIndex: 1,
   },
-  crispGroundOval: {
+  groundOval: {
     position: 'absolute',
-    bottom: -2,
-    width: 120,
+    bottom: 2,
+    width: 125,
     height: 10,
     borderRadius: 5,
     backgroundColor: '#E2E8F0',
     zIndex: 1,
   },
   mascotWrap: {
-    width: Math.min(SW * 0.62, 230),
-    height: Math.min(SH * 0.28, 230),
+    width: Math.min(SW * 0.60, 225),
+    height: Math.min(SH * 0.27, 225),
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    zIndex: 2,
+    zIndex: 5,
   },
   mascotImg: {
     width: '100%',
     height: '100%',
   },
 
-  // HEADINGS
+  // FLOATING CHIPS
+  luxuryChip: {
+    position: 'absolute',
+    zIndex: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 11,
+    paddingVertical: 5.5,
+    borderRadius: 12,
+    gap: 5,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  chipLeft: {
+    left: 2,
+    top: '12%',
+  },
+  chipRight: {
+    right: 2,
+    bottom: '16%',
+  },
+  chipEmoji: {
+    fontSize: 11,
+  },
+  chipLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+
+  // TEXT HEADINGS
   textSection: {
     width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    marginBottom: 14,
+    paddingHorizontal: 6,
+    marginBottom: 12,
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 11,
+    paddingVertical: 4.5,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  categoryBadgeTxt: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   title: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '900',
     color: '#0F172A',
     textAlign: 'center',
     letterSpacing: -0.4,
@@ -441,11 +640,11 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 18.5,
-    maxWidth: 320,
+    maxWidth: 325,
   },
 
-  // NEAT STRUCTURED FEATURES LIST ("FEATURES KE TSARI")
-  featuresList: {
+  // STRUCTURED FEATURE CARDS
+  featuresDeck: {
     width: '100%',
     gap: 8,
     marginBottom: 10,
@@ -454,21 +653,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderRadius: 13,
-    paddingVertical: 9,
+    borderRadius: 14,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 2,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
     elevation: 1,
   },
-  featureIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
+  featureIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -477,29 +676,30 @@ const styles = StyleSheet.create({
     marginRight: 11,
   },
   featureIconTxt: {
-    fontSize: 15,
+    fontSize: 16,
   },
-  featureTextBox: {
+  featureBody: {
     flex: 1,
   },
-  featureMainTxt: {
-    fontSize: 12,
+  featurePrimaryTxt: {
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#0F172A',
     marginBottom: 1,
   },
-  featureSubTxt: {
+  featureSecondaryTxt: {
     fontSize: 10.5,
     fontWeight: '500',
     color: '#64748B',
     lineHeight: 14,
   },
 
-  // BOTTOM SECTION
-  bottomSection: {
+  // BOTTOM CONTROLS
+  bottomArea: {
     width: '100%',
     alignItems: 'center',
     gap: 14,
+    zIndex: 20,
   },
   dotsRow: {
     flexDirection: 'row',
@@ -512,7 +712,7 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   dotActive: {
-    width: 20,
+    width: 22,
     backgroundColor: '#0F172A',
   },
   dotInactive: {
@@ -531,12 +731,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#0F172A',
     paddingVertical: 14,
-    borderRadius: 14,
-    gap: 6,
+    borderRadius: 15,
+    gap: 8,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
     elevation: 3,
   },
   primaryBtnTxt: {
