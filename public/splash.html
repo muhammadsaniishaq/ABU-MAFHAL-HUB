@@ -3,1507 +3,628 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ABU MAFHAL SUB — Official Splash & Onboarding Preview (Play Store Simulator)</title>
+  <title>ABU MAFHAL SUB — Modern Clean Splash & Onboarding Preview</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
-    :root {
-      --bg-dark: #0B0F19;
-      --card-dark: #111827;
-      --border-dark: #1F2937;
-      --gold-primary: #F59E0B;
-      --gold-dark: #D97706;
-      --blue-primary: #2563EB;
-      --emerald-primary: #059669;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: radial-gradient(circle at 50% 10%, #151E32 0%, #0B0F19 55%, #05070D 100%);
-      color: #F8FAFC;
+      background: #F3F4F6;
+      color: #1E293B;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px 16px 50px;
-      overflow-x: hidden;
+      padding: 24px 16px 60px;
     }
 
-    /* TOP APP BAR / BRAND HEADER */
-    header.page-header {
+    /* TOP TITLE BAR */
+    .top-header {
       text-align: center;
-      margin-bottom: 16px;
-      max-width: 800px;
+      margin-bottom: 20px;
     }
-    .header-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(245, 158, 11, 0.12);
-      color: #FBBF24;
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      padding: 5px 12px;
-      border-radius: 30px;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.6px;
-      margin-bottom: 10px;
-    }
-    h1.page-title {
-      font-size: 26px;
-      font-weight: 900;
-      color: #FFFFFF;
-      letter-spacing: -0.6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .gradient-txt {
-      background: linear-gradient(135deg, #FDE68A 0%, #F59E0B 50%, #D97706 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    p.page-desc {
-      color: #94A3B8;
-      font-size: 13.5px;
-      margin-top: 6px;
-      line-height: 1.5;
-    }
-
-    /* TOP CONTROLS TOOLBAR */
-    .toolbar-container {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 22px;
-      background: rgba(17, 24, 39, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 8px 14px;
-      border-radius: 18px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    }
-    .control-group {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .control-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: #64748B;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-right: 4px;
-    }
-    .tool-btn {
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 700;
-      color: #94A3B8;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 9px;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .tool-btn:hover {
-      background: rgba(255, 255, 255, 0.12);
-      color: #FFFFFF;
-      transform: translateY(-1px);
-    }
-    .tool-btn.active {
-      background: #F59E0B;
-      color: #0F172A;
-      border-color: #F59E0B;
-      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
-    }
-    .tool-btn.play-btn {
-      background: rgba(16, 185, 129, 0.15);
-      color: #10B981;
-      border-color: rgba(16, 185, 129, 0.3);
-    }
-    .tool-btn.play-btn.paused {
-      background: rgba(239, 68, 68, 0.15);
-      color: #EF4444;
-      border-color: rgba(239, 68, 68, 0.3);
-    }
-
-    /* MAIN PREVIEW STAGE */
-    .preview-stage {
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      gap: 32px;
-      max-width: 1100px;
-      width: 100%;
-    }
-
-    /* PHONE FRAME MOCKUP */
-    .phone-container {
-      position: relative;
-      flex-shrink: 0;
-    }
-    .phone-wrapper {
-      position: relative;
-      width: 395px;
-      height: 840px;
-      background: #000000;
-      border-radius: 54px;
-      box-shadow: 
-        0 30px 80px -15px rgba(0, 0, 0, 0.9),
-        0 0 0 10px #1E293B,
-        0 0 0 13px #334155,
-        0 0 50px rgba(245, 158, 11, 0.15);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      transition: width 0.35s ease, height 0.35s ease, border-radius 0.35s ease;
-    }
-
-    /* HARDWARE CUTOUT: DYNAMIC ISLAND / PUNCH HOLE */
-    .hardware-island {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 116px;
-      height: 27px;
-      background: #000000;
-      border-radius: 20px;
-      z-index: 99;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding-right: 11px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
-      transition: all 0.3s;
-    }
-    .island-lens {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #090E17;
-      border: 1px solid #1E293B;
-      box-shadow: inset 0 0 2px #0056D2;
-    }
-
-    /* PHONE SCREEN */
-    .screen {
-      position: relative;
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-      user-select: none;
-    }
-
-    /* SCREEN BACKGROUND THEMES */
-    .theme-telecom {
-      background: linear-gradient(180deg, #FFFDF5 0%, #FEF8E7 42%, #F0F9FF 100%);
-    }
-    .theme-banking {
-      background: linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 42%, #F5F3FF 100%);
-    }
-    .theme-start {
-      background: linear-gradient(180deg, #F0FDF4 0%, #DCFCE7 42%, #FEF9C3 100%);
-    }
-
-    /* AMBIENT ORBS ON PHONE */
-    .screen-orb {
-      position: absolute;
-      border-radius: 50%;
-      pointer-events: none;
-      filter: blur(40px);
-      transition: all 0.6s;
-    }
-    .orb-top {
-      top: -60px; right: -50px;
-      width: 250px; height: 250px;
-      opacity: 0.55;
-    }
-    .orb-bottom {
-      bottom: -50px; left: -40px;
-      width: 230px; height: 230px;
-      opacity: 0.45;
-    }
-
-    /* STATUS BAR */
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 13px 26px 4px;
-      font-size: 12px;
-      font-weight: 700;
-      color: #0F172A;
-      z-index: 50;
-    }
-    .status-icons {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-    }
-
-    /* HEADER BAR */
-    .header-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 16px 6px;
-      z-index: 20;
-    }
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(255, 255, 255, 0.94);
-      padding: 6px 12px;
-      border-radius: 20px;
-      border: 1px solid #E2E8F0;
-      font-size: 11px;
+    .top-header h1 {
+      font-size: 22px;
       font-weight: 800;
       color: #0F172A;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-    }
-    .live-dot {
-      width: 7.5px;
-      height: 7.5px;
-      border-radius: 50%;
-      background: #10B981;
-      box-shadow: 0 0 8px #10B981;
-      animation: pulseLive 1.5s infinite;
-    }
-    @keyframes pulseLive {
-      0% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.8); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-    .brand-mark {
-      width: 38px;
-      height: 38px;
-      border-radius: 12px;
-      background: #FFFFFF;
-      border: 1.5px solid #FDE68A;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(217, 119, 6, 0.18);
-      overflow: hidden;
-    }
-    .brand-mark img { width: 30px; height: 30px; object-fit: contain; }
-    .support-btn {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(255, 255, 255, 0.92);
-      padding: 6px 12px;
-      border-radius: 20px;
-      border: 1px solid #DCFCE7;
-      font-size: 11px;
-      font-weight: 800;
-      color: #15803D;
-      text-decoration: none;
-      box-shadow: 0 2px 6px rgba(22, 163, 74, 0.1);
-    }
-
-    /* STORY STATUS PROGRESS BARS */
-    .story-bars {
-      display: flex;
-      gap: 6px;
-      padding: 2px 18px 6px;
-      z-index: 20;
-    }
-    .story-track {
-      flex: 1;
-      height: 4px;
-      background: rgba(203, 213, 225, 0.55);
-      border-radius: 2px;
-      overflow: hidden;
-      cursor: pointer;
-    }
-    .story-fill {
-      height: 100%;
-      width: 0%;
-      border-radius: 2px;
-      background: #D97706;
-      transition: width 0.1s linear, background-color 0.4s ease;
-    }
-
-    /* MASCOT HERO SECTION */
-    .mascot-hero {
-      position: relative;
-      width: 100%;
-      height: 285px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 2px;
-    }
-    .stage-card {
-      position: absolute;
-      width: 92%;
-      height: 265px;
-      border-radius: 30px;
-      background: linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.38) 100%);
-      border: 1.5px solid rgba(255,255,255,0.95);
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-      backdrop-filter: blur(14px);
-    }
-    .orbit-ring {
-      position: absolute;
-      border: 1.5px dashed rgba(217, 119, 6, 0.35);
-      border-radius: 50%;
-      pointer-events: none;
-      transition: border-color 0.4s;
-    }
-    .ring-1 {
-      width: 210px; height: 210px;
-      animation: rotateClockwise 9s linear infinite;
-    }
-    .ring-2 {
-      width: 270px; height: 270px;
-      animation: rotateCounter 14s linear infinite;
-    }
-    @keyframes rotateClockwise { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    @keyframes rotateCounter { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
-
-    .glow-aura {
-      position: absolute;
-      width: 250px;
-      height: 250px;
-      border-radius: 50%;
-      filter: blur(28px);
-      animation: glowBreath 2.4s ease-in-out infinite alternate;
-      transition: background 0.6s ease;
-    }
-    @keyframes glowBreath {
-      0% { transform: scale(0.92); opacity: 0.55; }
-      100% { transform: scale(1.18); opacity: 0.95; }
-    }
-    .ground-shadow {
-      position: absolute;
-      bottom: 8px;
-      width: 160px;
-      height: 18px;
-      border-radius: 50%;
-      background: rgba(15, 23, 42, 0.3);
-      filter: blur(5px);
-      animation: shadowFloat 2.6s ease-in-out infinite alternate;
-    }
-    @keyframes shadowFloat {
-      0% { transform: scaleX(0.9) scaleY(1.1); opacity: 0.4; }
-      100% { transform: scaleX(1.3) scaleY(0.7); opacity: 0.15; }
-    }
-    .hero-pill {
-      position: absolute;
-      top: 6px;
-      z-index: 15;
-      padding: 5px 14px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: 0.8px;
-      border: 1px solid #FDE68A;
-      background: rgba(254, 243, 199, 0.96);
-      color: #B45309;
-      box-shadow: 0 3px 6px rgba(0,0,0,0.06);
-      transition: all 0.4s;
-    }
-    .side-tag {
-      position: absolute;
-      bottom: 20px;
-      z-index: 14;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 4.5px 10px;
-      border-radius: 12px;
-      border: 1px solid #E2E8F0;
-      font-size: 9.5px;
-      font-weight: 800;
-      letter-spacing: 0.3px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
-      transition: all 0.4s;
-    }
-    .side-tag.left { left: 10px; }
-    .side-tag.right { right: 10px; }
-
-    .mascot-img-wrap {
-      position: relative;
-      width: 250px;
-      height: 250px;
-      z-index: 12;
-      animation: mascotHover 2.6s ease-in-out infinite alternate;
-    }
-    @keyframes mascotHover {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-13px); }
-    }
-    .mascot-img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-
-    /* SLIDE CONTENT AREA (SCROLLABLE & PROTECTED) */
-    .content-area {
-      flex: 1;
-      padding: 4px 18px 8px;
-      overflow-y: auto;
-      scrollbar-width: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .content-area::-webkit-scrollbar { display: none; }
-
-    .slide-box {
-      width: 100%;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .slide-box.active { display: flex; }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* TYPOGRAPHY */
-    .badge-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: #FEF3C7;
-      border: 1px solid #FDE68A;
-      color: #B45309;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      margin-bottom: 8px;
-    }
-    .main-title {
-      font-size: 20px;
-      font-weight: 900;
-      color: #0F172A;
-      text-align: center;
-      line-height: 1.25;
       letter-spacing: -0.4px;
-      margin-bottom: 6px;
     }
-    .main-sub {
-      font-size: 12px;
-      font-weight: 500;
-      color: #64748B;
-      text-align: center;
-      line-height: 1.45;
-      max-width: 330px;
-      margin-bottom: 12px;
-    }
-
-    /* SLIDE 1 PILLARS */
-    .pillars-list {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .pillar-card {
-      display: flex;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.94);
-      border-radius: 14px;
-      padding: 10px 12px;
-      border: 1px solid #F1F5F9;
-      box-shadow: 0 2px 6px rgba(100, 116, 139, 0.05);
-      border-left: 4px solid #D97706;
-    }
-    .pillar-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 11px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 11px;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-    .pillar-info { flex: 1; }
-    .pillar-title {
-      font-size: 12.5px;
-      font-weight: 800;
-      color: #0F172A;
-      margin-bottom: 1px;
-    }
-    .pillar-desc {
-      font-size: 10.5px;
-      font-weight: 500;
-      color: #64748B;
-      line-height: 1.3;
-    }
-    .check-mark {
-      color: #10B981;
-      font-size: 15px;
-      font-weight: 800;
-    }
-
-    /* STATS RIBBON */
-    .stats-ribbon {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      background: rgba(255, 255, 255, 0.94);
-      border-radius: 14px;
-      padding: 9px 12px;
-      border: 1px solid #E2E8F0;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-      margin-top: 2px;
-    }
-    .stat-item {
-      text-align: center;
-      flex: 1;
-    }
-    .stat-val {
-      font-size: 13.5px;
-      font-weight: 900;
-      color: #0F172A;
-    }
-    .stat-lbl {
-      font-size: 9.5px;
-      font-weight: 600;
-      color: #64748B;
-      margin-top: 1px;
-    }
-    .stat-divider {
-      width: 1px;
-      height: 20px;
-      background: #E2E8F0;
-    }
-
-    /* SLIDE 2 SERVICES GRID */
-    .services-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px;
-      width: 100%;
-      margin-bottom: 12px;
-    }
-    .service-card {
-      background: rgba(255, 255, 255, 0.94);
-      border-radius: 14px;
-      padding: 10px;
-      border: 1px solid #F1F5F9;
-      box-shadow: 0 2px 6px rgba(100, 116, 139, 0.04);
-    }
-    .service-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      margin-bottom: 6px;
-    }
-    .service-title {
-      font-size: 12px;
-      font-weight: 800;
-      color: #0F172A;
-      margin-bottom: 2px;
-    }
-    .service-desc {
-      font-size: 10px;
-      font-weight: 500;
-      color: #64748B;
-      line-height: 1.3;
-    }
-
-    /* PARTNERS SECTION */
-    .partners-box {
-      width: 100%;
-      background: rgba(255, 255, 255, 0.94);
-      border-radius: 14px;
-      padding: 9px 10px;
-      border: 1px solid #E2E8F0;
-      text-align: center;
-    }
-    .partners-lbl {
-      font-size: 9.5px;
-      font-weight: 800;
-      color: #94A3B8;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
-    }
-    .partners-badges {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 5px;
-    }
-    .partner-pill {
-      font-size: 9.5px;
-      font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 8px;
-      border: 1px solid #E2E8F0;
-      background: #F8FAFC;
-    }
-
-    /* SLIDE 3 STEPS */
-    .steps-list {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-      margin-bottom: 12px;
-    }
-    .step-card {
-      display: flex;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.94);
-      border-radius: 13px;
-      padding: 9px 11px;
-      border: 1px solid #F1F5F9;
-      box-shadow: 0 1px 4px rgba(100, 116, 139, 0.04);
-    }
-    .step-num {
-      width: 27px;
-      height: 27px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 900;
-      border: 1.5px solid;
-      margin-right: 10px;
-      flex-shrink: 0;
-    }
-    .step-info { flex: 1; }
-    .step-title {
-      font-size: 12px;
-      font-weight: 800;
-      color: #0F172A;
-    }
-    .step-desc {
-      font-size: 10px;
-      font-weight: 500;
-      color: #64748B;
-      margin-top: 1px;
-    }
-
-    /* SLIDE 3 CTA BUTTONS */
-    .cta-container {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-      margin-bottom: 6px;
-    }
-    .primary-cta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      border-radius: 15px;
-      background: linear-gradient(90deg, #F59E0B, #D97706, #B45309);
-      color: #FFFFFF;
-      text-decoration: none;
-      box-shadow: 0 4px 15px rgba(217, 119, 6, 0.35);
-      border: none;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .primary-cta:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(217, 119, 6, 0.45);
-    }
-    .primary-cta-content {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .cta-icon-box {
-      width: 30px;
-      height: 30px;
-      border-radius: 9px;
-      background: rgba(255, 255, 255, 0.22);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 15px;
-    }
-    .cta-text-box { text-align: left; }
-    .cta-main-txt {
+    .top-header p {
       font-size: 13px;
-      font-weight: 900;
-      letter-spacing: 0.2px;
-    }
-    .cta-sub-txt {
-      font-size: 9.5px;
-      font-weight: 600;
-      opacity: 0.88;
-    }
-    .secondary-cta {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 11px;
-      border-radius: 13px;
-      background: rgba(255, 255, 255, 0.95);
-      border: 1.5px solid #CBD5E1;
-      color: #0F172A;
-      font-size: 12.5px;
-      font-weight: 800;
-      cursor: pointer;
-      box-shadow: 0 1px 4px rgba(100, 116, 139, 0.05);
-      transition: all 0.2s;
-    }
-    .secondary-cta:hover {
-      background: #FFFFFF;
-      border-color: #94A3B8;
-    }
-    .security-note {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      font-size: 9.5px;
-      font-weight: 600;
       color: #64748B;
-      padding-top: 4px;
+      margin-top: 4px;
     }
 
-    /* BOTTOM NAV BAR */
-    .bottom-bar {
-      background: rgba(255, 255, 255, 0.96);
-      padding: 10px 20px 22px;
+    /* DEVICE SWITCHER & CONTROLS */
+    .controls-bar {
       display: flex;
-      flex-direction: column;
       align-items: center;
       gap: 10px;
-      box-shadow: 0 -4px 15px rgba(15, 23, 42, 0.05);
-      z-index: 30;
+      background: #FFFFFF;
+      padding: 6px 12px;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      margin-bottom: 24px;
+      border: 1px solid #E2E8F0;
     }
-    .nav-shimmer {
-      width: 36px;
-      height: 4px;
-      border-radius: 2px;
-      background: #E2E8F0;
-    }
-    .dots-row {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-    }
-    .dot {
-      height: 7px;
-      border-radius: 3.5px;
-      cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .dot.active {
-      width: 26px;
-      background: #D97706;
-    }
-    .dot.inactive {
-      width: 7px;
-      background: #CBD5E1;
-    }
-    .nav-actions {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-    }
-    .skip-btn {
-      padding: 7px 12px;
-      font-size: 12.5px;
+    .ctrl-btn {
+      padding: 6px 14px;
+      border-radius: 9px;
+      font-size: 12px;
       font-weight: 700;
       color: #64748B;
       background: transparent;
       border: none;
       cursor: pointer;
+      transition: all 0.2s ease;
     }
-    .skip-btn:hover { color: #0F172A; }
-    .next-btn {
+    .ctrl-btn:hover {
+      background: #F1F5F9;
+      color: #0F172A;
+    }
+    .ctrl-btn.active {
+      background: #0F172A;
+      color: #FFFFFF;
+    }
+    .divider {
+      width: 1px;
+      height: 20px;
+      background: #E2E8F0;
+    }
+
+    /* PHONE FRAME MOCKUP */
+    .phone-frame {
+      position: relative;
+      width: 390px;
+      height: 820px;
+      background: #FFFFFF;
+      border-radius: 50px;
+      box-shadow: 
+        0 25px 60px -15px rgba(15, 23, 42, 0.18),
+        0 0 0 12px #FFFFFF,
+        0 0 0 14px #E2E8F0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      transition: width 0.3s ease, height 0.3s ease;
+    }
+
+    /* SCREEN (SEAMLESS CLEAN BACKGROUND - NO DIS-DIS) */
+    .screen-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px 24px 34px;
+      overflow: hidden;
+    }
+
+    /* TOP NAVIGATION (BACK & SKIP) */
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      height: 36px;
+      z-index: 20;
+    }
+    .back-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 9px 18px;
-      border-radius: 12px;
-      background: linear-gradient(90deg, #F59E0B, #D97706, #B45309);
-      color: #FFFFFF;
+      justify-content: center;
+      font-size: 18px;
+      color: #334155;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .back-btn:hover {
+      background: #F1F5F9;
+    }
+    .back-btn.hidden {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .skip-btn {
+      background: transparent;
+      border: none;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #64748B;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .skip-btn:hover {
+      color: #0F172A;
+      background: #F8FAFC;
+    }
+
+    /* SLIDER TRACK & ANIMATED SLIDES */
+    .slides-wrapper {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .slide-item {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: translateX(60px);
+      transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .slide-item.active {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+    .slide-item.prev {
+      opacity: 0;
+      transform: translateX(-60px);
+    }
+
+    /* CENTER CHARACTER ILLUSTRATION (NO NOISE, NO HEAVY CARDS) */
+    .character-wrap {
+      position: relative;
+      width: 270px;
+      height: 270px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    /* SOFT CLEAN VIGNETTE BACKDROP (MATCHES REFERENCE IMAGE) */
+    .character-wrap::before {
+      content: '';
+      position: absolute;
+      width: 210px;
+      height: 210px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #F1F5F9 0%, rgba(241, 245, 249, 0) 70%);
+      z-index: 1;
+    }
+    .character-img {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      animation: subtleFloat 4s ease-in-out infinite alternate;
+    }
+    @keyframes subtleFloat {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-7px); }
+    }
+
+    /* TEXT CONTENT (CLEAN, MINIMAL, MODERN) */
+    .text-content {
+      text-align: center;
+      max-width: 320px;
+      z-index: 10;
+    }
+    .slide-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #1E293B;
+      letter-spacing: -0.4px;
+      margin-bottom: 10px;
+    }
+    .slide-desc {
       font-size: 13px;
-      font-weight: 900;
+      font-weight: 500;
+      color: #64748B;
+      line-height: 1.55;
+    }
+
+    /* BOTTOM CONTROLS & PAGINATION DOTS */
+    .bottom-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      width: 100%;
+      z-index: 20;
+    }
+    
+    /* 3 CLEAN PAGINATION DOTS (MATCHES REFERENCE IMAGE) */
+    .dots-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #CBD5E1;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .dot.active {
+      width: 18px;
+      border-radius: 4px;
+      background: #2563EB;
+    }
+
+    /* ACTION BUTTONS (FOR SLIDE 3 / NEXT) */
+    .actions-row {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn-next {
+      width: 100%;
+      padding: 13px;
+      border-radius: 14px;
+      background: #0F172A;
+      color: #FFFFFF;
+      font-size: 14px;
+      font-weight: 800;
       border: none;
       cursor: pointer;
-      box-shadow: 0 3px 10px rgba(217, 119, 6, 0.28);
-      transition: all 0.2s;
-    }
-    .next-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 5px 14px rgba(217, 119, 6, 0.35);
-    }
-
-    /* RIGHT SIDEBAR: PLAYSTORE READINESS & AUDIT PANEL */
-    .audit-panel {
-      flex: 1;
-      max-width: 420px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .audit-card {
-      background: rgba(17, 24, 39, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    }
-    .audit-card-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: #F8FAFC;
-      letter-spacing: -0.2px;
-      margin-bottom: 12px;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+      transition: all 0.2s;
     }
-    .audit-badge {
-      background: rgba(16, 185, 129, 0.15);
-      color: #10B981;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 10px;
-      font-weight: 800;
+    .btn-next:hover {
+      background: #1E293B;
+      transform: translateY(-1px);
     }
-    .checklist-items {
+    .btn-signin {
+      background: transparent;
+      border: none;
+      color: #64748B;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 6px;
+      transition: color 0.2s;
+    }
+    .btn-signin:hover {
+      color: #0F172A;
+    }
+
+    /* 3-CARD SIDE-BY-SIDE GALLERY VIEW */
+    .gallery-view {
+      display: none;
+      gap: 24px;
+      align-items: center;
+      justify-content: center;
+      max-width: 1200px;
+      width: 100%;
+    }
+    .gallery-card {
+      width: 320px;
+      height: 640px;
+      background: #FFFFFF;
+      border-radius: 36px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+      border: 1px solid #E2E8F0;
+      padding: 32px 20px 24px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      justify-content: space-between;
     }
-    .check-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      font-size: 12.5px;
-      color: #CBD5E1;
-      line-height: 1.4;
+    .gallery-card .character-wrap {
+      width: 210px;
+      height: 210px;
+      margin: 0 auto 16px;
     }
-    .check-icon {
-      color: #10B981;
-      font-size: 14px;
-      margin-top: 1px;
-      flex-shrink: 0;
+    .gallery-card .slide-title {
+      font-size: 18px;
     }
-    .code-box {
-      background: #0B0F19;
-      border: 1px solid #1E293B;
-      border-radius: 12px;
-      padding: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: #94A3B8;
-      line-height: 1.5;
-    }
-    .code-box span.hl { color: #F59E0B; }
-    .code-box span.gr { color: #10B981; }
-
-    @media (max-width: 900px) {
-      .preview-stage {
-        flex-direction: column;
-        align-items: center;
-      }
-      .audit-panel {
-        max-width: 395px;
-        width: 100%;
-      }
+    .gallery-card .slide-desc {
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
 
-  <!-- HEADER -->
-  <header class="page-header">
-    <div class="header-pill">
-      <span>✦</span> PLAY STORE SIMULATOR & SPLASH AUDITOR
-    </div>
-    <h1 class="page-title">
-      ABU MAFHAL SUB <span class="gradient-txt">Modern Splash Screen</span>
-    </h1>
-    <p class="page-desc">
-      Official Interactive Preview &bull; Verifying Ultra-Modern Fintech Onboarding, 5G Animated Hero, Glassmorphic UI & 100% Play Store Compliance before final release.
-    </p>
-  </header>
+  <!-- TOP HEADER -->
+  <div class="top-header">
+    <h1>ABU MAFHAL SUB — Clean Modern Onboarding</h1>
+    <p>Zero Clutter &bull; Seamless Clean Background &bull; Smooth Animation</p>
+  </div>
 
-  <!-- TOP TOOLBAR -->
-  <div class="toolbar-container">
-    <div class="control-group">
-      <span class="control-label">Device:</span>
-      <button class="tool-btn active" onclick="setDevice(395, 840, 54, this)">iPhone 16 Pro</button>
-      <button class="tool-btn" onclick="setDevice(380, 830, 42, this)">Galaxy S24 Ultra</button>
-      <button class="tool-btn" onclick="setDevice(370, 800, 38, this)">Pixel 9 Pro</button>
-    </div>
+  <!-- TOOLBAR -->
+  <div class="controls-bar">
+    <button class="ctrl-btn active" id="btnSingle" onclick="toggleView('single')">Single Device</button>
+    <button class="ctrl-btn" id="btnAll" onclick="toggleView('all')">View All 3 Slides</button>
+    
+    <div class="divider"></div>
 
-    <div style="width: 1px; height: 22px; background: rgba(255,255,255,0.1);"></div>
+    <button class="ctrl-btn" onclick="goTo(0)">1. Telecom</button>
+    <button class="ctrl-btn" onclick="goTo(1)">2. Accounts</button>
+    <button class="ctrl-btn" onclick="goTo(2)">3. Enjoy</button>
 
-    <div class="control-group">
-      <span class="control-label">Slide:</span>
-      <button class="tool-btn active" id="btnSlide0" onclick="goToSlide(0)">1. Telecom</button>
-      <button class="tool-btn" id="btnSlide1" onclick="goToSlide(1)">2. Services</button>
-      <button class="tool-btn" id="btnSlide2" onclick="goToSlide(2)">3. Onboard</button>
-    </div>
+    <div class="divider"></div>
 
-    <div style="width: 1px; height: 22px; background: rgba(255,255,255,0.1);"></div>
+    <button class="ctrl-btn" id="btnPlay" onclick="togglePlay()">⏸ Auto-Play</button>
+  </div>
 
-    <div class="control-group">
-      <button class="tool-btn play-btn" id="autoPlayBtn" onclick="toggleAutoPlay()">
-        <span id="playIcon">⏸</span> Auto-Play: On
-      </button>
+  <!-- 1. SINGLE DEVICE VIEW (MOCKUP) -->
+  <div class="phone-frame" id="singleFrame">
+    <div class="screen-container">
+      
+      <!-- TOP NAVIGATION -->
+      <div class="top-nav">
+        <button class="back-btn hidden" id="backBtn" onclick="prevSlide()" title="Go Back">‹</button>
+        <button class="skip-btn" onclick="goTo(2)" id="skipBtn">Skip</button>
+      </div>
+
+      <!-- SLIDES WRAPPER -->
+      <div class="slides-wrapper">
+        
+        <!-- SLIDE 0: REGISTER / TELECOM -->
+        <div class="slide-item active" id="slide0">
+          <div class="character-wrap">
+            <img src="./splash_hero_character.gif" alt="Lightbulb Character" class="character-img" />
+          </div>
+          <div class="text-content">
+            <h2 class="slide-title">Register Online</h2>
+            <p class="slide-desc">
+              Buy cheap 5G data bundles, airtime, and pay utility bills at wholesale rates with instant automated delivery.
+            </p>
+          </div>
+        </div>
+
+        <!-- SLIDE 1: GET STARTED / ROCKET -->
+        <div class="slide-item" id="slide1">
+          <div class="character-wrap">
+            <img src="./splash_hero_character2.gif" alt="Rocket Character" class="character-img" />
+          </div>
+          <div class="text-content">
+            <h2 class="slide-title">Get Started</h2>
+            <p class="slide-desc">
+              Dedicated Moniepoint &amp; Wema bank virtual accounts for zero-fee, instant automated wallet funding.
+            </p>
+          </div>
+        </div>
+
+        <!-- SLIDE 2: RELAX / MEGAPHONE -->
+        <div class="slide-item" id="slide2">
+          <div class="character-wrap">
+            <img src="./splash_hero_character3.gif" alt="Megaphone Character" class="character-img" />
+          </div>
+          <div class="text-content">
+            <h2 class="slide-title">Sit Back &amp; Relax</h2>
+            <p class="slide-desc">
+              Enjoy 99.9% automated telecom services, 24/7 customer support, and lucrative wholesale reseller profits.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOTTOM SECTION -->
+      <div class="bottom-section">
+        
+        <!-- DOTS -->
+        <div class="dots-container">
+          <div class="dot active" id="dot0" onclick="goTo(0)"></div>
+          <div class="dot" id="dot1" onclick="goTo(1)"></div>
+          <div class="dot" id="dot2" onclick="goTo(2)"></div>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="actions-row">
+          <button class="btn-next" id="nextBtn" onclick="nextSlide()">
+            <span>Next</span>
+            <span>›</span>
+          </button>
+          <button class="btn-signin" id="signInBtn" style="display:none;" onclick="alert('Redirecting to Sign In...')">
+            Already have an account? Sign In
+          </button>
+        </div>
+
+      </div>
+
     </div>
   </div>
 
-  <!-- STAGE WITH PHONE + AUDIT PANEL -->
-  <div class="preview-stage">
+  <!-- 2. ALL 3 SLIDES GALLERY VIEW (EXACTLY AS SHOWN IN USER IMAGE) -->
+  <div class="gallery-view" id="galleryView">
     
-    <!-- PHONE WRAPPER -->
-    <div class="phone-container">
-      <div class="phone-wrapper" id="phoneWrapper">
-        
-        <!-- DYNAMIC ISLAND -->
-        <div class="hardware-island" id="hardwareIsland">
-          <div class="island-lens"></div>
-        </div>
-
-        <!-- SCREEN INNER -->
-        <div class="screen theme-telecom" id="screenEl">
-          
-          <!-- AMBIENT ORBS -->
-          <div class="screen-orb orb-top" id="orbTop" style="background: #FEF3C7;"></div>
-          <div class="screen-orb orb-bottom" id="orbBottom" style="background: #DBEAFE;"></div>
-
-          <!-- STATUS BAR -->
-          <div class="status-bar">
-            <span>09:41</span>
-            <div class="status-icons">
-              <span>5G</span>
-              <span>●●●</span>
-              <span>100%</span>
-            </div>
-          </div>
-
-          <!-- HEADER BAR -->
-          <div class="header-bar">
-            <div class="status-badge">
-              <div class="live-dot"></div>
-              <span>Automated 24/7</span>
-            </div>
-
-            <div class="brand-mark">
-              <img src="./logo.png" alt="Logo" onerror="this.onerror=null; this.src='./assets/images/logo.png';" />
-            </div>
-
-            <a href="https://wa.me/2348144445438" target="_blank" class="support-btn">
-              <span>💬</span> 24/7 Support
-            </a>
-          </div>
-
-          <!-- STORY PROGRESS BARS -->
-          <div class="story-bars">
-            <div class="story-track" onclick="goToSlide(0)">
-              <div class="story-fill" id="bar0"></div>
-            </div>
-            <div class="story-track" onclick="goToSlide(1)">
-              <div class="story-fill" id="bar1"></div>
-            </div>
-            <div class="story-track" onclick="goToSlide(2)">
-              <div class="story-fill" id="bar2"></div>
-            </div>
-          </div>
-
-          <!-- MASCOT HERO SECTION -->
-          <div class="mascot-hero">
-            <div class="stage-card"></div>
-            <div class="orbit-ring ring-1" id="ring1"></div>
-            <div class="orbit-ring ring-2" id="ring2"></div>
-            <div class="glow-aura" id="glowAura"></div>
-            <div class="ground-shadow"></div>
-
-            <div class="hero-pill" id="heroPill">✦ OFFICIAL 5G PLATFORM</div>
-            <div class="side-tag left" id="sideTagLeft">⚡ 5G Automated</div>
-            <div class="side-tag right" id="sideTagRight">₦240 / GB SME</div>
-
-            <div class="mascot-img-wrap">
-              <img id="mascotImg" src="./splash_hero_character.gif" alt="Mascot" class="mascot-img" />
-            </div>
-          </div>
-
-          <!-- SCROLLABLE SLIDE CONTENT -->
-          <div class="content-area">
-            
-            <!-- SLIDE 0: TELECOM -->
-            <div class="slide-box active" id="slide0">
-              <div class="badge-pill">
-                <span>✦</span> NIGERIA'S #1 AUTOMATED VTU
-              </div>
-              <div class="main-title">Fast, Reliable &amp;<br/>Automated Telecom</div>
-              <div class="main-sub">
-                Buy cheap data bundles, airtime, and pay utility bills at wholesale prices with instant automated delivery.
-              </div>
-
-              <div class="pillars-list">
-                <div class="pillar-card" style="border-left-color: #F59E0B;">
-                  <div class="pillar-icon" style="background: #EFF6FF; color: #2563EB;">📶</div>
-                  <div class="pillar-info">
-                    <div class="pillar-title">Instant 5G Data</div>
-                    <div class="pillar-desc">MTN, Airtel, Glo &amp; 9mobile in seconds</div>
-                  </div>
-                  <div class="check-mark">✓</div>
-                </div>
-
-                <div class="pillar-card" style="border-left-color: #DB2777;">
-                  <div class="pillar-icon" style="background: #FDF2F8; color: #DB2777;">🏦</div>
-                  <div class="pillar-info">
-                    <div class="pillar-title">Dedicated Bank Accounts</div>
-                    <div class="pillar-desc">Personal Moniepoint &amp; Wema instant wallet</div>
-                  </div>
-                  <div class="check-mark">✓</div>
-                </div>
-
-                <div class="pillar-card" style="border-left-color: #059669;">
-                  <div class="pillar-icon" style="background: #ECFDF5; color: #059669;">⚡</div>
-                  <div class="pillar-info">
-                    <div class="pillar-title">Bills &amp; Electricity</div>
-                    <div class="pillar-desc">Prepaid tokens &amp; TV renewals instantly</div>
-                  </div>
-                  <div class="check-mark">✓</div>
-                </div>
-              </div>
-
-              <div class="stats-ribbon">
-                <div class="stat-item">
-                  <div class="stat-val">₦2.5B+</div>
-                  <div class="stat-lbl">Processed</div>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-item">
-                  <div class="stat-val">50,000+</div>
-                  <div class="stat-lbl">Active Users</div>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-item">
-                  <div class="stat-val">99.98%</div>
-                  <div class="stat-lbl">Uptime</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- SLIDE 1: SERVICES -->
-            <div class="slide-box" id="slide1">
-              <div class="badge-pill" style="background: #EFF6FF; border-color: #BFDBFE; color: #1D4ED8;">
-                <span>✦</span> ALL-IN-ONE SERVICES
-              </div>
-              <div class="main-title">Everything You Need<br/>In One App</div>
-              <div class="main-sub">
-                Wholesale telecom rates for personal savings and profitable reselling.
-              </div>
-
-              <div class="services-grid">
-                <div class="service-card">
-                  <div class="service-icon" style="background: #FEF3C7; color: #D97706;">📱</div>
-                  <div class="service-title">Cheap Data</div>
-                  <div class="service-desc">SME &amp; Corporate packages from ₦240/GB</div>
-                </div>
-                <div class="service-card">
-                  <div class="service-icon" style="background: #EFF6FF; color: #2563EB;">📞</div>
-                  <div class="service-title">Airtime Top-Up</div>
-                  <div class="service-desc">Instant refill with up to 3% cashback</div>
-                </div>
-                <div class="service-card">
-                  <div class="service-icon" style="background: #ECFDF5; color: #059669;">💡</div>
-                  <div class="service-title">Electricity &amp; TV</div>
-                  <div class="service-desc">AEDC, EKEDC, DStv &amp; GOtv zero delays</div>
-                </div>
-                <div class="service-card">
-                  <div class="service-icon" style="background: #F3E8FF; color: #9333EA;">💳</div>
-                  <div class="service-title">Virtual Accounts</div>
-                  <div class="service-desc">Dedicated 0-fee automatic wallet top-up</div>
-                </div>
-              </div>
-
-              <div class="partners-box">
-                <div class="partners-lbl">SUPPORTED NETWORKS &amp; BANKS</div>
-                <div class="partners-badges">
-                  <span class="partner-pill" style="color: #B45309; border-color: #F59E0B;">MTN 5G</span>
-                  <span class="partner-pill" style="color: #DC2626; border-color: #EF4444;">AIRTEL</span>
-                  <span class="partner-pill" style="color: #047857; border-color: #10B981;">GLO</span>
-                  <span class="partner-pill" style="color: #4D7C0F; border-color: #84CC16;">9MOBILE</span>
-                  <span class="partner-pill" style="color: #0369A1; border-color: #0284C7;">MONIEPOINT</span>
-                  <span class="partner-pill" style="color: #BE123C; border-color: #F43F5E;">WEMA</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- SLIDE 2: ONBOARDING -->
-            <div class="slide-box" id="slide2">
-              <div class="badge-pill" style="background: #ECFDF5; border-color: #A7F3D0; color: #047857;">
-                <span>✦</span> START IN 30 SECONDS
-              </div>
-              <div class="main-title">Ready to Experience<br/>Seamless Telecom?</div>
-              <div class="main-sub">
-                Join over 50,000 happy users and start saving or reselling today.
-              </div>
-
-              <div class="steps-list">
-                <div class="step-card">
-                  <div class="step-num" style="background: #FEF3C7; border-color: #FDE68A; color: #B45309;">01</div>
-                  <div class="step-info">
-                    <div class="step-title">Create Free Account</div>
-                    <div class="step-desc">Sign up with your phone number and email.</div>
-                  </div>
-                  <div class="check-mark">✓</div>
-                </div>
-                <div class="step-card">
-                  <div class="step-num" style="background: #EFF6FF; border-color: #BFDBFE; color: #2563EB;">02</div>
-                  <div class="step-info">
-                    <div class="step-title">Fund Your Wallet</div>
-                    <div class="step-desc">Instant zero-fee transfer to your bank account.</div>
-                  </div>
-                  <div class="check-mark">✓</div>
-                </div>
-                <div class="step-card">
-                  <div class="step-num" style="background: #ECFDF5; border-color: #A7F3D0; color: #059669;">03</div>
-                  <div class="step-info">
-                    <div class="step-title">Transact &amp; Profit</div>
-                    <div class="step-desc">Buy at wholesale rates or resell for profit.</div>
-                  </div>
-                  <div class="check-mark">✓</div>
-                </div>
-              </div>
-
-              <div class="cta-container">
-                <button class="primary-cta" onclick="alert('Demo: Redirects to Sign Up Screen')">
-                  <div class="primary-cta-content">
-                    <div class="cta-icon-box">✨</div>
-                    <div class="cta-text-box">
-                      <div class="cta-main-txt">Create Free Account</div>
-                      <div class="cta-sub-txt">Zero fees &bull; Instant 30s access</div>
-                    </div>
-                  </div>
-                  <span style="font-size: 16px;">→</span>
-                </button>
-
-                <button class="secondary-cta" onclick="alert('Demo: Redirects to Sign In Screen')">
-                  <span>🔐</span> Sign In to Account
-                </button>
-              </div>
-
-              <div class="security-note">
-                <span>🛡️</span> Bank-Grade 256-Bit SSL &bull; NDPA Certified &bull; 100% Automated
-              </div>
-            </div>
-
-          </div>
-
-          <!-- BOTTOM NAV BAR -->
-          <div class="bottom-bar">
-            <div class="nav-shimmer"></div>
-            <div class="dots-row">
-              <div class="dot active" id="dot0" onclick="goToSlide(0)"></div>
-              <div class="dot inactive" id="dot1" onclick="goToSlide(1)"></div>
-              <div class="dot inactive" id="dot2" onclick="goToSlide(2)"></div>
-            </div>
-
-            <div class="nav-actions">
-              <button class="skip-btn" id="skipBtn" onclick="goToSlide(2)">Skip</button>
-              <button class="next-btn" id="nextBtn" onclick="nextSlide()">
-                <span>Next</span>
-                <span>→</span>
-              </button>
-            </div>
-          </div>
-
-        </div>
+    <!-- CARD 1 -->
+    <div class="gallery-card">
+      <div class="top-nav">
+        <button class="back-btn" style="visibility:hidden;">‹</button>
+        <span class="skip-btn">Skip</span>
+      </div>
+      <div class="character-wrap">
+        <img src="./splash_hero_character.gif" alt="Lightbulb Character" class="character-img" />
+      </div>
+      <div class="text-content" style="margin: 0 auto;">
+        <h2 class="slide-title">Register Online</h2>
+        <p class="slide-desc">Buy cheap 5G data bundles, airtime, and pay utility bills at wholesale rates with instant automated delivery.</p>
+      </div>
+      <div class="dots-container" style="margin-top: 14px;">
+        <div class="dot active"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
       </div>
     </div>
 
-    <!-- AUDIT & PLAY STORE VERIFICATION PANEL -->
-    <div class="audit-panel">
-      
-      <div class="audit-card">
-        <div class="audit-card-title">
-          <span>🚀 Play Store Production Status</span>
-          <span class="audit-badge">100% READY</span>
-        </div>
-        <div class="checklist-items">
-          <div class="check-item">
-            <span class="check-icon">✓</span>
-            <div><strong>Adaptive App Icons:</strong> High-res vector icons with transparent/circular background configured for Android 14/15.</div>
-          </div>
-          <div class="check-item">
-            <span class="check-icon">✓</span>
-            <div><strong>Zero-Crash Session Guard:</strong> Safe-area insets, offline retry guards, and silent error handling prevent cold-start crashes.</div>
-          </div>
-          <div class="check-item">
-            <span class="check-icon">✓</span>
-            <div><strong>Automated Story Progress:</strong> Smooth auto-advancing progress indicator with pause-on-press and swipe gestures.</div>
-          </div>
-          <div class="check-item">
-            <span class="check-icon">✓</span>
-            <div><strong>NDPA &amp; SSL Compliance:</strong> Certified data handling badges and direct WhatsApp 24/7 support channel visible to reviewers.</div>
-          </div>
-        </div>
+    <!-- CARD 2 -->
+    <div class="gallery-card">
+      <div class="top-nav">
+        <button class="back-btn">‹</button>
+        <span class="skip-btn">Skip</span>
       </div>
-
-      <div class="audit-card">
-        <div class="audit-card-title">
-          <span>📱 App Architecture Summary</span>
-        </div>
-        <div class="code-box">
-          Package: <span class="hl">com.muhammmadsaniishaq.abumafhalsub</span><br/>
-          Version: <span class="gr">1.0.9</span> (Build Code: <span class="hl">23</span>)<br/>
-          SDK: <span class="gr">Expo 54 (Hermes + New Architecture)</span><br/>
-          Routes: <span class="hl">app/index.tsx (Root Splash)</span><br/>
-          Status: <span class="gr">Production Ready</span>
-        </div>
+      <div class="character-wrap">
+        <img src="./splash_hero_character2.gif" alt="Rocket Character" class="character-img" />
       </div>
-
-      <div class="audit-card" style="background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
-        <div class="audit-card-title" style="color: #FBBF24;">
-          <span>💡 Quick Action for User</span>
-        </div>
-        <p style="font-size: 12.5px; color: #CBD5E1; line-height: 1.5;">
-          You can double click this file or open it anytime in your browser to inspect each slide, test responsiveness, and ensure total satisfaction before running EAS build to Play Store!
-        </p>
+      <div class="text-content" style="margin: 0 auto;">
+        <h2 class="slide-title">Get Started</h2>
+        <p class="slide-desc">Dedicated Moniepoint &amp; Wema bank virtual accounts for zero-fee, instant automated wallet funding.</p>
       </div>
+      <div class="dots-container" style="margin-top: 14px;">
+        <div class="dot"></div>
+        <div class="dot active"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
 
+    <!-- CARD 3 -->
+    <div class="gallery-card">
+      <div class="top-nav">
+        <button class="back-btn">‹</button>
+        <span class="skip-btn">Skip</span>
+      </div>
+      <div class="character-wrap">
+        <img src="./splash_hero_character3.gif" alt="Megaphone Character" class="character-img" />
+      </div>
+      <div class="text-content" style="margin: 0 auto;">
+        <h2 class="slide-title">Sit Back &amp; Relax</h2>
+        <p class="slide-desc">Enjoy 99.9% automated telecom services, 24/7 customer support, and lucrative wholesale reseller profits.</p>
+      </div>
+      <div class="dots-container" style="margin-top: 14px;">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot active"></div>
+      </div>
     </div>
 
   </div>
 
   <script>
-    const SLIDES = [
-      {
-        theme: 'theme-telecom',
-        img: './splash_hero_character.gif',
-        orbTop: '#FEF3C7',
-        orbBottom: '#DBEAFE',
-        pill: '✦ OFFICIAL 5G PLATFORM',
-        pillBg: 'rgba(254, 243, 199, 0.96)',
-        pillColor: '#B45309',
-        pillBorder: '#FDE68A',
-        tagLeft: '⚡ 5G Automated',
-        tagRight: '₦240 / GB SME',
-        glow: 'rgba(245, 158, 11, 0.45)',
-        ringColor: 'rgba(217, 119, 6, 0.35)',
-        btnGrad: 'linear-gradient(90deg, #F59E0B, #D97706, #B45309)',
-        accent: '#D97706'
-      },
-      {
-        theme: 'theme-banking',
-        img: './splash_hero_character2.gif',
-        orbTop: '#DBEAFE',
-        orbBottom: '#EDE9FE',
-        pill: '✦ DEDICATED AUTO WALLETS',
-        pillBg: 'rgba(239, 246, 255, 0.96)',
-        pillColor: '#1D4ED8',
-        pillBorder: '#BFDBFE',
-        tagLeft: '🏦 Moniepoint / Wema',
-        tagRight: '0-Fee Auto-Credit',
-        glow: 'rgba(37, 99, 235, 0.45)',
-        ringColor: 'rgba(37, 99, 235, 0.35)',
-        btnGrad: 'linear-gradient(90deg, #3B82F6, #2563EB, #1D4ED8)',
-        accent: '#2563EB'
-      },
-      {
-        theme: 'theme-start',
-        img: './splash_hero_character3.gif',
-        orbTop: '#DCFCE7',
-        orbBottom: '#FEF9C3',
-        pill: '✦ 30-SECOND ONBOARDING',
-        pillBg: 'rgba(236, 253, 245, 0.96)',
-        pillColor: '#047857',
-        pillBorder: '#A7F3D0',
-        tagLeft: '🚀 Instant 30s Setup',
-        tagRight: '🔒 256-Bit SSL',
-        glow: 'rgba(16, 185, 129, 0.45)',
-        ringColor: 'rgba(16, 185, 129, 0.35)',
-        btnGrad: 'linear-gradient(90deg, #10B981, #059669, #047857)',
-        accent: '#059669'
-      }
-    ];
-
     let currentIdx = 0;
-    let timer = 0;
-    let autoInterval = null;
-    let isAutoPlaying = true;
+    let autoTimer = null;
+    let isPlaying = true;
 
-    function renderSlide(idx) {
+    function goTo(idx) {
       currentIdx = idx;
-      const s = SLIDES[idx];
-
-      const screen = document.getElementById('screenEl');
-      screen.className = 'screen ' + s.theme;
-
-      // Orbs
-      document.getElementById('orbTop').style.background = s.orbTop;
-      document.getElementById('orbBottom').style.background = s.orbBottom;
-
-      // Image swap with cache busting
-      const img = document.getElementById('mascotImg');
-      img.src = s.img + '?t=' + Date.now();
-
-      // Pill update
-      const pill = document.getElementById('heroPill');
-      pill.textContent = s.pill;
-      pill.style.background = s.pillBg;
-      pill.style.color = s.pillColor;
-      pill.style.borderColor = s.pillBorder;
-
-      // Side tags update
-      const tagL = document.getElementById('sideTagLeft');
-      const tagR = document.getElementById('sideTagRight');
-      tagL.textContent = s.tagLeft;
-      tagR.textContent = s.tagRight;
-      tagL.style.borderColor = s.accent + '35';
-      tagR.style.borderColor = s.accent + '35';
-
-      // Glow aura & Rings
-      document.getElementById('glowAura').style.background = `radial-gradient(circle, ${s.glow} 0%, rgba(255,255,255,0) 70%)`;
-      document.getElementById('ring1').style.borderColor = s.ringColor;
-      document.getElementById('ring2').style.borderColor = s.ringColor;
-
-      // Next button gradient
-      document.getElementById('nextBtn').style.background = s.btnGrad;
-
-      // Slide visibility
+      
+      // Update slides
       for (let i = 0; i < 3; i++) {
-        const box = document.getElementById('slide' + i);
-        box.classList.toggle('active', i === idx);
-
+        const slide = document.getElementById('slide' + i);
         const dot = document.getElementById('dot' + i);
-        dot.className = 'dot ' + (i === idx ? 'active' : 'inactive');
-        if (i === idx) dot.style.background = s.accent;
-        else dot.style.background = '#CBD5E1';
-
-        const btn = document.getElementById('btnSlide' + i);
-        if (btn) btn.classList.toggle('active', i === idx);
+        
+        if (i === idx) {
+          slide.className = 'slide-item active';
+          dot.className = 'dot active';
+        } else if (i < idx) {
+          slide.className = 'slide-item prev';
+          dot.className = 'dot';
+        } else {
+          slide.className = 'slide-item';
+          dot.className = 'dot';
+        }
       }
 
-      // Action buttons text
-      const skipBtn = document.getElementById('skipBtn');
-      const nextBtn = document.getElementById('nextBtn');
-      if (idx === 2) {
-        skipBtn.textContent = 'Back';
-        skipBtn.onclick = () => goToSlide(0);
-        nextBtn.innerHTML = '<span>Get Started</span><span>✓</span>';
+      // Back button visibility
+      const backBtn = document.getElementById('backBtn');
+      if (idx === 0) {
+        backBtn.className = 'back-btn hidden';
       } else {
-        skipBtn.textContent = 'Skip';
-        skipBtn.onclick = () => goToSlide(2);
-        nextBtn.innerHTML = '<span>Next</span><span>→</span>';
+        backBtn.className = 'back-btn';
       }
-    }
 
-    function goToSlide(idx) {
-      timer = 0;
-      renderSlide(idx);
+      // Next / Finish button
+      const nextBtn = document.getElementById('nextBtn');
+      const signInBtn = document.getElementById('signInBtn');
+      const skipBtn = document.getElementById('skipBtn');
+
+      if (idx === 2) {
+        nextBtn.innerHTML = '<span>Get Started Free</span><span>✓</span>';
+        signInBtn.style.display = 'block';
+        skipBtn.style.visibility = 'hidden';
+      } else {
+        nextBtn.innerHTML = '<span>Next</span><span>›</span>';
+        signInBtn.style.display = 'none';
+        skipBtn.style.visibility = 'visible';
+      }
     }
 
     function nextSlide() {
       if (currentIdx < 2) {
-        goToSlide(currentIdx + 1);
+        goTo(currentIdx + 1);
       } else {
-        goToSlide(0);
+        goTo(0);
       }
     }
 
-    function toggleAutoPlay() {
-      isAutoPlaying = !isAutoPlaying;
-      const btn = document.getElementById('autoPlayBtn');
-      const icon = document.getElementById('playIcon');
-      if (isAutoPlaying) {
-        btn.className = 'tool-btn play-btn';
-        btn.innerHTML = '<span>⏸</span> Auto-Play: On';
-        startTimer();
-      } else {
-        btn.className = 'tool-btn play-btn paused';
-        btn.innerHTML = '<span>▶</span> Auto-Play: Paused';
-        clearInterval(autoInterval);
+    function prevSlide() {
+      if (currentIdx > 0) {
+        goTo(currentIdx - 1);
       }
     }
 
-    function startTimer() {
-      if (autoInterval) clearInterval(autoInterval);
-      if (!isAutoPlaying) return;
-      autoInterval = setInterval(() => {
-        timer += 2;
-        if (timer > 100) {
-          timer = 0;
-          if (currentIdx < 2) {
-            goToSlide(currentIdx + 1);
-          } else {
-            timer = 100;
-          }
-        }
-        updateStoryBars();
-      }, 100);
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('btnPlay');
+      if (isPlaying) {
+        btn.innerText = '⏸ Auto-Play';
+        startAutoPlay();
+      } else {
+        btn.innerText = '▶ Paused';
+        clearInterval(autoTimer);
+      }
     }
 
-    function updateStoryBars() {
-      const s = SLIDES[currentIdx];
-      for (let i = 0; i < 3; i++) {
-        const bar = document.getElementById('bar' + i);
-        if (i < currentIdx) {
-          bar.style.width = '100%';
-          bar.style.backgroundColor = s.accent;
-        } else if (i === currentIdx) {
-          bar.style.width = timer + '%';
-          bar.style.backgroundColor = s.accent;
+    function startAutoPlay() {
+      if (autoTimer) clearInterval(autoTimer);
+      if (!isPlaying) return;
+      autoTimer = setInterval(() => {
+        if (currentIdx < 2) {
+          goTo(currentIdx + 1);
         } else {
-          bar.style.width = '0%';
+          goTo(0);
         }
-      }
+      }, 4500);
     }
 
-    function setDevice(w, h, radius, btn) {
-      document.querySelectorAll('.control-group button').forEach(b => {
-        if (b.innerText.includes('iPhone') || b.innerText.includes('Galaxy') || b.innerText.includes('Pixel')) {
-          b.classList.remove('active');
-        }
-      });
-      btn.classList.add('active');
-      const phone = document.getElementById('phoneWrapper');
-      phone.style.width = w + 'px';
-      phone.style.height = h + 'px';
-      phone.style.borderRadius = radius + 'px';
+    function toggleView(mode) {
+      const single = document.getElementById('singleFrame');
+      const gallery = document.getElementById('galleryView');
+      const btnSingle = document.getElementById('btnSingle');
+      const btnAll = document.getElementById('btnAll');
+
+      if (mode === 'all') {
+        single.style.display = 'none';
+        gallery.style.display = 'flex';
+        btnAll.classList.add('active');
+        btnSingle.classList.remove('active');
+      } else {
+        single.style.display = 'flex';
+        gallery.style.display = 'none';
+        btnSingle.classList.add('active');
+        btnAll.classList.remove('active');
+      }
     }
 
     // Initialize
-    renderSlide(0);
-    startTimer();
+    goTo(0);
+    startAutoPlay();
   </script>
 </body>
 </html>
