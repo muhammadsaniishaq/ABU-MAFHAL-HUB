@@ -3,104 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ABU MAFHAL SUB — Luxury Modern Splash & Onboarding Experience</title>
+  <title>ABU MAFHAL SUB — Clean Structured Onboarding & Splash Screen</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
-    :root {
-      --primary-gold: #D97706;
-      --primary-blue: #2563EB;
-      --primary-emerald: #059669;
-      --slate-900: #0F172A;
-      --slate-800: #1E293B;
-      --slate-600: #475569;
-      --slate-400: #94A3B8;
-      --slate-100: #F1F5F9;
-      --bg-canvas: #F8FAFC;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
     
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #F1F5F9 50%, #E2E8F0 100%);
+      background: #F1F5F9;
       color: #0F172A;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 24px 16px 60px;
-      overflow-x: hidden;
     }
 
-    /* TOP INTRO BANNER */
-    .top-banner {
+    /* TOP HEADER */
+    .page-header {
       text-align: center;
       margin-bottom: 20px;
-      max-width: 650px;
     }
-    .brand-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(217, 119, 6, 0.1);
-      border: 1px solid rgba(217, 119, 6, 0.25);
-      color: #B45309;
-      padding: 5px 14px;
-      border-radius: 30px;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.6px;
-      margin-bottom: 8px;
-    }
-    .top-banner h1 {
+    .page-header h1 {
       font-size: 24px;
-      font-weight: 900;
+      font-weight: 800;
       color: #0F172A;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.4px;
     }
-    .top-banner p {
+    .page-header p {
       font-size: 13px;
       color: #64748B;
       margin-top: 4px;
     }
 
     /* CONTROLS TOOLBAR */
-    .toolbar-wrap {
+    .controls-toolbar {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       background: #FFFFFF;
       padding: 6px 12px;
-      border-radius: 16px;
-      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
-      border: 1px solid #E2E8F0;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
       margin-bottom: 24px;
-      flex-wrap: wrap;
-      justify-content: center;
+      border: 1px solid #E2E8F0;
     }
-    .tab-btn {
+    .ctrl-btn {
       padding: 7px 14px;
-      border-radius: 10px;
+      border-radius: 9px;
       font-size: 12px;
       font-weight: 700;
       color: #64748B;
       background: transparent;
       border: none;
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.2s;
     }
-    .tab-btn:hover {
+    .ctrl-btn:hover {
       background: #F8FAFC;
       color: #0F172A;
     }
-    .tab-btn.active {
+    .ctrl-btn.active {
       background: #0F172A;
       color: #FFFFFF;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
     }
-    .toolbar-divider {
+    .divider-line {
       width: 1px;
       height: 20px;
       background: #E2E8F0;
@@ -112,11 +81,11 @@
       width: 395px;
       height: 840px;
       background: #FFFFFF;
-      border-radius: 54px;
+      border-radius: 52px;
       box-shadow: 
-        0 25px 60px -15px rgba(15, 23, 42, 0.22),
+        0 25px 60px -15px rgba(15, 23, 42, 0.18),
         0 0 0 12px #FFFFFF,
-        0 0 0 15px #CBD5E1;
+        0 0 0 14px #CBD5E1;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -124,363 +93,238 @@
       transition: width 0.3s, height 0.3s;
     }
 
-    /* SCREEN INNER (SEAMLESS LUXURY DESIGN - NO DIS-DIS) */
+    /* SCREEN INNER (SOLID 100% UNIFIED WHITE - ZERO BLUR, ZERO MISMATCH) */
     .screen-canvas {
       position: relative;
       flex: 1;
       width: 100%;
       height: 100%;
-      background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 55%, #F1F5F9 100%);
+      background: #FFFFFF;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       padding: 44px 22px 28px;
-      overflow: hidden;
+      overflow-y: auto;
+      scrollbar-width: none;
     }
+    .screen-canvas::-webkit-scrollbar { display: none; }
 
-    /* SOPHISTICATED VECTOR RADAR / AURA LINES (NO DIS-DIS NOISE) */
-    .bg-radar-arcs {
-      position: absolute;
-      top: 14%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 340px;
-      height: 340px;
-      pointer-events: none;
-      z-index: 1;
-    }
-    .radar-circle {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      border: 1px dashed rgba(203, 213, 225, 0.45);
-    }
-    .rc-1 { width: 180px; height: 180px; }
-    .rc-2 { width: 250px; height: 250px; border-style: solid; border-color: rgba(226, 232, 240, 0.4); }
-    .rc-3 { width: 330px; height: 330px; }
-
-    /* SOFT AMBIENT GLOW BACKDROP BEHIND MASCOT */
-    .mascot-backdrop-glow {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 210px;
-      height: 210px;
-      border-radius: 50%;
-      filter: blur(35px);
-      transition: background 0.6s ease;
-      z-index: 1;
-    }
-    .glow-telecom { background: radial-gradient(circle, rgba(254, 243, 199, 0.85) 0%, rgba(254, 243, 199, 0) 75%); }
-    .glow-banking { background: radial-gradient(circle, rgba(219, 234, 254, 0.85) 0%, rgba(219, 234, 254, 0) 75%); }
-    .glow-start { background: radial-gradient(circle, rgba(209, 250, 229, 0.85) 0%, rgba(209, 250, 229, 0) 75%); }
-
-    /* TOP HEADER & STORY BAR */
-    .top-header-area {
-      position: relative;
-      z-index: 20;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .story-progress-row {
-      display: flex;
-      gap: 6px;
-      width: 100%;
-    }
-    .story-track {
-      flex: 1;
-      height: 3.5px;
-      background: #E2E8F0;
-      border-radius: 3px;
-      overflow: hidden;
-      cursor: pointer;
-    }
-    .story-fill {
-      height: 100%;
-      width: 0%;
-      border-radius: 3px;
-      background: #0F172A;
-      transition: width 0.1s linear, background-color 0.3s ease;
-    }
-
-    .top-nav-bar {
+    /* TOP NAVIGATION */
+    .top-nav {
       display: flex;
       justify-content: space-between;
       align-items: center;
       width: 100%;
+      height: 36px;
+      z-index: 20;
     }
-    .nav-btn-back {
+    .nav-back-btn {
       width: 36px;
       height: 36px;
-      border-radius: 12px;
-      background: #FFFFFF;
+      border-radius: 18px;
+      background: #F8FAFC;
       border: 1px solid #E2E8F0;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 16px;
-      color: #0F172A;
+      color: #334155;
       cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
       transition: all 0.2s;
     }
-    .nav-btn-back:hover {
-      background: #F8FAFC;
-      border-color: #CBD5E1;
+    .nav-back-btn:hover {
+      background: #F1F5F9;
+      color: #0F172A;
     }
-    .nav-btn-back.hidden {
+    .nav-back-btn.hidden {
       visibility: hidden;
       pointer-events: none;
     }
-    .brand-identity {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: #FFFFFF;
-      padding: 5px 12px;
-      border-radius: 20px;
-      border: 1px solid #E2E8F0;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .brand-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #10B981;
-      box-shadow: 0 0 6px #10B981;
-    }
-    .brand-name {
-      font-size: 11px;
-      font-weight: 800;
-      color: #0F172A;
-      letter-spacing: 0.3px;
-    }
-    .skip-link {
-      font-size: 13px;
+    .skip-btn {
+      font-size: 13.5px;
       font-weight: 700;
       color: #64748B;
       cursor: pointer;
-      padding: 6px 10px;
+      padding: 6px 12px;
       border-radius: 8px;
       transition: all 0.2s;
       background: transparent;
       border: none;
     }
-    .skip-link:hover {
+    .skip-btn:hover {
       color: #0F172A;
-      background: #FFFFFF;
+      background: #F8FAFC;
     }
 
-    /* CENTER STAGE & MASCOT SECTION */
-    .center-stage {
+    /* MASCOT & CRISP SHADING SECTION (ZERO BLUR FILTER) */
+    .mascot-section {
       position: relative;
-      flex: 1;
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 10;
+      margin: 10px 0 16px;
     }
-
-    /* FLOATING CHIPS DECORATIONS (MODERN, SLEEK, REVOLUT STYLE) */
-    .floating-chip {
+    
+    /* CRISP VECTOR BACKDROP LINES (NO BLUR, CLEAN HATCH/RADAR LINES AS IN REFERENCE) */
+    .crisp-backdrop-shape {
       position: absolute;
-      z-index: 15;
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      padding: 5px 11px;
-      border-radius: 12px;
-      border: 1px solid #E2E8F0;
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 10px;
-      font-weight: 800;
-      color: #0F172A;
-      animation: chipFloat 3.8s ease-in-out infinite alternate;
-      transition: all 0.3s ease;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: #F8FAFC;
+      border: 1.5px dashed #E2E8F0;
+      z-index: 1;
     }
-    .chip-left {
-      left: 6px;
-      top: 18%;
-      animation-delay: 0.2s;
-    }
-    .chip-right {
-      right: 6px;
-      bottom: 22%;
-      animation-delay: 1.2s;
-    }
-    @keyframes chipFloat {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-7px); }
-    }
-
-    /* CHARACTER IMAGE CONTAINER */
-    .mascot-container {
+    
+    .mascot-img-wrap {
       position: relative;
-      width: 250px;
-      height: 250px;
+      width: 230px;
+      height: 230px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 18px;
+      background: transparent;
+      z-index: 2;
     }
-    .mascot-hero-img {
-      position: relative;
-      z-index: 5;
+    .mascot-img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      animation: mascotLevitate 3.4s ease-in-out infinite alternate;
+      animation: gentleMascotFloat 3.8s ease-in-out infinite alternate;
     }
-    @keyframes mascotLevitate {
+    @keyframes gentleMascotFloat {
       0% { transform: translateY(0); }
-      100% { transform: translateY(-9px); }
+      100% { transform: translateY(-8px); }
     }
 
-    /* GROUND SHADOW */
-    .mascot-ground-shadow {
+    /* CRISP SOLID GROUND OVAL (NO BLUR!) */
+    .crisp-ground-oval {
       position: absolute;
-      bottom: 4px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 140px;
-      height: 14px;
+      bottom: -4px;
+      width: 120px;
+      height: 10px;
       border-radius: 50%;
-      background: rgba(15, 23, 42, 0.08);
-      filter: blur(4px);
-      z-index: 2;
-      animation: shadowScale 3.4s ease-in-out infinite alternate;
-    }
-    @keyframes shadowScale {
-      0% { transform: translateX(-50%) scale(1); opacity: 0.08; }
-      100% { transform: translateX(-50%) scale(1.18); opacity: 0.04; }
+      background: #E2E8F0;
+      z-index: 1;
     }
 
-    /* CONTENT DETAILS (SLIDES TEXT & FEATURES) */
-    .slide-content-wrap {
+    /* TEXT HEADINGS */
+    .text-section {
       width: 100%;
       text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      margin-bottom: 16px;
     }
-    .category-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.6px;
-      margin-bottom: 8px;
-      transition: all 0.3s;
-    }
-    .badge-telecom {
-      background: #FEF3C7;
-      color: #B45309;
-      border: 1px solid #FDE68A;
-    }
-    .badge-banking {
-      background: #EFF6FF;
-      color: #1D4ED8;
-      border: 1px solid #BFDBFE;
-    }
-    .badge-start {
-      background: #ECFDF5;
-      color: #047857;
-      border: 1px solid #A7F3D0;
-    }
-
-    .slide-headline {
+    .slide-title {
       font-size: 22px;
-      font-weight: 900;
+      font-weight: 800;
       color: #0F172A;
-      letter-spacing: -0.5px;
-      margin-bottom: 8px;
-      line-height: 1.25;
+      letter-spacing: -0.4px;
+      margin-bottom: 6px;
     }
-    .slide-subheadline {
+    .slide-subtitle {
       font-size: 13px;
       font-weight: 500;
       color: #64748B;
       line-height: 1.5;
       max-width: 320px;
-      margin-bottom: 14px;
+      margin: 0 auto;
     }
 
-    /* FEATURE TAGS RIBBON (REAL FEATURES, CLEAN DESIGN) */
-    .features-pill-row {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 6px;
+    /* NEAT, STRUCTURED FEATURES LIST ("FEATURES KE TSARI") */
+    .features-list {
       width: 100%;
-      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 18px;
     }
-    .feat-tag {
-      display: inline-flex;
+    .feature-card {
+      display: flex;
       align-items: center;
-      gap: 4px;
       background: #FFFFFF;
       border: 1px solid #E2E8F0;
-      padding: 4px 9px;
-      border-radius: 10px;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #334155;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      border-radius: 13px;
+      padding: 9px 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      transition: all 0.2s;
     }
-    .feat-tag strong { color: #0F172A; }
+    .feature-card:hover {
+      border-color: #CBD5E1;
+      background: #F8FAFC;
+    }
+    .feature-icon-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      margin-right: 11px;
+      flex-shrink: 0;
+    }
+    .feature-text-box {
+      flex: 1;
+      text-align: left;
+    }
+    .feature-main-txt {
+      font-size: 12px;
+      font-weight: 800;
+      color: #0F172A;
+      margin-bottom: 1px;
+    }
+    .feature-sub-txt {
+      font-size: 10.5px;
+      font-weight: 500;
+      color: #64748B;
+      line-height: 1.35;
+    }
 
     /* BOTTOM CONTROLS & ACTIONS */
-    .bottom-controls-area {
-      position: relative;
-      z-index: 20;
+    .bottom-section {
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
-    .dots-nav {
+    
+    /* 3 CLEAN PAGINATION DOTS (MATCHES REFERENCE IMAGE) */
+    .dots-row {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-    }
-    .nav-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 4px;
-      background: #CBD5E1;
+      gap: 7px;
       cursor: pointer;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #CBD5E1;
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .nav-dot.active {
-      width: 22px;
+    .dot.active {
+      width: 20px;
+      border-radius: 4px;
       background: #0F172A;
     }
 
-    /* ACTION BUTTONS */
-    .action-buttons-wrap {
+    /* BUTTONS */
+    .action-row {
       width: 100%;
       display: flex;
       flex-direction: column;
       gap: 8px;
     }
-    .btn-action-primary {
+    .primary-btn {
       width: 100%;
-      padding: 13px 20px;
-      border-radius: 16px;
+      padding: 13px;
+      border-radius: 14px;
       background: #0F172A;
       color: #FFFFFF;
       font-size: 14px;
@@ -490,32 +334,31 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
-      transition: all 0.2s ease;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+      transition: all 0.2s;
     }
-    .btn-action-primary:hover {
+    .primary-btn:hover {
       background: #1E293B;
       transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
     }
-    .btn-action-secondary {
+    .secondary-link {
       background: transparent;
       border: none;
       color: #64748B;
       font-size: 12.5px;
       font-weight: 700;
       cursor: pointer;
-      padding: 6px;
+      padding: 4px;
       text-align: center;
       transition: color 0.2s;
     }
-    .btn-action-secondary:hover {
+    .secondary-link:hover {
       color: #0F172A;
     }
 
-    /* GALLERY SIDE-BY-SIDE MODE */
-    .gallery-container {
+    /* 3-SLIDE GALLERY VIEW */
+    .gallery-grid {
       display: none;
       gap: 20px;
       max-width: 1200px;
@@ -524,132 +367,89 @@
       flex-wrap: wrap;
     }
     .gallery-phone-card {
-      width: 340px;
-      height: 720px;
+      width: 350px;
+      height: 740px;
       background: #FFFFFF;
       border-radius: 40px;
-      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
       border: 1px solid #E2E8F0;
-      overflow: hidden;
+      padding: 32px 20px 24px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 32px 18px 24px;
-      position: relative;
     }
   </style>
 </head>
 <body>
 
-  <!-- TOP BANNER -->
-  <div class="top-banner">
-    <div class="brand-chip">
-      <span>✦</span> ABU MAFHAL SUB &bull; OFFICIAL PLATFORM
-    </div>
-    <h1>Modern Onboarding & Splash Experience</h1>
-    <p>Seamless Aesthetic &bull; Rich Features &bull; Smooth Motion &bull; Zero Clutter</p>
+  <!-- HEADER -->
+  <div class="page-header">
+    <h1>ABU MAFHAL SUB — Clean &amp; Structured Onboarding</h1>
+    <p>Seamless 100% Unified Background &bull; Crisp Edges (Zero Blur) &bull; Structured Features</p>
   </div>
 
   <!-- TOOLBAR -->
-  <div class="toolbar-wrap">
-    <button class="tab-btn active" id="btnSingle" onclick="switchView('single')">📱 Interactive Phone</button>
-    <button class="tab-btn" id="btnGallery" onclick="switchView('gallery')">🖼️ All 3 Slides</button>
+  <div class="controls-toolbar">
+    <button class="ctrl-btn active" id="btnSingle" onclick="switchMode('single')">📱 Interactive Phone</button>
+    <button class="ctrl-btn" id="btnGallery" onclick="switchMode('gallery')">🖼️ All 3 Slides</button>
     
-    <div class="toolbar-divider"></div>
+    <div class="divider-line"></div>
 
-    <button class="tab-btn" onclick="selectSlide(0)" id="tBtn0">1. Telecom & 5G</button>
-    <button class="tab-btn" onclick="selectSlide(1)" id="tBtn1">2. Auto Accounts</button>
-    <button class="tab-btn" onclick="selectSlide(2)" id="tBtn2">3. Relax & Profit</button>
+    <button class="ctrl-btn" onclick="selectSlide(0)" id="tab0">1. Fast 5G Data</button>
+    <button class="ctrl-btn" onclick="selectSlide(1)" id="tab1">2. Auto Accounts</button>
+    <button class="ctrl-btn" onclick="selectSlide(2)" id="tab2">3. Relax &amp; Profit</button>
 
-    <div class="toolbar-divider"></div>
+    <div class="divider-line"></div>
 
-    <button class="tab-btn" id="btnAutoPlay" onclick="togglePlayState()">⏸ Auto-Play</button>
+    <button class="ctrl-btn" id="btnPlay" onclick="togglePlay()">⏸ Auto-Play</button>
   </div>
 
-  <!-- SINGLE INTERACTIVE PHONE MOCKUP -->
-  <div class="phone-container" id="singlePhone">
+  <!-- 1. SINGLE INTERACTIVE PHONE MOCKUP -->
+  <div class="phone-container" id="phoneMockup">
     <div class="screen-canvas">
       
-      <!-- BACKGROUND CONCENTRIC RADAR ARCS (ELEGANT VECTOR MOTIF) -->
-      <div class="bg-radar-arcs">
-        <div class="radar-circle rc-1"></div>
-        <div class="radar-circle rc-2"></div>
-        <div class="radar-circle rc-3"></div>
+      <!-- TOP NAVIGATION -->
+      <div class="top-nav">
+        <button class="nav-back-btn hidden" id="backBtn" onclick="prevSlide()" title="Go Back">‹</button>
+        <button class="skip-btn" id="skipBtn" onclick="selectSlide(2)">Skip</button>
       </div>
 
-      <!-- SOFT RADIANCE AURA BEHIND CHARACTER -->
-      <div class="mascot-backdrop-glow glow-telecom" id="backdropGlow"></div>
-
-      <!-- TOP HEADER & PROGRESS -->
-      <div class="top-header-area">
-        <div class="story-progress-row">
-          <div class="story-track" onclick="selectSlide(0)"><div class="story-fill" id="sFill0"></div></div>
-          <div class="story-track" onclick="selectSlide(1)"><div class="story-fill" id="sFill1"></div></div>
-          <div class="story-track" onclick="selectSlide(2)"><div class="story-fill" id="sFill2"></div></div>
-        </div>
-
-        <div class="top-nav-bar">
-          <button class="nav-btn-back hidden" id="backArrow" onclick="prevSlide()" title="Go Back">‹</button>
-          <div class="brand-identity">
-            <div class="brand-dot"></div>
-            <span class="brand-name">ABU MAFHAL SUB</span>
-          </div>
-          <button class="skip-link" id="skipAction" onclick="selectSlide(2)">Skip</button>
+      <!-- CENTER CHARACTER & CRISP VECTOR SHAPE (ZERO BLUR) -->
+      <div class="mascot-section">
+        <div class="crisp-backdrop-shape"></div>
+        <div class="crisp-ground-oval"></div>
+        <div class="mascot-img-wrap">
+          <img src="./splash_hero_character.gif" alt="Hero Mascot" class="mascot-img" id="mascotImage" />
         </div>
       </div>
 
-      <!-- CENTER CHARACTER STAGE -->
-      <div class="center-stage">
-        
-        <!-- FLOATING FEATURE CHIPS (MODERN DECORATIONS) -->
-        <div class="floating-chip chip-left" id="chipLeft">
-          <span>⚡</span> <span id="chipLeftTxt">5G Automated</span>
-        </div>
-        <div class="floating-chip chip-right" id="chipRight">
-          <span>💰</span> <span id="chipRightTxt">₦240/GB SME</span>
-        </div>
-
-        <!-- MASCOT ILLUSTRATION -->
-        <div class="mascot-container">
-          <div class="mascot-ground-shadow"></div>
-          <img src="./splash_hero_character.gif" alt="Hero Character" class="mascot-hero-img" id="mascotImage" />
-        </div>
-
-        <!-- TEXT CONTENT & RICH FEATURES -->
-        <div class="slide-content-wrap">
-          <div class="category-badge badge-telecom" id="catBadge">
-            <span>✦</span> <span id="catBadgeTxt">OFFICIAL 5G VTU PLATFORM</span>
-          </div>
-          
-          <h2 class="slide-headline" id="slideHeading">Instant 5G Data & Airtime</h2>
-          <p class="slide-subheadline" id="slideDesc">
-            Wholesale packages for MTN, Airtel, Glo & 9mobile delivered in seconds with automated recharge.
-          </p>
-
-          <!-- FEATURES PILLS ROW -->
-          <div class="features-pill-row" id="featuresRow">
-            <span class="feat-tag">📶 <strong>All 4 Networks</strong></span>
-            <span class="feat-tag">⚡ <strong>0s Instant</strong></span>
-            <span class="feat-tag">₦ <strong>From ₦240/GB</strong></span>
-          </div>
-        </div>
-
+      <!-- TITLE & SUBTITLE -->
+      <div class="text-section">
+        <h2 class="slide-title" id="slideTitle">Instant 5G Data &amp; Airtime</h2>
+        <p class="slide-subtitle" id="slideSubtitle">
+          Buy cheap data bundles and airtime at wholesale prices with instant automated delivery.
+        </p>
       </div>
 
-      <!-- BOTTOM NAVIGATION & BUTTONS -->
-      <div class="bottom-controls-area">
-        <div class="dots-nav">
-          <div class="nav-dot active" id="dot0" onclick="selectSlide(0)"></div>
-          <div class="nav-dot" id="dot1" onclick="selectSlide(1)"></div>
-          <div class="nav-dot" id="dot2" onclick="selectSlide(2)"></div>
+      <!-- NEAT STRUCTURED FEATURES LIST ("FEATURES KE TSARI") -->
+      <div class="features-list" id="featuresContainer">
+        <!-- Generated dynamically per slide -->
+      </div>
+
+      <!-- BOTTOM NAVIGATION: 3 DOTS & BUTTON -->
+      <div class="bottom-section">
+        <div class="dots-row">
+          <div class="dot active" id="dot0" onclick="selectSlide(0)"></div>
+          <div class="dot" id="dot1" onclick="selectSlide(1)"></div>
+          <div class="dot" id="dot2" onclick="selectSlide(2)"></div>
         </div>
 
-        <div class="action-buttons-wrap">
-          <button class="btn-action-primary" id="mainActionBtn" onclick="nextSlide()">
-            <span id="mainBtnLabel">Next</span>
+        <div class="action-row">
+          <button class="primary-btn" id="mainBtn" onclick="nextSlide()">
+            <span id="mainBtnTxt">Next</span>
             <span>›</span>
           </button>
-          <button class="btn-action-secondary" id="secondaryActionBtn" style="display:none;" onclick="alert('Redirecting to Sign In...')">
+          <button class="secondary-link" id="signInLink" style="display:none;" onclick="alert('Redirecting to Sign In...')">
             Already have an account? Sign In
           </button>
         </div>
@@ -658,269 +458,259 @@
     </div>
   </div>
 
-  <!-- GALLERY VIEW: ALL 3 SLIDES PRESENTED SIDE-BY-SIDE -->
-  <div class="gallery-container" id="galleryView">
+  <!-- 2. GALLERY VIEW: ALL 3 SLIDES SIDE-BY-SIDE -->
+  <div class="gallery-grid" id="galleryView">
     
-    <!-- CARD 1: TELECOM -->
+    <!-- CARD 1 -->
     <div class="gallery-phone-card">
-      <div class="top-nav-bar">
-        <div class="nav-btn-back" style="visibility:hidden;">‹</div>
-        <div class="brand-identity"><div class="brand-dot"></div><span class="brand-name">ABU MAFHAL</span></div>
-        <span class="skip-link">Skip</span>
+      <div class="top-nav">
+        <div class="nav-back-btn" style="visibility:hidden;">‹</div>
+        <span class="skip-btn">Skip</span>
       </div>
-      <div style="text-align:center; margin: 15px 0;">
-        <div style="position:relative; width: 190px; height: 190px; margin: 0 auto 10px;">
-          <img src="./splash_hero_character.gif" alt="Lightbulb" style="width:100%; height:100%; object-fit:contain;" />
-        </div>
-        <div class="category-badge badge-telecom">✦ 5G VTU PLATFORM</div>
-        <h3 style="font-size:18px; font-weight:800; color:#0F172A; margin: 6px 0;">Instant 5G Data & Airtime</h3>
-        <p style="font-size:12px; color:#64748B; line-height:1.45;">Buy MTN, Airtel, Glo & 9mobile at wholesale prices with instant automated delivery.</p>
-        <div class="features-pill-row" style="margin-top:10px;">
-          <span class="feat-tag">📶 4 Networks</span>
-          <span class="feat-tag">⚡ 0s Instant</span>
-          <span class="feat-tag">₦240/GB</span>
+      <div class="mascot-section">
+        <div class="crisp-backdrop-shape"></div>
+        <div class="crisp-ground-oval"></div>
+        <div class="mascot-img-wrap">
+          <img src="./splash_hero_character.gif" alt="Lightbulb Character" class="mascot-img" />
         </div>
       </div>
-      <div style="display:flex; justify-content:center; gap:6px;">
-        <div class="nav-dot active"></div>
-        <div class="nav-dot"></div>
-        <div class="nav-dot"></div>
+      <div class="text-section">
+        <h3 class="slide-title">Instant 5G Data &amp; Airtime</h3>
+        <p class="slide-subtitle">Buy cheap data bundles and airtime at wholesale prices with automated delivery.</p>
+      </div>
+      <div class="features-list">
+        <div class="feature-card">
+          <div class="feature-icon-box">📶</div>
+          <div class="feature-text-box">
+            <div class="feature-main-txt">All 4 Networks Supported</div>
+            <div class="feature-sub-txt">MTN, Airtel, Glo &amp; 9mobile instant delivery</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-box">💰</div>
+          <div class="feature-text-box">
+            <div class="feature-main-txt">Wholesale SME Packages</div>
+            <div class="feature-sub-txt">Direct rates starting from ₦240 per GB</div>
+          </div>
+        </div>
+      </div>
+      <div class="dots-row">
+        <div class="dot active"></div><div class="dot"></div><div class="dot"></div>
       </div>
     </div>
 
-    <!-- CARD 2: BANKING -->
+    <!-- CARD 2 -->
     <div class="gallery-phone-card">
-      <div class="top-nav-bar">
-        <div class="nav-btn-back">‹</div>
-        <div class="brand-identity"><div class="brand-dot"></div><span class="brand-name">ABU MAFHAL</span></div>
-        <span class="skip-link">Skip</span>
+      <div class="top-nav">
+        <div class="nav-back-btn">‹</div>
+        <span class="skip-btn">Skip</span>
       </div>
-      <div style="text-align:center; margin: 15px 0;">
-        <div style="position:relative; width: 190px; height: 190px; margin: 0 auto 10px;">
-          <img src="./splash_hero_character2.gif" alt="Rocket" style="width:100%; height:100%; object-fit:contain;" />
-        </div>
-        <div class="category-badge badge-banking">✦ AUTO WALLET FUNDING</div>
-        <h3 style="font-size:18px; font-weight:800; color:#0F172A; margin: 6px 0;">Dedicated Bank Accounts</h3>
-        <p style="font-size:12px; color:#64748B; line-height:1.45;">Personal Moniepoint & Wema virtual accounts for zero-fee instant wallet funding.</p>
-        <div class="features-pill-row" style="margin-top:10px;">
-          <span class="feat-tag">🏦 Moniepoint / Wema</span>
-          <span class="feat-tag">0% Fee</span>
-          <span class="feat-tag">Auto-Credit</span>
+      <div class="mascot-section">
+        <div class="crisp-backdrop-shape"></div>
+        <div class="crisp-ground-oval"></div>
+        <div class="mascot-img-wrap">
+          <img src="./splash_hero_character2.gif" alt="Rocket Character" class="mascot-img" />
         </div>
       </div>
-      <div style="display:flex; justify-content:center; gap:6px;">
-        <div class="nav-dot"></div>
-        <div class="nav-dot active"></div>
-        <div class="nav-dot"></div>
+      <div class="text-section">
+        <h3 class="slide-title">Dedicated Bank Accounts</h3>
+        <p class="slide-subtitle">Personal Nigerian bank accounts for zero-fee, instant automated wallet funding.</p>
+      </div>
+      <div class="features-list">
+        <div class="feature-card">
+          <div class="feature-icon-box">🏦</div>
+          <div class="feature-text-box">
+            <div class="feature-main-txt">Personal Account Numbers</div>
+            <div class="feature-sub-txt">Dedicated Moniepoint &amp; Wema Bank accounts</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-box">⚡</div>
+          <div class="feature-text-box">
+            <div class="feature-main-txt">Instant Auto-Credit</div>
+            <div class="feature-sub-txt">Wallet credited in seconds with 0% deposit fee</div>
+          </div>
+        </div>
+      </div>
+      <div class="dots-row">
+        <div class="dot"></div><div class="dot active"></div><div class="dot"></div>
       </div>
     </div>
 
-    <!-- CARD 3: PROFIT & UTILITIES -->
+    <!-- CARD 3 -->
     <div class="gallery-phone-card">
-      <div class="top-nav-bar">
-        <div class="nav-btn-back">‹</div>
-        <div class="brand-identity"><div class="brand-dot"></div><span class="brand-name">ABU MAFHAL</span></div>
-        <span class="skip-link" style="visibility:hidden;">Skip</span>
+      <div class="top-nav">
+        <div class="nav-back-btn">‹</div>
+        <span class="skip-btn" style="visibility:hidden;">Skip</span>
       </div>
-      <div style="text-align:center; margin: 15px 0;">
-        <div style="position:relative; width: 190px; height: 190px; margin: 0 auto 10px;">
-          <img src="./splash_hero_character3.gif" alt="Megaphone" style="width:100%; height:100%; object-fit:contain;" />
-        </div>
-        <div class="category-badge badge-start">✦ SIT BACK & PROFIT</div>
-        <h3 style="font-size:18px; font-weight:800; color:#0F172A; margin: 6px 0;">Sit Back & Relax</h3>
-        <p style="font-size:12px; color:#64748B; line-height:1.45;">Prepaid electricity tokens, TV renewals & lucrative wholesale reseller profits.</p>
-        <div class="features-pill-row" style="margin-top:10px;">
-          <span class="feat-tag">💡 Electricity</span>
-          <span class="feat-tag">📺 Cable TV</span>
-          <span class="feat-tag">💸 3% Cashback</span>
+      <div class="mascot-section">
+        <div class="crisp-backdrop-shape"></div>
+        <div class="crisp-ground-oval"></div>
+        <div class="mascot-img-wrap">
+          <img src="./splash_hero_character3.gif" alt="Megaphone Character" class="mascot-img" />
         </div>
       </div>
-      <div style="display:flex; justify-content:center; gap:6px;">
-        <div class="nav-dot"></div>
-        <div class="nav-dot"></div>
-        <div class="nav-dot active"></div>
+      <div class="text-section">
+        <h3 class="slide-title">Sit Back &amp; Relax</h3>
+        <p class="slide-subtitle">Automate utility bills, TV renewals and resell VTU services for daily income.</p>
+      </div>
+      <div class="features-list">
+        <div class="feature-card">
+          <div class="feature-icon-box">💡</div>
+          <div class="feature-text-box">
+            <div class="feature-main-txt">Prepaid Electricity &amp; TV</div>
+            <div class="feature-sub-txt">Instant meter tokens, DStv, GOtv &amp; Startimes</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-box">📈</div>
+          <div class="feature-text-box">
+            <div class="feature-main-txt">Reseller Profit Hub</div>
+            <div class="feature-sub-txt">Save money for personal use or resell for profit</div>
+          </div>
+        </div>
+      </div>
+      <div class="dots-row">
+        <div class="dot"></div><div class="dot"></div><div class="dot active"></div>
       </div>
     </div>
 
   </div>
 
   <script>
-    const SLIDES_CONFIG = [
+    const SLIDES_DATA = [
       {
-        img: './splash_hero_character.gif',
-        glowClass: 'glow-telecom',
-        badgeClass: 'badge-telecom',
-        badgeText: 'OFFICIAL 5G VTU PLATFORM',
+        image: './splash_hero_character.gif',
         title: 'Instant 5G Data & Airtime',
-        desc: 'Wholesale packages for MTN, Airtel, Glo & 9mobile delivered in seconds with automated recharge.',
-        chipL: { icon: '⚡', txt: '5G Automated' },
-        chipR: { icon: '💰', txt: '₦240/GB SME' },
+        subtitle: 'Buy cheap data bundles and airtime at wholesale prices with instant automated delivery.',
         features: [
-          '📶 <strong>All 4 Networks</strong>',
-          '⚡ <strong>0s Instant</strong>',
-          '₦ <strong>From ₦240/GB</strong>'
-        ],
-        btnColor: '#0F172A'
+          { icon: '📶', title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile recharged in seconds' },
+          { icon: '💰', title: 'Wholesale SME Packages', desc: 'Direct wholesale rates starting from ₦240 per GB' },
+          { icon: '⚡', title: '0-Second Automated Delivery', desc: 'Real-time API processing with 99.98% uptime' }
+        ]
       },
       {
-        img: './splash_hero_character2.gif',
-        glowClass: 'glow-banking',
-        badgeClass: 'badge-banking',
-        badgeText: 'DEDICATED AUTO WALLETS',
+        image: './splash_hero_character2.gif',
         title: 'Dedicated Bank Accounts',
-        desc: 'Personal Moniepoint & Wema virtual accounts for zero-fee, instant automated wallet funding.',
-        chipL: { icon: '🏦', txt: 'Moniepoint / Wema' },
-        chipR: { icon: '🔒', txt: '0% Deposit Fee' },
+        subtitle: 'Personal Nigerian bank accounts for zero-fee, instant automated wallet funding.',
         features: [
-          '🏦 <strong>Dedicated Acc</strong>',
-          '⚡ <strong>Auto-Credit</strong>',
-          '🛡️ <strong>Zero Fees</strong>'
-        ],
-        btnColor: '#2563EB'
+          { icon: '🏦', title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema Bank accounts in your name' },
+          { icon: '⚡', title: 'Instant 0s Auto-Credit', desc: 'Wallet is credited immediately with 0% deposit charge' },
+          { icon: '🔒', title: 'Bank-Grade Security', desc: '256-bit SSL encrypted & NDPA certified compliance' }
+        ]
       },
       {
-        img: './splash_hero_character3.gif',
-        glowClass: 'glow-start',
-        badgeClass: 'badge-start',
-        badgeText: 'SIT BACK & PROFIT',
+        image: './splash_hero_character3.gif',
         title: 'Sit Back & Relax',
-        desc: 'Automate your utility bills, cable TV renewals, or resell VTU services to earn daily income.',
-        chipL: { icon: '💡', txt: 'Prepaid Bills' },
-        chipR: { icon: '💸', txt: '3% Cashback' },
+        subtitle: 'Automate utility bills, TV renewals and resell VTU services for daily income.',
         features: [
-          '💡 <strong>Electricity Tokens</strong>',
-          '📺 <strong>DStv / GOtv</strong>',
-          '🤝 <strong>Reseller Hub</strong>'
-        ],
-        btnColor: '#059669'
+          { icon: '💡', title: 'Prepaid Electricity Tokens', desc: 'Instant meter tokens for AEDC, EKEDC, IBEDC & more' },
+          { icon: '📺', title: 'Cable TV Subscriptions', desc: 'Instant renewal for DStv, GOtv, Startimes & Showmax' },
+          { icon: '📈', title: 'Lucrative Reseller Profits', desc: 'Save money on personal use or resell to earn daily profits' }
+        ]
       }
     ];
 
-    let currentSlideIndex = 0;
-    let autoPlayInterval = null;
-    let isPlaying = true;
-    let progressTimer = 0;
+    let currentIdx = 0;
+    let autoInterval = null;
+    let isAutoPlaying = true;
 
     function selectSlide(idx) {
-      currentSlideIndex = idx;
-      progressTimer = 0;
-      const s = SLIDES_CONFIG[idx];
+      currentIdx = idx;
+      const data = SLIDES_DATA[idx];
 
-      // Update image
-      const img = document.getElementById('mascotImage');
-      img.src = s.img + '?t=' + Date.now();
+      // Update mascot image with cache busting
+      document.getElementById('mascotImage').src = data.image + '?t=' + Date.now();
 
-      // Update backdrop glow
-      const glow = document.getElementById('backdropGlow');
-      glow.className = 'mascot-backdrop-glow ' + s.glowClass;
+      // Update title & subtitle
+      document.getElementById('slideTitle').innerText = data.title;
+      document.getElementById('slideSubtitle').innerText = data.subtitle;
 
-      // Update chips
-      document.getElementById('chipLeftTxt').innerText = s.chipL.txt;
-      document.getElementById('chipRightTxt').innerText = s.chipR.txt;
-
-      // Update badge
-      const badge = document.getElementById('catBadge');
-      badge.className = 'category-badge ' + s.badgeClass;
-      document.getElementById('catBadgeTxt').innerText = s.badgeText;
-
-      // Update headings
-      document.getElementById('slideHeading').innerText = s.title;
-      document.getElementById('slideDesc').innerText = s.desc;
-
-      // Update features row
-      document.getElementById('featuresRow').innerHTML = s.features.map(f => `<span class="feat-tag">${f}</span>`).join('');
+      // Update structured features list
+      const container = document.getElementById('featuresContainer');
+      container.innerHTML = data.features.map(f => `
+        <div class="feature-card">
+          <div class="feature-icon-box">${f.icon}</div>
+          <div class="feature-text-box">
+            <div class="feature-main-txt">${f.title}</div>
+            <div class="feature-sub-txt">${f.desc}</div>
+          </div>
+        </div>
+      `).join('');
 
       // Update back button
-      const backBtn = document.getElementById('backArrow');
+      const backBtn = document.getElementById('backBtn');
       if (idx === 0) {
-        backBtn.className = 'nav-btn-back hidden';
+        backBtn.className = 'nav-back-btn hidden';
       } else {
-        backBtn.className = 'nav-btn-back';
-      }
-
-      // Update skip & buttons
-      const mainBtn = document.getElementById('mainActionBtn');
-      const secBtn = document.getElementById('secondaryActionBtn');
-      const skip = document.getElementById('skipAction');
-      const label = document.getElementById('mainBtnLabel');
-
-      if (idx === 2) {
-        label.innerText = 'Get Started Free';
-        secBtn.style.display = 'block';
-        skip.style.visibility = 'hidden';
-      } else {
-        label.innerText = 'Next';
-        secBtn.style.display = 'none';
-        skip.style.visibility = 'visible';
+        backBtn.className = 'nav-back-btn';
       }
 
       // Update dots
       for (let i = 0; i < 3; i++) {
         const dot = document.getElementById('dot' + i);
-        dot.className = 'nav-dot' + (i === idx ? ' active' : '');
+        dot.className = 'dot' + (i === idx ? ' active' : '');
+        
+        const tab = document.getElementById('tab' + i);
+        if (tab) tab.classList.toggle('active', i === idx);
       }
 
-      updateStoryBars();
+      // Update bottom buttons
+      const mainBtnTxt = document.getElementById('mainBtnTxt');
+      const signInLink = document.getElementById('signInLink');
+      const skipBtn = document.getElementById('skipBtn');
+
+      if (idx === 2) {
+        mainBtnTxt.innerText = 'Get Started Free';
+        signInLink.style.display = 'block';
+        skipBtn.style.visibility = 'hidden';
+      } else {
+        mainBtnTxt.innerText = 'Next';
+        signInLink.style.display = 'none';
+        skipBtn.style.visibility = 'visible';
+      }
     }
 
     function nextSlide() {
-      if (currentSlideIndex < 2) {
-        selectSlide(currentSlideIndex + 1);
+      if (currentIdx < 2) {
+        selectSlide(currentIdx + 1);
       } else {
         selectSlide(0);
       }
     }
 
     function prevSlide() {
-      if (currentSlideIndex > 0) {
-        selectSlide(currentSlideIndex - 1);
+      if (currentIdx > 0) {
+        selectSlide(currentIdx - 1);
       }
     }
 
-    function togglePlayState() {
-      isPlaying = !isPlaying;
-      const btn = document.getElementById('btnAutoPlay');
-      if (isPlaying) {
+    function togglePlay() {
+      isAutoPlaying = !isAutoPlaying;
+      const btn = document.getElementById('btnPlay');
+      if (isAutoPlaying) {
         btn.innerText = '⏸ Auto-Play';
-        startStoryLoop();
+        startLoop();
       } else {
         btn.innerText = '▶ Paused';
-        clearInterval(autoPlayInterval);
+        clearInterval(autoInterval);
       }
     }
 
-    function startStoryLoop() {
-      if (autoPlayInterval) clearInterval(autoPlayInterval);
-      if (!isPlaying) return;
-      autoPlayInterval = setInterval(() => {
-        progressTimer += 2;
-        if (progressTimer > 100) {
-          progressTimer = 0;
-          if (currentSlideIndex < 2) {
-            selectSlide(currentSlideIndex + 1);
-          } else {
-            selectSlide(0);
-          }
-        }
-        updateStoryBars();
-      }, 90);
-    }
-
-    function updateStoryBars() {
-      for (let i = 0; i < 3; i++) {
-        const bar = document.getElementById('sFill' + i);
-        if (i < currentSlideIndex) {
-          bar.style.width = '100%';
-        } else if (i === currentSlideIndex) {
-          bar.style.width = progressTimer + '%';
+    function startLoop() {
+      if (autoInterval) clearInterval(autoInterval);
+      if (!isAutoPlaying) return;
+      autoInterval = setInterval(() => {
+        if (currentIdx < 2) {
+          selectSlide(currentIdx + 1);
         } else {
-          bar.style.width = '0%';
+          selectSlide(0);
         }
-      }
+      }, 4500);
     }
 
-    function switchView(mode) {
-      const single = document.getElementById('singlePhone');
+    function switchMode(mode) {
+      const single = document.getElementById('phoneMockup');
       const gallery = document.getElementById('galleryView');
       const bS = document.getElementById('btnSingle');
       const bG = document.getElementById('btnGallery');
@@ -940,7 +730,7 @@
 
     // Initialize
     selectSlide(0);
-    startStoryLoop();
+    startLoop();
   </script>
 </body>
 </html>

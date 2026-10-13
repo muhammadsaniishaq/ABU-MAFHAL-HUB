@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,54 +31,33 @@ const { width: SW, height: SH } = Dimensions.get('window');
 const SLIDES = [
   {
     image: require('../assets/images/splash_hero_character.gif'),
-    badge: 'OFFICIAL 5G VTU PLATFORM',
-    badgeBg: '#FEF3C7',
-    badgeTxt: '#B45309',
-    badgeBorder: '#FDE68A',
     title: 'Instant 5G Data & Airtime',
-    desc: 'Wholesale packages for MTN, Airtel, Glo & 9mobile delivered in seconds with automated recharge.',
-    chipL: { icon: '⚡', txt: '5G Automated' },
-    chipR: { icon: '💰', txt: '₦240/GB SME' },
+    subtitle: 'Buy cheap data bundles and airtime at wholesale prices with instant automated delivery.',
     features: [
-      { icon: '📶', txt: 'All 4 Networks' },
-      { icon: '⚡', txt: '0s Instant' },
-      { icon: '₦', txt: 'From ₦240/GB' },
+      { icon: '📶', title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile recharged in seconds' },
+      { icon: '💰', title: 'Wholesale SME Packages', desc: 'Direct wholesale rates starting from ₦240 per GB' },
+      { icon: '⚡', title: '0-Second Automated Delivery', desc: 'Real-time API processing with 99.98% uptime' },
     ],
-    glow: 'rgba(254, 243, 199, 0.75)',
   },
   {
     image: require('../assets/images/splash_hero_character2.gif'),
-    badge: 'DEDICATED AUTO WALLETS',
-    badgeBg: '#EFF6FF',
-    badgeTxt: '#1D4ED8',
-    badgeBorder: '#BFDBFE',
     title: 'Dedicated Bank Accounts',
-    desc: 'Personal Moniepoint & Wema virtual accounts for zero-fee, instant automated wallet funding.',
-    chipL: { icon: '🏦', txt: 'Moniepoint / Wema' },
-    chipR: { icon: '🔒', txt: '0% Deposit Fee' },
+    subtitle: 'Personal Nigerian bank accounts for zero-fee, instant automated wallet funding.',
     features: [
-      { icon: '🏦', txt: 'Dedicated Acc' },
-      { icon: '⚡', txt: 'Auto-Credit' },
-      { icon: '🛡️', txt: 'Zero Fees' },
+      { icon: '🏦', title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema Bank accounts in your name' },
+      { icon: '⚡', title: 'Instant 0s Auto-Credit', desc: 'Wallet is credited immediately with 0% deposit charge' },
+      { icon: '🔒', title: 'Bank-Grade Security', desc: '256-bit SSL encrypted & NDPA certified compliance' },
     ],
-    glow: 'rgba(219, 234, 254, 0.75)',
   },
   {
     image: require('../assets/images/splash_hero_character3.gif'),
-    badge: 'SIT BACK & PROFIT',
-    badgeBg: '#ECFDF5',
-    badgeTxt: '#047857',
-    badgeBorder: '#A7F3D0',
     title: 'Sit Back & Relax',
-    desc: 'Automate your utility bills, cable TV renewals, or resell VTU services to earn daily income.',
-    chipL: { icon: '💡', txt: 'Prepaid Bills' },
-    chipR: { icon: '💸', txt: '3% Cashback' },
+    subtitle: 'Automate utility bills, TV renewals and resell VTU services for daily income.',
     features: [
-      { icon: '💡', txt: 'Electricity Tokens' },
-      { icon: '📺', txt: 'DStv / GOtv' },
-      { icon: '🤝', txt: 'Reseller Hub' },
+      { icon: '💡', title: 'Prepaid Electricity Tokens', desc: 'Instant meter tokens for AEDC, EKEDC, IBEDC & more' },
+      { icon: '📺', title: 'Cable TV Subscriptions', desc: 'Instant renewal for DStv, GOtv, Startimes & Showmax' },
+      { icon: '📈', title: 'Lucrative Reseller Profits', desc: 'Save money on personal use or resell to earn daily profits' },
     ],
-    glow: 'rgba(209, 250, 229, 0.75)',
   },
 ];
 
@@ -85,13 +65,11 @@ export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [pageIdx, setPageIdx] = useState(0);
-  const [progress, setProgress] = useState(0);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  // Floating mascot animation (gentle, peaceful)
+  // Floating mascot animation (smooth & peaceful)
   const floatY = useSharedValue(0);
-  const chipFloat = useSharedValue(0);
 
   // Transition animations
   const slideOpacity = useSharedValue(1);
@@ -100,59 +78,26 @@ export default function SplashScreen() {
   useEffect(() => {
     checkAuthSession();
 
-    // Gentle float (3.4s slow loop)
+    // Gentle floating (3.6s cycle)
     floatY.value = withRepeat(
       withSequence(
-        withTiming(-8, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-7, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
         withTiming(0, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      true
-    );
-
-    chipFloat.value = withRepeat(
-      withSequence(
-        withTiming(-6, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
       ),
       -1,
       true
     );
   }, []);
 
-  // Slide auto-advance and progress bar
-  useEffect(() => {
-    setProgress(0);
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          setPageIdx(curr => (curr < 2 ? curr + 1 : curr));
-          return 0;
-        }
-        return prev + 2;
-      });
-    }, 90);
-
-    return () => clearInterval(interval);
-  }, [pageIdx]);
-
   useEffect(() => {
     slideOpacity.value = 0.35;
     slideScale.value = 0.95;
-    slideOpacity.value = withTiming(1, { duration: 360, easing: Easing.out(Easing.cubic) });
+    slideOpacity.value = withTiming(1, { duration: 340, easing: Easing.out(Easing.cubic) });
     slideScale.value = withSpring(1, { damping: 16, stiffness: 120 });
   }, [pageIdx]);
 
   const floatAnimStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: floatY.value }],
-  }));
-
-  const chipAnimStyleL = useAnimatedStyle(() => ({
-    transform: [{ translateY: chipFloat.value }],
-  }));
-
-  const chipAnimStyleR = useAnimatedStyle(() => ({
-    transform: [{ translateY: -chipFloat.value }],
   }));
 
   const slideAnimStyle = useAnimatedStyle(() => ({
@@ -252,7 +197,7 @@ export default function SplashScreen() {
       style={[
         styles.screen,
         {
-          paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 44 : 24) + 8,
+          paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 44 : 24) + 6,
           paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 34 : 20) + 12,
         },
       ]}
@@ -261,117 +206,75 @@ export default function SplashScreen() {
     >
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* BACKGROUND CONCENTRIC RADAR ARCS */}
-      <View style={styles.radarContainer}>
-        <View style={[styles.radarCircle, styles.rc1]} />
-        <View style={[styles.radarCircle, styles.rc2]} />
-        <View style={[styles.radarCircle, styles.rc3]} />
+      {/* TOP NAVIGATION: BACK ARROW & SKIP */}
+      <View style={styles.topNav}>
+        {pageIdx > 0 ? (
+          <TouchableOpacity onPress={prevSlide} style={styles.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="chevron-back" size={20} color="#334155" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backPlaceholder} />
+        )}
+
+        {pageIdx < 2 ? (
+          <TouchableOpacity onPress={skipAll} style={styles.skipBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={styles.skipTxt}>Skip</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backPlaceholder} />
+        )}
       </View>
 
-      {/* TOP HEADER: STORY BARS + NAVIGATION BAR */}
-      <View style={styles.topArea}>
-        <View style={styles.storyProgressRow}>
-          {[0, 1, 2].map(idx => (
-            <TouchableOpacity key={idx} onPress={() => goTo(idx)} style={styles.storyTrack}>
-              <View
-                style={[
-                  styles.storyFill,
-                  {
-                    width: pageIdx > idx ? '100%' : pageIdx === idx ? `${progress}%` : '0%',
-                  },
-                ]}
+      {/* SCROLLABLE MAIN BODY FOR CLEAN SCALING ON ALL PHONES */}
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.mainSection, slideAnimStyle]}>
+          
+          {/* MASCOT SECTION WITH CRISP SHAPE (ZERO BLUR FILTER) */}
+          <View style={styles.mascotSection}>
+            <View style={styles.crispBackdropShape} />
+            <View style={styles.crispGroundOval} />
+            
+            <Animated.View style={[styles.mascotWrap, floatAnimStyle]}>
+              <Image
+                key={`slide-img-${pageIdx}`}
+                source={currentSlide.image}
+                style={styles.mascotImg}
+                resizeMode="contain"
               />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.topNav}>
-          {pageIdx > 0 ? (
-            <TouchableOpacity onPress={prevSlide} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="chevron-back" size={20} color="#0F172A" />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.backPlaceholder} />
-          )}
-
-          <View style={styles.brandBadge}>
-            <View style={styles.brandLiveDot} />
-            <Text style={styles.brandBadgeTxt}>ABU MAFHAL SUB</Text>
+            </Animated.View>
           </View>
 
-          {pageIdx < 2 ? (
-            <TouchableOpacity onPress={skipAll} style={styles.skipBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.skipTxt}>Skip</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.backPlaceholder} />
-          )}
-        </View>
-      </View>
-
-      {/* CENTERPIECE: STAGE WITH FLOATING CHIPS & CHARACTER */}
-      <Animated.View style={[styles.centerStage, slideAnimStyle]}>
-        
-        {/* Soft Radiance Glow Backdrop */}
-        <View style={[styles.mascotGlow, { backgroundColor: currentSlide.glow }]} />
-
-        {/* Floating Feature Chip Left */}
-        <Animated.View style={[styles.floatingChip, styles.chipLeft, chipAnimStyleL]}>
-          <Text style={styles.chipEmoji}>{currentSlide.chipL.icon}</Text>
-          <Text style={styles.chipTxt}>{currentSlide.chipL.txt}</Text>
-        </Animated.View>
-
-        {/* Floating Feature Chip Right */}
-        <Animated.View style={[styles.floatingChip, styles.chipRight, chipAnimStyleR]}>
-          <Text style={styles.chipEmoji}>{currentSlide.chipR.icon}</Text>
-          <Text style={styles.chipTxt}>{currentSlide.chipR.txt}</Text>
-        </Animated.View>
-
-        {/* Mascot Center Illustration */}
-        <Animated.View style={[styles.mascotWrap, floatAnimStyle]}>
-          <View style={styles.groundShadow} />
-          <Image
-            key={`slide-img-${pageIdx}`}
-            source={currentSlide.image}
-            style={styles.mascotImg}
-            resizeMode="contain"
-          />
-        </Animated.View>
-
-        {/* Rich Content: Badge, Heading, Subtitle & Features */}
-        <View style={styles.contentWrap}>
-          <View
-            style={[
-              styles.categoryBadge,
-              {
-                backgroundColor: currentSlide.badgeBg,
-                borderColor: currentSlide.badgeBorder,
-              },
-            ]}
-          >
-            <Text style={[styles.categoryBadgeTxt, { color: currentSlide.badgeTxt }]}>
-              ✦ {currentSlide.badge}
-            </Text>
+          {/* HEADINGS */}
+          <View style={styles.textSection}>
+            <Text style={styles.title}>{currentSlide.title}</Text>
+            <Text style={styles.subtitle}>{currentSlide.subtitle}</Text>
           </View>
 
-          <Text style={styles.title}>{currentSlide.title}</Text>
-          <Text style={styles.desc}>{currentSlide.desc}</Text>
-
-          {/* Features Pills Row */}
-          <View style={styles.featuresRow}>
+          {/* NEAT STRUCTURED FEATURES LIST ("FEATURES KE TSARI") */}
+          <View style={styles.featuresList}>
             {currentSlide.features.map((feat, idx) => (
-              <View key={idx} style={styles.featPill}>
-                <Text style={styles.featIcon}>{feat.icon}</Text>
-                <Text style={styles.featTxt}>{feat.txt}</Text>
+              <View key={idx} style={styles.featureCard}>
+                <View style={styles.featureIconBox}>
+                  <Text style={styles.featureIconTxt}>{feat.icon}</Text>
+                </View>
+                <View style={styles.featureTextBox}>
+                  <Text style={styles.featureMainTxt}>{feat.title}</Text>
+                  <Text style={styles.featureSubTxt}>{feat.desc}</Text>
+                </View>
               </View>
             ))}
           </View>
-        </View>
 
-      </Animated.View>
+        </Animated.View>
+      </ScrollView>
 
-      {/* BOTTOM SECTION: DOTS & ACTION BUTTONS */}
-      <View style={styles.bottomArea}>
+      {/* BOTTOM CONTROLS & ACTIONS */}
+      <View style={styles.bottomSection}>
+        {/* 3 Pagination Dots */}
         <View style={styles.dotsRow}>
           {[0, 1, 2].map(idx => (
             <TouchableOpacity key={idx} onPress={() => goTo(idx)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
@@ -380,10 +283,11 @@ export default function SplashScreen() {
           ))}
         </View>
 
-        <View style={styles.actionWrap}>
+        {/* Buttons */}
+        <View style={styles.actionRow}>
           {pageIdx < 2 ? (
-            <TouchableOpacity onPress={nextSlide} activeOpacity={0.88} style={styles.btnPrimary}>
-              <Text style={styles.btnPrimaryTxt}>Next</Text>
+            <TouchableOpacity onPress={nextSlide} activeOpacity={0.88} style={styles.primaryBtn}>
+              <Text style={styles.primaryBtnTxt}>Next</Text>
               <Ionicons name="chevron-forward" size={17} color="#FFFFFF" />
             </TouchableOpacity>
           ) : (
@@ -391,18 +295,18 @@ export default function SplashScreen() {
               <TouchableOpacity
                 onPress={() => { haptic(); router.push('/(auth)/signup' as any); }}
                 activeOpacity={0.88}
-                style={styles.btnPrimary}
+                style={styles.primaryBtn}
               >
-                <Text style={styles.btnPrimaryTxt}>Get Started Free</Text>
+                <Text style={styles.primaryBtnTxt}>Get Started Free</Text>
                 <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => { haptic(); router.push('/(auth)/login' as any); }}
                 activeOpacity={0.7}
-                style={styles.btnSecondary}
+                style={styles.secondaryBtn}
               >
-                <Text style={styles.btnSecondaryTxt}>Already have an account? Sign In</Text>
+                <Text style={styles.secondaryBtnTxt}>Already have an account? Sign In</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -413,10 +317,11 @@ export default function SplashScreen() {
 }
 
 const styles = StyleSheet.create({
+  // SOLID UNIFIED BACKGROUND (NO DIS-DIS, SEAMLESS WITH IMAGES)
   screen: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     justifyContent: 'space-between',
     alignItems: 'center',
     maxWidth: 500,
@@ -424,284 +329,182 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 
-  // RADAR CONCENTRIC CIRCLES (CLEAN LUXURY VECTOR LINES)
-  radarContainer: {
-    position: 'absolute',
-    top: '15%',
-    alignSelf: 'center',
-    width: 320,
-    height: 320,
-    alignItems: 'center',
-    justifyContent: 'center',
-    pointerEvents: 'none',
-    zIndex: 1,
-  },
-  radarCircle: {
-    position: 'absolute',
-    borderRadius: 999,
-  },
-  rc1: {
-    width: 170,
-    height: 170,
-    borderWidth: 1,
-    borderColor: 'rgba(203, 213, 225, 0.45)',
-    borderStyle: 'dashed',
-  },
-  rc2: {
-    width: 240,
-    height: 240,
-    borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.4)',
-  },
-  rc3: {
-    width: 310,
-    height: 310,
-    borderWidth: 1,
-    borderColor: 'rgba(203, 213, 225, 0.3)',
-    borderStyle: 'dashed',
-  },
-
-  // TOP AREA
-  topArea: {
-    width: '100%',
-    gap: 12,
-    zIndex: 20,
-  },
-  storyProgressRow: {
-    flexDirection: 'row',
-    gap: 6,
-    width: '100%',
-  },
-  storyTrack: {
-    flex: 1,
-    height: 3.5,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  storyFill: {
-    height: '100%',
-    backgroundColor: '#0F172A',
-    borderRadius: 2,
-  },
+  // TOP NAVIGATION
   topNav: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     height: 38,
+    zIndex: 10,
   },
   backBtn: {
     width: 36,
     height: 36,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 2,
   },
   backPlaceholder: {
     width: 36,
     height: 36,
   },
-  brandBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  brandLiveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#10B981',
-  },
-  brandBadgeTxt: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: 0.3,
-  },
   skipBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: 8,
   },
   skipTxt: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#64748B',
   },
 
-  // CENTER STAGE
-  centerStage: {
+  // SCROLL CONTENT
+  scrollArea: {
     flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    position: 'relative',
-    zIndex: 10,
+    flexGrow: 1,
+    paddingVertical: 6,
   },
-  mascotGlow: {
+  mainSection: {
+    width: '100%',
+    alignItems: 'center',
+  },
+
+  // MASCOT & CRISP BACKDROP (ZERO BLUR FILTER)
+  mascotSection: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginVertical: 10,
+  },
+  crispBackdropShape: {
     position: 'absolute',
-    top: '18%',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    opacity: 0.85,
+    width: Math.min(SW * 0.58, 220),
+    height: Math.min(SW * 0.58, 220),
+    borderRadius: Math.min(SW * 0.58, 220) / 2,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
     zIndex: 1,
   },
-  floatingChip: {
+  crispGroundOval: {
     position: 'absolute',
-    zIndex: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    gap: 5,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  chipLeft: {
-    left: 4,
-    top: '16%',
-  },
-  chipRight: {
-    right: 4,
-    bottom: '22%',
-  },
-  chipEmoji: {
-    fontSize: 11,
-  },
-  chipTxt: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#0F172A',
+    bottom: -2,
+    width: 120,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#E2E8F0',
+    zIndex: 1,
   },
   mascotWrap: {
-    width: Math.min(SW * 0.70, 260),
-    height: Math.min(SH * 0.32, 260),
+    width: Math.min(SW * 0.62, 230),
+    height: Math.min(SH * 0.28, 230),
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginBottom: 16,
-    zIndex: 5,
-  },
-  groundShadow: {
-    position: 'absolute',
-    bottom: 2,
-    width: 140,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: 'rgba(15, 23, 42, 0.06)',
+    zIndex: 2,
   },
   mascotImg: {
     width: '100%',
     height: '100%',
   },
 
-  // CONTENT
-  contentWrap: {
+  // HEADINGS
+  textSection: {
+    width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    maxWidth: 340,
-    zIndex: 10,
-  },
-  categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  categoryBadgeTxt: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+    paddingHorizontal: 8,
+    marginBottom: 14,
   },
   title: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#0F172A',
     textAlign: 'center',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
     marginBottom: 6,
   },
-  desc: {
+  subtitle: {
     fontSize: 13,
     fontWeight: '500',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 18.5,
-    marginBottom: 12,
+    maxWidth: 320,
   },
 
-  // FEATURES ROW
-  featuresRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 6,
+  // NEAT STRUCTURED FEATURES LIST ("FEATURES KE TSARI")
+  featuresList: {
+    width: '100%',
+    gap: 8,
+    marginBottom: 10,
   },
-  featPill: {
+  featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 10,
-    gap: 4,
+    borderRadius: 13,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.02,
     shadowRadius: 2,
     elevation: 1,
   },
-  featIcon: {
-    fontSize: 11,
+  featureIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
   },
-  featTxt: {
+  featureIconTxt: {
+    fontSize: 15,
+  },
+  featureTextBox: {
+    flex: 1,
+  },
+  featureMainTxt: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 1,
+  },
+  featureSubTxt: {
     fontSize: 10.5,
-    fontWeight: '700',
-    color: '#334155',
+    fontWeight: '500',
+    color: '#64748B',
+    lineHeight: 14,
   },
 
-  // BOTTOM
-  bottomArea: {
+  // BOTTOM SECTION
+  bottomSection: {
     width: '100%',
     alignItems: 'center',
-    gap: 16,
-    zIndex: 20,
+    gap: 14,
   },
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 7,
   },
   dot: {
@@ -709,7 +512,7 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   dotActive: {
-    width: 22,
+    width: 20,
     backgroundColor: '#0F172A',
   },
   dotInactive: {
@@ -718,35 +521,35 @@ const styles = StyleSheet.create({
   },
 
   // BUTTONS
-  actionWrap: {
+  actionRow: {
     width: '100%',
   },
-  btnPrimary: {
+  primaryBtn: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0F172A',
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 14,
     gap: 6,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 3,
   },
-  btnPrimaryTxt: {
+  primaryBtnTxt: {
     fontSize: 14.5,
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  btnSecondary: {
+  secondaryBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
-  btnSecondaryTxt: {
+  secondaryBtnTxt: {
     fontSize: 12.5,
     fontWeight: '700',
     color: '#64748B',
