@@ -134,6 +134,67 @@ serve(async (req: Request) => {
       })
     }
 
+    // ── ACTION: Save CAC Service Pricing ───────────────────────────────────
+    if (action === 'save_cac_price') {
+      const { id, price, name } = body;
+      const p = parseFloat(price);
+      if (isNaN(p) || p < 0) {
+        return jsonOk({ error: 'Please specify a valid numeric price' });
+      }
+
+      let updatedData = null;
+      if (id && !id.startsWith('cac-certificate-retrieval-default')) {
+        const { data, error } = await supabaseAdmin
+          .from('cac_pricing')
+          .update({ price: p })
+          .eq('id', id)
+          .select();
+        if (error) return jsonOk({ error: error.message });
+        updatedData = data;
+      } else {
+        const { data, error } = await supabaseAdmin
+          .from('cac_pricing')
+          .upsert([{
+            name: name || 'CAC Certificate Retrieval / Document Search',
+            price: p,
+            active: true
+          }])
+          .select();
+        if (error) return jsonOk({ error: error.message });
+        updatedData = data;
+      }
+
+      try {
+        await supabaseAdmin.from('app_settings').upsert({
+          key: `cac_price_${id || 'retrieval'}`,
+          value: String(p),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+      } catch (_) {}
+
+      return jsonOk({
+        success: true,
+        message: 'CAC Price updated successfully in database',
+        data: updatedData
+      });
+    }
+
+    // ── ACTION: Save TIN Add-on Fee ─────────────────────────────────────────
+    if (action === 'save_tin_fee') {
+      const { fee } = body;
+      const val = parseFloat(fee);
+      if (isNaN(val) || val < 0) {
+        return jsonOk({ error: 'Please specify a valid TIN fee' });
+      }
+      const { error } = await supabaseAdmin.from('app_settings').upsert({
+        key: 'cac_tin_fee',
+        value: String(val),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+      if (error) return jsonOk({ error: error.message });
+      return jsonOk({ success: true, message: 'TIN fee updated successfully' });
+    }
+
     return jsonOk({ error: 'Invalid action specified' })
 
   } catch (error: any) {

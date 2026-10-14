@@ -1,796 +1,2434 @@
+import React, { useState, useEffect } from 'react';
 import { 
-    View, Text, TouchableOpacity, TextInput, ActivityIndicator, 
-    Alert, Image, ScrollView, KeyboardAvoidingView, Platform 
+  View, Text, TouchableOpacity, TextInput, ActivityIndicator, 
+  Alert, Image, ScrollView, KeyboardAvoidingView, Platform, 
+  StyleSheet, Modal, Switch 
 } from 'react-native';
-import { useState, useEffect } from 'react';
-import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as FileSystem from 'expo-file-system/legacy';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
-import { useAppSettings } from '../../hooks/useAppSettings';
-import FaceBiometricScanner from '../../components/FaceBiometricScanner';
-import { submitFaceBiometricKYC, checkUserFaceBiometricStatus } from '../../services/faceBiometrics';
 
-// Executive Light Platinum, Royal Navy & Gold Tokens
-const L = {
-    bg: '#F4F6FB',
-    card: '#FFFFFF',
-    cardBorder: 'rgba(245, 166, 35, 0.35)',
-    navyHeader: '#0F172A',
-    navyMid: '#1C2541',
-    gold: '#F5A623',
-    goldDk: '#D97706',
-    goldAmber: '#B45309',
-    goldBg: 'rgba(254, 243, 199, 0.75)',
-    textPrimary: '#0F172A',
-    textSecondary: '#334155',
-    textMuted: '#64748B',
-    inputBg: '#FFFFFF',
-    inputBorder: '#CBD5E1',
-    emerald: '#10B981',
-    emeraldBg: '#ECFDF5',
-    emeraldBorder: '#A7F3D0'
+import { supabase } from '../../services/supabase';
+import { useAppSettings } from '../../hooks/useAppSettings';
+import { NIGERIA_STATES, STATE_LIST } from '../../utils/nigeriaStates';
+
+// Design Tokens matching reference UI
+const C = {
+  navy: '#0D1B3E',
+  navyMid: '#162854',
+  gold: '#D99414',
+  goldDark: '#B87B0B',
+  goldLight: '#FFF8EB',
+  goldBorder: '#F3C366',
+  white: '#FFFFFF',
+  bg: '#F8FAFC',
+  cardBg: '#FFFFFF',
+  border: '#E2E8F0',
+  borderDark: '#CBD5E1',
+  textMain: '#0D1B3E',
+  textSub: '#64748B',
+  textMuted: '#94A3B8',
+  green: '#10B981',
+  greenLight: '#ECFDF5',
+  greenBorder: '#A7F3D0',
+  blueInfo: '#EFF6FF',
+  blueBorder: '#BFDBFE',
+  blueShield: '#1D4ED8',
+  error: '#EF4444',
+  amber: '#F59E0B',
 };
 
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
 export default function UserKYCScreen() {
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const { settings } = useAppSettings();
+  const router = useRouter();
+  const { settings } = useAppSettings();
 
-    const [loading, setLoading] = useState(true);
-    const [tier, setTier] = useState(0);
-    const [userData, setUserData] = useState<any>(null);
-    const [pendingRequest, setPendingRequest] = useState<any>(null);
-    const [verifying, setVerifying] = useState(false);
-    const [virtualAcc, setVirtualAcc] = useState<any>(null);
-    const [virtualAccs, setVirtualAccs] = useState<any[]>([]);
+  // Screen State: 'intro' | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 'in_progress' | 'verified'
+  const [currentStep, setCurrentStep] = useState<number | string>('intro');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
-    // Active Selected Document Type
-    const [selectedDocType, setSelectedDocType] = useState<string>('bvn');
+  // Step 1: Consent & Privacy
+  const [consentAgreed, setConsentAgreed] = useState(true);
 
-    // Input States
-    const [idNumberInput, setIdNumberInput] = useState('');
-    const [docImageUri, setDocImageUri] = useState<string | null>(null);
+  // Step 2: NIN & DOB
+  const [ninInput, setNinInput] = useState('');
+  const [dobDay, setDobDay] = useState('15');
+  const [dobMonth, setDobMonth] = useState('Mar');
+  const [dobYear, setDobYear] = useState('2000');
+  const [showDobModal, setShowDobModal] = useState(false);
 
-    // Face Biometrics State
-    const [faceScannerOpen, setFaceScannerOpen] = useState(false);
-    const [submittingFace, setSubmittingFace] = useState(false);
-    const [biometricInfo, setBiometricInfo] = useState<{
-        hasBiometric: boolean;
-        status: 'approved' | 'pending' | 'rejected' | null;
-        photoUrl: string | null;
-        createdAt: string | null;
-    }>({ hasBiometric: false, status: null, photoUrl: null, createdAt: null });
+  // Step 3: BVN
+  const [bvnInput, setBvnInput] = useState('');
 
-    useEffect(() => {
-        loadData();
-    }, []);
+  // Step 4: Upload ID Card
+  const [docImageUri, setDocImageUri] = useState<string | null>(null);
 
-    const loadData = async () => {
-        try {
-            setLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Not logged in");
+  // Step 5: Selfie
+  const [selfieUri, setSelfieUri] = useState<string | null>(null);
 
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('id, full_name, email, phone, kyc_tier, kyc_verified, nin, bvn')
-                .eq('id', user.id)
-                .single();
-            setUserData({ ...profile, id: user.id });
+  // Step 6: Residential Address
+  const [state, setState] = useState('Yobe');
+  const [lga, setLga] = useState('Gashua');
+  const [addressInput, setAddressInput] = useState('No. 12, Main Road, Gashua');
+  const [useAddressForAll, setUseAddressForAll] = useState(true);
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
+  const [showLgaDropdown, setShowLgaDropdown] = useState(false);
 
-            // Fetch User Virtual Accounts
-            const { data: vAccs } = await supabase
-                .from('virtual_accounts')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: true });
+  // Load User Data
+  useEffect(() => {
+    loadUserData();
+  }, []);
 
-            if (vAccs && vAccs.length > 0) {
-                setVirtualAcc(vAccs[0]);
-                setVirtualAccs(vAccs);
-            }
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Session Expired', 'Please log in to continue.');
+        router.replace('/(auth)/login');
+        return;
+      }
 
-            const { data: pending } = await supabase
-                .from('kyc_requests')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('status', 'pending')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-            if (pending) setPendingRequest(pending);
+      setUserProfile({ ...profile, id: user.id });
 
-            // Fetch Face Biometric Status
-            const bioStatus = await checkUserFaceBiometricStatus(user.id);
-            setBiometricInfo(bioStatus);
+      // Pre-fill profile values if already present
+      if (profile?.nin) setNinInput(profile.nin);
+      if (profile?.bvn) setBvnInput(profile.bvn);
+      if (profile?.state) setState(profile.state);
+      if (profile?.lga) setLga(profile.lga);
+      if (profile?.address) setAddressInput(profile.address);
 
-            const currentTier = profile?.kyc_tier || 0;
-            setTier(currentTier);
+      // Check for pending KYC requests
+      const { data: pending } = await supabase
+        .from('kyc_requests')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-            // Auto select document options strictly based on Tier level
-            if (currentTier === 0) setSelectedDocType('bvn');
-            else if (currentTier === 1) setSelectedDocType('nin');
-            else if (currentTier === 2) setSelectedDocType('utility_bill');
+      if (profile?.kyc_verified || (profile?.kyc_tier && profile.kyc_tier >= 2)) {
+        setCurrentStep('verified');
+      } else if (pending) {
+        setCurrentStep('in_progress');
+      } else {
+        setCurrentStep('intro');
+      }
 
-        } catch (error: any) {
-            console.error("KYC Load Error:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const pickDocumentPhoto = async () => {
-        try {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert("Permission Required", "Please allow photo library access.");
-                return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.7,
-                allowsEditing: true,
-            });
-            if (!result.canceled && result.assets && result.assets.length > 0) {
-                setDocImageUri(result.assets[0].uri);
-            }
-        } catch (e: any) {
-            Alert.alert("Image Error", e.message || "Failed to select document photo.");
-        }
-    };
-
-    const takeDocumentPhoto = async () => {
-        try {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert("Permission Required", "Please allow camera access.");
-                return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-                quality: 0.7,
-                allowsEditing: true,
-            });
-            if (!result.canceled && result.assets && result.assets.length > 0) {
-                setDocImageUri(result.assets[0].uri);
-            }
-        } catch (e: any) {
-            Alert.alert("Camera Error", e.message || "Failed to take photo.");
-        }
-    };
-
-    const handleFaceBiometricCapture = async (result: { uri: string; base64?: string }) => {
-        try {
-            setSubmittingFace(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Not logged in");
-
-            const isAutoApprove = settings?.auto_kyc_verification_enabled === true || settings?.auto_approve_kyc === true;
-
-            const res = await submitFaceBiometricKYC({
-                userId: user.id,
-                imageUri: result.uri,
-                imageBase64: result.base64,
-                idType: selectedDocType,
-                idNumber: idNumberInput.trim() || undefined,
-                autoApprove: isAutoApprove,
-            });
-
-            if (res.success) {
-                Alert.alert(
-                    res.status === 'approved' ? "Face Biometric Verified! 🎉" : "Face Biometric Saved! 🛡️",
-                    res.message
-                );
-                await loadData();
-            } else {
-                Alert.alert("Submission Update", res.message);
-            }
-        } catch (e: any) {
-            Alert.alert("Biometric Error", e.message || "Failed to process face biometric.");
-        } finally {
-            setSubmittingFace(false);
-        }
-    };
-
-    const handleSubmitKYC = async () => {
-        // Validation Checks
-        if (selectedDocType === 'bvn' && (!idNumberInput || idNumberInput.trim().length !== 11)) {
-            return Alert.alert("BVN Required", "Please enter your valid 11-digit BVN.");
-        }
-        if (selectedDocType === 'nin' && (!idNumberInput || idNumberInput.trim().length !== 11)) {
-            return Alert.alert("NIN Required", "Please enter your valid 11-digit NIN.");
-        }
-        if (selectedDocType === 'drivers_license' && !idNumberInput.trim() && !docImageUri) {
-            return Alert.alert("License Required", "Please enter your Driver's License Number or attach a document photo.");
-        }
-        if (selectedDocType === 'voters_card' && !idNumberInput.trim() && !docImageUri) {
-            return Alert.alert("Voter's Card Required", "Please enter your Voter's Card VIN Number or attach a document photo.");
-        }
-        if ((selectedDocType === 'utility_bill' || selectedDocType === 'bank_statement') && !idNumberInput.trim() && !docImageUri) {
-            return Alert.alert("Document Required", "Please enter document reference number or attach photo.");
-        }
-
-        setVerifying(true);
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("User session expired. Please log in.");
-
-            let fileUrl = null;
-
-            if (docImageUri) {
-                try {
-                    if (docImageUri.startsWith('data:')) {
-                        fileUrl = docImageUri;
-                    } else {
-                        let base64 = '';
-                        try {
-                            base64 = await FileSystem.readAsStringAsync(docImageUri, { encoding: 'base64' });
-                        } catch (fsErr) {}
-
-                        const fileExt = (docImageUri.split('.').pop() || 'jpg').split('?')[0];
-                        const fileName = `${user.id}_${selectedDocType}_${Date.now()}.${fileExt}`;
-                        const mime = fileExt.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
-                        
-                        if (base64) {
-                            const { data: uploadData, error: uploadError } = await supabase.storage
-                                .from('kyc-documents')
-                                .upload(fileName, decode(base64), {
-                                    contentType: mime,
-                                    upsert: true
-                                });
-
-                            if (!uploadError && uploadData) {
-                                const { data: publicUrlData } = supabase.storage
-                                    .from('kyc-documents')
-                                    .getPublicUrl(fileName);
-                                fileUrl = publicUrlData?.publicUrl || fileName;
-                            } else {
-                                fileUrl = `data:${mime};base64,${base64}`;
-                            }
-                        }
-                    }
-                } catch (imgErr) {
-                    console.warn("Doc image upload warning:", imgErr);
-                }
-            }
-
-            // Check Auto-Approve Setting
-            const isAutoApprove = 
-                settings?.auto_kyc_verification_enabled === true || 
-                settings?.auto_approve_kyc === true;
-
-            const reqStatus = isAutoApprove ? 'approved' : 'pending';
-
-            // Insert Request safely
-            const { error: dbError } = await supabase.from('kyc_requests').insert({
-                user_id: user.id,
-                document_type: selectedDocType,
-                document_number: idNumberInput.trim() || null,
-                document_url: fileUrl,
-                status: reqStatus
-            });
-
-            if (dbError) {
-                console.warn("KYC request insert fallback:", dbError.message);
-            }
-
-            if (isAutoApprove) {
-                let targetTier = tier;
-                if (selectedDocType === 'bvn') targetTier = 1;
-                else if (selectedDocType === 'nin' || selectedDocType === 'drivers_license' || selectedDocType === 'voters_card') targetTier = 2;
-                else if (selectedDocType === 'utility_bill' || selectedDocType === 'bank_statement') targetTier = 3;
-
-                const updatePayload: any = { kyc_tier: targetTier };
-                if (selectedDocType === 'bvn') updatePayload.bvn = idNumberInput.trim();
-                if (selectedDocType === 'nin') updatePayload.nin = idNumberInput.trim();
-
-                await supabase.from('profiles').update(updatePayload).eq('id', user.id);
-
-                // Auto Create / Upgrade Dedicated Virtual Accounts (Account #1 & Account #2)
-                if (selectedDocType === 'bvn' || selectedDocType === 'nin' || selectedDocType === 'drivers_license') {
-                    try {
-                        const vaRes = await supabase.functions.invoke('create-virtual-account', {
-                            body: { userId: user.id, bvn: idNumberInput.trim(), forceSecondAccount: true, forceUpdate: true }
-                        });
-                        if (vaRes.data?.accounts && vaRes.data.accounts.length > 0) {
-                            setVirtualAccs(vaRes.data.accounts);
-                            setVirtualAcc(vaRes.data.accounts[0]);
-                        }
-                    } catch (dvaErr) {
-                        console.warn("DVA trigger warning:", dvaErr);
-                    }
-                }
-
-                setTier(targetTier);
-                Alert.alert(
-                    "Verification Successful! 🎉",
-                    selectedDocType === 'bvn' 
-                        ? `BVN Verified Successfully! Your 2nd Dedicated Virtual Bank Account (PalmPay / 9PSB) has been generated!`
-                        : `Your ${selectedDocType.toUpperCase().replace(/_/g, ' ')} has been verified automatically. Account upgraded to Tier ${targetTier}!`
-                );
-                loadData();
-            } else {
-                setPendingRequest({ document_type: selectedDocType, status: 'pending' });
-                Alert.alert("Submitted Successfully", "Your verification request has been submitted for instant review.");
-            }
-
-            setIdNumberInput('');
-            setDocImageUri(null);
-
-        } catch (error: any) {
-            console.error("KYC Submit Error:", error);
-            Alert.alert("Submission Update", error.message || "Request recorded successfully.");
-        } finally {
-            setVerifying(false);
-        }
-    };
-
-
-    // Strict Tier Document Selector Lists
-    const tier2DocOptions = [
-        { id: 'nin', name: 'NIN (National ID)', icon: 'id-card' },
-        { id: 'drivers_license', name: "Driver's License", icon: 'car-sport' },
-        { id: 'voters_card', name: "Voter's Card (VIN)", icon: 'checkbox' },
-    ];
-
-    const tier3DocOptions = [
-        { id: 'utility_bill', name: 'Utility Bill (Electricity)', icon: 'home' },
-        { id: 'bank_statement', name: 'Bank Statement (Address)', icon: 'document-text' },
-    ];
-
-    if (loading) {
-        return (
-            <View style={{ flex: 1, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator size="small" color={L.goldDk} />
-            </View>
-        );
+    } catch (e: any) {
+      console.warn('KYC load error:', e);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return (
-        <View style={{ flex: 1, backgroundColor: L.bg }}>
-            <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar style="light" />
+  // Image Pickers
+  const handleTakePhoto = async (type: 'document' | 'selfie') => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please grant camera access to take a photo.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.8,
+        cameraType: type === 'selfie' ? ImagePicker.CameraType.front : ImagePicker.CameraType.back,
+      });
 
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                
-                {/* Royal Navy Header */}
-                <LinearGradient 
-                    colors={['#0F172A', '#1C2541', '#0B132B']} 
-                    style={{ paddingTop: insets.top + 6, paddingBottom: 12, paddingHorizontal: 12, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, borderBottomWidth: 1.5, borderColor: L.goldDk }}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}>
-                            <Ionicons name="arrow-back" size={14} color={L.gold} />
-                        </TouchableOpacity>
-                        <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: -0.2 }}>IDENTITY VERIFICATION HUB</Text>
-                        <View style={{ width: 30 }} />
-                    </View>
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (type === 'document') setDocImageUri(result.assets[0].uri);
+        else setSelfieUri(result.assets[0].uri);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to capture photo');
+    }
+  };
 
-                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', textAlign: 'center' }}>Account Tier: Level {tier}</Text>
-                    <Text style={{ color: '#CBD5E1', fontSize: 9, textAlign: 'center', marginTop: 1 }}>
-                        {tier === 0 ? 'Step 1: Submit BVN to activate Virtual Bank Account' : tier === 1 ? 'Step 2: Submit NIN, Driver License or Voter Card' : tier === 2 ? 'Step 3: Submit Utility Bill or Address Proof' : 'Tier 3 Account Fully Verified'}
-                    </Text>
-                </LinearGradient>
+  const handlePickFromGallery = async (type: 'document' | 'selfie') => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please grant gallery access to select a photo.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
 
-                <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 10 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-                    
-                    {/* Stepper Progress Bar */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, backgroundColor: L.card, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, elevation: 1 }}>
-                        {[
-                            { t: 1, label: 'Tier 1 (BVN)' },
-                            { t: 2, label: 'Tier 2 (ID/License)' },
-                            { t: 3, label: 'Tier 3 (Address)' },
-                        ].map((st) => {
-                            const isPassed = tier >= st.t;
-                            return (
-                                <View key={st.t} style={{ alignItems: 'center', flex: 1 }}>
-                                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isPassed ? L.navyHeader : L.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isPassed ? L.gold : L.inputBorder, marginBottom: 2 }}>
-                                        {isPassed ? <Ionicons name="checkmark" size={10} color={L.gold} /> : <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '800' }}>{st.t}</Text>}
-                                    </View>
-                                    <Text style={{ fontSize: 7, fontWeight: '800', color: isPassed ? L.navyHeader : L.textMuted, textAlign: 'center' }}>{st.label}</Text>
-                                </View>
-                            );
-                        })}
-                    </View>
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (type === 'document') setDocImageUri(result.assets[0].uri);
+        else setSelfieUri(result.assets[0].uri);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to pick image');
+    }
+  };
 
-                    {/* Reserved Virtual Dedicated Bank Account(s) Display */}
-                    {virtualAccs.length > 0 ? (
-                        <View style={{ gap: 8, marginBottom: 10 }}>
-                            {virtualAccs.map((va, idx) => (
-                                <View key={va.id || idx} style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.cardBorder, elevation: 2 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                            <Ionicons name="card" size={14} color={L.goldAmber} />
-                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>
-                                                {va.bank_name} {idx === 0 ? '(Account 1)' : idx === 1 ? '(Account 2)' : ''}
-                                            </Text>
-                                        </View>
-                                        <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
-                                            <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>Active</Text>
-                                        </View>
-                                    </View>
+  const uploadFileToSupabase = async (uri: string, prefix: string, userId: string) => {
+    if (!uri) return null;
+    if (uri.startsWith('http://') || uri.startsWith('https://')) return uri;
+    const fileExt = (uri.split('.').pop() || 'jpg').split('?')[0];
+    const fileName = `${userId}_${prefix}_${Date.now()}.${fileExt}`;
+    const mime = fileExt.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
 
-                                    <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
-                                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>Bank Name: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{va.bank_name}</Text></Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                                            <Text style={{ color: L.navyHeader, fontSize: 14, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                                                {va.account_number}
-                                            </Text>
-                                            <TouchableOpacity onPress={() => Alert.alert("Copied", `Account ${va.account_number} copied!`)} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: L.gold }}>
-                                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 8 }}>COPY</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    ) : virtualAcc ? (
-                        <View style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 10, elevation: 2 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Ionicons name="card" size={14} color={L.goldAmber} />
-                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Reserved Dedicated Bank Account</Text>
-                                </View>
-                                <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
-                                    <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>Active</Text>
-                                </View>
-                            </View>
+    const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+    const { data, error } = await supabase.storage
+      .from('kyc-documents')
+      .upload(fileName, decode(base64), { contentType: mime, upsert: true });
 
-                            <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
-                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>Bank Name: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{virtualAcc.bank_name || '9Payment Service Bank'}</Text></Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                                    <Text style={{ color: L.navyHeader, fontSize: 14, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                                        {virtualAcc.account_number}
-                                    </Text>
-                                    <TouchableOpacity onPress={() => Alert.alert("Copied", `Account ${virtualAcc.account_number} copied!`)} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: L.gold }}>
-                                        <Text style={{ color: L.gold, fontWeight: '900', fontSize: 8 }}>COPY</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </View>
-                    ) : null}
+    if (!error && data) {
+      const { data: publicUrlData } = supabase.storage
+        .from('kyc-documents')
+        .getPublicUrl(fileName);
+      return publicUrlData?.publicUrl || fileName;
+    }
+    return `data:${mime};base64,${base64}`;
+  };
 
-                    {/* FACE BIOMETRIC & SMILE ID SMARTSELFIE CARD */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 10, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}>
-                                    <Ionicons name="scan-outline" size={14} color={L.goldAmber} />
-                                </View>
-                                <View>
-                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>Face Biometric & SmartSelfie</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>AI Live Face & Smile Liveness Verification</Text>
-                                </View>
-                            </View>
-                            <View style={{ 
-                                backgroundColor: biometricInfo.status === 'approved' ? L.emeraldBg : biometricInfo.status === 'pending' ? L.goldBg : 'rgba(15, 23, 42, 0.06)', 
-                                paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, 
-                                borderColor: biometricInfo.status === 'approved' ? L.emeraldBorder : biometricInfo.status === 'pending' ? L.goldDk : L.inputBorder 
-                            }}>
-                                <Text style={{ 
-                                    color: biometricInfo.status === 'approved' ? L.emerald : biometricInfo.status === 'pending' ? L.goldAmber : L.textMuted, 
-                                    fontSize: 8, fontWeight: '900', textTransform: 'uppercase' 
-                                }}>
-                                    {biometricInfo.status === 'approved' ? 'Verified ✅' : biometricInfo.status === 'pending' ? 'Pending Review ⏳' : 'Not Enrolled'}
-                                </Text>
-                            </View>
-                        </View>
+  // Step 1 Validation
+  const handleContinueFromStep1 = () => {
+    if (!consentAgreed) {
+      return Alert.alert('Consent Required', 'Please agree to the privacy policy to continue.');
+    }
+    setCurrentStep(2);
+  };
 
-                        {biometricInfo.photoUrl ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: L.bg, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 4 }}>
-                                <Image 
-                                    source={{ uri: biometricInfo.photoUrl }} 
-                                    style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: L.gold }} 
-                                    resizeMode="cover"
-                                />
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Biometric Face Identity On File</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 8, marginTop: 1 }}>
-                                        {biometricInfo.status === 'approved' 
-                                            ? 'Your face biometric is authenticated and active on your account.' 
-                                            : 'Face scan captured successfully and recorded in your KYC record.'}
-                                    </Text>
-                                </View>
-                                <TouchableOpacity 
-                                    onPress={() => setFaceScannerOpen(true)}
-                                    style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: L.gold }}
-                                >
-                                    <Text style={{ color: L.gold, fontSize: 8, fontWeight: '900' }}>RETAKE</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View>
-                                <Text style={{ color: L.textSecondary, fontSize: 8.5, lineHeight: 13, marginBottom: 8 }}>
-                                    Capture your live biometric selfie with real-time smile detection to verify your identity and unlock instant account upgrade.
-                                </Text>
-                                <TouchableOpacity
-                                    onPress={() => setFaceScannerOpen(true)}
-                                    disabled={submittingFace}
-                                    style={{ height: 38, backgroundColor: L.navyHeader, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: L.gold }}
-                                >
-                                    {submittingFace ? (
-                                        <ActivityIndicator size="small" color={L.gold} />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="camera" size={14} color={L.gold} />
-                                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9.5, textTransform: 'uppercase' }}>
-                                                Launch Biometric Face Scan 📸
-                                            </Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
+  // Step 2 Validation (NIN)
+  const handleVerifyNIN = () => {
+    const cleanNin = ninInput.replace(/\s+/g, '');
+    if (!cleanNin || cleanNin.length !== 11 || !/^\d{11}$/.test(cleanNin)) {
+      return Alert.alert('Invalid NIN', 'Please enter your valid 11-digit National Identification Number (NIN).');
+    }
+    setCurrentStep(3);
+  };
 
+  // Step 3 Validation (BVN)
+  const handleVerifyBVN = () => {
+    const cleanBvn = bvnInput.replace(/\s+/g, '');
+    if (!cleanBvn || cleanBvn.length !== 11 || !/^\d{11}$/.test(cleanBvn)) {
+      return Alert.alert('Invalid BVN', 'Please enter your valid 11-digit Bank Verification Number (BVN). Both NIN and BVN are required.');
+    }
+    setCurrentStep(4);
+  };
 
-                    {/* STEP 1: BVN FIRST (Tier === 0) */}
-                    {tier === 0 && (
-                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 10, elevation: 2 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                <Ionicons name="card" size={14} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>Tier 1: Bank Verification Number (BVN)</Text>
-                            </View>
-                            <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 8 }}>
-                                Enter your 11-digit BVN to activate your account and issue your Reserved Virtual Dedicated Bank Account.
-                            </Text>
+  // Step 4 Validation (ID Document)
+  const handleContinueFromStep4 = () => {
+    if (!docImageUri) {
+      return Alert.alert('Document Required', 'Please upload or capture a photo of your National ID card.');
+    }
+    setCurrentStep(5);
+  };
 
-                            <View style={{ marginBottom: 8 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                                    <Text style={{ color: L.textSecondary, fontSize: 8, fontWeight: 'bold' }}>11-Digit BVN Number:</Text>
-                                    <TouchableOpacity 
-                                        onPress={async () => {
-                                            const text = await Clipboard.getStringAsync();
-                                            if (text) setIdNumberInput(text.trim());
-                                        }}
-                                        style={{ backgroundColor: L.goldBg, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.goldDk }}
-                                    >
-                                        <Text style={{ color: L.goldAmber, fontSize: 7, fontWeight: '900' }}>PASTE</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={{ height: 36, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 8, justifyContent: 'center' }}>
-                                    <TextInput
-                                        value={idNumberInput}
-                                        onChangeText={setIdNumberInput}
-                                        placeholder="Enter 11-Digit BVN..."
-                                        placeholderTextColor="#94A3B8"
-                                        style={{ color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
-                                        keyboardType="numeric"
-                                        maxLength={11}
-                                    />
-                                </View>
-                            </View>
+  // Step 5 Validation (Selfie)
+  const handleContinueFromStep5 = () => {
+    if (!selfieUri) {
+      return Alert.alert('Selfie Required', 'Please take a clear selfie photo to confirm your identity.');
+    }
+    setCurrentStep(6);
+  };
 
-                            <TouchableOpacity 
-                                onPress={() => { setSelectedDocType('bvn'); handleSubmitKYC(); }}
-                                disabled={verifying}
-                                style={{ height: 36, backgroundColor: L.navyHeader, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: L.gold }}
-                            >
-                                {verifying ? <ActivityIndicator size="small" color={L.gold} /> : (
-                                    <>
-                                        <Ionicons name="checkmark-circle-sharp" size={14} color={L.gold} />
-                                        <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Verify BVN & Issue Bank Account</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    )}
+  // Step 6 Validation (Address)
+  const handleContinueFromStep6 = () => {
+    if (!state) return Alert.alert('State Required', 'Please select your residential State.');
+    if (!lga) return Alert.alert('LGA Required', 'Please select your LGA.');
+    if (!addressInput.trim() || addressInput.trim().length < 5) {
+      return Alert.alert('Address Required', 'Please enter your complete residential street address.');
+    }
+    setCurrentStep(7);
+  };
 
-                    {/* STEP 2: TIER 2 (NIN, Driver's License, Voter's Card strictly) */}
-                    {tier === 1 && (
-                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 10, elevation: 2 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                <Ionicons name="id-card" size={14} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>Tier 2: Government Identity Verification</Text>
-                            </View>
-                            <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 8 }}>
-                                Select your Government Photo ID document to upgrade to Tier 2:
-                            </Text>
+  // Step 7: Final Submit
+  const handleFinalSubmit = async () => {
+    try {
+      setSubmitting(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User session expired. Please log in.');
 
-                            {/* Strict Tier 2 Selector: NIN, Driver's License, Voter's Card */}
-                            <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
-                                {tier2DocOptions.map((opt) => {
-                                    const isSelected = selectedDocType === opt.id;
-                                    return (
-                                        <TouchableOpacity
-                                            key={opt.id}
-                                            onPress={() => { setSelectedDocType(opt.id); setIdNumberInput(''); setDocImageUri(null); }}
-                                            style={{
-                                                flex: 1, paddingVertical: 5, paddingHorizontal: 3, borderRadius: 6,
-                                                backgroundColor: isSelected ? L.navyHeader : L.bg,
-                                                borderWidth: 1, borderColor: isSelected ? L.gold : L.inputBorder,
-                                                alignItems: 'center', justifyContent: 'center'
-                                            }}
-                                        >
-                                            <Ionicons name={opt.icon as any} size={11} color={isSelected ? L.gold : L.textSecondary} />
-                                            <Text style={{ fontSize: 7.5, fontWeight: '900', color: isSelected ? L.gold : L.textSecondary, textAlign: 'center', marginTop: 2 }}>{opt.name}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
+      // 1. Upload Document & Selfie Photos
+      const docUploadedUrl = await uploadFileToSupabase(docImageUri || '', 'doc', user.id);
+      const selfieUploadedUrl = await uploadFileToSupabase(selfieUri || '', 'selfie', user.id);
 
-                            {/* ID Number Input */}
-                            <View style={{ marginBottom: 8 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                                    <Text style={{ color: L.textSecondary, fontSize: 8, fontWeight: 'bold' }}>
-                                        {selectedDocType === 'nin' ? '11-Digit NIN Number:' : selectedDocType === 'drivers_license' ? "Driver's License Number:" : "Voter's Card VIN Number:"}
-                                    </Text>
-                                    <TouchableOpacity 
-                                        onPress={async () => {
-                                            const text = await Clipboard.getStringAsync();
-                                            if (text) setIdNumberInput(text.trim());
-                                        }}
-                                        style={{ backgroundColor: L.goldBg, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.goldDk }}
-                                    >
-                                        <Text style={{ color: L.goldAmber, fontSize: 7, fontWeight: '900' }}>PASTE</Text>
-                                    </TouchableOpacity>
-                                </View>
+      const isAutoApprove = 
+        settings?.auto_kyc_verification_enabled === true || 
+        settings?.auto_approve_kyc === true;
 
-                                <View style={{ height: 36, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 8, justifyContent: 'center' }}>
-                                    <TextInput
-                                        value={idNumberInput}
-                                        onChangeText={setIdNumberInput}
-                                        placeholder={`Enter ${selectedDocType.replace(/_/g, ' ')} Number...`}
-                                        placeholderTextColor="#94A3B8"
-                                        style={{ color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
-                                        keyboardType={selectedDocType === 'nin' ? 'numeric' : 'default'}
-                                        maxLength={selectedDocType === 'nin' ? 11 : 30}
-                                    />
-                                </View>
-                            </View>
+      const formattedDob = `${dobDay} ${dobMonth} ${dobYear}`;
 
-                            {/* Photo Attachment Box */}
-                            {docImageUri ? (
-                                <View style={{ height: 110, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: L.goldDk, marginBottom: 8, position: 'relative' }}>
-                                    <Image source={{ uri: docImageUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                    <TouchableOpacity onPress={() => setDocImageUri(null)} style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 10, padding: 3 }}>
-                                        <Ionicons name="close" size={12} color="#FFFFFF" />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
-                                    <TouchableOpacity onPress={takeDocumentPhoto} style={{ flex: 1, height: 32, backgroundColor: L.bg, borderRadius: 6, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 }}>
-                                        <Ionicons name="camera-outline" size={12} color={L.navyHeader} />
-                                        <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: 'bold' }}>Snap Photo</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={pickDocumentPhoto} style={{ flex: 1, height: 32, backgroundColor: L.bg, borderRadius: 6, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 }}>
-                                        <Ionicons name="image-outline" size={12} color={L.navyHeader} />
-                                        <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: 'bold' }}>Gallery Upload</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
+      // 2. Insert into kyc_requests table
+      await supabase.from('kyc_requests').insert({
+        user_id: user.id,
+        document_type: 'nin',
+        document_number: ninInput.trim(),
+        document_url: docUploadedUrl,
+        status: isAutoApprove ? 'approved' : 'pending',
+        admin_note: JSON.stringify({
+          nin: ninInput.trim(),
+          bvn: bvnInput.trim(),
+          dob: formattedDob,
+          state: state,
+          lga: lga,
+          address: addressInput.trim(),
+          selfie_url: selfieUploadedUrl,
+        })
+      });
 
-                            <TouchableOpacity 
-                                onPress={handleSubmitKYC}
-                                disabled={verifying}
-                                style={{ height: 36, backgroundColor: L.navyHeader, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: L.gold }}
-                            >
-                                {verifying ? <ActivityIndicator size="small" color={L.gold} /> : (
-                                    <>
-                                        <Ionicons name="checkmark-circle-sharp" size={14} color={L.gold} />
-                                        <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Submit Tier 2 Identity</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    )}
+      // 3. Update Profiles with both NIN, BVN, & Address
+      const profileUpdate: any = {
+        nin: ninInput.trim(),
+        bvn: bvnInput.trim(),
+        state: state,
+        lga: lga,
+        address: addressInput.trim(),
+      };
 
-                    {/* STEP 3: TIER 3 (Utility Bill & Address Proof strictly) */}
-                    {tier === 2 && (
-                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 10, elevation: 2 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                <Ionicons name="home" size={14} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>Tier 3: Address & Residency Verification</Text>
-                            </View>
-                            <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 8 }}>
-                                Select Utility Bill or Address proof document:
-                            </Text>
+      if (isAutoApprove) {
+        profileUpdate.kyc_tier = 2;
+        profileUpdate.kyc_verified = true;
+      }
 
-                            {/* Strict Tier 3 Selector: Utility Bill, Bank Statement */}
-                            <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
-                                {tier3DocOptions.map((opt) => {
-                                    const isSelected = selectedDocType === opt.id;
-                                    return (
-                                        <TouchableOpacity
-                                            key={opt.id}
-                                            onPress={() => { setSelectedDocType(opt.id); setIdNumberInput(''); setDocImageUri(null); }}
-                                            style={{
-                                                flex: 1, paddingVertical: 5, paddingHorizontal: 4, borderRadius: 6,
-                                                backgroundColor: isSelected ? L.navyHeader : L.bg,
-                                                borderWidth: 1, borderColor: isSelected ? L.gold : L.inputBorder,
-                                                alignItems: 'center', justifyContent: 'center'
-                                            }}
-                                        >
-                                            <Ionicons name={opt.icon as any} size={11} color={isSelected ? L.gold : L.textSecondary} />
-                                            <Text style={{ fontSize: 7.5, fontWeight: '900', color: isSelected ? L.gold : L.textSecondary, textAlign: 'center', marginTop: 2 }}>{opt.name}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
+      await supabase.from('profiles').update(profileUpdate).eq('id', user.id);
 
-                            {/* Photo Attachment Box */}
-                            {docImageUri ? (
-                                <View style={{ height: 110, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: L.goldDk, marginBottom: 8, position: 'relative' }}>
-                                    <Image source={{ uri: docImageUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                    <TouchableOpacity onPress={() => setDocImageUri(null)} style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 10, padding: 3 }}>
-                                        <Ionicons name="close" size={12} color="#FFFFFF" />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
-                                    <TouchableOpacity onPress={takeDocumentPhoto} style={{ flex: 1, height: 32, backgroundColor: L.bg, borderRadius: 6, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 }}>
-                                        <Ionicons name="camera-outline" size={12} color={L.navyHeader} />
-                                        <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: 'bold' }}>Snap Bill Photo</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={pickDocumentPhoto} style={{ flex: 1, height: 32, backgroundColor: L.bg, borderRadius: 6, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 }}>
-                                        <Ionicons name="image-outline" size={12} color={L.navyHeader} />
-                                        <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: 'bold' }}>Upload Document</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
+      // 4. Trigger Automatic Dedicated Virtual Account (Wema/PalmPay/9PSB)
+      try {
+        await supabase.functions.invoke('create-virtual-account', {
+          body: { userId: user.id, bvn: bvnInput.trim(), forceSecondAccount: true, forceUpdate: true }
+        });
+      } catch (vaErr) {
+        console.warn('Virtual account creation trigger warning:', vaErr);
+      }
 
-                            <TouchableOpacity 
-                                onPress={handleSubmitKYC}
-                                disabled={verifying}
-                                style={{ height: 36, backgroundColor: L.navyHeader, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: L.gold }}
-                            >
-                                {verifying ? <ActivityIndicator size="small" color={L.gold} /> : (
-                                    <>
-                                        <Ionicons name="checkmark-circle-sharp" size={14} color={L.gold} />
-                                        <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Submit Tier 3 Address Proof</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    )}
+      // Transition Screen
+      if (isAutoApprove) {
+        setCurrentStep('verified');
+      } else {
+        setCurrentStep('in_progress');
+      }
 
-                    {/* STEP 4: TIER 4 (Fully Verified) */}
-                    {tier >= 3 && (
-                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: L.cardBorder, alignItems: 'center', marginBottom: 10, elevation: 2 }}>
-                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: L.emeraldBg, alignItems: 'center', justifyContent: 'center', marginBottom: 6, borderWidth: 1, borderColor: L.emeraldBorder }}>
-                                <Ionicons name="shield-checkmark" size={22} color={L.emerald} />
-                            </View>
-                            <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>Account Fully Verified (Tier {tier})</Text>
-                            <Text style={{ color: L.textMuted, fontSize: 9, textAlign: 'center', marginTop: 2, marginBottom: 8 }}>
-                                Congratulations! You have unlocked all transaction limits, DEX crypto trading & priority support.
-                            </Text>
-                            <TouchableOpacity onPress={() => router.replace('/')} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: L.gold }}>
-                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Return to Dashboard</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
+    } catch (e: any) {
+      console.error('KYC submit error:', e);
+      Alert.alert('Submission Error', e.message || 'Could not complete verification. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-                    {/* Pending Status Banner */}
-                    {pendingRequest && (
-                        <View style={{ backgroundColor: L.goldBg, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: L.goldDk, marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Ionicons name="time-outline" size={14} color={L.goldAmber} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 9 }}>Verification Request Pending</Text>
-                                <Text style={{ color: L.textSecondary, fontSize: 8 }}>
-                                    Your submitted {pendingRequest.document_type?.toUpperCase().replace(/_/g, ' ')} request is pending review by compliance.
-                                </Text>
-                            </View>
-                        </View>
-                    )}
+  const STEP_LABELS = ['Consent','NIN','BVN','ID Card','Selfie','Address','Review'];
 
-                </ScrollView>
-            </KeyboardAvoidingView>
-
-            {/* Face Biometric & Smile Liveness Modal */}
-            <FaceBiometricScanner
-                visible={faceScannerOpen}
-                onClose={() => setFaceScannerOpen(false)}
-                onCapture={handleFaceBiometricCapture}
-            />
+  // Premium 7-step header with gold progress bar
+  const render7StepHeader = (stepNum: number, onBack: () => void) => (
+    <View style={s.stepHeaderContainer}>
+      <View style={s.stepHeaderTop}>
+        <TouchableOpacity onPress={onBack} style={s.headerBackBtn} activeOpacity={0.7}>
+          <View style={s.backBtnCircle}>
+            <Ionicons name="chevron-back" size={20} color={C.navy} />
+          </View>
+        </TouchableOpacity>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={s.stepHeaderTitle}>Identity Verification</Text>
+          <Text style={s.stepHeaderSubtitle}>{STEP_LABELS[stepNum - 1]} · Step {stepNum} of 7</Text>
         </View>
+        <View style={s.stepBadge}>
+          <Text style={s.stepBadgeTxt}>{stepNum}/7</Text>
+        </View>
+      </View>
+
+      {/* Progress Track */}
+      <View style={s.progressBarTrack}>
+        {[1, 2, 3, 4, 5, 6, 7].map((seg) => (
+          <View
+            key={seg}
+            style={[
+              s.progressSegment,
+              seg < stepNum
+                ? s.progressSegmentDone
+                : seg === stepNum
+                  ? s.progressSegmentActive
+                  : s.progressSegmentInactive,
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={[s.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={C.gold} />
+        <Text style={{ marginTop: 12, color: C.textSub, fontSize: 13, fontWeight: '600' }}>Loading KYC profile...</Text>
+      </View>
     );
+  }
+
+  return (
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+
+        {/* ======================================================== */}
+        {/* INTRO SCREEN */}
+        {/* ======================================================== */}
+        {currentStep === 'intro' && (
+          <View style={s.screenWrapper}>
+            <View style={s.introTopBar}>
+              <TouchableOpacity onPress={() => router.back()} style={s.headerBackBtn}>
+                <View style={s.backBtnCircle}>
+                  <Ionicons name="chevron-back" size={20} color={C.navy} />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.skipBtnTxt}>Skip</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={s.introContent} showsVerticalScrollIndicator={false}>
+
+              {/* Hero Panel */}
+              <View style={s.introHeroPanel}>
+                <View style={s.introShieldGlow} />
+                <View style={s.introShieldOuter}>
+                  <View style={s.introShieldInner}>
+                    <Ionicons name="shield-checkmark" size={44} color={C.gold} />
+                  </View>
+                </View>
+                <View style={s.introBrandRow}>
+                  <View style={s.introBrandDot} />
+                  <Text style={s.introBrandTxt}>ABU <Text style={{ color: C.gold }}>MAFHAL</Text> SUB</Text>
+                </View>
+              </View>
+
+              <Text style={s.introHeading}>Verify Your Identity</Text>
+              <Text style={s.introSubheading}>
+                Complete your KYC in 7 easy steps to unlock higher limits and all premium services.
+              </Text>
+
+              {/* Step roadmap */}
+              <View style={s.introRoadmap}>
+                {[
+                  { icon: 'document-text-outline', label: 'Consent & Privacy', sub: 'Review data usage policy' },
+                  { icon: 'card-outline',           label: 'NIN Verification',  sub: '11-digit national ID number' },
+                  { icon: 'business-outline',        label: 'BVN Verification',  sub: 'Bank verification number' },
+                  { icon: 'id-card-outline',         label: 'Upload ID Card',    sub: 'Clear photo of your NIN card' },
+                  { icon: 'camera-outline',          label: 'Take a Selfie',     sub: 'Face matching for security' },
+                  { icon: 'location-outline',        label: 'Residential Address',sub: 'Your current state & LGA' },
+                  { icon: 'checkmark-circle-outline',label: 'Review & Submit',   sub: 'Confirm all your details' },
+                ].map((step, i) => (
+                  <View key={i} style={s.introRoadmapRow}>
+                    <View style={s.introRoadmapNum}>
+                      <Text style={s.introRoadmapNumTxt}>{i + 1}</Text>
+                    </View>
+                    {i < 6 && <View style={s.introRoadmapLine} />}
+                    <View style={s.introRoadmapIconBox}>
+                      <Ionicons name={step.icon as any} size={18} color={C.gold} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.introRoadmapLabel}>{step.label}</Text>
+                      <Text style={s.introRoadmapSub}>{step.sub}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+            </ScrollView>
+
+            {/* Bottom Action */}
+            <View style={s.introBottomBar}>
+              <TouchableOpacity
+                style={s.btnGold}
+                onPress={() => setCurrentStep(1)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="shield-checkmark" size={18} color={C.white} />
+                <Text style={s.btnGoldTxt}>Start Verification</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+              <View style={s.footnoteRow}>
+                <Ionicons name="lock-closed" size={13} color={C.textSub} />
+                <Text style={s.footnoteTxt}>256-bit encrypted · NDPR & CBN compliant</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 1 OF 7: CONSENT & PRIVACY */}
+        {/* ======================================================== */}
+        {currentStep === 1 && (
+          <View style={s.screenWrapper}>
+            {render7StepHeader(1, () => setCurrentStep('intro'))}
+
+            <ScrollView contentContainerStyle={s.stepBodyContent} showsVerticalScrollIndicator={false}>
+              <Text style={s.pageHeading}>Consent & Privacy</Text>
+
+              {/* Graphic: Document with Padlock + Blue Shield & Checkmark */}
+              <View style={s.consentGraphicContainer}>
+                <View style={s.consentDocSheet}>
+                  <View style={s.docSheetLineLong} />
+                  <View style={s.docSheetLineMid} />
+                  <View style={s.docSheetLineShort} />
+                  <View style={s.docPadlockBadge}>
+                    <Ionicons name="lock-closed" size={14} color={C.gold} />
+                  </View>
+                </View>
+
+                <View style={s.consentShieldBadge}>
+                  <Ionicons name="shield-checkmark" size={36} color={C.blueShield} />
+                </View>
+              </View>
+
+              <Text style={s.consentBodyText}>
+                We collect and verify your NIN and BVN for identity verification in compliance with Nigerian regulations. Your data is encrypted and used only for verification purposes.
+              </Text>
+
+              {/* Checkbox Card */}
+              <TouchableOpacity 
+                style={s.consentCheckboxRow} 
+                onPress={() => setConsentAgreed(!consentAgreed)}
+                activeOpacity={0.8}
+              >
+                <View style={[s.checkboxSquare, consentAgreed && s.checkboxSquareActive]}>
+                  {consentAgreed && <Ionicons name="checkmark" size={14} color={C.white} />}
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={s.consentCheckLabel}>
+                    I agree to the collection and verification of my NIN and BVN data and I have read the{' '}
+                    <Text style={s.privacyLinkTxt}>Privacy Policy.</Text>
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={() => Alert.alert('Privacy Policy', 'Abu Mafhal Sub uses bank-grade encryption to safeguard your identity data in compliance with NDPR and CBN guidelines.')}
+                    style={{ marginTop: 4 }}
+                  >
+                    <Text style={s.readPolicyBtnTxt}>Read Privacy Policy</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={[s.btnNavy, !consentAgreed && { opacity: 0.6 }]} 
+                onPress={handleContinueFromStep1}
+                disabled={!consentAgreed}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnNavyTxt}>Continue</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 2 OF 7: ENTER YOUR NIN */}
+        {/* ======================================================== */}
+        {currentStep === 2 && (
+          <View style={s.screenWrapper}>
+            {render7StepHeader(2, () => setCurrentStep(1))}
+
+            <ScrollView contentContainerStyle={s.stepBodyContent} showsVerticalScrollIndicator={false}>
+              <Text style={s.pageHeading}>Enter Your NIN</Text>
+              <Text style={s.pageSubheading}>
+                Provide your National Identification Number (NIN) as printed on your NIN slip.
+              </Text>
+
+              {/* NIN Number Input */}
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>NIN Number (11 digits)</Text>
+                <View style={s.textInputWrapper}>
+                  <Ionicons name="card-outline" size={19} color={C.textSub} style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={s.textInputField}
+                    placeholder="1234 5678 901"
+                    placeholderTextColor={C.textMuted}
+                    keyboardType="numeric"
+                    maxLength={11}
+                    value={ninInput}
+                    onChangeText={setNinInput}
+                  />
+                </View>
+              </View>
+
+              {/* Blue Info Notice */}
+              <View style={s.infoNoticeBox}>
+                <Ionicons name="information-circle" size={19} color="#2563EB" style={{ marginTop: 1 }} />
+                <Text style={s.infoNoticeTxt}>
+                  Your NIN will be verified with the official NIMC database.
+                </Text>
+              </View>
+
+              {/* Date of Birth Input */}
+              <View style={[s.fieldGroup, { marginTop: 16 }]}>
+                <Text style={s.fieldLabel}>Date of Birth</Text>
+                <TouchableOpacity 
+                  style={s.textInputWrapper} 
+                  onPress={() => setShowDobModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="calendar-outline" size={18} color={C.textSub} style={{ marginRight: 10 }} />
+                  <Text style={[s.textInputField, { paddingTop: 2 }]}>
+                    {`${dobDay} ${dobMonth} ${dobYear}`}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={C.textSub} />
+                </TouchableOpacity>
+              </View>
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnGold} 
+                onPress={handleVerifyNIN}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnGoldTxt}>Verify NIN</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 3 OF 7: ENTER YOUR BVN */}
+        {/* ======================================================== */}
+        {currentStep === 3 && (
+          <View style={s.screenWrapper}>
+            {render7StepHeader(3, () => setCurrentStep(2))}
+
+            <ScrollView contentContainerStyle={s.stepBodyContent} showsVerticalScrollIndicator={false}>
+              <Text style={s.pageHeading}>Enter Your BVN</Text>
+              <Text style={s.pageSubheading}>
+                Provide your Bank Verification Number (BVN) to verify your identity.
+              </Text>
+
+              {/* BVN Number Input */}
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>BVN Number (11 digits)</Text>
+                <View style={s.textInputWrapper}>
+                  <Ionicons name="business-outline" size={19} color={C.textSub} style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={s.textInputField}
+                    placeholder="1234 5678 901"
+                    placeholderTextColor={C.textMuted}
+                    keyboardType="numeric"
+                    maxLength={11}
+                    value={bvnInput}
+                    onChangeText={setBvnInput}
+                  />
+                </View>
+              </View>
+
+              {/* Blue Info Notice */}
+              <View style={s.infoNoticeBox}>
+                <Ionicons name="information-circle" size={19} color="#2563EB" style={{ marginTop: 1 }} />
+                <Text style={s.infoNoticeTxt}>
+                  Your BVN will be verified with the official CBN database.
+                </Text>
+              </View>
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnGold} 
+                onPress={handleVerifyBVN}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnGoldTxt}>Verify BVN</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 4 OF 7: UPLOAD YOUR ID CARD */}
+        {/* ======================================================== */}
+        {currentStep === 4 && (
+          <View style={s.screenWrapper}>
+            {render7StepHeader(4, () => setCurrentStep(3))}
+
+            <ScrollView contentContainerStyle={s.stepBodyContent} showsVerticalScrollIndicator={false}>
+              <Text style={s.pageHeading}>Upload Your ID Card</Text>
+              <Text style={s.pageSubheading}>
+                Take a clear photo of your National ID. Make sure the details are visible.
+              </Text>
+
+              {/* ID Card Graphic / Preview */}
+              <View style={s.idCardGraphicContainer}>
+                {docImageUri ? (
+                  <View style={s.uploadedPreviewFrame}>
+                    <Image source={{ uri: docImageUri }} style={s.uploadedDocImg} resizeMode="cover" />
+                    <TouchableOpacity 
+                      style={s.changePhotoChip} 
+                      onPress={() => setDocImageUri(null)}
+                    >
+                      <Ionicons name="refresh" size={14} color={C.navy} />
+                      <Text style={s.changePhotoChipTxt}>Change Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={s.idCardGraphicFrame}>
+                    <View style={s.idGraphicHeader}>
+                      <View style={s.idCoatOfArmsDot} />
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={s.idGraphicCountry}>FEDERAL REPUBLIC OF NIGERIA</Text>
+                        <Text style={s.idGraphicCardTitle}>National Identity Card</Text>
+                      </View>
+                    </View>
+
+                    <View style={s.idGraphicBody}>
+                      <View style={s.idChipBox}>
+                        <View style={s.idChipLine} />
+                        <View style={s.idChipLine} />
+                      </View>
+
+                      <View style={s.idPhotoPlaceholder}>
+                        <Ionicons name="person" size={40} color={C.textMuted} />
+                      </View>
+                    </View>
+
+                    <Text style={s.idCardNumberGraphic}>1234 5678 9012 3456</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Action Buttons: Take Photo & Choose Gallery */}
+              <View style={s.uploadButtonsGroup}>
+                <TouchableOpacity 
+                  style={s.btnOutlined} 
+                  onPress={() => handleTakePhoto('document')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="camera-outline" size={19} color={C.navy} />
+                  <Text style={s.btnOutlinedTxt}>Take Photo</Text>
+                </TouchableOpacity>
+
+                <View style={s.orDividerRow}>
+                  <View style={s.orLine} />
+                  <Text style={s.orTxt}>or</Text>
+                  <View style={s.orLine} />
+                </View>
+
+                <TouchableOpacity 
+                  style={s.btnOutlined} 
+                  onPress={() => handlePickFromGallery('document')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="image-outline" size={19} color={C.navy} />
+                  <Text style={s.btnOutlinedTxt}>Choose from Gallery</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Tips for Best Results */}
+              <View style={s.tipsContainer}>
+                <Text style={s.tipsHeading}>Tips for best results:</Text>
+                <View style={s.tipRow}>
+                  <Ionicons name="checkmark" size={15} color={C.textSub} />
+                  <Text style={s.tipTxt}>Good lighting</Text>
+                </View>
+                <View style={s.tipRow}>
+                  <Ionicons name="checkmark" size={15} color={C.textSub} />
+                  <Text style={s.tipTxt}>All corners visible</Text>
+                </View>
+                <View style={s.tipRow}>
+                  <Ionicons name="checkmark" size={15} color={C.textSub} />
+                  <Text style={s.tipTxt}>No blur or glare</Text>
+                </View>
+              </View>
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnNavy} 
+                onPress={handleContinueFromStep4}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnNavyTxt}>Continue</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 5 OF 7: TAKE A SELFIE */}
+        {/* ======================================================== */}
+        {currentStep === 5 && (
+          <View style={s.screenWrapper}>
+            {render7StepHeader(5, () => setCurrentStep(4))}
+
+            <ScrollView contentContainerStyle={s.stepBodyContent} showsVerticalScrollIndicator={false}>
+              <Text style={s.pageHeading}>Take a Selfie</Text>
+              <Text style={s.pageSubheading}>
+                Take a clear selfie to confirm it's you. Make sure your face is well lit.
+              </Text>
+
+              {/* Premium Selfie Viewfinder */}
+              <View style={s.selfieViewfinderBox}>
+                {selfieUri ? (
+                  <Image source={{ uri: selfieUri }} style={s.selfieCapturedImg} resizeMode="cover" />
+                ) : (
+                  <View style={s.selfiePlaceholderArea}>
+                    {/* Oval face guide */}
+                    <View style={s.selfieFaceOval}>
+                      <Ionicons name="person-outline" size={80} color="rgba(255,255,255,0.25)" />
+                    </View>
+                    <Text style={s.selfiePlaceholderTxt}>Position your face inside the oval</Text>
+                    <Text style={s.selfiePlaceholderSub}>Ensure good lighting · Look straight ahead</Text>
+                  </View>
+                )}
+
+                {/* Corner brackets overlay */}
+                <View style={s.viewfinderBracketsFrame} pointerEvents="none">
+                  <View style={[s.bracketCorner, { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 }]} />
+                  <View style={[s.bracketCorner, { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 }]} />
+                  <View style={[s.bracketCorner, { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 }]} />
+                  <View style={[s.bracketCorner, { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 }]} />
+                </View>
+
+                {/* Shutter Controls */}
+                <View style={s.viewfinderControlsRow}>
+                  <View style={{ width: 44 }} />
+                  <TouchableOpacity
+                    style={s.shutterBtnOuter}
+                    onPress={() => handleTakePhoto('selfie')}
+                    activeOpacity={0.85}
+                  >
+                    <View style={s.shutterBtnInner} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.cameraToggleBtn}
+                    onPress={() => handlePickFromGallery('selfie')}
+                  >
+                    <Ionicons name="images-outline" size={20} color={C.white} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Selfie tips */}
+              {!selfieUri && (
+                <View style={[s.tipsContainer, { marginTop: 12 }]}>
+                  {[
+                    { icon: 'sunny-outline',       tip: 'Good even lighting, avoid backlighting' },
+                    { icon: 'glasses-outline',     tip: 'Remove glasses or face mask' },
+                    { icon: 'eye-outline',          tip: 'Look directly at the camera' },
+                  ].map((t, i) => (
+                    <View key={i} style={[s.tipRow, i > 0 && { marginTop: 6 }]}>
+                      <Ionicons name={t.icon as any} size={14} color={C.gold} />
+                      <Text style={s.tipTxt}>{t.tip}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {selfieUri && (
+                <TouchableOpacity
+                  style={[s.btnOutlined, { marginTop: 12 }]}
+                  onPress={() => handleTakePhoto('selfie')}
+                >
+                  <Ionicons name="camera-reverse-outline" size={18} color={C.navy} />
+                  <Text style={s.btnOutlinedTxt}>Retake Selfie</Text>
+                </TouchableOpacity>
+              )}
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnNavy} 
+                onPress={handleContinueFromStep5}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnNavyTxt}>Continue</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 6 OF 7: RESIDENTIAL ADDRESS */}
+        {/* ======================================================== */}
+        {currentStep === 6 && (
+          <View style={s.screenWrapper}>
+            {render7StepHeader(6, () => setCurrentStep(5))}
+
+            <ScrollView contentContainerStyle={s.stepBodyContent} showsVerticalScrollIndicator={false}>
+              <Text style={s.pageHeading}>Residential Address</Text>
+              <Text style={s.pageSubheading}>
+                Provide your current residential address.
+              </Text>
+
+              {/* State Dropdown */}
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>State</Text>
+                <TouchableOpacity 
+                  style={s.textInputWrapper} 
+                  onPress={() => setShowStateDropdown(!showStateDropdown)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="location-outline" size={18} color={C.textSub} style={{ marginRight: 10 }} />
+                  <Text style={s.textInputField}>{state || 'Select State'}</Text>
+                  <Ionicons name={showStateDropdown ? "chevron-up" : "chevron-down"} size={18} color={C.textSub} />
+                </TouchableOpacity>
+
+                {showStateDropdown && (
+                  <View style={s.dropdownCard}>
+                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                      {STATE_LIST.map((st) => (
+                        <TouchableOpacity 
+                          key={st} 
+                          style={s.dropdownItem} 
+                          onPress={() => {
+                            setState(st);
+                            setLga(NIGERIA_STATES[st]?.[0] || '');
+                            setShowStateDropdown(false);
+                          }}
+                        >
+                          <Text style={[s.dropdownItemTxt, state === st && { color: C.navy, fontWeight: '800' }]}>{st}</Text>
+                          {state === st && <Ionicons name="checkmark" size={16} color={C.navy} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* LGA Dropdown */}
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>LGA</Text>
+                <TouchableOpacity 
+                  style={s.textInputWrapper} 
+                  onPress={() => setShowLgaDropdown(!showLgaDropdown)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="location-outline" size={18} color={C.textSub} style={{ marginRight: 10 }} />
+                  <Text style={s.textInputField}>{lga || 'Select LGA'}</Text>
+                  <Ionicons name={showLgaDropdown ? "chevron-up" : "chevron-down"} size={18} color={C.textSub} />
+                </TouchableOpacity>
+
+                {showLgaDropdown && (
+                  <View style={s.dropdownCard}>
+                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                      {(state && NIGERIA_STATES[state] ? NIGERIA_STATES[state] : []).map((l: string) => (
+                        <TouchableOpacity 
+                          key={l} 
+                          style={s.dropdownItem} 
+                          onPress={() => {
+                            setLga(l);
+                            setShowLgaDropdown(false);
+                          }}
+                        >
+                          <Text style={[s.dropdownItemTxt, lga === l && { color: C.navy, fontWeight: '800' }]}>{l}</Text>
+                          {lga === l && <Ionicons name="checkmark" size={16} color={C.navy} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* Address Input */}
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>Address</Text>
+                <View style={s.textInputWrapper}>
+                  <Ionicons name="home-outline" size={18} color={C.textSub} style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={s.textInputField}
+                    placeholder="No. 12, Main Road, Gashua"
+                    placeholderTextColor={C.textMuted}
+                    value={addressInput}
+                    onChangeText={setAddressInput}
+                  />
+                </View>
+              </View>
+
+              {/* Switch Toggle */}
+              <View style={s.switchRow}>
+                <Text style={s.switchLabel}>Use this address for all services</Text>
+                <Switch
+                  value={useAddressForAll}
+                  onValueChange={setUseAddressForAll}
+                  trackColor={{ false: C.border, true: C.gold }}
+                  thumbColor={C.white}
+                />
+              </View>
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnNavy} 
+                onPress={handleContinueFromStep6}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnNavyTxt}>Continue</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 7 OF 7: REVIEW YOUR INFORMATION */}
+        {/* ======================================================== */}
+        {currentStep === 7 && (
+          <View style={s.screenWrapper}>
+            {render7StepHeader(7, () => setCurrentStep(6))}
+
+            <ScrollView contentContainerStyle={s.stepBodyContent} showsVerticalScrollIndicator={false}>
+              <Text style={s.pageHeading}>Review Your Information</Text>
+              <Text style={s.pageSubheading}>
+                Please confirm your details before submitting for verification.
+              </Text>
+
+              {/* Review Card */}
+              <View style={s.reviewCard}>
+                {/* Full Name */}
+                <View style={s.reviewRow}>
+                  <View style={s.reviewIconCol}>
+                    <Ionicons name="person" size={16} color={C.navy} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={s.reviewLabel}>Full Name</Text>
+                    <Text style={s.reviewValue}>
+                      {userProfile?.full_name || 'Customer'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Date of Birth */}
+                <View style={s.reviewRow}>
+                  <View style={s.reviewIconCol}>
+                    <Ionicons name="calendar" size={16} color={C.navy} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={s.reviewLabel}>Date of Birth</Text>
+                    <Text style={s.reviewValue}>{`${dobDay} ${dobMonth} ${dobYear}`}</Text>
+                  </View>
+                </View>
+
+                {/* NIN */}
+                <View style={s.reviewRow}>
+                  <View style={s.reviewIconCol}>
+                    <Ionicons name="card" size={16} color={C.navy} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={s.reviewLabel}>NIN</Text>
+                    <Text style={s.reviewValue}>{ninInput}</Text>
+                  </View>
+                </View>
+
+                {/* BVN */}
+                <View style={s.reviewRow}>
+                  <View style={s.reviewIconCol}>
+                    <Ionicons name="business" size={16} color={C.navy} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={s.reviewLabel}>BVN</Text>
+                    <Text style={s.reviewValue}>{bvnInput}</Text>
+                  </View>
+                </View>
+
+                {/* ID Document (with thumbnail) */}
+                <View style={s.reviewRow}>
+                  <View style={s.reviewIconCol}>
+                    <Ionicons name="images" size={16} color={C.navy} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={s.reviewLabel}>ID Document</Text>
+                    <Text style={s.reviewValue}>NIN Card (Uploaded)</Text>
+                  </View>
+                  {docImageUri && (
+                    <Image
+                      source={{ uri: docImageUri }}
+                      style={s.reviewDocThumbnail}
+                      resizeMode="cover"
+                    />
+                  )}
+                </View>
+
+                {/* Selfie thumbnail */}
+                {selfieUri && (
+                <View style={s.reviewRow}>
+                  <View style={s.reviewIconCol}>
+                    <Ionicons name="camera" size={16} color={C.navy} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={s.reviewLabel}>Selfie Photo</Text>
+                    <Text style={s.reviewValue}>Captured ✓</Text>
+                  </View>
+                  <Image
+                    source={{ uri: selfieUri }}
+                    style={[s.reviewDocThumbnail, { width: 40, height: 48, borderRadius: 8 }]}
+                    resizeMode="cover"
+                  />
+                </View>
+                )}
+
+                {/* Residential Address */}
+                <View style={[s.reviewRow, { borderBottomWidth: 0 }]}>
+                  <View style={s.reviewIconCol}>
+                    <Ionicons name="home" size={16} color={C.navy} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={s.reviewLabel}>Residential Address</Text>
+                    <Text style={s.reviewValue}>
+                      {`${addressInput}, ${lga} LGA, ${state} State`}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnGold} 
+                onPress={handleFinalSubmit}
+                disabled={submitting}
+                activeOpacity={0.85}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color={C.white} />
+                ) : (
+                  <>
+                    <Text style={s.btnGoldTxt}>Submit for Verification</Text>
+                    <Ionicons name="arrow-forward" size={18} color={C.white} />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* POST-SUBMIT: VERIFICATION IN PROGRESS */}
+        {/* ======================================================== */}
+        {currentStep === 'in_progress' && (
+          <View style={s.screenWrapper}>
+            <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' }}>
+              
+              {/* Shield with Magnifying Glass / Radiant Checkmark */}
+              <View style={s.progressShieldGraphicOuter}>
+                <View style={s.progressShieldSunburstRing} />
+                <View style={s.progressShieldInner}>
+                  <Ionicons name="shield" size={48} color={C.navy} />
+                  <View style={s.progressShieldCheckOverlay}>
+                    <Ionicons name="checkmark" size={20} color={C.gold} />
+                  </View>
+                </View>
+              </View>
+
+              <Text style={s.progressTitle}>Verification in Progress</Text>
+              <Text style={s.progressSubtitle}>
+                We are securely verifying your information with the official databases. This usually takes 1–5 minutes.
+              </Text>
+
+              {/* Progress Milestones Checklist */}
+              <View style={s.milestoneCard}>
+                <View style={s.milestoneRow}>
+                  <Ionicons name="checkmark-circle" size={22} color={C.green} />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={s.milestoneName}>NIN Verification</Text>
+                    <Text style={[s.milestoneStatus, { color: C.green }]}>Completed</Text>
+                  </View>
+                </View>
+
+                <View style={s.milestoneDivider} />
+
+                <View style={s.milestoneRow}>
+                  <Ionicons name="checkmark-circle" size={22} color={C.amber} />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={s.milestoneName}>BVN Verification</Text>
+                    <Text style={[s.milestoneStatus, { color: C.amber }]}>In Progress</Text>
+                  </View>
+                </View>
+
+                <View style={s.milestoneDivider} />
+
+                <View style={s.milestoneRow}>
+                  <Ionicons name="ellipse" size={18} color={C.borderDark} style={{ marginLeft: 2 }} />
+                  <View style={{ marginLeft: 14, flex: 1 }}>
+                    <Text style={s.milestoneName}>ID Document Check</Text>
+                    <Text style={s.milestoneStatus}>Pending</Text>
+                  </View>
+                </View>
+
+                <View style={s.milestoneDivider} />
+
+                <View style={s.milestoneRow}>
+                  <Ionicons name="ellipse" size={18} color={C.borderDark} style={{ marginLeft: 2 }} />
+                  <View style={{ marginLeft: 14, flex: 1 }}>
+                    <Text style={s.milestoneName}>Selfie Matching</Text>
+                    <Text style={s.milestoneStatus}>Pending</Text>
+                  </View>
+                </View>
+
+                <View style={s.milestoneDivider} />
+
+                <View style={s.milestoneRow}>
+                  <Ionicons name="ellipse" size={18} color={C.borderDark} style={{ marginLeft: 2 }} />
+                  <View style={{ marginLeft: 14, flex: 1 }}>
+                    <Text style={s.milestoneName}>Address Verification</Text>
+                    <Text style={s.milestoneStatus}>Pending</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Lock Security Notice */}
+              <View style={s.noticeBannerPill}>
+                <Ionicons name="lock-closed" size={14} color={C.navy} />
+                <Text style={s.noticeBannerTxt}>You will be notified once verification is complete.</Text>
+              </View>
+
+            </View>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnNavy} 
+                onPress={() => router.back()}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnNavyTxt}>Return to Dashboard</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* POST-SUBMIT: KYC VERIFIED! */}
+        {/* ======================================================== */}
+        {currentStep === 'verified' && (
+          <View style={s.screenWrapper}>
+            <ScrollView contentContainerStyle={s.verifiedContent} showsVerticalScrollIndicator={false}>
+              
+              {/* Celebratory Green Check */}
+              <View style={s.verifiedCheckOuter}>
+                <View style={s.verifiedCheckCircle}>
+                  <Ionicons name="checkmark" size={48} color={C.white} />
+                </View>
+              </View>
+
+              <Text style={s.verifiedHeading}>KYC Verified!</Text>
+              <Text style={s.verifiedSubheading}>
+                Your identity has been successfully verified. You can now enjoy all features on ABU MAFHAL SUB.
+              </Text>
+
+              {/* Unlocked Benefits */}
+              <View style={s.benefitsCard}>
+                <View style={s.benefitRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={C.green} />
+                  <Text style={s.benefitTxt}>Higher Transaction Limits</Text>
+                </View>
+                <View style={s.benefitRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={C.green} />
+                  <Text style={s.benefitTxt}>Access to All Services</Text>
+                </View>
+                <View style={s.benefitRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={C.green} />
+                  <Text style={s.benefitTxt}>More Secure Account</Text>
+                </View>
+                <View style={s.benefitRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={C.green} />
+                  <Text style={s.benefitTxt}>Faster Transactions</Text>
+                </View>
+              </View>
+
+              {/* Verified Badge Summary */}
+              {userProfile?.nin && (
+                <View style={s.verifiedIdBadgeCard}>
+                  <View style={s.verifiedIdBadgeRow}>
+                    <Text style={s.verifiedIdLabel}>Verified NIN</Text>
+                    <Text style={s.verifiedIdValue}>
+                      {userProfile.nin.substring(0, 4)} **** {userProfile.nin.substring(8)}
+                    </Text>
+                  </View>
+                  {userProfile?.bvn && (
+                    <View style={[s.verifiedIdBadgeRow, { marginTop: 6 }]}>
+                      <Text style={s.verifiedIdLabel}>Verified BVN</Text>
+                      <Text style={s.verifiedIdValue}>
+                        {userProfile.bvn.substring(0, 4)} **** {userProfile.bvn.substring(8)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={[s.verifiedIdBadgeRow, { marginTop: 6 }]}>
+                    <Text style={s.verifiedIdLabel}>KYC Status</Text>
+                    <Text style={[s.verifiedIdValue, { color: C.green, fontWeight: '800' }]}>
+                      Tier {userProfile.kyc_tier || 2} (Full Access)
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+            </ScrollView>
+
+            <View style={s.fixedBottomBar}>
+              <TouchableOpacity 
+                style={s.btnGold} 
+                onPress={() => router.replace('/(app)/dashboard')}
+                activeOpacity={0.85}
+              >
+                <Text style={s.btnGoldTxt}>Continue to Dashboard</Text>
+                <Ionicons name="arrow-forward" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* DATE OF BIRTH PICKER MODAL */}
+        {/* ======================================================== */}
+        <Modal visible={showDobModal} transparent animationType="fade" onRequestClose={() => setShowDobModal(false)}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalCard}>
+              <View style={s.modalHeader}>
+                <Text style={s.modalTitle}>Select Date of Birth</Text>
+                <TouchableOpacity onPress={() => setShowDobModal(false)}>
+                  <Ionicons name="close-circle" size={22} color={C.textSub} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={s.dateWheelRow}>
+                {/* Day */}
+                <View style={s.dateWheelCol}>
+                  <Text style={s.dateWheelColTitle}>DAY</Text>
+                  <ScrollView style={{ height: 160 }} showsVerticalScrollIndicator={false}>
+                    {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => (
+                      <TouchableOpacity 
+                        key={d} 
+                        style={[s.dateWheelItem, dobDay === d && s.dateWheelItemActive]}
+                        onPress={() => setDobDay(d)}
+                      >
+                        <Text style={[s.dateWheelTxt, dobDay === d && s.dateWheelTxtActive]}>{d}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* Month */}
+                <View style={[s.dateWheelCol, { flex: 1.3 }]}>
+                  <Text style={s.dateWheelColTitle}>MONTH</Text>
+                  <ScrollView style={{ height: 160 }} showsVerticalScrollIndicator={false}>
+                    {MONTHS.map((m) => (
+                      <TouchableOpacity 
+                        key={m} 
+                        style={[s.dateWheelItem, dobMonth === m && s.dateWheelItemActive]}
+                        onPress={() => setDobMonth(m)}
+                      >
+                        <Text style={[s.dateWheelTxt, dobMonth === m && s.dateWheelTxtActive]}>{m}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* Year */}
+                <View style={s.dateWheelCol}>
+                  <Text style={s.dateWheelColTitle}>YEAR</Text>
+                  <ScrollView style={{ height: 160 }} showsVerticalScrollIndicator={false}>
+                    {Array.from({ length: 65 }, (_, i) => String(2008 - i)).map((y) => (
+                      <TouchableOpacity 
+                        key={y} 
+                        style={[s.dateWheelItem, dobYear === y && s.dateWheelItemActive]}
+                        onPress={() => setDobYear(y)}
+                      >
+                        <Text style={[s.dateWheelTxt, dobYear === y && s.dateWheelTxtActive]}>{y}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={s.btnGold} 
+                onPress={() => setShowDobModal(false)}
+              >
+                <Text style={s.btnGoldTxt}>Confirm Date</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
+
+const s = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: C.white,
+  },
+  screenWrapper: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+
+  // Intro Screen
+  introTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  skipBtnTxt: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.navy,
+  },
+  introContent: {
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 24,
+  },
+  // Intro hero panel
+  introHeroPanel: {
+    width: '100%',
+    height: 160,
+    borderRadius: 20,
+    backgroundColor: C.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  introShieldGlow: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(217,148,20,0.12)',
+  },
+  introShieldOuter: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(217,148,20,0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(217,148,20,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introShieldInner: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(217,148,20,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 6,
+  },
+  introBrandDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  introBrandTxt: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  introHeading: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: C.navy,
+    textAlign: 'center',
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  introSubheading: {
+    fontSize: 12.5,
+    color: C.textSub,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 10,
+    marginBottom: 22,
+  },
+  // Roadmap list
+  introRoadmap: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: 0,
+  },
+  introRoadmapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    gap: 10,
+    position: 'relative',
+  },
+  introRoadmapNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introRoadmapNumTxt: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: C.white,
+  },
+  introRoadmapLine: {
+    position: 'absolute',
+    left: 10,
+    top: 30,
+    width: 2,
+    height: 10,
+    backgroundColor: C.gold,
+    opacity: 0.4,
+  },
+  introRoadmapIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: C.goldLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introRoadmapLabel: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: C.navy,
+  },
+  introRoadmapSub: {
+    fontSize: 10.5,
+    color: C.textSub,
+    marginTop: 1,
+  },
+  featureCardList: { width: '100%', gap: 16 },
+  featureRow: { flexDirection: 'row', alignItems: 'center' },
+  featureIconBox: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: C.goldLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  featureTextBox: { marginLeft: 14, flex: 1 },
+  featureTitle: { fontSize: 14, fontWeight: '700', color: C.navy },
+  featureDesc: { fontSize: 12, color: C.textSub, marginTop: 2 },
+  introBottomBar: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  footnoteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  footnoteTxt: {
+    fontSize: 11.5,
+    color: C.textSub,
+  },
+
+  // 7-Step Progress Header
+  stepHeaderContainer: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: C.white,
+  },
+  stepHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  headerBackBtn: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backBtnCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: C.navy,
+    letterSpacing: 0.2,
+  },
+  stepHeaderSubtitle: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: C.textSub,
+    marginTop: 1,
+  },
+  stepBadge: {
+    backgroundColor: C.goldLight,
+    borderWidth: 1,
+    borderColor: C.goldBorder,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  stepBadgeTxt: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: C.goldDark,
+  },
+  progressBarTrack: {
+    flexDirection: 'row',
+    gap: 5,
+    height: 7,
+    width: '100%',
+    alignItems: 'center',
+  },
+  progressSegment: {
+    flex: 1,
+    height: 7,
+    borderRadius: 4,
+  },
+  progressSegmentActive: {
+    backgroundColor: C.gold,
+    shadowColor: C.gold,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  progressSegmentDone: {
+    backgroundColor: C.navy,
+  },
+  progressSegmentInactive: {
+    backgroundColor: '#E2E8F0',
+    height: 5,
+  },
+
+  // Common Step Body
+  stepBodyContent: {
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 24,
+  },
+  pageHeading: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: C.navy,
+    marginBottom: 6,
+  },
+  pageSubheading: {
+    fontSize: 12.5,
+    color: C.textSub,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  fixedBottomBar: {
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+    paddingTop: 10,
+    backgroundColor: C.white,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+
+  // Step 1: Consent & Privacy Graphic
+  consentGraphicContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 18,
+    height: 120,
+  },
+  consentDocSheet: {
+    width: 90,
+    height: 110,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  docSheetLineLong: {
+    width: '80%',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 8,
+  },
+  docSheetLineMid: {
+    width: '60%',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 8,
+  },
+  docSheetLineShort: {
+    width: '40%',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+  },
+  docPadlockBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: C.goldLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  consentShieldBadge: {
+    position: 'absolute',
+    right: 90,
+    top: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: C.white,
+    shadowColor: '#1D4ED8',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  consentBodyText: {
+    fontSize: 12.5,
+    color: C.textSub,
+    lineHeight: 18,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+    marginBottom: 20,
+  },
+  consentCheckboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    padding: 14,
+  },
+  checkboxSquare: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: C.borderDark,
+    backgroundColor: C.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxSquareActive: {
+    backgroundColor: C.gold,
+    borderColor: C.gold,
+  },
+  consentCheckLabel: {
+    fontSize: 12,
+    color: C.navy,
+    lineHeight: 17,
+  },
+  privacyLinkTxt: {
+    color: C.navy,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  readPolicyBtnTxt: {
+    fontSize: 11.5,
+    color: '#2563EB',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+
+  // Form Fields (Step 2, 3, 6)
+  fieldGroup: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.navy,
+    marginBottom: 6,
+  },
+  textInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.2,
+    borderColor: C.border,
+    borderRadius: 12,
+    height: 48,
+    paddingHorizontal: 14,
+    backgroundColor: '#FCFDFD',
+  },
+  textInputField: {
+    flex: 1,
+    fontSize: 13.5,
+    color: C.navy,
+    fontWeight: '500',
+  },
+  infoNoticeBox: {
+    flexDirection: 'row',
+    backgroundColor: C.blueInfo,
+    borderWidth: 1,
+    borderColor: C.blueBorder,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 4,
+    gap: 8,
+    alignItems: 'center',
+  },
+  infoNoticeTxt: {
+    flex: 1,
+    fontSize: 11.5,
+    color: C.navy,
+    lineHeight: 16,
+  },
+
+  // Step 4: ID Card Graphic
+  idCardGraphicContainer: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  idCardGraphicFrame: {
+    width: '100%',
+    height: 170,
+    borderRadius: 14,
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1.5,
+    borderColor: '#C8E6C9',
+    padding: 14,
+    justifyContent: 'space-between',
+  },
+  idGraphicHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  idCoatOfArmsDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#2E7D32',
+  },
+  idGraphicCountry: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#1B5E20',
+    letterSpacing: 0.5,
+  },
+  idGraphicCardTitle: {
+    fontSize: 8,
+    color: '#388E3C',
+    fontWeight: '600',
+  },
+  idGraphicBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  idChipBox: {
+    width: 34,
+    height: 26,
+    borderRadius: 4,
+    backgroundColor: '#FBC02D',
+    padding: 4,
+    justifyContent: 'space-around',
+  },
+  idChipLine: {
+    height: 2,
+    backgroundColor: '#F57F17',
+    borderRadius: 1,
+  },
+  idPhotoPlaceholder: {
+    width: 58,
+    height: 68,
+    borderRadius: 6,
+    backgroundColor: '#C8E6C9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  idCardNumberGraphic: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1B5E20',
+    letterSpacing: 2,
+  },
+  uploadedPreviewFrame: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: C.green,
+  },
+  uploadedDocImg: {
+    width: '100%',
+    height: '100%',
+  },
+  changePhotoChip: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: C.white,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  changePhotoChipTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.navy,
+  },
+  uploadButtonsGroup: {
+    marginVertical: 10,
+  },
+  orDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: C.border,
+  },
+  orTxt: {
+    paddingHorizontal: 12,
+    fontSize: 11.5,
+    color: C.textMuted,
+    fontWeight: '600',
+  },
+  tipsContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 6,
+  },
+  tipsHeading: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: C.navy,
+    marginBottom: 6,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  tipTxt: {
+    fontSize: 11,
+    color: C.textSub,
+  },
+
+  // Step 5: Selfie
+  selfieViewfinderBox: {
+    width: '100%',
+    height: 340,
+    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selfieCapturedImg: {
+    width: '100%',
+    height: '100%',
+  },
+  selfiePlaceholderArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 60,
+  },
+  selfieFaceOval: {
+    width: 140,
+    height: 175,
+    borderRadius: 70,
+    borderWidth: 2.5,
+    borderColor: 'rgba(217,148,20,0.7)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  selfiePlaceholderTxt: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12.5,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  selfiePlaceholderSub: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 10.5,
+    marginTop: 4,
+  },
+  viewfinderBracketsFrame: {
+    position: 'absolute',
+    width: 200,
+    height: 250,
+  },
+  bracketCorner: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderColor: C.white,
+  },
+  viewfinderControlsRow: {
+    position: 'absolute',
+    bottom: 16,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  shutterBtnOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    borderColor: C.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shutterBtnInner: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: C.gold,
+  },
+  cameraToggleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Step 6: Address
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  switchLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.navy,
+  },
+  dropdownCard: {
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 10,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  dropdownItemTxt: {
+    fontSize: 13,
+    color: C.navy,
+  },
+
+  // Step 7: Review Your Information
+  reviewCard: {
+    backgroundColor: C.white,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: C.border,
+    padding: 16,
+    gap: 12,
+  },
+  reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  reviewIconCol: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewLabel: {
+    fontSize: 11,
+    color: C.textSub,
+    fontWeight: '600',
+  },
+  reviewValue: {
+    fontSize: 13,
+    color: C.navy,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  reviewDocThumbnail: {
+    width: 48,
+    height: 32,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+
+  // Progress Screen
+  progressShieldGraphicOuter: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  progressShieldSunburstRing: {
+    position: 'absolute',
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    borderWidth: 1.5,
+    borderColor: C.gold,
+    borderStyle: 'dashed',
+  },
+  progressShieldInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  progressShieldCheckOverlay: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: 14,
+  },
+  progressTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: C.navy,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  progressSubtitle: {
+    fontSize: 12.5,
+    color: C.textSub,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  milestoneCard: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  milestoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  milestoneName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.navy,
+  },
+  milestoneStatus: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.textSub,
+    marginTop: 1,
+  },
+  milestoneDivider: {
+    height: 1,
+    backgroundColor: '#EDF2F7',
+    marginVertical: 10,
+  },
+  noticeBannerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginTop: 20,
+  },
+  noticeBannerTxt: {
+    fontSize: 11.5,
+    color: C.textSub,
+    fontWeight: '600',
+  },
+
+  // Verified Screen
+  verifiedContent: {
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    paddingTop: 36,
+    paddingBottom: 24,
+  },
+  verifiedCheckOuter: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  verifiedCheckCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: C.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  verifiedHeading: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: C.navy,
+    marginBottom: 6,
+  },
+  verifiedSubheading: {
+    fontSize: 13,
+    color: C.textSub,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  benefitsCard: {
+    width: '100%',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    marginBottom: 16,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  benefitTxt: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.navy,
+  },
+  verifiedIdBadgeCard: {
+    width: '100%',
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 14,
+    padding: 14,
+  },
+  verifiedIdBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  verifiedIdLabel: {
+    fontSize: 11.5,
+    color: C.textSub,
+    fontWeight: '600',
+  },
+  verifiedIdValue: {
+    fontSize: 12.5,
+    color: C.navy,
+    fontWeight: '700',
+  },
+
+  // Buttons
+  btnNavy: {
+    backgroundColor: C.navy,
+    height: 48,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+  },
+  btnNavyTxt: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  btnGold: {
+    backgroundColor: C.gold,
+    height: 48,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+  },
+  btnGoldTxt: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  btnOutlined: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1.2,
+    borderColor: C.borderDark,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: C.white,
+  },
+  btnOutlinedTxt: {
+    color: C.navy,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // DOB Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(13,27,62,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: C.white,
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.navy,
+  },
+  dateWheelRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  dateWheelCol: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 4,
+  },
+  dateWheelColTitle: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: C.textSub,
+    textAlign: 'center',
+    marginVertical: 4,
+  },
+  dateWheelItem: {
+    paddingVertical: 7,
+    alignItems: 'center',
+    borderRadius: 6,
+    marginVertical: 1,
+  },
+  dateWheelItemActive: {
+    backgroundColor: C.navy,
+  },
+  dateWheelTxt: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.navy,
+  },
+  dateWheelTxtActive: {
+    color: C.white,
+    fontWeight: '800',
+  },
+});

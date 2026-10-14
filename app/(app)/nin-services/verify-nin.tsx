@@ -2180,6 +2180,7 @@ export default function VerifyNINScreen() {
             }
         } finally {
             setLoading(false);
+            fetchWalletBalance();
         }
     };
 

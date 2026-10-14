@@ -6,10 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// AgentHub base URL
+// Provider Base URLs
 const AGENTHUB_BASE = 'https://agenthub.ng/api';
+const IDPRO_BASE = 'https://idpro.ng/api/v1';
 
-// Always return HTTP 200 so SDK can read actual error body
+// Always return HTTP 200 so Supabase Client SDK can read the actual JSON body
 const jsonOk = (body: object) =>
   new Response(JSON.stringify(body), {
     status: 200,
@@ -21,9 +22,14 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Track if user was deducted in this invocation to prevent phantom refunds
+  let hasDeducted = false;
+  let supabaseAdmin: any = null;
+  let userId = '';
+  let FEE_AMOUNT = 0;
+
   try {
-    // Use Service Role admin client — reliable JWT verification without RLS issues
-    const supabaseAdmin = createClient(
+    supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
@@ -37,15 +43,15 @@ serve(async (req: Request) => {
       return jsonOk({ error: 'No auth token provided. Please log in and try again.' })
     }
 
-    // Verify the JWT using the admin client
+    // Verify the JWT using admin client
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
 
     if (authError || !user) {
-      console.error('Auth verification failed:', authError?.message, '| JWT (first 20 chars):', jwt.substring(0, 20))
+      console.error('Auth verification failed:', authError?.message)
       return jsonOk({ error: `Auth failed: ${authError?.message || 'Invalid token'}. Please log out and log in again.` })
     }
 
-    console.log('Auth OK for user:', user.id)
+    userId = user.id;
 
     const requestData = await req.json()
     const { type, value, firstname, lastname, dob, gender, service_code } = requestData
@@ -57,7 +63,7 @@ serve(async (req: Request) => {
       return jsonOk({ error: 'Missing search type' })
     }
 
-    // ── Handle Admin Live Pricing Sync (Server-to-Server) ──────────────────────
+    // ── Handle Admin Live Pricing Sync ───────────────────────────────────────
     if (searchType === 'sync_prices') {
       let AGENTHUB_API_KEY = Deno.env.get('AGENTHUB_API_KEY');
       if (!AGENTHUB_API_KEY) {
@@ -74,12 +80,10 @@ serve(async (req: Request) => {
       }
 
       try {
-        console.log(`Fetching live AgentHub prices from ${AGENTHUB_BASE}/v1/identity/pricing`);
         const agentHubRes = await fetch(`${AGENTHUB_BASE}/v1/identity/pricing`, {
           headers: { 
             'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            'Accept': 'application/json'
           }
         });
 
@@ -89,23 +93,20 @@ serve(async (req: Request) => {
         try {
           agentData = JSON.parse(rawText);
         } catch (_) {
-          console.warn("AgentHub pricing API returned non-JSON response:", rawText.substring(0, 150));
           return jsonOk({ 
             success: true, 
-            message: 'Default AgentHub wholesale pricing is active in registry.',
+            message: 'Default wholesale pricing active in registry.',
             isDefault: true 
           });
         }
 
-        return jsonOk({ success: true, message: 'AgentHub pricing synced!', data: agentData });
+        return jsonOk({ success: true, message: 'Pricing synced!', data: agentData });
       } catch (err: any) {
-        console.error('AgentHub pricing fetch error:', err);
-        return jsonOk({ error: `AgentHub pricing fetch failed: ${err.message}` });
+        return jsonOk({ error: `Pricing fetch failed: ${err.message}` });
       }
     }
 
     const isStatusCheck = String(searchType).endsWith('-status');
-    let FEE_AMOUNT = 0;
     let description = `Verification Status Check`;
     let priceId = requestData.priceId || '';
 
@@ -119,7 +120,7 @@ serve(async (req: Request) => {
           'nin-regular': 'nin_regular',
           'nin-slip': 'nin_regular',
           'nin-slip-v2': 'nin_premium',
-          'nin-validation': 'nin_validation',
+          'nin-validation': 'val_bypass_nin',
           'nin-personalization': 'pers_status',
           'pers_status': 'pers_status',
           'nin-modification': 'nin_mod_name',
@@ -143,7 +144,7 @@ serve(async (req: Request) => {
       }
 
       // Fetch dynamic pricing from service_pricing table
-      const { data: pricing, error: pricingError } = await supabaseAdmin
+      const { data: pricing } = await supabaseAdmin
         .from('service_pricing')
         .select('*')
         .eq('id', priceId)
@@ -156,8 +157,7 @@ serve(async (req: Request) => {
         FEE_AMOUNT = selling > 0 ? selling : (cost + markup);
         description = `Verification: ${pricing.name || pricing.service_name || priceId}`;
       } else {
-        console.warn(`Pricing record for '${priceId}' not found in service_pricing:`, pricingError?.message);
-        FEE_AMOUNT = 150;
+        FEE_AMOUNT = 190;
         description = `Verification: ${priceId}`;
       }
 
@@ -179,7 +179,7 @@ serve(async (req: Request) => {
         }
       }
 
-      // Deduct balance only if FEE_AMOUNT > 0
+      // Single Atomic Balance Deduction via RPC
       if (FEE_AMOUNT > 0) {
         const { error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
           user_id: user.id,
@@ -191,10 +191,12 @@ serve(async (req: Request) => {
           if (deductError.message.toLowerCase().includes('insufficient')) {
             return jsonOk({ error: `Insufficient wallet balance. You need ₦${FEE_AMOUNT.toLocaleString()}.` });
           }
-          return jsonOk({ error: 'Failed to deduct wallet balance. Please try again.' });
+          return jsonOk({ error: 'Failed to process wallet payment. Please try again.' });
         }
 
-        // Record transaction
+        hasDeducted = true;
+
+        // Record single payment transaction
         await supabaseAdmin.from('transactions').insert({
           user_id: user.id,
           amount: FEE_AMOUNT,
@@ -206,528 +208,395 @@ serve(async (req: Request) => {
       }
     }
 
-    // ── Retrieve AgentHub API Key ─────────────────────────────────────────────
+    // ── Retrieve API Keys for AgentHub and IDPro ───────────────────────────────
     let AGENTHUB_API_KEY = Deno.env.get('AGENTHUB_API_KEY');
-    if (!AGENTHUB_API_KEY) {
-        const { data: secrets } = await supabaseAdmin
-            .from('system_secrets')
-            .select('value')
-            .eq('key', 'AGENTHUB_API_KEY')
-            .single();
-        if (secrets && secrets.value) {
-            AGENTHUB_API_KEY = secrets.value;
+    let IDPRO_API_KEY = Deno.env.get('IDPRO_API_KEY');
+
+    const { data: secrets } = await supabaseAdmin
+      .from('system_secrets')
+      .select('key, value');
+
+    if (secrets && Array.isArray(secrets)) {
+      for (const s of secrets) {
+        const k = String(s.key || '').toUpperCase();
+        if (!AGENTHUB_API_KEY && ['AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY'].includes(k)) {
+          AGENTHUB_API_KEY = s.value;
         }
+        if (!IDPRO_API_KEY && ['IDPRO_API_KEY', 'IDPRO_KEY', 'ID_PRO_KEY'].includes(k)) {
+          IDPRO_API_KEY = s.value;
+        }
+      }
     }
 
-    if (!AGENTHUB_API_KEY) {
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: AgentHub API key not configured`);
-        console.error('AGENTHUB_API_KEY is not set in environment or system_secrets table')
-        return jsonOk({ error: 'Verification service is not configured. Please contact support.' })
+    if (!AGENTHUB_API_KEY && !IDPRO_API_KEY) {
+      if (hasDeducted) {
+        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Verification provider keys not configured');
+        hasDeducted = false;
+      }
+      return jsonOk({ error: 'Verification service is not configured. Please contact support.' });
     }
 
-    // ── Build AgentHub endpoint & payload ────────────────────────────────────
+    // ── Build Candidate Request List for AgentHub ────────────────────────────
     let endpoint = '';
     let bodyPayload: any = {};
+    const candidateRequests: { url: string; body: any; method: 'GET' | 'POST' }[] = [];
+
+    let calculatedSlipType = (requestData.slip_type || requestData.layout || '').toUpperCase();
+    if (!calculatedSlipType) {
+      if (priceId === 'nin_standard') calculatedSlipType = 'STANDARD';
+      else if (priceId === 'nin_regular') calculatedSlipType = 'REGULAR';
+      else if (priceId === 'nin_info') calculatedSlipType = 'INFO';
+      else calculatedSlipType = 'PREMIUM';
+    }
+
+    let serviceCode = '403';
+    if (calculatedSlipType === 'PREMIUM' || priceId === 'nin_premium') serviceCode = '401';
+    else if (calculatedSlipType === 'STANDARD' || priceId === 'nin_standard') serviceCode = '402';
+    else if (calculatedSlipType === 'REGULAR' || priceId === 'nin_regular') serviceCode = '403';
+    else if (calculatedSlipType === 'INFO' || priceId === 'nin_info') serviceCode = '404';
 
     switch (searchType) {
-
-      // ── NIN Verification ───────────────────────────────────────────────────
-      case 'nin': {
-        let calculatedSlipType = (requestData.slip_type || requestData.layout || '').toUpperCase();
-        if (!calculatedSlipType) {
-          if (priceId === 'nin_standard') calculatedSlipType = 'STANDARD';
-          else if (priceId === 'nin_regular') calculatedSlipType = 'REGULAR';
-          else if (priceId === 'nin_info') calculatedSlipType = 'INFO';
-          else calculatedSlipType = 'PREMIUM';
-        }
-        let serviceCode = '403';
-        if (calculatedSlipType === 'PREMIUM' || priceId === 'nin_premium') serviceCode = '401';
-        else if (calculatedSlipType === 'STANDARD' || priceId === 'nin_standard') serviceCode = '402';
-        else if (calculatedSlipType === 'REGULAR' || priceId === 'nin_regular') serviceCode = '403';
-        else if (calculatedSlipType === 'INFO' || priceId === 'nin_info') serviceCode = '404';
-
-        if (calculatedSlipType === 'REGULAR') {
-          endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
-          bodyPayload = {
-            nin: searchValue,
-            service_code: '403',
-            reference: requestData.reference || `REF-SLIP-${Date.now()}`
-          };
-        } else if (calculatedSlipType === 'STANDARD') {
-          endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
-          bodyPayload = {
-            nin: searchValue,
-            service_code: '402',
-            reference: requestData.reference || `REF-SLIP-${Date.now()}`
-          };
-        } else if (calculatedSlipType === 'PREMIUM') {
-          endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
-          bodyPayload = {
-            nin: searchValue,
-            service_code: '401',
-            reference: requestData.reference || `REF-SLIP-${Date.now()}`
-          };
-        } else {
-          endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
-          bodyPayload = {
-            nin: searchValue,
-            service_code: serviceCode,
-            slip_type: calculatedSlipType,
-            reference: requestData.reference || `REF-NIN-${Date.now()}`
-          };
-        }
+      case 'nin':
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/nin`, body: { nin: searchValue }, method: 'POST' });
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: { nin: searchValue, slip_type: calculatedSlipType, reference: `REF-${Date.now()}` }, method: 'POST' });
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/slip`, body: { nin: searchValue, service_code: serviceCode }, method: 'POST' });
         break;
-      }
 
-      // ── NIN Slip (PDF) ─────────────────────────────────────────────────────
-      // service_code: 401 = Premium, 402 = Standard, 403 = Regular (NIMC layout), 404 = Info
       case 'nin-slip':
-      case 'nin-slip-v2': {
-        let serviceCode = service_code || requestData.service_code;
-        if (!serviceCode) {
-          if (priceId === 'nin_premium') serviceCode = '401';
-          else if (priceId === 'nin_standard') serviceCode = '402';
-          else if (priceId === 'nin_regular') serviceCode = '403';
-          else if (priceId === 'nin_info') serviceCode = '404';
-          else serviceCode = '403';
-        }
-        endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
-        bodyPayload = {
-          nin: searchValue,
-          service_code: serviceCode,
-          reference: requestData.reference || `REF-${Date.now()}`
-        };
-        break;
-      }
-
-      // ── NIN Validation Queue ───────────────────────────────────────────────
-      case 'nin-validation':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-validation`;
-        bodyPayload = {
-          nin: searchValue,
-          service_code: service_code || requestData.service_code || '329',
-          reference: requestData.reference || `REF-VAL-${Date.now()}`
-        };
+      case 'nin-slip-v2':
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: { nin: searchValue, slip_type: calculatedSlipType, reference: `REF-${Date.now()}` }, method: 'POST' });
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/slip`, body: { nin: searchValue, service_code: serviceCode, reference: `REF-${Date.now()}` }, method: 'POST' });
         break;
 
-      // ── Check NIN Validation Status ────────────────────────────────────────
-      case 'nin-validation-status':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-validation/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || '')}`;
-        bodyPayload = null; // GET request
-        break;
-
-      // ── NIN Personalization (Tracking ID) ─────────────────────────────────
-      case 'nin-personalization':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-personalization`;
-        bodyPayload = {
-          trackingId: searchValue || requestData.trackingId,
-          reference: requestData.reference
-        };
-        break;
-
-      // ── Check NIN Personalization Status ──────────────────────────────────
-      case 'nin-personalization-status':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-personalization/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || '')}`;
-        bodyPayload = null; // GET request
-        break;
-
-      // ── NIN Modification ───────────────────────────────────────────────────
-      case 'nin-modification':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-modification`;
-        bodyPayload = {
-          service_code: service_code || requestData.service_code || '501',
-          nin: searchValue || requestData.nin,
-          phone_number: requestData.phone_number,
-          new_first_name: requestData.new_first_name,
-          new_surname: requestData.new_surname,
-          new_middle_name: requestData.new_middle_name,
-          full_name: requestData.full_name,
-          new_phone_number: requestData.new_phone_number,
-          new_address: requestData.new_address
-        };
-        break;
-
-      // ── VNIN Slip (PDF) ────────────────────────────────────────────────────
-      case 'vnin-slip':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/vnin-slip`;
-        bodyPayload = { nin: searchValue };
-        break;
-
-      // ── Phone → NIN Lookup ─────────────────────────────────────────────────
       case 'phone':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/phone-verify`;
-        bodyPayload = { phone: searchValue };
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2-phone`, body: { nin: searchValue, slip_type: 'STANDARD', reference: `REF-${Date.now()}` }, method: 'POST' });
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/phone-verify`, body: { phone: searchValue }, method: 'POST' });
         break;
 
-      // ── Demographic Verification ───────────────────────────────────────────
       case 'demographic':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/demographic`;
-        bodyPayload = { firstname, lastname, gender, dob };
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/demographic`, body: { firstname, lastname, gender, dob }, method: 'POST' });
         break;
 
-      // ── BVN Verification & Slips ───────────────────────────────────────────
       case 'bvn':
       case 'bvn-card':
       case 'bvn-slip':
       case 'bvn-premium-slip':
-        endpoint = `${AGENTHUB_BASE}/bvn/premium-slip`;
-        bodyPayload = { bvn: searchValue };
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/api/bvn/verification`, body: { bvn: searchValue }, method: 'POST' });
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn`, body: { bvn: searchValue }, method: 'POST' });
         break;
 
-      // ── BVN by Phone / Retrieval ───────────────────────────────────────────
       case 'bvn-phone':
       case 'bvn-retrieval':
-        endpoint = `${AGENTHUB_BASE}/bvn/retrieval`;
-        bodyPayload = { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` };
-        break;
-
-      // ── VNIN to NIBSS ──────────────────────────────────────────────────────
-      case 'vnin-to-nibss':
-        endpoint = `${AGENTHUB_BASE}/bvn/vnin-to-nibss`;
-        bodyPayload = {
-          reference: requestData.reference || `REF-VNIN-${Date.now()}`,
-          ticket_id: requestData.ticket_id || `TICKET-${Date.now()}`,
-          full_name: requestData.full_name || requestData.name || 'BVN Holder',
-          nin: requestData.nin || searchValue,
-          bvn: requestData.bvn || searchValue,
-          vnin: searchValue || requestData.vnin
-        };
-        break;
-
-      // ── Check VNIN to NIBSS Status ─────────────────────────────────────────
-      case 'vnin-to-nibss-status':
-        endpoint = `${AGENTHUB_BASE}/bvn/vnin-to-nibss/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
-        bodyPayload = null;
-        break;
-
-      // ── BVN Modification ───────────────────────────────────────────────────
-      case 'bvn-modification':
-        endpoint = `${AGENTHUB_BASE}/bvn/modification`;
-        bodyPayload = {
-          service_code: service_code || requestData.service_code || '620',
-          bank_code: requestData.bank_code || '706',
-          reference: requestData.reference || `REF-MOD-${Date.now()}`,
-          nin: requestData.nin,
-          bvn: searchValue || requestData.bvn,
-          old_first_name: requestData.old_first_name,
-          old_surname: requestData.old_surname,
-          old_middle_name: requestData.old_middle_name,
-          new_first_name: requestData.new_first_name || requestData.firstname,
-          new_surname: requestData.new_surname || requestData.lastname,
-          new_middle_name: requestData.new_middle_name,
-          phone_number: requestData.phone_number || requestData.phone,
-          dob: requestData.dob
-        };
-        break;
-
-      // ── Check BVN Modification Status ───────────────────────────────────────
-      case 'bvn-modification-status':
-        endpoint = `${AGENTHUB_BASE}/bvn/modification/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || requestData.reference || '')}`;
-        bodyPayload = null;
-        break;
-
-      // ── BVN User Enrollment ─────────────────────────────────────────────────
-      case 'bvn-enrollment':
-        endpoint = `${AGENTHUB_BASE}/bvn/enrollment`;
-        bodyPayload = {
-          ...requestData,
-          reference: requestData.reference || `BVN-ENROLL-${Date.now()}`
-        };
-        break;
-
-      // ── Check BVN Enrollment Status ────────────────────────────────────────
-      case 'bvn-enrollment-status':
-        endpoint = `${AGENTHUB_BASE}/bvn/enrollment/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || requestData.reference || '')}`;
-        bodyPayload = null;
-        break;
-
-      // ── Check BVN Retrieval Status ─────────────────────────────────────────
-      case 'bvn-retrieval-status':
-        endpoint = `${AGENTHUB_BASE}/bvn/retrieval/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || requestData.reference || '')}`;
-        bodyPayload = null;
-        break;
-
-      // ── NIN Tracking / Personalization ─────────────────────────────────────
-      case 'tracking-id':
-      case 'nin-personalization':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-personalization`;
-        bodyPayload = { trackingId: searchValue };
-        break;
-
-      // ── IPE Clearance ──────────────────────────────────────────────────────
-      case 'ipe':
-      case 'ipe-clearance':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/ipe-clearance`;
-        bodyPayload = { trackingId: searchValue, reference: requestData.reference || `IPE-${Date.now()}` };
-        break;
-
-      // ── Identity Validation ────────────────────────────────────────────────
-      case 'val':
-      case 'nin-validation':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-validation`;
-        bodyPayload = { nin: searchValue, service_code: service_code || '329', reference: requestData.reference || `VAL-${Date.now()}` };
-        break;
-
-      // ── Delink ─────────────────────────────────────────────────────────────
-      case 'delink':
-        endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
-        bodyPayload = { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` };
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/retrieval`, body: { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` }, method: 'POST' });
         break;
 
       default:
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Invalid verification type`);
-        return jsonOk({ error: `Invalid verification type: ${searchType}` })
+        candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/nin`, body: { nin: searchValue }, method: 'POST' });
+        break;
     }
 
-    const candidateRequests: { url: string; body: any; method: string }[] = [];
+    let successfulResponse: any = null;
 
-    if (searchType === 'bvn' || searchType === 'bvn-premium-slip') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/verification`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/verification`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/verification`, body: { bvn: searchValue, reference: requestData.reference || `REF-BVN-${Date.now()}` }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn`, body: { bvn: searchValue }, method: 'POST' });
-    } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/retrieval`, body: { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/retrieval`, body: { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/retrieval`, body: { phone: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/retrieval`, body: { phone: searchValue }, method: 'POST' });
-    } else if (searchType === 'bvn-card' || searchType === 'bvn-slip') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
-    } else if (searchType === 'vnin-to-nibss') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
-    } else if (searchType === 'bvn-modification') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/modification`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/modification`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/modification`, body: bodyPayload, method: 'POST' });
-    } else if (searchType === 'bvn-enrollment') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/enrollment`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/enrollment`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/enrollment`, body: bodyPayload, method: 'POST' });
-    } else if (searchType === 'nin') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/slip`, body: { nin: searchValue, service_code: '403' }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/nin`, body: { nin: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin`, body: { nin: searchValue }, method: 'POST' });
-    } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/slip`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/slip`, body: bodyPayload, method: 'POST' });
-    } else {
-      candidateRequests.push({ url: endpoint, body: bodyPayload, method: bodyPayload !== null ? 'POST' : 'GET' });
-    }
+    // ── PROVIDER 1: Try AgentHub ─────────────────────────────────────────────
+    if (AGENTHUB_API_KEY && candidateRequests.length > 0) {
+      for (const reqItem of candidateRequests) {
+        try {
+          const fetchOptions: RequestInit = {
+            method: reqItem.method,
+            headers: {
+              'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            }
+          };
 
-    try {
-        let apiResponse: Response | null = null;
-        let lastErrorText = '';
-        let responseData: any = null;
-        let successfulResponse: any = null;
+          if (reqItem.body !== null && reqItem.method === 'POST') {
+            fetchOptions.body = JSON.stringify(reqItem.body);
+          }
 
-        for (const reqItem of candidateRequests) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 7000);
+          fetchOptions.signal = controller.signal;
+
+          const apiResponse = await fetch(reqItem.url, fetchOptions);
+          clearTimeout(timeoutId);
+
+          if (apiResponse.ok) {
+            const rawText = await apiResponse.text();
             try {
-                console.log(`Calling AgentHub API: ${reqItem.url} (Method: ${reqItem.method}) with payload:`, reqItem.body);
-
-                const fetchOptions: RequestInit = {
-                    method: reqItem.method,
-                    headers: {
-                        'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    }
-                };
-
-                if (reqItem.body !== null && reqItem.method === 'POST') {
-                    fetchOptions.body = JSON.stringify(reqItem.body);
+              const parsed = JSON.parse(rawText);
+              if (parsed) {
+                const isSuccess = parsed.status === true || 
+                                  parsed.status === 'success' || 
+                                  parsed.success === true ||
+                                  parsed.current_status === 'COMPLETED' ||
+                                  Boolean(parsed.data && (
+                                    parsed.data.bvn || 
+                                    parsed.data.firstName || 
+                                    parsed.data.firstname || 
+                                    parsed.data.nin || 
+                                    parsed.data.pdf_base64 || 
+                                    parsed.data.user_details || 
+                                    parsed.data.data
+                                  ));
+                if (isSuccess) {
+                  successfulResponse = parsed;
+                  break;
                 }
-
-                apiResponse = await fetch(reqItem.url, fetchOptions);
-
-                const rawText = await apiResponse.text();
-                lastErrorText = rawText;
-
-                try {
-                    const parsed = JSON.parse(rawText);
-                    if (parsed) {
-                        responseData = parsed;
-                        const isSuccess = parsed.status === true || 
-                                          parsed.status === 'success' || 
-                                          parsed.success === true ||
-                                          parsed.current_status === 'COMPLETED' ||
-                                          Boolean(parsed.data && (
-                                              parsed.data.bvn || 
-                                              parsed.data.firstName || 
-                                              parsed.data.firstname || 
-                                              parsed.data.nin || 
-                                              parsed.data.pdf_base64 || 
-                                              parsed.data.user_details || 
-                                              parsed.data.data
-                                          ));
-                        if (isSuccess) {
-                            successfulResponse = parsed;
-                            break; // Success! Stop trying candidate fallbacks
-                        }
-                    }
-                } catch (_) {
-                    console.warn(`Non-JSON response from ${reqItem.url} (HTTP ${apiResponse.status}):`, rawText.substring(0, 200));
-                }
-            } catch (err: any) {
-                console.warn(`Fetch failed for ${reqItem.url}:`, err.message);
-            }
-        }
-
-        if (successfulResponse) {
-            responseData = successfulResponse;
-        }
-
-        if (!responseData) {
-            console.error(`AgentHub API returned unparsable response:`, lastErrorText.substring(0, 500));
-            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Provider unreachable`);
-            let cleanText = lastErrorText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            if (cleanText.includes('404') || cleanText.includes('could not be found') || cleanText.includes('Page Not Found')) {
-                cleanText = 'Record not found on identity verification provider.';
-            } else {
-                cleanText = cleanText.substring(0, 120);
-            }
-            return jsonOk({ error: cleanText || 'Service temporarily unavailable. Please try again later.' });
-        }
-
-        // ── Deeply unwrap and normalize AgentHub response ───────────────────────
-        let innerData: any = {};
-        if (responseData.data && typeof responseData.data === 'object') {
-            innerData = { ...responseData.data };
-            if (responseData.data.data && typeof responseData.data.data === 'object') {
-                innerData = { ...innerData, ...responseData.data.data };
-            }
-            if (responseData.data.user_details) {
-                if (typeof responseData.data.user_details === 'object') {
-                    innerData = { ...innerData, ...responseData.data.user_details };
-                    if (responseData.data.user_details.data && typeof responseData.data.user_details.data === 'object') {
-                        innerData = { ...innerData, ...responseData.data.user_details.data };
-                    }
-                }
-            }
-        } else {
-            innerData = { ...responseData };
-        }
-
-        const firstName = innerData.firstName || innerData.firstname || innerData.first_name || '';
-        const lastName = innerData.lastName || innerData.surname || innerData.lastname || innerData.last_name || '';
-        const middleName = innerData.middleName || innerData.middlename || innerData.middle_name || '';
-        const bvn = innerData.bvn || innerData.number || searchValue || '';
-        const phone = innerData.phoneNumber || innerData.phoneNumber1 || innerData.phone || innerData.phone_number || '';
-        const dob = innerData.dateOfBirth || innerData.dob || innerData.birthdate || '';
-        const gender = innerData.gender || '';
-        const photo = innerData.image || innerData.base64Image || innerData.photo || innerData.face || '';
-        const pdfBase64 = responseData.pdf_base64 || responseData.data?.pdf_base64 || innerData.pdf_base64 || responseData.slip || innerData.slip;
-
-        innerData.firstName = firstName;
-        innerData.first_name = firstName;
-        innerData.lastName = lastName;
-        innerData.last_name = lastName;
-        innerData.surname = lastName;
-        innerData.middleName = middleName;
-        innerData.middle_name = middleName;
-        innerData.bvn = bvn;
-        innerData.phone = phone;
-        innerData.phoneNumber = phone;
-        innerData.phoneNumber1 = phone;
-        innerData.dateOfBirth = dob;
-        innerData.dob = dob;
-        innerData.gender = gender;
-        if (photo) {
-            innerData.image = photo;
-            innerData.base64Image = photo;
-            innerData.photo = photo;
-        }
-        if (pdfBase64) {
-            innerData.pdf_base64 = pdfBase64;
-        }
-
-        const isSuccess = responseData.status === true || 
-                          responseData.status === 'success' || 
-                          responseData.success === true ||
-                          responseData.current_status === 'COMPLETED' ||
-                          Boolean(firstName || lastName || (bvn && bvn.length >= 10) || pdfBase64);
-
-        if (isSuccess) {
-            return jsonOk({
-                data: {
-                    status: 'success',
-                    message: responseData.message || 'Verification Successful',
-                    data: innerData,
-                    pdf_base64: pdfBase64
-                }
-            });
-        }
-
-        // ── AgentHub failure ───────────────────────────────────────────────────
-        console.error('AgentHub API Error:', responseData);
-        let agentHubMsg =
-            responseData.error ||
-            responseData.message ||
-            'Verification failed. Record not found.';
-
-        if (typeof agentHubMsg === 'string') {
-            if (agentHubMsg.toLowerCase().includes('insufficient wallet balance') || agentHubMsg.toLowerCase().includes('insufficient funds')) {
-                agentHubMsg = 'Provider API Wallet Insufficient Balance: Please top up your AgentHub developer account (https://agenthub.ng) to process identity verifications.';
-            } else if (agentHubMsg.toLowerCase().includes('bvn not exists') || agentHubMsg.toLowerCase().includes('bvn not exist')) {
-                agentHubMsg = 'The provided 11-digit BVN does not exist or is not registered in the central database.';
-            } else if (agentHubMsg.toLowerCase().includes('nin not exists') || agentHubMsg.toLowerCase().includes('nin not exist')) {
-                agentHubMsg = 'The provided 11-digit NIN does not exist or is not registered.';
-            } else if (agentHubMsg.toLowerCase().includes('service currently unavailable') || agentHubMsg.toLowerCase().includes('service unavailable')) {
-                agentHubMsg = 'Service is temporarily busy on the provider network. Please try again shortly.';
-            }
-        }
-
-        // AgentHub already refunds on their side ("message": "Refunded")
-        // But we still refund the user's wallet locally since we charged them upfront
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: ${agentHubMsg}`);
-        return jsonOk({ error: agentHubMsg, details: responseData });
-
-    } catch (apiError: any) {
-        console.error('AgentHub Fetch Error:', apiError);
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Network error during verification`);
-        return jsonOk({ error: 'Failed to reach verification provider. Please try again.' })
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
     }
+
+    // ── PROVIDER 2: Failover to IDPro if AgentHub did not succeed ────────────
+    if (!successfulResponse && IDPRO_API_KEY) {
+      console.log(`AgentHub did not succeed. Triggering IDPro failover for searchType: ${searchType}`);
+      let idproEndpoint = `${IDPRO_BASE}/nin`;
+      let idproPayload: any = { number: searchValue };
+
+      switch (searchType) {
+        case 'nin':
+        case 'nin-slip':
+        case 'nin-slip-v2':
+          idproEndpoint = `${IDPRO_BASE}/nin`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'phone':
+          idproEndpoint = `${IDPRO_BASE}/phone`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'demographic':
+          idproEndpoint = `${IDPRO_BASE}/demo`;
+          idproPayload = { firstname, lastname, gender, dob };
+          break;
+        case 'bvn':
+        case 'bvn-slip':
+        case 'bvn-premium-slip':
+          idproEndpoint = `${IDPRO_BASE}/bvn`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'bvn-card':
+          idproEndpoint = `${IDPRO_BASE}/bvncard`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'bvn-phone':
+        case 'bvn-retrieval':
+          idproEndpoint = `${IDPRO_BASE}/bvn-phone`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'tracking-id':
+        case 'pers_status':
+        case 'nin-personalization':
+          idproEndpoint = `${IDPRO_BASE}/tracking-id`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'ipe':
+          idproEndpoint = `${IDPRO_BASE}/ipe`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'val':
+        case 'nin-validation':
+          idproEndpoint = `${IDPRO_BASE}/val`;
+          idproPayload = { number: searchValue };
+          break;
+        case 'delink':
+          idproEndpoint = `${IDPRO_BASE}/delink`;
+          idproPayload = { number: searchValue };
+          break;
+      }
+
+      try {
+        const idproController = new AbortController();
+        const idproTimeout = setTimeout(() => idproController.abort(), 12000);
+
+        const idproRes = await fetch(idproEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${IDPRO_API_KEY}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(idproPayload),
+          signal: idproController.signal
+        });
+        clearTimeout(idproTimeout);
+
+        const idproRawText = await idproRes.text();
+        try {
+          const parsedIdpro = JSON.parse(idproRawText);
+          if (parsedIdpro) {
+            const statusStr = String(parsedIdpro.status || '').toLowerCase();
+            const isIdproSuccess = (idproRes.ok && (statusStr === 'success' || statusStr === 'true' || parsedIdpro.status === true)) ||
+                                   Boolean(parsedIdpro.data && (parsedIdpro.data.firstname || parsedIdpro.data.surname || parsedIdpro.data.nin)) ||
+                                   Boolean(parsedIdpro.firstname || parsedIdpro.surname || parsedIdpro.nin);
+
+            if (isIdproSuccess) {
+              successfulResponse = parsedIdpro;
+            } else if (parsedIdpro.message && (
+              parsedIdpro.message.toLowerCase().includes('not found') || 
+              parsedIdpro.message.toLowerCase().includes('no record') || 
+              parsedIdpro.message.toLowerCase().includes('does not exist')
+            )) {
+              if (hasDeducted) {
+                await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Record not found');
+                hasDeducted = false;
+              }
+              return jsonOk({ error: 'The provided NIN does not exist or has no record in the central database.' });
+            }
+          }
+        } catch (_) {}
+      } catch (idproErr: any) {
+        console.warn('IDPro failover error:', idproErr.message);
+      }
+    }
+
+    // ── Handle Successful Verification ───────────────────────────────────────
+    if (successfulResponse) {
+      let personData: any = {};
+      if (successfulResponse.data && typeof successfulResponse.data === 'object') {
+        personData = { ...successfulResponse.data };
+        if (successfulResponse.data.data && typeof successfulResponse.data.data === 'object') {
+          personData = { ...personData, ...successfulResponse.data.data };
+        }
+        if (successfulResponse.data.user_details && typeof successfulResponse.data.user_details === 'object') {
+          personData = { ...personData, ...successfulResponse.data.user_details };
+        }
+      } else {
+        personData = { ...successfulResponse };
+      }
+
+      // Universal field normalizer for all slip components
+      const firstName = personData.firstName || personData.firstname || personData.first_name || '';
+      const lastName = personData.lastName || personData.surname || personData.lastname || personData.last_name || '';
+      const middleName = personData.middleName || personData.middlename || personData.middle_name || '';
+      const ninNum = personData.nin || personData.number || searchValue || '';
+      const bvnNum = personData.bvn || '';
+      const phoneNum = personData.phoneNumber || personData.phoneNumber1 || personData.phone || personData.telephoneno || '';
+      const dobVal = personData.dateOfBirth || personData.dob || personData.birthdate || '';
+      const genderVal = personData.gender || personData.sex || '';
+      const photoVal = personData.image || personData.base64Image || personData.photo || personData.picture || personData.face || '';
+      const pdfBase64Val = successfulResponse.pdf_base64 || successfulResponse.data?.pdf_base64 || personData.pdf_base64 || successfulResponse.slip || personData.slip || '';
+      const trackingIdVal = personData.tracking_id || personData.trackingId || personData.ref || '';
+      const resState = personData.residence_state || personData.residenceState || personData.state || '';
+      const resLga = personData.residence_lga || personData.residenceLga || personData.lga || '';
+      const bState = personData.birthstate || personData.birthState || '';
+      const bLga = personData.birthlga || personData.birthLga || '';
+      const resAddress = personData.residence_address || personData.address || '';
+
+      const normalized: any = {
+        ...personData,
+        firstname: firstName,
+        first_name: firstName,
+        firstName: firstName,
+        surname: lastName,
+        lastname: lastName,
+        last_name: lastName,
+        lastName: lastName,
+        middlename: middleName,
+        middle_name: middleName,
+        middleName: middleName,
+        nin: ninNum,
+        number: ninNum,
+        bvn: bvnNum,
+        phone: phoneNum,
+        phoneNumber: phoneNum,
+        telephoneno: phoneNum,
+        dob: dobVal,
+        birthdate: dobVal,
+        dateOfBirth: dobVal,
+        gender: genderVal,
+        sex: genderVal,
+        photo: photoVal,
+        image: photoVal,
+        base64Image: photoVal,
+        picture: photoVal,
+        tracking_id: trackingIdVal,
+        trackingId: trackingIdVal,
+        residence_state: resState,
+        residenceState: resState,
+        state: resState,
+        residence_lga: resLga,
+        residenceLga: resLga,
+        lga: resLga,
+        birthstate: bState,
+        birthState: bState,
+        birthlga: bLga,
+        birthLga: bLga,
+        residence_address: resAddress,
+        address: resAddress,
+        pdf_base64: pdfBase64Val
+      };
+
+      return jsonOk({
+        data: {
+          status: 'success',
+          message: successfulResponse.message || 'Verification Successful',
+          data: normalized,
+          pdf_base64: pdfBase64Val
+        }
+      });
+    }
+
+    // ── Fallback Failure: Refund cleanly if deducted ─────────────────────────
+    if (hasDeducted) {
+      await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Verification could not be completed');
+      hasDeducted = false;
+    }
+
+    return jsonOk({ 
+      error: 'The NIN could not be verified on the national identity database. Please verify the number and try again.' 
+    });
 
   } catch (error: any) {
-    console.error('Unexpected error:', error)
-    return jsonOk({ error: `An unexpected error occurred: ${error?.message || 'Unknown'}` })
+    console.error('Unexpected error in verify-nin:', error);
+    if (hasDeducted && supabaseAdmin && userId && FEE_AMOUNT > 0) {
+      try {
+        await refundUser(supabaseAdmin, userId, FEE_AMOUNT, 'Refund: System error during verification');
+      } catch (_) {}
+    }
+    return jsonOk({ error: error?.message || 'An unexpected error occurred during verification.' });
   }
 })
 
 async function refundUser(supabaseAdmin: any, userId: string, amount: number, reason: string) {
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('balance')
-      .eq('id', userId)
-      .single()
-      
-    if (profile) {
+  if (!amount || amount <= 0) return;
+  try {
+    const { error: rpcError } = await supabaseAdmin.rpc('refund_balance', {
+      user_id: userId,
+      amount: amount
+    });
+
+    if (rpcError) {
+      console.warn('refund_balance RPC failed, updating profile directly:', rpcError.message);
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('balance')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profile) {
         const currentBalance = parseFloat(profile.balance?.toString() || '0');
         const newBalance = currentBalance + amount;
         await supabaseAdmin
           .from('profiles')
           .update({ balance: newBalance })
-          .eq('id', userId)
-          
-        await supabaseAdmin.from('transactions').insert({
-            user_id: userId,
-            amount: amount,
-            type: 'deposit',
-            status: 'success',
-            reference: `refund_${Date.now()}`,
-            description: reason
-        });
+          .eq('id', userId);
+      }
     }
+
+    await supabaseAdmin.from('transactions').insert({
+      user_id: userId,
+      amount: amount,
+      type: 'refund',
+      status: 'success',
+      reference: `refund_${Date.now()}`,
+      description: reason
+    });
+  } catch (err: any) {
+    console.error('Failed to execute refund:', err.message);
+  }
 }

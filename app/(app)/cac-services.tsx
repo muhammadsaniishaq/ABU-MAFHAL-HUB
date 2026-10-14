@@ -1,54 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Image, Modal } from 'react-native';
-import { StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import { 
+  View, Text, ScrollView, TouchableOpacity, TextInput, 
+  ActivityIndicator, Alert, Image, Modal, StyleSheet, 
+  Platform, KeyboardAvoidingView 
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { supabase } from '../../services/supabase';
-import DynamicBanners from '../../components/DynamicBanners';
-import * as DocumentPicker from 'expo-document-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
-import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+
+import { supabase } from '../../services/supabase';
+import DynamicBanners from '../../components/DynamicBanners';
 import { NIGERIA_STATES, STATE_LIST } from '../../utils/nigeriaStates';
 
 const COLORS = {
   navy: '#0d1b3e',
-  navyMid: '#142258',
+  navyMid: '#162854',
+  navyLight: '#1f3875',
   gold: '#f5a623',
+  goldLight: '#fff9ed',
   goldDk: '#d4890e',
-  bg: '#f4f6fb',
+  bg: '#f8fafc',
   white: '#FFFFFF',
-  textMain: '#0d1b3e',
-  textSub: '#5a6890',
+  cardBg: '#FFFFFF',
+  textMain: '#0f172a',
+  textSub: '#64748b',
   border: '#e2e8f0',
+  borderFocus: '#94a3b8',
   error: '#ef4444',
   success: '#10b981',
+  successLight: '#ecfdf5',
+  info: '#3b82f6',
+  infoLight: '#eff6ff',
 };
 
-type Pricing = { id: string; name: string; price: number; };
+type Pricing = { id: string; name: string; price: number; active?: boolean };
 
-const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select..." }: any) => {
+// Reusable Custom Dropdown
+const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select...", required = false }: any) => {
   const [visible, setVisible] = useState(false);
   const safeOptions = Array.isArray(options) ? options : [];
   return (
     <View style={[s.inputContainer, { zIndex: visible ? 100 : 1 }]}>
-      <Text style={s.label}>{label}</Text>
-      <TouchableOpacity style={[s.input, { justifyContent: 'center' }]} onPress={() => setVisible(!visible)}>
-        <Text style={{ color: value ? COLORS.navy : COLORS.textSub }}>{value || placeholder}</Text>
-        <Ionicons name={visible ? "chevron-up" : "chevron-down"} size={16} color={COLORS.textSub} style={{ position: 'absolute', right: 12, top: 12 }} />
+      <Text style={s.inputLabel}>
+        {label} {required && <Text style={{ color: COLORS.error }}>*</Text>}
+      </Text>
+      <TouchableOpacity 
+        style={[s.inputBox, visible && s.inputBoxActive]} 
+        onPress={() => setVisible(!visible)}
+        activeOpacity={0.8}
+      >
+        <Text style={[s.inputText, !value && { color: COLORS.textSub }]} numberOfLines={1}>
+          {value || placeholder}
+        </Text>
+        <Ionicons name={visible ? "chevron-up" : "chevron-down"} size={16} color={COLORS.textSub} />
       </TouchableOpacity>
       
       {visible && (
-        <View style={[s.dropdownList, { position: 'relative', top: 0, marginTop: 4, maxHeight: 250, zIndex: 1000 }]}>
-          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+        <View style={s.dropdownList}>
+          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ maxHeight: 220 }}>
             {safeOptions.length === 0 ? (
-              <Text style={{ textAlign: 'center', padding: 12, color: COLORS.textSub }}>No options</Text>
+              <Text style={{ textAlign: 'center', padding: 12, color: COLORS.textSub, fontSize: 13 }}>No options</Text>
             ) : (
               safeOptions.map((opt: string, i: number) => (
-                <TouchableOpacity key={i} style={[s.dropdownItem, value === opt && s.dropdownItemActive]} onPress={() => { onSelect(opt); setVisible(false); }}>
+                <TouchableOpacity 
+                  key={i} 
+                  style={[s.dropdownItem, value === opt && s.dropdownItemActive]} 
+                  onPress={() => { onSelect(opt); setVisible(false); }}
+                >
                   <Text style={[s.dropdownItemTxt, value === opt && s.dropdownItemTxtActive]}>{opt}</Text>
+                  {value === opt && <Ionicons name="checkmark" size={16} color={COLORS.navy} />}
                 </TouchableOpacity>
               ))
             )}
@@ -68,10 +91,9 @@ const MONTHS = [
 ];
 const YEARS = Array.from({ length: 70 }, (_, i) => String(2008 - i));
 
-const CustomDatePicker = ({ label, value, onChange }: any) => {
+// Date Picker Modal
+const CustomDatePicker = ({ label, value, onChange, required = false }: any) => {
   const [showModal, setShowModal] = useState(false);
-  
-  // Parse initial values
   const parts = (value || '').split('-');
   const [selYear, setSelYear] = useState(parts[0] || '1998');
   const [selMonth, setSelMonth] = useState(parts[1] || '05');
@@ -89,8 +111,7 @@ const CustomDatePicker = ({ label, value, onChange }: any) => {
   }, [value]);
 
   const handleConfirm = () => {
-    const formattedDate = `${selYear}-${selMonth}-${selDay}`;
-    onChange(formattedDate);
+    onChange(`${selYear}-${selMonth}-${selDay}`);
     setShowModal(false);
   };
 
@@ -105,104 +126,91 @@ const CustomDatePicker = ({ label, value, onChange }: any) => {
 
   return (
     <View style={s.inputContainer}>
-      <Text style={s.label}>{label}</Text>
+      <Text style={s.inputLabel}>
+        {label} {required && <Text style={{ color: COLORS.error }}>*</Text>}
+      </Text>
       <TouchableOpacity 
-        style={[s.input, { justifyContent: 'center', backgroundColor: '#f8fafc' }]} 
+        style={s.inputBox} 
         onPress={() => setShowModal(true)}
         activeOpacity={0.8}
       >
-        <Text style={{ fontSize: 13, color: value ? COLORS.navy : COLORS.textSub, fontWeight: value ? '700' : '400' }}>
+        <Text style={[s.inputText, !value && { color: COLORS.textSub }]}>
           {formattedDisplay}
         </Text>
-        <Ionicons name="calendar-outline" size={18} color={COLORS.navy} style={{ position: 'absolute', right: 12, top: 11 }} />
+        <Ionicons name="calendar-outline" size={17} color={COLORS.navy} />
       </TouchableOpacity>
 
-      {/* Styled Interactive Modal Date Picker */}
       <Modal visible={showModal} transparent animationType="fade" onRequestClose={() => setShowModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(13,27,62,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 24, padding: 20, width: '100%', maxWidth: 380, shadowColor: '#000', shadowRadius: 16, shadowOpacity: 0.2, elevation: 8 }}>
-            
-            {/* Modal Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(245,166,35,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                  <Ionicons name="calendar" size={18} color={COLORS.goldDk} />
-                </View>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.navy }}>Select Date of Birth</Text>
+        <View style={s.modalBackdrop}>
+          <View style={s.datePickerCard}>
+            <View style={s.datePickerHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="calendar" size={20} color={COLORS.navy} />
+                <Text style={s.datePickerTitle}>Select Date of Birth</Text>
               </View>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Ionicons name="close-circle" size={24} color={COLORS.textSub} />
+                <Ionicons name="close-circle" size={22} color={COLORS.textSub} />
               </TouchableOpacity>
             </View>
 
-            {/* Live Selected Date Display Badge */}
-            <View style={{ backgroundColor: '#0d1b3e', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 11, color: COLORS.gold, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Selected Date</Text>
-              <Text style={{ fontSize: 18, color: '#fff', fontWeight: '900', marginTop: 2 }}>{selDay} {getMonthName(selMonth)} {selYear}</Text>
+            <View style={s.selectedDateBadge}>
+              <Text style={s.selectedDateLabel}>SELECTED DATE</Text>
+              <Text style={s.selectedDateValue}>{selDay} {getMonthName(selMonth)} {selYear}</Text>
             </View>
 
-            {/* 3 Wheel Selector Columns */}
-            <View style={{ flexDirection: 'row', gap: 8, height: 180, marginBottom: 16 }}>
-              
-              {/* Day Selector */}
-              <View style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', padding: 4 }}>
-                <Text style={{ fontSize: 10, fontWeight: 'bold', color: COLORS.textSub, textAlign: 'center', marginVertical: 4 }}>DAY</Text>
+            <View style={{ flexDirection: 'row', gap: 6, height: 180, marginBottom: 16 }}>
+              {/* Day */}
+              <View style={s.wheelCol}>
+                <Text style={s.wheelHeader}>DAY</Text>
                 <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
                   {DAYS.map(d => (
                     <TouchableOpacity 
                       key={d} 
                       onPress={() => setSelDay(d)}
-                      style={{ paddingVertical: 8, borderRadius: 8, backgroundColor: selDay === d ? COLORS.navy : 'transparent', alignItems: 'center', marginVertical: 1 }}
+                      style={[s.wheelItem, selDay === d && s.wheelItemActive]}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: selDay === d ? 'bold' : '500', color: selDay === d ? '#fff' : COLORS.textMain }}>{d}</Text>
+                      <Text style={[s.wheelItemTxt, selDay === d && s.wheelItemTxtActive]}>{d}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
 
-              {/* Month Selector */}
-              <View style={{ flex: 1.3, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', padding: 4 }}>
-                <Text style={{ fontSize: 10, fontWeight: 'bold', color: COLORS.textSub, textAlign: 'center', marginVertical: 4 }}>MONTH</Text>
+              {/* Month */}
+              <View style={[s.wheelCol, { flex: 1.4 }]}>
+                <Text style={s.wheelHeader}>MONTH</Text>
                 <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
                   {MONTHS.map(m => (
                     <TouchableOpacity 
                       key={m.value} 
                       onPress={() => setSelMonth(m.value)}
-                      style={{ paddingVertical: 8, borderRadius: 8, backgroundColor: selMonth === m.value ? COLORS.navy : 'transparent', alignItems: 'center', marginVertical: 1 }}
+                      style={[s.wheelItem, selMonth === m.value && s.wheelItemActive]}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: selMonth === m.value ? 'bold' : '500', color: selMonth === m.value ? '#fff' : COLORS.textMain }} numberOfLines={1}>{m.name}</Text>
+                      <Text style={[s.wheelItemTxt, selMonth === m.value && s.wheelItemTxtActive]} numberOfLines={1}>{m.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
 
-              {/* Year Selector */}
-              <View style={{ flex: 1.2, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', padding: 4 }}>
-                <Text style={{ fontSize: 10, fontWeight: 'bold', color: COLORS.textSub, textAlign: 'center', marginVertical: 4 }}>YEAR</Text>
+              {/* Year */}
+              <View style={s.wheelCol}>
+                <Text style={s.wheelHeader}>YEAR</Text>
                 <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
                   {YEARS.map(y => (
                     <TouchableOpacity 
                       key={y} 
                       onPress={() => setSelYear(y)}
-                      style={{ paddingVertical: 8, borderRadius: 8, backgroundColor: selYear === y ? COLORS.navy : 'transparent', alignItems: 'center', marginVertical: 1 }}
+                      style={[s.wheelItem, selYear === y && s.wheelItemActive]}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: selYear === y ? 'bold' : '500', color: selYear === y ? '#fff' : COLORS.textMain }}>{y}</Text>
+                      <Text style={[s.wheelItemTxt, selYear === y && s.wheelItemTxtActive]}>{y}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
-
             </View>
 
-            {/* Confirm Button */}
-            <TouchableOpacity 
-              onPress={handleConfirm}
-              style={{ backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}
-            >
-              <Ionicons name="checkmark-circle" size={18} color={COLORS.navy} style={{ marginRight: 6 }} />
-              <Text style={{ color: COLORS.navy, fontWeight: 'bold', fontSize: 14, textTransform: 'uppercase', letterSpacing: 0.5 }}>Confirm Date</Text>
+            <TouchableOpacity style={s.btnPrimary} onPress={handleConfirm}>
+              <Text style={s.btnPrimaryTxt}>Confirm Date</Text>
             </TouchableOpacity>
-
           </View>
         </View>
       </Modal>
@@ -213,33 +221,40 @@ const CustomDatePicker = ({ label, value, onChange }: any) => {
 export default function CACServices() {
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId: string }>();
+
+  // Flow State (Step 1 to 4)
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // Pricing State
   const [pricings, setPricings] = useState<Pricing[]>([]);
   const [regType, setRegType] = useState<Pricing | null>(null);
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
   // TIN & Retrieval Add-on State
   const [includeTin, setIncludeTin] = useState(false);
-  const [tinFee, setTinFee] = useState(3000);
+  const [tinFee, setTinFee] = useState(5000);
   const [rcNumber, setRcNumber] = useState('');
   const [registrationYear, setRegistrationYear] = useState('');
 
-  // Form State
+  // Form State: Names
   const [proposedName1, setProposedName1] = useState('');
   const [proposedName2, setProposedName2] = useState('');
-  const [proposedName3, setProposedName3] = useState(''); // Only for NGO
+  const [proposedName3, setProposedName3] = useState('');
 
+  // Form State: Business Info
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [natureOfBusiness, setNatureOfBusiness] = useState(''); // Org type for NGO
+  const [natureOfBusiness, setNatureOfBusiness] = useState('');
   const [state, setState] = useState('');
   const [lga, setLga] = useState('');
   const [officeNumber, setOfficeNumber] = useState('');
   const [officeAddress, setOfficeAddress] = useState('');
-  const [tenure, setTenure] = useState(''); // For NGO
+  const [tenure, setTenure] = useState('');
+  const [aims, setAims] = useState('');
 
-  // Dynamic Persons (Proprietor, Chairman, Secretary, Trustees)
+  // Persons
   const defaultPerson = {
     fullName: '', dob: '', gender: 'Male', phone: '', nin: '', email: '',
     state: '', lga: '', houseNumber: '', address: '', signatureUri: '', passportUri: ''
@@ -250,12 +265,23 @@ export default function CACServices() {
   const [secretary, setSecretary] = useState({ ...defaultPerson });
   const [trustees, setTrustees] = useState([{ ...defaultPerson }]);
   const [witness, setWitness] = useState({ ...defaultPerson });
-  
-  const [aims, setAims] = useState('');
 
   useEffect(() => {
     fetchPricing();
+    fetchUserBalance();
   }, []);
+
+  const fetchUserBalance = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
+        if (profile) setWalletBalance(profile.balance || 0);
+      }
+    } catch (e) {
+      console.log('Balance fetch err:', e);
+    }
+  };
 
   const fetchPricing = async () => {
     try {
@@ -285,7 +311,7 @@ export default function CACServices() {
         allPricings.push({
           id: 'cac-certificate-retrieval-default',
           name: 'CAC Certificate Retrieval / Document Search',
-          price: 7500
+          price: 4000
         });
       }
 
@@ -294,7 +320,7 @@ export default function CACServices() {
       if (editId) {
         await loadEditData(editId as string, allPricings);
       } else if (allPricings.length > 0) {
-        setRegType(allPricings[0]); // Default first pricing
+        setRegType(allPricings[0]);
       }
     } catch (e) {
       console.error(e);
@@ -351,22 +377,19 @@ export default function CACServices() {
   const isLimitedLiability = regType?.name?.toLowerCase().includes('limited liability') || regType?.name?.toLowerCase().includes('ltd') || regType?.name?.toLowerCase().includes('share');
   const isRetrieval = regType?.name?.toLowerCase().includes('retrieval') || regType?.name?.toLowerCase().includes('certificate');
 
+  const totalCost = (regType?.price || 0) + (includeTin ? tinFee : 0);
+
+  // Pick Image Helper
   const pickImage = async (setter: Function, field: string) => {
     try {
-      let result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setter((prev: any) => {
-          if (Array.isArray(prev)) {
-            // Not handling array logic directly here to keep it simple, but we map index if needed.
-            return prev;
-          }
-          return { ...prev, [field]: result.assets[0].uri };
-        });
+        setter((prev: any) => ({ ...prev, [field]: result.assets[0].uri }));
       }
     } catch (e) {
       Alert.alert('Error', 'Failed to pick image');
@@ -375,7 +398,7 @@ export default function CACServices() {
 
   const pickArrayImage = async (array: any[], index: number, field: string, setArray: Function) => {
     try {
-      let result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.8,
@@ -391,100 +414,9 @@ export default function CACServices() {
     }
   };
 
-  const renderPersonForm = (person: any, title: string, setter: Function, isArray: boolean = false, index: number = 0, onRemove?: () => void) => {
-    const updateField = (f: string, v: string) => {
-      if (isArray) {
-        setter((prev: any[]) => {
-          const newArr = [...prev];
-          newArr[index] = { ...newArr[index], [f]: v };
-          return newArr;
-        });
-      } else {
-        setter((prev: any) => ({ ...prev, [f]: v }));
-      }
-    };
-
-    const data = isArray ? person[index] : person;
-
-    return (
-      <View style={s.personCard} key={title + index}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <Text style={[s.personTitle, { marginBottom: 0 }]}>{title}</Text>
-          {onRemove && (
-            <TouchableOpacity onPress={onRemove}>
-              <Text style={{ color: COLORS.error, fontSize: 12, fontWeight: 'bold' }}>Remove</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <View style={s.row}>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>Full name</Text>
-            <TextInput style={s.input} value={data.fullName} onChangeText={t => updateField('fullName', t)} />
-          </View>
-          <CustomDatePicker label="Date of birth" value={data.dob} onChange={(v: string) => updateField('dob', v)} />
-        </View>
-
-        <View style={s.row}>
-          <CustomDropdown label="Gender" value={data.gender} options={['Male', 'Female']} onSelect={(v: string) => updateField('gender', v)} />
-          <View style={s.inputContainer}>
-            <Text style={s.label}>Phone number</Text>
-            <TextInput style={s.input} keyboardType="phone-pad" value={data.phone} onChangeText={t => updateField('phone', t)} />
-          </View>
-        </View>
-
-        <View style={s.row}>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>NIN number</Text>
-            <TextInput style={s.input} keyboardType="numeric" value={data.nin} onChangeText={t => updateField('nin', t)} />
-          </View>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>Email address</Text>
-            <TextInput style={s.input} keyboardType="email-address" value={data.email} onChangeText={t => updateField('email', t)} />
-          </View>
-        </View>
-
-        <View style={s.row}>
-          <CustomDropdown label="State" value={data.state} options={STATE_LIST} onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} />
-          <CustomDropdown label="LGA and city" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State First" />
-        </View>
-
-        <View style={s.row}>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>House number</Text>
-            <TextInput style={s.input} value={data.houseNumber} onChangeText={t => updateField('houseNumber', t)} />
-          </View>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>Home address</Text>
-            <TextInput style={s.input} value={data.address} onChangeText={t => updateField('address', t)} />
-          </View>
-        </View>
-
-        <View style={s.row}>
-          <TouchableOpacity 
-            style={s.filePickerBtn} 
-            onPress={() => isArray ? pickArrayImage(person as any[], index, 'signatureUri', setter) : pickImage(setter, 'signatureUri')}
-          >
-            <Text style={s.label}>Signature (upload)</Text>
-            <View style={s.fileBox}>
-              <Text style={data.signatureUri ? s.fileTextActive : s.fileText}>{data.signatureUri ? 'Image Selected ✓' : 'Choose File No file chosen'}</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={s.filePickerBtn} 
-            onPress={() => isArray ? pickArrayImage(person as any[], index, 'passportUri', setter) : pickImage(setter, 'passportUri')}
-          >
-            <Text style={s.label}>Passport (upload)</Text>
-            <View style={s.fileBox}>
-              <Text style={data.passportUri ? s.fileTextActive : s.fileText}>{data.passportUri ? 'Image Selected ✓' : 'Choose File No file chosen'}</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
   const uploadFileToSupabase = async (uri: string, path: string) => {
     if (!uri) return null;
+    if (uri.startsWith('http://') || uri.startsWith('https://')) return uri; // Already uploaded
     const filename = uri.split('/').pop() || 'file.jpg';
     const filepath = `${path}/${Date.now()}_${filename}`;
     
@@ -509,25 +441,45 @@ export default function CACServices() {
     return copy;
   };
 
+  // Step Validation
+  const handleNextFromStep1 = () => {
+    if (!regType) return Alert.alert('Notice', 'Please choose a registration service');
+    if (isRetrieval) {
+      if (!proposedName1.trim()) return Alert.alert('Required', 'Please enter Registered Business / Company Name');
+      if (!rcNumber.trim()) return Alert.alert('Required', 'Please enter CAC RC or BN Number');
+    } else {
+      if (!proposedName1.trim()) return Alert.alert('Required', 'Please enter your Primary Proposed Business Name (Choice 1)');
+      if (!isNgo && !proposedName2.trim()) return Alert.alert('Required', 'Please enter an Alternative Business Name (Choice 2)');
+    }
+    setCurrentStep(2);
+  };
+
+  const handleNextFromStep2 = () => {
+    if (!isRetrieval) {
+      if (!phone.trim()) return Alert.alert('Required', 'Please enter a contact phone number');
+      if (!state) return Alert.alert('Required', 'Please select business state location');
+    }
+    setCurrentStep(3);
+  };
+
+  const handleNextFromStep3 = () => {
+    // Basic verification for primary person
+    const primaryPerson = isNgo ? chairman : proprietors[0];
+    if (!primaryPerson.fullName.trim()) {
+      return Alert.alert('Required', `Please enter the full name of ${isNgo ? 'Chairman' : 'Proprietor / Applicant'}`);
+    }
+    setCurrentStep(4);
+  };
+
+  // Final Submit Handler
   const handleSubmit = async () => {
     if (!regType) return Alert.alert('Error', 'Please select a service type');
-    
-    if (isRetrieval) {
-      if (!proposedName1.trim()) return Alert.alert('Error', 'Please enter your Registered Business / Company Name');
-      if (!rcNumber.trim()) return Alert.alert('Error', 'Please enter your CAC RC or BN Number');
-    } else {
-      if (!proposedName1.trim() || (!isNgo && !proposedName2.trim())) {
-        return Alert.alert('Error', 'Please enter your proposed business names');
-      }
-    }
 
     try {
       setSubmitting(true);
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-
-      const totalCost = regType.price + (includeTin ? tinFee : 0);
 
       // Check balance first before heavy uploads
       const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
@@ -572,7 +524,6 @@ export default function CACServices() {
         name3: proposedName3
       };
 
-      // If editing, bypass payment RPC and just update the table directly
       if (editId) {
         const { error: updateError } = await supabase.from('cac_requests').update({
           pricing_id: regType.id,
@@ -596,7 +547,7 @@ export default function CACServices() {
         return;
       }
 
-      // Call RPC for new requests (charges wallet total cost including TIN)
+      // New submission RPC (Charges wallet and notifies)
       const { data: rpcData, error: rpcError } = await supabase.rpc('submit_cac_request', {
         p_pricing_id: regType.id,
         p_registration_type: regType.name,
@@ -612,409 +563,722 @@ export default function CACServices() {
 
       if (rpcError) throw rpcError;
 
-      Alert.alert('Success', isRetrieval ? 'Certificate Retrieval Request submitted successfully!' : 'CAC Registration submitted successfully!', [
+      Alert.alert('Success 🎉', isRetrieval ? 'Certificate Retrieval Request submitted successfully!' : 'CAC Registration submitted successfully!', [
         { text: 'View History', onPress: () => router.push('/cac-history') },
-        { text: 'OK', onPress: () => router.back() }
+        { text: 'Done', onPress: () => router.back() }
       ]);
       
     } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', e.message || 'Failed to submit request');
+      Alert.alert('Application Failed', e.message || 'Failed to submit CAC request');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Render Person Card in Step 3
+  const renderPersonForm = (person: any, title: string, setter: Function, isArray: boolean = false, index: number = 0, onRemove?: () => void) => {
+    const updateField = (f: string, v: string) => {
+      if (isArray) {
+        setter((prev: any[]) => {
+          const newArr = [...prev];
+          newArr[index] = { ...newArr[index], [f]: v };
+          return newArr;
+        });
+      } else {
+        setter((prev: any) => ({ ...prev, [f]: v }));
+      }
+    };
+
+    const data = isArray ? person[index] : person;
+
+    return (
+      <View style={s.personCard} key={title + index}>
+        <View style={s.personCardHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={s.personAvatarIcon}>
+              <Ionicons name="person" size={15} color={COLORS.navy} />
+            </View>
+            <Text style={s.personCardTitle}>{title}</Text>
+          </View>
+          {onRemove && (
+            <TouchableOpacity onPress={onRemove} style={s.removeBtn}>
+              <Ionicons name="trash-outline" size={14} color={COLORS.error} />
+              <Text style={s.removeBtnTxt}>Remove</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={s.inputContainer}>
+          <Text style={s.inputLabel}>Full Legal Name <Text style={{ color: COLORS.error }}>*</Text></Text>
+          <TextInput 
+            style={s.inputBox} 
+            placeholder="As written on NIN or Valid ID"
+            value={data.fullName} 
+            onChangeText={t => updateField('fullName', t)} 
+          />
+        </View>
+
+        <View style={s.formGrid2}>
+          <CustomDatePicker label="Date of Birth" value={data.dob} onChange={(v: string) => updateField('dob', v)} required />
+          <CustomDropdown label="Gender" value={data.gender} options={['Male', 'Female']} onSelect={(v: string) => updateField('gender', v)} />
+        </View>
+
+        <View style={s.formGrid2}>
+          <View style={s.inputContainer}>
+            <Text style={s.inputLabel}>Phone Number <Text style={{ color: COLORS.error }}>*</Text></Text>
+            <TextInput style={s.inputBox} keyboardType="phone-pad" placeholder="080..." value={data.phone} onChangeText={t => updateField('phone', t)} />
+          </View>
+          <View style={s.inputContainer}>
+            <Text style={s.inputLabel}>NIN (11 Digits)</Text>
+            <TextInput style={s.inputBox} keyboardType="numeric" maxLength={11} placeholder="11 digits" value={data.nin} onChangeText={t => updateField('nin', t)} />
+          </View>
+        </View>
+
+        <View style={s.inputContainer}>
+          <Text style={s.inputLabel}>Email Address</Text>
+          <TextInput style={s.inputBox} keyboardType="email-address" placeholder="name@email.com" value={data.email} onChangeText={t => updateField('email', t)} />
+        </View>
+
+        <View style={s.formGrid2}>
+          <CustomDropdown label="State of Origin" value={data.state} options={STATE_LIST} onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} />
+          <CustomDropdown label="LGA" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State" />
+        </View>
+
+        <View style={s.inputContainer}>
+          <Text style={s.inputLabel}>Residential Address</Text>
+          <TextInput style={s.inputBox} placeholder="Street, house number, area" value={data.address} onChangeText={t => updateField('address', t)} />
+        </View>
+
+        {/* Upload Tiles */}
+        <View style={s.uploadGrid}>
+          {/* Signature Upload */}
+          <TouchableOpacity 
+            style={[s.uploadTile, data.signatureUri && s.uploadTileDone]} 
+            onPress={() => isArray ? pickArrayImage(person as any[], index, 'signatureUri', setter) : pickImage(setter, 'signatureUri')}
+            activeOpacity={0.8}
+          >
+            <View style={[s.uploadIconBadge, data.signatureUri && { backgroundColor: COLORS.successLight }]}>
+              <Ionicons name={data.signatureUri ? "checkmark-circle" : "create-outline"} size={20} color={data.signatureUri ? COLORS.success : COLORS.navy} />
+            </View>
+            <Text style={s.uploadTileTitle}>Signature</Text>
+            <Text style={[s.uploadTileSub, data.signatureUri && { color: COLORS.success, fontWeight: '700' }]}>
+              {data.signatureUri ? 'Uploaded ✓' : 'Upload photo'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Passport Upload */}
+          <TouchableOpacity 
+            style={[s.uploadTile, data.passportUri && s.uploadTileDone]} 
+            onPress={() => isArray ? pickArrayImage(person as any[], index, 'passportUri', setter) : pickImage(setter, 'passportUri')}
+            activeOpacity={0.8}
+          >
+            <View style={[s.uploadIconBadge, data.passportUri && { backgroundColor: COLORS.successLight }]}>
+              <Ionicons name={data.passportUri ? "checkmark-circle" : "camera-outline"} size={20} color={data.passportUri ? COLORS.success : COLORS.navy} />
+            </View>
+            <Text style={s.uploadTileTitle}>Passport Photo</Text>
+            <Text style={[s.uploadTileSub, data.passportUri && { color: COLORS.success, fontWeight: '700' }]}>
+              {data.passportUri ? 'Uploaded ✓' : 'Upload photo'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.container}>
+      {/* Sleek Gradient Header */}
       <LinearGradient colors={[COLORS.navy, COLORS.navyMid]} style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+        <TouchableOpacity onPress={() => router.back()} style={s.headerIconBtn} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={20} color={COLORS.white} />
         </TouchableOpacity>
         <View style={s.headerTitleArea}>
-          <Text style={s.headerTitle}>{editId ? 'Edit Application' : 'CAC Registration'}</Text>
-          <Text style={s.headerSubTitle}>Register a business name, company or NGO</Text>
+          <Text style={s.headerTitle}>{editId ? 'Edit CAC Application' : 'CAC Registration'}</Text>
+          <Text style={s.headerSubtitle}>Official CAC & Business Registration Hub</Text>
         </View>
-        <TouchableOpacity style={s.historyBtnTop} onPress={() => router.push('/cac-history')}>
-          <Ionicons name="time-outline" size={16} color={COLORS.gold} />
+        <TouchableOpacity style={s.historyBtn} onPress={() => router.push('/cac-history')} activeOpacity={0.7}>
+          <Ionicons name="time-outline" size={15} color={COLORS.gold} />
           <Text style={s.historyBtnTxt}>History</Text>
         </TouchableOpacity>
       </LinearGradient>
 
-      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-        {/* Dynamic Banners */}
-        <DynamicBanners placement="cac" />
-        
-        {/* Info Banner Feature */}
-        <View style={s.infoBanner}>
-          <Ionicons name="information-circle" size={20} color={COLORS.navy} />
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={s.infoBannerTitle}>Registration Guide</Text>
-            <Text style={s.infoBannerText}>Ensure all names and addresses are accurate. Provide clear passport and signature uploads to avoid queries.</Text>
-          </View>
-        </View>
-
-        {!editId && (
-          <View style={s.chargeCard}>
-             <View style={s.chargeRow}>
-                <Text style={s.chargeRowLabel}>Base Service Fee:</Text>
-                <Text style={s.chargeRowAmt}>₦{regType?.price ? regType.price.toLocaleString() : '0.00'}</Text>
-             </View>
-             {includeTin && (
-               <View style={[s.chargeRow, { marginTop: 4 }]}>
-                  <Text style={[s.chargeRowLabel, { color: COLORS.goldDk }]}>TIN Processing Add-on:</Text>
-                  <Text style={[s.chargeRowAmt, { color: COLORS.goldDk }]}>+₦{tinFee.toLocaleString()}</Text>
-               </View>
-             )}
-             <View style={[s.chargeRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderColor: '#e2e8f0' }]}>
-                <Text style={[s.chargeRowLabel, { fontWeight: 'bold', color: COLORS.navy }]}>Total Amount Payable:</Text>
-                <Text style={[s.chargeRowAmt, { fontSize: 18, color: COLORS.navy }]}>
-                  ₦{((regType?.price || 0) + (includeTin ? tinFee : 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+      {/* Modern 4-Step Stepper Bar */}
+      <View style={s.stepperBar}>
+        {[
+          { num: 1, label: 'Service' },
+          { num: 2, label: 'Business' },
+          { num: 3, label: 'Officers' },
+          { num: 4, label: 'Review' },
+        ].map((st, idx) => {
+          const isActive = currentStep === st.num;
+          const isDone = currentStep > st.num;
+          return (
+            <React.Fragment key={st.num}>
+              <TouchableOpacity 
+                style={s.stepItem} 
+                onPress={() => isDone && setCurrentStep(st.num)} 
+                disabled={!isDone}
+                activeOpacity={0.7}
+              >
+                <View style={[s.stepCircle, isActive && s.stepCircleActive, isDone && s.stepCircleDone]}>
+                  {isDone ? (
+                    <Ionicons name="checkmark" size={13} color={COLORS.white} />
+                  ) : (
+                    <Text style={[s.stepNum, isActive && s.stepNumActive]}>{st.num}</Text>
+                  )}
+                </View>
+                <Text style={[s.stepLabel, isActive && s.stepLabelActive, isDone && s.stepLabelDone]}>
+                  {st.label}
                 </Text>
-             </View>
+              </TouchableOpacity>
+              {idx < 3 && <View style={[s.stepDivider, currentStep > idx + 1 && s.stepDividerDone]} />}
+            </React.Fragment>
+          );
+        })}
+      </View>
+
+      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        {/* Dynamic Promotional Banner */}
+        <DynamicBanners placement="cac" />
+
+        {/* ======================================================== */}
+        {/* STEP 1: SERVICE & PROPOSED NAME */}
+        {/* ======================================================== */}
+        {currentStep === 1 && (
+          <View style={s.stepContent}>
+            
+            <View style={s.sectionTitleRow}>
+              <View style={s.sectionNumberBadge}>
+                <Text style={s.sectionNumberTxt}>1</Text>
+              </View>
+              <View>
+                <Text style={s.stepHeading}>Choose Service Type</Text>
+                <Text style={s.stepSubheading}>Select the CAC registration or document category</Text>
+              </View>
+            </View>
+
+            {/* Service Selection Cards */}
+            {loading ? (
+              <View style={{ padding: 30, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={COLORS.navy} />
+                <Text style={{ marginTop: 8, fontSize: 13, color: COLORS.textSub }}>Loading available services...</Text>
+              </View>
+            ) : (
+              <View style={s.serviceCardsContainer}>
+                {pricings.map((p) => {
+                  const isSelected = regType?.id === p.id;
+                  const isCert = p.name.toLowerCase().includes('retrieval') || p.name.toLowerCase().includes('search');
+                  const isNgoType = p.name.toLowerCase().includes('ngo') || p.name.toLowerCase().includes('club');
+                  return (
+                    <TouchableOpacity 
+                      key={p.id} 
+                      style={[s.serviceCard, isSelected && s.serviceCardSelected]}
+                      onPress={() => !editId && setRegType(p)}
+                      disabled={Boolean(editId)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <View style={[s.serviceIconBox, isSelected && s.serviceIconBoxSelected]}>
+                          <Ionicons 
+                            name={isCert ? "document-text" : isNgoType ? "people" : "briefcase"} 
+                            size={18} 
+                            color={isSelected ? COLORS.white : COLORS.navy} 
+                          />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={[s.serviceTitle, isSelected && s.serviceTitleSelected]}>{p.name}</Text>
+                          <Text style={s.servicePrice}>₦{p.price.toLocaleString()}</Text>
+                        </View>
+                      </View>
+                      <View style={[s.radioCircle, isSelected && s.radioCircleSelected]}>
+                        {isSelected && <View style={s.radioInner} />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* TIN Processing Add-on (Clean switch-like card) */}
+            <TouchableOpacity 
+              style={[s.tinCard, includeTin && s.tinCardActive]} 
+              onPress={() => setIncludeTin(!includeTin)}
+              activeOpacity={0.8}
+            >
+              <View style={[s.tinCheckbox, includeTin && s.tinCheckboxActive]}>
+                {includeTin && <Ionicons name="checkmark" size={14} color={COLORS.white} />}
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={s.tinTitle}>Apply with TIN (Tax ID)</Text>
+                  <Text style={s.tinPrice}>+₦{tinFee.toLocaleString()}</Text>
+                </View>
+                <Text style={s.tinSub}>Process official JTB Tax Identification Number alongside your registration.</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Names Input Section */}
+            <View style={s.cleanCard}>
+              <Text style={s.cardSectionTitle}>
+                {isRetrieval ? 'REGISTERED BUSINESS INFO' : 'PROPOSED BUSINESS NAMES'}
+              </Text>
+              
+              {isRetrieval ? (
+                <>
+                  <View style={s.inputContainer}>
+                    <Text style={s.inputLabel}>Registered Business / Company Name <Text style={{ color: COLORS.error }}>*</Text></Text>
+                    <TextInput 
+                      style={s.inputBox} 
+                      placeholder="e.g. Abu Mafhal Multi Services"
+                      value={proposedName1} 
+                      onChangeText={setProposedName1} 
+                    />
+                  </View>
+
+                  <View style={s.formGrid2}>
+                    <View style={s.inputContainer}>
+                      <Text style={s.inputLabel}>RC or BN Number <Text style={{ color: COLORS.error }}>*</Text></Text>
+                      <TextInput 
+                        style={s.inputBox} 
+                        placeholder="e.g. BN-1234567" 
+                        value={rcNumber} 
+                        onChangeText={setRcNumber} 
+                      />
+                    </View>
+                    <View style={s.inputContainer}>
+                      <Text style={s.inputLabel}>Registration Year</Text>
+                      <TextInput 
+                        style={s.inputBox} 
+                        placeholder="e.g. 2021" 
+                        keyboardType="numeric"
+                        value={registrationYear} 
+                        onChangeText={setRegistrationYear} 
+                      />
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={s.inputContainer}>
+                    <Text style={s.inputLabel}>Proposed Name 1 (Primary Choice) <Text style={{ color: COLORS.error }}>*</Text></Text>
+                    <TextInput 
+                      style={s.inputBox} 
+                      placeholder="e.g. Abu Mafhal General Merchant"
+                      value={proposedName1} 
+                      onChangeText={setProposedName1} 
+                    />
+                  </View>
+
+                  <View style={s.inputContainer}>
+                    <Text style={s.inputLabel}>
+                      Proposed Name 2 (Alternative Choice) {!isNgo && <Text style={{ color: COLORS.error }}>*</Text>}
+                    </Text>
+                    <TextInput 
+                      style={s.inputBox} 
+                      placeholder="e.g. Abu Mafhal Integrated Services"
+                      value={proposedName2} 
+                      onChangeText={setProposedName2} 
+                    />
+                  </View>
+
+                  {isNgo && (
+                    <View style={s.inputContainer}>
+                      <Text style={s.inputLabel}>Proposed Name 3 (Optional for NGO)</Text>
+                      <TextInput 
+                        style={s.inputBox} 
+                        placeholder="Third alternative name"
+                        value={proposedName3} 
+                        onChangeText={setProposedName3} 
+                      />
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+
+            {/* Next Step Button */}
+            <TouchableOpacity style={s.btnPrimary} onPress={handleNextFromStep1} activeOpacity={0.8}>
+              <Text style={s.btnPrimaryTxt}>Next: Business Details</Text>
+              <Ionicons name="arrow-forward" size={17} color={COLORS.white} />
+            </TouchableOpacity>
+
           </View>
         )}
 
-        <View style={s.formCard}>
-          
-          <View style={s.inputGroup}>
-            <Text style={s.labelReq}>Service / Registration Type *</Text>
-            <TouchableOpacity 
-              style={[s.dropdownBtn, editId ? { backgroundColor: '#f1f5f9' } : {}]} 
-              onPress={() => !editId && setShowTypeDropdown(!showTypeDropdown)}
-              activeOpacity={editId ? 1 : 0.2}
-            >
-              <Text style={[s.dropdownTxt, editId ? { color: COLORS.textSub } : {}]}>
-                {regType ? regType.name : 'Select Type'}
-              </Text>
-              {!editId && <Ionicons name="chevron-down" size={20} color={COLORS.textSub} />}
-            </TouchableOpacity>
+        {/* ======================================================== */}
+        {/* STEP 2: BUSINESS & CONTACT DETAILS */}
+        {/* ======================================================== */}
+        {currentStep === 2 && (
+          <View style={s.stepContent}>
             
-            {showTypeDropdown && !editId && (
-              <View style={s.dropdownList}>
-                {loading ? <ActivityIndicator color={COLORS.navy} /> : pricings.map((p) => (
-                  <TouchableOpacity 
-                    key={p.id} 
-                    style={[s.dropdownItem, regType?.id === p.id && s.dropdownItemActive]}
-                    onPress={() => { setRegType(p); setShowTypeDropdown(false); }}
-                  >
-                    <Text style={[s.dropdownItemTxt, regType?.id === p.id && s.dropdownItemTxtActive]}>{p.name}</Text>
-                  </TouchableOpacity>
-                ))}
+            <View style={s.sectionTitleRow}>
+              <View style={s.sectionNumberBadge}>
+                <Text style={s.sectionNumberTxt}>2</Text>
               </View>
-            )}
-          </View>
-
-          {/* Apply with TIN Checkbox Feature */}
-          <TouchableOpacity 
-            style={[s.tinCard, includeTin && s.tinCardActive]} 
-            onPress={() => setIncludeTin(!includeTin)}
-            activeOpacity={0.8}
-          >
-            <View style={[s.tinCheckbox, includeTin && s.tinCheckboxActive]}>
-              {includeTin && <Ionicons name="checkmark" size={14} color={COLORS.white} />}
+              <View>
+                <Text style={s.stepHeading}>Business & Contact Info</Text>
+                <Text style={s.stepSubheading}>Provide operational office address and contact channels</Text>
+              </View>
             </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={s.tinTitle}>Apply with TIN (Tax Identification Number)</Text>
-                <View style={s.tinBadge}>
-                  <Text style={s.tinBadgeTxt}>RECOMMENDED</Text>
+
+            <View style={s.cleanCard}>
+              <Text style={s.cardSectionTitle}>CONTACT CHANNELS</Text>
+              
+              <View style={s.formGrid2}>
+                <View style={s.inputContainer}>
+                  <Text style={s.inputLabel}>Contact Phone <Text style={{ color: COLORS.error }}>*</Text></Text>
+                  <TextInput 
+                    style={s.inputBox} 
+                    keyboardType="phone-pad" 
+                    placeholder="08012345678" 
+                    value={phone} 
+                    onChangeText={setPhone} 
+                  />
+                </View>
+                <View style={s.inputContainer}>
+                  <Text style={s.inputLabel}>Contact Email</Text>
+                  <TextInput 
+                    style={s.inputBox} 
+                    keyboardType="email-address" 
+                    placeholder="company@email.com" 
+                    value={email} 
+                    onChangeText={setEmail} 
+                  />
                 </View>
               </View>
-              <Text style={s.tinSub}>Process official JTB Tax Identification Number alongside your CAC (+₦{tinFee.toLocaleString()})</Text>
-            </View>
-          </TouchableOpacity>
 
-          {isRetrieval ? (
-            /* CAC Certificate Retrieval Specific Form */
-            <>
-              <Text style={s.sectionHeader}>CAC CERTIFICATE RETRIEVAL DETAILS</Text>
               <View style={s.inputContainer}>
-                <Text style={s.labelReq}>Registered Business / Company Name *</Text>
+                <Text style={s.inputLabel}>Nature of Business / Core Activities</Text>
                 <TextInput 
-                  style={s.input} 
-                  placeholder="e.g. Abu Mafhal Enterprises LTD" 
-                  value={proposedName1} 
-                  onChangeText={setProposedName1} 
+                  style={s.inputBox} 
+                  placeholder="e.g. General Contracts, Trading, Logistics" 
+                  value={natureOfBusiness} 
+                  onChangeText={setNatureOfBusiness} 
+                />
+              </View>
+            </View>
+
+            <View style={s.cleanCard}>
+              <Text style={s.cardSectionTitle}>OPERATIONAL ADDRESS</Text>
+              
+              <View style={s.formGrid2}>
+                <CustomDropdown 
+                  label="State Location" 
+                  value={state} 
+                  options={STATE_LIST} 
+                  onSelect={(val: string) => { setState(val); setLga(''); }} 
+                  required 
+                />
+                <CustomDropdown 
+                  label="LGA / City" 
+                  value={lga} 
+                  options={state ? NIGERIA_STATES[state] : []} 
+                  onSelect={setLga} 
+                  placeholder="Select State First" 
                 />
               </View>
 
-              <View style={s.row}>
+              <View style={s.formGrid2}>
                 <View style={s.inputContainer}>
-                  <Text style={s.labelReq}>CAC RC or BN Number *</Text>
+                  <Text style={s.inputLabel}>Shop / Suite / House No.</Text>
                   <TextInput 
-                    style={s.input} 
-                    placeholder="e.g. BN-1234567 or RC-987654" 
-                    value={rcNumber} 
-                    onChangeText={setRcNumber} 
+                    style={s.inputBox} 
+                    placeholder="e.g. Suite 4B or No 12" 
+                    value={officeNumber} 
+                    onChangeText={setOfficeNumber} 
                   />
                 </View>
-
                 <View style={s.inputContainer}>
-                  <Text style={s.label}>Registration Year / Date</Text>
+                  <Text style={s.inputLabel}>Street / Area</Text>
                   <TextInput 
-                    style={s.input} 
-                    placeholder="e.g. 2021 or 15/04/2021" 
-                    value={registrationYear} 
-                    onChangeText={setRegistrationYear} 
+                    style={s.inputBox} 
+                    placeholder="e.g. Ahmadu Bello Way" 
+                    value={officeAddress} 
+                    onChangeText={setOfficeAddress} 
                   />
                 </View>
               </View>
 
-              <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Contact Email Address</Text>
-                  <TextInput style={s.input} keyboardType="email-address" value={email} onChangeText={setEmail} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Contact Phone Number</Text>
-                  <TextInput style={s.input} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-                </View>
-              </View>
-
-              <Text style={s.sectionHeader}>APPLICANT / BUSINESS OWNER DETAILS</Text>
-              {proprietors.map((_, i) => renderPersonForm(
-                proprietors, 
-                'Business Owner / Applicant', 
-                setProprietors, 
-                true, 
-                i
-              ))}
-            </>
-          ) : (
-            /* Standard CAC Registration Form */
-            <>
-              <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.labelReq}>Proposed Name 1 *</Text>
-                  <TextInput style={s.input} placeholder="First choice name" value={proposedName1} onChangeText={setProposedName1} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.labelReq}>Proposed Name 2 *</Text>
-                  <TextInput style={s.input} placeholder="Alternative name" value={proposedName2} onChangeText={setProposedName2} />
-                </View>
-              </View>
-
-              <Text style={s.sectionHeader}>BUSINESS INFORMATION</Text>
-
-          {isNgo && (
-            <View style={s.row}>
-              <View style={s.inputContainer}>
-                <Text style={s.label}>Proposed name 3</Text>
-                <TextInput style={s.input} value={proposedName3} onChangeText={setProposedName3} />
-              </View>
-              <View style={s.inputContainer}>
-                <Text style={s.label}>NGO email address</Text>
-                <TextInput style={s.input} keyboardType="email-address" value={email} onChangeText={setEmail} />
-              </View>
-            </View>
-          )}
-
-          {!isNgo && !isLimitedLiability && (
-            <>
-              <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Company email address</Text>
-                  <TextInput style={s.input} keyboardType="email-address" value={email} onChangeText={setEmail} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Nature of business</Text>
-                  <TextInput style={s.input} value={natureOfBusiness} onChangeText={setNatureOfBusiness} />
-                </View>
-              </View>
-
-              <View style={s.row}>
-                <CustomDropdown label="Company state" value={state} options={STATE_LIST} onSelect={(val: string) => { setState(val); setLga(''); }} />
-                <CustomDropdown label="Company LGA and city" value={lga} options={state ? NIGERIA_STATES[state] : []} onSelect={setLga} placeholder="Select State First" />
-              </View>
-
-              <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Office/House Number</Text>
-                  <TextInput style={s.input} value={officeNumber} onChangeText={setOfficeNumber} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Office address</Text>
-                  <TextInput style={s.input} value={officeAddress} onChangeText={setOfficeAddress} />
-                </View>
-              </View>
-            </>
-          )}
-
-          {isLimitedLiability && (
-            <>
-              <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Company email address</Text>
-                  <TextInput style={s.input} keyboardType="email-address" value={email} onChangeText={setEmail} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Company phone number</Text>
-                  <TextInput style={s.input} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-                </View>
-              </View>
-
-              <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Nature of business</Text>
-                  <TextInput style={s.input} value={natureOfBusiness} onChangeText={setNatureOfBusiness} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Company state</Text>
-                  <TextInput style={s.input} value={state} onChangeText={setState} />
-                </View>
-              </View>
-
-              <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Company LGA and city</Text>
-                  <TextInput style={s.input} value={lga} onChangeText={setLga} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Office/House Number</Text>
-                  <TextInput style={s.input} value={officeNumber} onChangeText={setOfficeNumber} />
-                </View>
-              </View>
-
-              <View style={s.inputContainer}>
-                 <Text style={s.label}>Office address</Text>
-                 <TextInput style={s.input} value={officeAddress} onChangeText={setOfficeAddress} />
-              </View>
-            </>
-          )}
-
-          <View style={s.row}>
-            {isNgo && (
-               <>
-                 <View style={s.inputContainer}>
-                  <Text style={s.label}>Company phone number</Text>
-                  <TextInput style={s.input} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-                 </View>
-                 <View style={s.inputContainer}>
-                  <Text style={s.label}>Organisation type or category</Text>
-                  <TextInput style={s.input} value={natureOfBusiness} onChangeText={setNatureOfBusiness} />
-                 </View>
-               </>
-            )}
-          </View>
-
-          <View style={s.row}>
-            {isNgo && (
-              <>
-                 <View style={s.inputContainer}>
-                  <Text style={s.label}>Company state</Text>
-                  <TextInput style={s.input} value={state} onChangeText={setState} />
-                 </View>
-                 <View style={s.inputContainer}>
-                  <Text style={s.label}>Company LGA and city</Text>
-                  <TextInput style={s.input} value={lga} onChangeText={setLga} />
-                 </View>
-              </>
-            )}
-          </View>
-
-          <View style={s.row}>
-            {isNgo && (
-               <>
-                 <View style={s.inputContainer}>
-                  <Text style={s.label}>Office/House Number</Text>
-                  <TextInput style={s.input} value={officeNumber} onChangeText={setOfficeNumber} />
-                 </View>
-                 <View style={s.inputContainer}>
-                  <Text style={s.label}>Trustees tenure (years)</Text>
-                  <TextInput style={s.input} keyboardType="numeric" value={tenure} onChangeText={setTenure} />
-                 </View>
-               </>
-            )}
-          </View>
-
-          {isNgo && (
-             <View style={s.inputContainer}>
-                <Text style={s.label}>Office address</Text>
-                <TextInput style={s.input} value={officeAddress} onChangeText={setOfficeAddress} />
-             </View>
-          )}
-
-          {isNgo ? (
-            <>
-              <Text style={s.sectionHeader}>CHAIRMAN</Text>
-              {renderPersonForm(chairman, 'Chairman', setChairman)}
-
-              <Text style={s.sectionHeader}>SECRETARY</Text>
-              {renderPersonForm(secretary, 'Secretary', setSecretary)}
-
-              <Text style={s.sectionHeader}>TRUSTEE DETAILS</Text>
-              {trustees.map((_, i) => renderPersonForm(
-                trustees, 
-                `Trustee ${i+1}`, 
-                setTrustees, 
-                true, 
-                i,
-                i > 0 ? () => {
-                  const newArr = [...trustees];
-                  newArr.splice(i, 1);
-                  setTrustees(newArr);
-                } : undefined
-              ))}
-              
-              <TouchableOpacity onPress={() => setTrustees([...trustees, { ...defaultPerson }])}>
-                <Text style={s.addText}>+ Add Trustee</Text>
-              </TouchableOpacity>
-
-              <Text style={s.sectionHeader}>AIMS AND OBJECTIVES</Text>
-              <TextInput 
-                style={[s.input, { height: 100, textAlignVertical: 'top' }]} 
-                placeholder="Describe the aims and objectives of the organization"
-                multiline
-                value={aims}
-                onChangeText={setAims}
-              />
-            </>
-          ) : (
-            <>
-              <Text style={s.sectionHeader}>PROPRIETOR DETAILS</Text>
-              {proprietors.map((_, i) => renderPersonForm(
-                proprietors, 
-                isPartnership ? `Proprietor ${i+1}` : 'Proprietor', 
-                setProprietors, 
-                true, 
-                i,
-                isPartnership && i > 0 ? () => {
-                  const newArr = [...proprietors];
-                  newArr.splice(i, 1);
-                  setProprietors(newArr);
-                } : undefined
-              ))}
-              
-              {isPartnership || isLimitedLiability ? (
-                <TouchableOpacity onPress={() => setProprietors([...proprietors, { ...defaultPerson }])}>
-                  <Text style={s.addText}>+ Add Proprietor</Text>
-                </TouchableOpacity>
-              ) : null}
-
-              {isLimitedLiability && (
+              {isNgo && (
                 <>
-                  <Text style={s.sectionHeader}>WITNESS</Text>
-                  {renderPersonForm(witness, 'Witness', setWitness)}
-
-                  <Text style={s.sectionHeader}>SECRETARY (OPTIONAL)</Text>
-                  {renderPersonForm(secretary, 'Secretary (optional)', setSecretary)}
+                  <View style={s.inputContainer}>
+                    <Text style={s.inputLabel}>Trustees Tenure (Years)</Text>
+                    <TextInput 
+                      style={s.inputBox} 
+                      keyboardType="numeric" 
+                      placeholder="e.g. 5" 
+                      value={tenure} 
+                      onChangeText={setTenure} 
+                    />
+                  </View>
+                  <View style={s.inputContainer}>
+                    <Text style={s.inputLabel}>Aims & Objectives</Text>
+                    <TextInput 
+                      style={[s.inputBox, { height: 75, textAlignVertical: 'top', paddingTop: 8 }]} 
+                      multiline 
+                      placeholder="Summary of organizational goals and objectives..."
+                      value={aims} 
+                      onChangeText={setAims} 
+                    />
+                  </View>
                 </>
               )}
-            </>
-          )}
-        </>
-      )}
+            </View>
 
-          <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} disabled={submitting}>
-            {submitting ? (
-              <ActivityIndicator color={COLORS.white} />
+            {/* Stepper Buttons */}
+            <View style={s.navButtonsRow}>
+              <TouchableOpacity style={s.btnSecondary} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
+                <Ionicons name="arrow-back" size={16} color={COLORS.navy} />
+                <Text style={s.btnSecondaryTxt}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary, { flex: 1 }]} onPress={handleNextFromStep2} activeOpacity={0.8}>
+                <Text style={s.btnPrimaryTxt}>Next: Officers & Docs</Text>
+                <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 3: OFFICERS & UPLOADS */}
+        {/* ======================================================== */}
+        {currentStep === 3 && (
+          <View style={s.stepContent}>
+            
+            <View style={s.sectionTitleRow}>
+              <View style={s.sectionNumberBadge}>
+                <Text style={s.sectionNumberTxt}>3</Text>
+              </View>
+              <View>
+                <Text style={s.stepHeading}>Officers & Identification</Text>
+                <Text style={s.stepSubheading}>Personal details, signature, and passport photos</Text>
+              </View>
+            </View>
+
+            {isRetrieval ? (
+              // Retrieval Owner / Applicant
+              <>
+                {proprietors.map((_, i) => renderPersonForm(
+                  proprietors, 
+                  'Business Owner / Applicant', 
+                  setProprietors, 
+                  true, 
+                  i
+                ))}
+              </>
+            ) : isNgo ? (
+              // NGO Chairman, Secretary, Trustees
+              <>
+                {renderPersonForm(chairman, 'Chairman', setChairman)}
+                {renderPersonForm(secretary, 'Secretary', setSecretary)}
+                {trustees.map((_, i) => renderPersonForm(
+                  trustees, 
+                  `Trustee ${i + 1}`, 
+                  setTrustees, 
+                  true, 
+                  i,
+                  i > 0 ? () => {
+                    const newArr = [...trustees];
+                    newArr.splice(i, 1);
+                    setTrustees(newArr);
+                  } : undefined
+                ))}
+                
+                <TouchableOpacity 
+                  style={s.addPartnerBtn} 
+                  onPress={() => setTrustees([...trustees, { ...defaultPerson }])}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add-circle-outline" size={18} color={COLORS.navy} />
+                  <Text style={s.addPartnerBtnTxt}>Add Another Trustee</Text>
+                </TouchableOpacity>
+              </>
             ) : (
-              <Text style={s.submitBtnTxt}>{editId ? 'Update Application' : 'Submit Registration'}</Text>
-            )}
-          </TouchableOpacity>
+              // Sole Proprietor / Partnership / Ltd
+              <>
+                {proprietors.map((_, i) => renderPersonForm(
+                  proprietors, 
+                  isPartnership ? `Partner / Proprietor ${i + 1}` : 'Proprietor / Business Owner', 
+                  setProprietors, 
+                  true, 
+                  i,
+                  isPartnership && i > 0 ? () => {
+                    const newArr = [...proprietors];
+                    newArr.splice(i, 1);
+                    setProprietors(newArr);
+                  } : undefined
+                ))}
 
-        </View>
+                {(isPartnership || isLimitedLiability) && (
+                  <TouchableOpacity 
+                    style={s.addPartnerBtn} 
+                    onPress={() => setProprietors([...proprietors, { ...defaultPerson }])}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color={COLORS.navy} />
+                    <Text style={s.addPartnerBtnTxt}>Add Another Partner</Text>
+                  </TouchableOpacity>
+                )}
+
+                {isLimitedLiability && (
+                  <>
+                    {renderPersonForm(witness, 'Company Witness', setWitness)}
+                    {renderPersonForm(secretary, 'Company Secretary (Optional)', setSecretary)}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Stepper Buttons */}
+            <View style={s.navButtonsRow}>
+              <TouchableOpacity style={s.btnSecondary} onPress={() => setCurrentStep(2)} activeOpacity={0.8}>
+                <Ionicons name="arrow-back" size={16} color={COLORS.navy} />
+                <Text style={s.btnSecondaryTxt}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary, { flex: 1 }]} onPress={handleNextFromStep3} activeOpacity={0.8}>
+                <Text style={s.btnPrimaryTxt}>Next: Review & Payment</Text>
+                <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 4: REVIEW & PAYMENT SUMMARY */}
+        {/* ======================================================== */}
+        {currentStep === 4 && (
+          <View style={s.stepContent}>
+            
+            <View style={s.sectionTitleRow}>
+              <View style={s.sectionNumberBadge}>
+                <Text style={s.sectionNumberTxt}>4</Text>
+              </View>
+              <View>
+                <Text style={s.stepHeading}>Review & Confirm</Text>
+                <Text style={s.stepSubheading}>Check your details and confirm wallet payment</Text>
+              </View>
+            </View>
+
+            {/* Summary Receipt Card */}
+            <View style={s.summaryCard}>
+              <View style={s.summaryHeader}>
+                <Ionicons name="shield-checkmark" size={20} color={COLORS.gold} />
+                <Text style={s.summaryHeaderTitle}>Application Summary</Text>
+              </View>
+
+              <View style={s.summaryBody}>
+                <View style={s.summaryRow}>
+                  <Text style={s.summaryLabel}>Registration Type</Text>
+                  <Text style={s.summaryVal}>{regType?.name}</Text>
+                </View>
+                <View style={s.summaryDivider} />
+
+                <View style={s.summaryRow}>
+                  <Text style={s.summaryLabel}>{isRetrieval ? 'Registered Name' : 'Primary Choice'}</Text>
+                  <Text style={[s.summaryVal, { fontWeight: '700' }]}>{proposedName1}</Text>
+                </View>
+
+                {!isRetrieval && proposedName2 ? (
+                  <>
+                    <View style={s.summaryDivider} />
+                    <View style={s.summaryRow}>
+                      <Text style={s.summaryLabel}>Alternative Name</Text>
+                      <Text style={s.summaryVal}>{proposedName2}</Text>
+                    </View>
+                  </>
+                ) : null}
+
+                {isRetrieval && rcNumber ? (
+                  <>
+                    <View style={s.summaryDivider} />
+                    <View style={s.summaryRow}>
+                      <Text style={s.summaryLabel}>RC / BN Number</Text>
+                      <Text style={s.summaryVal}>{rcNumber}</Text>
+                    </View>
+                  </>
+                ) : null}
+
+                <View style={s.summaryDivider} />
+                <View style={s.summaryRow}>
+                  <Text style={s.summaryLabel}>Applicant Name</Text>
+                  <Text style={s.summaryVal}>
+                    {isNgo ? chairman.fullName || 'N/A' : proprietors[0]?.fullName || 'N/A'}
+                  </Text>
+                </View>
+
+                <View style={s.summaryDivider} />
+                <View style={s.summaryRow}>
+                  <Text style={s.summaryLabel}>Base CAC Fee</Text>
+                  <Text style={s.summaryVal}>₦{(regType?.price || 0).toLocaleString()}</Text>
+                </View>
+
+                {includeTin && (
+                  <>
+                    <View style={s.summaryDivider} />
+                    <View style={s.summaryRow}>
+                      <Text style={[s.summaryLabel, { color: COLORS.goldDk }]}>TIN Processing Add-on</Text>
+                      <Text style={[s.summaryVal, { color: COLORS.goldDk, fontWeight: '700' }]}>+₦{tinFee.toLocaleString()}</Text>
+                    </View>
+                  </>
+                )}
+
+                <View style={[s.summaryDivider, { backgroundColor: COLORS.navyLight, height: 1.5 }]} />
+                <View style={s.summaryRow}>
+                  <Text style={[s.summaryLabel, { fontSize: 14, fontWeight: '800', color: COLORS.navy }]}>Total Amount Payable</Text>
+                  <Text style={[s.summaryVal, { fontSize: 18, fontWeight: '900', color: COLORS.navy }]}>
+                    ₦{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Wallet Balance Readiness Badge */}
+            <View style={[s.walletStatusCard, walletBalance !== null && walletBalance < totalCost ? s.walletStatusCardLow : s.walletStatusCardOk]}>
+              <Ionicons 
+                name={walletBalance !== null && walletBalance >= totalCost ? "wallet" : "alert-circle"} 
+                size={22} 
+                color={walletBalance !== null && walletBalance >= totalCost ? COLORS.success : COLORS.error} 
+              />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={s.walletStatusLabel}>Your Wallet Balance</Text>
+                <Text style={s.walletStatusAmt}>₦{(walletBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+              </View>
+              <View style={[s.walletStatusPill, walletBalance !== null && walletBalance < totalCost ? { backgroundColor: '#fee2e2' } : { backgroundColor: '#d1fae5' }]}>
+                <Text style={[s.walletStatusPillTxt, walletBalance !== null && walletBalance < totalCost ? { color: COLORS.error } : { color: COLORS.success }]}>
+                  {walletBalance !== null && walletBalance >= totalCost ? 'Ready' : 'Low Balance'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Navigation & Submit Buttons */}
+            <View style={s.navButtonsRow}>
+              <TouchableOpacity style={s.btnSecondary} onPress={() => setCurrentStep(3)} activeOpacity={0.8}>
+                <Ionicons name="arrow-back" size={16} color={COLORS.navy} />
+                <Text style={s.btnSecondaryTxt}>Edit Details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[s.btnPrimary, { flex: 1.8 }]} 
+                onPress={handleSubmit} 
+                disabled={submitting}
+                activeOpacity={0.8}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-done" size={18} color={COLORS.white} />
+                    <Text style={s.btnPrimaryTxt}>{editId ? 'Update Application' : 'Pay & Submit'}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        )}
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -1022,63 +1286,188 @@ export default function CACServices() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
+  
+  // Header
   header: {
-    flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: COLORS.navy,
+    flexDirection: 'row', alignItems: 'center', 
+    paddingHorizontal: 16, 
+    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+    paddingBottom: 16,
   },
-  backBtn: { marginRight: 16 },
+  headerIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   headerTitleArea: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
-  headerSubTitle: { fontSize: 12, color: COLORS.gold, marginTop: 2 },
-  historyBtnTop: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245,166,35,0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: COLORS.gold, gap: 4 },
-  historyBtnTxt: { fontSize: 12, fontWeight: 'bold', color: COLORS.gold },
-  chargeCard: { backgroundColor: COLORS.white, padding: 14, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
-  chargeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chargeRowLabel: { fontSize: 13, fontWeight: '700', color: COLORS.navy },
-  chargeRowAmt: { fontSize: 15, fontWeight: '800', color: COLORS.success },
-  content: { flex: 1 },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: COLORS.white },
+  headerSubtitle: { fontSize: 11, color: COLORS.gold, marginTop: 1 },
+  historyBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245,166,35,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.gold, gap: 4 },
+  historyBtnTxt: { fontSize: 11, fontWeight: '700', color: COLORS.gold },
 
-  tinCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.border, marginBottom: 16 },
-  tinCardActive: { backgroundColor: '#fffbeb', borderColor: COLORS.goldDk },
-  tinCheckbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: COLORS.textSub, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
+  // Stepper Bar
+  stepperBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.white, paddingVertical: 12, paddingHorizontal: 18,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  stepItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stepCircle: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  stepCircleActive: { backgroundColor: COLORS.navy },
+  stepCircleDone: { backgroundColor: COLORS.success },
+  stepNum: { fontSize: 11, fontWeight: '700', color: COLORS.textSub },
+  stepNumActive: { color: COLORS.white },
+  stepLabel: { fontSize: 12, fontWeight: '600', color: COLORS.textSub },
+  stepLabelActive: { color: COLORS.navy, fontWeight: '800' },
+  stepLabelDone: { color: COLORS.success, fontWeight: '700' },
+  stepDivider: { flex: 1, height: 2, backgroundColor: '#f1f5f9', marginHorizontal: 6 },
+  stepDividerDone: { backgroundColor: COLORS.success },
+
+  content: { flex: 1 },
+  stepContent: { marginTop: 4 },
+
+  // Section Heading
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
+  sectionNumberBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.navy, alignItems: 'center', justifyContent: 'center' },
+  sectionNumberTxt: { color: COLORS.white, fontWeight: '800', fontSize: 13 },
+  stepHeading: { fontSize: 15, fontWeight: '800', color: COLORS.navy },
+  stepSubheading: { fontSize: 11.5, color: COLORS.textSub, marginTop: 1 },
+
+  // Service Selection Cards
+  serviceCardsContainer: { gap: 8, marginBottom: 14 },
+  serviceCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.white, borderRadius: 12, padding: 12,
+    borderWidth: 1.5, borderColor: COLORS.border,
+  },
+  serviceCardSelected: { borderColor: COLORS.navy, backgroundColor: '#f8fafc' },
+  serviceIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  serviceIconBoxSelected: { backgroundColor: COLORS.navy },
+  serviceTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textMain },
+  serviceTitleSelected: { color: COLORS.navy },
+  servicePrice: { fontSize: 12, fontWeight: '800', color: COLORS.goldDk, marginTop: 2 },
+  radioCircle: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  radioCircleSelected: { borderColor: COLORS.navy },
+  radioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.navy },
+
+  // TIN Card
+  tinCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
+    padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.border, marginBottom: 14,
+  },
+  tinCardActive: { backgroundColor: COLORS.goldLight, borderColor: COLORS.gold },
+  tinCheckbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: COLORS.textSub, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
   tinCheckboxActive: { backgroundColor: COLORS.goldDk, borderColor: COLORS.goldDk },
-  tinTitle: { fontSize: 12, fontWeight: 'bold', color: COLORS.navy },
-  tinSub: { fontSize: 10, color: COLORS.textSub, marginTop: 2, lineHeight: 14 },
-  tinBadge: { backgroundColor: 'rgba(245,166,35,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 },
-  tinBadgeTxt: { fontSize: 8, fontWeight: '900', color: COLORS.goldDk },
-  
-  infoBanner: { flexDirection: 'row', backgroundColor: '#e0e7ff', padding: 12, borderRadius: 10, marginBottom: 16, borderWidth: 1, borderColor: '#c7d2fe', alignItems: 'center' },
-  infoBannerTitle: { fontSize: 12, fontWeight: '700', color: COLORS.navy, marginBottom: 2 },
-  infoBannerText: { fontSize: 10, color: COLORS.textSub, lineHeight: 14 },
-  
-  formCard: { backgroundColor: COLORS.white, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, marginBottom: 20 },
-  inputGroup: { marginBottom: 14, zIndex: 10 },
-  labelReq: { fontSize: 11, fontWeight: '700', color: COLORS.navy, marginBottom: 4 },
-  label: { fontSize: 11, fontWeight: '600', color: COLORS.textSub, marginBottom: 4 },
-  dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 12, height: 42, backgroundColor: '#f8fafc' },
-  dropdownTxt: { fontSize: 13, color: COLORS.navy, fontWeight: '600' },
-  dropdownList: { position: 'absolute', top: 65, left: 0, right: 0, backgroundColor: COLORS.white, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, zIndex: 100 },
-  dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  dropdownItemActive: { backgroundColor: 'rgba(245,166,35,0.1)' },
-  dropdownItemTxt: { fontSize: 13, color: COLORS.textMain },
-  dropdownItemTxtActive: { color: COLORS.goldDk, fontWeight: 'bold' },
-  row: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  inputContainer: { flex: 1 },
-  input: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, height: 42, paddingHorizontal: 12, fontSize: 13, color: COLORS.textMain, backgroundColor: '#f8fafc' },
-  sectionHeader: { fontSize: 12, fontWeight: 'bold', color: COLORS.navy, marginTop: 12, marginBottom: 10, letterSpacing: 0.5, borderBottomWidth: 2, borderBottomColor: COLORS.gold, alignSelf: 'flex-start', paddingBottom: 4 },
-  personCard: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, padding: 14, marginBottom: 16, backgroundColor: '#fcfdfd' },
-  personTitle: { fontSize: 13, fontWeight: 'bold', color: COLORS.navy, marginBottom: 12 },
-  filePickerBtn: { flex: 1, marginBottom: 10 },
-  fileBox: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, height: 42, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: '#f8fafc', borderStyle: 'dashed' },
-  fileText: { fontSize: 11, color: COLORS.textSub },
-  fileTextActive: { fontSize: 11, color: COLORS.success, fontWeight: 'bold' },
-  addText: { color: COLORS.goldDk, fontSize: 12, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', paddingVertical: 8, borderWidth: 1, borderColor: COLORS.gold, borderRadius: 6 },
-  submitBtn: { backgroundColor: COLORS.navy, flexDirection: 'row', height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 8, width: '60%', alignSelf: 'center' },
-  submitBtnTxt: { color: COLORS.white, fontSize: 12, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.navy },
-  modalOption: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  modalOptionText: { fontSize: 16, color: COLORS.textMain },
+  tinTitle: { fontSize: 12.5, fontWeight: '700', color: COLORS.navy },
+  tinPrice: { fontSize: 12, fontWeight: '800', color: COLORS.goldDk },
+  tinSub: { fontSize: 10.5, color: COLORS.textSub, marginTop: 2 },
+
+  // Clean White Card
+  cleanCard: {
+    backgroundColor: COLORS.white, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 14,
+  },
+  cardSectionTitle: { fontSize: 11, fontWeight: '800', color: COLORS.navy, letterSpacing: 0.5, marginBottom: 12 },
+
+  // Inputs & Grid
+  inputContainer: { marginBottom: 12 },
+  inputLabel: { fontSize: 11.5, fontWeight: '700', color: COLORS.textMain, marginBottom: 5 },
+  inputBox: {
+    height: 42, borderWidth: 1, borderColor: COLORS.border, borderRadius: 9,
+    paddingHorizontal: 12, fontSize: 13, color: COLORS.textMain, backgroundColor: '#fcfcfd',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  inputBoxActive: { borderColor: COLORS.navy },
+  inputText: { fontSize: 13, color: COLORS.textMain },
+  formGrid2: { flexDirection: 'row', gap: 10 },
+
+  // Dropdown
+  dropdownList: {
+    position: 'relative', marginTop: 4, backgroundColor: COLORS.white,
+    borderRadius: 8, borderWidth: 1, borderColor: COLORS.border,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 4,
+  },
+  dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
+  dropdownItemActive: { backgroundColor: '#f1f5f9' },
+  dropdownItemTxt: { fontSize: 12.5, color: COLORS.textMain },
+  dropdownItemTxtActive: { fontWeight: '700', color: COLORS.navy },
+
+  // Person Card in Step 3
+  personCard: {
+    backgroundColor: COLORS.white, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 14,
+  },
+  personCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 8 },
+  personAvatarIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  personCardTitle: { fontSize: 13, fontWeight: '800', color: COLORS.navy },
+  removeBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  removeBtnTxt: { fontSize: 11, fontWeight: '700', color: COLORS.error },
+  addPartnerBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 11, borderRadius: 10, borderWidth: 1.5,
+    borderColor: COLORS.navy, borderStyle: 'dashed', marginBottom: 14,
+  },
+  addPartnerBtnTxt: { fontSize: 12.5, fontWeight: '700', color: COLORS.navy },
+
+  // Upload Tiles
+  uploadGrid: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  uploadTile: {
+    flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10,
+    padding: 12, alignItems: 'center', backgroundColor: '#fcfcfd', borderStyle: 'dashed',
+  },
+  uploadTileDone: { borderColor: COLORS.success, backgroundColor: COLORS.successLight, borderStyle: 'solid' },
+  uploadIconBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  uploadTileTitle: { fontSize: 11.5, fontWeight: '700', color: COLORS.navy },
+  uploadTileSub: { fontSize: 10, color: COLORS.textSub, marginTop: 2 },
+
+  // Step 4 Summary Card
+  summaryCard: {
+    backgroundColor: COLORS.white, borderRadius: 14, borderWidth: 1.5,
+    borderColor: COLORS.navy, overflow: 'hidden', marginBottom: 14,
+  },
+  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.navy, paddingVertical: 12, paddingHorizontal: 16 },
+  summaryHeaderTitle: { color: COLORS.white, fontWeight: '800', fontSize: 13.5 },
+  summaryBody: { padding: 14 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  summaryLabel: { fontSize: 12, color: COLORS.textSub, fontWeight: '600' },
+  summaryVal: { fontSize: 12.5, color: COLORS.navy, fontWeight: '600' },
+  summaryDivider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 8 },
+
+  // Wallet Status
+  walletStatusCard: {
+    flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12,
+    borderWidth: 1, marginBottom: 18,
+  },
+  walletStatusCardOk: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' },
+  walletStatusCardLow: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  walletStatusLabel: { fontSize: 10.5, color: COLORS.textSub, fontWeight: '600' },
+  walletStatusAmt: { fontSize: 14, fontWeight: '800', color: COLORS.navy, marginTop: 1 },
+  walletStatusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  walletStatusPillTxt: { fontSize: 10.5, fontWeight: '800' },
+
+  // Buttons
+  navButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  btnPrimary: {
+    backgroundColor: COLORS.navy, height: 44, borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingHorizontal: 18,
+  },
+  btnPrimaryTxt: { color: COLORS.white, fontSize: 13, fontWeight: '700' },
+  btnSecondary: {
+    backgroundColor: COLORS.white, height: 44, borderRadius: 10,
+    borderWidth: 1, borderColor: COLORS.border, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16,
+  },
+  btnSecondaryTxt: { color: COLORS.navy, fontSize: 13, fontWeight: '700' },
+
+  // Date Picker Modal Styles
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,62,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  datePickerCard: { backgroundColor: COLORS.white, borderRadius: 18, padding: 18, width: '100%', maxWidth: 360 },
+  datePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  datePickerTitle: { fontSize: 15, fontWeight: '800', color: COLORS.navy },
+  selectedDateBadge: { backgroundColor: COLORS.navy, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', marginBottom: 12 },
+  selectedDateLabel: { fontSize: 9.5, color: COLORS.gold, fontWeight: '700', letterSpacing: 0.5 },
+  selectedDateValue: { fontSize: 15, color: COLORS.white, fontWeight: '800', marginTop: 1 },
+  wheelCol: { flex: 1, backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, padding: 3 },
+  wheelHeader: { fontSize: 9.5, fontWeight: '800', color: COLORS.textSub, textAlign: 'center', marginVertical: 3 },
+  wheelItem: { paddingVertical: 7, borderRadius: 6, alignItems: 'center', marginVertical: 1 },
+  wheelItemActive: { backgroundColor: COLORS.navy },
+  wheelItemTxt: { fontSize: 12, color: COLORS.textMain, fontWeight: '600' },
+  wheelItemTxtActive: { color: COLORS.white, fontWeight: '800' },
 });

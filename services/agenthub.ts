@@ -57,500 +57,53 @@ const extractStringValue = (val: any): string => {
 };
 
 export const AgentHubIdentityVerifier = {
-  // ── Core helper: invoke verification directly with fallback to Edge Function ─────────────────────
+  // ── Core helper: invoke verification securely via Supabase Edge Function ─────────────────────
   async invokeEdge(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
     try {
-      // On Web, browser CORS blocks direct calls to agenthub.ng, so use Supabase Edge Function first
-      if (Platform.OS === 'web') {
-        const body = { searchType, searchValue, ...extra };
-        const { data, error } = await supabase.functions.invoke('verify-nin', { body });
-
-        if (error) {
-          return { isValid: false, message: error.message || 'Verification failed. Please try again.' };
-        }
-
-        if (data?.error) {
-          return { isValid: false, message: data.error };
-        }
-
-        if (data?.data) {
-          const agentHubResponse = data.data;
-          const rawStatus = agentHubResponse.status;
-          const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(String(rawStatus || '').toLowerCase());
-
-          if (isSuccessStatus) {
-            const personData = agentHubResponse.data ?? agentHubResponse;
-            return {
-              isValid: true,
-              message: agentHubResponse.message || 'Verification Successful',
-              data: personData,
-              pdf_base64: agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64
-            };
-          }
-        }
-
-        if (data?.message) {
-          return { isValid: false, message: data.message };
-        }
-
-        return { isValid: false, message: 'Could not verify details. Please check the input and try again.' };
-      }
-
-      // On Mobile native, try Direct Client Execution first
-      const directRes = await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
-      if (directRes && (directRes.isValid || (directRes.data && (directRes.data.bvn || directRes.data.firstName || directRes.data.pdf_base64)))) {
-        return directRes;
-      }
-      
-      // If direct response indicated an intentional user error (like insufficient funds), return it immediately
-      if (directRes && !directRes.isValid && directRes.message) {
-        const m = directRes.message.toLowerCase();
-        if (m.includes('insufficient') || m.includes('balance') || m.includes('please log in') || m.includes('provider api wallet')) {
-          return directRes;
-        }
-      }
-
-      // If direct verification did not return success on mobile, try Edge Function as fallback
       const body = { searchType, searchValue, ...extra };
       const { data, error } = await supabase.functions.invoke('verify-nin', { body });
 
       if (error) {
-        return directRes || { isValid: false, message: error.message || 'Verification failed' };
+        let msg = error.message || 'Verification failed. Please try again.';
+        if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
+          msg = 'Insufficient wallet balance. Please fund your wallet and try again.';
+        }
+        return { isValid: false, message: msg };
       }
 
       if (data?.error) {
-        return { isValid: false, message: data.error };
+        return { isValid: false, message: data.error, data: data.details };
       }
 
       if (data?.data) {
-        const agentHubResponse = data.data;
-        const rawStatus = agentHubResponse.status;
+        const providerResponse = data.data;
+        const rawStatus = providerResponse.status;
         const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(String(rawStatus || '').toLowerCase());
 
         if (isSuccessStatus) {
-          const personData = agentHubResponse.data ?? agentHubResponse;
+          const personData = providerResponse.data ?? providerResponse;
           return {
             isValid: true,
-            message: agentHubResponse.message || 'Verification Successful',
+            message: providerResponse.message || 'Verification Successful',
             data: personData,
-            pdf_base64: agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64
+            pdf_base64: providerResponse.pdf_base64 || providerResponse.data?.pdf_base64 || data.pdf_base64
           };
         }
       }
 
-      return directRes || { isValid: false, message: 'Could not verify details. Please check the input and try again.' };
+      if (data?.message) {
+        return { isValid: false, message: data.message };
+      }
 
+      return { isValid: false, message: 'Could not verify details. Please check the input and try again.' };
     } catch (e: any) {
-      return await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
+      return { isValid: false, message: e.message || 'A network error occurred. Please check your connection.' };
     }
   },
 
-  // ── Direct Execution Provider ─────────────────────────────────────────────
+  // ── Direct Execution Alias: Always delegates to invokeEdge to guarantee single atomic deduction ──
   async invokeDirect(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { isValid: false, message: 'Please log in to continue.' };
-
-      // 1. Get AgentHub API Key from all secret stores
-      let apiKey = '';
-
-      // A. Try system_secrets
-      const { data: secretList } = await supabase
-        .from('system_secrets')
-        .select('*');
-      if (secretList) {
-        for (const s of secretList) {
-          const k = String(s.key || '').toUpperCase();
-          if (['AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY'].includes(k)) {
-            const v = extractStringValue(s.value);
-            if (v) { apiKey = v; break; }
-          }
-        }
-      }
-
-      // B. Try app_settings
-      if (!apiKey) {
-        const { data: settingsList } = await supabase
-          .from('app_settings')
-          .select('*');
-        if (settingsList) {
-          for (const s of settingsList) {
-            const k = String(s.key || '').toUpperCase();
-            if (['AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY'].includes(k)) {
-              const v = extractStringValue(s.value);
-              if (v) { apiKey = v; break; }
-            }
-          }
-        }
-      }
-
-      // C. Try AsyncStorage (Local Vault Cache)
-      if (!apiKey) {
-        for (const k of ['AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY']) {
-          const cached = await AsyncStorage.getItem(`@vault_${k}`).catch(() => null);
-          if (cached && cached.trim()) {
-            apiKey = cached.trim();
-            break;
-          }
-        }
-      }
-
-      // D. Try process.env
-      if (!apiKey) {
-        apiKey = (process.env.AGENTHUB_API_KEY || (process.env as any).EXPO_PUBLIC_AGENTHUB_API_KEY || '').trim();
-      }
-
-      if (!apiKey) {
-        return { isValid: false, message: 'Verification service key is not configured.' };
-      }
-
-      // 2. Determine price and verify balance
-      const priceId = extra?.priceId || (searchType === 'bvn' ? 'bvn_num_advanced' : 'nin_regular');
-      let fee = 100;
-      const { data: pricing } = await supabase
-        .from('service_pricing')
-        .select('*')
-        .eq('id', priceId)
-        .maybeSingle();
-      if (pricing) {
-        const cost = Number(pricing.cost_price || 0);
-        const markup = Number(pricing.markup_price || 0);
-        fee = pricing.selling_price ? Number(pricing.selling_price) : (cost + markup);
-      }
-
-      // 3. Deduct balance
-      if (fee > 0) {
-        const { error: deductErr } = await supabase.rpc('deduct_balance', {
-          user_id: user.id,
-          amount: fee
-        });
-        if (deductErr) {
-          if (deductErr.message?.toLowerCase().includes('insufficient')) {
-            return { isValid: false, message: `Insufficient wallet balance. You need ₦${fee.toLocaleString()}.` };
-          }
-          return { isValid: false, message: 'Failed to process payment for verification.' };
-        }
-      }
-
-      // 4. Build AgentHub endpoint & payload
-      let endpoint = 'https://agenthub.ng/api/v1/identity/nin';
-      let payload: any = { nin: searchValue };
-      const slipType = (extra?.slip_type || extra?.layout || 'REGULAR').toUpperCase();
-      let serviceCode = '403';
-      if (slipType === 'PREMIUM') serviceCode = '401';
-      else if (slipType === 'STANDARD') serviceCode = '402';
-      else if (slipType === 'REGULAR') serviceCode = '403';
-      else if (slipType === 'INFO') serviceCode = '404';
-
-      const candidateList: { url: string; body?: any; method?: 'GET' | 'POST'; isFormData?: boolean }[] = [];
-
-      if (searchType === 'nin') {
-        if (slipType === 'REGULAR') {
-          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '403' } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
-        } else if (slipType === 'STANDARD') {
-          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'STANDARD', reference: `REF-${Date.now()}` } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '402' } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
-        } else if (slipType === 'PREMIUM') {
-          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'PREMIUM', reference: `REF-${Date.now()}` } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '401' } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
-        } else {
-          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '403' } });
-          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
-        }
-      } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: slipType, reference: `REF-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: serviceCode } });
-      } else if (searchType === 'phone') {
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2-phone', body: { nin: searchValue, slip_type: 'STANDARD', reference: `REF-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/phone-verify', body: { phone: searchValue } });
-      } else if (searchType === 'bvn') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue, reference: extra?.reference || `REF-BVN-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/verification', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue } });
-      } else if (searchType === 'bvn-premium-slip') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/premium-slip', body: { bvn: searchValue } });
-      } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
-        const ref = extra?.reference || `REF-RET-${Date.now()}`;
-        const sCode = String(extra?.service_code || (extra?.ticket_id || extra?.agent_code ? '631' : '630'));
-        const pNum = extra?.phone_number || extra?.phone || searchValue;
-        const fName = extra?.full_name || extra?.name || 'Account Holder';
-
-        if (sCode === '631') {
-          candidateList.push({ 
-            url: 'https://agenthub.ng/api/bvn/retrieval', 
-            isFormData: true,
-            body: { 
-              service_code: '631', 
-              reference: ref, 
-              agent_code: extra?.agent_code || extra?.agentCode, 
-              ticket_id: extra?.ticket_id || extra?.ticketId, 
-              bms_ticket: extra?.bms_ticket || extra?.bmsTicket || '', 
-              screenshot: extra?.screenshot || extra?.screenshot_proof || extra?.image || '' 
-            } 
-          });
-        } else {
-          candidateList.push({ 
-            url: 'https://agenthub.ng/api/bvn/retrieval', 
-            isFormData: true,
-            body: { service_code: '630', reference: ref, phone_number: pNum, full_name: fName } 
-          });
-        }
-      } else if (searchType === 'bvn-retrieval-status') {
-        const qId = encodeURIComponent(searchValue || extra?.request_id || extra?.reference || '');
-        candidateList.push({ url: `https://agenthub.ng/api/bvn/retrieval/status?request_id=${qId}&reference=${qId}`, method: 'GET' });
-        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/retrieval/status?request_id=${qId}`, method: 'GET' });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/retrieval/status', body: { request_id: searchValue, reference: searchValue } });
-      } else if (searchType === 'bvn-card' || searchType === 'card' || searchType === 'bvn-slip') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/premium-slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/slip', body: { bvn: searchValue } });
-      } else if (searchType === 'vnin-to-nibss') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/vnin-to-nibss', body: { reference: extra?.reference || `REF-VNIN-${Date.now()}`, ticket_id: extra?.ticket_id || `TICKET-${Date.now()}`, full_name: extra?.full_name || 'BVN Holder', nin: extra?.nin || searchValue, bvn: extra?.bvn || searchValue, vnin: searchValue || extra?.vnin } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
-      } else if (searchType === 'vnin-to-nibss-status') {
-        const qRef = encodeURIComponent(searchValue || extra?.reference || '');
-        candidateList.push({ url: `https://agenthub.ng/api/bvn/vnin-to-nibss/status?reference=${qRef}&request_id=${qRef}`, method: 'GET' });
-        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/vnin-to-nibss/status?reference=${qRef}`, method: 'GET' });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/vnin-to-nibss/status', body: { reference: searchValue } });
-      } else if (searchType === 'bvn-modification') {
-        candidateList.push({ 
-          url: 'https://agenthub.ng/api/bvn/modification', 
-          body: { 
-            service_code: extra?.service_code || '620', 
-            bank_code: extra?.bank_code || '706', 
-            reference: extra?.reference || `REF-MOD-${Date.now()}`, 
-            nin: extra?.nin, 
-            bvn: searchValue || extra?.bvn, 
-            old_first_name: extra?.old_first_name || extra?.old_firstname,
-            old_surname: extra?.old_surname || extra?.old_lastname,
-            new_first_name: extra?.new_first_name || extra?.firstname, 
-            new_surname: extra?.new_surname || extra?.lastname, 
-            new_middle_name: extra?.new_middle_name || extra?.middlename,
-            phone_number: extra?.phone_number || extra?.phone, 
-            dob: extra?.dob || extra?.date_of_birth 
-          } 
-        });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/modification', body: { bvn: searchValue || extra?.bvn } });
-      } else if (searchType === 'bvn-modification-status') {
-        const qMod = encodeURIComponent(searchValue || extra?.request_id || extra?.reference || '');
-        candidateList.push({ url: `https://agenthub.ng/api/bvn/modification/status?request_id=${qMod}&reference=${qMod}`, method: 'GET' });
-        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/modification/status?request_id=${qMod}`, method: 'GET' });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/modification/status', body: { request_id: searchValue, reference: searchValue } });
-      } else if (searchType === 'bvn-enrollment') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/enrollment', body: { ...extra, reference: extra?.reference || `REF-ENROLL-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/enrollment', body: { ...extra } });
-      } else if (searchType === 'bvn-enrollment-status') {
-        const qEnr = encodeURIComponent(searchValue || extra?.request_id || extra?.reference || '');
-        candidateList.push({ url: `https://agenthub.ng/api/bvn/enrollment/status?request_id=${qEnr}&reference=${qEnr}`, method: 'GET' });
-        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/enrollment/status?request_id=${qEnr}`, method: 'GET' });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/enrollment/status', body: { request_id: searchValue, reference: searchValue } });
-      } else {
-        candidateList.push({ url: endpoint, body: payload });
-      }
-
-      // 5. Call AgentHub across candidates
-      let resData: any = null;
-      let successfulData: any = null;
-
-      for (const item of candidateList as any[]) {
-        try {
-          const isGet = (item.method || '').toUpperCase() === 'GET';
-          const fetchOptions: any = {
-            method: item.method || 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Accept': 'application/json',
-            },
-          };
-          
-          if (!isGet && item.body) {
-            if (item.isFormData) {
-              const fd = new FormData();
-              for (const [k, v] of Object.entries(item.body || {})) {
-                if (v !== undefined && v !== null && v !== '') {
-                  if (k === 'screenshot' && typeof v === 'string' && v.startsWith('data:')) {
-                    try {
-                      const byteString = atob(v.split(',')[1]);
-                      const mimeString = v.split(',')[0].split(':')[1].split(';')[0];
-                      const ab = new ArrayBuffer(byteString.length);
-                      const ia = new Uint8Array(ab);
-                      for (let i = 0; i < byteString.length; i++) {
-                        ia[i] = byteString.charCodeAt(i);
-                      }
-                      const blob = new Blob([ab], { type: mimeString });
-                      fd.append('screenshot', blob, 'proof.jpg');
-                    } catch (_) {
-                      fd.append('screenshot', v as any);
-                    }
-                  } else {
-                    fd.append(k, v as any);
-                  }
-                }
-              }
-              fetchOptions.body = fd;
-            } else {
-              fetchOptions.headers['Content-Type'] = 'application/json';
-              fetchOptions.body = JSON.stringify(item.body);
-            }
-          }
-
-          const res = await fetch(item.url, fetchOptions);
-
-          const parsed = await res.json().catch(() => null);
-          if (parsed) {
-            resData = parsed;
-            const isSuccess = parsed.status === true || 
-                              parsed.status === 'success' || 
-                              parsed.success === true ||
-                              parsed.current_status === 'COMPLETED' ||
-                              parsed.current_status === 'PROCESSING' ||
-                              Boolean(parsed.data && (
-                                parsed.data.bvn || 
-                                parsed.data.firstName || 
-                                parsed.data.firstname || 
-                                parsed.data.nin || 
-                                parsed.data.pdf_base64 || 
-                                parsed.data.user_details || 
-                                parsed.data.request_id ||
-                                parsed.data.data
-                              ));
-            if (isSuccess) {
-              successfulData = parsed;
-              break;
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (successfulData) {
-        resData = successfulData;
-      }
-
-      if (resData) {
-        // Deeply unwrap personData across all AgentHub formats
-        let personData: any = {};
-        
-        if (resData.data && typeof resData.data === 'object') {
-          personData = { ...resData.data };
-          if (resData.data.data && typeof resData.data.data === 'object') {
-            personData = { ...personData, ...resData.data.data };
-          }
-          if (resData.data.user_details) {
-            if (typeof resData.data.user_details === 'object') {
-              personData = { ...personData, ...resData.data.user_details };
-              if (resData.data.user_details.data && typeof resData.data.user_details.data === 'object') {
-                personData = { ...personData, ...resData.data.user_details.data };
-              }
-            }
-          }
-        } else {
-          personData = { ...resData };
-        }
-
-        const firstName = personData.firstName || personData.firstname || personData.first_name || '';
-        const lastName = personData.lastName || personData.surname || personData.lastname || personData.last_name || '';
-        const middleName = personData.middleName || personData.middlename || personData.middle_name || '';
-        const bvn = personData.bvn || personData.number || searchValue || '';
-        const phone = personData.phoneNumber || personData.phoneNumber1 || personData.phone || personData.phone_number || '';
-        const dob = personData.dateOfBirth || personData.dob || personData.birthdate || '';
-        const gender = personData.gender || '';
-        const photo = personData.image || personData.base64Image || personData.photo || personData.face || '';
-        const pdfBase64 = resData.pdf_base64 || resData.data?.pdf_base64 || personData.pdf_base64 || resData.slip || personData.slip;
-
-        personData.firstName = firstName;
-        personData.first_name = firstName;
-        personData.lastName = lastName;
-        personData.last_name = lastName;
-        personData.surname = lastName;
-        personData.middleName = middleName;
-        personData.middle_name = middleName;
-        personData.bvn = bvn;
-        personData.phone = phone;
-        personData.phoneNumber = phone;
-        personData.phoneNumber1 = phone;
-        personData.dateOfBirth = dob;
-        personData.dob = dob;
-        personData.gender = gender;
-        if (photo) {
-          personData.image = photo;
-          personData.base64Image = photo;
-          personData.photo = photo;
-        }
-        if (pdfBase64) {
-          personData.pdf_base64 = pdfBase64;
-        }
-
-        const isSuccess = resData.status === true || 
-                          resData.status === 'success' || 
-                          resData.success === true || 
-                          resData.current_status === 'COMPLETED' ||
-                          Boolean(firstName || lastName || (bvn && bvn.length >= 10) || pdfBase64);
-
-        if (isSuccess) {
-          // Record successful transaction
-          await supabase.from('transactions').insert({
-            user_id: user.id,
-            amount: fee,
-            type: 'payment',
-            status: 'success',
-            reference: `id_verify_${searchType}_${Date.now()}`,
-            description: `Verification: ${pricing?.name || priceId}`
-          });
-
-          return {
-            isValid: true,
-            message: resData.message || 'Verification Successful',
-            data: personData
-          };
-        }
-      }
-
-      // If failed, refund user balance
-      if (fee > 0) {
-        try {
-          const { error: refundErr } = await supabase.rpc('refund_balance', { user_id: user.id, amount: fee });
-          if (refundErr) {
-            const { data: p } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
-            if (p) {
-              await supabase.from('profiles').update({ balance: Number(p.balance) + fee }).eq('id', user.id);
-            }
-          }
-        } catch (_) {
-          try {
-            const { data: p } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
-            if (p) {
-              await supabase.from('profiles').update({ balance: Number(p.balance) + fee }).eq('id', user.id);
-            }
-          } catch (_) {}
-        }
-      }
-
-      let errMsg = resData?.error || resData?.message || resData?.msg || 'Verification failed. Record not found.';
-      if (typeof errMsg === 'string') {
-        if (errMsg.toLowerCase().includes('insufficient wallet balance') || errMsg.toLowerCase().includes('insufficient funds')) {
-          errMsg = 'Provider API Wallet Insufficient Balance: Please top up your AgentHub developer account (https://agenthub.ng) to process identity verifications.';
-        } else if (errMsg.toLowerCase().includes('bvn not exists') || errMsg.toLowerCase().includes('bvn not exist')) {
-          errMsg = 'The provided 11-digit BVN does not exist or is not registered in the central database.';
-        } else if (errMsg.toLowerCase().includes('nin not exists') || errMsg.toLowerCase().includes('nin not exist')) {
-          errMsg = 'The provided 11-digit NIN does not exist or is not registered.';
-        } else if (errMsg.toLowerCase().includes('service currently unavailable') || errMsg.toLowerCase().includes('service unavailable')) {
-          errMsg = 'Service is temporarily busy on the provider network. Please try again shortly.';
-        }
-      }
-      return { isValid: false, message: errMsg };
-    } catch (err: any) {
-      return { isValid: false, message: err.message || 'An error occurred during verification.' };
-    }
+    return AgentHubIdentityVerifier.invokeEdge(searchType, searchValue, extra);
   },
 
   /** Verify NIN and get full personal data for high-resolution slip generation */

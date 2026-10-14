@@ -42,6 +42,7 @@ export default function ManageCAC() {
   const [pricings, setPricings] = useState<any[]>([]);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [tinFeeDraft, setTinFeeDraft] = useState('3000');
+  const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
 
   // Computed Stats
   const totalRequests = requests.length;
@@ -98,21 +99,52 @@ export default function ManageCAC() {
     const val = parseFloat(tinFeeDraft);
     if (isNaN(val) || val < 0) return Alert.alert('Error', 'Please enter a valid TIN fee');
 
+    setSavingPriceId('tin_fee');
     try {
-      setLoading(true);
-      const { error } = await supabase.from('app_settings').upsert({
-        key: 'cac_tin_fee',
-        value: String(val),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'key' });
+      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('provider-wallet-action', {
+        body: { action: 'save_tin_fee', fee: val }
+      });
 
-      if (error) throw error;
-      Alert.alert('Success', 'TIN Add-on Fee updated successfully!');
+      if (edgeErr || edgeData?.error) {
+        await supabase.from('app_settings').upsert({
+          key: 'cac_tin_fee',
+          value: String(val),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+      }
+
+      Alert.alert('Success', `TIN Add-on Fee updated to ₦${val.toLocaleString()} successfully!`);
       fetchData();
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Error', e.message || 'Failed to update TIN fee');
     } finally {
-      setLoading(false);
+      setSavingPriceId(null);
+    }
+  };
+
+  const savePrice = async (id: string, name?: string) => {
+    const currentPriceObj = pricings.find(p => p.id === id);
+    const draftVal = priceDrafts[id] !== undefined ? priceDrafts[id] : currentPriceObj?.price?.toString();
+    const p = parseFloat(draftVal || '');
+    if (isNaN(p) || p < 0) return Alert.alert('Error', 'Please enter a valid price amount');
+
+    setSavingPriceId(id);
+    try {
+      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('provider-wallet-action', {
+        body: { action: 'save_cac_price', id, price: p, name: name || currentPriceObj?.name }
+      });
+
+      if (edgeErr || edgeData?.error) {
+        const { error: directErr } = await supabase.from('cac_pricing').update({ price: p }).eq('id', id);
+        if (directErr) throw new Error(edgeData?.error || edgeErr?.message || directErr.message);
+      }
+
+      Alert.alert('Success', `Price updated to ₦${p.toLocaleString()} successfully!`);
+      fetchData();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to update price');
+    } finally {
+      setSavingPriceId(null);
     }
   };
 
@@ -429,33 +461,6 @@ export default function ManageCAC() {
     );
   };
 
-  const savePrice = async (id: string, name?: string) => {
-    const draft = priceDrafts[id];
-    if (!draft) return;
-    const p = parseFloat(draft);
-    if (isNaN(p)) return Alert.alert('Error', 'Invalid price format');
-    
-    try {
-      setLoading(true);
-      if (id.startsWith('cac-certificate-retrieval-default')) {
-        const { error } = await supabase.from('cac_pricing').upsert([{
-          name: name || 'CAC Certificate Retrieval / Document Search',
-          price: p,
-          active: true
-        }]);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('cac_pricing').update({ price: p }).eq('id', id);
-        if (error) throw error;
-      }
-      Alert.alert('Success', 'Price updated successfully');
-      fetchData();
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <View style={s.container}>
@@ -564,29 +569,48 @@ export default function ManageCAC() {
                   keyboardType="numeric"
                   onChangeText={setTinFeeDraft}
                 />
-                <TouchableOpacity style={[s.savePriceBtn, { backgroundColor: COLORS.gold }]} onPress={saveTinFee}>
-                  <Text style={[s.savePriceBtnTxt, { color: COLORS.navy }]}>Save</Text>
+                <TouchableOpacity 
+                  style={[s.savePriceBtn, { backgroundColor: COLORS.gold }, savingPriceId === 'tin_fee' && { opacity: 0.7 }]} 
+                  onPress={saveTinFee}
+                  disabled={savingPriceId === 'tin_fee'}
+                >
+                  {savingPriceId === 'tin_fee' ? (
+                    <ActivityIndicator size="small" color={COLORS.navy} />
+                  ) : (
+                    <Text style={[s.savePriceBtnTxt, { color: COLORS.navy }]}>Save</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
 
-            {pricings.map((p) => (
-              <View key={p.id} style={s.priceCard}>
-                <Text style={s.priceName}>{p.name}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ color: COLORS.textSub, fontWeight: '600' }}>₦</Text>
-                  <TextInput 
-                    style={s.priceInput} 
-                    defaultValue={p.price.toString()} 
-                    keyboardType="numeric"
-                    onChangeText={(val) => setPriceDrafts(prev => ({ ...prev, [p.id]: val }))}
-                  />
-                  <TouchableOpacity style={s.savePriceBtn} onPress={() => savePrice(p.id)}>
-                    <Text style={s.savePriceBtnTxt}>Save</Text>
-                  </TouchableOpacity>
+            {pricings.map((p) => {
+              const isSaving = savingPriceId === p.id;
+              return (
+                <View key={p.id} style={s.priceCard}>
+                  <Text style={s.priceName}>{p.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ color: COLORS.textSub, fontWeight: '600' }}>₦</Text>
+                    <TextInput 
+                      style={s.priceInput} 
+                      defaultValue={p.price.toString()} 
+                      keyboardType="numeric"
+                      onChangeText={(val) => setPriceDrafts(prev => ({ ...prev, [p.id]: val }))}
+                    />
+                    <TouchableOpacity 
+                      style={[s.savePriceBtn, isSaving && { opacity: 0.7 }]} 
+                      onPress={() => savePrice(p.id, p.name)}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={s.savePriceBtnTxt}>Save</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>

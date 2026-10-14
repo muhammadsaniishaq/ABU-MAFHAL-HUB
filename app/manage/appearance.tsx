@@ -28,6 +28,7 @@ const T = {
   text:    '#0F172A',
   textSub: '#475569',
   indigo:  '#4F46E5',
+  indigoL: '#EEF2FF',
   border:  '#E2E8F0',
   green:   '#16A34A',
   greenL:  '#F0FDF4',
@@ -51,7 +52,7 @@ const EVENT_TYPES = [
 
 export default function AppDesigner() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'celebration' | 'theme' | 'branding'>('celebration');
+  const [activeTab, setActiveTab] = useState<'celebration' | 'theme' | 'branding' | 'splash'>('celebration');
 
   // Theme states
   const [primaryColor, setPrimaryColor] = useState('#D97706');
@@ -63,6 +64,12 @@ export default function AppDesigner() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
+
+  // Splash slides states
+  type SplashSlide = { id: string; url: string; order: number };
+  const [splashSlides, setSplashSlides] = useState<SplashSlide[]>([]);
+  const [uploadingSlide, setUploadingSlide] = useState(false);
+  const [savingSlides, setSavingSlides] = useState(false);
 
   // Celebration / Festive states
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings>({
@@ -79,6 +86,7 @@ export default function AppDesigner() {
   useEffect(() => {
     fetchBrandSettings();
     fetchCelebrationSettings();
+    fetchSplashSlides();
   }, []);
 
   const fetchBrandSettings = async () => {
@@ -97,6 +105,7 @@ export default function AppDesigner() {
     } catch (e) {
       console.error('Error fetching brand settings:', e);
     } finally {
+
       setLoadingSettings(false);
     }
   };
@@ -117,6 +126,83 @@ export default function AppDesigner() {
       }
     } catch (e) {
       console.log('No celebration settings yet or error:', e);
+    }
+  };
+
+  const fetchSplashSlides = async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'app_splash_slides')
+        .single();
+      if (data?.value) {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        if (Array.isArray(parsed)) setSplashSlides(parsed);
+      }
+    } catch (e) {
+      console.log('No splash slides yet:', e);
+    }
+  };
+
+  const handleUploadSplashSlide = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Denied', 'Allow photo access to upload splash slides.');
+        return;
+      }
+      const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+        base64: true,
+      }));
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingSlide(true);
+        const image = result.assets[0];
+        const fileExt = (image.uri.split('.').pop() || 'jpg').split('?')[0];
+        const fileName = `splash/slide_${Date.now()}.${fileExt}`;
+        const uploadRes = await uploadMediaFile({
+          uri: image.uri,
+          bucket: 'banners',
+          fileName,
+          mimeType: 'image/jpeg',
+          base64: image.base64,
+          isVideo: false,
+        });
+        if (!uploadRes.success || !uploadRes.publicUrl) throw new Error(uploadRes.error || 'Upload failed');
+        const newSlide = { id: Date.now().toString(), url: uploadRes.publicUrl, order: splashSlides.length };
+        const updated = [...splashSlides, newSlide];
+        setSplashSlides(updated);
+        await saveSplashSlidesToDB(updated);
+        Alert.alert('Done! 🎉', 'Splash slide uploaded and added.');
+      }
+    } catch (e: any) {
+      Alert.alert('Upload Failed', e.message);
+    } finally {
+      setUploadingSlide(false);
+    }
+  };
+
+  const handleDeleteSplashSlide = async (id: string) => {
+    const updated = splashSlides.filter(s => s.id !== id).map((s, i) => ({ ...s, order: i }));
+    setSplashSlides(updated);
+    await saveSplashSlidesToDB(updated);
+  };
+
+  const saveSplashSlidesToDB = async (slides: any[]) => {
+    setSavingSlides(true);
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'app_splash_slides',
+        value: JSON.stringify(slides),
+        description: 'Custom splash screen slide images',
+      }, { onConflict: 'key' });
+    } catch (e: any) {
+      Alert.alert('Save Error', e.message);
+    } finally {
+      setSavingSlides(false);
     }
   };
 
@@ -309,6 +395,14 @@ export default function AppDesigner() {
           >
             <Ionicons name="image" size={14} color={activeTab === 'branding' ? T.navy : 'rgba(255,255,255,0.7)'} />
             <Text style={[s.tabText, activeTab === 'branding' && s.tabTextActive]}>Logos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setActiveTab('splash')}
+            style={[s.tabButton, activeTab === 'splash' && s.tabButtonActive]}
+          >
+            <Ionicons name="phone-portrait" size={14} color={activeTab === 'splash' ? T.navy : 'rgba(255,255,255,0.7)'} />
+            <Text style={[s.tabText, activeTab === 'splash' && s.tabTextActive]}>Splash</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -559,6 +653,87 @@ export default function AppDesigner() {
           </View>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════════════════
+            TAB 4: SPLASH SLIDES
+        ═══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'splash' && (
+          <View style={{ gap: 16 }}>
+            {/* Header info card */}
+            <View style={s.card}>
+              <View style={s.cardHeaderRow}>
+                <View style={[s.iconBadge, { backgroundColor: T.indigoL }]}>
+                  <Ionicons name="phone-portrait" size={20} color={T.indigo} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={s.cardTitle}>Splash Screen Slides</Text>
+                  <Text style={s.cardSubtitle}>These images appear on the animated splash/onboarding screen when the app loads</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Upload button */}
+            <TouchableOpacity
+              style={[s.uploadActionBtn, uploadingSlide && { opacity: 0.6 }]}
+              onPress={handleUploadSplashSlide}
+              disabled={uploadingSlide}
+              activeOpacity={0.8}
+            >
+              {uploadingSlide ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+                  <Text style={s.uploadActionText}>Upload New Slide Image</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Slides list */}
+            {splashSlides.length === 0 ? (
+              <View style={[s.card, { alignItems: 'center', paddingVertical: 32 }]}>
+                <Ionicons name="images-outline" size={40} color={T.border} />
+                <Text style={{ color: T.textSub, fontWeight: '700', marginTop: 10, fontSize: 13 }}>No custom slides yet</Text>
+                <Text style={{ color: T.textSub, fontSize: 11, marginTop: 4, textAlign: 'center' }}>Default app slides will be shown until you upload custom ones</Text>
+              </View>
+            ) : (
+              splashSlides.map((slide, idx) => (
+                <View key={slide.id} style={s.card}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <View style={[s.iconBadge, { backgroundColor: T.goldL }]}>
+                      <Text style={{ fontSize: 13, fontWeight: '900', color: T.gold }}>#{idx + 1}</Text>
+                    </View>
+                    <Text style={[s.cardTitle, { marginLeft: 8, flex: 1 }]}>Slide {idx + 1}</Text>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteSplashSlide(slide.id)}
+                      style={{ padding: 6 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={T.red} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={s.splashPreviewBox}>
+                    <Image
+                      source={{ uri: slide.url }}
+                      style={{ width: '100%', height: '100%', borderRadius: 10 }}
+                      resizeMode="cover"
+                    />
+                  </View>
+                </View>
+              ))
+            )}
+
+            {splashSlides.length > 0 && (
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                {savingSlides
+                  ? <ActivityIndicator color={T.gold} size="small" />
+                  : <Ionicons name="cloud-done" size={16} color={T.green} />}
+                <Text style={{ color: T.textSub, fontSize: 11, fontWeight: '700' }}>
+                  {savingSlides ? 'Saving…' : `${splashSlides.length} slide${splashSlides.length !== 1 ? 's' : ''} saved & live`}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
       </ScrollView>
     </View>
   );
@@ -566,6 +741,14 @@ export default function AppDesigner() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
+  splashPreviewBox: {
+    height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: T.bg,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
 
   // Header
   header: {

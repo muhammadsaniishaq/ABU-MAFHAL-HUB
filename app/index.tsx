@@ -125,11 +125,18 @@ const SLIDES = [
   },
 ];
 
+const DEFAULT_SLIDE_IMAGES = [
+  require('../assets/images/splash_hero_character.gif'),
+  require('../assets/images/splash_hero_character2.gif'),
+  require('../assets/images/splash_hero_character3.gif'),
+];
+
 export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [pageIdx, setPageIdx] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [customSlideImages, setCustomSlideImages] = useState<(string | null)[]>([null, null, null]);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
@@ -143,6 +150,7 @@ export default function SplashScreen() {
 
   useEffect(() => {
     checkAuthSession();
+    loadCustomSplashImages();
 
     // Gentle mascot float (3.6s cycle)
     floatY.value = withRepeat(
@@ -243,6 +251,47 @@ export default function SplashScreen() {
         await AsyncStorage.removeItem('app_unlocked');
       }
     } catch {}
+  };
+
+  const loadCustomSplashImages = async () => {
+    try {
+      // Try cached first for instant display
+      const cached = await AsyncStorage.getItem('cached_splash_slides_v2');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length >= 1) {
+          const imgs = parsed.map((s: any) => s.url || null);
+          setCustomSlideImages([
+            imgs[0] ?? null,
+            imgs[1] ?? null,
+            imgs[2] ?? null,
+          ]);
+        }
+      }
+
+      // Fetch fresh from Supabase
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'app_splash_slides')
+        .maybeSingle();
+
+      if (data?.value) {
+        const val = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        if (Array.isArray(val) && val.length >= 1) {
+          const sorted = [...val].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          const imgs = sorted.map((s: any) => s.url || null);
+          setCustomSlideImages([
+            imgs[0] ?? null,
+            imgs[1] ?? null,
+            imgs[2] ?? null,
+          ]);
+          await AsyncStorage.setItem('cached_splash_slides_v2', JSON.stringify(sorted));
+        }
+      }
+    } catch (e) {
+      console.log('Splash custom images load error:', e);
+    }
   };
 
   const haptic = useCallback(() => {
@@ -379,12 +428,21 @@ export default function SplashScreen() {
 
             {/* Mascot Character Image */}
             <Animated.View style={[styles.mascotHolder, floatAnimStyle]}>
-              <Image
-                key={`slide-img-${pageIdx}`}
-                source={currentSlide.image}
-                style={styles.mascotImg}
-                resizeMode="contain"
-              />
+              {customSlideImages[pageIdx] ? (
+                <Image
+                  key={`custom-slide-img-${pageIdx}`}
+                  source={{ uri: customSlideImages[pageIdx]! }}
+                  style={styles.mascotImg}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Image
+                  key={`slide-img-${pageIdx}`}
+                  source={currentSlide.image}
+                  style={styles.mascotImg}
+                  resizeMode="contain"
+                />
+              )}
             </Animated.View>
           </View>
 
