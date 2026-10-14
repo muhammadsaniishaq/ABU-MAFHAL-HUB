@@ -128,39 +128,8 @@ export default function VirtualCardsScreen() {
           setSelectedCard(current);
           loadCardTransactions(current.id, user.id);
         } else {
-          // If brand new user with no card yet, generate a default sample active card so the realistic page looks complete immediately
-          const initialCard: VirtualCard = {
-            id: 'default_card',
-            user_id: user.id,
-            card_id: 'PV_CARD_DEFAULT',
-            card_name: 'ABU MAFHAL USD Card',
-            card_number_masked: '4578 •••• •••• 7890',
-            card_number_full: '4578 9200 3456 7890',
-            cvv: '890',
-            expiry_month: '12',
-            expiry_year: '29',
-            card_holder_name: profile?.full_name?.toUpperCase() || 'MUHAMMAD SANI ISYAKU',
-            currency: 'USD',
-            card_type: 'VISA',
-            balance: 254.00,
-            status: 'active',
-            spending_limit_monthly: 1000,
-            spending_limit_transaction: 500,
-            online_payments_enabled: true,
-            international_payments_enabled: true,
-            contactless_payments_enabled: true,
-            billing_address: {
-              street: '350 Fifth Avenue, Suite 4100',
-              city: 'New York',
-              state: 'NY',
-              zip: '10118',
-              country: 'United States'
-            },
-            created_at: new Date().toISOString()
-          };
-          setSelectedCard(initialCard);
-          setCards([initialCard]);
-          loadCardTransactions(initialCard.id, user.id);
+          setSelectedCard(null);
+          setTransactions([]);
         }
       }
     } catch (e: any) {
@@ -173,9 +142,10 @@ export default function VirtualCardsScreen() {
   const loadCardTransactions = async (cardId: string, userId: string) => {
     try {
       const txs = await payvesselCardService.getCardTransactions(cardId, userId);
-      setTransactions(txs);
+      setTransactions(txs || []);
     } catch (e) {
       console.warn('Error loading card transactions:', e);
+      setTransactions([]);
     }
   };
 
@@ -191,9 +161,7 @@ export default function VirtualCardsScreen() {
     try {
       setActionLoading(true);
       const newStatus = target.status === 'active' ? 'frozen' : 'active';
-      if (target.id !== 'default_card') {
-        await payvesselCardService.toggleFreezeCard(target.id, target.status);
-      }
+      await payvesselCardService.toggleFreezeCard(target.id, target.status);
       const updatedCard = { ...target, status: newStatus as any };
 
       setCards(prev => prev.map(c => c.id === target.id ? updatedCard : c));
@@ -228,7 +196,7 @@ export default function VirtualCardsScreen() {
       });
 
       setRecentlyCreatedCard(newCard);
-      setCards(prev => [newCard, ...prev.filter(c => c.id !== 'default_card')]);
+      setCards(prev => [newCard, ...prev]);
       setSelectedCard(newCard);
       setCreateStep(3); // Celebration step!
 
@@ -258,22 +226,17 @@ export default function VirtualCardsScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      if (selectedCard.id !== 'default_card') {
-        const res = await payvesselCardService.fundCard({
-          cardDbId: selectedCard.id,
-          userId: user.id,
-          amount,
-          currency: selectedCard.currency,
-        });
-        const updated = { ...selectedCard, balance: res.newCardBalance };
-        setSelectedCard(updated);
-        setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
-        setWalletBalance(res.newWalletBalance);
-      } else {
-        const updated = { ...selectedCard, balance: (selectedCard.balance || 0) + amount };
-        setSelectedCard(updated);
-        setCards([updated]);
-      }
+      const res = await payvesselCardService.fundCard({
+        cardDbId: selectedCard.id,
+        userId: user.id,
+        amount,
+        currency: selectedCard.currency,
+      });
+      const updated = { ...selectedCard, balance: res.newCardBalance };
+      setSelectedCard(updated);
+      setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
+      setWalletBalance(res.newWalletBalance);
+      loadCardTransactions(selectedCard.id, user.id);
 
       setShowTopUpModal(false);
       setTopUpAmountInput('50');
@@ -296,9 +259,7 @@ export default function VirtualCardsScreen() {
         ? { spending_limit_monthly: num }
         : { spending_limit_transaction: num };
 
-      if (selectedCard.id !== 'default_card') {
-        await payvesselCardService.updateCardSettings(selectedCard.id, updates);
-      }
+      await payvesselCardService.updateCardSettings(selectedCard.id, updates);
       const updated = { ...selectedCard, ...updates };
       setSelectedCard(updated);
       setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
@@ -317,9 +278,7 @@ export default function VirtualCardsScreen() {
 
     try {
       setActionLoading(true);
-      if (selectedCard.id !== 'default_card') {
-        await payvesselCardService.updateCardName(selectedCard.id, renameInput.trim());
-      }
+      await payvesselCardService.updateCardName(selectedCard.id, renameInput.trim());
       const updated = { ...selectedCard, card_name: renameInput.trim() };
       setSelectedCard(updated);
       setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
@@ -339,11 +298,9 @@ export default function VirtualCardsScreen() {
     setSelectedCard(updated);
     setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
 
-    if (selectedCard.id !== 'default_card') {
-      try {
-        await payvesselCardService.updateCardSettings(selectedCard.id, { [key]: val });
-      } catch (_) {}
-    }
+    try {
+      await payvesselCardService.updateCardSettings(selectedCard.id, { [key]: val });
+    } catch (_) {}
     triggerToast('Setting saved');
   };
 
@@ -382,6 +339,66 @@ export default function VirtualCardsScreen() {
     if (txFilterTab === 'Failed') return t.status === 'DECLINED';
     return true;
   });
+
+  // ── Physical Card Renderer using Clean Master Templates ──
+  const renderPhysicalCard = (
+    card: VirtualCard,
+    isInteractive: boolean = false,
+    customStyle?: any
+  ) => {
+    const isVisa = card.card_type === 'VISA' || card.currency === 'USD';
+    const templateImg = isVisa
+      ? require('../../assets/images/vc_template_visa.png')
+      : require('../../assets/images/vc_template_mastercard.png');
+
+    return (
+      <View style={[s.liveCardWrapper, customStyle]}>
+        <Image
+          source={templateImg}
+          style={s.liveCardBg}
+          resizeMode="contain"
+        />
+
+        {/* Currency Flag Pill */}
+        <View style={s.liveCardCurrencyPill}>
+          <Text style={s.liveCardCurrencyTxt}>
+            {card.currency === 'USD' ? '🇺🇸 USD' : '🇳🇬 NGN'}
+          </Text>
+        </View>
+
+        {/* Live Card Number */}
+        <View style={s.liveCardNumberBox}>
+          <Text style={s.liveCardNumberTxt}>
+            {showFullDetails
+              ? (card.card_number_full || card.card_number_masked)
+              : card.card_number_masked}
+          </Text>
+        </View>
+
+        {/* Live Expiry Date */}
+        <View style={s.liveCardExpiryBox}>
+          <Text style={s.liveCardExpiryTxt}>
+            {card.expiry_month}/{card.expiry_year}
+          </Text>
+        </View>
+
+        {/* Live Cardholder Name */}
+        <View style={s.liveCardHolderBox}>
+          <Text style={s.liveCardHolderTxt} numberOfLines={1}>
+            {(card.card_holder_name || userName).toUpperCase()}
+          </Text>
+        </View>
+
+        {/* Frosted Freeze Overlay */}
+        {card.status === 'frozen' && (
+          <View style={s.liveCardFrozenOverlay}>
+            <Ionicons name="snow" size={28} color="#93C5FD" />
+            <Text style={s.liveCardFrozenTxt}>CARD FROZEN • PAYMENTS PAUSED</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={s.container}>
@@ -422,7 +439,7 @@ export default function VirtualCardsScreen() {
         ) : selectedCard ? (
           <>
             {/* ══════════════════════════════════════════════════════════
-                 1. PHOTOREALISTIC 3D CARD STACK (EXACT TO MASTER ARTWORK)
+                 1. PHOTOREALISTIC LIVE CARD (CLEAN MASTER TEMPLATE)
                  ══════════════════════════════════════════════════════════ */}
             <TouchableOpacity
               activeOpacity={0.92}
@@ -432,11 +449,7 @@ export default function VirtualCardsScreen() {
               {/* Soft Ambient Glow behind the card */}
               <View style={s.cardAmbientGlow} />
 
-              <Image
-                source={require('../../assets/images/vc_card_stack_3d.png')}
-                style={s.cardStackHeroImg}
-                resizeMode="contain"
-              />
+              {renderPhysicalCard(selectedCard, true)}
 
               {/* Dynamic Credentials Glass Overlay on demand */}
               {showFullDetails && (
@@ -454,7 +467,7 @@ export default function VirtualCardsScreen() {
                     </TouchableOpacity>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                    <Text style={s.overlayCardMeta}>HOLDER: {selectedCard.card_holder_name || userName}</Text>
+                    <Text style={s.overlayCardMeta}>HOLDER: {(selectedCard.card_holder_name || userName).toUpperCase()}</Text>
                     <Text style={s.overlayCardMeta}>EXP: {selectedCard.expiry_month}/{selectedCard.expiry_year}</Text>
                     <TouchableOpacity
                       onPress={() => handleCopy(selectedCard.cvv || '890', 'CVV')}
@@ -464,15 +477,6 @@ export default function VirtualCardsScreen() {
                       <Ionicons name="copy-outline" size={13} color="#F59E0B" />
                     </TouchableOpacity>
                   </View>
-                </View>
-              )}
-
-              {/* Frozen Card Overlay if card is temporarily disabled */}
-              {selectedCard.status === 'frozen' && (
-                <View style={s.cardFrozenOverlay}>
-                  <Ionicons name="snow" size={26} color="#60A5FA" />
-                  <Text style={s.cardFrozenTxt}>CARD FROZEN • ONLINE SPEND PAUSED</Text>
-                  <Text style={s.cardFrozenSub}>Tap 'Unfreeze' below to reactivate</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -677,7 +681,90 @@ export default function VirtualCardsScreen() {
               </View>
             )}
           </>
-        ) : null}
+        ) : (
+          /* ══════════════════════════════════════════════════════════
+               PROFESSIONAL EMPTY STATE: GET YOUR FIRST CARD
+               ══════════════════════════════════════════════════════════ */
+          <View style={s.emptyStateBox}>
+            {/* Dual Floating Card Preview */}
+            <View style={s.emptyCardStack}>
+              <View style={s.emptyRearCard}>
+                <Image
+                  source={require('../../assets/images/vc_template_mastercard.png')}
+                  style={s.emptyTemplateImg}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={s.emptyFrontCard}>
+                <Image
+                  source={require('../../assets/images/vc_template_visa.png')}
+                  style={s.emptyTemplateImg}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+
+            <Text style={s.emptyTitle}>Get Your Virtual Card</Text>
+            <Text style={s.emptySubtitle}>
+              Create your personal USD Visa or NGN Mastercard in seconds. Shop globally on Amazon, Netflix, AliExpress, Apple Store, Facebook Ads & Google Play.
+            </Text>
+
+            {/* Wallet Balance Info */}
+            <View style={s.emptyWalletPill}>
+              <Ionicons name="wallet-outline" size={17} color="#F59E0B" />
+              <Text style={s.emptyWalletTxt}>
+                Available Wallet Balance: <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>₦{walletBalance.toLocaleString()}</Text>
+              </Text>
+            </View>
+
+            {/* CTA Button */}
+            <TouchableOpacity
+              onPress={() => {
+                setCreateStep(1);
+                setShowCreateModal(true);
+              }}
+              style={s.emptyCtaBtn}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="card-outline" size={20} color="#070D1E" />
+              <Text style={s.emptyCtaBtnTxt}>Create Virtual Card Now</Text>
+              <Ionicons name="arrow-forward" size={18} color="#070D1E" />
+            </TouchableOpacity>
+
+            {/* Feature Highlights */}
+            <View style={s.emptyFeaturesGrid}>
+              <View style={s.emptyFeatureItem}>
+                <View style={s.emptyFeatureIcon}>
+                  <Ionicons name="globe" size={18} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={s.emptyFeatureTitle}>Global USD Acceptance</Text>
+                  <Text style={s.emptyFeatureSub}>Pay seamlessly anywhere Visa or Mastercard is accepted.</Text>
+                </View>
+              </View>
+
+              <View style={s.emptyFeatureItem}>
+                <View style={s.emptyFeatureIcon}>
+                  <Ionicons name="flash" size={18} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={s.emptyFeatureTitle}>Instant 3D Secure OTP</Text>
+                  <Text style={s.emptyFeatureSub}>Real-time OTP via PayVessel for safe online checkouts.</Text>
+                </View>
+              </View>
+
+              <View style={s.emptyFeatureItem}>
+                <View style={s.emptyFeatureIcon}>
+                  <Ionicons name="lock-closed" size={18} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={s.emptyFeatureTitle}>Total Security & Control</Text>
+                  <Text style={s.emptyFeatureSub}>Freeze, unfreeze, and set spending limits in one tap.</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -699,10 +786,10 @@ export default function VirtualCardsScreen() {
                   <View style={{ width: 32 }} />
                 </View>
 
-                {/* 3-Card Stack Illustration at top */}
+                {/* Real Card Template Preview based on selected currency */}
                 <View style={s.modalHeroCardStack}>
                   <Image
-                    source={require('../../assets/images/vc_card_choice_stack.png')}
+                    source={selectedCurrency === 'USD' ? require('../../assets/images/vc_template_visa.png') : require('../../assets/images/vc_template_mastercard.png')}
                     style={s.cardChoiceStackImg}
                     resizeMode="contain"
                   />
@@ -906,14 +993,12 @@ export default function VirtualCardsScreen() {
                 <Text style={s.celebrateTitle}>Virtual Card Created!</Text>
                 <Text style={s.celebrateSub}>Your virtual card has been created successfully.</Text>
 
-                {/* Flat Card Preview */}
-                <View style={{ width: '100%', height: 180, marginVertical: 14, alignItems: 'center' }}>
-                  <Image
-                    source={require('../../assets/images/vc_card_flat_luxury.png')}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="contain"
-                  />
-                </View>
+                {/* Real Physical Card Preview */}
+                {recentlyCreatedCard && (
+                  <View style={{ width: '100%', alignItems: 'center', marginVertical: 14 }}>
+                    {renderPhysicalCard(recentlyCreatedCard, false, { width: '100%', height: 210 })}
+                  </View>
+                )}
 
                 <TouchableOpacity
                   onPress={() => {
@@ -961,13 +1046,9 @@ export default function VirtualCardsScreen() {
 
             {selectedCard && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Flat Luxury Card Preview */}
-                <View style={{ width: '100%', height: 190, marginBottom: 16, alignItems: 'center' }}>
-                  <Image
-                    source={require('../../assets/images/vc_card_flat_luxury.png')}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="contain"
-                  />
+                {/* Real Physical Card Preview */}
+                <View style={{ width: '100%', alignItems: 'center', marginBottom: 16 }}>
+                  {renderPhysicalCard(selectedCard, true, { width: '100%', height: 215 })}
                 </View>
 
                 {/* 4 Quick Card Action Icons */}
@@ -1127,9 +1208,11 @@ export default function VirtualCardsScreen() {
                   >
                     <View style={s.myCardMiniThumb}>
                       <Image
-                        source={require('../../assets/images/vc_card_flat_luxury.png')}
+                        source={c.card_type === 'VISA' || c.currency === 'USD'
+                          ? require('../../assets/images/vc_template_visa.png')
+                          : require('../../assets/images/vc_template_mastercard.png')}
                         style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
+                        resizeMode="contain"
                       />
                     </View>
 
@@ -1174,13 +1257,9 @@ export default function VirtualCardsScreen() {
 
             {selectedCard && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Flat card preview */}
-                <View style={{ width: '100%', height: 160, marginBottom: 12, alignItems: 'center' }}>
-                  <Image
-                    source={require('../../assets/images/vc_card_flat_luxury.png')}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="contain"
-                  />
+                {/* Real Physical Card Preview */}
+                <View style={{ width: '100%', alignItems: 'center', marginBottom: 14 }}>
+                  {renderPhysicalCard(selectedCard, false, { width: '100%', height: 185 })}
                 </View>
 
                 {/* Balance summary */}
@@ -1689,10 +1768,9 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ── Photorealistic 3D Card Stack Container ──
+  // ── Photorealistic Live Card Container ──
   cardStackHeroContainer: {
     width: '100%',
-    height: 235,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 4,
@@ -1706,15 +1784,104 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(217, 119, 6, 0.08)',
     top: 30,
   },
-  cardStackHeroImg: {
+  liveCardWrapper: {
+    width: '100%',
+    aspectRatio: 1.5,
+    borderRadius: 18,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    elevation: 8,
+    alignSelf: 'center',
+    maxWidth: 420,
+  },
+  liveCardBg: {
     width: '100%',
     height: '100%',
   },
+  liveCardCurrencyPill: {
+    position: 'absolute',
+    top: '9%',
+    right: '8%',
+    backgroundColor: 'rgba(7, 13, 30, 0.72)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+  },
+  liveCardCurrencyTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#F59E0B',
+  },
+  liveCardNumberBox: {
+    position: 'absolute',
+    top: '55%',
+    left: '8%',
+    right: '8%',
+    alignItems: 'center',
+  },
+  liveCardNumberTxt: {
+    fontSize: 16.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 2.8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 3,
+  },
+  liveCardExpiryBox: {
+    position: 'absolute',
+    top: '72%',
+    left: '58%',
+  },
+  liveCardExpiryTxt: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  liveCardHolderBox: {
+    position: 'absolute',
+    bottom: '7%',
+    left: '8%',
+    maxWidth: '56%',
+  },
+  liveCardHolderTxt: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 1.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  liveCardFrozenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 13, 30, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  liveCardFrozenTxt: {
+    color: '#93C5FD',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
   cardActiveDetailsOverlay: {
     position: 'absolute',
-    bottom: 12,
-    left: 18,
-    right: 18,
+    bottom: 8,
+    left: 14,
+    right: 14,
     backgroundColor: 'rgba(7, 13, 30, 0.94)',
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -1738,31 +1905,129 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#F59E0B',
   },
-  cardFrozenOverlay: {
-    position: 'absolute',
-    top: 12,
-    bottom: 12,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(7, 13, 30, 0.88)',
-    borderRadius: 18,
+
+  // ── Professional Empty State ──
+  emptyStateBox: {
+    paddingHorizontal: 6,
+    paddingTop: 10,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  emptyCardStack: {
+    width: '100%',
+    height: 220,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#60A5FA',
-    padding: 12,
+    marginVertical: 10,
+    position: 'relative',
   },
-  cardFrozenTxt: {
-    color: '#93C5FD',
-    fontSize: 12,
+  emptyRearCard: {
+    position: 'absolute',
+    width: '90%',
+    height: 180,
+    top: 6,
+    transform: [{ rotate: '-8deg' }, { translateX: -12 }],
+    opacity: 0.85,
+  },
+  emptyFrontCard: {
+    width: '92%',
+    height: 195,
+    top: 14,
+    transform: [{ rotate: '3deg' }, { translateX: 8 }],
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  emptyTemplateImg: {
+    width: '100%',
+    height: '100%',
+  },
+  emptyTitle: {
+    fontSize: 22,
     fontWeight: '900',
-    letterSpacing: 0.8,
-    marginTop: 6,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 18,
+    letterSpacing: 0.2,
   },
-  cardFrozenSub: {
+  emptySubtitle: {
+    fontSize: 13,
     color: '#94A3B8',
-    fontSize: 10.5,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: 8,
+    paddingHorizontal: 8,
+  },
+  emptyWalletPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0D1B3E',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyWalletTxt: {
+    fontSize: 12.5,
+    color: '#94A3B8',
+  },
+  emptyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F59E0B',
+    borderRadius: 26,
+    height: 52,
+    width: '100%',
+    marginTop: 14,
+    marginBottom: 24,
+    gap: 8,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  emptyCtaBtnTxt: {
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#070D1E',
+  },
+  emptyFeaturesGrid: {
+    width: '100%',
+    gap: 10,
+  },
+  emptyFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0D1B3E',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  emptyFeatureIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyFeatureTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  emptyFeatureSub: {
+    fontSize: 11.5,
+    color: '#94A3B8',
     marginTop: 2,
+    lineHeight: 16,
   },
 
   // ── Balance Card (Matching Mockup) ──
