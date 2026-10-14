@@ -248,111 +248,34 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       HERO CENTER CARD — THE LUXURY SMART FINTECH SHOWCASE CARD
-       ("CARD DIN MU YA ZAMA YAYI KYAU")
+       HERO CENTER STAGE — RADIANT SPOTLIGHT & MASCOT (CLEAN LUXURY)
        ══════════════════════════════════════════════════════════════════ */
     .hero-center-stage {
       position: relative;
       width: 100%;
+      height: 230px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      margin: 8px 0 12px;
+      margin: 4px 0 8px;
     }
 
-    .fintech-smart-card {
-      position: relative;
-      width: 100%;
-      background: linear-gradient(160deg, #FFFFFF 0%, #F8FAFC 60%, #FFFDF5 100%);
-      border: 1.5px solid rgba(245, 166, 35, 0.38);
-      border-radius: 28px;
-      padding: 16px 16px 14px;
-      box-shadow: 
-        0 14px 34px -10px rgba(13, 27, 62, 0.12),
-        0 2px 8px rgba(245, 166, 35, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.9);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      overflow: hidden;
-      transition: border-color 0.3s;
-    }
-
-    /* CARD HEADER: EMV CHIP & VIP STATUS */
-    .smart-card-top-bar {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 2px;
-      z-index: 10;
-    }
-    .emv-chip-wrap {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .emv-chip-gold {
-      width: 28px;
-      height: 20px;
-      border-radius: 5px;
-      background: linear-gradient(135deg, #F59E0B 0%, #FDE047 50%, #D97706 100%);
-      border: 1px solid #B45309;
-      position: relative;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-    }
-    .emv-chip-gold::after {
-      content: '';
+    .ambient-radial-glow {
       position: absolute;
-      top: 50%; left: 0; right: 0;
-      height: 1px;
-      background: rgba(180, 83, 9, 0.5);
-    }
-    .emv-nfc-wave {
-      font-size: 11px;
-      color: #94A3B8;
-      font-weight: 800;
-      letter-spacing: -1px;
-    }
-    .card-vip-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      background: linear-gradient(135deg, #0D1B3E, #0056D2);
-      color: #FFFFFF;
-      padding: 3px 9px;
-      border-radius: 12px;
-      font-size: 9.5px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      box-shadow: 0 2px 6px rgba(0, 86, 210, 0.2);
-    }
-
-    /* CARD MASCOT STAGE: CRISP VECTOR ORBIT ARCH */
-    .card-mascot-arena {
-      position: relative;
       width: 220px;
-      height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 2px 0 6px;
-    }
-    .arena-vector-ring {
-      position: absolute;
-      width: 195px;
-      height: 195px;
+      height: 220px;
       border-radius: 50%;
-      border: 1.5px dashed rgba(245, 166, 35, 0.45);
-      background: radial-gradient(circle, rgba(254, 243, 199, 0.25) 0%, rgba(255, 255, 255, 0) 70%);
+      background: radial-gradient(circle, rgba(245, 166, 35, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+      border: 1px solid rgba(245, 166, 35, 0.2);
       z-index: 1;
     }
+
     .arena-ground-shadow {
       position: absolute;
-      bottom: 2px;
-      width: 120px;
-      height: 9px;
+      bottom: 4px;
+      width: 140px;
+      height: 10px;
       border-radius: 5px;
       background: #E2E8F0;
       z-index: 1;
@@ -363,26 +286,26 @@
       position: absolute;
       z-index: 15;
       background: #FFFFFF;
-      padding: 5px 11px;
-      border-radius: 12px;
-      border: 1.5px solid rgba(245, 166, 35, 0.4);
-      box-shadow: 0 4px 14px rgba(13, 27, 62, 0.08);
+      padding: 5px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(245, 166, 35, 0.35);
+      box-shadow: 0 4px 12px rgba(13, 27, 62, 0.08);
       display: flex;
       align-items: center;
       gap: 5px;
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 800;
       color: var(--brand-navy);
       animation: chipFloat 3.6s ease-in-out infinite alternate;
       transition: all 0.3s;
     }
     .chip-pos-left {
-      left: -8px;
-      top: 18%;
+      left: 6px;
+      top: 14%;
     }
     .chip-pos-right {
-      right: -8px;
-      bottom: 18%;
+      right: 6px;
+      bottom: 16%;
       animation-delay: 1.2s;
     }
     @keyframes chipFloat {
@@ -392,8 +315,8 @@
 
     .mascot-image-box {
       position: relative;
-      width: 205px;
-      height: 195px;
+      width: 220px;
+      height: 215px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -410,38 +333,25 @@
       100% { transform: translateY(-8px); }
     }
 
-    /* CARD FOOTER: REPUTABLE PILLS (MTN, MONIEPOINT, BILLS) */
-    .smart-card-footer-strip {
-      width: 100%;
+    /* QUICK METRICS PILL ROW */
+    .quick-metrics-row {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding-top: 6px;
-      border-top: 1px solid rgba(226, 232, 240, 0.7);
-      z-index: 10;
+      width: 100%;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
     }
-    .badge-pill-micro {
-      padding: 3px 8px;
-      border-radius: 8px;
-      font-size: 9.5px;
+    .metric-pill-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 10px;
+      font-size: 10px;
       font-weight: 800;
       letter-spacing: 0.3px;
-    }
-    .micro-gold {
-      background: #FEF3C7;
-      color: #B45309;
-      border: 1px solid #FDE68A;
-    }
-    .micro-navy {
-      background: #EFF6FF;
-      color: #1D4ED8;
-      border: 1px solid #BFDBFE;
-    }
-    .micro-green {
-      background: #ECFDF5;
-      color: #047857;
-      border: 1px solid #A7F3D0;
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -716,52 +626,24 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
-           CENTER STAGE: LUXURY FINTECH SMART CARD ("CARD DIN MU")
+           CENTER STAGE: LUXURY RADIANT SPOTLIGHT (CLEAN & SPACIOUS)
            ══════════════════════════════════════════════════════════════ -->
       <div class="hero-center-stage">
-        
-        <div class="fintech-smart-card" id="smartCardContainer">
-          
-          <!-- Card Header: Gold EMV Chip & VIP Status Badge -->
-          <div class="smart-card-top-bar">
-            <div class="emv-chip-wrap">
-              <div class="emv-chip-gold"></div>
-              <span class="emv-nfc-wave">)))</span>
-            </div>
-            <div class="card-vip-badge" id="cardVipBadge">
-              <span>✦</span> <span id="cardVipLabel">5G AUTOMATED</span>
-            </div>
-          </div>
+        <div class="ambient-radial-glow"></div>
+        <div class="arena-ground-shadow"></div>
 
-          <!-- Card Mascot Arena -->
-          <div class="card-mascot-arena">
-            <div class="arena-vector-ring"></div>
-            <div class="arena-ground-shadow"></div>
-
-            <!-- Floating Chips -->
-            <div class="luxury-chip chip-pos-left" id="chipL">
-              <span>⚡</span> <span id="chipLTxt">5G Automated</span>
-            </div>
-            <div class="luxury-chip chip-pos-right" id="chipR">
-              <span>💰</span> <span id="chipRTxt">₦240/GB SME</span>
-            </div>
-
-            <!-- Mascot Illustration -->
-            <div class="mascot-image-box">
-              <img src="./splash_hero_character.gif" alt="Hero Mascot" class="mascot-element" id="mascotImg" />
-            </div>
-          </div>
-
-          <!-- Card Footer Strip: Network / Bank Badges -->
-          <div class="smart-card-footer-strip" id="cardFooterStrip">
-            <span class="badge-pill-micro micro-gold">MTN</span>
-            <span class="badge-pill-micro micro-navy">AIRTEL</span>
-            <span class="badge-pill-micro micro-green">GLO</span>
-            <span class="badge-pill-micro micro-gold">9MOBILE</span>
-          </div>
-
+        <!-- Floating Micro Chips -->
+        <div class="luxury-chip chip-pos-left" id="chipL">
+          <span>⚡</span> <span id="chipLTxt">5G Automated</span>
+        </div>
+        <div class="luxury-chip chip-pos-right" id="chipR">
+          <span>💰</span> <span id="chipRTxt">₦240/GB SME</span>
         </div>
 
+        <!-- Mascot Illustration -->
+        <div class="mascot-image-box">
+          <img src="./splash_hero_character.gif" alt="Hero Mascot" class="mascot-element" id="mascotImg" />
+        </div>
       </div>
 
       <!-- HEADINGS & CATEGORY BADGE -->
@@ -771,8 +653,15 @@
         </div>
         <h2 class="headline-main" id="mainTitle">Instant 5G Data &amp; Airtime</h2>
         <p class="headline-sub" id="mainSubtitle">
-          Wholesale telecom bundles delivered automatically in seconds.
+          Wholesale SME &amp; Direct Telecom bundles delivered automatically in seconds.
         </p>
+      </div>
+
+      <!-- QUICK METRICS PILL ROW -->
+      <div class="quick-metrics-row" id="metricsRow">
+        <span class="metric-pill-chip micro-navy">📶 4 Networks</span>
+        <span class="metric-pill-chip micro-gold">⚡ From ₦240/GB</span>
+        <span class="metric-pill-chip micro-green">🚀 0s Instant VTU</span>
       </div>
 
       <!-- 2 COMPACT DECORATED FEATURE CARDS (ZERO CLUTTER) -->
@@ -813,30 +702,24 @@
         <span class="btn-skip-text">Skip</span>
       </div>
       
-      <div class="fintech-smart-card" style="margin: 6px 0 10px;">
-        <div class="smart-card-top-bar">
-          <div class="emv-chip-wrap"><div class="emv-chip-gold"></div><span class="emv-nfc-wave">)))</span></div>
-          <div class="card-vip-badge">✦ 5G VTU</div>
-        </div>
-        <div class="card-mascot-arena" style="height:170px;">
-          <div class="arena-vector-ring" style="width:160px;height:160px;"></div>
-          <div class="arena-ground-shadow" style="width:100px;"></div>
-          <div class="mascot-image-box" style="width:170px;height:160px;">
-            <img src="./splash_hero_character.gif" alt="Mascot 1" class="mascot-element" />
-          </div>
-        </div>
-        <div class="smart-card-footer-strip">
-          <span class="badge-pill-micro micro-gold">MTN</span>
-          <span class="badge-pill-micro micro-navy">AIRTEL</span>
-          <span class="badge-pill-micro micro-green">GLO</span>
-          <span class="badge-pill-micro micro-gold">9MOBILE</span>
+      <div class="hero-center-stage" style="height:190px;">
+        <div class="ambient-radial-glow" style="width:170px;height:170px;"></div>
+        <div class="arena-ground-shadow" style="width:110px;"></div>
+        <div class="mascot-image-box" style="width:170px;height:160px;">
+          <img src="./splash_hero_character.gif" alt="Mascot 1" class="mascot-element" />
         </div>
       </div>
 
       <div class="headings-container">
-        <div class="badge-category-pill badge-gold">✦ 5G VTU PLATFORM</div>
+        <div class="badge-category-pill badge-gold">✦ 5G WHOLESALE TELECOM</div>
         <h3 class="headline-main" style="font-size:17px;">Instant 5G Data &amp; Airtime</h3>
-        <p class="headline-sub" style="font-size:11.5px;">Wholesale telecom bundles delivered in seconds.</p>
+        <p class="headline-sub" style="font-size:11.5px;">Wholesale SME data &amp; automated airtime recharge in 0s.</p>
+      </div>
+
+      <div class="quick-metrics-row">
+        <span class="metric-pill-chip micro-navy">📶 4 Networks</span>
+        <span class="metric-pill-chip micro-gold">⚡ From ₦240/GB</span>
+        <span class="metric-pill-chip micro-green">🚀 0s Delivery</span>
       </div>
 
       <div class="features-card-deck">
@@ -844,15 +727,15 @@
           <div class="feature-icon-badge">📶</div>
           <div class="feature-body-text">
             <div class="feature-primary-lbl">All 4 Networks Supported</div>
-            <div class="feature-secondary-lbl">MTN, Airtel, Glo &amp; 9mobile recharge</div>
+            <div class="feature-secondary-lbl">MTN, Airtel, Glo &amp; 9mobile wholesale recharge</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
         <div class="feature-row-card">
           <div class="feature-icon-badge gold-accent">💰</div>
           <div class="feature-body-text">
-            <div class="feature-primary-lbl">Direct Wholesale SME</div>
-            <div class="feature-secondary-lbl">Cheapest rates from ₦240 per GB</div>
+            <div class="feature-primary-lbl">Wholesale SME Bundles</div>
+            <div class="feature-secondary-lbl">Direct cheapest rates from ₦240 per GB</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
@@ -871,29 +754,24 @@
         <span class="btn-skip-text">Skip</span>
       </div>
 
-      <div class="fintech-smart-card" style="margin: 6px 0 10px;">
-        <div class="smart-card-top-bar">
-          <div class="emv-chip-wrap"><div class="emv-chip-gold"></div><span class="emv-nfc-wave">)))</span></div>
-          <div class="card-vip-badge">✦ AUTO WALLETS</div>
-        </div>
-        <div class="card-mascot-arena" style="height:170px;">
-          <div class="arena-vector-ring" style="width:160px;height:160px;"></div>
-          <div class="arena-ground-shadow" style="width:100px;"></div>
-          <div class="mascot-image-box" style="width:170px;height:160px;">
-            <img src="./splash_hero_character2.gif" alt="Mascot 2" class="mascot-element" />
-          </div>
-        </div>
-        <div class="smart-card-footer-strip">
-          <span class="badge-pill-micro micro-navy">MONIEPOINT</span>
-          <span class="badge-pill-micro micro-gold">WEMA BANK</span>
-          <span class="badge-pill-micro micro-green">0% FEE</span>
+      <div class="hero-center-stage" style="height:190px;">
+        <div class="ambient-radial-glow" style="width:170px;height:170px;"></div>
+        <div class="arena-ground-shadow" style="width:110px;"></div>
+        <div class="mascot-image-box" style="width:170px;height:160px;">
+          <img src="./splash_hero_character2.gif" alt="Mascot 2" class="mascot-element" />
         </div>
       </div>
 
       <div class="headings-container">
-        <div class="badge-category-pill badge-navy">✦ DEDICATED ACCOUNTS</div>
+        <div class="badge-category-pill badge-navy">✦ DEDICATED AUTO WALLETS</div>
         <h3 class="headline-main" style="font-size:17px;">Dedicated Bank Accounts</h3>
-        <p class="headline-sub" style="font-size:11.5px;">Automated wallet funding in your personal name.</p>
+        <p class="headline-sub" style="font-size:11.5px;">Personal bank accounts for 24/7 instant wallet topup.</p>
+      </div>
+
+      <div class="quick-metrics-row">
+        <span class="metric-pill-chip micro-navy">🏦 Moniepoint &amp; Wema</span>
+        <span class="metric-pill-chip micro-green">🔒 0% Deposit Fee</span>
+        <span class="metric-pill-chip micro-gold">⚡ 24/7 Credit</span>
       </div>
 
       <div class="features-card-deck">
@@ -901,15 +779,15 @@
           <div class="feature-icon-badge">🏦</div>
           <div class="feature-body-text">
             <div class="feature-primary-lbl">Personal Account Numbers</div>
-            <div class="feature-secondary-lbl">Moniepoint &amp; Wema dedicated accounts</div>
+            <div class="feature-secondary-lbl">Dedicated Moniepoint &amp; Wema in your name</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
         <div class="feature-row-card">
           <div class="feature-icon-badge gold-accent">⚡</div>
           <div class="feature-body-text">
-            <div class="feature-primary-lbl">Instant 0s Auto-Credit</div>
-            <div class="feature-secondary-lbl">Wallet funded automatically with 0% fee</div>
+            <div class="feature-primary-lbl">0s Instant Auto-Credit</div>
+            <div class="feature-secondary-lbl">Funds reflect automatically with 0% charge</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
@@ -928,45 +806,40 @@
         <span class="btn-skip-text" style="visibility:hidden;">Skip</span>
       </div>
 
-      <div class="fintech-smart-card" style="margin: 6px 0 10px;">
-        <div class="smart-card-top-bar">
-          <div class="emv-chip-wrap"><div class="emv-chip-gold"></div><span class="emv-nfc-wave">)))</span></div>
-          <div class="card-vip-badge">✦ BILLS &amp; PROFIT</div>
-        </div>
-        <div class="card-mascot-arena" style="height:170px;">
-          <div class="arena-vector-ring" style="width:160px;height:160px;"></div>
-          <div class="arena-ground-shadow" style="width:100px;"></div>
-          <div class="mascot-image-box" style="width:170px;height:160px;">
-            <img src="./splash_hero_character3.gif" alt="Mascot 3" class="mascot-element" />
-          </div>
-        </div>
-        <div class="smart-card-footer-strip">
-          <span class="badge-pill-micro micro-gold">NEPA BILLS</span>
-          <span class="badge-pill-micro micro-navy">DSTV / GOTV</span>
-          <span class="badge-pill-micro micro-green">CASHBACK</span>
+      <div class="hero-center-stage" style="height:190px;">
+        <div class="ambient-radial-glow" style="width:170px;height:170px;"></div>
+        <div class="arena-ground-shadow" style="width:110px;"></div>
+        <div class="mascot-image-box" style="width:170px;height:160px;">
+          <img src="./splash_hero_character3.gif" alt="Mascot 3" class="mascot-element" />
         </div>
       </div>
 
       <div class="headings-container">
-        <div class="badge-category-pill badge-emerald">✦ SIT BACK &amp; PROFIT</div>
-        <h3 class="headline-main" style="font-size:17px;">Sit Back, Relax &amp; Profit</h3>
-        <p class="headline-sub" style="font-size:11.5px;">Instant bills &amp; profitable daily VTU reselling.</p>
+        <div class="badge-category-pill badge-emerald">✦ BILLS, RESELLER &amp; DEV API</div>
+        <h3 class="headline-main" style="font-size:17px;">Bills, Card Printing &amp; API</h3>
+        <p class="headline-sub" style="font-size:11.5px;">Utility bills tokens, voucher printing &amp; VTU API integration.</p>
+      </div>
+
+      <div class="quick-metrics-row">
+        <span class="metric-pill-chip micro-gold">💡 NEPA Tokens</span>
+        <span class="metric-pill-chip micro-navy">🖨️ Card Printing</span>
+        <span class="metric-pill-chip micro-green">🔌 REST VTU API</span>
       </div>
 
       <div class="features-card-deck">
         <div class="feature-row-card">
           <div class="feature-icon-badge">💡</div>
           <div class="feature-body-text">
-            <div class="feature-primary-lbl">Prepaid Electricity &amp; TV</div>
-            <div class="feature-secondary-lbl">Instant meter tokens &amp; cable renewals</div>
+            <div class="feature-primary-lbl">Electricity &amp; Cable TV Cashback</div>
+            <div class="feature-secondary-lbl">Prepaid meter tokens (AEDC, EKEDC) &amp; DStv/GOtv</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
         <div class="feature-row-card">
-          <div class="feature-icon-badge gold-accent">💸</div>
+          <div class="feature-icon-badge gold-accent">🔌</div>
           <div class="feature-body-text">
-            <div class="feature-primary-lbl">Reseller Profit Hub</div>
-            <div class="feature-secondary-lbl">Save money or resell for daily earnings</div>
+            <div class="feature-primary-lbl">Card Printing &amp; Developer API</div>
+            <div class="feature-secondary-lbl">Print vouchers, Bulk SMS, or connect REST API</div>
           </div>
           <div class="feature-status-check">✓</div>
         </div>
@@ -986,19 +859,17 @@
         categoryClass: 'badge-gold',
         categoryText: 'OFFICIAL 5G VTU PLATFORM',
         title: 'Instant 5G Data & Airtime',
-        subtitle: 'Wholesale telecom bundles delivered automatically in seconds.',
-        cardVipText: '5G AUTOMATED',
+        subtitle: 'Wholesale SME & Direct Telecom bundles delivered automatically in seconds.',
         chipL: { icon: '⚡', txt: '5G Automated' },
         chipR: { icon: '💰', txt: '₦240/GB SME' },
-        cardFooterHtml: `
-          <span class="badge-pill-micro micro-gold">MTN</span>
-          <span class="badge-pill-micro micro-navy">AIRTEL</span>
-          <span class="badge-pill-micro micro-green">GLO</span>
-          <span class="badge-pill-micro micro-gold">9MOBILE</span>
+        metricsHtml: `
+          <span class="metric-pill-chip micro-navy">📶 4 Networks</span>
+          <span class="metric-pill-chip micro-gold">⚡ From ₦240/GB</span>
+          <span class="metric-pill-chip micro-green">🚀 0s Instant VTU</span>
         `,
         features: [
-          { icon: '📶', isGold: false, title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated recharge' },
-          { icon: '💰', isGold: true, title: 'Direct Wholesale SME Bundles', desc: 'Cheapest direct prices starting from ₦240 per GB' }
+          { icon: '📶', isGold: false, title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated wholesale recharge' },
+          { icon: '💰', isGold: true, title: 'Wholesale SME Bundles', desc: 'Cheapest direct prices starting from ₦240 per GB with zero delay' }
         ]
       },
       {
@@ -1006,37 +877,35 @@
         categoryClass: 'badge-navy',
         categoryText: 'DEDICATED AUTO WALLETS',
         title: 'Dedicated Bank Accounts',
-        subtitle: 'Automated wallet funding with personal Nigerian bank accounts.',
-        cardVipText: 'AUTO WALLETS',
+        subtitle: 'Automated 24/7 wallet funding with personal Nigerian bank accounts in your name.',
         chipL: { icon: '🏦', txt: 'Moniepoint / Wema' },
         chipR: { icon: '🔒', txt: '0% Deposit Fee' },
-        cardFooterHtml: `
-          <span class="badge-pill-micro micro-navy">MONIEPOINT</span>
-          <span class="badge-pill-micro micro-gold">WEMA BANK</span>
-          <span class="badge-pill-micro micro-green">0% FEE</span>
+        metricsHtml: `
+          <span class="metric-pill-chip micro-navy">🏦 Moniepoint &amp; Wema</span>
+          <span class="metric-pill-chip micro-green">🔒 0% Deposit Fee</span>
+          <span class="metric-pill-chip micro-gold">⚡ 24/7 Auto-Credit</span>
         `,
         features: [
-          { icon: '🏦', isGold: false, title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema accounts in your name' },
-          { icon: '⚡', isGold: true, title: 'Instant 0s Auto-Credit', desc: 'Wallet is funded automatically with 0% deposit charge' }
+          { icon: '🏦', isGold: false, title: 'Personal Dedicated Accounts', desc: 'Moniepoint & Wema bank account numbers generated in your real name' },
+          { icon: '⚡', isGold: true, title: '0-Second Instant Topup', desc: 'Wallet funds instantly whenever you transfer, with 0% deposit charge' }
         ]
       },
       {
         image: './splash_hero_character3.gif',
         categoryClass: 'badge-emerald',
-        categoryText: 'SIT BACK & PROFIT',
-        title: 'Sit Back, Relax & Profit',
-        subtitle: 'Automate utility bills or resell VTU services for daily income.',
-        cardVipText: 'BILLS & PROFIT',
+        categoryText: 'BILLS, RESELLER & DEV API',
+        title: 'Bills, Card Printing & API',
+        subtitle: 'Automate utility bills, print recharge cards, or integrate our high-speed VTU API.',
         chipL: { icon: '💡', txt: 'Prepaid Bills' },
-        chipR: { icon: '💸', txt: 'Daily Profit' },
-        cardFooterHtml: `
-          <span class="badge-pill-micro micro-gold">NEPA TOKENS</span>
-          <span class="badge-pill-micro micro-navy">DSTV / GOTV</span>
-          <span class="badge-pill-micro micro-green">CASHBACK</span>
+        chipR: { icon: '🔌', txt: 'Developer API' },
+        metricsHtml: `
+          <span class="metric-pill-chip micro-gold">💡 NEPA Tokens</span>
+          <span class="metric-pill-chip micro-navy">🖨️ Card Printing</span>
+          <span class="metric-pill-chip micro-green">🔌 REST VTU API</span>
         `,
         features: [
-          { icon: '💡', isGold: false, title: 'Prepaid Electricity & Cable TV', desc: 'Instant meter tokens for AEDC, EKEDC, DStv & GOtv' },
-          { icon: '💸', isGold: true, title: 'Reseller Profit Hub', desc: 'Save money on personal use or earn daily retail profit' }
+          { icon: '💡', isGold: false, title: 'Electricity & Cable TV Cashback', desc: 'Instant prepaid NEPA meter tokens for AEDC, EKEDC, DStv & GOtv' },
+          { icon: '🔌', isGold: true, title: 'Card Printing & Developer API', desc: 'Print recharge vouchers, send Bulk SMS, or connect our fast API' }
         ]
       }
     ];
@@ -1058,9 +927,11 @@
       document.getElementById('chipLTxt').innerText = data.chipL.txt;
       document.getElementById('chipRTxt').innerText = data.chipR.txt;
 
-      // Update VIP tag & footer on card
-      document.getElementById('cardVipLabel').innerText = data.cardVipText;
-      document.getElementById('cardFooterStrip').innerHTML = data.cardFooterHtml;
+      // Update metrics pills
+      const metricsRow = document.getElementById('metricsRow');
+      if (metricsRow && data.metricsHtml) {
+        metricsRow.innerHTML = data.metricsHtml;
+      }
 
       // Update category badge
       const badge = document.getElementById('categoryBadge');

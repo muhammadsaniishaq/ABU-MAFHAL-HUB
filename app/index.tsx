@@ -36,20 +36,29 @@ const SLIDES = [
     categoryBg: '#FEF3C7',
     categoryTxt: '#B45309',
     categoryBorder: '#FDE68A',
-    cardVipText: '5G AUTOMATED',
+    badgeText: '5G AUTOMATED',
     title: 'Instant 5G Data & Airtime',
-    subtitle: 'Wholesale telecom bundles delivered automatically in seconds.',
+    subtitle: 'Wholesale SME & Direct Telecom bundles delivered automatically in seconds.',
     chipL: { icon: '⚡', txt: '5G Automated' },
     chipR: { icon: '💰', txt: '₦240/GB SME' },
-    footerPills: [
-      { lbl: 'MTN', bg: '#FEF3C7', txt: '#B45309' },
-      { lbl: 'AIRTEL', bg: '#EFF6FF', txt: '#1D4ED8' },
-      { lbl: 'GLO', bg: '#ECFDF5', txt: '#047857' },
-      { lbl: '9MOBILE', bg: '#FEF3C7', txt: '#B45309' },
+    metrics: [
+      { lbl: '4 Networks', icon: '📶', bg: '#EFF6FF', txt: '#1D4ED8' },
+      { lbl: 'From ₦240/GB', icon: '⚡', bg: '#FEF3C7', txt: '#B45309' },
+      { lbl: '0s Instant VTU', icon: '🚀', bg: '#ECFDF5', txt: '#047857' },
     ],
     features: [
-      { icon: '📶', isGold: false, title: 'All 4 Networks Supported', desc: 'MTN, Airtel, Glo & 9mobile automated recharge' },
-      { icon: '💰', isGold: true, title: 'Direct Wholesale SME Bundles', desc: 'Cheapest direct prices starting from ₦240 per GB' },
+      {
+        icon: '📶',
+        isGold: false,
+        title: 'All 4 Networks Supported',
+        desc: 'MTN, Airtel, Glo & 9mobile automated wholesale recharge',
+      },
+      {
+        icon: '💰',
+        isGold: true,
+        title: 'Wholesale SME Bundles',
+        desc: 'Cheapest direct prices starting from ₦240 per GB with zero delay',
+      },
     ],
   },
   {
@@ -58,40 +67,60 @@ const SLIDES = [
     categoryBg: '#EFF6FF',
     categoryTxt: '#0056D2',
     categoryBorder: '#BFDBFE',
-    cardVipText: 'AUTO WALLETS',
+    badgeText: 'AUTO WALLETS',
     title: 'Dedicated Bank Accounts',
-    subtitle: 'Automated wallet funding with personal Nigerian bank accounts.',
+    subtitle: 'Automated 24/7 wallet funding with personal Nigerian bank accounts in your name.',
     chipL: { icon: '🏦', txt: 'Moniepoint / Wema' },
     chipR: { icon: '🔒', txt: '0% Deposit Fee' },
-    footerPills: [
-      { lbl: 'MONIEPOINT', bg: '#EFF6FF', txt: '#0056D2' },
-      { lbl: 'WEMA BANK', bg: '#FEF3C7', txt: '#B45309' },
-      { lbl: '0% FEE', bg: '#ECFDF5', txt: '#047857' },
+    metrics: [
+      { lbl: 'Moniepoint & Wema', icon: '🏦', bg: '#EFF6FF', txt: '#0056D2' },
+      { lbl: '0% Deposit Fee', icon: '🔒', bg: '#ECFDF5', txt: '#047857' },
+      { lbl: '24/7 Auto-Credit', icon: '⚡', bg: '#FEF3C7', txt: '#B45309' },
     ],
     features: [
-      { icon: '🏦', isGold: false, title: 'Personal Account Numbers', desc: 'Dedicated Moniepoint & Wema accounts in your name' },
-      { icon: '⚡', isGold: true, title: 'Instant 0s Auto-Credit', desc: 'Wallet is funded automatically with 0% deposit charge' },
+      {
+        icon: '🏦',
+        isGold: false,
+        title: 'Personal Dedicated Accounts',
+        desc: 'Moniepoint & Wema bank account numbers generated in your real name',
+      },
+      {
+        icon: '⚡',
+        isGold: true,
+        title: '0-Second Instant Topup',
+        desc: 'Wallet funds instantly whenever you transfer, with 0% deposit charge',
+      },
     ],
   },
   {
     image: require('../assets/images/splash_hero_character3.gif'),
-    categoryText: 'SIT BACK & PROFIT',
+    categoryText: 'BILLS, RESELLER & DEV API',
     categoryBg: '#ECFDF5',
     categoryTxt: '#047857',
     categoryBorder: '#A7F3D0',
-    cardVipText: 'BILLS & PROFIT',
-    title: 'Sit Back, Relax & Profit',
-    subtitle: 'Automate utility bills or resell VTU services for daily income.',
+    badgeText: 'RESELLER & DEV API',
+    title: 'Bills, Card Printing & API',
+    subtitle: 'Automate utility bills, print recharge cards, or integrate our high-speed VTU API.',
     chipL: { icon: '💡', txt: 'Prepaid Bills' },
-    chipR: { icon: '💸', txt: 'Daily Profit' },
-    footerPills: [
-      { lbl: 'NEPA TOKENS', bg: '#FEF3C7', txt: '#B45309' },
-      { lbl: 'DSTV / GOTV', bg: '#EFF6FF', txt: '#0056D2' },
-      { lbl: 'CASHBACK', bg: '#ECFDF5', txt: '#047857' },
+    chipR: { icon: '🔌', txt: 'Developer API' },
+    metrics: [
+      { lbl: 'NEPA Tokens', icon: '💡', bg: '#FEF3C7', txt: '#B45309' },
+      { lbl: 'Card Printing', icon: '🖨️', bg: '#EFF6FF', txt: '#0056D2' },
+      { lbl: 'REST VTU API', icon: '🔌', bg: '#ECFDF5', txt: '#047857' },
     ],
     features: [
-      { icon: '💡', isGold: false, title: 'Prepaid Electricity & Cable TV', desc: 'Instant meter tokens for AEDC, EKEDC, DStv & GOtv' },
-      { icon: '💸', isGold: true, title: 'Reseller Profit Hub', desc: 'Save money on personal use or earn daily retail profit' },
+      {
+        icon: '💡',
+        isGold: false,
+        title: 'Electricity & Cable TV Cashback',
+        desc: 'Instant prepaid NEPA meter tokens for AEDC, EKEDC, DStv & GOtv',
+      },
+      {
+        icon: '🔌',
+        isGold: true,
+        title: 'Card Printing & Developer API',
+        desc: 'Print recharge vouchers, send Bulk SMS, or connect our fast API',
+      },
     ],
   },
 ];
@@ -329,65 +358,38 @@ export default function SplashScreen() {
         <Animated.View style={[styles.mainSection, slideAnimStyle]}>
           
           {/* ══════════════════════════════════════════════════════════════
-               HERO CENTER CARD — THE LUXURY SMART FINTECH CARD
-               ("CARD DIN MU YA ZAMA YAYI KYAU")
+               HERO STAGE — RADIANT SPOTLIGHT & MASCOT (CLEAN LUXURY)
                ══════════════════════════════════════════════════════════════ */}
-          <View style={styles.fintechSmartCard}>
-            
-            {/* Card Header: Gold EMV Chip & VIP Status Badge */}
-            <View style={styles.smartCardTopBar}>
-              <View style={styles.emvChipWrap}>
-                <View style={styles.emvChipGold}>
-                  <View style={styles.emvChipLine} />
-                </View>
-                <Text style={styles.emvNfcWave}>)))</Text>
-              </View>
+          <View style={styles.heroStage}>
+            {/* Ambient Halo & Ground Stage */}
+            <View style={styles.ambientHalo} />
+            <View style={styles.stageGroundShadow} />
 
-              <View style={styles.cardVipBadge}>
-                <Text style={styles.cardVipBadgeTxt}>✦ {currentSlide.cardVipText}</Text>
-              </View>
-            </View>
+            {/* Left Floating Micro Chip */}
+            <Animated.View style={[styles.floatingChip, styles.floatingChipL, chipAnimStyleL]}>
+              <Text style={styles.chipEmoji}>{currentSlide.chipL.icon}</Text>
+              <Text style={styles.chipText}>{currentSlide.chipL.txt}</Text>
+            </Animated.View>
 
-            {/* Mascot Center Arena */}
-            <View style={styles.cardMascotArena}>
-              <View style={styles.vectorRing} />
-              <View style={styles.groundOval} />
+            {/* Right Floating Micro Chip */}
+            <Animated.View style={[styles.floatingChip, styles.floatingChipR, chipAnimStyleR]}>
+              <Text style={styles.chipEmoji}>{currentSlide.chipR.icon}</Text>
+              <Text style={styles.chipText}>{currentSlide.chipR.txt}</Text>
+            </Animated.View>
 
-              {/* Left Floating Chip */}
-              <Animated.View style={[styles.luxuryChip, styles.chipLeft, chipAnimStyleL]}>
-                <Text style={styles.chipEmoji}>{currentSlide.chipL.icon}</Text>
-                <Text style={styles.chipLabel}>{currentSlide.chipL.txt}</Text>
-              </Animated.View>
-
-              {/* Right Floating Chip */}
-              <Animated.View style={[styles.luxuryChip, styles.chipRight, chipAnimStyleR]}>
-                <Text style={styles.chipEmoji}>{currentSlide.chipR.icon}</Text>
-                <Text style={styles.chipLabel}>{currentSlide.chipR.txt}</Text>
-              </Animated.View>
-              
-              <Animated.View style={[styles.mascotWrap, floatAnimStyle]}>
-                <Image
-                  key={`slide-img-${pageIdx}`}
-                  source={currentSlide.image}
-                  style={styles.mascotImg}
-                  resizeMode="contain"
-                />
-              </Animated.View>
-            </View>
-
-            {/* Card Footer: Miniature Partner Pills */}
-            <View style={styles.smartCardFooterStrip}>
-              {currentSlide.footerPills.map((pill, idx) => (
-                <View key={idx} style={[styles.footerMicroPill, { backgroundColor: pill.bg }]}>
-                  <Text style={[styles.footerMicroPillTxt, { color: pill.txt }]}>{pill.lbl}</Text>
-                </View>
-              ))}
-            </View>
-
+            {/* Mascot Character Image */}
+            <Animated.View style={[styles.mascotHolder, floatAnimStyle]}>
+              <Image
+                key={`slide-img-${pageIdx}`}
+                source={currentSlide.image}
+                style={styles.mascotImg}
+                resizeMode="contain"
+              />
+            </Animated.View>
           </View>
 
           {/* HEADINGS & CATEGORY BADGE */}
-          <View style={styles.textSection}>
+          <View style={styles.headingsBox}>
             <View
               style={[
                 styles.categoryBadge,
@@ -406,7 +408,17 @@ export default function SplashScreen() {
             <Text style={styles.subtitle}>{currentSlide.subtitle}</Text>
           </View>
 
-          {/* 2 COMPACT DECORATED FEATURE CARDS (ZERO CLUTTER) */}
+          {/* QUICK METRICS PILL ROW */}
+          <View style={styles.metricsRow}>
+            {currentSlide.metrics.map((m, idx) => (
+              <View key={idx} style={[styles.metricPill, { backgroundColor: m.bg }]}>
+                <Text style={styles.metricIcon}>{m.icon}</Text>
+                <Text style={[styles.metricText, { color: m.txt }]}>{m.lbl}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* SLEEK BENEFIT CARDS */}
           <View style={styles.featuresDeck}>
             {currentSlide.features.map((feat, idx) => (
               <View key={idx} style={styles.featureCard}>
@@ -417,7 +429,9 @@ export default function SplashScreen() {
                   <Text style={styles.featurePrimaryTxt}>{feat.title}</Text>
                   <Text style={styles.featureSecondaryTxt}>{feat.desc}</Text>
                 </View>
-                <Ionicons name="checkmark-circle" size={17} color="#10B981" />
+                <View style={styles.checkBadge}>
+                  <Ionicons name="checkmark-sharp" size={13} color="#10B981" />
+                </View>
               </View>
             ))}
           </View>
@@ -579,182 +593,92 @@ const styles = StyleSheet.create({
   },
 
   // ══════════════════════════════════════════════════════════════
-  // LUXURY SMART FINTECH CARD ("CARD DIN MU YA ZAMA YAYI KYAU")
+  // LUXURY HERO STAGE (SPOTLIGHT & AMBIENT GLOW)
   // ══════════════════════════════════════════════════════════════
-  fintechSmartCard: {
+  heroStage: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.38)',
-    borderRadius: 28,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 12,
-    marginVertical: 6,
-    alignItems: 'center',
-    shadowColor: '#0D1B3E',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 3,
-  },
-  smartCardTopBar: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  emvChipWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  emvChipGold: {
-    width: 26,
-    height: 18,
-    borderRadius: 4,
-    backgroundColor: '#F59E0B',
-    borderWidth: 1,
-    borderColor: '#B45309',
-    justifyContent: 'center',
-  },
-  emvChipLine: {
-    width: '100%',
-    height: 1,
-    backgroundColor: 'rgba(180, 83, 9, 0.5)',
-  },
-  emvNfcWave: {
-    fontSize: 11,
-    color: '#94A3B8',
-    fontWeight: '800',
-  },
-  cardVipBadge: {
-    backgroundColor: '#0D1B3E',
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  cardVipBadgeTxt: {
-    color: '#FFFFFF',
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-
-  // CARD ARENA
-  cardMascotArena: {
-    width: '100%',
-    height: Math.min(SH * 0.25, 205),
+    height: Math.min(SH * 0.28, 225),
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginVertical: 2,
+    marginVertical: 4,
   },
-  vectorRing: {
+  ambientHalo: {
     position: 'absolute',
-    width: Math.min(SW * 0.54, 195),
-    height: Math.min(SW * 0.54, 195),
-    borderRadius: Math.min(SW * 0.54, 195) / 2,
-    backgroundColor: 'rgba(254, 243, 199, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.45)',
-    borderStyle: 'dashed',
-    zIndex: 1,
+    width: Math.min(SW * 0.65, 230),
+    height: Math.min(SW * 0.65, 230),
+    borderRadius: Math.min(SW * 0.65, 230) / 2,
+    backgroundColor: 'rgba(245, 166, 35, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.22)',
   },
-  groundOval: {
+  stageGroundShadow: {
     position: 'absolute',
-    bottom: 2,
-    width: 120,
-    height: 9,
-    borderRadius: 4.5,
+    bottom: 4,
+    width: 140,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#E2E8F0',
-    zIndex: 1,
   },
-  mascotWrap: {
-    width: Math.min(SW * 0.56, 210),
+  mascotHolder: {
+    width: Math.min(SW * 0.62, 225),
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
     zIndex: 5,
   },
   mascotImg: {
     width: '100%',
     height: '100%',
   },
-
-  // CARD FOOTER STRIP
-  smartCardFooterStrip: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(226, 232, 240, 0.7)',
-  },
-  footerMicroPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  footerMicroPillTxt: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-
-  // FLOATING CHIPS
-  luxuryChip: {
+  floatingChip: {
     position: 'absolute',
     zIndex: 15,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+    paddingHorizontal: 11,
+    paddingVertical: 5.5,
+    borderRadius: 14,
     gap: 5,
     shadowColor: '#0D1B3E',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 3,
   },
-  chipLeft: {
-    left: -4,
-    top: '14%',
+  floatingChipL: {
+    left: 4,
+    top: '16%',
   },
-  chipRight: {
-    right: -4,
-    bottom: '16%',
+  floatingChipR: {
+    right: 4,
+    bottom: '18%',
   },
   chipEmoji: {
-    fontSize: 10,
+    fontSize: 12,
   },
-  chipLabel: {
-    fontSize: 10,
+  chipText: {
+    fontSize: 10.5,
     fontWeight: '800',
     color: '#0D1B3E',
   },
 
-  // TEXT HEADINGS
-  textSection: {
+  // HEADINGS
+  headingsBox: {
     width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    marginBottom: 10,
-    marginTop: 4,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+    marginTop: 2,
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 11,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 4.5,
     borderRadius: 20,
     borderWidth: 1,
     marginBottom: 6,
@@ -765,7 +689,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   title: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: '900',
     color: '#0D1B3E',
     textAlign: 'center',
@@ -777,11 +701,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#5A6385',
     textAlign: 'center',
-    lineHeight: 17.5,
+    lineHeight: 18,
     maxWidth: 320,
   },
 
-  // COMPACT DECORATED FEATURE CARDS
+  // QUICK METRICS PILL ROW
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    width: '100%',
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  metricPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  metricIcon: {
+    fontSize: 11,
+  },
+  metricText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
+  // VALUE BENEFIT CARDS
   featuresDeck: {
     width: '100%',
     gap: 8,
@@ -793,19 +744,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingVertical: 9,
+    borderRadius: 16,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 1,
   },
   featureIconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     backgroundColor: '#0D1B3E',
     alignItems: 'center',
     justifyContent: 'center',
@@ -815,7 +766,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D97706',
   },
   featureIconTxt: {
-    fontSize: 15,
+    fontSize: 16,
   },
   featureBody: {
     flex: 1,
@@ -824,13 +775,24 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     color: '#0D1B3E',
-    marginBottom: 1,
+    marginBottom: 1.5,
   },
   featureSecondaryTxt: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '600',
     color: '#5A6385',
-    lineHeight: 14,
+    lineHeight: 15,
+  },
+  checkBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
   },
 
   // BOTTOM CONTROLS
