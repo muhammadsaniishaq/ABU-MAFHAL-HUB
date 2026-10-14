@@ -671,41 +671,58 @@ export default function UserKYCScreen() {
                 Take a clear photo of your National ID. Make sure the details are visible.
               </Text>
 
-              {/* ID Card Graphic / Preview */}
+              {/* ID Card Graphic / Preview with Premium NIN Mockup */}
               <View style={s.idCardGraphicContainer}>
                 {docImageUri ? (
                   <View style={s.uploadedPreviewFrame}>
                     <Image source={{ uri: docImageUri }} style={s.uploadedDocImg} resizeMode="cover" />
+                    <View style={s.uploadedSuccessBadge}>
+                      <Ionicons name="checkmark-circle" size={13} color={C.white} />
+                      <Text style={s.uploadedSuccessBadgeTxt}>Photo Selected</Text>
+                    </View>
                     <TouchableOpacity 
                       style={s.changePhotoChip} 
                       onPress={() => setDocImageUri(null)}
+                      activeOpacity={0.8}
                     >
-                      <Ionicons name="refresh" size={14} color={C.navy} />
+                      <Ionicons name="refresh" size={13} color={C.navy} />
                       <Text style={s.changePhotoChipTxt}>Change Photo</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <View style={s.idCardGraphicFrame}>
-                    <View style={s.idGraphicHeader}>
-                      <View style={s.idCoatOfArmsDot} />
-                      <View style={{ flex: 1, marginLeft: 8 }}>
-                        <Text style={s.idGraphicCountry}>FEDERAL REPUBLIC OF NIGERIA</Text>
-                        <Text style={s.idGraphicCardTitle}>National Identity Card</Text>
+                  <View style={s.sampleCardContainer}>
+                    {/* Badge Row */}
+                    <View style={s.sampleCardBadgeRow}>
+                      <View style={s.sampleBadgePill}>
+                        <Ionicons name="shield-checkmark" size={13} color={C.gold} />
+                        <Text style={s.sampleBadgeTxt}>SAMPLE NIN CARD MOCKUP</Text>
+                      </View>
+                      <View style={s.sampleAcceptedPill}>
+                        <Ionicons name="checkmark-circle" size={12} color={C.green} />
+                        <Text style={s.sampleAcceptedTxt}>Accepted Format</Text>
                       </View>
                     </View>
 
-                    <View style={s.idGraphicBody}>
-                      <View style={s.idChipBox}>
-                        <View style={s.idChipLine} />
-                        <View style={s.idChipLine} />
+                    {/* Premium NIN Card Mockup Image */}
+                    <TouchableOpacity 
+                      style={s.sampleCardImageHolder} 
+                      onPress={() => handlePickFromGallery('document')}
+                      activeOpacity={0.92}
+                    >
+                      <Image 
+                        source={require('../../assets/images/premium.png')} 
+                        style={s.sampleCardImg} 
+                        resizeMode="cover" 
+                      />
+                      <View style={s.sampleWatermarkChip}>
+                        <Ionicons name="camera-outline" size={13} color="#FFFFFF" />
+                        <Text style={s.sampleWatermarkTxt}>Tap to upload your ID</Text>
                       </View>
+                    </TouchableOpacity>
 
-                      <View style={s.idPhotoPlaceholder}>
-                        <Ionicons name="person" size={40} color={C.textMuted} />
-                      </View>
-                    </View>
-
-                    <Text style={s.idCardNumberGraphic}>1234 5678 9012 3456</Text>
+                    <Text style={s.sampleCardHelperTxt}>
+                      Upload a clear photo of your NIN Premium Card, Standard Slip, or National e-ID.
+                    </Text>
                   </View>
                 )}
               </View>
@@ -1837,68 +1854,118 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 10,
   },
-  idCardGraphicFrame: {
+  sampleCardContainer: {
     width: '100%',
-    height: 170,
-    borderRadius: 14,
-    backgroundColor: '#E8F5E9',
-    borderWidth: 1.5,
-    borderColor: '#C8E6C9',
-    padding: 14,
-    justifyContent: 'space-between',
+    backgroundColor: C.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  idGraphicHeader: {
+  sampleCardBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
-  idCoatOfArmsDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#2E7D32',
+  sampleBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: C.navy,
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 20,
   },
-  idGraphicCountry: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#1B5E20',
+  sampleBadgeTxt: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: C.gold,
     letterSpacing: 0.5,
   },
-  idGraphicCardTitle: {
-    fontSize: 8,
-    color: '#388E3C',
-    fontWeight: '600',
-  },
-  idGraphicBody: {
+  sampleAcceptedPill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 4,
+    backgroundColor: C.greenLight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
   },
-  idChipBox: {
-    width: 34,
-    height: 26,
-    borderRadius: 4,
-    backgroundColor: '#FBC02D',
-    padding: 4,
-    justifyContent: 'space-around',
-  },
-  idChipLine: {
-    height: 2,
-    backgroundColor: '#F57F17',
-    borderRadius: 1,
-  },
-  idPhotoPlaceholder: {
-    width: 58,
-    height: 68,
-    borderRadius: 6,
-    backgroundColor: '#C8E6C9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  idCardNumberGraphic: {
-    fontSize: 14,
+  sampleAcceptedTxt: {
+    fontSize: 10.5,
     fontWeight: '700',
-    color: '#1B5E20',
-    letterSpacing: 2,
+    color: C.green,
+  },
+  sampleCardImageHolder: {
+    width: '100%',
+    height: 195,
+    borderRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: '#F3C366',
+    backgroundColor: '#0D1B3E',
+  },
+  sampleCardImg: {
+    width: '100%',
+    height: '100%',
+  },
+  sampleWatermarkChip: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(13, 27, 62, 0.88)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 148, 20, 0.4)',
+  },
+  sampleWatermarkTxt: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  sampleCardHelperTxt: {
+    fontSize: 11.5,
+    color: C.textSub,
+    textAlign: 'center',
+    marginTop: 10,
+    paddingHorizontal: 6,
+    lineHeight: 16,
+  },
+  uploadedSuccessBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: C.green,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  uploadedSuccessBadgeTxt: {
+    color: C.white,
+    fontSize: 10.5,
+    fontWeight: '800',
   },
   uploadedPreviewFrame: {
     width: '100%',
