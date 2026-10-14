@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Alert, StyleSheet, TextInput, Switch, Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -52,7 +52,16 @@ const EVENT_TYPES = [
 
 export default function AppDesigner() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'celebration' | 'theme' | 'branding' | 'splash'>('celebration');
+  const { tab } = useLocalSearchParams<{ tab: string }>();
+  const [activeTab, setActiveTab] = useState<'celebration' | 'theme' | 'branding' | 'splash'>(
+    tab === 'splash' || tab === 'theme' || tab === 'branding' ? (tab as any) : 'celebration'
+  );
+
+  useEffect(() => {
+    if (tab && ['celebration', 'theme', 'branding', 'splash'].includes(tab)) {
+      setActiveTab(tab as any);
+    }
+  }, [tab]);
 
   // Theme states
   const [primaryColor, setPrimaryColor] = useState('#D97706');
@@ -116,7 +125,7 @@ export default function AppDesigner() {
         .from('app_settings')
         .select('value')
         .eq('key', 'celebration_event_settings')
-        .single();
+        .maybeSingle();
 
       if (data?.value) {
         const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
@@ -135,7 +144,7 @@ export default function AppDesigner() {
         .from('app_settings')
         .select('value')
         .eq('key', 'app_splash_slides')
-        .single();
+        .maybeSingle();
       if (data?.value) {
         const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
         if (Array.isArray(parsed)) setSplashSlides(parsed);

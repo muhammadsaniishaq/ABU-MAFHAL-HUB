@@ -36,14 +36,21 @@ const COLORS = {
   infoLight: '#eff6ff',
 };
 
-type Pricing = { id: string; name: string; price: number; active?: boolean };
+type Pricing = { 
+  id: string; 
+  name: string; 
+  price: number; 
+  original_price?: number | null;
+  discount_label?: string | null;
+  active?: boolean 
+};
 
-// Reusable Custom Dropdown
-const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select...", required = false }: any) => {
+// Reusable Custom Dropdown (Mobile-first)
+const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select...", required = false, style }: any) => {
   const [visible, setVisible] = useState(false);
   const safeOptions = Array.isArray(options) ? options : [];
   return (
-    <View style={[s.inputContainer, { zIndex: visible ? 100 : 1 }]}>
+    <View style={[s.inputContainer, { zIndex: visible ? 100 : 1 }, style]}>
       <Text style={s.inputLabel}>
         {label} {required && <Text style={{ color: COLORS.error }}>*</Text>}
       </Text>
@@ -91,8 +98,8 @@ const MONTHS = [
 ];
 const YEARS = Array.from({ length: 70 }, (_, i) => String(2008 - i));
 
-// Date Picker Modal
-const CustomDatePicker = ({ label, value, onChange, required = false }: any) => {
+// Date Picker Modal (Mobile-first)
+const CustomDatePicker = ({ label, value, onChange, required = false, style }: any) => {
   const [showModal, setShowModal] = useState(false);
   const parts = (value || '').split('-');
   const [selYear, setSelYear] = useState(parts[0] || '1998');
@@ -125,7 +132,7 @@ const CustomDatePicker = ({ label, value, onChange, required = false }: any) => 
     : 'Select Date of Birth';
 
   return (
-    <View style={s.inputContainer}>
+    <View style={[s.inputContainer, style]}>
       <Text style={s.inputLabel}>
         {label} {required && <Text style={{ color: COLORS.error }}>*</Text>}
       </Text>
@@ -231,6 +238,7 @@ export default function CACServices() {
   // Pricing State
   const [pricings, setPricings] = useState<Pricing[]>([]);
   const [regType, setRegType] = useState<Pricing | null>(null);
+  const [showServiceModal, setShowServiceModal] = useState(false);
 
   // TIN & Retrieval Add-on State
   const [includeTin, setIncludeTin] = useState(false);
@@ -313,6 +321,32 @@ export default function CACServices() {
           name: 'CAC Certificate Retrieval / Document Search',
           price: 4000
         });
+      }
+
+      // Fetch custom discount & original price data from app_settings
+      try {
+        const { data: settingsData } = await supabase.from('app_settings').select('key, value').like('key', 'cac_price_%');
+        if (settingsData) {
+          const metaMap: Record<string, any> = {};
+          settingsData.forEach(s => {
+            try {
+              metaMap[s.key] = JSON.parse(s.value);
+            } catch (_) {
+              metaMap[s.key] = { price: parseFloat(s.value) };
+            }
+          });
+
+          allPricings = allPricings.map(p => {
+            const meta = metaMap[`cac_price_${p.id}`];
+            return {
+              ...p,
+              original_price: p.original_price ?? (meta?.original_price || null),
+              discount_label: p.discount_label ?? (meta?.discount_label || null),
+            };
+          });
+        }
+      } catch (err) {
+        console.log("Pricing meta fetch err:", err);
       }
 
       setPricings(allPricings);
@@ -620,16 +654,16 @@ export default function CACServices() {
         </View>
 
         <View style={s.formGrid2}>
-          <CustomDatePicker label="Date of Birth" value={data.dob} onChange={(v: string) => updateField('dob', v)} required />
-          <CustomDropdown label="Gender" value={data.gender} options={['Male', 'Female']} onSelect={(v: string) => updateField('gender', v)} />
+          <CustomDatePicker style={{ flex: 1, minWidth: 0 }} label="Date of Birth" value={data.dob} onChange={(v: string) => updateField('dob', v)} required />
+          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="Gender" value={data.gender} options={['Male', 'Female']} onSelect={(v: string) => updateField('gender', v)} />
         </View>
 
         <View style={s.formGrid2}>
-          <View style={s.inputContainer}>
+          <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
             <Text style={s.inputLabel}>Phone Number <Text style={{ color: COLORS.error }}>*</Text></Text>
             <TextInput style={s.inputBox} keyboardType="phone-pad" placeholder="080..." value={data.phone} onChangeText={t => updateField('phone', t)} />
           </View>
-          <View style={s.inputContainer}>
+          <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
             <Text style={s.inputLabel}>NIN (11 Digits)</Text>
             <TextInput style={s.inputBox} keyboardType="numeric" maxLength={11} placeholder="11 digits" value={data.nin} onChangeText={t => updateField('nin', t)} />
           </View>
@@ -641,8 +675,8 @@ export default function CACServices() {
         </View>
 
         <View style={s.formGrid2}>
-          <CustomDropdown label="State of Origin" value={data.state} options={STATE_LIST} onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} />
-          <CustomDropdown label="LGA" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State" />
+          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="State of Origin" value={data.state} options={STATE_LIST} onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} />
+          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="LGA" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State" />
         </View>
 
         <View style={s.inputContainer}>
@@ -758,45 +792,142 @@ export default function CACServices() {
               </View>
             </View>
 
-            {/* Service Selection Cards */}
+            {/* Choose Service Dropdown */}
             {loading ? (
               <View style={{ padding: 30, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={COLORS.navy} />
                 <Text style={{ marginTop: 8, fontSize: 13, color: COLORS.textSub }}>Loading available services...</Text>
               </View>
             ) : (
-              <View style={s.serviceCardsContainer}>
-                {pricings.map((p) => {
-                  const isSelected = regType?.id === p.id;
-                  const isCert = p.name.toLowerCase().includes('retrieval') || p.name.toLowerCase().includes('search');
-                  const isNgoType = p.name.toLowerCase().includes('ngo') || p.name.toLowerCase().includes('club');
-                  return (
-                    <TouchableOpacity 
-                      key={p.id} 
-                      style={[s.serviceCard, isSelected && s.serviceCardSelected]}
-                      onPress={() => !editId && setRegType(p)}
-                      disabled={Boolean(editId)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        <View style={[s.serviceIconBox, isSelected && s.serviceIconBoxSelected]}>
-                          <Ionicons 
-                            name={isCert ? "document-text" : isNgoType ? "people" : "briefcase"} 
-                            size={18} 
-                            color={isSelected ? COLORS.white : COLORS.navy} 
-                          />
+              <View style={s.serviceDropdownCard}>
+                <Text style={s.inputLabel}>
+                  Select Service Package <Text style={{ color: COLORS.error }}>*</Text>
+                </Text>
+
+                <TouchableOpacity
+                  style={s.serviceSelectTrigger}
+                  onPress={() => !editId && setShowServiceModal(true)}
+                  disabled={Boolean(editId)}
+                  activeOpacity={0.85}
+                >
+                  <View style={s.serviceSelectIconBox}>
+                    <Ionicons 
+                      name={isRetrieval ? "document-text" : isNgo ? "people" : "briefcase"} 
+                      size={20} 
+                      color={COLORS.goldDk} 
+                    />
+                  </View>
+
+                  <View style={{ flex: 1, marginHorizontal: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={s.serviceSelectName} numberOfLines={1}>
+                        {regType ? regType.name : 'Choose CAC Service...'}
+                      </Text>
+                      {regType?.original_price && regType.original_price > regType.price && (
+                        <View style={s.discountBadgePill}>
+                          <Ionicons name="pricetag" size={10} color="#15803d" />
+                          <Text style={s.discountBadgePillTxt}>
+                            {regType.discount_label || `${Math.round(((regType.original_price - regType.price) / regType.original_price) * 100)}% OFF`}
+                          </Text>
                         </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={[s.serviceTitle, isSelected && s.serviceTitleSelected]}>{p.name}</Text>
-                          <Text style={s.servicePrice}>₦{p.price.toLocaleString()}</Text>
+                      )}
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 3 }}>
+                      <Text style={s.serviceSelectPrice}>
+                        ₦{(regType?.price || 0).toLocaleString()}
+                      </Text>
+                      {regType?.original_price && regType.original_price > regType.price && (
+                        <Text style={s.serviceSelectOrigPrice}>
+                          ₦{regType.original_price.toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={s.serviceSelectChevron}>
+                    <Ionicons name="chevron-down" size={18} color={COLORS.navy} />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Dropdown Modal Selection Sheet */}
+                <Modal visible={showServiceModal} transparent animationType="slide" onRequestClose={() => setShowServiceModal(false)}>
+                  <View style={s.modalBackdrop}>
+                    <View style={s.serviceModalCard}>
+                      <View style={s.serviceModalHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Ionicons name="briefcase" size={20} color={COLORS.navy} />
+                          <Text style={s.serviceModalTitle}>Select CAC Service</Text>
                         </View>
+                        <TouchableOpacity onPress={() => setShowServiceModal(false)} style={{ padding: 4 }}>
+                          <Ionicons name="close-circle" size={24} color={COLORS.textSub} />
+                        </TouchableOpacity>
                       </View>
-                      <View style={[s.radioCircle, isSelected && s.radioCircleSelected]}>
-                        {isSelected && <View style={s.radioInner} />}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+
+                      <Text style={s.serviceModalSubtitle}>
+                        Select from available official registration and search packages below:
+                      </Text>
+
+                      <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                        {pricings.map((p) => {
+                          const isSelected = regType?.id === p.id;
+                          const hasDiscount = p.original_price && p.original_price > p.price;
+                          const isCert = p.name.toLowerCase().includes('retrieval') || p.name.toLowerCase().includes('search');
+                          const isNgoType = p.name.toLowerCase().includes('ngo') || p.name.toLowerCase().includes('club');
+                          const discountPct = hasDiscount ? Math.round(((p.original_price! - p.price) / p.original_price!) * 100) : 0;
+
+                          return (
+                            <TouchableOpacity
+                              key={p.id}
+                              style={[s.serviceModalItem, isSelected && s.serviceModalItemActive]}
+                              onPress={() => {
+                                setRegType(p);
+                                setShowServiceModal(false);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <View style={[s.serviceModalItemIcon, isSelected && { backgroundColor: COLORS.navy }]}>
+                                <Ionicons 
+                                  name={isCert ? "document-text" : isNgoType ? "people" : "briefcase"} 
+                                  size={18} 
+                                  color={isSelected ? COLORS.white : COLORS.navy} 
+                                />
+                              </View>
+
+                              <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                <Text style={[s.serviceModalItemName, isSelected && { color: COLORS.navy, fontWeight: '800' }]}>
+                                  {p.name}
+                                </Text>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                                  <Text style={s.serviceModalItemPrice}>
+                                    ₦{p.price.toLocaleString()}
+                                  </Text>
+                                  {hasDiscount && (
+                                    <Text style={s.serviceModalItemOrigPrice}>
+                                      ₦{p.original_price?.toLocaleString()}
+                                    </Text>
+                                  )}
+                                  {hasDiscount && (
+                                    <View style={s.discountBadgePill}>
+                                      <Text style={s.discountBadgePillTxt}>
+                                        {p.discount_label || `${discountPct}% OFF`}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              </View>
+
+                              <View style={[s.radioCircle, isSelected && s.radioCircleSelected]}>
+                                {isSelected && <View style={s.radioInner} />}
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  </View>
+                </Modal>
               </View>
             )}
 
@@ -837,7 +968,7 @@ export default function CACServices() {
                   </View>
 
                   <View style={s.formGrid2}>
-                    <View style={s.inputContainer}>
+                    <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
                       <Text style={s.inputLabel}>RC or BN Number <Text style={{ color: COLORS.error }}>*</Text></Text>
                       <TextInput 
                         style={s.inputBox} 
@@ -846,7 +977,7 @@ export default function CACServices() {
                         onChangeText={setRcNumber} 
                       />
                     </View>
-                    <View style={s.inputContainer}>
+                    <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
                       <Text style={s.inputLabel}>Registration Year</Text>
                       <TextInput 
                         style={s.inputBox} 
@@ -926,7 +1057,7 @@ export default function CACServices() {
               <Text style={s.cardSectionTitle}>CONTACT CHANNELS</Text>
               
               <View style={s.formGrid2}>
-                <View style={s.inputContainer}>
+                <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
                   <Text style={s.inputLabel}>Contact Phone <Text style={{ color: COLORS.error }}>*</Text></Text>
                   <TextInput 
                     style={s.inputBox} 
@@ -936,7 +1067,7 @@ export default function CACServices() {
                     onChangeText={setPhone} 
                   />
                 </View>
-                <View style={s.inputContainer}>
+                <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
                   <Text style={s.inputLabel}>Contact Email</Text>
                   <TextInput 
                     style={s.inputBox} 
@@ -964,6 +1095,7 @@ export default function CACServices() {
               
               <View style={s.formGrid2}>
                 <CustomDropdown 
+                  style={{ flex: 1, minWidth: 0 }}
                   label="State Location" 
                   value={state} 
                   options={STATE_LIST} 
@@ -971,6 +1103,7 @@ export default function CACServices() {
                   required 
                 />
                 <CustomDropdown 
+                  style={{ flex: 1, minWidth: 0 }}
                   label="LGA / City" 
                   value={lga} 
                   options={state ? NIGERIA_STATES[state] : []} 
@@ -980,7 +1113,7 @@ export default function CACServices() {
               </View>
 
               <View style={s.formGrid2}>
-                <View style={s.inputContainer}>
+                <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
                   <Text style={s.inputLabel}>Shop / Suite / House No.</Text>
                   <TextInput 
                     style={s.inputBox} 
@@ -989,7 +1122,7 @@ export default function CACServices() {
                     onChangeText={setOfficeNumber} 
                   />
                 </View>
-                <View style={s.inputContainer}>
+                <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
                   <Text style={s.inputLabel}>Street / Area</Text>
                   <TextInput 
                     style={s.inputBox} 
@@ -1212,8 +1345,27 @@ export default function CACServices() {
                 <View style={s.summaryDivider} />
                 <View style={s.summaryRow}>
                   <Text style={s.summaryLabel}>Base CAC Fee</Text>
-                  <Text style={s.summaryVal}>₦{(regType?.price || 0).toLocaleString()}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={s.summaryVal}>₦{(regType?.price || 0).toLocaleString()}</Text>
+                    {regType?.original_price && regType.original_price > regType.price && (
+                      <Text style={{ fontSize: 11, color: COLORS.textSub, textDecorationLine: 'line-through' }}>
+                        ₦{regType.original_price.toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
                 </View>
+
+                {regType?.original_price && regType.original_price > regType.price && (
+                  <>
+                    <View style={s.summaryDivider} />
+                    <View style={s.summaryRow}>
+                      <Text style={[s.summaryLabel, { color: COLORS.success }]}>Discount Savings</Text>
+                      <Text style={[s.summaryVal, { color: COLORS.success, fontWeight: '800' }]}>
+                        -₦{(regType.original_price - regType.price).toLocaleString()} ({regType.discount_label || `${Math.round(((regType.original_price - regType.price) / regType.original_price) * 100)}% OFF`})
+                      </Text>
+                    </View>
+                  </>
+                )}
 
                 {includeTin && (
                   <>
@@ -1304,23 +1456,24 @@ const s = StyleSheet.create({
   // Stepper Bar
   stepperBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: COLORS.white, paddingVertical: 12, paddingHorizontal: 18,
+    backgroundColor: COLORS.white, paddingVertical: 10, paddingHorizontal: 12,
     borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    width: '100%',
   },
-  stepItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stepCircle: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  stepItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  stepCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   stepCircleActive: { backgroundColor: COLORS.navy },
   stepCircleDone: { backgroundColor: COLORS.success },
-  stepNum: { fontSize: 11, fontWeight: '700', color: COLORS.textSub },
+  stepNum: { fontSize: 10, fontWeight: '700', color: COLORS.textSub },
   stepNumActive: { color: COLORS.white },
-  stepLabel: { fontSize: 12, fontWeight: '600', color: COLORS.textSub },
+  stepLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textSub },
   stepLabelActive: { color: COLORS.navy, fontWeight: '800' },
   stepLabelDone: { color: COLORS.success, fontWeight: '700' },
-  stepDivider: { flex: 1, height: 2, backgroundColor: '#f1f5f9', marginHorizontal: 6 },
+  stepDivider: { flex: 1, height: 2, backgroundColor: '#f1f5f9', marginHorizontal: 4 },
   stepDividerDone: { backgroundColor: COLORS.success },
 
-  content: { flex: 1 },
-  stepContent: { marginTop: 4 },
+  content: { flex: 1, width: '100%' },
+  stepContent: { marginTop: 4, width: '100%' },
 
   // Section Heading
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
@@ -1328,6 +1481,139 @@ const s = StyleSheet.create({
   sectionNumberTxt: { color: COLORS.white, fontWeight: '800', fontSize: 13 },
   stepHeading: { fontSize: 15, fontWeight: '800', color: COLORS.navy },
   stepSubheading: { fontSize: 11.5, color: COLORS.textSub, marginTop: 1 },
+
+  // Service Dropdown Styles
+  serviceDropdownCard: {
+    marginBottom: 14,
+    width: '100%',
+  },
+  serviceSelectTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: COLORS.navy,
+    padding: 12,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+    width: '100%',
+  },
+  serviceSelectIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#fff9ed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  serviceSelectName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  serviceSelectPrice: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: COLORS.navy,
+  },
+  serviceSelectOrigPrice: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: COLORS.textSub,
+    textDecorationLine: 'line-through',
+  },
+  serviceSelectChevron: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discountBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  discountBadgePillTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  serviceModalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 18,
+    width: '100%',
+    maxWidth: 420,
+  },
+  serviceModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  serviceModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  serviceModalSubtitle: {
+    fontSize: 11.5,
+    color: COLORS.textSub,
+    marginBottom: 14,
+    lineHeight: 16,
+  },
+  serviceModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    marginBottom: 8,
+  },
+  serviceModalItemActive: {
+    borderColor: COLORS.navy,
+    backgroundColor: '#f8fafc',
+  },
+  serviceModalItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceModalItemName: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.textMain,
+  },
+  serviceModalItemPrice: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  serviceModalItemOrigPrice: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSub,
+    textDecorationLine: 'line-through',
+  },
 
   // Service Selection Cards
   serviceCardsContainer: { gap: 8, marginBottom: 14 },
@@ -1350,6 +1636,7 @@ const s = StyleSheet.create({
   tinCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
     padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.border, marginBottom: 14,
+    width: '100%',
   },
   tinCardActive: { backgroundColor: COLORS.goldLight, borderColor: COLORS.gold },
   tinCheckbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: COLORS.textSub, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
@@ -1362,26 +1649,29 @@ const s = StyleSheet.create({
   cleanCard: {
     backgroundColor: COLORS.white, borderRadius: 14, padding: 14,
     borderWidth: 1, borderColor: COLORS.border, marginBottom: 14,
+    width: '100%', maxWidth: '100%', overflow: 'hidden',
   },
   cardSectionTitle: { fontSize: 11, fontWeight: '800', color: COLORS.navy, letterSpacing: 0.5, marginBottom: 12 },
 
   // Inputs & Grid
-  inputContainer: { marginBottom: 12 },
+  inputContainer: { marginBottom: 12, width: '100%', maxWidth: '100%' },
   inputLabel: { fontSize: 11.5, fontWeight: '700', color: COLORS.textMain, marginBottom: 5 },
   inputBox: {
     height: 42, borderWidth: 1, borderColor: COLORS.border, borderRadius: 9,
     paddingHorizontal: 12, fontSize: 13, color: COLORS.textMain, backgroundColor: '#fcfcfd',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%', maxWidth: '100%',
   },
   inputBoxActive: { borderColor: COLORS.navy },
   inputText: { fontSize: 13, color: COLORS.textMain },
-  formGrid2: { flexDirection: 'row', gap: 10 },
+  formGrid2: { flexDirection: 'row', gap: 10, width: '100%', alignItems: 'flex-start' },
 
   // Dropdown
   dropdownList: {
     position: 'relative', marginTop: 4, backgroundColor: COLORS.white,
     borderRadius: 8, borderWidth: 1, borderColor: COLORS.border,
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 4,
+    width: '100%',
   },
   dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
   dropdownItemActive: { backgroundColor: '#f1f5f9' },
@@ -1392,6 +1682,7 @@ const s = StyleSheet.create({
   personCard: {
     backgroundColor: COLORS.white, borderRadius: 14, padding: 14,
     borderWidth: 1, borderColor: COLORS.border, marginBottom: 14,
+    width: '100%', maxWidth: '100%', overflow: 'hidden',
   },
   personCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 8 },
   personAvatarIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
@@ -1406,10 +1697,11 @@ const s = StyleSheet.create({
   addPartnerBtnTxt: { fontSize: 12.5, fontWeight: '700', color: COLORS.navy },
 
   // Upload Tiles
-  uploadGrid: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  uploadGrid: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
   uploadTile: {
     flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10,
     padding: 12, alignItems: 'center', backgroundColor: '#fcfcfd', borderStyle: 'dashed',
+    minWidth: 0,
   },
   uploadTileDone: { borderColor: COLORS.success, backgroundColor: COLORS.successLight, borderStyle: 'solid' },
   uploadIconBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
@@ -1420,6 +1712,7 @@ const s = StyleSheet.create({
   summaryCard: {
     backgroundColor: COLORS.white, borderRadius: 14, borderWidth: 1.5,
     borderColor: COLORS.navy, overflow: 'hidden', marginBottom: 14,
+    width: '100%', maxWidth: '100%',
   },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.navy, paddingVertical: 12, paddingHorizontal: 16 },
   summaryHeaderTitle: { color: COLORS.white, fontWeight: '800', fontSize: 13.5 },

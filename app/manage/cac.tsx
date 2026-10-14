@@ -41,6 +41,7 @@ export default function ManageCAC() {
   // Pricing state
   const [pricings, setPricings] = useState<any[]>([]);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [originalPriceDrafts, setOriginalPriceDrafts] = useState<Record<string, string>>({});
   const [tinFeeDraft, setTinFeeDraft] = useState('3000');
   const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
 
@@ -76,6 +77,32 @@ export default function ManageCAC() {
             price: 7500,
             active: true
           });
+        }
+
+        // Fetch custom discount & original price data from app_settings
+        try {
+          const { data: settingsData } = await supabase.from('app_settings').select('key, value').like('key', 'cac_price_%');
+          if (settingsData) {
+            const metaMap: Record<string, any> = {};
+            settingsData.forEach(s => {
+              try {
+                metaMap[s.key] = JSON.parse(s.value);
+              } catch (_) {
+                metaMap[s.key] = { price: parseFloat(s.value) };
+              }
+            });
+
+            allPricings = allPricings.map(p => {
+              const meta = metaMap[`cac_price_${p.id}`];
+              return {
+                ...p,
+                original_price: p.original_price ?? (meta?.original_price || null),
+                discount_label: p.discount_label ?? (meta?.discount_label || null),
+              };
+            });
+          }
+        } catch (err) {
+          console.log("Pricing meta fetch err:", err);
         }
 
         setPricings(allPricings);
@@ -125,21 +152,50 @@ export default function ManageCAC() {
   const savePrice = async (id: string, name?: string) => {
     const currentPriceObj = pricings.find(p => p.id === id);
     const draftVal = priceDrafts[id] !== undefined ? priceDrafts[id] : currentPriceObj?.price?.toString();
+    const draftOrigVal = originalPriceDrafts[id] !== undefined 
+      ? originalPriceDrafts[id] 
+      : (currentPriceObj?.original_price !== undefined && currentPriceObj?.original_price !== null ? currentPriceObj.original_price.toString() : '');
+    
     const p = parseFloat(draftVal || '');
     if (isNaN(p) || p < 0) return Alert.alert('Error', 'Please enter a valid price amount');
+
+    const origP = draftOrigVal.trim() ? parseFloat(draftOrigVal) : null;
+    let discountLabel = '';
+    if (origP && origP > p) {
+      const pct = Math.round(((origP - p) / origP) * 100);
+      discountLabel = `${pct}% OFF`;
+    }
 
     setSavingPriceId(id);
     try {
       const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('provider-wallet-action', {
-        body: { action: 'save_cac_price', id, price: p, name: name || currentPriceObj?.name }
+        body: { 
+          action: 'save_cac_price', 
+          id, 
+          price: p, 
+          original_price: origP,
+          discount_label: discountLabel,
+          name: name || currentPriceObj?.name 
+        }
       });
 
       if (edgeErr || edgeData?.error) {
-        const { error: directErr } = await supabase.from('cac_pricing').update({ price: p }).eq('id', id);
-        if (directErr) throw new Error(edgeData?.error || edgeErr?.message || directErr.message);
+        const updatePayload: any = { price: p };
+        if (origP !== null && !isNaN(origP)) updatePayload.original_price = origP;
+        if (discountLabel) updatePayload.discount_label = discountLabel;
+
+        const { error: directErr } = await supabase.from('cac_pricing').update(updatePayload).eq('id', id);
+        if (directErr) {
+          await supabase.from('cac_pricing').update({ price: p }).eq('id', id);
+        }
+        await supabase.from('app_settings').upsert({
+          key: `cac_price_${id}`,
+          value: JSON.stringify({ price: p, original_price: origP, discount_label: discountLabel }),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
       }
 
-      Alert.alert('Success', `Price updated to ₦${p.toLocaleString()} successfully!`);
+      Alert.alert('Success', `Price updated to ₦${p.toLocaleString()}${origP ? ` (Original: ₦${origP.toLocaleString()})` : ''} successfully!`);
       fetchData();
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to update price');
@@ -585,26 +641,91 @@ export default function ManageCAC() {
 
             {pricings.map((p) => {
               const isSaving = savingPriceId === p.id;
+              const currentPrice = priceDrafts[p.id] !== undefined ? priceDrafts[p.id] : p.price?.toString();
+              const currentOrig = originalPriceDrafts[p.id] !== undefined 
+                ? originalPriceDrafts[p.id] 
+                : (p.original_price !== undefined && p.original_price !== null ? p.original_price.toString() : '');
+
+              const numPrice = parseFloat(currentPrice || '0');
+              const numOrig = parseFloat(currentOrig || '0');
+              const hasDiscount = numOrig > numPrice && numPrice > 0;
+              const discountPct = hasDiscount ? Math.round(((numOrig - numPrice) / numOrig) * 100) : 0;
+              const savingsAmt = hasDiscount ? numOrig - numPrice : 0;
+
               return (
-                <View key={p.id} style={s.priceCard}>
-                  <Text style={s.priceName}>{p.name}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ color: COLORS.textSub, fontWeight: '600' }}>₦</Text>
-                    <TextInput 
-                      style={s.priceInput} 
-                      defaultValue={p.price.toString()} 
-                      keyboardType="numeric"
-                      onChangeText={(val) => setPriceDrafts(prev => ({ ...prev, [p.id]: val }))}
-                    />
+                <View key={p.id} style={s.priceManageCard}>
+                  {/* Service Header Row */}
+                  <View style={s.priceManageHeader}>
+                    <View style={s.priceServiceIcon}>
+                      <Ionicons name="briefcase-outline" size={16} color={COLORS.navy} />
+                    </View>
+                    <Text style={s.priceManageName}>{p.name}</Text>
+                  </View>
+
+                  {/* Inputs Grid */}
+                  <View style={s.priceInputGrid}>
+                    {/* Original Price */}
+                    <View style={s.priceInputCol}>
+                      <Text style={s.priceInputColLabel}>Original Price (Asali)</Text>
+                      <View style={s.priceInputFieldWrapper}>
+                        <Text style={s.priceNairaPrefix}>₦</Text>
+                        <TextInput 
+                          style={s.priceManageInput} 
+                          placeholder="e.g. 35000"
+                          placeholderTextColor={COLORS.textSub}
+                          defaultValue={currentOrig} 
+                          keyboardType="numeric"
+                          onChangeText={(val) => setOriginalPriceDrafts(prev => ({ ...prev, [p.id]: val }))}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Selling / Discount Price */}
+                    <View style={s.priceInputCol}>
+                      <Text style={s.priceInputColLabel}>Selling / Final Price</Text>
+                      <View style={[s.priceInputFieldWrapper, { borderColor: COLORS.gold }]}>
+                        <Text style={[s.priceNairaPrefix, { color: COLORS.gold }]}>₦</Text>
+                        <TextInput 
+                          style={[s.priceManageInput, { fontWeight: '700' }]} 
+                          placeholderTextColor={COLORS.textSub}
+                          defaultValue={p.price.toString()} 
+                          keyboardType="numeric"
+                          onChangeText={(val) => setPriceDrafts(prev => ({ ...prev, [p.id]: val }))}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Savings & Action Row */}
+                  <View style={s.priceCardFooterRow}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      {hasDiscount ? (
+                        <View style={s.discountPreviewPill}>
+                          <Ionicons name="pricetag" size={12} color="#15803d" />
+                          <Text style={s.discountPreviewTxt}>
+                            Save ₦{savingsAmt.toLocaleString()} ({discountPct}% OFF)
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 11, color: COLORS.textSub }}>
+                          {numOrig ? 'No active discount' : 'No original price set'}
+                        </Text>
+                      )}
+                    </View>
+
                     <TouchableOpacity 
                       style={[s.savePriceBtn, isSaving && { opacity: 0.7 }]} 
                       onPress={() => savePrice(p.id, p.name)}
                       disabled={isSaving}
+                      activeOpacity={0.8}
                     >
                       {isSaving ? (
                         <ActivityIndicator size="small" color="#fff" />
                       ) : (
-                        <Text style={s.savePriceBtnTxt}>Save</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="checkmark-circle-outline" size={14} color="#fff" />
+                          <Text style={s.savePriceBtnTxt}>Save</Text>
+                        </View>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -914,8 +1035,106 @@ const s = StyleSheet.create({
   infoBanner: { flexDirection: 'row', backgroundColor: '#e0e7ff', padding: 12, borderRadius: 10, marginBottom: 16, borderWidth: 1, borderColor: '#c7d2fe', alignItems: 'center' },
   infoBannerTitle: { fontSize: 12, fontWeight: '700', color: COLORS.navy, marginBottom: 2 },
   infoBannerText: { fontSize: 12, color: COLORS.textSub, lineHeight: 14 },
-  savePriceBtn: { backgroundColor: COLORS.navy, paddingHorizontal: 12, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  savePriceBtn: { backgroundColor: COLORS.navy, paddingHorizontal: 12, height: 34, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   savePriceBtnTxt: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
+
+  // Modern Mobile-First Pricing Management Cards
+  priceManageCard: {
+    backgroundColor: COLORS.white,
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  priceManageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  priceServiceIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priceManageName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.navy,
+    flex: 1,
+  },
+  priceInputGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  priceInputCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  priceInputColLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSub,
+    marginBottom: 5,
+  },
+  priceInputFieldWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    height: 38,
+  },
+  priceNairaPrefix: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textSub,
+    marginRight: 4,
+  },
+  priceManageInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.navy,
+    paddingVertical: 0,
+    height: '100%',
+  },
+  priceCardFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+  },
+  discountPreviewPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  discountPreviewTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803d',
+  },
   
   viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' },
   viewerHeader: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 20, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, zIndex: 10 },

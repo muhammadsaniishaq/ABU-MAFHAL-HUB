@@ -136,19 +136,42 @@ serve(async (req: Request) => {
 
     // ── ACTION: Save CAC Service Pricing ───────────────────────────────────
     if (action === 'save_cac_price') {
-      const { id, price, name } = body;
+      const { id, price, name, original_price, discount_label } = body;
       const p = parseFloat(price);
       if (isNaN(p) || p < 0) {
         return jsonOk({ error: 'Please specify a valid numeric price' });
       }
 
+      const origP = original_price !== undefined && original_price !== null && original_price !== ''
+        ? parseFloat(original_price)
+        : null;
+
       let updatedData = null;
+      const updatePayload: Record<string, any> = { price: p };
+      if (origP !== null && !isNaN(origP)) {
+        updatePayload.original_price = origP;
+      }
+      if (discount_label !== undefined) {
+        updatePayload.discount_label = discount_label;
+      }
+
       if (id && !id.startsWith('cac-certificate-retrieval-default')) {
-        const { data, error } = await supabaseAdmin
+        let { data, error } = await supabaseAdmin
           .from('cac_pricing')
-          .update({ price: p })
+          .update(updatePayload)
           .eq('id', id)
           .select();
+
+        if (error && (error.message?.includes('original_price') || error.message?.includes('discount_label'))) {
+          const fallback = await supabaseAdmin
+            .from('cac_pricing')
+            .update({ price: p })
+            .eq('id', id)
+            .select();
+          data = fallback.data;
+          error = fallback.error;
+        }
+
         if (error) return jsonOk({ error: error.message });
         updatedData = data;
       } else {
@@ -167,14 +190,18 @@ serve(async (req: Request) => {
       try {
         await supabaseAdmin.from('app_settings').upsert({
           key: `cac_price_${id || 'retrieval'}`,
-          value: String(p),
+          value: JSON.stringify({
+            price: p,
+            original_price: origP && !isNaN(origP) ? origP : null,
+            discount_label: discount_label || null
+          }),
           updated_at: new Date().toISOString()
         }, { onConflict: 'key' });
       } catch (_) {}
 
       return jsonOk({
         success: true,
-        message: 'CAC Price updated successfully in database',
+        message: 'CAC Price and discount updated successfully',
         data: updatedData
       });
     }

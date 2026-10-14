@@ -44,6 +44,8 @@ const NL= C.navyLight;// navy light bg
 const MODS = {
   operations: [
     { t:'Users Control',   i:'people',          r:'/manage/users',          c:N,  b:NL,  badge:0, tag:'Core' },
+    { t:'Transactions',    i:'receipt',         r:'/manage/transactions',   c:N,  b:NL,  tag:'Live' },
+    { t:'Splash Screens',  i:'phone-portrait',  r:'/manage/appearance?tab=splash', c:G, b:GL, tag:'New' },
     { t:'BVN Tasks',       i:'finger-print',     r:'/manage/bvn-tasks',      c:G,  b:GL,  badge:0, tag:'Identity' },
     { t:'NIN Tasks',       i:'card',             r:'/manage/nin-tasks',      c:N,  b:NL,  badge:0, tag:'Identity' },
     { t:'KYC Requests',    i:'id-card',          r:'/manage/kyc',            c:G,  b:GL,  badge:0 },
@@ -106,24 +108,26 @@ const MODS = {
 };
 
 const QUICK = [
-  { l:'Master Hub',  i:'ribbon',           r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
-  { l:'App Updates', i:'cloud-download',   r:'/manage/app-update',     c:G,  b:GL,  tag:'AI' },
-  { l:'Profits & Expenses', i:'calculator', r:'/manage/accounting',     c:G,  b:GL,  tag:'Super', sup:true },
-  { l:'Audit Logs',  i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
-  { l:'Users',       i:'people',           r:'/manage/users',          c:G,  b:GL },
-  { l:'Liquidity',   i:'wallet',           r:'/manage/liquidity',      c:N,  b:NL },
-  { l:'Data Plans',  i:'wifi',             r:'/manage/data-plans',     c:G,  b:GL },
-  { l:'Help Desk',   i:'chatbubbles',      r:'/manage/tickets',        c:N,  b:NL },
-  { l:'Broadcast',   i:'megaphone',        r:'/manage/communications', c:G,  b:GL },
-  { l:'KYC Queue',   i:'scan',             r:'/manage/kyc',            c:N,  b:NL },
-  { l:'Panic Room',  i:'warning',          r:'/manage/panic',          c:C.red, b:C.redL, sup:true },
+  { l:'Master Hub',     i:'ribbon',           r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
+  { l:'Transactions',   i:'receipt',          r:'/manage/transactions',   c:N,  b:NL,  tag:'Live' },
+  { l:'Splash Slides',  i:'phone-portrait',   r:'/manage/appearance?tab=splash', c:G, b:GL, tag:'New' },
+  { l:'App Updates',    i:'cloud-download',   r:'/manage/app-update',     c:G,  b:GL,  tag:'AI' },
+  { l:'Profits & Exp',  i:'calculator',       r:'/manage/accounting',     c:G,  b:GL,  tag:'Super', sup:true },
+  { l:'Audit Logs',     i:'shield-checkmark', r:'/manage/logs',           c:G,  b:GL,  tag:'Live' },
+  { l:'Users',          i:'people',           r:'/manage/users',          c:G,  b:GL },
+  { l:'Liquidity',      i:'wallet',           r:'/manage/liquidity',      c:N,  b:NL },
+  { l:'Data Plans',     i:'wifi',             r:'/manage/data-plans',     c:G,  b:GL },
+  { l:'Help Desk',      i:'chatbubbles',      r:'/manage/tickets',        c:N,  b:NL },
+  { l:'Broadcast',      i:'megaphone',        r:'/manage/communications', c:G,  b:GL },
+  { l:'KYC Queue',      i:'scan',             r:'/manage/kyc',            c:N,  b:NL },
+  { l:'Panic Room',     i:'warning',          r:'/manage/panic',          c:C.red, b:C.redL, sup:true },
 ];
 
 const DOCK = [
   { i:'grid',        r:'/manage',              l:'Home' },
+  { i:'receipt',     r:'/manage/transactions', l:'Txns' },
   { i:'people',      r:'/manage/users',        l:'Users' },
   { i:'wallet',      r:'/manage/liquidity',    l:'Funds' },
-  { i:'chatbubbles', r:'/manage/tickets',      l:'Tickets' },
   { i:'settings',    r:'/manage/settings',     l:'Settings' },
 ];
 
