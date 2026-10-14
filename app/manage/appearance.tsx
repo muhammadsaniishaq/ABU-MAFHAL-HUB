@@ -699,10 +699,36 @@ export default function AppDesigner() {
 
             {/* Slides list */}
             {splashSlides.length === 0 ? (
-              <View style={[s.card, { alignItems: 'center', paddingVertical: 32 }]}>
-                <Ionicons name="images-outline" size={40} color={T.border} />
-                <Text style={{ color: T.textSub, fontWeight: '700', marginTop: 10, fontSize: 13 }}>No custom slides yet</Text>
-                <Text style={{ color: T.textSub, fontSize: 11, marginTop: 4, textAlign: 'center' }}>Default app slides will be shown until you upload custom ones</Text>
+              <View style={[s.card, { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 }]}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: T.goldL, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <Ionicons name="sparkles" size={24} color={T.gold} />
+                </View>
+                <Text style={{ color: T.navy, fontWeight: '800', fontSize: 15, textAlign: 'center' }}>
+                  Luxury 3-Screen 3D Splash Active
+                </Text>
+                <Text style={{ color: T.textSub, fontSize: 12, marginTop: 4, textAlign: 'center', lineHeight: 18 }}>
+                  Screen 1: Global Digital Hub (3D Globe & Experience Loader){'\n'}
+                  Screen 2: Your All-in-One Digital Hub (3D Phone with Services){'\n'}
+                  Screen 3: Value Props, Skyline & Fast Onboarding
+                </Text>
+
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 14,
+                    paddingHorizontal: 16,
+                    paddingVertical: 9,
+                    borderRadius: 20,
+                    backgroundColor: T.navy,
+                  }}
+                  onPress={() => router.push('/?preview=splash' as any)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="play-circle-outline" size={16} color={T.gold} />
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Preview Splash Now</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               splashSlides.map((slide, idx) => (
