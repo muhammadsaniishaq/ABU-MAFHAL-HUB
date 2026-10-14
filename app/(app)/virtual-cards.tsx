@@ -402,7 +402,7 @@ export default function VirtualCardsScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#070D1E" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
 
       {/* ── TOAST NOTIFICATION ── */}
       {toastMessage && (
@@ -414,15 +414,26 @@ export default function VirtualCardsScreen() {
       {/* ── TOP HEADER ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.headerBtn} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={22} color="#0F172A" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Virtual Card</Text>
         <TouchableOpacity
-          onPress={() => setShowMyCardsModal(true)}
+          onPress={() => {
+            if (cards.length > 1) {
+              setShowMyCardsModal(true);
+            } else {
+              setCreateStep(1);
+              setShowCreateModal(true);
+            }
+          }}
           style={s.headerBtn}
           activeOpacity={0.7}
         >
-          <Ionicons name="ellipsis-horizontal" size={22} color="#FFFFFF" />
+          <Ionicons
+            name={cards.length > 1 ? "layers-outline" : "add"}
+            size={22}
+            color="#0F172A"
+          />
         </TouchableOpacity>
       </View>
 
@@ -430,6 +441,7 @@ export default function VirtualCardsScreen() {
         style={s.scrollArea}
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         {loading ? (
           <View style={s.loaderBox}>
@@ -446,9 +458,6 @@ export default function VirtualCardsScreen() {
               onPress={() => setShowDetailsModal(true)}
               style={s.cardStackHeroContainer}
             >
-              {/* Soft Ambient Glow behind the card */}
-              <View style={s.cardAmbientGlow} />
-
               {renderPhysicalCard(selectedCard, true)}
 
               {/* Dynamic Credentials Glass Overlay on demand */}
@@ -463,10 +472,10 @@ export default function VirtualCardsScreen() {
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={{ padding: 4 }}
                     >
-                      <Ionicons name="copy-outline" size={17} color="#F59E0B" />
+                      <Ionicons name="copy-outline" size={16} color="#F59E0B" />
                     </TouchableOpacity>
                   </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                     <Text style={s.overlayCardMeta}>HOLDER: {(selectedCard.card_holder_name || userName).toUpperCase()}</Text>
                     <Text style={s.overlayCardMeta}>EXP: {selectedCard.expiry_month}/{selectedCard.expiry_year}</Text>
                     <TouchableOpacity
@@ -474,38 +483,55 @@ export default function VirtualCardsScreen() {
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 2 }}
                     >
                       <Text style={s.overlayCardMeta}>CVV: {selectedCard.cvv || '890'}</Text>
-                      <Ionicons name="copy-outline" size={13} color="#F59E0B" />
+                      <Ionicons name="copy-outline" size={12} color="#F59E0B" />
                     </TouchableOpacity>
                   </View>
                 </View>
               )}
             </TouchableOpacity>
 
+            {/* Pagination dots if user has multiple cards */}
+            {cards.length > 1 && (
+              <View style={s.cardPaginationRow}>
+                {cards.map(c => (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => {
+                      setSelectedCard(c);
+                      loadCardTransactions(c.id, c.user_id);
+                    }}
+                    style={[s.cardPaginationDot, c.id === selectedCard.id && s.cardPaginationDotActive]}
+                  />
+                ))}
+              </View>
+            )}
+
             {/* ══════════════════════════════════════════════════════════
-                 2. CARD BALANCE & TOP UP (MATCHING LUXURY MOCKUP)
+                 2. CARD BALANCE & TOP UP (COMPACT HORIZONTAL BAR)
                  ══════════════════════════════════════════════════════════ */}
             <View style={s.balanceCard}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={s.balanceLabel}>Card Balance</Text>
                   <TouchableOpacity onPress={() => setHideBalance(!hideBalance)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={15} color="#94A3B8" />
+                    <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={14} color="#64748B" />
                   </TouchableOpacity>
                 </View>
 
-                <Text style={s.balanceAmount}>
-                  {hideBalance
-                    ? '••••••'
-                    : `${selectedCard.currency === 'USD' ? '$' : '₦'}${Number(selectedCard.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                </Text>
-
-                <Text style={s.balanceSub}>
-                  {hideBalance
-                    ? '••••••••••'
-                    : selectedCard.currency === 'USD'
-                      ? `≈ ₦${Math.round((selectedCard.balance || 0) * usdRate).toLocaleString()}`
-                      : `≈ $${((selectedCard.balance || 0) / usdRate).toFixed(2)}`}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 1 }}>
+                  <Text style={s.balanceAmount}>
+                    {hideBalance
+                      ? '••••••'
+                      : `${selectedCard.currency === 'USD' ? '$' : '₦'}${Number(selectedCard.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </Text>
+                  <Text style={s.balanceSub}>
+                    {hideBalance
+                      ? '••••••••••'
+                      : selectedCard.currency === 'USD'
+                        ? `≈ ₦${Math.round((selectedCard.balance || 0) * usdRate).toLocaleString()}`
+                        : `≈ $${((selectedCard.balance || 0) / usdRate).toFixed(2)}`}
+                  </Text>
+                </View>
               </View>
 
               <TouchableOpacity
@@ -513,13 +539,13 @@ export default function VirtualCardsScreen() {
                 style={s.topUpBtn}
                 activeOpacity={0.85}
               >
-                <Ionicons name="add" size={18} color="#070D1E" />
+                <Ionicons name="add" size={16} color="#070D1E" />
                 <Text style={s.topUpBtnTxt}>Top Up</Text>
               </TouchableOpacity>
             </View>
 
             {/* ══════════════════════════════════════════════════════════
-                 3. QUICK ACTION 4-ICON GRID (MATCHING LUXURY MOCKUP)
+                 3. QUICK ACTION 4-ICON GRID (COMPACT SINGLE ROW)
                  ══════════════════════════════════════════════════════════ */}
             <View style={s.actionsGrid}>
               {/* Show Details */}
@@ -529,9 +555,9 @@ export default function VirtualCardsScreen() {
                 activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
-                  <Ionicons name="eye-outline" size={20} color="#0D1B3E" />
+                  <Ionicons name="eye-outline" size={18} color="#0F172A" />
                 </View>
-                <Text style={s.actionTileTxt}>Show Details</Text>
+                <Text style={s.actionTileTxt}>Details</Text>
               </TouchableOpacity>
 
               {/* Freeze Card */}
@@ -543,150 +569,102 @@ export default function VirtualCardsScreen() {
                 <View style={[s.actionTileIconBox, selectedCard.status === 'frozen' && { backgroundColor: '#EFF6FF' }]}>
                   <Ionicons
                     name={selectedCard.status === 'frozen' ? 'lock-open-outline' : 'snow-outline'}
-                    size={20}
-                    color={selectedCard.status === 'frozen' ? '#2563EB' : '#0D1B3E'}
+                    size={18}
+                    color={selectedCard.status === 'frozen' ? '#2563EB' : '#0F172A'}
                   />
                 </View>
                 <Text style={s.actionTileTxt}>
-                  {selectedCard.status === 'frozen' ? 'Unfreeze' : 'Freeze Card'}
+                  {selectedCard.status === 'frozen' ? 'Unfreeze' : 'Freeze'}
                 </Text>
               </TouchableOpacity>
 
-              {/* Card Settings */}
+              {/* Card Settings / Limits */}
               <TouchableOpacity
-                onPress={() => setShowSettingsModal(true)}
+                onPress={() => setShowLimitModal(true)}
                 style={s.actionTile}
                 activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
-                  <Ionicons name="settings-outline" size={20} color="#0D1B3E" />
+                  <Ionicons name="options-outline" size={18} color="#0F172A" />
                 </View>
-                <Text style={s.actionTileTxt}>Card Settings</Text>
+                <Text style={s.actionTileTxt}>Limits</Text>
               </TouchableOpacity>
 
-              {/* Transactions */}
+              {/* Transactions History */}
               <TouchableOpacity
                 onPress={() => setShowTransactionsModal(true)}
                 style={s.actionTile}
                 activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
-                  <Ionicons name="receipt-outline" size={20} color="#0D1B3E" />
+                  <Ionicons name="receipt-outline" size={18} color="#0F172A" />
                 </View>
-                <Text style={s.actionTileTxt}>Transactions</Text>
+                <Text style={s.actionTileTxt}>History</Text>
               </TouchableOpacity>
             </View>
 
             {/* ══════════════════════════════════════════════════════════
-                 4. "GET A NEW CARD" CROWN CTA BANNER (MATCHING MOCKUP)
+                 4. BOTTOM EXECUTIVE CARD: ACTIVITY / TRUST & UTILITY
                  ══════════════════════════════════════════════════════════ */}
-            <TouchableOpacity
-              onPress={() => {
-                setCreateStep(1);
-                setShowCreateModal(true);
-              }}
-              style={s.getNewCardBanner}
-              activeOpacity={0.88}
-            >
-              <Image
-                source={require('../../assets/images/vc_crown_icon.png')}
-                style={s.crownIconImg}
-                resizeMode="contain"
-              />
-
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={s.getNewCardTitle}>Get a New Card</Text>
-                <Text style={s.getNewCardSubtitle}>
-                  Create another virtual card in seconds for your online payments.
-                </Text>
-              </View>
-
-              <View style={s.arrowCircleBtn}>
-                <Ionicons name="arrow-forward" size={17} color="#0D1B3E" />
-              </View>
-            </TouchableOpacity>
-
-            {/* ══════════════════════════════════════════════════════════
-                 5. RECENT ACTIVITY PREVIEW (MATCHING SCREEN 1 & 9)
-                 ══════════════════════════════════════════════════════════ */}
-            <View style={s.recentTxBox}>
-              <View style={s.recentTxHeader}>
-                <Text style={s.recentTxTitle}>Recent Transactions</Text>
+            <View style={s.bottomExecutiveCard}>
+              <View style={s.bottomExecHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="time-outline" size={15} color="#0F172A" />
+                  <Text style={s.bottomExecTitle}>Recent Activity</Text>
+                </View>
                 <TouchableOpacity onPress={() => setShowTransactionsModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={s.recentTxViewAll}>View All</Text>
+                  <Text style={s.bottomExecViewAll}>View All ›</Text>
                 </TouchableOpacity>
               </View>
 
               {transactions.length > 0 ? (
-                transactions.slice(0, 3).map((t) => {
+                transactions.slice(0, 2).map((t) => {
                   const meta = MERCHANT_ICONS[t.merchant_name] || { icon: 'card-outline', color: '#64748B', bg: '#F8FAFC' };
                   return (
-                    <View key={t.id} style={s.recentTxRow}>
-                      <View style={[s.recentTxIconCircle, { backgroundColor: meta.bg }]}>
-                        <Ionicons name={meta.icon} size={18} color={meta.color} />
+                    <View key={t.id} style={s.miniTxRow}>
+                      <View style={[s.miniTxIcon, { backgroundColor: meta.bg }]}>
+                        <Ionicons name={meta.icon} size={15} color={meta.color} />
                       </View>
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={s.recentTxMerchant}>{t.merchant_name}</Text>
-                        <Text style={s.recentTxTime}>
-                          {new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} • {t.currency === 'USD' ? '$' : '₦'}{Number(t.amount).toFixed(2)}
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={s.miniTxMerchant} numberOfLines={1}>{t.merchant_name}</Text>
+                        <Text style={s.miniTxDate}>
+                          {new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                         </Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={s.recentTxAmount}>-${Number(t.amount || 0).toFixed(2)}</Text>
-                        <View style={s.recentTxBadge}>
-                          <Text style={s.recentTxBadgeTxt}>Successful</Text>
-                        </View>
-                      </View>
+                      <Text style={s.miniTxAmount}>-${Number(t.amount || 0).toFixed(2)}</Text>
                     </View>
                   );
                 })
               ) : (
-                <View style={{ paddingVertical: 14, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, color: '#94A3B8' }}>No transactions recorded yet.</Text>
+                <View style={s.miniTrustBox}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Ionicons name="shield-checkmark" size={14} color="#16A34A" />
+                      <Text style={s.miniTrustTitle}>3D Secure Protected</Text>
+                    </View>
+                    <Text style={s.miniTrustSub}>Accepted on Amazon, Netflix, Apple & Google Play</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setCreateStep(1);
+                      setShowCreateModal(true);
+                    }}
+                    style={s.miniNewCardBtn}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="add" size={14} color="#0F172A" />
+                    <Text style={s.miniNewCardTxt}>New Card</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
-
-            {/* My Cards Link (if multiple cards) */}
-            {cards.length > 1 && (
-              <View style={s.myCardsBar}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <Text style={s.myCardsBarTitle}>My Virtual Cards ({cards.length})</Text>
-                  <TouchableOpacity onPress={() => setShowMyCardsModal(true)}>
-                    <Text style={s.viewAllTxt}>View All</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-                  {cards.map(c => {
-                    const isSelected = c.id === selectedCard.id;
-                    return (
-                      <TouchableOpacity
-                        key={c.id}
-                        onPress={() => {
-                          setSelectedCard(c);
-                          loadCardTransactions(c.id, c.user_id);
-                        }}
-                        style={[s.miniCardPill, isSelected && s.miniCardPillActive]}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={{ fontSize: 13 }}>{c.currency === 'USD' ? '🇺🇸' : '🇳🇬'}</Text>
-                        <Text style={[s.miniCardPillTxt, isSelected && { color: '#0D1B3E', fontWeight: '800' }]}>
-                          {c.card_name || c.currency} (•••• {c.card_number_masked.slice(-4)})
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
           </>
         ) : (
           /* ══════════════════════════════════════════════════════════
-               PROFESSIONAL EMPTY STATE: GET YOUR FIRST CARD
+               PROFESSIONAL EMPTY STATE: GET YOUR FIRST CARD (ONE PAGE)
                ══════════════════════════════════════════════════════════ */
           <View style={s.emptyStateBox}>
-            {/* Dual Floating Card Preview */}
+            {/* Dual Floating Card Preview (Compact) */}
             <View style={s.emptyCardStack}>
               <View style={s.emptyRearCard}>
                 <Image
@@ -704,16 +682,16 @@ export default function VirtualCardsScreen() {
               </View>
             </View>
 
-            <Text style={s.emptyTitle}>Get Your Virtual Card</Text>
+            <Text style={s.emptyTitle}>Instant Virtual Card</Text>
             <Text style={s.emptySubtitle}>
-              Create your personal USD Visa or NGN Mastercard in seconds. Shop globally on Amazon, Netflix, AliExpress, Apple Store, Facebook Ads & Google Play.
+              Create your USD Visa or NGN Mastercard for global shopping, ads, and subscriptions.
             </Text>
 
             {/* Wallet Balance Info */}
             <View style={s.emptyWalletPill}>
-              <Ionicons name="wallet-outline" size={17} color="#F59E0B" />
+              <Ionicons name="wallet-outline" size={15} color="#D97706" />
               <Text style={s.emptyWalletTxt}>
-                Available Wallet Balance: <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>₦{walletBalance.toLocaleString()}</Text>
+                Available Wallet Balance: <Text style={{ color: '#0F172A', fontWeight: '800' }}>₦{walletBalance.toLocaleString()}</Text>
               </Text>
             </View>
 
@@ -726,42 +704,24 @@ export default function VirtualCardsScreen() {
               style={s.emptyCtaBtn}
               activeOpacity={0.88}
             >
-              <Ionicons name="card-outline" size={20} color="#070D1E" />
+              <Ionicons name="card-outline" size={18} color="#070D1E" />
               <Text style={s.emptyCtaBtnTxt}>Create Virtual Card Now</Text>
-              <Ionicons name="arrow-forward" size={18} color="#070D1E" />
+              <Ionicons name="arrow-forward" size={16} color="#070D1E" />
             </TouchableOpacity>
 
-            {/* Feature Highlights */}
-            <View style={s.emptyFeaturesGrid}>
-              <View style={s.emptyFeatureItem}>
-                <View style={s.emptyFeatureIcon}>
-                  <Ionicons name="globe" size={18} color="#F59E0B" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={s.emptyFeatureTitle}>Global USD Acceptance</Text>
-                  <Text style={s.emptyFeatureSub}>Pay seamlessly anywhere Visa or Mastercard is accepted.</Text>
-                </View>
+            {/* 3 Compact Feature Pills */}
+            <View style={s.emptyFeaturesRow}>
+              <View style={s.emptyFeatureChip}>
+                <Ionicons name="globe-outline" size={14} color="#D97706" />
+                <Text style={s.emptyFeatureChipTxt}>Global Acceptance</Text>
               </View>
-
-              <View style={s.emptyFeatureItem}>
-                <View style={s.emptyFeatureIcon}>
-                  <Ionicons name="flash" size={18} color="#F59E0B" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={s.emptyFeatureTitle}>Instant 3D Secure OTP</Text>
-                  <Text style={s.emptyFeatureSub}>Real-time OTP via PayVessel for safe online checkouts.</Text>
-                </View>
+              <View style={s.emptyFeatureChip}>
+                <Ionicons name="flash-outline" size={14} color="#D97706" />
+                <Text style={s.emptyFeatureChipTxt}>Instant 3D OTP</Text>
               </View>
-
-              <View style={s.emptyFeatureItem}>
-                <View style={s.emptyFeatureIcon}>
-                  <Ionicons name="lock-closed" size={18} color="#F59E0B" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={s.emptyFeatureTitle}>Total Security & Control</Text>
-                  <Text style={s.emptyFeatureSub}>Freeze, unfreeze, and set spending limits in one tap.</Text>
-                </View>
-              </View>
+              <View style={s.emptyFeatureChip}>
+                <Ionicons name="lock-closed-outline" size={14} color="#D97706" />
+                <Text style={s.emptyFeatureChipTxt}>Freeze Anytime</Text>
             </View>
           </View>
         )}
@@ -1700,24 +1660,24 @@ export default function VirtualCardsScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#070D1E',
+    backgroundColor: '#F8FAFC',
   },
   toast: {
     position: 'absolute',
-    top: 54,
+    top: 50,
     alignSelf: 'center',
-    backgroundColor: '#D97706',
+    backgroundColor: '#0F172A',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 24,
     zIndex: 999,
     shadowColor: '#000',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
-    elevation: 10,
+    elevation: 6,
   },
   toastTxt: {
-    color: '#FFFFFF',
+    color: '#F59E0B',
     fontWeight: '800',
     fontSize: 13,
   },
@@ -1727,34 +1687,40 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingBottom: 14,
-    backgroundColor: '#070D1E',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 48 : 20,
+    paddingBottom: 10,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   headerBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
+    color: '#0F172A',
+    letterSpacing: -0.2,
   },
 
   scrollArea: {
     flex: 1,
-    backgroundColor: '#070D1E',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40,
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 14,
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
 
   loaderBox: {
@@ -1764,7 +1730,7 @@ const s = StyleSheet.create({
   loaderTxt: {
     marginTop: 12,
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#64748B',
     fontWeight: '600',
   },
 
@@ -1773,29 +1739,22 @@ const s = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 4,
+    marginVertical: 2,
     position: 'relative',
-  },
-  cardAmbientGlow: {
-    position: 'absolute',
-    width: '80%',
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(217, 119, 6, 0.08)',
-    top: 30,
   },
   liveCardWrapper: {
-    width: '100%',
-    aspectRatio: 1.5,
-    borderRadius: 18,
+    width: '92%',
+    maxWidth: 340,
+    aspectRatio: 1.586,
+    borderRadius: 16,
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
     alignSelf: 'center',
-    maxWidth: 420,
   },
   liveCardBg: {
     width: '100%',
@@ -1805,7 +1764,7 @@ const s = StyleSheet.create({
     position: 'absolute',
     top: '9%',
     right: '8%',
-    backgroundColor: 'rgba(7, 13, 30, 0.72)',
+    backgroundColor: 'rgba(7, 13, 30, 0.75)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
@@ -1825,13 +1784,13 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   liveCardNumberTxt: {
-    fontSize: 16.5,
+    fontSize: 15.5,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 2.8,
+    letterSpacing: 2.6,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   liveCardExpiryBox: {
@@ -1840,7 +1799,7 @@ const s = StyleSheet.create({
     left: '58%',
   },
   liveCardExpiryTxt: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#FFFFFF',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
@@ -1856,10 +1815,10 @@ const s = StyleSheet.create({
     maxWidth: '56%',
   },
   liveCardHolderTxt: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -1873,355 +1832,354 @@ const s = StyleSheet.create({
   },
   liveCardFrozenTxt: {
     color: '#93C5FD',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   cardActiveDetailsOverlay: {
     position: 'absolute',
-    bottom: 8,
-    left: 14,
-    right: 14,
-    backgroundColor: 'rgba(7, 13, 30, 0.94)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
+    bottom: 6,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.6)',
-    shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 6,
+    borderColor: 'rgba(245, 158, 11, 0.5)',
   },
   overlayCardNumber: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1.8,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   overlayCardMeta: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#F59E0B',
   },
 
-  // ── Professional Empty State ──
+  // Pagination for multiple cards
+  cardPaginationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  cardPaginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#CBD5E1',
+  },
+  cardPaginationDotActive: {
+    width: 16,
+    backgroundColor: '#D97706',
+  },
+
+  // ── Balance Card (Compact & High Contrast) ──
+  balanceCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  balanceLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  balanceAmount: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+  },
+  balanceSub: {
+    fontSize: 11.5,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  topUpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  topUpBtnTxt: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#070D1E',
+  },
+
+  // ── 4 Action Tiles Grid (Sleek Compact Row) ──
+  actionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginVertical: 6,
+  },
+  actionTile: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  actionTileIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  actionTileTxt: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+
+  // ── Bottom Executive Card ──
+  bottomExecutiveCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  bottomExecHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  bottomExecTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  bottomExecViewAll: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  miniTxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  miniTxIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniTxMerchant: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  miniTxDate: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  miniTxAmount: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#EF4444',
+  },
+  miniTrustBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  miniTrustTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  miniTrustSub: {
+    fontSize: 10.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  miniNewCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    gap: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  miniNewCardTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+
+  // ── Professional Empty State (One Page) ──
   emptyStateBox: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingTop: 10,
-    paddingBottom: 40,
+    paddingBottom: 20,
     alignItems: 'center',
   },
   emptyCardStack: {
     width: '100%',
-    height: 220,
+    height: 140,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
+    marginVertical: 6,
     position: 'relative',
   },
   emptyRearCard: {
     position: 'absolute',
-    width: '90%',
-    height: 180,
-    top: 6,
-    transform: [{ rotate: '-8deg' }, { translateX: -12 }],
+    width: '80%',
+    height: 120,
+    top: 4,
+    transform: [{ rotate: '-7deg' }, { translateX: -10 }],
     opacity: 0.85,
   },
   emptyFrontCard: {
-    width: '92%',
-    height: 195,
-    top: 14,
-    transform: [{ rotate: '3deg' }, { translateX: 8 }],
-    shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
+    width: '84%',
+    height: 130,
+    top: 10,
+    transform: [{ rotate: '3deg' }, { translateX: 6 }],
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   emptyTemplateImg: {
     width: '100%',
     height: '100%',
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#0F172A',
     textAlign: 'center',
-    marginTop: 18,
-    letterSpacing: 0.2,
+    marginTop: 14,
+    letterSpacing: -0.3,
   },
   emptySubtitle: {
-    fontSize: 13,
-    color: '#94A3B8',
+    fontSize: 12,
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 19,
-    marginTop: 8,
-    paddingHorizontal: 8,
+    lineHeight: 17,
+    marginTop: 4,
+    paddingHorizontal: 12,
   },
   emptyWalletPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0D1B3E',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: '#E2E8F0',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 12,
     marginBottom: 8,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
   emptyWalletTxt: {
-    fontSize: 12.5,
-    color: '#94A3B8',
+    fontSize: 11.5,
+    color: '#64748B',
   },
   emptyCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F59E0B',
-    borderRadius: 26,
-    height: 52,
+    borderRadius: 24,
+    height: 46,
     width: '100%',
-    marginTop: 14,
-    marginBottom: 24,
-    gap: 8,
+    marginTop: 8,
+    marginBottom: 14,
+    gap: 6,
     shadowColor: '#F59E0B',
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   emptyCtaBtnTxt: {
-    fontSize: 15.5,
+    fontSize: 14,
     fontWeight: '800',
     color: '#070D1E',
   },
-  emptyFeaturesGrid: {
+  emptyFeaturesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
     width: '100%',
-    gap: 10,
   },
-  emptyFeatureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0D1B3E',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  emptyFeatureIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyFeatureTitle: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  emptyFeatureSub: {
-    fontSize: 11.5,
-    color: '#94A3B8',
-    marginTop: 2,
-    lineHeight: 16,
-  },
-
-  // ── Balance Card (Matching Mockup) ──
-  balanceCard: {
-    backgroundColor: '#0D1B3E',
-    borderRadius: 18,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  balanceLabel: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
-  balanceAmount: {
-    fontSize: 27,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    marginTop: 2,
-    letterSpacing: -0.5,
-  },
-  balanceSub: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  topUpBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 22,
-    gap: 4,
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  topUpBtnTxt: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#070D1E',
-  },
-
-  // ── 4 Action Tiles Grid (Matching Mockup) ──
-  actionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 14,
-  },
-  actionTile: {
+  emptyFeatureChip: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 2,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
-  actionTileIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  actionTileTxt: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#0D1B3E',
-    textAlign: 'center',
-  },
-
-  // ── Recent Activity Box (Matching Mockup) ──
-  recentTxBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  recentTxHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  recentTxTitle: {
-    fontSize: 14.5,
-    fontWeight: '800',
-    color: '#0D1B3E',
-  },
-  recentTxViewAll: {
-    fontSize: 12,
+  emptyFeatureChipTxt: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#D97706',
-  },
-  recentTxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  recentTxIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recentTxMerchant: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0D1B3E',
-  },
-  recentTxTime: {
-    fontSize: 10.5,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  recentTxAmount: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#EF4444',
-  },
-  recentTxBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-    marginTop: 2,
-  },
-  recentTxBadgeTxt: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#16A34A',
-  },
-
-  // ── "Get a New Card" Crown Banner (Matching Mockup) ──
-  getNewCardBanner: {
-    backgroundColor: '#0D1B3E',
-    borderRadius: 18,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    shadowColor: '#0D1B3E',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  crownIconImg: {
-    width: 34,
-    height: 34,
-  },
-  getNewCardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  getNewCardSubtitle: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  arrowCircleBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F59E0B',
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#0F172A',
   },
 
   // My Cards Bar
@@ -2232,7 +2190,7 @@ const s = StyleSheet.create({
   myCardsBarTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0D1B3E',
+    color: '#0F172A',
   },
   viewAllTxt: {
     fontSize: 12,
