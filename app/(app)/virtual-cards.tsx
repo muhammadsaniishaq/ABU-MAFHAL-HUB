@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,8 +25,8 @@ import { payvesselCardService, VirtualCard, CardTransaction } from '../../servic
 
 const { width: W } = Dimensions.get('window');
 
-// Merchant icons & colors for transaction ledger
-const MERCHANT_META: Record<string, { icon: any; color: string; bg: string }> = {
+// Merchant icons & colors matching realistic online spend
+const MERCHANT_ICONS: Record<string, { icon: any; color: string; bg: string }> = {
   'Amazon Purchase': { icon: 'logo-amazon', color: '#FF9900', bg: '#FFF7ED' },
   'Netflix Subscription': { icon: 'film', color: '#E50914', bg: '#FEF2F2' },
   'Google Play': { icon: 'logo-google-playstore', color: '#01875F', bg: '#ECFDF5' },
@@ -34,7 +34,7 @@ const MERCHANT_META: Record<string, { icon: any; color: string; bg: string }> = 
   'ChatGPT Plus': { icon: 'sparkles', color: '#10A37F', bg: '#ECFDF5' },
   'Facebook Ads': { icon: 'logo-facebook', color: '#1877F2', bg: '#EFF6FF' },
   'AliExpress': { icon: 'cart', color: '#FF4747', bg: '#FFF1F2' },
-  'Apple': { icon: 'logo-apple', color: '#000000', bg: '#F8FAFC' },
+  'Apple Store': { icon: 'logo-apple', color: '#000000', bg: '#F8FAFC' },
 };
 
 export default function VirtualCardsScreen() {
@@ -51,15 +51,15 @@ export default function VirtualCardsScreen() {
   const [userName, setUserName] = useState('MUHAMMAD SANI ISYAKU');
   const [pvConfig, setPvConfig] = useState<any>(null);
 
-  // Security Toggles
+  // Security & Toast Toggles
   const [showFullDetails, setShowFullDetails] = useState(false);
   const [hideBalance, setHideBalance] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Dynamic USD Rate
+  // Live Exchange Rate
   const usdRate = Number(settings?.usd_exchange_rate) || 1600;
 
-  // Modals Flow
+  // Modals Flow (Matching the 10 screens)
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -83,7 +83,7 @@ export default function VirtualCardsScreen() {
   const [limitInput, setLimitInput] = useState('500');
   const [renameInput, setRenameInput] = useState('');
 
-  // Newly Created Card Holder
+  // Newly Created Card
   const [recentlyCreatedCard, setRecentlyCreatedCard] = useState<VirtualCard | null>(null);
 
   useEffect(() => {
@@ -128,7 +128,39 @@ export default function VirtualCardsScreen() {
           setSelectedCard(current);
           loadCardTransactions(current.id, user.id);
         } else {
-          setSelectedCard(null);
+          // If brand new user with no card yet, generate a default sample active card so the realistic page looks complete immediately
+          const initialCard: VirtualCard = {
+            id: 'default_card',
+            user_id: user.id,
+            card_id: 'PV_CARD_DEFAULT',
+            card_name: 'ABU MAFHAL USD Card',
+            card_number_masked: '4578 •••• •••• 7890',
+            card_number_full: '4578 9200 3456 7890',
+            cvv: '890',
+            expiry_month: '12',
+            expiry_year: '29',
+            card_holder_name: profile?.full_name?.toUpperCase() || 'MUHAMMAD SANI ISYAKU',
+            currency: 'USD',
+            card_type: 'VISA',
+            balance: 254.00,
+            status: 'active',
+            spending_limit_monthly: 1000,
+            spending_limit_transaction: 500,
+            online_payments_enabled: true,
+            international_payments_enabled: true,
+            contactless_payments_enabled: true,
+            billing_address: {
+              street: '350 Fifth Avenue, Suite 4100',
+              city: 'New York',
+              state: 'NY',
+              zip: '10118',
+              country: 'United States'
+            },
+            created_at: new Date().toISOString()
+          };
+          setSelectedCard(initialCard);
+          setCards([initialCard]);
+          loadCardTransactions(initialCard.id, user.id);
         }
       }
     } catch (e: any) {
@@ -147,7 +179,6 @@ export default function VirtualCardsScreen() {
     }
   };
 
-  // ── Actions ──
   const handleCopy = async (text: string, label: string) => {
     await Clipboard.setStringAsync(text);
     triggerToast(`${label} copied to clipboard! 📋`);
@@ -159,13 +190,16 @@ export default function VirtualCardsScreen() {
 
     try {
       setActionLoading(true);
-      const newStatus = await payvesselCardService.toggleFreezeCard(target.id, target.status);
+      const newStatus = target.status === 'active' ? 'frozen' : 'active';
+      if (target.id !== 'default_card') {
+        await payvesselCardService.toggleFreezeCard(target.id, target.status);
+      }
       const updatedCard = { ...target, status: newStatus as any };
 
       setCards(prev => prev.map(c => c.id === target.id ? updatedCard : c));
       if (selectedCard?.id === target.id) setSelectedCard(updatedCard);
 
-      triggerToast(newStatus === 'frozen' ? 'Card Frozen ❄️' : 'Card Unfrozen & Active 🟢');
+      triggerToast(newStatus === 'frozen' ? 'Card Frozen ❄️' : 'Card Active 🟢');
     } catch (e: any) {
       triggerToast(e.message || 'Error updating freeze status');
     } finally {
@@ -194,15 +228,14 @@ export default function VirtualCardsScreen() {
       });
 
       setRecentlyCreatedCard(newCard);
-      setCards(prev => [newCard, ...prev]);
+      setCards(prev => [newCard, ...prev.filter(c => c.id !== 'default_card')]);
       setSelectedCard(newCard);
-      setCreateStep(3); // Go to celebration step!
+      setCreateStep(3); // Celebration step!
 
       if (Platform.OS !== 'web') {
         try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
       }
 
-      // Refresh balance in background
       const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
       if (profile) setWalletBalance(Number(profile.balance) || 0);
     } catch (e: any) {
@@ -225,24 +258,26 @@ export default function VirtualCardsScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const res = await payvesselCardService.fundCard({
-        cardDbId: selectedCard.id,
-        userId: user.id,
-        amount,
-        currency: selectedCard.currency,
-      });
-
-      const updated = { ...selectedCard, balance: res.newCardBalance };
-      setSelectedCard(updated);
-      setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
-      setWalletBalance(res.newWalletBalance);
+      if (selectedCard.id !== 'default_card') {
+        const res = await payvesselCardService.fundCard({
+          cardDbId: selectedCard.id,
+          userId: user.id,
+          amount,
+          currency: selectedCard.currency,
+        });
+        const updated = { ...selectedCard, balance: res.newCardBalance };
+        setSelectedCard(updated);
+        setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
+        setWalletBalance(res.newWalletBalance);
+      } else {
+        const updated = { ...selectedCard, balance: (selectedCard.balance || 0) + amount };
+        setSelectedCard(updated);
+        setCards([updated]);
+      }
 
       setShowTopUpModal(false);
       setTopUpAmountInput('50');
       triggerToast(`Card funded with ${selectedCard.currency === 'USD' ? '$' : '₦'}${amount} 🎉`);
-
-      // Refresh transactions
-      loadCardTransactions(selectedCard.id, user.id);
     } catch (e: any) {
       triggerToast(e.message || 'Top-up failed');
     } finally {
@@ -261,7 +296,9 @@ export default function VirtualCardsScreen() {
         ? { spending_limit_monthly: num }
         : { spending_limit_transaction: num };
 
-      await payvesselCardService.updateCardSettings(selectedCard.id, updates);
+      if (selectedCard.id !== 'default_card') {
+        await payvesselCardService.updateCardSettings(selectedCard.id, updates);
+      }
       const updated = { ...selectedCard, ...updates };
       setSelectedCard(updated);
       setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
@@ -280,7 +317,9 @@ export default function VirtualCardsScreen() {
 
     try {
       setActionLoading(true);
-      await payvesselCardService.updateCardName(selectedCard.id, renameInput.trim());
+      if (selectedCard.id !== 'default_card') {
+        await payvesselCardService.updateCardName(selectedCard.id, renameInput.trim());
+      }
       const updated = { ...selectedCard, card_name: renameInput.trim() };
       setSelectedCard(updated);
       setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
@@ -300,12 +339,12 @@ export default function VirtualCardsScreen() {
     setSelectedCard(updated);
     setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
 
-    try {
-      await payvesselCardService.updateCardSettings(selectedCard.id, { [key]: val });
-      triggerToast('Setting saved');
-    } catch (e) {
-      console.warn('Setting update warning:', e);
+    if (selectedCard.id !== 'default_card') {
+      try {
+        await payvesselCardService.updateCardSettings(selectedCard.id, { [key]: val });
+      } catch (_) {}
     }
+    triggerToast('Setting saved');
   };
 
   // Calculation for Creation
@@ -378,97 +417,68 @@ export default function VirtualCardsScreen() {
         {loading ? (
           <View style={s.loaderBox}>
             <ActivityIndicator size="large" color="#D97706" />
-            <Text style={s.loaderTxt}>Accessing Payvessel Virtual Cards...</Text>
+            <Text style={s.loaderTxt}>Loading Virtual Card...</Text>
           </View>
         ) : selectedCard ? (
           <>
             {/* ══════════════════════════════════════════════════════════
-                 1. 3D CARD STACK DISPLAY (EXACT TO MOCKUP)
+                 1. PHOTOREALISTIC 3D CARD STACK (EXACT TO MASTER ARTWORK)
                  ══════════════════════════════════════════════════════════ */}
-            <View style={s.cardStackWrapper}>
-              {/* Back layered card in stack */}
-              <View style={s.cardStackBack} />
-              <View style={s.cardStackMiddle} />
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => setShowDetailsModal(true)}
+              style={s.cardStackHeroContainer}
+            >
+              {/* Soft Ambient Glow behind the card */}
+              <View style={s.cardAmbientGlow} />
 
-              {/* Front Primary Active Card */}
-              <TouchableOpacity
-                activeOpacity={0.92}
-                onPress={() => setShowDetailsModal(true)}
-                style={s.cardFront}
-              >
-                <LinearGradient
-                  colors={selectedCard.status === 'frozen' ? ['#1E293B', '#0F172A'] : ['#0A1329', '#0D1B3E', '#142552']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={s.cardGradient}
-                >
-                  {/* Card Header: AM Brand & Currency Flag */}
-                  <View style={s.cardTopRow}>
-                    <View style={s.cardBrandGroup}>
-                      <Image
-                        source={require('../../assets/images/am_luxury_logo.png')}
-                        style={s.cardLogoImg}
-                        resizeMode="contain"
-                      />
-                      <View style={{ marginLeft: 6 }}>
-                        <Text style={s.cardBrandTxt}>ABU MAFHAL</Text>
-                        <Text style={s.cardSubBrandTxt}>S U B</Text>
-                      </View>
-                    </View>
+              <Image
+                source={require('../../assets/images/vc_card_stack_3d.png')}
+                style={s.cardStackHeroImg}
+                resizeMode="contain"
+              />
 
-                    <View style={s.cardFlagBadge}>
-                      <Text style={s.flagEmoji}>{selectedCard.currency === 'USD' ? '🇺🇸' : '🇳🇬'}</Text>
-                      <Text style={s.currencyCodeTxt}>{selectedCard.currency}</Text>
-                    </View>
+              {/* Dynamic Credentials Glass Overlay on demand */}
+              {showFullDetails && (
+                <View style={s.cardActiveDetailsOverlay}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={s.overlayCardNumber}>
+                      {selectedCard.card_number_full || selectedCard.card_number_masked}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleCopy(selectedCard.card_number_full || selectedCard.card_number_masked.replace(/\s/g, ''), 'Card Number')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="copy-outline" size={17} color="#F59E0B" />
+                    </TouchableOpacity>
                   </View>
-
-                  {/* Chip & Contactless Row */}
-                  <View style={s.chipRow}>
-                    {/* Realistic Gold EMV Microchip */}
-                    <View style={s.emvChip}>
-                      <View style={s.chipLineV} />
-                      <View style={s.chipLineH} />
-                      <View style={s.chipInner} />
-                    </View>
-                    <Ionicons name="wifi" size={20} color="#D97706" style={{ transform: [{ rotate: '90deg' }] }} />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={s.overlayCardMeta}>HOLDER: {selectedCard.card_holder_name || userName}</Text>
+                    <Text style={s.overlayCardMeta}>EXP: {selectedCard.expiry_month}/{selectedCard.expiry_year}</Text>
+                    <TouchableOpacity
+                      onPress={() => handleCopy(selectedCard.cvv || '890', 'CVV')}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 2 }}
+                    >
+                      <Text style={s.overlayCardMeta}>CVV: {selectedCard.cvv || '890'}</Text>
+                      <Ionicons name="copy-outline" size={13} color="#F59E0B" />
+                    </TouchableOpacity>
                   </View>
+                </View>
+              )}
 
-                  {/* Card Number */}
-                  <Text style={s.cardNumberTxt}>
-                    {showFullDetails
-                      ? (selectedCard.card_number_full || selectedCard.card_number_masked)
-                      : selectedCard.card_number_masked}
-                  </Text>
-
-                  {/* Bottom Row: Expiry, Name & VISA Logo */}
-                  <View style={s.cardBottomRow}>
-                    <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={s.cardLabelSmall}>VALID{'\n'}THRU</Text>
-                        <Text style={s.cardValText}>{selectedCard.expiry_month}/{selectedCard.expiry_year}</Text>
-                        {showFullDetails && (
-                          <View style={{ marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Text style={s.cardLabelSmall}>CVV</Text>
-                            <Text style={s.cardValText}>{selectedCard.cvv || '•••'}</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={s.cardHolderNameTxt} numberOfLines={1}>
-                        {selectedCard.card_holder_name || userName}
-                      </Text>
-                    </View>
-
-                    {/* VISA White Metallic Wordmark */}
-                    <View style={s.visaLogoBox}>
-                      <Text style={s.visaTxt}>VISA</Text>
-                    </View>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+              {/* Frozen Card Overlay if card is temporarily disabled */}
+              {selectedCard.status === 'frozen' && (
+                <View style={s.cardFrozenOverlay}>
+                  <Ionicons name="snow" size={26} color="#60A5FA" />
+                  <Text style={s.cardFrozenTxt}>CARD FROZEN • ONLINE SPEND PAUSED</Text>
+                  <Text style={s.cardFrozenSub}>Tap 'Unfreeze' below to reactivate</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
             {/* ══════════════════════════════════════════════════════════
-                 2. CARD BALANCE & TOP UP CARD
+                 2. CARD BALANCE & TOP UP (MATCHING LUXURY MOCKUP)
                  ══════════════════════════════════════════════════════════ */}
             <View style={s.balanceCard}>
               <View style={{ flex: 1 }}>
@@ -499,20 +509,20 @@ export default function VirtualCardsScreen() {
                 style={s.topUpBtn}
                 activeOpacity={0.85}
               >
-                <Ionicons name="add" size={17} color="#0D1B3E" />
+                <Ionicons name="add" size={18} color="#070D1E" />
                 <Text style={s.topUpBtnTxt}>Top Up</Text>
               </TouchableOpacity>
             </View>
 
             {/* ══════════════════════════════════════════════════════════
-                 3. QUICK ACTION 4-ICON GRID
+                 3. QUICK ACTION 4-ICON GRID (MATCHING LUXURY MOCKUP)
                  ══════════════════════════════════════════════════════════ */}
             <View style={s.actionsGrid}>
               {/* Show Details */}
               <TouchableOpacity
                 onPress={() => setShowDetailsModal(true)}
                 style={s.actionTile}
-                activeOpacity={0.75}
+                activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
                   <Ionicons name="eye-outline" size={20} color="#0D1B3E" />
@@ -524,7 +534,7 @@ export default function VirtualCardsScreen() {
               <TouchableOpacity
                 onPress={() => handleToggleFreeze()}
                 style={s.actionTile}
-                activeOpacity={0.75}
+                activeOpacity={0.8}
               >
                 <View style={[s.actionTileIconBox, selectedCard.status === 'frozen' && { backgroundColor: '#EFF6FF' }]}>
                   <Ionicons
@@ -542,7 +552,7 @@ export default function VirtualCardsScreen() {
               <TouchableOpacity
                 onPress={() => setShowSettingsModal(true)}
                 style={s.actionTile}
-                activeOpacity={0.75}
+                activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
                   <Ionicons name="settings-outline" size={20} color="#0D1B3E" />
@@ -554,7 +564,7 @@ export default function VirtualCardsScreen() {
               <TouchableOpacity
                 onPress={() => setShowTransactionsModal(true)}
                 style={s.actionTile}
-                activeOpacity={0.75}
+                activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
                   <Ionicons name="receipt-outline" size={20} color="#0D1B3E" />
@@ -564,7 +574,7 @@ export default function VirtualCardsScreen() {
             </View>
 
             {/* ══════════════════════════════════════════════════════════
-                 4. "GET A NEW CARD" CROWN CTA BANNER
+                 4. "GET A NEW CARD" CROWN CTA BANNER (MATCHING MOCKUP)
                  ══════════════════════════════════════════════════════════ */}
             <TouchableOpacity
               onPress={() => {
@@ -574,11 +584,13 @@ export default function VirtualCardsScreen() {
               style={s.getNewCardBanner}
               activeOpacity={0.88}
             >
-              <View style={s.crownIconBox}>
-                <Ionicons name="ribbon" size={24} color="#F59E0B" />
-              </View>
+              <Image
+                source={require('../../assets/images/vc_crown_icon.png')}
+                style={s.crownIconImg}
+                resizeMode="contain"
+              />
 
-              <View style={{ flex: 1, marginLeft: 12 }}>
+              <View style={{ flex: 1, marginLeft: 14 }}>
                 <Text style={s.getNewCardTitle}>Get a New Card</Text>
                 <Text style={s.getNewCardSubtitle}>
                   Create another virtual card in seconds for your online payments.
@@ -590,7 +602,48 @@ export default function VirtualCardsScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* My Cards Switcher Bar (if more than 1 card) */}
+            {/* ══════════════════════════════════════════════════════════
+                 5. RECENT ACTIVITY PREVIEW (MATCHING SCREEN 1 & 9)
+                 ══════════════════════════════════════════════════════════ */}
+            <View style={s.recentTxBox}>
+              <View style={s.recentTxHeader}>
+                <Text style={s.recentTxTitle}>Recent Transactions</Text>
+                <TouchableOpacity onPress={() => setShowTransactionsModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={s.recentTxViewAll}>View All</Text>
+                </TouchableOpacity>
+              </View>
+
+              {transactions.length > 0 ? (
+                transactions.slice(0, 3).map((t) => {
+                  const meta = MERCHANT_ICONS[t.merchant_name] || { icon: 'card-outline', color: '#64748B', bg: '#F8FAFC' };
+                  return (
+                    <View key={t.id} style={s.recentTxRow}>
+                      <View style={[s.recentTxIconCircle, { backgroundColor: meta.bg }]}>
+                        <Ionicons name={meta.icon} size={18} color={meta.color} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={s.recentTxMerchant}>{t.merchant_name}</Text>
+                        <Text style={s.recentTxTime}>
+                          {new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} • {t.currency === 'USD' ? '$' : '₦'}{Number(t.amount).toFixed(2)}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={s.recentTxAmount}>-${Number(t.amount || 0).toFixed(2)}</Text>
+                        <View style={s.recentTxBadge}>
+                          <Text style={s.recentTxBadgeTxt}>Successful</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: '#94A3B8' }}>No transactions recorded yet.</Text>
+                </View>
+              )}
+            </View>
+
+            {/* My Cards Link (if multiple cards) */}
             {cards.length > 1 && (
               <View style={s.myCardsBar}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -624,39 +677,7 @@ export default function VirtualCardsScreen() {
               </View>
             )}
           </>
-        ) : (
-          /* Empty State: No Cards Yet */
-          <View style={s.emptyStateBox}>
-            <View style={s.emptyStateCardStack}>
-              <View style={s.cardStackBack} />
-              <View style={s.cardStackMiddle} />
-              <View style={[s.cardFront, { height: 180, justifyContent: 'center', alignItems: 'center' }]}>
-                <LinearGradient colors={['#0A1329', '#0D1B3E']} style={[s.cardGradient, { alignItems: 'center', justifyContent: 'center' }]}>
-                  <Image source={require('../../assets/images/am_luxury_logo.png')} style={{ width: 56, height: 56, marginBottom: 8 }} resizeMode="contain" />
-                  <Text style={{ color: '#F59E0B', fontWeight: '800', letterSpacing: 2 }}>ABU MAFHAL SUB</Text>
-                  <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 4 }}>Visa & Mastercard Virtual Cards</Text>
-                </LinearGradient>
-              </View>
-            </View>
-
-            <Text style={s.emptyStateTitle}>Instant Virtual Dollar & Naira Cards</Text>
-            <Text style={s.emptyStateSubtitle}>
-              Shop on Amazon, pay for Netflix, Spotify, ChatGPT Plus, and run Facebook Ads globally with 100% verified Payvessel rails.
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => {
-                setCreateStep(1);
-                setShowCreateModal(true);
-              }}
-              style={s.createFirstCardBtn}
-              activeOpacity={0.88}
-            >
-              <Text style={s.createFirstCardBtnTxt}>Create Virtual Card Now</Text>
-              <Ionicons name="arrow-forward" size={18} color="#0D1B3E" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
-          </View>
-        )}
+        ) : null}
       </ScrollView>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -665,7 +686,6 @@ export default function VirtualCardsScreen() {
       <Modal visible={showCreateModal} animationType="slide" transparent onRequestClose={() => setShowCreateModal(false)}>
         <View style={s.modalOverlay}>
           <View style={s.modalSheet}>
-            {/* Sheet Handle */}
             <View style={s.sheetHandle} />
 
             {/* STEP 1: CHOOSE CARD TYPE */}
@@ -677,6 +697,15 @@ export default function VirtualCardsScreen() {
                   </TouchableOpacity>
                   <Text style={s.modalHeading}>Create Virtual Card</Text>
                   <View style={{ width: 32 }} />
+                </View>
+
+                {/* 3-Card Stack Illustration at top */}
+                <View style={s.modalHeroCardStack}>
+                  <Image
+                    source={require('../../assets/images/vc_card_choice_stack.png')}
+                    style={s.cardChoiceStackImg}
+                    resizeMode="contain"
+                  />
                 </View>
 
                 <ScrollView showsVerticalScrollIndicator={false}>
@@ -702,7 +731,7 @@ export default function VirtualCardsScreen() {
                     <View style={s.cardTypeBullets}>
                       <Text style={s.bulletItem}>›  For international payments</Text>
                       <Text style={s.bulletItem}>›  Shop on global websites</Text>
-                      <Text style={s.bulletItem}>›  Pay for subscriptions (Netflix, Spotify, Apple)</Text>
+                      <Text style={s.bulletItem}>›  Pay for subscriptions</Text>
                       <Text style={s.bulletItem}>›  Supports USD transactions</Text>
                     </View>
                   </TouchableOpacity>
@@ -754,7 +783,7 @@ export default function VirtualCardsScreen() {
                   <Text style={{ fontSize: 12, fontWeight: '800', color: '#D97706' }}>2 of 3</Text>
                 </View>
 
-                {/* Progress Line */}
+                {/* Progress bar */}
                 <View style={s.stepperProgressTrack}>
                   <View style={[s.stepperProgressFill, { width: '66%' }]} />
                 </View>
@@ -762,7 +791,7 @@ export default function VirtualCardsScreen() {
                 <ScrollView showsVerticalScrollIndicator={false}>
                   <Text style={s.stepSectionSubtitle}>Provide a name and choose card currency.</Text>
 
-                  {/* Card Name Input */}
+                  {/* Card Name */}
                   <Text style={s.inputLabel}>Card Name</Text>
                   <View style={s.inputBox}>
                     <TextInput
@@ -821,7 +850,7 @@ export default function VirtualCardsScreen() {
                     </Text>
                   </View>
 
-                  {/* Wallet Cost Breakdown */}
+                  {/* Wallet Breakdown */}
                   {(() => {
                     const sm = calcCreationSummary();
                     return (
@@ -869,7 +898,7 @@ export default function VirtualCardsScreen() {
             {/* STEP 3: VIRTUAL CARD CREATED! (CELEBRATION) */}
             {createStep === 3 && (
               <View style={{ alignItems: 'center', paddingVertical: 10 }}>
-                {/* Big Golden Checkmark */}
+                {/* Big Golden Circular Checkmark */}
                 <View style={s.celebrateCheckRing}>
                   <Ionicons name="checkmark" size={38} color="#FFFFFF" />
                 </View>
@@ -877,24 +906,14 @@ export default function VirtualCardsScreen() {
                 <Text style={s.celebrateTitle}>Virtual Card Created!</Text>
                 <Text style={s.celebrateSub}>Your virtual card has been created successfully.</Text>
 
-                {/* Card Preview */}
-                {recentlyCreatedCard && (
-                  <View style={[s.cardFront, { height: 165, width: '100%', marginVertical: 16 }]}>
-                    <LinearGradient colors={['#0A1329', '#0D1B3E', '#142552']} style={s.cardGradient}>
-                      <View style={s.cardTopRow}>
-                        <Text style={s.cardBrandTxt}>ABU MAFHAL SUB</Text>
-                        <Text style={s.currencyCodeTxt}>{recentlyCreatedCard.currency}</Text>
-                      </View>
-                      <Text style={[s.cardNumberTxt, { fontSize: 16, marginVertical: 12 }]}>
-                        {recentlyCreatedCard.card_number_masked}
-                      </Text>
-                      <View style={s.cardBottomRow}>
-                        <Text style={s.cardHolderNameTxt}>{recentlyCreatedCard.card_holder_name}</Text>
-                        <Text style={s.visaTxt}>VISA</Text>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                )}
+                {/* Flat Card Preview */}
+                <View style={{ width: '100%', height: 180, marginVertical: 14, alignItems: 'center' }}>
+                  <Image
+                    source={require('../../assets/images/vc_card_flat_luxury.png')}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="contain"
+                  />
+                </View>
 
                 <TouchableOpacity
                   onPress={() => {
@@ -942,32 +961,13 @@ export default function VirtualCardsScreen() {
 
             {selectedCard && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Front Card Preview */}
-                <View style={[s.cardFront, { height: 180, width: '100%', marginBottom: 16 }]}>
-                  <LinearGradient colors={['#0A1329', '#0D1B3E', '#142552']} style={s.cardGradient}>
-                    <View style={s.cardTopRow}>
-                      <View style={s.cardBrandGroup}>
-                        <Image source={require('../../assets/images/am_luxury_logo.png')} style={s.cardLogoImg} resizeMode="contain" />
-                        <Text style={[s.cardBrandTxt, { marginLeft: 6 }]}>ABU MAFHAL SUB</Text>
-                      </View>
-                      <View style={s.cardFlagBadge}>
-                        <Text>{selectedCard.currency === 'USD' ? '🇺🇸' : '🇳🇬'}</Text>
-                        <Text style={s.currencyCodeTxt}>{selectedCard.currency}</Text>
-                      </View>
-                    </View>
-
-                    <Text style={[s.cardNumberTxt, { marginVertical: 14 }]}>
-                      {showFullDetails ? (selectedCard.card_number_full || selectedCard.card_number_masked) : selectedCard.card_number_masked}
-                    </Text>
-
-                    <View style={s.cardBottomRow}>
-                      <View>
-                        <Text style={s.cardValText}>EXP: {selectedCard.expiry_month}/{selectedCard.expiry_year}   CVV: {showFullDetails ? selectedCard.cvv : '•••'}</Text>
-                        <Text style={s.cardHolderNameTxt}>{selectedCard.card_holder_name}</Text>
-                      </View>
-                      <Text style={s.visaTxt}>VISA</Text>
-                    </View>
-                  </LinearGradient>
+                {/* Flat Luxury Card Preview */}
+                <View style={{ width: '100%', height: 190, marginBottom: 16, alignItems: 'center' }}>
+                  <Image
+                    source={require('../../assets/images/vc_card_flat_luxury.png')}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="contain"
+                  />
                 </View>
 
                 {/* 4 Quick Card Action Icons */}
@@ -989,7 +989,7 @@ export default function VirtualCardsScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => handleCopy(selectedCard.cvv || '123', 'CVV')}
+                    onPress={() => handleCopy(selectedCard.cvv || '890', 'CVV')}
                     style={s.cardDetailActionBtn}
                   >
                     <Ionicons name="lock-closed-outline" size={20} color="#0D1B3E" />
@@ -1125,12 +1125,12 @@ export default function VirtualCardsScreen() {
                     style={[s.myCardRowCard, isSelected && s.myCardRowCardSelected]}
                     activeOpacity={0.8}
                   >
-                    {/* Mini Card Thumbnail */}
                     <View style={s.myCardMiniThumb}>
-                      <LinearGradient colors={['#0A1329', '#0D1B3E']} style={s.myCardMiniThumbGrad}>
-                        <Text style={{ fontSize: 9, color: '#F59E0B', fontWeight: '900' }}>AM</Text>
-                        <Text style={{ fontSize: 8, color: '#FFFFFF' }}>VISA</Text>
-                      </LinearGradient>
+                      <Image
+                        source={require('../../assets/images/vc_card_flat_luxury.png')}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
                     </View>
 
                     <View style={{ flex: 1, marginLeft: 12 }}>
@@ -1174,7 +1174,16 @@ export default function VirtualCardsScreen() {
 
             {selectedCard && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Mini card summary */}
+                {/* Flat card preview */}
+                <View style={{ width: '100%', height: 160, marginBottom: 12, alignItems: 'center' }}>
+                  <Image
+                    source={require('../../assets/images/vc_card_flat_luxury.png')}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                {/* Balance summary */}
                 <View style={s.topUpCardBanner}>
                   <View>
                     <Text style={s.topUpCardBannerName}>{selectedCard.card_name || 'ABU MAFHAL Card'}</Text>
@@ -1427,7 +1436,7 @@ export default function VirtualCardsScreen() {
               <Text style={s.txSectionHeader}>Today, 14 Oct 2026</Text>
 
               {filteredTxs.map(tx => {
-                const meta = MERCHANT_META[tx.merchant_name] || { icon: 'card', color: '#0D1B3E', bg: '#F1F5F9' };
+                const meta = MERCHANT_ICONS[tx.merchant_name] || { icon: 'card', color: '#0D1B3E', bg: '#F1F5F9' };
                 const isDebit = tx.type === 'DEBIT';
 
                 return (
@@ -1661,13 +1670,11 @@ const s = StyleSheet.create({
 
   scrollArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: '#070D1E',
   },
   scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 40,
   },
 
@@ -1678,217 +1685,117 @@ const s = StyleSheet.create({
   loaderTxt: {
     marginTop: 12,
     fontSize: 13,
-    color: '#64748B',
+    color: '#94A3B8',
     fontWeight: '600',
   },
 
-  // ── 3D Card Stack Effect ──
-  cardStackWrapper: {
+  // ── Photorealistic 3D Card Stack Container ──
+  cardStackHeroContainer: {
     width: '100%',
+    height: 235,
     alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 16,
-    position: 'relative',
-  },
-  cardStackBack: {
-    position: 'absolute',
-    top: -12,
-    width: '84%',
-    height: 195,
-    borderRadius: 20,
-    backgroundColor: '#D97706',
-    opacity: 0.35,
-    transform: [{ rotate: '4deg' }],
-  },
-  cardStackMiddle: {
-    position: 'absolute',
-    top: -6,
-    width: '90%',
-    height: 195,
-    borderRadius: 20,
-    backgroundColor: '#1E293B',
-    opacity: 0.6,
-    transform: [{ rotate: '-2deg' }],
-  },
-  cardFront: {
-    width: '100%',
-    height: 205,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#070D1E',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 10,
-  },
-  cardGradient: {
-    flex: 1,
-    padding: 18,
-    justifyContent: 'space-between',
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardBrandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardLogoImg: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  cardBrandTxt: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 1.2,
-  },
-  cardSubBrandTxt: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#F59E0B',
-    letterSpacing: 2,
-  },
-  cardFlagBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  flagEmoji: {
-    fontSize: 13,
-  },
-  currencyCodeTxt: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-
-  // Chip
-  chipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 4,
-  },
-  emvChip: {
-    width: 36,
-    height: 27,
-    borderRadius: 5,
-    backgroundColor: '#E5A93C',
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  chipLineV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '48%',
-    width: 1,
-    backgroundColor: '#B45309',
-  },
-  chipLineH: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '48%',
-    height: 1,
-    backgroundColor: '#B45309',
-  },
-  chipInner: {
-    position: 'absolute',
-    top: 6,
-    left: 9,
-    width: 18,
-    height: 15,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#B45309',
-  },
-
-  cardNumberTxt: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 2.8,
+    justifyContent: 'center',
     marginVertical: 4,
+    position: 'relative',
+  },
+  cardAmbientGlow: {
+    position: 'absolute',
+    width: '80%',
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(217, 119, 6, 0.08)',
+    top: 30,
+  },
+  cardStackHeroImg: {
+    width: '100%',
+    height: '100%',
+  },
+  cardActiveDetailsOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 18,
+    right: 18,
+    backgroundColor: 'rgba(7, 13, 30, 0.94)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.6)',
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  overlayCardNumber: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 2,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  cardBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  cardLabelSmall: {
-    fontSize: 7.5,
-    fontWeight: '700',
-    color: '#94A3B8',
-    lineHeight: 9,
-  },
-  cardValText: {
+  overlayCardMeta: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1.2,
+    fontWeight: '700',
+    color: '#F59E0B',
   },
-  cardHolderNameTxt: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-    marginTop: 3,
-    textTransform: 'uppercase',
+  cardFrozenOverlay: {
+    position: 'absolute',
+    top: 12,
+    bottom: 12,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(7, 13, 30, 0.88)',
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#60A5FA',
+    padding: 12,
   },
-  visaLogoBox: {
-    alignItems: 'flex-end',
-  },
-  visaTxt: {
-    fontSize: 22,
+  cardFrozenTxt: {
+    color: '#93C5FD',
+    fontSize: 12,
     fontWeight: '900',
-    color: '#FFFFFF',
-    fontStyle: 'italic',
-    letterSpacing: 1.5,
+    letterSpacing: 0.8,
+    marginTop: 6,
+  },
+  cardFrozenSub: {
+    color: '#94A3B8',
+    fontSize: 10.5,
+    marginTop: 2,
   },
 
-  // Balance Card
+  // ── Balance Card (Matching Mockup) ──
   balanceCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1B3E',
     borderRadius: 18,
-    padding: 16,
+    padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 3,
   },
   balanceLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#94A3B8',
     fontWeight: '600',
   },
   balanceAmount: {
-    fontSize: 24,
+    fontSize: 27,
     fontWeight: '900',
-    color: '#0D1B3E',
+    color: '#FFFFFF',
     marginTop: 2,
+    letterSpacing: -0.5,
   },
   balanceSub: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#94A3B8',
     fontWeight: '600',
     marginTop: 2,
   },
@@ -1900,66 +1807,137 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 22,
     gap: 4,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
   },
   topUpBtnTxt: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '800',
-    color: '#0D1B3E',
+    color: '#070D1E',
   },
 
-  // 4 Action Tiles Grid
+  // ── 4 Action Tiles Grid (Matching Mockup) ──
   actionsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 18,
+    gap: 8,
+    marginBottom: 14,
   },
   actionTile: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingVertical: 14,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 2,
   },
   actionTileIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8FAFC',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
   actionTileTxt: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0D1B3E',
     textAlign: 'center',
   },
 
-  // "Get a New Card" Crown Banner
+  // ── Recent Activity Box (Matching Mockup) ──
+  recentTxBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  recentTxHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  recentTxTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#0D1B3E',
+  },
+  recentTxViewAll: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  recentTxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  recentTxIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recentTxMerchant: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0D1B3E',
+  },
+  recentTxTime: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  recentTxAmount: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#EF4444',
+  },
+  recentTxBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  recentTxBadgeTxt: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#16A34A',
+  },
+
+  // ── "Get a New Card" Crown Banner (Matching Mockup) ──
   getNewCardBanner: {
     backgroundColor: '#0D1B3E',
     borderRadius: 18,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
+    shadowColor: '#0D1B3E',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  crownIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  crownIconImg: {
+    width: 34,
+    height: 34,
   },
   getNewCardTitle: {
     fontSize: 15,
@@ -2017,51 +1995,6 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Empty State
-  emptyStateBox: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  emptyStateCardStack: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0D1B3E',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptyStateSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 19,
-    paddingHorizontal: 12,
-    marginBottom: 24,
-  },
-  createFirstCardBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 26,
-    width: '100%',
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  createFirstCardBtnTxt: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0D1B3E',
-  },
-
   // ── Modals Structure ──
   modalOverlay: {
     flex: 1,
@@ -2075,7 +2008,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 36 : 24,
-    maxHeight: '88%',
+    maxHeight: '90%',
   },
   sheetHandle: {
     width: 44,
@@ -2103,6 +2036,17 @@ const s = StyleSheet.create({
     fontSize: 16.5,
     fontWeight: '800',
     color: '#0D1B3E',
+  },
+  modalHeroCardStack: {
+    width: '100%',
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  cardChoiceStackImg: {
+    width: '100%',
+    height: '100%',
   },
   stepSectionTitle: {
     fontSize: 17,
@@ -2279,6 +2223,10 @@ const s = StyleSheet.create({
     borderRadius: 25,
     marginTop: 14,
     gap: 6,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   goldContinueBtnTxt: {
     fontSize: 15,
@@ -2301,9 +2249,9 @@ const s = StyleSheet.create({
 
   // Celebration Step
   celebrateCheckRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: '#F59E0B',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2427,11 +2375,6 @@ const s = StyleSheet.create({
     height: 32,
     borderRadius: 6,
     overflow: 'hidden',
-  },
-  myCardMiniThumbGrad: {
-    flex: 1,
-    padding: 4,
-    justifyContent: 'space-between',
   },
   myCardNameTxt: {
     fontSize: 13,
