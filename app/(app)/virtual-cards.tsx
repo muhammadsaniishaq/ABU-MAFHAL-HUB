@@ -412,11 +412,18 @@ export default function VirtualCardsScreen() {
       )}
 
       {/* ── TOP HEADER ── */}
+      {/* ── TOP HEADER ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.headerBtn} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={22} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Virtual Card</Text>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={s.headerTitle}>Virtual Cards</Text>
+          <View style={s.headerPvBadge}>
+            <View style={s.headerPvDot} />
+            <Text style={s.headerPvTxt}>Payvessel 3D Secure</Text>
+          </View>
+        </View>
         <TouchableOpacity
           onPress={() => {
             if (cards.length > 1) {
@@ -437,20 +444,52 @@ export default function VirtualCardsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── ONE PAGE MAIN BODY (ZERO SCROLLING) ── */}
-      <View style={s.mainBody}>
+      {/* ── FLUID SCROLLABLE BODY (FILLS MOBILE SCREEN GRACEFULLY) ── */}
+      <ScrollView
+        style={s.scrollView}
+        contentContainerStyle={s.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {loading ? (
           <View style={s.loaderBox}>
             <ActivityIndicator size="large" color="#D97706" />
-            <Text style={s.loaderTxt}>Loading Virtual Card...</Text>
+            <Text style={s.loaderTxt}>Connecting to Payvessel Card Services...</Text>
           </View>
         ) : selectedCard ? (
           <>
             {/* ══════════════════════════════════════════════════════════
-                 1. PHOTOREALISTIC LIVE CARD (CLEAN MASTER TEMPLATE)
+                 1. MULTI-CARD SELECTOR / TABS (IF MULTIPLE CARDS EXIST)
+                 ══════════════════════════════════════════════════════════ */}
+            {cards.length > 1 && (
+              <View style={s.cardMultiSwitcherRow}>
+                {cards.map(c => {
+                  const isCur = c.id === selectedCard.id;
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => {
+                        setSelectedCard(c);
+                        loadCardTransactions(c.id, c.user_id);
+                      }}
+                      style={[s.cardMultiPill, isCur && s.cardMultiPillActive]}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontSize: 13 }}>{c.currency === 'USD' ? '🇺🇸' : '🇳🇬'}</Text>
+                      <Text style={[s.cardMultiPillTxt, isCur && s.cardMultiPillTxtActive]}>
+                        {c.card_name || `${c.currency} Card`}
+                      </Text>
+                      {c.status === 'frozen' && <Ionicons name="snow" size={12} color="#93C5FD" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════
+                 2. PHOTOREALISTIC LIVE CARD (CLEAN MASTER TEMPLATE)
                  ══════════════════════════════════════════════════════════ */}
             <TouchableOpacity
-              activeOpacity={0.92}
+              activeOpacity={0.94}
               onPress={() => setShowDetailsModal(true)}
               style={s.cardStackHeroContainer}
             >
@@ -486,62 +525,74 @@ export default function VirtualCardsScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Pagination dots if user has multiple cards */}
-            {cards.length > 1 && (
-              <View style={s.cardPaginationRow}>
-                {cards.map(c => (
-                  <TouchableOpacity
-                    key={c.id}
-                    onPress={() => {
-                      setSelectedCard(c);
-                      loadCardTransactions(c.id, c.user_id);
-                    }}
-                    style={[s.cardPaginationDot, c.id === selectedCard.id && s.cardPaginationDotActive]}
-                  />
-                ))}
-              </View>
-            )}
+            {/* Fast Details Toggle Pill */}
+            <TouchableOpacity
+              onPress={() => setShowFullDetails(!showFullDetails)}
+              style={s.cardRevealPill}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={showFullDetails ? "eye-off-outline" : "eye-outline"} size={14} color="#0D1B3E" />
+              <Text style={s.cardRevealPillTxt}>
+                {showFullDetails ? 'Hide Card Details' : 'Show Full Card Details (CVV & Number)'}
+              </Text>
+            </TouchableOpacity>
 
             {/* ══════════════════════════════════════════════════════════
-                 2. CARD BALANCE & TOP UP (COMPACT HORIZONTAL BAR)
+                 3. CARD BALANCE & TOP UP (OPAY / MONIEPOINT STYLE)
                  ══════════════════════════════════════════════════════════ */}
             <View style={s.balanceCard}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={s.balanceLabel}>Card Balance</Text>
+                  <Text style={s.balanceLabel}>Available Card Balance</Text>
                   <TouchableOpacity onPress={() => setHideBalance(!hideBalance)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={14} color="#64748B" />
+                    <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={15} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 1 }}>
-                  <Text style={s.balanceAmount}>
-                    {hideBalance
-                      ? '••••••'
-                      : `${selectedCard.currency === 'USD' ? '$' : '₦'}${Number(selectedCard.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                  </Text>
-                  <Text style={s.balanceSub}>
-                    {hideBalance
-                      ? '••••••••••'
-                      : selectedCard.currency === 'USD'
-                        ? `≈ ₦${Math.round((selectedCard.balance || 0) * usdRate).toLocaleString()}`
-                        : `≈ $${((selectedCard.balance || 0) / usdRate).toFixed(2)}`}
+                <View style={[s.cardStatusBadge, selectedCard.status === 'frozen' ? s.cardStatusBadgeFrozen : s.cardStatusBadgeActive]}>
+                  <View style={[s.cardStatusDot, selectedCard.status === 'frozen' ? { backgroundColor: '#3B82F6' } : { backgroundColor: '#10B981' }]} />
+                  <Text style={[s.cardStatusBadgeTxt, selectedCard.status === 'frozen' ? { color: '#1D4ED8' } : { color: '#047857' }]}>
+                    {selectedCard.status === 'frozen' ? 'Frozen' : 'Active'}
                   </Text>
                 </View>
               </View>
 
-              <TouchableOpacity
-                onPress={() => setShowTopUpModal(true)}
-                style={s.topUpBtn}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="add" size={16} color="#070D1E" />
-                <Text style={s.topUpBtnTxt}>Top Up</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4, marginBottom: 8 }}>
+                <Text style={s.balanceAmount}>
+                  {hideBalance
+                    ? '••••••'
+                    : `${selectedCard.currency === 'USD' ? '$' : '₦'}${Number(selectedCard.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </Text>
+                <Text style={s.balanceSub}>
+                  {hideBalance
+                    ? '••••••••••'
+                    : selectedCard.currency === 'USD'
+                      ? `≈ ₦${Math.round((selectedCard.balance || 0) * usdRate).toLocaleString()}`
+                      : `≈ $${((selectedCard.balance || 0) / usdRate).toFixed(2)}`}
+                </Text>
+              </View>
+
+              <View style={s.balanceDivider} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '600' }}>Linked ABU MAFHAL Wallet:</Text>
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A', marginTop: 1 }}>
+                    ₦{Math.floor(walletBalance).toLocaleString()} Available
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowTopUpModal(true)}
+                  style={s.topUpBtn}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="add-circle" size={17} color="#070D1E" />
+                  <Text style={s.topUpBtnTxt}>Top Up Card</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* ══════════════════════════════════════════════════════════
-                 3. QUICK ACTION 4-ICON GRID (COMPACT SINGLE ROW)
+                 4. QUICK ACTION 4-ICON GRID (OPAY / MONIEPOINT STYLE)
                  ══════════════════════════════════════════════════════════ */}
             <View style={s.actionsGrid}>
               {/* Show Details */}
@@ -553,7 +604,7 @@ export default function VirtualCardsScreen() {
                 <View style={s.actionTileIconBox}>
                   <Ionicons name="eye-outline" size={20} color="#0F172A" />
                 </View>
-                <Text style={s.actionTileTxt}>Details</Text>
+                <Text style={s.actionTileTxt}>Card Details</Text>
               </TouchableOpacity>
 
               {/* Freeze Card */}
@@ -570,7 +621,7 @@ export default function VirtualCardsScreen() {
                   />
                 </View>
                 <Text style={s.actionTileTxt}>
-                  {selectedCard.status === 'frozen' ? 'Unfreeze' : 'Freeze'}
+                  {selectedCard.status === 'frozen' ? 'Unfreeze' : 'Freeze Card'}
                 </Text>
               </TouchableOpacity>
 
@@ -583,146 +634,264 @@ export default function VirtualCardsScreen() {
                 <View style={s.actionTileIconBox}>
                   <Ionicons name="options-outline" size={20} color="#0F172A" />
                 </View>
-                <Text style={s.actionTileTxt}>Limits</Text>
+                <Text style={s.actionTileTxt}>Card Limits</Text>
               </TouchableOpacity>
 
-              {/* Transactions History */}
+              {/* Settings / Security */}
               <TouchableOpacity
-                onPress={() => setShowTransactionsModal(true)}
+                onPress={() => setShowSettingsModal(true)}
                 style={s.actionTile}
                 activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
-                  <Ionicons name="receipt-outline" size={20} color="#0F172A" />
+                  <Ionicons name="shield-checkmark-outline" size={20} color="#0F172A" />
                 </View>
-                <Text style={s.actionTileTxt}>History</Text>
+                <Text style={s.actionTileTxt}>Security</Text>
               </TouchableOpacity>
             </View>
 
             {/* ══════════════════════════════════════════════════════════
-                 4. BOTTOM EXECUTIVE CARD: ACTIVITY / TRUST & UTILITY
+                 5. US BILLING ADDRESS CARD (CRITICAL FOR US STORES)
                  ══════════════════════════════════════════════════════════ */}
-            <View style={s.bottomExecutiveCard}>
-              <View style={s.bottomExecHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="time-outline" size={16} color="#0F172A" />
-                  <Text style={s.bottomExecTitle}>Recent Activity</Text>
+            {selectedCard.currency === 'USD' && (
+              <View style={s.billingAddressCard}>
+                <View style={s.billingHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 16 }}>🇺🇸</Text>
+                    <Text style={s.billingCardTitle}>Official US Billing Address</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleCopy('1201 North Orange Street, Suite 300, Wilmington, DE 19801', 'Billing Address')}
+                    style={s.copyAddressBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="copy-outline" size={13} color="#D97706" />
+                    <Text style={s.copyAddressTxt}>Copy All</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => setShowTransactionsModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={s.bottomExecViewAll}>View All ›</Text>
-                </TouchableOpacity>
+                <Text style={s.billingSubTxt}>
+                  Enter this address during checkout on Apple, Amazon, Netflix & Google:
+                </Text>
+
+                <View style={s.billingGrid}>
+                  <View style={s.billingItem}>
+                    <Text style={s.billingLabel}>Street Address</Text>
+                    <Text style={s.billingVal} numberOfLines={1}>1201 N Orange St, Ste 300</Text>
+                  </View>
+                  <View style={s.billingItem}>
+                    <Text style={s.billingLabel}>City & State</Text>
+                    <Text style={s.billingVal}>Wilmington, DE</Text>
+                  </View>
+                  <View style={s.billingItem}>
+                    <Text style={s.billingLabel}>Zip Code</Text>
+                    <Text style={s.billingVal}>19801</Text>
+                  </View>
+                  <View style={s.billingItem}>
+                    <Text style={s.billingLabel}>Country</Text>
+                    <Text style={s.billingVal}>United States (USA)</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════
+                 6. RECENT ACTIVITY & TRANSACTIONS (EXPANDED LIST)
+                 ══════════════════════════════════════════════════════════ */}
+            <View style={s.txSectionCard}>
+              <View style={s.txSectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="receipt-outline" size={17} color="#0F172A" />
+                  <Text style={s.txSectionTitle}>Card Transactions</Text>
+                </View>
+                <View style={s.txCountBadge}>
+                  <Text style={s.txCountBadgeTxt}>{transactions.length} Total</Text>
+                </View>
               </View>
 
-              {transactions.length > 0 ? (
-                transactions.slice(0, 2).map((t) => {
+              {/* Transaction Filters */}
+              <View style={s.txTabsRow}>
+                {(['All', 'Successful', 'Pending', 'Failed'] as const).map(tab => (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setTxFilterTab(tab)}
+                    style={[s.txTabChip, txFilterTab === tab && s.txTabChipActive]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.txTabChipTxt, txFilterTab === tab && s.txTabChipTxtActive]}>
+                      {tab}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {filteredTxs.length > 0 ? (
+                filteredTxs.slice(0, 10).map((t) => {
                   const meta = MERCHANT_ICONS[t.merchant_name] || { icon: 'card-outline', color: '#64748B', bg: '#F8FAFC' };
+                  const isSuccess = t.status === 'COMPLETED';
+                  const isPending = t.status === 'PENDING';
                   return (
-                    <View key={t.id} style={s.miniTxRow}>
-                      <View style={[s.miniTxIcon, { backgroundColor: meta.bg }]}>
-                        <Ionicons name={meta.icon} size={15} color={meta.color} />
+                    <View key={t.id} style={s.txRowItem}>
+                      <View style={[s.txRowIconBox, { backgroundColor: meta.bg }]}>
+                        <Ionicons name={meta.icon} size={18} color={meta.color} />
                       </View>
-                      <View style={{ flex: 1, marginLeft: 10 }}>
-                        <Text style={s.miniTxMerchant} numberOfLines={1}>{t.merchant_name}</Text>
-                        <Text style={s.miniTxDate}>
-                          {new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                        </Text>
+                      <View style={{ flex: 1, marginLeft: 11 }}>
+                        <Text style={s.txRowMerchant} numberOfLines={1}>{t.merchant_name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <Text style={s.txRowDate}>
+                            {new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                          <View style={[s.txStatusDot, { backgroundColor: isSuccess ? '#10B981' : isPending ? '#F59E0B' : '#EF4444' }]} />
+                          <Text style={[s.txStatusLabel, { color: isSuccess ? '#047857' : isPending ? '#B45309' : '#DC2626' }]}>
+                            {isSuccess ? 'Success' : isPending ? 'Pending' : 'Declined'}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={s.miniTxAmount}>-${Number(t.amount || 0).toFixed(2)}</Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={s.txRowAmount}>-${Number(t.amount || 0).toFixed(2)}</Text>
+                        <Text style={s.txRowAmountSub}>≈ ₦{Math.round(Number(t.amount || 0) * usdRate).toLocaleString()}</Text>
+                      </View>
                     </View>
                   );
                 })
               ) : (
-                <View style={s.miniTrustBox}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Ionicons name="shield-checkmark" size={14} color="#16A34A" />
-                      <Text style={s.miniTrustTitle}>3D Secure Protected</Text>
-                    </View>
-                    <Text style={s.miniTrustSub}>Accepted on Amazon, Netflix, Apple & Google Play</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setCreateStep(1);
-                      setShowCreateModal(true);
-                    }}
-                    style={s.miniNewCardBtn}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="add" size={14} color="#0F172A" />
-                    <Text style={s.miniNewCardTxt}>New Card</Text>
-                  </TouchableOpacity>
+                <View style={s.txEmptyStateBox}>
+                  <Ionicons name="card-outline" size={32} color="#CBD5E1" />
+                  <Text style={s.txEmptyTitle}>No Card Transactions Yet</Text>
+                  <Text style={s.txEmptySub}>
+                    Use your card on Amazon, Netflix, Apple, or ChatGPT to see instant live transactions here.
+                  </Text>
                 </View>
               )}
+            </View>
+
+            {/* ══════════════════════════════════════════════════════════
+                 7. 3D SECURE & PAYVESSEL TRUST BADGE
+                 ══════════════════════════════════════════════════════════ */}
+            <View style={s.securityBadgeCard}>
+              <Ionicons name="shield-checkmark" size={24} color="#10B981" />
+              <View style={s.securityBadgeTxtBox}>
+                <Text style={s.securityBadgeTitle}>Bank-Grade Payvessel Security</Text>
+                <Text style={s.securityBadgeSub}>
+                  Protected by 3D Secure 2.0 with dynamic OTP authentication & 256-bit encryption.
+                </Text>
+              </View>
             </View>
           </>
         ) : (
           /* ══════════════════════════════════════════════════════════
-               PROFESSIONAL EMPTY STATE: GET YOUR FIRST CARD (ONE PAGE)
+               OPAY / MONIEPOINT STYLE EMPTY STATE & CARD SHOWCASE
                ══════════════════════════════════════════════════════════ */
-          <View style={s.emptyStateBox}>
-            {/* Dual Floating Card Preview (Compact) */}
-            <View style={s.emptyCardStack}>
-              <View style={s.emptyRearCard}>
-                <Image
-                  source={require('../../assets/images/vc_template_mastercard.png')}
-                  style={s.emptyTemplateImg}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={s.emptyFrontCard}>
-                <Image
-                  source={require('../../assets/images/vc_template_visa.png')}
-                  style={s.emptyTemplateImg}
-                  resizeMode="contain"
-                />
-              </View>
+          <View style={s.emptyStateContainer}>
+            {/* High-Resolution 3D Cards Hero Banner */}
+            <View style={s.emptyHeroVisualBox}>
+              <Image
+                source={require('../../assets/images/vc_card_choice_stack.png')}
+                style={s.emptyHeroImg}
+                resizeMode="contain"
+              />
             </View>
 
-            <Text style={s.emptyTitle}>Instant Virtual Card</Text>
-            <Text style={s.emptySubtitle}>
-              Create your USD Visa or NGN Mastercard for global shopping, ads, and subscriptions.
+            <Text style={s.emptyMainTitle}>Global USD Virtual Card</Text>
+            <Text style={s.emptyMainSub}>
+              Pay for Netflix, Amazon, Apple, Google Play, ChatGPT, Facebook Ads & international websites without bank restrictions.
             </Text>
 
-            {/* Wallet Balance Info */}
-            <View style={s.emptyWalletPill}>
-              <Ionicons name="wallet-outline" size={15} color="#D97706" />
-              <Text style={s.emptyWalletTxt}>
-                Available Wallet Balance: <Text style={{ color: '#0F172A', fontWeight: '800' }}>₦{walletBalance.toLocaleString()}</Text>
-              </Text>
+            {/* Live Payvessel API Pricing & Exchange Rate Card */}
+            <View style={s.pvLiveCard}>
+              <View style={s.pvLiveHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="pulse" size={16} color="#059669" />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
+                    Payvessel Card Engine
+                  </Text>
+                </View>
+                <View style={s.pvLiveBadge}>
+                  <View style={s.pvLiveDot} />
+                  <Text style={s.pvLiveBadgeTxt}>Connected • Instant</Text>
+                </View>
+              </View>
+
+              <View style={s.pvStatsGrid}>
+                <View style={s.pvStatCol}>
+                  <Text style={s.pvStatLabel}>USD Rate</Text>
+                  <Text style={s.pvStatVal}>₦{usdRate.toLocaleString()}</Text>
+                </View>
+                <View style={[s.pvStatCol, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#F1F5F9' }]}>
+                  <Text style={s.pvStatLabel}>Card Fee</Text>
+                  <Text style={s.pvStatVal}>$3.00</Text>
+                </View>
+                <View style={s.pvStatCol}>
+                  <Text style={s.pvStatLabel}>Min Funding</Text>
+                  <Text style={s.pvStatVal}>$1.50</Text>
+                </View>
+              </View>
+
+              <View style={s.pvWalletRow}>
+                <Ionicons name="wallet-outline" size={15} color="#D97706" />
+                <Text style={s.pvWalletTxt}>
+                  Your Wallet Balance: <Text style={s.pvWalletAmt}>₦{Math.floor(walletBalance).toLocaleString()}</Text>
+                </Text>
+              </View>
             </View>
 
-            {/* CTA Button */}
+            {/* High-Impact Primary CTA */}
             <TouchableOpacity
               onPress={() => {
                 setCreateStep(1);
                 setShowCreateModal(true);
               }}
-              style={s.emptyCtaBtn}
+              style={s.bigCtaBtn}
               activeOpacity={0.88}
             >
-              <Ionicons name="card-outline" size={18} color="#070D1E" />
-              <Text style={s.emptyCtaBtnTxt}>Create Virtual Card Now</Text>
-              <Ionicons name="arrow-forward" size={16} color="#070D1E" />
+              <Ionicons name="card" size={20} color="#070D1E" />
+              <Text style={s.bigCtaBtnTxt}>Create Virtual Card Now</Text>
+              <Ionicons name="arrow-forward" size={18} color="#070D1E" />
             </TouchableOpacity>
 
-            {/* 3 Compact Feature Pills */}
-            <View style={s.emptyFeaturesRow}>
-              <View style={s.emptyFeatureChip}>
-                <Ionicons name="globe-outline" size={14} color="#D97706" />
-                <Text style={s.emptyFeatureChipTxt}>Global Acceptance</Text>
-              </View>
-              <View style={s.emptyFeatureChip}>
-                <Ionicons name="flash-outline" size={14} color="#D97706" />
-                <Text style={s.emptyFeatureChipTxt}>Instant 3D OTP</Text>
-              </View>
-              <View style={s.emptyFeatureChip}>
-                <Ionicons name="lock-closed-outline" size={14} color="#D97706" />
-                <Text style={s.emptyFeatureChipTxt}>Freeze Anytime</Text>
+            {/* Global Merchant Showcase */}
+            <View style={s.merchantsShowcaseCard}>
+              <Text style={s.merchantsTitle}>ACCEPTED ON OVER 50M+ PLATFORMS</Text>
+              <View style={s.merchantsGrid}>
+                {[
+                  { name: 'Amazon', icon: 'logo-amazon', color: '#FF9900' },
+                  { name: 'Netflix', icon: 'film', color: '#E50914' },
+                  { name: 'Apple', icon: 'logo-apple', color: '#000000' },
+                  { name: 'Google Play', icon: 'logo-google-playstore', color: '#01875F' },
+                  { name: 'ChatGPT Plus', icon: 'sparkles', color: '#10A37F' },
+                  { name: 'Spotify', icon: 'musical-notes', color: '#1DB954' },
+                  { name: 'Facebook Ads', icon: 'logo-facebook', color: '#1877F2' },
+                  { name: 'AliExpress', icon: 'cart', color: '#FF4747' },
+                ].map(m => (
+                  <View key={m.name} style={s.merchantChip}>
+                    <Ionicons name={m.icon as any} size={14} color={m.color} />
+                    <Text style={s.merchantChipTxt}>{m.name}</Text>
+                  </View>
+                ))}
               </View>
             </View>
+
+            {/* 3 OPay / Moniepoint Trust Pillars */}
+            <View style={s.trustPillarsRow}>
+              <View style={s.trustPillarItem}>
+                <Ionicons name="flash" size={20} color="#D97706" />
+                <Text style={s.trustPillarTitle}>Instant Setup</Text>
+                <Text style={s.trustPillarSub}>Ready in under 60 seconds</Text>
+              </View>
+              <View style={s.trustPillarItem}>
+                <Ionicons name="shield-checkmark" size={20} color="#10B981" />
+                <Text style={s.trustPillarTitle}>3D Secure</Text>
+                <Text style={s.trustPillarSub}>Realtime OTP verification</Text>
+              </View>
+              <View style={s.trustPillarItem}>
+                <Ionicons name="lock-closed" size={20} color="#2563EB" />
+                <Text style={s.trustPillarTitle}>Full Control</Text>
+                <Text style={s.trustPillarSub}>Freeze & set spend limits</Text>
+              </View>
+            </View>
+
           </View>
         )}
-      </View>
+      </ScrollView>
 
       {/* ══════════════════════════════════════════════════════════════
            MODAL 1: CREATE VIRTUAL CARD WIZARD (STEPS 1, 2 & 3)
@@ -1469,7 +1638,7 @@ export default function VirtualCardsScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={s.txSectionHeader}>Today, 14 Oct 2026</Text>
+              <Text style={s.modalTxDateHeader}>Today, 14 Oct 2026</Text>
 
               {filteredTxs.map(tx => {
                 const meta = MERCHANT_ICONS[tx.merchant_name] || { icon: 'card', color: '#0D1B3E', bg: '#F1F5F9' };
@@ -1707,18 +1876,73 @@ const s = StyleSheet.create({
     color: '#0F172A',
     letterSpacing: -0.2,
   },
+  headerPvBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  headerPvDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#10B981',
+  },
+  headerPvTxt: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#065F46',
+  },
 
-  mainBody: {
+  // Fluid Mobile Scroll
+  scrollView: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 40,
+  },
+
+  // Multi-Card Switcher
+  cardMultiSwitcherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+    marginTop: 2,
+  },
+  cardMultiPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
-    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardMultiPillActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  cardMultiPillTxt: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  cardMultiPillTxtActive: {
+    color: '#F59E0B',
   },
 
   loaderBox: {
-    paddingVertical: 60,
+    paddingVertical: 80,
     alignItems: 'center',
   },
   loaderTxt: {
@@ -1875,16 +2099,37 @@ const s = StyleSheet.create({
     backgroundColor: '#D97706',
   },
 
-  // ── Balance Card (Comfortable & High Contrast) ──
+  // Card Reveal Pill
+  cardRevealPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  cardRevealPillTxt: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+
+  // ── Balance Card (OPay / Moniepoint High-Contrast Card) ──
   balanceCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: 8,
+    padding: 16,
+    marginVertical: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
@@ -1897,16 +2142,44 @@ const s = StyleSheet.create({
     color: '#64748B',
     fontWeight: '600',
   },
+  cardStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  cardStatusBadgeActive: {
+    backgroundColor: '#ECFDF5',
+  },
+  cardStatusBadgeFrozen: {
+    backgroundColor: '#EFF6FF',
+  },
+  cardStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cardStatusBadgeTxt: {
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
   balanceAmount: {
-    fontSize: 25,
+    fontSize: 26,
     fontWeight: '900',
     color: '#0F172A',
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   balanceSub: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: '#64748B',
     fontWeight: '600',
+  },
+  balanceDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 4,
   },
   topUpBtn: {
     flexDirection: 'row',
@@ -1915,31 +2188,31 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 22,
-    gap: 4,
+    gap: 5,
     shadowColor: '#F59E0B',
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 2,
   },
   topUpBtnTxt: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#070D1E',
   },
 
-  // ── 4 Action Tiles Grid (Comfortable Touch Targets) ──
+  // ── 4 Action Tiles Grid (OPay / Moniepoint Touch Targets) ──
   actionsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 10,
-    marginVertical: 8,
+    marginBottom: 14,
   },
   actionTile: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 3,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -1949,28 +2222,27 @@ const s = StyleSheet.create({
     elevation: 2,
   },
   actionTileIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
   },
   actionTileTxt: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#0F172A',
     textAlign: 'center',
   },
 
-  // ── Bottom Executive Card ──
-  bottomExecutiveCard: {
+  // ── US Billing Address Card ──
+  billingAddressCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 4,
+    padding: 16,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
@@ -1978,202 +2250,417 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  bottomExecHeader: {
+  billingHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  bottomExecTitle: {
+  billingCardTitle: {
     fontSize: 13.5,
     fontWeight: '800',
     color: '#0F172A',
   },
-  bottomExecViewAll: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#D97706',
-  },
-  miniTxRow: {
+  copyAddressBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 7,
+    gap: 4,
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  copyAddressTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  billingSubTxt: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 10,
+  },
+  billingGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  billingItem: {
+    width: '48%',
+  },
+  billingLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+  },
+  billingVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+
+  // ── Card Transactions Section ──
+  txSectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  txSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  txSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  txCountBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  txCountBadgeTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  txTabsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+  },
+  txTabChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  txTabChipActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  txTabChipTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  txTabChipTxtActive: {
+    color: '#FFFFFF',
+  },
+  txRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
-  miniTxIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  txRowIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  miniTxMerchant: {
-    fontSize: 12.5,
+  txRowMerchant: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#0F172A',
   },
-  miniTxDate: {
+  txRowDate: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+  },
+  txStatusDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  txStatusLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  txRowAmount: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#EF4444',
+  },
+  txRowAmountSub: {
     fontSize: 10.5,
     color: '#94A3B8',
     marginTop: 1,
   },
-  miniTxAmount: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#EF4444',
-  },
-  miniTrustBox: {
-    flexDirection: 'row',
+  txEmptyStateBox: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
   },
-  miniTrustTitle: {
-    fontSize: 12,
+  txEmptyTitle: {
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#0F172A',
+    marginTop: 8,
   },
-  miniTrustSub: {
-    fontSize: 10.5,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  miniNewCardBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    gap: 3,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  miniNewCardTxt: {
+  txEmptySub: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#0F172A',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 3,
+    lineHeight: 16,
   },
 
-  // ── Professional Empty State (One Page) ──
-  emptyStateBox: {
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    paddingBottom: 20,
+  // ── Security Trust Card ──
+  securityBadgeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    marginBottom: 16,
+  },
+  securityBadgeTxtBox: {
+    flex: 1,
+  },
+  securityBadgeTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  securityBadgeSub: {
+    fontSize: 10.5,
+    color: '#047857',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+
+  // ── OPay / Moniepoint Empty State & Card Showcase ──
+  emptyStateContainer: {
+    width: '100%',
     alignItems: 'center',
   },
-  emptyCardStack: {
+  emptyHeroVisualBox: {
     width: '100%',
-    height: 140,
+    height: 200,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 6,
-    position: 'relative',
+    marginVertical: 10,
   },
-  emptyRearCard: {
-    position: 'absolute',
-    width: '80%',
-    height: 120,
-    top: 4,
-    transform: [{ rotate: '-7deg' }, { translateX: -10 }],
-    opacity: 0.85,
-  },
-  emptyFrontCard: {
-    width: '84%',
-    height: 130,
-    top: 10,
-    transform: [{ rotate: '3deg' }, { translateX: 6 }],
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  emptyTemplateImg: {
+  emptyHeroImg: {
     width: '100%',
     height: '100%',
   },
-  emptyTitle: {
-    fontSize: 20,
+  emptyMainTitle: {
+    fontSize: 22,
     fontWeight: '900',
     color: '#0F172A',
     textAlign: 'center',
-    marginTop: 14,
-    letterSpacing: -0.3,
+    marginTop: 6,
+    letterSpacing: -0.4,
   },
-  emptySubtitle: {
-    fontSize: 12,
+  emptyMainSub: {
+    fontSize: 12.5,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 17,
-    marginTop: 4,
-    paddingHorizontal: 12,
+    lineHeight: 18,
+    marginTop: 6,
+    paddingHorizontal: 10,
   },
-  emptyWalletPill: {
+  pvLiveCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#FEF3C7',
+    shadowColor: '#D97706',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  pvLiveHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  pvLiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  pvLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  pvLiveBadgeTxt: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  pvStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  pvStatCol: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  pvStatLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+  },
+  pvStatVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  pvWalletRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: 12,
-    marginBottom: 8,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
   },
-  emptyWalletTxt: {
+  pvWalletTxt: {
     fontSize: 11.5,
     color: '#64748B',
   },
-  emptyCtaBtn: {
+  pvWalletAmt: {
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  bigCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F59E0B',
     borderRadius: 24,
-    height: 46,
+    height: 50,
     width: '100%',
-    marginTop: 8,
-    marginBottom: 14,
-    gap: 6,
+    marginBottom: 18,
+    gap: 8,
     shadowColor: '#F59E0B',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  emptyCtaBtnTxt: {
-    fontSize: 14,
-    fontWeight: '800',
+  bigCtaBtnTxt: {
+    fontSize: 15,
+    fontWeight: '900',
     color: '#070D1E',
   },
-  emptyFeaturesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
+  merchantsShowcaseCard: {
     width: '100%',
-  },
-  emptyFeatureChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
   },
-  emptyFeatureChipTxt: {
-    fontSize: 10,
+  merchantsTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  merchantsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  merchantChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  merchantChipTxt: {
+    fontSize: 11,
     fontWeight: '700',
     color: '#0F172A',
+  },
+  trustPillarsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+    marginBottom: 10,
+  },
+  trustPillarItem: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  trustPillarTitle: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  trustPillarSub: {
+    fontSize: 9.5,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 2,
+    lineHeight: 13,
   },
 
   // My Cards Bar
@@ -2603,17 +3090,6 @@ const s = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
-  cardStatusBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  cardStatusBadgeTxt: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#16A34A',
-  },
 
   // Top Up Modal
   topUpCardBanner: {
@@ -2675,18 +3151,11 @@ const s = StyleSheet.create({
   },
 
   // Transactions Modal
-  txSectionHeader: {
+  modalTxDateHeader: {
     fontSize: 12,
     fontWeight: '800',
     color: '#64748B',
     marginVertical: 10,
-  },
-  txRowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   txIconBox: {
     width: 40,
