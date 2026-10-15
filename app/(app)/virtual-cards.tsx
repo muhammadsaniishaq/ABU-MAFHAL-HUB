@@ -402,7 +402,7 @@ export default function VirtualCardsScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* ── TOAST NOTIFICATION ── */}
       {toastMessage && (
@@ -437,12 +437,8 @@ export default function VirtualCardsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={s.scrollArea}
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+      {/* ── ONE PAGE MAIN BODY (ZERO SCROLLING) ── */}
+      <View style={s.mainBody}>
         {loading ? (
           <View style={s.loaderBox}>
             <ActivityIndicator size="large" color="#D97706" />
@@ -722,10 +718,11 @@ export default function VirtualCardsScreen() {
               <View style={s.emptyFeatureChip}>
                 <Ionicons name="lock-closed-outline" size={14} color="#D97706" />
                 <Text style={s.emptyFeatureChipTxt}>Freeze Anytime</Text>
+              </View>
             </View>
           </View>
         )}
-      </ScrollView>
+      </View>
 
       {/* ══════════════════════════════════════════════════════════════
            MODAL 1: CREATE VIRTUAL CARD WIZARD (STEPS 1, 2 & 3)
@@ -1660,7 +1657,7 @@ export default function VirtualCardsScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   toast: {
     position: 'absolute',
@@ -1690,15 +1687,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 48 : 20,
     paddingBottom: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F1F5F9',
   },
   headerBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
@@ -1711,15 +1708,12 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  scrollArea: {
+  mainBody: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  scrollContent: {
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
-    paddingTop: 6,
-    paddingBottom: 14,
-    flexGrow: 1,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
     justifyContent: 'space-between',
   },
 
@@ -2221,7 +2215,7 @@ const s = StyleSheet.create({
   // ── Modals Structure ──
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(7, 13, 30, 0.75)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
@@ -2258,7 +2252,7 @@ const s = StyleSheet.create({
   modalHeading: {
     fontSize: 16.5,
     fontWeight: '800',
-    color: '#0D1B3E',
+    color: '#0F172A',
   },
   modalHeroCardStack: {
     width: '100%',
