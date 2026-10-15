@@ -78,7 +78,7 @@ export default function VirtualCardsScreen() {
   // Form Inputs
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'NGN'>('USD');
   const [cardNameInput, setCardNameInput] = useState('ABU MAFHAL USD Card');
-  const [initialFundInput, setInitialFundInput] = useState('50');
+  const [initialFundInput, setInitialFundInput] = useState('1.5');
   const [topUpAmountInput, setTopUpAmountInput] = useState('50');
   const [limitInput, setLimitInput] = useState('500');
   const [renameInput, setRenameInput] = useState('');
@@ -177,8 +177,8 @@ export default function VirtualCardsScreen() {
 
   const handleCreateVirtualCard = async () => {
     const fundAmount = Number(initialFundInput) || 0;
-    if (selectedCurrency === 'USD' && fundAmount < 10) {
-      triggerToast('Minimum initial funding for USD Card is $10');
+    if (selectedCurrency === 'USD' && fundAmount < 1.5) {
+      triggerToast('Minimum initial funding for USD Card is $1.50');
       return;
     }
 
@@ -551,7 +551,7 @@ export default function VirtualCardsScreen() {
                 activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
-                  <Ionicons name="eye-outline" size={18} color="#0F172A" />
+                  <Ionicons name="eye-outline" size={20} color="#0F172A" />
                 </View>
                 <Text style={s.actionTileTxt}>Details</Text>
               </TouchableOpacity>
@@ -565,7 +565,7 @@ export default function VirtualCardsScreen() {
                 <View style={[s.actionTileIconBox, selectedCard.status === 'frozen' && { backgroundColor: '#EFF6FF' }]}>
                   <Ionicons
                     name={selectedCard.status === 'frozen' ? 'lock-open-outline' : 'snow-outline'}
-                    size={18}
+                    size={20}
                     color={selectedCard.status === 'frozen' ? '#2563EB' : '#0F172A'}
                   />
                 </View>
@@ -581,7 +581,7 @@ export default function VirtualCardsScreen() {
                 activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
-                  <Ionicons name="options-outline" size={18} color="#0F172A" />
+                  <Ionicons name="options-outline" size={20} color="#0F172A" />
                 </View>
                 <Text style={s.actionTileTxt}>Limits</Text>
               </TouchableOpacity>
@@ -593,7 +593,7 @@ export default function VirtualCardsScreen() {
                 activeOpacity={0.8}
               >
                 <View style={s.actionTileIconBox}>
-                  <Ionicons name="receipt-outline" size={18} color="#0F172A" />
+                  <Ionicons name="receipt-outline" size={20} color="#0F172A" />
                 </View>
                 <Text style={s.actionTileTxt}>History</Text>
               </TouchableOpacity>
@@ -605,7 +605,7 @@ export default function VirtualCardsScreen() {
             <View style={s.bottomExecutiveCard}>
               <View style={s.bottomExecHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="time-outline" size={15} color="#0F172A" />
+                  <Ionicons name="time-outline" size={16} color="#0F172A" />
                   <Text style={s.bottomExecTitle}>Recent Activity</Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowTransactionsModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -865,7 +865,7 @@ export default function VirtualCardsScreen() {
                       value={initialFundInput}
                       onChangeText={setInitialFundInput}
                       keyboardType="numeric"
-                      placeholder="50.00"
+                      placeholder="1.50"
                       placeholderTextColor="#94A3B8"
                       style={[s.textInput, { fontSize: 18, fontWeight: '800' }]}
                     />
@@ -873,7 +873,7 @@ export default function VirtualCardsScreen() {
 
                   {/* Quick Pills */}
                   <View style={s.quickAmountsRow}>
-                    {(selectedCurrency === 'USD' ? ['10', '50', '100', '200'] : ['5000', '10000', '25000', '50000']).map(amt => (
+                    {(selectedCurrency === 'USD' ? ['1.5', '5', '10', '25'] : ['2000', '5000', '10000', '25000']).map(amt => (
                       <TouchableOpacity
                         key={amt}
                         onPress={() => setInitialFundInput(amt)}
@@ -1737,10 +1737,10 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   liveCardWrapper: {
-    width: '92%',
-    maxWidth: 340,
+    width: '94%',
+    maxWidth: 356,
     aspectRatio: 1.586,
-    borderRadius: 16,
+    borderRadius: 18,
     position: 'relative',
     overflow: 'hidden',
     shadowColor: '#0F172A',
@@ -1778,10 +1778,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   liveCardNumberTxt: {
-    fontSize: 15.5,
+    fontSize: 16.8,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 2.6,
+    letterSpacing: 2.8,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
@@ -1793,7 +1793,7 @@ const s = StyleSheet.create({
     left: '58%',
   },
   liveCardExpiryTxt: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#FFFFFF',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
@@ -1809,7 +1809,7 @@ const s = StyleSheet.create({
     maxWidth: '56%',
   },
   liveCardHolderTxt: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 1.1,
@@ -1875,36 +1875,36 @@ const s = StyleSheet.create({
     backgroundColor: '#D97706',
   },
 
-  // ── Balance Card (Compact & High Contrast) ──
+  // ── Balance Card (Comfortable & High Contrast) ──
   balanceCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 6,
+    marginVertical: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   balanceLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     fontWeight: '600',
   },
   balanceAmount: {
-    fontSize: 22,
+    fontSize: 25,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.4,
   },
   balanceSub: {
-    fontSize: 11.5,
+    fontSize: 12,
     color: '#64748B',
     fontWeight: '600',
   },
@@ -1912,9 +1912,9 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F59E0B',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 22,
     gap: 4,
     shadowColor: '#F59E0B',
     shadowOpacity: 0.25,
@@ -1922,43 +1922,43 @@ const s = StyleSheet.create({
     elevation: 2,
   },
   topUpBtnTxt: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '800',
     color: '#070D1E',
   },
 
-  // ── 4 Action Tiles Grid (Sleek Compact Row) ──
+  // ── 4 Action Tiles Grid (Comfortable Touch Targets) ──
   actionsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
-    marginVertical: 6,
+    gap: 10,
+    marginVertical: 8,
   },
   actionTile: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 2,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 3,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
   },
   actionTileIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   actionTileTxt: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#0F172A',
     textAlign: 'center',
@@ -1967,16 +1967,16 @@ const s = StyleSheet.create({
   // ── Bottom Executive Card ──
   bottomExecutiveCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginTop: 4,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
   },
   bottomExecHeader: {
     flexDirection: 'row',
@@ -1985,41 +1985,41 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   bottomExecTitle: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#0F172A',
   },
   bottomExecViewAll: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#D97706',
   },
   miniTxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
   miniTxIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   miniTxMerchant: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
     color: '#0F172A',
   },
   miniTxDate: {
-    fontSize: 10,
+    fontSize: 10.5,
     color: '#94A3B8',
     marginTop: 1,
   },
   miniTxAmount: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     color: '#EF4444',
   },
