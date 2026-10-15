@@ -47,6 +47,8 @@ const COLORS = {
   infoLight: '#eff6ff',
 };
 
+const PLACEHOLDER_COLOR = '#94a3b8';
+
 type Pricing = { 
   id: string; 
   name: string; 
@@ -56,8 +58,8 @@ type Pricing = {
   active?: boolean 
 };
 
-// Reusable Custom Dropdown (Mobile-first)
-const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select...", required = false, style }: any) => {
+// Reusable Custom Dropdown (Mobile-first, compact & sleek)
+const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select option...", required = false, style }: any) => {
   const [visible, setVisible] = useState(false);
   const safeOptions = Array.isArray(options) ? options : [];
   return (
@@ -70,17 +72,17 @@ const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select
         onPress={() => setVisible(!visible)}
         activeOpacity={0.8}
       >
-        <Text style={[s.inputText, !value && { color: COLORS.textSub }]} numberOfLines={1}>
+        <Text style={[s.inputText, !value && s.inputPlaceholderText]} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Ionicons name={visible ? "chevron-up" : "chevron-down"} size={16} color={COLORS.textSub} />
+        <Ionicons name={visible ? "chevron-up" : "chevron-down"} size={14} color={COLORS.textSub} />
       </TouchableOpacity>
       
       {visible && (
         <View style={s.dropdownList}>
           <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ maxHeight: 220 }}>
             {safeOptions.length === 0 ? (
-              <Text style={{ textAlign: 'center', padding: 12, color: COLORS.textSub, fontSize: 13 }}>No options</Text>
+              <Text style={{ textAlign: 'center', padding: 12, color: COLORS.textSub, fontSize: 12 }}>No options</Text>
             ) : (
               safeOptions.map((opt: string, i: number) => (
                 <TouchableOpacity 
@@ -89,7 +91,7 @@ const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select
                   onPress={() => { onSelect(opt); setVisible(false); }}
                 >
                   <Text style={[s.dropdownItemTxt, value === opt && s.dropdownItemTxtActive]}>{opt}</Text>
-                  {value === opt && <Ionicons name="checkmark" size={16} color={COLORS.navy} />}
+                  {value === opt && <Ionicons name="checkmark" size={15} color={COLORS.navy} />}
                 </TouchableOpacity>
               ))
             )}
@@ -109,7 +111,7 @@ const MONTHS = [
 ];
 const YEARS = Array.from({ length: 70 }, (_, i) => String(2008 - i));
 
-// Date Picker Modal (Mobile-first)
+// Date Picker Modal (Mobile-first, compact & sleek)
 const CustomDatePicker = ({ label, value, onChange, required = false, style }: any) => {
   const [showModal, setShowModal] = useState(false);
   const parts = (value || '').split('-');
@@ -140,7 +142,7 @@ const CustomDatePicker = ({ label, value, onChange, required = false, style }: a
 
   const formattedDisplay = value 
     ? `${selDay} ${getMonthName(selMonth)} ${selYear}` 
-    : 'Select Date of Birth';
+    : 'Select date of birth';
 
   return (
     <View style={[s.inputContainer, style]}>
@@ -152,10 +154,10 @@ const CustomDatePicker = ({ label, value, onChange, required = false, style }: a
         onPress={() => setShowModal(true)}
         activeOpacity={0.8}
       >
-        <Text style={[s.inputText, !value && { color: COLORS.textSub }]}>
+        <Text style={[s.inputText, !value && s.inputPlaceholderText]}>
           {formattedDisplay}
         </Text>
-        <Ionicons name="calendar-outline" size={17} color={COLORS.navy} />
+        <Ionicons name="calendar-outline" size={15} color={COLORS.navy} />
       </TouchableOpacity>
 
       <Modal visible={showModal} transparent animationType="fade" onRequestClose={() => setShowModal(false)}>
@@ -705,7 +707,8 @@ export default function CACServices() {
           <Text style={s.inputLabel}>Full Legal Name <Text style={{ color: COLORS.error }}>*</Text></Text>
           <TextInput 
             style={s.inputBox} 
-            placeholder="As written on NIN or Valid ID"
+            placeholder="Full name as on NIN / ID"
+            placeholderTextColor={PLACEHOLDER_COLOR}
             value={data.fullName} 
             onChangeText={t => updateField('fullName', t)} 
           />
@@ -719,27 +722,55 @@ export default function CACServices() {
         <View style={s.formGrid2}>
           <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
             <Text style={s.inputLabel}>Phone Number <Text style={{ color: COLORS.error }}>*</Text></Text>
-            <TextInput style={s.inputBox} keyboardType="phone-pad" placeholder="080..." value={data.phone} onChangeText={t => updateField('phone', t)} />
+            <TextInput 
+              style={s.inputBox} 
+              keyboardType="phone-pad" 
+              placeholder="e.g. 08012345678" 
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={data.phone} 
+              onChangeText={t => updateField('phone', t)} 
+            />
           </View>
           <View style={[s.inputContainer, { flex: 1, minWidth: 0 }]}>
             <Text style={s.inputLabel}>NIN (11 Digits)</Text>
-            <TextInput style={s.inputBox} keyboardType="numeric" maxLength={11} placeholder="11 digits" value={data.nin} onChangeText={t => updateField('nin', t)} />
+            <TextInput 
+              style={s.inputBox} 
+              keyboardType="numeric" 
+              maxLength={11} 
+              placeholder="11-digit NIN" 
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={data.nin} 
+              onChangeText={t => updateField('nin', t)} 
+            />
           </View>
         </View>
 
         <View style={s.inputContainer}>
           <Text style={s.inputLabel}>Email Address</Text>
-          <TextInput style={s.inputBox} keyboardType="email-address" placeholder="name@email.com" value={data.email} onChangeText={t => updateField('email', t)} />
+          <TextInput 
+            style={s.inputBox} 
+            keyboardType="email-address" 
+            placeholder="officer@email.com" 
+            placeholderTextColor={PLACEHOLDER_COLOR}
+            value={data.email} 
+            onChangeText={t => updateField('email', t)} 
+          />
         </View>
 
         <View style={s.formGrid2}>
           <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="State of Origin" value={data.state} options={STATE_LIST} onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} />
-          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="LGA" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State" />
+          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="LGA" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State First" />
         </View>
 
         <View style={s.inputContainer}>
           <Text style={s.inputLabel}>Residential Address</Text>
-          <TextInput style={s.inputBox} placeholder="Street, house number, area" value={data.address} onChangeText={t => updateField('address', t)} />
+          <TextInput 
+            style={s.inputBox} 
+            placeholder="Street address, house number, area" 
+            placeholderTextColor={PLACEHOLDER_COLOR}
+            value={data.address} 
+            onChangeText={t => updateField('address', t)} 
+          />
         </View>
 
         {/* Upload Tiles with Live Preview */}
@@ -852,7 +883,7 @@ export default function CACServices() {
         })}
       </View>
 
-      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {/* Dynamic Promotional Banner */}
         <DynamicBanners placement="cac" />
 
@@ -1115,6 +1146,7 @@ export default function CACServices() {
                     <TextInput 
                       style={s.inputBox} 
                       placeholder="e.g. Abu Mafhal Multi Services"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
                       value={proposedName1} 
                       onChangeText={setProposedName1} 
                     />
@@ -1126,6 +1158,7 @@ export default function CACServices() {
                       <TextInput 
                         style={s.inputBox} 
                         placeholder="e.g. BN-1234567" 
+                        placeholderTextColor={PLACEHOLDER_COLOR}
                         value={rcNumber} 
                         onChangeText={setRcNumber} 
                       />
@@ -1135,6 +1168,7 @@ export default function CACServices() {
                       <TextInput 
                         style={s.inputBox} 
                         placeholder="e.g. 2021" 
+                        placeholderTextColor={PLACEHOLDER_COLOR}
                         keyboardType="numeric"
                         value={registrationYear} 
                         onChangeText={setRegistrationYear} 
@@ -1149,6 +1183,7 @@ export default function CACServices() {
                     <TextInput 
                       style={s.inputBox} 
                       placeholder="e.g. Abu Mafhal General Merchant"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
                       value={proposedName1} 
                       onChangeText={setProposedName1} 
                     />
@@ -1161,6 +1196,7 @@ export default function CACServices() {
                     <TextInput 
                       style={s.inputBox} 
                       placeholder="e.g. Abu Mafhal Integrated Services"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
                       value={proposedName2} 
                       onChangeText={setProposedName2} 
                     />
@@ -1171,7 +1207,8 @@ export default function CACServices() {
                       <Text style={s.inputLabel}>Proposed Name 3 (Optional for NGO)</Text>
                       <TextInput 
                         style={s.inputBox} 
-                        placeholder="Third alternative name"
+                        placeholder="Optional third alternative choice"
+                        placeholderTextColor={PLACEHOLDER_COLOR}
                         value={proposedName3} 
                         onChangeText={setProposedName3} 
                       />
@@ -1180,12 +1217,6 @@ export default function CACServices() {
                 </>
               )}
             </View>
-
-            {/* Next Step Button */}
-            <TouchableOpacity style={s.btnPrimary} onPress={handleNextFromStep1} activeOpacity={0.8}>
-              <Text style={s.btnPrimaryTxt}>Next: Business Details</Text>
-              <Ionicons name="arrow-forward" size={17} color={COLORS.white} />
-            </TouchableOpacity>
 
           </View>
         )}
@@ -1215,7 +1246,8 @@ export default function CACServices() {
                   <TextInput 
                     style={s.inputBox} 
                     keyboardType="phone-pad" 
-                    placeholder="08012345678" 
+                    placeholder="e.g. 08012345678" 
+                    placeholderTextColor={PLACEHOLDER_COLOR}
                     value={phone} 
                     onChangeText={setPhone} 
                   />
@@ -1226,6 +1258,7 @@ export default function CACServices() {
                     style={s.inputBox} 
                     keyboardType="email-address" 
                     placeholder="company@email.com" 
+                    placeholderTextColor={PLACEHOLDER_COLOR}
                     value={email} 
                     onChangeText={setEmail} 
                   />
@@ -1236,7 +1269,8 @@ export default function CACServices() {
                 <Text style={s.inputLabel}>Nature of Business / Core Activities</Text>
                 <TextInput 
                   style={s.inputBox} 
-                  placeholder="e.g. General Contracts, Trading, Logistics" 
+                  placeholder="e.g. Trading, General Contracts, Logistics" 
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={natureOfBusiness} 
                   onChangeText={setNatureOfBusiness} 
                 />
@@ -1270,7 +1304,8 @@ export default function CACServices() {
                   <Text style={s.inputLabel}>Shop / Suite / House No.</Text>
                   <TextInput 
                     style={s.inputBox} 
-                    placeholder="e.g. Suite 4B or No 12" 
+                    placeholder="e.g. Suite 4B or No. 12" 
+                    placeholderTextColor={PLACEHOLDER_COLOR}
                     value={officeNumber} 
                     onChangeText={setOfficeNumber} 
                   />
@@ -1280,6 +1315,7 @@ export default function CACServices() {
                   <TextInput 
                     style={s.inputBox} 
                     placeholder="e.g. Ahmadu Bello Way" 
+                    placeholderTextColor={PLACEHOLDER_COLOR}
                     value={officeAddress} 
                     onChangeText={setOfficeAddress} 
                   />
@@ -1294,6 +1330,7 @@ export default function CACServices() {
                       style={s.inputBox} 
                       keyboardType="numeric" 
                       placeholder="e.g. 5" 
+                      placeholderTextColor={PLACEHOLDER_COLOR}
                       value={tenure} 
                       onChangeText={setTenure} 
                     />
@@ -1301,9 +1338,10 @@ export default function CACServices() {
                   <View style={s.inputContainer}>
                     <Text style={s.inputLabel}>Aims & Objectives</Text>
                     <TextInput 
-                      style={[s.inputBox, { height: 75, textAlignVertical: 'top', paddingTop: 8 }]} 
+                      style={[s.inputBox, { height: 70, textAlignVertical: 'top', paddingTop: 8 }]} 
                       multiline 
-                      placeholder="Summary of organizational goals and objectives..."
+                      placeholder="Brief summary of organizational aims & goals..."
+                      placeholderTextColor={PLACEHOLDER_COLOR}
                       value={aims} 
                       onChangeText={setAims} 
                     />
@@ -1368,7 +1406,8 @@ export default function CACServices() {
                   <TextInput
                     style={s.inputBox}
                     keyboardType="numeric"
-                    placeholder={`e.g. ${currentConfig.included_share_capital || 1000000}`}
+                    placeholder={`e.g. ${(currentConfig.included_share_capital || 1000000).toLocaleString()}`}
+                    placeholderTextColor={PLACEHOLDER_COLOR}
                     value={customShareCapital}
                     onChangeText={(val) => {
                       setCustomShareCapital(val);
@@ -1389,18 +1428,6 @@ export default function CACServices() {
                 </View>
               </View>
             )}
-
-            {/* Stepper Buttons */}
-            <View style={s.navButtonsRow}>
-              <TouchableOpacity style={s.btnSecondary} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                <Ionicons name="arrow-back" size={16} color={COLORS.navy} />
-                <Text style={s.btnSecondaryTxt}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.btnPrimary, { flex: 1 }]} onPress={handleNextFromStep2} activeOpacity={0.8}>
-                <Text style={s.btnPrimaryTxt}>Next: Officers & Docs</Text>
-                <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
-              </TouchableOpacity>
-            </View>
 
           </View>
         )}
@@ -1542,18 +1569,6 @@ export default function CACServices() {
                 )}
               </>
             )}
-
-            {/* Stepper Buttons */}
-            <View style={s.navButtonsRow}>
-              <TouchableOpacity style={s.btnSecondary} onPress={() => setCurrentStep(2)} activeOpacity={0.8}>
-                <Ionicons name="arrow-back" size={16} color={COLORS.navy} />
-                <Text style={s.btnSecondaryTxt}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.btnPrimary, { flex: 1 }]} onPress={handleNextFromStep3} activeOpacity={0.8}>
-                <Text style={s.btnPrimaryTxt}>Next: Review & Payment</Text>
-                <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
-              </TouchableOpacity>
-            </View>
 
           </View>
         )}
@@ -1727,73 +1742,61 @@ export default function CACServices() {
               )}
             </View>
 
-            {/* Navigation & Submit Buttons */}
-            <View style={s.navButtonsRow}>
-              <TouchableOpacity style={s.btnSecondary} onPress={() => setCurrentStep(3)} activeOpacity={0.8}>
-                <Ionicons name="arrow-back" size={16} color={COLORS.navy} />
-                <Text style={s.btnSecondaryTxt}>Edit Details</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[s.btnPrimary, { flex: 1.8 }]} 
-                onPress={handleSubmit} 
-                disabled={submitting}
-                activeOpacity={0.8}
-              >
-                {submitting ? (
-                  <ActivityIndicator color={COLORS.white} />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-done" size={18} color={COLORS.white} />
-                    <Text style={s.btnPrimaryTxt}>{editId ? 'Update Application' : 'Pay & Submit'}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-
           </View>
         )}
 
       </ScrollView>
 
-      {/* Mobile-First Sticky Quotation & Quick Action Bar */}
-      <View style={s.floatingQuoteBar}>
+      {/* Modern In-Flow Docked Navigation & Live Quote Bar */}
+      <View style={s.dockedFooterBar}>
+        {currentStep > 1 && (
+          <TouchableOpacity 
+            style={s.dockedBackBtn} 
+            onPress={() => setCurrentStep(currentStep - 1)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={14} color={COLORS.navy} />
+            <Text style={s.dockedBackBtnTxt}>Back</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity 
-          style={s.floatingQuoteLeft} 
+          style={s.dockedQuoteInfo} 
           onPress={() => setShowBreakdownModal(true)}
           activeOpacity={0.7}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={s.floatingQuoteLabel}>Live Quotation</Text>
-            <Ionicons name="chevron-up-circle" size={14} color={COLORS.gold} />
+            <Text style={s.dockedQuoteLabel}>Live Quote</Text>
+            <Ionicons name="chevron-up-circle" size={13} color={COLORS.gold} />
           </View>
-          <Text style={s.floatingQuoteAmount}>₦{totalCost.toLocaleString()}</Text>
-          <Text style={s.floatingQuoteTime}>⏱ {currentConfig.processing_time || '24-48h'}</Text>
+          <Text style={s.dockedQuoteAmount}>₦{totalCost.toLocaleString()}</Text>
+          <Text style={s.dockedQuoteTime}>⏱ {currentConfig.processing_time || '24-48h'}</Text>
         </TouchableOpacity>
 
-        <View style={s.floatingQuoteRight}>
+        <View style={s.dockedActionRight}>
           {currentStep === 1 && (
-            <TouchableOpacity style={s.floatingNextBtn} onPress={handleNextFromStep1} activeOpacity={0.85}>
-              <Text style={s.floatingNextBtnTxt}>Next: Business</Text>
-              <Ionicons name="arrow-forward" size={15} color={COLORS.white} />
+            <TouchableOpacity style={s.dockedNextBtn} onPress={handleNextFromStep1} activeOpacity={0.85}>
+              <Text style={s.dockedNextBtnTxt}>Next: Business</Text>
+              <Ionicons name="arrow-forward" size={14} color={COLORS.white} />
             </TouchableOpacity>
           )}
           {currentStep === 2 && (
-            <TouchableOpacity style={s.floatingNextBtn} onPress={handleNextFromStep2} activeOpacity={0.85}>
-              <Text style={s.floatingNextBtnTxt}>Next: Officers</Text>
-              <Ionicons name="arrow-forward" size={15} color={COLORS.white} />
+            <TouchableOpacity style={s.dockedNextBtn} onPress={handleNextFromStep2} activeOpacity={0.85}>
+              <Text style={s.dockedNextBtnTxt}>Next: Officers</Text>
+              <Ionicons name="arrow-forward" size={14} color={COLORS.white} />
             </TouchableOpacity>
           )}
           {currentStep === 3 && (
-            <TouchableOpacity style={s.floatingNextBtn} onPress={handleNextFromStep3} activeOpacity={0.85}>
-              <Text style={s.floatingNextBtnTxt}>Next: Review</Text>
-              <Ionicons name="arrow-forward" size={15} color={COLORS.white} />
+            <TouchableOpacity style={s.dockedNextBtn} onPress={handleNextFromStep3} activeOpacity={0.85}>
+              <Text style={s.dockedNextBtnTxt}>Next: Review</Text>
+              <Ionicons name="arrow-forward" size={14} color={COLORS.white} />
             </TouchableOpacity>
           )}
           {currentStep === 4 && (
             <TouchableOpacity 
               style={[
-                s.floatingSubmitBtn, 
-                (submitting || (walletBalance !== null && walletBalance < totalCost)) && s.floatingSubmitBtnDisabled
+                s.dockedSubmitBtn, 
+                (submitting || (walletBalance !== null && walletBalance < totalCost)) && s.dockedSubmitBtnDisabled
               ]} 
               onPress={handleSubmit} 
               disabled={submitting}
@@ -1804,7 +1807,7 @@ export default function CACServices() {
               ) : (
                 <>
                   <Ionicons name="checkmark-done" size={16} color={COLORS.white} />
-                  <Text style={s.floatingNextBtnTxt}>{editId ? 'Update' : 'Pay & Submit'}</Text>
+                  <Text style={s.dockedNextBtnTxt}>{editId ? 'Update' : 'Pay & Submit'}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -2086,16 +2089,17 @@ const s = StyleSheet.create({
   cardSectionTitle: { fontSize: 11, fontWeight: '800', color: COLORS.navy, letterSpacing: 0.5, marginBottom: 12 },
 
   // Inputs & Grid
-  inputContainer: { marginBottom: 12, width: '100%', maxWidth: '100%' },
-  inputLabel: { fontSize: 11.5, fontWeight: '700', color: COLORS.textMain, marginBottom: 5 },
+  inputContainer: { marginBottom: 11, width: '100%', maxWidth: '100%' },
+  inputLabel: { fontSize: 11, fontWeight: '700', color: '#334155', marginBottom: 4 },
   inputBox: {
-    height: 42, borderWidth: 1, borderColor: COLORS.border, borderRadius: 9,
-    paddingHorizontal: 12, fontSize: 13, color: COLORS.textMain, backgroundColor: '#fcfcfd',
+    height: 38, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8,
+    paddingHorizontal: 11, fontSize: 12, color: COLORS.textMain, backgroundColor: '#ffffff',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     width: '100%', maxWidth: '100%',
   },
-  inputBoxActive: { borderColor: COLORS.navy },
-  inputText: { fontSize: 13, color: COLORS.textMain },
+  inputBoxActive: { borderColor: COLORS.navy, borderWidth: 1.5 },
+  inputText: { fontSize: 12, color: COLORS.textMain },
+  inputPlaceholderText: { fontSize: 11.5, color: '#94a3b8' },
   formGrid2: { flexDirection: 'row', gap: 10, width: '100%', alignItems: 'flex-start' },
 
   // Dropdown
@@ -2497,77 +2501,86 @@ const s = StyleSheet.create({
   },
   btnSecondaryTxt: { color: COLORS.navy, fontSize: 13, fontWeight: '700' },
 
-  // Mobile Sticky Floating Bar
-  floatingQuoteBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  // Modern In-Flow Docked Bottom Bar (Zero Overlap)
+  dockedFooterBar: {
     backgroundColor: '#0a142f',
     borderTopWidth: 1.5,
     borderTopColor: '#1e293b',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    gap: 8,
   },
-  floatingQuoteLeft: {
+  dockedBackBtn: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  dockedBackBtnTxt: {
+    color: COLORS.navy,
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  dockedQuoteInfo: {
     flex: 1,
-    paddingRight: 10,
+    paddingHorizontal: 4,
   },
-  floatingQuoteLabel: {
-    fontSize: 10,
+  dockedQuoteLabel: {
+    fontSize: 9.5,
     fontWeight: '700',
     color: 'rgba(255,255,255,0.7)',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
-  floatingQuoteAmount: {
-    fontSize: 16,
+  dockedQuoteAmount: {
+    fontSize: 15,
     fontWeight: '900',
     color: COLORS.white,
     marginTop: 1,
   },
-  floatingQuoteTime: {
-    fontSize: 9.5,
+  dockedQuoteTime: {
+    fontSize: 9,
     color: COLORS.gold,
     marginTop: 1,
     fontWeight: '600',
   },
-  floatingQuoteRight: {
+  dockedActionRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  floatingNextBtn: {
+  dockedNextBtn: {
     backgroundColor: COLORS.goldDk,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 9,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
-  floatingNextBtnTxt: {
+  dockedNextBtnTxt: {
     color: COLORS.white,
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
   },
-  floatingSubmitBtn: {
+  dockedSubmitBtn: {
     backgroundColor: COLORS.success,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 9,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
-  floatingSubmitBtnDisabled: {
+  dockedSubmitBtnDisabled: {
     opacity: 0.5,
   },
 
