@@ -603,11 +603,34 @@ export default function ManageCAC() {
 
         {!loading && activeTab === 'pricing' && (
           <View>
+            {/* Direct Link Banner to Dedicated CAC Pricing Suite */}
+            <TouchableOpacity 
+              style={[s.infoBanner, { backgroundColor: '#eff6ff', borderColor: '#3b82f6', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 }]}
+              onPress={() => router.push('/manage/cac-pricing' as any)}
+              activeOpacity={0.85}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="sparkles" size={18} color="#1d4ed8" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.navy }}>CAC Pricing & Configuration Suite</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2 }}>
+                    Manage share capital increments, director surcharges, promo dates, and live quotation simulator.
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.navy, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>Open Suite</Text>
+                <Ionicons name="arrow-forward" size={12} color="#fff" />
+              </View>
+            </TouchableOpacity>
+
             <View style={s.infoBanner}>
               <Ionicons name="pricetag" size={20} color={COLORS.navy} />
               <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={s.infoBannerTitle}>Pricing Management</Text>
-                <Text style={s.infoBannerText}>Set the costs for your CAC services and TIN Processing Add-on. Enter the new amount and tap Save.</Text>
+                <Text style={s.infoBannerTitle}>Quick Pricing Management</Text>
+                <Text style={s.infoBannerText}>Set the base costs for your CAC services and TIN Processing Add-on. Enter the new amount and tap Save.</Text>
               </View>
             </View>
 

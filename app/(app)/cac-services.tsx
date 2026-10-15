@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   View, Text, ScrollView, TouchableOpacity, TextInput, 
   ActivityIndicator, Alert, Image, Modal, StyleSheet, 
@@ -14,6 +14,17 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
 import DynamicBanners from '../../components/DynamicBanners';
 import { NIGERIA_STATES, STATE_LIST } from '../../utils/nigeriaStates';
+import {
+  CacServiceCode,
+  CacPricingConfig,
+  CacCalculationResult,
+  fetchCacPricingConfigurations,
+  calculateCacPrice,
+  resolveServiceCode,
+  formatNaira,
+  DEFAULT_CAC_PRICING_CONFIGS,
+  CAC_SERVICES_ORDER,
+} from '../../services/cacPricingService';
 
 const COLORS = {
   navy: '#0d1b3e',
@@ -239,12 +250,47 @@ export default function CACServices() {
   const [pricings, setPricings] = useState<Pricing[]>([]);
   const [regType, setRegType] = useState<Pricing | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
+
+  // Dynamic Pricing Configuration State
+  const [pricingConfigs, setPricingConfigs] = useState<Record<CacServiceCode, CacPricingConfig>>({
+    ...DEFAULT_CAC_PRICING_CONFIGS,
+  });
+  const [activeServiceCode, setActiveServiceCode] = useState<CacServiceCode>('business_name');
+  const [shareCapital, setShareCapital] = useState<number>(1000000);
+  const [customShareCapital, setCustomShareCapital] = useState<string>('');
 
   // TIN & Retrieval Add-on State
   const [includeTin, setIncludeTin] = useState(false);
-  const [tinFee, setTinFee] = useState(5000);
+  const [tinFee, setTinFee] = useState(3000);
   const [rcNumber, setRcNumber] = useState('');
   const [registrationYear, setRegistrationYear] = useState('');
+
+  const handleSelectServiceCode = (code: CacServiceCode) => {
+    const config = pricingConfigs[code] || DEFAULT_CAC_PRICING_CONFIGS[code];
+    if (!config.is_available) {
+      return Alert.alert('Service Unavailable', 'This registration service is currently offline for maintenance.');
+    }
+    setActiveServiceCode(code);
+    const matched = pricings.find(p => p.id === code || resolveServiceCode(p.name) === code);
+    const effectivePrice = config.is_promo_active && config.promo_price ? config.promo_price : config.regular_price;
+    if (matched) {
+      setRegType(matched);
+    } else {
+      setRegType({
+        id: code,
+        name: config.service_name,
+        price: effectivePrice,
+        original_price: config.regular_price,
+      });
+    }
+
+    if (code === 'plc') {
+      setShareCapital(2000000);
+    } else if (code === 'ltd' || code === 'upgrade_to_ltd') {
+      setShareCapital(1000000);
+    }
+  };
 
   // Form State: Names
   const [proposedName1, setProposedName1] = useState('');
@@ -295,69 +341,41 @@ export default function CACServices() {
     try {
       setLoading(true);
       
-      // Fetch TIN Add-on Fee from settings
-      try {
-        const { data: tinSetting } = await supabase.from('app_settings').select('value').eq('key', 'cac_tin_fee').maybeSingle();
-        if (tinSetting && tinSetting.value) {
-          const parsed = parseFloat(tinSetting.value);
-          if (!isNaN(parsed) && parsed >= 0) setTinFee(parsed);
-        }
-      } catch (err) {
-        console.log("Failed to fetch tin setting:", err);
-      }
+      const { configs, tinFee: fetchedTin } = await fetchCacPricingConfigurations();
+      setPricingConfigs(configs);
+      if (fetchedTin > 0) setTinFee(fetchedTin);
 
-      const { data, error } = await supabase.from('cac_pricing').select('*').eq('active', true).order('price', { ascending: true });
-      if (error && error.code !== '42P01') {
-        console.error('Error fetching CAC pricing:', error);
-      }
+      const legacyPricings: Pricing[] = CAC_SERVICES_ORDER.map(code => {
+        const c = configs[code];
+        const effectivePrice = c.is_promo_active && c.promo_price ? c.promo_price : c.regular_price;
+        return {
+          id: c.service_code,
+          name: c.service_name,
+          price: effectivePrice,
+          original_price: c.regular_price,
+          discount_label: c.is_promo_active && c.regular_price > effectivePrice 
+            ? `${Math.round(((c.regular_price - effectivePrice) / c.regular_price) * 100)}% OFF` 
+            : null,
+          active: c.is_available,
+        };
+      });
 
-      let allPricings: Pricing[] = data ? [...data] : [];
-      
-      // Ensure "CAC Certificate Retrieval" option is available
-      const hasRetrieval = allPricings.some(p => p.name.toLowerCase().includes('retrieval') || p.name.toLowerCase().includes('certificate search'));
-      if (!hasRetrieval) {
-        allPricings.push({
-          id: 'cac-certificate-retrieval-default',
-          name: 'CAC Certificate Retrieval / Document Search',
-          price: 4000
-        });
-      }
-
-      // Fetch custom discount & original price data from app_settings
-      try {
-        const { data: settingsData } = await supabase.from('app_settings').select('key, value').like('key', 'cac_price_%');
-        if (settingsData) {
-          const metaMap: Record<string, any> = {};
-          settingsData.forEach(s => {
-            try {
-              metaMap[s.key] = JSON.parse(s.value);
-            } catch (_) {
-              metaMap[s.key] = { price: parseFloat(s.value) };
-            }
-          });
-
-          allPricings = allPricings.map(p => {
-            const meta = metaMap[`cac_price_${p.id}`];
-            return {
-              ...p,
-              original_price: p.original_price ?? (meta?.original_price || null),
-              discount_label: p.discount_label ?? (meta?.discount_label || null),
-            };
-          });
-        }
-      } catch (err) {
-        console.log("Pricing meta fetch err:", err);
-      }
-
-      setPricings(allPricings);
+      setPricings(legacyPricings);
 
       if (editId) {
-        await loadEditData(editId as string, allPricings);
-      } else if (allPricings.length > 0) {
-        setRegType(allPricings[0]);
+        await loadEditData(editId as string, legacyPricings);
+      } else if (legacyPricings.length > 0) {
+        setRegType(legacyPricings[0]);
+        const initialCode = resolveServiceCode(legacyPricings[0].name);
+        setActiveServiceCode(initialCode);
+        if (initialCode === 'plc') {
+          setShareCapital(2000000);
+        } else if (initialCode === 'ltd' || initialCode === 'upgrade_to_ltd') {
+          setShareCapital(1000000);
+        }
       }
     } catch (e) {
-      console.error(e);
+      console.error('Pricing fetch error:', e);
     } finally {
       setLoading(false);
     }
@@ -386,6 +404,9 @@ export default function CACServices() {
           if (data.business_info.apply_with_tin !== undefined) {
             setIncludeTin(Boolean(data.business_info.apply_with_tin));
           }
+          if (data.business_info.share_capital) {
+            setShareCapital(Number(data.business_info.share_capital));
+          }
         }
 
         if (data.proprietors && data.proprietors.length > 0) setProprietors(data.proprietors);
@@ -395,8 +416,10 @@ export default function CACServices() {
         if (data.witness && Object.keys(data.witness).length > 0) setWitness(data.witness);
         if (data.aims_and_objectives) setAims(data.aims_and_objectives);
 
-        if (data.pricing_id) {
-          const matchedPricing = availablePricings.find(p => p.id === data.pricing_id);
+        if (data.pricing_id || data.registration_type) {
+          const resolvedCode = resolveServiceCode(data.registration_type || data.pricing_id);
+          setActiveServiceCode(resolvedCode);
+          const matchedPricing = availablePricings.find(p => p.id === data.pricing_id || p.id === resolvedCode);
           if (matchedPricing) setRegType(matchedPricing);
         }
       }
@@ -406,12 +429,34 @@ export default function CACServices() {
     }
   };
 
-  const isNgo = regType?.name?.toLowerCase().includes('ngo');
-  const isPartnership = regType?.name?.toLowerCase().includes('partnership');
-  const isLimitedLiability = regType?.name?.toLowerCase().includes('limited liability') || regType?.name?.toLowerCase().includes('ltd') || regType?.name?.toLowerCase().includes('share');
-  const isRetrieval = regType?.name?.toLowerCase().includes('retrieval') || regType?.name?.toLowerCase().includes('certificate');
+  // Dynamic Calculation Result (Single Source of Truth)
+  const currentConfig: CacPricingConfig = useMemo(() => {
+    return pricingConfigs[activeServiceCode] || DEFAULT_CAC_PRICING_CONFIGS[activeServiceCode];
+  }, [pricingConfigs, activeServiceCode]);
 
-  const totalCost = (regType?.price || 0) + (includeTin ? tinFee : 0);
+  const quoteCalculation: CacCalculationResult = useMemo(() => {
+    const isCo = activeServiceCode === 'ltd' || activeServiceCode === 'plc' || activeServiceCode === 'upgrade_to_ltd';
+    const effectiveShareCap = isCo ? shareCapital : 0;
+    const directorsCount = isCo ? Math.max(proprietors.length, 1) : proprietors.length;
+    const shareholdersCount = isCo ? Math.max(proprietors.length, 2) : 0;
+    const trusteesCount = activeServiceCode === 'incorporated_trustee' ? trustees.length : 0;
+
+    return calculateCacPrice(currentConfig, {
+      shareCapital: effectiveShareCap,
+      directorsCount,
+      shareholdersCount,
+      trusteesCount,
+      includeTin,
+      tinFee,
+    });
+  }, [currentConfig, activeServiceCode, shareCapital, proprietors.length, trustees.length, includeTin, tinFee]);
+
+  const totalCost = quoteCalculation.totalAmount;
+
+  const isNgo = activeServiceCode === 'incorporated_trustee' || regType?.name?.toLowerCase().includes('ngo');
+  const isPartnership = activeServiceCode === 'business_name' && proprietors.length > 1;
+  const isLimitedLiability = activeServiceCode === 'ltd' || activeServiceCode === 'plc' || activeServiceCode === 'upgrade_to_ltd';
+  const isRetrieval = activeServiceCode === 'cac_retrieval';
 
   // Pick Image Helper
   const pickImage = async (setter: Function, field: string) => {
@@ -545,10 +590,23 @@ export default function CACServices() {
         email, phone, natureOfBusiness, state, lga, officeNumber, officeAddress, tenure,
         rcNumber: isRetrieval ? rcNumber.trim() : undefined,
         registrationYear: isRetrieval ? registrationYear.trim() : undefined,
+        service_code: activeServiceCode,
+        share_capital: isLimitedLiability ? shareCapital : 0,
+        directors_count: proprietors.length,
+        shareholders_count: isLimitedLiability ? Math.max(proprietors.length, 2) : 0,
+        trustees_count: isNgo ? trustees.length : 0,
         apply_with_tin: includeTin,
         tin_fee: includeTin ? tinFee : 0,
-        base_price: regType.price,
+        base_price: quoteCalculation.effectiveBasePrice,
+        regular_price: quoteCalculation.regularPrice,
+        promo_savings: quoteCalculation.promoSavings,
+        share_capital_fee: quoteCalculation.shareCapitalFee,
+        directors_fee: quoteCalculation.directorsFee,
+        shareholders_fee: quoteCalculation.shareholdersFee,
+        trustees_fee: quoteCalculation.trusteesFee,
         total_cost: totalCost,
+        quote_breakdown: quoteCalculation.items,
+        quote_valid_until: quoteCalculation.quoteExpiresAt,
         is_retrieval: isRetrieval
       };
 
@@ -684,7 +742,7 @@ export default function CACServices() {
           <TextInput style={s.inputBox} placeholder="Street, house number, area" value={data.address} onChangeText={t => updateField('address', t)} />
         </View>
 
-        {/* Upload Tiles */}
+        {/* Upload Tiles with Live Preview */}
         <View style={s.uploadGrid}>
           {/* Signature Upload */}
           <TouchableOpacity 
@@ -692,13 +750,24 @@ export default function CACServices() {
             onPress={() => isArray ? pickArrayImage(person as any[], index, 'signatureUri', setter) : pickImage(setter, 'signatureUri')}
             activeOpacity={0.8}
           >
-            <View style={[s.uploadIconBadge, data.signatureUri && { backgroundColor: COLORS.successLight }]}>
-              <Ionicons name={data.signatureUri ? "checkmark-circle" : "create-outline"} size={20} color={data.signatureUri ? COLORS.success : COLORS.navy} />
-            </View>
-            <Text style={s.uploadTileTitle}>Signature</Text>
-            <Text style={[s.uploadTileSub, data.signatureUri && { color: COLORS.success, fontWeight: '700' }]}>
-              {data.signatureUri ? 'Uploaded ✓' : 'Upload photo'}
-            </Text>
+            {data.signatureUri ? (
+              <View style={s.uploadThumbWrapper}>
+                <Image source={{ uri: data.signatureUri }} style={s.uploadedThumbImg} resizeMode="contain" />
+                <View style={s.uploadDoneBadge}>
+                  <Ionicons name="checkmark-circle" size={13} color={COLORS.success} />
+                  <Text style={s.uploadDoneBadgeTxt}>Signature Added</Text>
+                </View>
+                <Text style={s.uploadChangeTxt}>Tap to replace</Text>
+              </View>
+            ) : (
+              <>
+                <View style={s.uploadIconBadge}>
+                  <Ionicons name="create-outline" size={19} color={COLORS.navy} />
+                </View>
+                <Text style={s.uploadTileTitle}>Applicant Signature</Text>
+                <Text style={s.uploadTileSub}>Sign on plain paper & snap photo</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           {/* Passport Upload */}
@@ -707,13 +776,24 @@ export default function CACServices() {
             onPress={() => isArray ? pickArrayImage(person as any[], index, 'passportUri', setter) : pickImage(setter, 'passportUri')}
             activeOpacity={0.8}
           >
-            <View style={[s.uploadIconBadge, data.passportUri && { backgroundColor: COLORS.successLight }]}>
-              <Ionicons name={data.passportUri ? "checkmark-circle" : "camera-outline"} size={20} color={data.passportUri ? COLORS.success : COLORS.navy} />
-            </View>
-            <Text style={s.uploadTileTitle}>Passport Photo</Text>
-            <Text style={[s.uploadTileSub, data.passportUri && { color: COLORS.success, fontWeight: '700' }]}>
-              {data.passportUri ? 'Uploaded ✓' : 'Upload photo'}
-            </Text>
+            {data.passportUri ? (
+              <View style={s.uploadThumbWrapper}>
+                <Image source={{ uri: data.passportUri }} style={s.uploadedThumbImg} resizeMode="cover" />
+                <View style={s.uploadDoneBadge}>
+                  <Ionicons name="checkmark-circle" size={13} color={COLORS.success} />
+                  <Text style={s.uploadDoneBadgeTxt}>Passport Added</Text>
+                </View>
+                <Text style={s.uploadChangeTxt}>Tap to replace</Text>
+              </View>
+            ) : (
+              <>
+                <View style={s.uploadIconBadge}>
+                  <Ionicons name="camera-outline" size={19} color={COLORS.navy} />
+                </View>
+                <Text style={s.uploadTileTitle}>Passport Photo</Text>
+                <Text style={s.uploadTileSub}>Clear front portrait photo</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -772,7 +852,7 @@ export default function CACServices() {
         })}
       </View>
 
-      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         {/* Dynamic Promotional Banner */}
         <DynamicBanners placement="cac" />
 
@@ -792,7 +872,7 @@ export default function CACServices() {
               </View>
             </View>
 
-            {/* Choose Service Dropdown */}
+            {/* Choose Service Dropdown & Mobile Pills */}
             {loading ? (
               <View style={{ padding: 30, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={COLORS.navy} />
@@ -803,6 +883,40 @@ export default function CACServices() {
                 <Text style={s.inputLabel}>
                   Select Service Package <Text style={{ color: COLORS.error }}>*</Text>
                 </Text>
+
+                {/* Mobile Fast Service Pills */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
+                  {CAC_SERVICES_ORDER.map((code) => {
+                    const cfg = pricingConfigs[code] || DEFAULT_CAC_PRICING_CONFIGS[code];
+                    const isSel = activeServiceCode === code;
+                    const effPrice = cfg.is_promo_active && cfg.promo_price ? cfg.promo_price : cfg.regular_price;
+                    return (
+                      <TouchableOpacity
+                        key={code}
+                        style={[s.quickPill, isSel && s.quickPillActive]}
+                        onPress={() => !editId && handleSelectServiceCode(code)}
+                        disabled={Boolean(editId) || !cfg.is_available}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[s.quickPillTxt, isSel && s.quickPillTxtActive]}>
+                          {code === 'business_name' ? 'Business Name' :
+                           code === 'ltd' ? 'LTD Company' :
+                           code === 'incorporated_trustee' ? 'NGO / Trustee' :
+                           code === 'cac_retrieval' ? 'Retrieval' :
+                           code === 'plc' ? 'PLC' : 'Upgrade LTD'}
+                        </Text>
+                        <Text style={[s.quickPillPrice, isSel && s.quickPillPriceActive]}>
+                          ₦{effPrice >= 1000 ? `${(effPrice / 1000).toFixed(0)}k` : effPrice}
+                        </Text>
+                        {cfg.is_promo_active && cfg.regular_price > effPrice && (
+                          <View style={s.quickPillPromoBadge}>
+                            <Text style={s.quickPillPromoBadgeTxt}>PROMO</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
 
                 <TouchableOpacity
                   style={s.serviceSelectTrigger}
@@ -821,13 +935,13 @@ export default function CACServices() {
                   <View style={{ flex: 1, marginHorizontal: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <Text style={s.serviceSelectName} numberOfLines={1}>
-                        {regType ? regType.name : 'Choose CAC Service...'}
+                        {currentConfig.service_name}
                       </Text>
-                      {regType?.original_price && regType.original_price > regType.price && (
+                      {quoteCalculation.isPromoActive && quoteCalculation.promoSavings > 0 && (
                         <View style={s.discountBadgePill}>
                           <Ionicons name="pricetag" size={10} color="#15803d" />
                           <Text style={s.discountBadgePillTxt}>
-                            {regType.discount_label || `${Math.round(((regType.original_price - regType.price) / regType.original_price) * 100)}% OFF`}
+                            Save {formatNaira(quoteCalculation.promoSavings)}
                           </Text>
                         </View>
                       )}
@@ -835,13 +949,16 @@ export default function CACServices() {
 
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 3 }}>
                       <Text style={s.serviceSelectPrice}>
-                        ₦{(regType?.price || 0).toLocaleString()}
+                        {formatNaira(quoteCalculation.effectiveBasePrice)}
                       </Text>
-                      {regType?.original_price && regType.original_price > regType.price && (
+                      {quoteCalculation.isPromoActive && quoteCalculation.regularPrice > quoteCalculation.effectiveBasePrice && (
                         <Text style={s.serviceSelectOrigPrice}>
-                          ₦{regType.original_price.toLocaleString()}
+                          {formatNaira(quoteCalculation.regularPrice)}
                         </Text>
                       )}
+                      <Text style={{ fontSize: 11, color: COLORS.textSub, marginLeft: 4 }}>
+                        • ⏱ {currentConfig.processing_time}
+                      </Text>
                     </View>
                   </View>
 
@@ -868,20 +985,42 @@ export default function CACServices() {
                         Select from available official registration and search packages below:
                       </Text>
 
-                      <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-                        {pricings.map((p) => {
-                          const isSelected = regType?.id === p.id;
-                          const hasDiscount = p.original_price && p.original_price > p.price;
-                          const isCert = p.name.toLowerCase().includes('retrieval') || p.name.toLowerCase().includes('search');
-                          const isNgoType = p.name.toLowerCase().includes('ngo') || p.name.toLowerCase().includes('club');
-                          const discountPct = hasDiscount ? Math.round(((p.original_price! - p.price) / p.original_price!) * 100) : 0;
+                      <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                        {CAC_SERVICES_ORDER.map((code) => {
+                          const config = pricingConfigs[code] || DEFAULT_CAC_PRICING_CONFIGS[code];
+                          const isSelected = activeServiceCode === code;
+                          const effectivePrice = config.is_promo_active && config.promo_price ? config.promo_price : config.regular_price;
+                          const hasDiscount = config.is_promo_active && config.regular_price > effectivePrice;
+                          const isCert = code === 'cac_retrieval';
+                          const isNgoType = code === 'incorporated_trustee';
+                          const discountPct = hasDiscount ? Math.round(((config.regular_price - effectivePrice) / config.regular_price) * 100) : 0;
 
                           return (
                             <TouchableOpacity
-                              key={p.id}
-                              style={[s.serviceModalItem, isSelected && s.serviceModalItemActive]}
+                              key={code}
+                              style={[s.serviceModalItem, isSelected && s.serviceModalItemActive, !config.is_available && { opacity: 0.6 }]}
                               onPress={() => {
-                                setRegType(p);
+                                if (!config.is_available) {
+                                  return Alert.alert('Service Unavailable', 'This registration service is currently offline for maintenance.');
+                                }
+                                setActiveServiceCode(code);
+                                const matched = pricings.find(p => p.id === code || resolveServiceCode(p.name) === code);
+                                if (matched) {
+                                  setRegType(matched);
+                                } else {
+                                  setRegType({
+                                    id: code,
+                                    name: config.service_name,
+                                    price: effectivePrice,
+                                    original_price: config.regular_price,
+                                  });
+                                }
+
+                                if (code === 'plc') {
+                                  setShareCapital(2000000);
+                                } else if (code === 'ltd' || code === 'upgrade_to_ltd') {
+                                  setShareCapital(1000000);
+                                }
                                 setShowServiceModal(false);
                               }}
                               activeOpacity={0.8}
@@ -895,23 +1034,37 @@ export default function CACServices() {
                               </View>
 
                               <View style={{ flex: 1, marginHorizontal: 10 }}>
-                                <Text style={[s.serviceModalItemName, isSelected && { color: COLORS.navy, fontWeight: '800' }]}>
-                                  {p.name}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={[s.serviceModalItemName, isSelected && { color: COLORS.navy, fontWeight: '800' }]}>
+                                    {config.service_name}
+                                  </Text>
+                                  {!config.is_available && (
+                                    <View style={[s.discountBadgePill, { backgroundColor: '#fee2e2' }]}>
+                                      <Text style={[s.discountBadgePillTxt, { color: '#dc2626' }]}>Offline</Text>
+                                    </View>
+                                  )}
+                                </View>
+
+                                <Text style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2 }}>
+                                  ⏱ {config.processing_time}
+                                  {config.included_share_capital > 0 ? ` • Inc. ₦${(config.included_share_capital / 1000000).toFixed(0)}M Share` : ''}
+                                  {config.included_directors > 0 ? ` • ${config.included_directors} Directors Inc.` : ''}
+                                  {config.included_trustees > 0 ? ` • ${config.included_trustees} Trustees Inc.` : ''}
                                 </Text>
 
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                                   <Text style={s.serviceModalItemPrice}>
-                                    ₦{p.price.toLocaleString()}
+                                    ₦{effectivePrice.toLocaleString()}
                                   </Text>
                                   {hasDiscount && (
                                     <Text style={s.serviceModalItemOrigPrice}>
-                                      ₦{p.original_price?.toLocaleString()}
+                                      ₦{config.regular_price.toLocaleString()}
                                     </Text>
                                   )}
                                   {hasDiscount && (
                                     <View style={s.discountBadgePill}>
                                       <Text style={s.discountBadgePillTxt}>
-                                        {p.discount_label || `${discountPct}% OFF`}
+                                        Save ₦{(config.regular_price - effectivePrice).toLocaleString()} ({discountPct}% OFF)
                                       </Text>
                                     </View>
                                   )}
@@ -1159,6 +1312,84 @@ export default function CACServices() {
               )}
             </View>
 
+            {/* COMPANY AUTHORIZED SHARE CAPITAL SECTION */}
+            {isLimitedLiability && (
+              <View style={s.cleanCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={s.cardSectionTitle}>AUTHORIZED SHARE CAPITAL</Text>
+                  {quoteCalculation.shareCapitalFee > 0 && (
+                    <View style={s.calcExtraBadge}>
+                      <Text style={s.calcExtraBadgeTxt}>+{formatNaira(quoteCalculation.shareCapitalFee)} extra</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ fontSize: 12, color: COLORS.textSub, marginBottom: 12, lineHeight: 17 }}>
+                  Base package covers up to{' '}
+                  <Text style={{ fontWeight: '700', color: COLORS.navy }}>{formatNaira(currentConfig.included_share_capital)}</Text> share capital.
+                  {currentConfig.share_capital_increment_fee > 0 && (
+                    <Text>
+                      {' '}Each additional {formatNaira(currentConfig.share_capital_increment_step)} is charged at{' '}
+                      <Text style={{ fontWeight: '700', color: COLORS.goldDk }}>+{formatNaira(currentConfig.share_capital_increment_fee)}</Text>.
+                    </Text>
+                  )}
+                </Text>
+
+                {/* Quick Selection Buttons */}
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  {[
+                    currentConfig.included_share_capital || 1000000,
+                    2000000,
+                    5000000,
+                    10000000,
+                  ].map((cap) => {
+                    const active = shareCapital === cap;
+                    const isBase = cap === currentConfig.included_share_capital;
+                    return (
+                      <TouchableOpacity
+                        key={cap}
+                        style={[s.shareCapChip, active && s.shareCapChipActive]}
+                        onPress={() => {
+                          setShareCapital(cap);
+                          setCustomShareCapital('');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[s.shareCapChipTxt, active && s.shareCapChipTxtActive]}>
+                          ₦{(cap / 1000000).toFixed(0)} Million {isBase ? '(Included)' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Custom Share Capital Option */}
+                <View style={s.inputContainer}>
+                  <Text style={s.inputLabel}>Or Enter Custom Share Capital (₦)</Text>
+                  <TextInput
+                    style={s.inputBox}
+                    keyboardType="numeric"
+                    placeholder={`e.g. ${currentConfig.included_share_capital || 1000000}`}
+                    value={customShareCapital}
+                    onChangeText={(val) => {
+                      setCustomShareCapital(val);
+                      const num = parseFloat(val.replace(/[^0-9]/g, ''));
+                      if (!isNaN(num) && num > 0) {
+                        setShareCapital(num);
+                      } else if (!val) {
+                        setShareCapital(currentConfig.included_share_capital || 1000000);
+                      }
+                    }}
+                  />
+                  <Text style={{ fontSize: 11, color: COLORS.textSub, marginTop: 4 }}>
+                    Current Selected Capital: <Text style={{ fontWeight: '700', color: COLORS.navy }}>{formatNaira(shareCapital)}</Text>
+                    {quoteCalculation.shareCapitalFee > 0
+                      ? ` (${quoteCalculation.shareCapitalIncrements} extra increment(s) = +${formatNaira(quoteCalculation.shareCapitalFee)})`
+                      : ' (Fully covered in base fee)'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* Stepper Buttons */}
             <View style={s.navButtonsRow}>
               <TouchableOpacity style={s.btnSecondary} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
@@ -1189,6 +1420,54 @@ export default function CACServices() {
                 <Text style={s.stepSubheading}>Personal details, signature, and passport photos</Text>
               </View>
             </View>
+
+            {/* Dynamic Director Allowance Banner */}
+            {isLimitedLiability && (
+              <View style={s.allowanceBanner}>
+                <View style={s.allowanceIconBox}>
+                  <Ionicons name="people" size={20} color={COLORS.navy} />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={s.allowanceTitle}>
+                    Director Allowance: {proprietors.length} of {currentConfig.included_directors} Included
+                  </Text>
+                  <Text style={s.allowanceSub}>
+                    {proprietors.length > currentConfig.included_directors
+                      ? `${proprietors.length - currentConfig.included_directors} extra director(s) added @ ${formatNaira(currentConfig.additional_director_fee)} each = +${formatNaira(quoteCalculation.directorsFee)} surcharge.`
+                      : `Base package includes up to ${currentConfig.included_directors} directors without extra fee.`}
+                  </Text>
+                </View>
+                {quoteCalculation.directorsFee > 0 && (
+                  <View style={s.calcExtraBadge}>
+                    <Text style={s.calcExtraBadgeTxt}>+{formatNaira(quoteCalculation.directorsFee)}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Dynamic Trustee Allowance Banner */}
+            {isNgo && (
+              <View style={s.allowanceBanner}>
+                <View style={s.allowanceIconBox}>
+                  <Ionicons name="people" size={20} color={COLORS.navy} />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={s.allowanceTitle}>
+                    Trustee Allowance: {trustees.length} of {currentConfig.included_trustees} Included
+                  </Text>
+                  <Text style={s.allowanceSub}>
+                    {trustees.length > currentConfig.included_trustees
+                      ? `${trustees.length - currentConfig.included_trustees} extra trustee(s) added @ ${formatNaira(currentConfig.additional_trustee_fee)} each = +${formatNaira(quoteCalculation.trusteesFee)} surcharge.`
+                      : `Base package includes up to ${currentConfig.included_trustees} trustees without extra fee.`}
+                  </Text>
+                </View>
+                {quoteCalculation.trusteesFee > 0 && (
+                  <View style={s.calcExtraBadge}>
+                    <Text style={s.calcExtraBadgeTxt}>+{formatNaira(quoteCalculation.trusteesFee)}</Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {isRetrieval ? (
               // Retrieval Owner / Applicant
@@ -1295,114 +1574,157 @@ export default function CACServices() {
               </View>
             </View>
 
-            {/* Summary Receipt Card */}
-            <View style={s.summaryCard}>
-              <View style={s.summaryHeader}>
-                <Ionicons name="shield-checkmark" size={20} color={COLORS.gold} />
-                <Text style={s.summaryHeaderTitle}>Application Summary</Text>
+            {/* Dynamic Official CAC Proforma Invoice */}
+            <View style={s.invoiceCard}>
+              <LinearGradient colors={[COLORS.navy, COLORS.navyMid]} style={s.invoiceHeader}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="shield-checkmark" size={18} color={COLORS.gold} />
+                    <Text style={s.invoiceHeaderTitle}>CAC PROFORMA QUOTATION</Text>
+                  </View>
+                  <Text style={s.invoiceHeaderSub}>Abu Mafhal Corporate Affairs Portal</Text>
+                </View>
+                <View style={s.invoiceLockBadge}>
+                  <Ionicons name="lock-closed" size={11} color={COLORS.gold} />
+                  <Text style={s.invoiceLockBadgeTxt}>24h Locked Rate</Text>
+                </View>
+              </LinearGradient>
+
+              <View style={s.invoiceMetaRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.invoiceMetaLabel}>SERVICE PACKAGE</Text>
+                  <Text style={s.invoiceMetaVal}>{currentConfig.service_name}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={s.invoiceMetaLabel}>PROCESSING TIME</Text>
+                  <Text style={[s.invoiceMetaVal, { color: COLORS.goldDk }]}>⏱ {currentConfig.processing_time}</Text>
+                </View>
               </View>
 
-              <View style={s.summaryBody}>
-                <View style={s.summaryRow}>
-                  <Text style={s.summaryLabel}>Registration Type</Text>
-                  <Text style={s.summaryVal}>{regType?.name}</Text>
-                </View>
-                <View style={s.summaryDivider} />
+              <View style={s.invoiceDivider} />
 
-                <View style={s.summaryRow}>
-                  <Text style={s.summaryLabel}>{isRetrieval ? 'Registered Name' : 'Primary Choice'}</Text>
-                  <Text style={[s.summaryVal, { fontWeight: '700' }]}>{proposedName1}</Text>
+              {/* Business Recap */}
+              <View style={s.invoiceRecapBox}>
+                <View style={s.invoiceRecapRow}>
+                  <Text style={s.invoiceRecapLabel}>{isRetrieval ? 'Registered Name:' : 'Proposed Name (Choice 1):'}</Text>
+                  <Text style={s.invoiceRecapVal} numberOfLines={1}>{proposedName1 || 'Not specified'}</Text>
                 </View>
-
                 {!isRetrieval && proposedName2 ? (
-                  <>
-                    <View style={s.summaryDivider} />
-                    <View style={s.summaryRow}>
-                      <Text style={s.summaryLabel}>Alternative Name</Text>
-                      <Text style={s.summaryVal}>{proposedName2}</Text>
-                    </View>
-                  </>
-                ) : null}
-
-                {isRetrieval && rcNumber ? (
-                  <>
-                    <View style={s.summaryDivider} />
-                    <View style={s.summaryRow}>
-                      <Text style={s.summaryLabel}>RC / BN Number</Text>
-                      <Text style={s.summaryVal}>{rcNumber}</Text>
-                    </View>
-                  </>
-                ) : null}
-
-                <View style={s.summaryDivider} />
-                <View style={s.summaryRow}>
-                  <Text style={s.summaryLabel}>Applicant Name</Text>
-                  <Text style={s.summaryVal}>
-                    {isNgo ? chairman.fullName || 'N/A' : proprietors[0]?.fullName || 'N/A'}
-                  </Text>
-                </View>
-
-                <View style={s.summaryDivider} />
-                <View style={s.summaryRow}>
-                  <Text style={s.summaryLabel}>Base CAC Fee</Text>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={s.summaryVal}>₦{(regType?.price || 0).toLocaleString()}</Text>
-                    {regType?.original_price && regType.original_price > regType.price && (
-                      <Text style={{ fontSize: 11, color: COLORS.textSub, textDecorationLine: 'line-through' }}>
-                        ₦{regType.original_price.toLocaleString()}
-                      </Text>
-                    )}
+                  <View style={s.invoiceRecapRow}>
+                    <Text style={s.invoiceRecapLabel}>Alternative Choice:</Text>
+                    <Text style={s.invoiceRecapVal} numberOfLines={1}>{proposedName2}</Text>
                   </View>
+                ) : null}
+                {isRetrieval && rcNumber ? (
+                  <View style={s.invoiceRecapRow}>
+                    <Text style={s.invoiceRecapLabel}>RC / BN Number:</Text>
+                    <Text style={s.invoiceRecapVal}>{rcNumber}</Text>
+                  </View>
+                ) : null}
+                {isLimitedLiability && (
+                  <View style={s.invoiceRecapRow}>
+                    <Text style={s.invoiceRecapLabel}>Authorized Capital:</Text>
+                    <Text style={s.invoiceRecapVal}>{formatNaira(shareCapital)}</Text>
+                  </View>
+                )}
+                <View style={s.invoiceRecapRow}>
+                  <Text style={s.invoiceRecapLabel}>Operating Location:</Text>
+                  <Text style={s.invoiceRecapVal}>{lga ? `${lga}, ${state}` : state || 'Nigeria'}</Text>
                 </View>
+                <View style={s.invoiceRecapRow}>
+                  <Text style={s.invoiceRecapLabel}>Applicant Contact:</Text>
+                  <Text style={s.invoiceRecapVal}>{phone || 'N/A'}</Text>
+                </View>
+              </View>
 
-                {regType?.original_price && regType.original_price > regType.price && (
-                  <>
-                    <View style={s.summaryDivider} />
-                    <View style={s.summaryRow}>
-                      <Text style={[s.summaryLabel, { color: COLORS.success }]}>Discount Savings</Text>
-                      <Text style={[s.summaryVal, { color: COLORS.success, fontWeight: '800' }]}>
-                        -₦{(regType.original_price - regType.price).toLocaleString()} ({regType.discount_label || `${Math.round(((regType.original_price - regType.price) / regType.original_price) * 100)}% OFF`})
+              <View style={s.invoiceDivider} />
+
+              {/* Dynamic Itemized Breakdown directly from Pricing Engine */}
+              <Text style={s.invoiceBreakdownHeader}>ITEMIZED COST BREAKDOWN</Text>
+              <View style={s.invoiceItemsTable}>
+                {quoteCalculation.items.map((item, idx) => {
+                  const isDiscount = item.type === 'discount' || item.amount < 0;
+                  return (
+                    <View key={idx} style={[s.invoiceItemRow, idx % 2 === 1 && s.invoiceItemRowAlt]}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={[s.invoiceItemName, isDiscount && { color: COLORS.success, fontWeight: '700' }]}>
+                          {item.label}
+                        </Text>
+                        {item.detail ? (
+                          <Text style={s.invoiceItemDetail}>{item.detail}</Text>
+                        ) : null}
+                      </View>
+                      <Text style={[s.invoiceItemAmt, isDiscount && { color: COLORS.success, fontWeight: '800' }]}>
+                        {isDiscount ? `-₦${Math.abs(item.amount).toLocaleString()}` : `₦${item.amount.toLocaleString()}`}
                       </Text>
                     </View>
-                  </>
-                )}
+                  );
+                })}
+              </View>
 
-                {includeTin && (
-                  <>
-                    <View style={s.summaryDivider} />
-                    <View style={s.summaryRow}>
-                      <Text style={[s.summaryLabel, { color: COLORS.goldDk }]}>TIN Processing Add-on</Text>
-                      <Text style={[s.summaryVal, { color: COLORS.goldDk, fontWeight: '700' }]}>+₦{tinFee.toLocaleString()}</Text>
-                    </View>
-                  </>
-                )}
-
-                <View style={[s.summaryDivider, { backgroundColor: COLORS.navyLight, height: 1.5 }]} />
-                <View style={s.summaryRow}>
-                  <Text style={[s.summaryLabel, { fontSize: 14, fontWeight: '800', color: COLORS.navy }]}>Total Amount Payable</Text>
-                  <Text style={[s.summaryVal, { fontSize: 18, fontWeight: '900', color: COLORS.navy }]}>
-                    ₦{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </Text>
+              {/* Total Row */}
+              <View style={s.invoiceTotalRow}>
+                <View>
+                  <Text style={s.invoiceTotalLabel}>TOTAL PAYABLE AMOUNT</Text>
+                  <Text style={s.invoiceTotalSub}>Inclusive of verified registry filing & charges</Text>
                 </View>
+                <Text style={s.invoiceTotalAmt}>₦{totalCost.toLocaleString()}</Text>
               </View>
             </View>
 
-            {/* Wallet Balance Readiness Badge */}
-            <View style={[s.walletStatusCard, walletBalance !== null && walletBalance < totalCost ? s.walletStatusCardLow : s.walletStatusCardOk]}>
-              <Ionicons 
-                name={walletBalance !== null && walletBalance >= totalCost ? "wallet" : "alert-circle"} 
-                size={22} 
-                color={walletBalance !== null && walletBalance >= totalCost ? COLORS.success : COLORS.error} 
-              />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={s.walletStatusLabel}>Your Wallet Balance</Text>
-                <Text style={s.walletStatusAmt}>₦{(walletBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+            {/* Official 24-Hour Price Lock Guarantee Banner */}
+            <View style={s.guaranteeCard}>
+              <View style={s.guaranteeIconCircle}>
+                <Ionicons name="shield-checkmark" size={22} color={COLORS.navy} />
               </View>
-              <View style={[s.walletStatusPill, walletBalance !== null && walletBalance < totalCost ? { backgroundColor: '#fee2e2' } : { backgroundColor: '#d1fae5' }]}>
-                <Text style={[s.walletStatusPillTxt, walletBalance !== null && walletBalance < totalCost ? { color: COLORS.error } : { color: COLORS.success }]}>
-                  {walletBalance !== null && walletBalance >= totalCost ? 'Ready' : 'Low Balance'}
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={s.guaranteeTitle}>Official 24-Hour Quotation Lock Policy</Text>
+                <Text style={s.guaranteeBody}>
+                  This verified rate is locked and guaranteed for 24 hours (until <Text style={{ fontWeight: '700', color: COLORS.navy }}>{new Date(quoteCalculation.quoteExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, {new Date(quoteCalculation.quoteExpiresAt).toLocaleDateString([], { day: 'numeric', month: 'short' })}</Text>). No unexpected price changes occur during processing.
                 </Text>
               </View>
+            </View>
+
+            {/* Wallet Balance Readiness & Top-Up CTA */}
+            <View style={[
+              s.walletStatusCard, 
+              walletBalance !== null && walletBalance < totalCost ? s.walletStatusCardLow : s.walletStatusCardOk
+            ]}>
+              <View style={s.walletStatusIcon}>
+                <Ionicons 
+                  name={walletBalance !== null && walletBalance >= totalCost ? "wallet" : "alert-circle"} 
+                  size={24} 
+                  color={walletBalance !== null && walletBalance >= totalCost ? COLORS.success : COLORS.error} 
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={s.walletStatusLabel}>Your Wallet Balance</Text>
+                <Text style={s.walletStatusAmt}>
+                  ₦{(walletBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </Text>
+                {walletBalance !== null && walletBalance < totalCost ? (
+                  <Text style={s.walletShortfallTxt}>
+                    Shortfall: ₦{(totalCost - walletBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </Text>
+                ) : (
+                  <Text style={s.walletReadyTxt}>✓ Sufficient balance available for instant deduction</Text>
+                )}
+              </View>
+
+              {walletBalance !== null && walletBalance < totalCost ? (
+                <TouchableOpacity 
+                  style={s.walletTopUpBtn} 
+                  onPress={() => router.push('/wallet')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add-circle" size={14} color={COLORS.white} />
+                  <Text style={s.walletTopUpBtnTxt}>Top Up</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={s.walletStatusBadgeOk}>
+                  <Text style={s.walletStatusBadgeOkTxt}>Ready</Text>
+                </View>
+              )}
             </View>
 
             {/* Navigation & Submit Buttons */}
@@ -1432,6 +1754,116 @@ export default function CACServices() {
         )}
 
       </ScrollView>
+
+      {/* Mobile-First Sticky Quotation & Quick Action Bar */}
+      <View style={s.floatingQuoteBar}>
+        <TouchableOpacity 
+          style={s.floatingQuoteLeft} 
+          onPress={() => setShowBreakdownModal(true)}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={s.floatingQuoteLabel}>Live Quotation</Text>
+            <Ionicons name="chevron-up-circle" size={14} color={COLORS.gold} />
+          </View>
+          <Text style={s.floatingQuoteAmount}>₦{totalCost.toLocaleString()}</Text>
+          <Text style={s.floatingQuoteTime}>⏱ {currentConfig.processing_time || '24-48h'}</Text>
+        </TouchableOpacity>
+
+        <View style={s.floatingQuoteRight}>
+          {currentStep === 1 && (
+            <TouchableOpacity style={s.floatingNextBtn} onPress={handleNextFromStep1} activeOpacity={0.85}>
+              <Text style={s.floatingNextBtnTxt}>Next: Business</Text>
+              <Ionicons name="arrow-forward" size={15} color={COLORS.white} />
+            </TouchableOpacity>
+          )}
+          {currentStep === 2 && (
+            <TouchableOpacity style={s.floatingNextBtn} onPress={handleNextFromStep2} activeOpacity={0.85}>
+              <Text style={s.floatingNextBtnTxt}>Next: Officers</Text>
+              <Ionicons name="arrow-forward" size={15} color={COLORS.white} />
+            </TouchableOpacity>
+          )}
+          {currentStep === 3 && (
+            <TouchableOpacity style={s.floatingNextBtn} onPress={handleNextFromStep3} activeOpacity={0.85}>
+              <Text style={s.floatingNextBtnTxt}>Next: Review</Text>
+              <Ionicons name="arrow-forward" size={15} color={COLORS.white} />
+            </TouchableOpacity>
+          )}
+          {currentStep === 4 && (
+            <TouchableOpacity 
+              style={[
+                s.floatingSubmitBtn, 
+                (submitting || (walletBalance !== null && walletBalance < totalCost)) && s.floatingSubmitBtnDisabled
+              ]} 
+              onPress={handleSubmit} 
+              disabled={submitting}
+              activeOpacity={0.85}
+            >
+              {submitting ? (
+                <ActivityIndicator color={COLORS.white} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-done" size={16} color={COLORS.white} />
+                  <Text style={s.floatingNextBtnTxt}>{editId ? 'Update' : 'Pay & Submit'}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Live Quotation Breakdown Bottom Sheet Modal */}
+      <Modal visible={showBreakdownModal} transparent animationType="slide" onRequestClose={() => setShowBreakdownModal(false)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.breakdownModalSheet}>
+            <View style={s.breakdownModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="receipt-outline" size={20} color={COLORS.navy} />
+                <Text style={s.breakdownModalTitle}>Dynamic Pricing Breakdown</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowBreakdownModal(false)} style={{ padding: 4 }}>
+                <Ionicons name="close-circle" size={24} color={COLORS.textSub} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 11.5, color: COLORS.textSub, marginBottom: 12 }}>
+              Verified official CAC registration cost calculation based on current inputs:
+            </Text>
+
+            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+              {quoteCalculation.items.map((it, i) => {
+                const isDisc = it.type === 'discount' || it.amount < 0;
+                return (
+                  <View key={i} style={[s.invoiceItemRow, i % 2 === 1 && s.invoiceItemRowAlt]}>
+                    <View style={{ flex: 1, paddingRight: 6 }}>
+                      <Text style={[s.invoiceItemName, isDisc && { color: COLORS.success, fontWeight: '700' }]}>
+                        {it.label}
+                      </Text>
+                      {it.detail ? <Text style={s.invoiceItemDetail}>{it.detail}</Text> : null}
+                    </View>
+                    <Text style={[s.invoiceItemAmt, isDisc && { color: COLORS.success, fontWeight: '800' }]}>
+                      {isDisc ? `-₦${Math.abs(it.amount).toLocaleString()}` : `₦${it.amount.toLocaleString()}`}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <View style={s.invoiceTotalRow}>
+              <Text style={s.invoiceTotalLabel}>TOTAL AMOUNT</Text>
+              <Text style={s.invoiceTotalAmt}>₦{totalCost.toLocaleString()}</Text>
+            </View>
+
+            <TouchableOpacity 
+              style={[s.btnPrimary, { marginTop: 14 }]} 
+              onPress={() => setShowBreakdownModal(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={s.btnPrimaryTxt}>Close Breakdown</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1699,58 +2131,468 @@ const s = StyleSheet.create({
   // Upload Tiles
   uploadGrid: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
   uploadTile: {
-    flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10,
+    flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12,
     padding: 12, alignItems: 'center', backgroundColor: '#fcfcfd', borderStyle: 'dashed',
-    minWidth: 0,
+    minWidth: 0, justifyContent: 'center', minHeight: 95,
   },
-  uploadTileDone: { borderColor: COLORS.success, backgroundColor: COLORS.successLight, borderStyle: 'solid' },
-  uploadIconBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  uploadTileTitle: { fontSize: 11.5, fontWeight: '700', color: COLORS.navy },
-  uploadTileSub: { fontSize: 10, color: COLORS.textSub, marginTop: 2 },
+  uploadTileDone: { borderColor: COLORS.success, backgroundColor: '#f0fdf4', borderStyle: 'solid' },
+  uploadIconBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  uploadTileTitle: { fontSize: 11.5, fontWeight: '700', color: COLORS.navy, textAlign: 'center' },
+  uploadTileSub: { fontSize: 10, color: COLORS.textSub, marginTop: 2, textAlign: 'center' },
+  uploadThumbWrapper: { alignItems: 'center', width: '100%' },
+  uploadedThumbImg: { width: '100%', height: 60, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#bbf7d0', marginBottom: 6 },
+  uploadDoneBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#dcfce7', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  uploadDoneBadgeTxt: { fontSize: 10, fontWeight: '800', color: COLORS.success },
+  uploadChangeTxt: { fontSize: 9.5, color: COLORS.textSub, marginTop: 3, fontWeight: '600' },
 
-  // Step 4 Summary Card
-  summaryCard: {
-    backgroundColor: COLORS.white, borderRadius: 14, borderWidth: 1.5,
-    borderColor: COLORS.navy, overflow: 'hidden', marginBottom: 14,
-    width: '100%', maxWidth: '100%',
+  // Mobile Fast Service Pills
+  quickPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.navy, paddingVertical: 12, paddingHorizontal: 16 },
-  summaryHeaderTitle: { color: COLORS.white, fontWeight: '800', fontSize: 13.5 },
-  summaryBody: { padding: 14 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel: { fontSize: 12, color: COLORS.textSub, fontWeight: '600' },
-  summaryVal: { fontSize: 12.5, color: COLORS.navy, fontWeight: '600' },
-  summaryDivider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 8 },
+  quickPillActive: {
+    backgroundColor: COLORS.navy,
+    borderColor: COLORS.navy,
+  },
+  quickPillTxt: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: COLORS.textMain,
+  },
+  quickPillTxtActive: {
+    color: COLORS.white,
+  },
+  quickPillPrice: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.goldDk,
+    marginTop: 1,
+  },
+  quickPillPriceActive: {
+    color: COLORS.gold,
+  },
+  quickPillPromoBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -4,
+    backgroundColor: '#dc2626',
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  quickPillPromoBadgeTxt: {
+    color: COLORS.white,
+    fontSize: 7.5,
+    fontWeight: '900',
+  },
+
+  // Allowance Banner in Step 3
+  allowanceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1.5,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  allowanceIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#dbeafe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allowanceTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  allowanceSub: {
+    fontSize: 11,
+    color: '#334155',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  calcExtraBadge: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  calcExtraBadgeTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#b45309',
+  },
+
+  // Share Capital Chips in Step 2
+  shareCapChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#f8fafc',
+  },
+  shareCapChipActive: {
+    borderColor: COLORS.navy,
+    backgroundColor: COLORS.navy,
+  },
+  shareCapChipTxt: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: COLORS.textMain,
+  },
+  shareCapChipTxtActive: {
+    color: COLORS.white,
+    fontWeight: '800',
+  },
+
+  // Official Proforma Invoice in Step 4
+  invoiceCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: COLORS.navy,
+    overflow: 'hidden',
+    marginBottom: 14,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  invoiceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  invoiceHeaderTitle: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  invoiceHeaderSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 10,
+    marginTop: 1,
+  },
+  invoiceLockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245,166,35,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+  },
+  invoiceLockBadgeTxt: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: COLORS.gold,
+  },
+  invoiceMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8fafc',
+  },
+  invoiceMetaLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: COLORS.textSub,
+    letterSpacing: 0.3,
+  },
+  invoiceMetaVal: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: COLORS.navy,
+    marginTop: 2,
+  },
+  invoiceDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+  },
+  invoiceRecapBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  invoiceRecapRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  invoiceRecapLabel: {
+    fontSize: 11.5,
+    color: COLORS.textSub,
+  },
+  invoiceRecapVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textMain,
+    maxWidth: '55%',
+    textAlign: 'right',
+  },
+  invoiceBreakdownHeader: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: COLORS.navy,
+    letterSpacing: 0.4,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  invoiceItemsTable: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  invoiceItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  invoiceItemRowAlt: {
+    backgroundColor: '#f8fafc',
+  },
+  invoiceItemName: {
+    fontSize: 12,
+    color: COLORS.textMain,
+    fontWeight: '600',
+  },
+  invoiceItemDetail: {
+    fontSize: 10,
+    color: COLORS.textSub,
+    marginTop: 2,
+  },
+  invoiceItemAmt: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  invoiceTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#0d1b3e',
+  },
+  invoiceTotalLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.gold,
+    letterSpacing: 0.5,
+  },
+  invoiceTotalSub: {
+    fontSize: 9.5,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 1,
+  },
+  invoiceTotalAmt: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: COLORS.white,
+  },
+
+  // 24-Hour Guarantee Box
+  guaranteeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    borderWidth: 1.5,
+    borderColor: '#fde68a',
+    borderRadius: 14,
+    padding: 13,
+    marginBottom: 14,
+  },
+  guaranteeIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fef3c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guaranteeTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#92400e',
+  },
+  guaranteeBody: {
+    fontSize: 11,
+    color: '#78350f',
+    marginTop: 2,
+    lineHeight: 16,
+  },
 
   // Wallet Status
   walletStatusCard: {
-    flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12,
-    borderWidth: 1, marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 18,
   },
   walletStatusCardOk: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' },
   walletStatusCardLow: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  walletStatusIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   walletStatusLabel: { fontSize: 10.5, color: COLORS.textSub, fontWeight: '600' },
-  walletStatusAmt: { fontSize: 14, fontWeight: '800', color: COLORS.navy, marginTop: 1 },
-  walletStatusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  walletStatusPillTxt: { fontSize: 10.5, fontWeight: '800' },
+  walletStatusAmt: { fontSize: 15, fontWeight: '900', color: COLORS.navy, marginTop: 1 },
+  walletShortfallTxt: { fontSize: 10.5, fontWeight: '700', color: COLORS.error, marginTop: 2 },
+  walletReadyTxt: { fontSize: 10.5, fontWeight: '600', color: COLORS.success, marginTop: 2 },
+  walletTopUpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.error,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  walletTopUpBtnTxt: { color: COLORS.white, fontSize: 11, fontWeight: '800' },
+  walletStatusBadgeOk: {
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  walletStatusBadgeOkTxt: { color: COLORS.success, fontSize: 11, fontWeight: '800' },
 
   // Buttons
   navButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
   btnPrimary: {
-    backgroundColor: COLORS.navy, height: 44, borderRadius: 10,
+    backgroundColor: COLORS.navy, height: 46, borderRadius: 11,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingHorizontal: 18,
   },
   btnPrimaryTxt: { color: COLORS.white, fontSize: 13, fontWeight: '700' },
   btnSecondary: {
-    backgroundColor: COLORS.white, height: 44, borderRadius: 10,
-    borderWidth: 1, borderColor: COLORS.border, flexDirection: 'row',
+    backgroundColor: COLORS.white, height: 46, borderRadius: 11,
+    borderWidth: 1.5, borderColor: COLORS.border, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16,
   },
   btnSecondaryTxt: { color: COLORS.navy, fontSize: 13, fontWeight: '700' },
 
+  // Mobile Sticky Floating Bar
+  floatingQuoteBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#0a142f',
+    borderTopWidth: 1.5,
+    borderTopColor: '#1e293b',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  floatingQuoteLeft: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  floatingQuoteLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  floatingQuoteAmount: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: COLORS.white,
+    marginTop: 1,
+  },
+  floatingQuoteTime: {
+    fontSize: 9.5,
+    color: COLORS.gold,
+    marginTop: 1,
+    fontWeight: '600',
+  },
+  floatingQuoteRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  floatingNextBtn: {
+    backgroundColor: COLORS.goldDk,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  floatingNextBtnTxt: {
+    color: COLORS.white,
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  floatingSubmitBtn: {
+    backgroundColor: COLORS.success,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  floatingSubmitBtnDisabled: {
+    opacity: 0.5,
+  },
+
+  // Live Breakdown Modal Sheet
+  breakdownModalSheet: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 18,
+    width: '100%',
+    maxWidth: 420,
+  },
+  breakdownModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  breakdownModalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+
   // Date Picker Modal Styles
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,62,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,62,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   datePickerCard: { backgroundColor: COLORS.white, borderRadius: 18, padding: 18, width: '100%', maxWidth: 360 },
   datePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   datePickerTitle: { fontSize: 15, fontWeight: '800', color: COLORS.navy },

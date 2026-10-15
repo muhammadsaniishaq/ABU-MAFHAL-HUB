@@ -55,6 +55,7 @@ const MODS = {
     { t:'SMM Pricing',     i:'thumbs-up',        r:'/manage/smm-pricing',    c:N,  b:NL },
     { t:'Bills Pricing',   i:'flash',            r:'/manage/bills-pricing',  c:G,  b:GL },
     { t:'CAC Mgmt',        i:'briefcase',        r:'/manage/cac',            c:N,  b:NL },
+    { t:'CAC Pricing',     i:'pricetag',         r:'/manage/cac-pricing',    c:G,  b:GL, tag:'Dynamic' },
     { t:'Help Desk',       i:'chatbubbles',      r:'/manage/tickets',        c:G,  b:GL,  badge:0 },
     { t:'Content CMS',     i:'images',           r:'/manage/cms',            c:N,  b:NL },
     { t:'Data Plans',      i:'wifi',             r:'/manage/data-plans',     c:G,  b:GL,  tag:'API' },

@@ -165,6 +165,7 @@ export default function AdminWebSidebar({
         { label: 'BVN Service Rates', route: '/manage/bvn-pricing', icon: 'pricetags' },
         { label: 'Utility Bills Pricing', route: '/manage/bills-pricing', icon: 'flash' },
         { label: 'SMM Pricing', route: '/manage/smm-pricing', icon: 'thumbs-up' },
+        { label: 'CAC Pricing & Config', route: '/manage/cac-pricing', icon: 'briefcase', tag: 'Dynamic' },
         { label: 'API Liquidity', route: '/manage/liquidity', icon: 'wallet', tag: 'Funds' },
         { label: 'Market Maker Rates', route: '/manage/rates', icon: 'stats-chart' },
       ],
