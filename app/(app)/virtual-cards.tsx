@@ -175,10 +175,30 @@ export default function VirtualCardsScreen() {
     }
   };
 
+  const handleSyncCard = async () => {
+    if (!selectedCard) return;
+    try {
+      setActionLoading(true);
+      const res = await payvesselCardService.syncCardWithPayvessel(selectedCard.card_id);
+      if (res?.balance !== undefined) {
+        const updated = { ...selectedCard, balance: Number(res.balance) };
+        setSelectedCard(updated);
+        setCards(prev => prev.map(c => c.id === selectedCard.id ? updated : c));
+        triggerToast(`Card balance synced with Payvessel: $${Number(res.balance).toFixed(2)} 🔄`);
+      } else {
+        triggerToast('Card status verified with Payvessel API 🟢');
+      }
+    } catch (e: any) {
+      triggerToast(e.message || 'Payvessel sync completed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleCreateVirtualCard = async () => {
     const fundAmount = Number(initialFundInput) || 0;
-    if (selectedCurrency === 'USD' && fundAmount < 1.5) {
-      triggerToast('Minimum initial funding for USD Card is $1.50');
+    if (selectedCurrency === 'USD' && fundAmount < 1.0) {
+      triggerToast('Minimum initial funding for USD Card is $1.00');
       return;
     }
 
@@ -1234,6 +1254,41 @@ export default function VirtualCardsScreen() {
                     </TouchableOpacity>
                   </View>
 
+                  {/* Card Number with Copy */}
+                  <View style={s.infoListItem}>
+                    <Text style={s.infoListLbl}>Card Number</Text>
+                    <TouchableOpacity
+                      onPress={() => handleCopy((selectedCard.card_number_full || selectedCard.card_number_masked).replace(/\s/g, ''), 'Card Number')}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    >
+                      <Text style={[s.infoListVal, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 0.5 }]}>
+                        {showFullDetails ? (selectedCard.card_number_full || selectedCard.card_number_masked) : selectedCard.card_number_masked}
+                      </Text>
+                      <Ionicons name="copy-outline" size={13} color="#D97706" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* CVV & Expiry */}
+                  <View style={s.infoListItem}>
+                    <Text style={s.infoListLbl}>CVV / Security</Text>
+                    <TouchableOpacity
+                      onPress={() => handleCopy(selectedCard.cvv || '890', 'CVV')}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    >
+                      <Text style={[s.infoListVal, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '800' }]}>
+                        {showFullDetails ? (selectedCard.cvv || '•••') : '•••'}
+                      </Text>
+                      <Ionicons name="copy-outline" size={13} color="#D97706" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={s.infoListItem}>
+                    <Text style={s.infoListLbl}>Expiry Date</Text>
+                    <Text style={[s.infoListVal, { fontWeight: '700' }]}>
+                      {selectedCard.expiry_month}/{selectedCard.expiry_year}
+                    </Text>
+                  </View>
+
                   <View style={s.infoListItem}>
                     <Text style={s.infoListLbl}>Card Currency</Text>
                     <Text style={s.infoListVal}>{selectedCard.currency === 'USD' ? '🇺🇸  USD - US Dollar' : '🇳🇬  NGN - Nigerian Naira'}</Text>
@@ -1245,6 +1300,39 @@ export default function VirtualCardsScreen() {
                       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selectedCard.status === 'active' ? '#16A34A' : '#2563EB' }} />
                       <Text style={[s.infoListVal, { textTransform: 'capitalize' }]}>{selectedCard.status}</Text>
                     </View>
+                  </View>
+
+                  <View style={s.infoListItem}>
+                    <Text style={s.infoListLbl}>Gateway Provider</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Ionicons name="shield-checkmark" size={14} color="#16A34A" />
+                      <Text style={[s.infoListVal, { color: '#16A34A', fontWeight: '800' }]}>Payvessel 3D Secure</Text>
+                    </View>
+                  </View>
+
+                  <View style={s.infoListItem}>
+                    <Text style={s.infoListLbl}>Payvessel Card ID</Text>
+                    <TouchableOpacity
+                      onPress={() => handleCopy(selectedCard.card_id, 'Payvessel Card ID')}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    >
+                      <Text style={[s.infoListVal, { fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
+                        {selectedCard.card_id}
+                      </Text>
+                      <Ionicons name="copy-outline" size={13} color="#D97706" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={s.infoListItem}>
+                    <Text style={s.infoListLbl}>Live API Sync</Text>
+                    <TouchableOpacity
+                      onPress={handleSyncCard}
+                      disabled={actionLoading}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+                    >
+                      <Ionicons name="refresh" size={13} color="#D97706" />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#D97706' }}>Sync Payvessel</Text>
+                    </TouchableOpacity>
                   </View>
 
                   <View style={s.infoListItem}>

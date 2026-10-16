@@ -36,17 +36,33 @@ export default function CardManager() {
         loadPayvesselConfig();
     }, []);
 
+    const [testLoading, setTestLoading] = useState(false);
+
     const loadPayvesselConfig = async () => {
         try {
-            const { data: keyData } = await supabase.from('app_settings').select('value').eq('key', 'payvessel_api_key').single();
-            const { data: secData } = await supabase.from('app_settings').select('value').eq('key', 'payvessel_secret_key').single();
-            const { data: busData } = await supabase.from('app_settings').select('value').eq('key', 'payvessel_business_id').single();
-            const { data: feeData } = await supabase.from('app_settings').select('value').eq('key', 'virtual_card_creation_fee_usd').single();
+            // Check system_secrets first
+            const { data: secList } = await supabase.from('system_secrets').select('key, value');
+            const secMap: Record<string, string> = {};
+            secList?.forEach((r: any) => {
+                if (r.key) secMap[r.key.toUpperCase()] = typeof r.value === 'string' ? r.value : JSON.stringify(r.value);
+            });
 
-            if (keyData?.value) setPayvesselApiKey(typeof keyData.value === 'string' ? keyData.value : keyData.value.key || '');
-            if (secData?.value) setPayvesselSecretKey(typeof secData.value === 'string' ? secData.value : secData.value.key || '');
-            if (busData?.value) setPayvesselBusinessId(typeof busData.value === 'string' ? busData.value : busData.value.id || '');
-            if (feeData?.value) setCardCreationFeeUSD(String(feeData.value));
+            // Also check app_settings
+            const { data: setList } = await supabase.from('app_settings').select('key, value');
+            const setMap: Record<string, string> = {};
+            setList?.forEach((r: any) => {
+                if (r.key) setMap[r.key.toUpperCase()] = typeof r.value === 'string' ? r.value : JSON.stringify(r.value);
+            });
+
+            const apiKey = secMap['PAYVESSEL_API_KEY'] || setMap['PAYVESSEL_API_KEY'] || setMap['PAYVESSEL_KEY'] || '';
+            const secretKey = secMap['PAYVESSEL_API_SECRET'] || setMap['PAYVESSEL_API_SECRET'] || setMap['PAYVESSEL_SECRET_KEY'] || '';
+            const bizId = secMap['PAYVESSEL_BUSINESS_ID'] || setMap['PAYVESSEL_BUSINESS_ID'] || setMap['PAYVESSEL_BUSINESS'] || '';
+            const fee = setMap['VIRTUAL_CARD_CREATION_FEE_USD'] || setMap['VIRTUAL_CARD_PROFIT_MARGIN_USD'] || '3.00';
+
+            if (apiKey) setPayvesselApiKey(apiKey);
+            if (secretKey) setPayvesselSecretKey(secretKey);
+            if (bizId) setPayvesselBusinessId(bizId);
+            if (fee) setCardCreationFeeUSD(String(fee));
         } catch (e) {}
     };
 
@@ -71,19 +87,52 @@ export default function CardManager() {
     const handleSaveConfig = async () => {
         try {
             setActionLoading(true);
+            const ak = payvesselApiKey.trim();
+            const sk = payvesselSecretKey.trim();
+            const bid = payvesselBusinessId.trim();
+            const fee = cardCreationFeeUSD.trim();
+
+            // Upsert in system_secrets
+            await supabase.from('system_secrets').upsert([
+                { key: 'PAYVESSEL_API_KEY', value: ak },
+                { key: 'PAYVESSEL_API_SECRET', value: sk },
+                { key: 'PAYVESSEL_BUSINESS_ID', value: bid }
+            ], { onConflict: 'key' }).catch(() => {});
+
+            // Also upsert in app_settings for full backward compatibility
             await supabase.from('app_settings').upsert([
-                { key: 'payvessel_api_key', value: payvesselApiKey.trim() },
-                { key: 'payvessel_secret_key', value: payvesselSecretKey.trim() },
-                { key: 'payvessel_business_id', value: payvesselBusinessId.trim() },
-                { key: 'virtual_card_creation_fee_usd', value: cardCreationFeeUSD.trim() }
+                { key: 'payvessel_api_key', value: ak },
+                { key: 'payvessel_secret_key', value: sk },
+                { key: 'payvessel_business_id', value: bid },
+                { key: 'virtual_card_creation_fee_usd', value: fee }
             ], { onConflict: 'key' });
 
-            Alert.alert('Settings Saved 🎉', 'Payvessel Virtual Card API configuration updated successfully.');
+            Alert.alert('Settings Saved 🎉', 'Payvessel Virtual Card API configuration updated across system_secrets and app_settings.');
             setShowConfigModal(false);
         } catch (e: any) {
             Alert.alert('Error', e.message);
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleTestConnection = async () => {
+        try {
+            setTestLoading(true);
+            const { data, error } = await supabase.functions.invoke('payvessel-cards', {
+                body: { action: 'test_connection' }
+            });
+
+            if (error) throw error;
+            if (data?.status) {
+                Alert.alert('PayVessel Connected! 🟢', `HTTP Status: ${data.http_status || 200}\nKey: ${data.api_key_masked}\nBusiness ID: ${data.business_id}`);
+            } else {
+                Alert.alert('PayVessel Diagnostic ⚠️', data?.message || 'Could not verify connection.');
+            }
+        } catch (e: any) {
+            Alert.alert('Connection Test Notice', e.message || 'Error executing connection test');
+        } finally {
+            setTestLoading(false);
         }
     };
 
@@ -371,13 +420,23 @@ export default function CardManager() {
                             </View>
                         </View>
 
-                        <TouchableOpacity
-                            onPress={handleSaveConfig}
-                            disabled={actionLoading}
-                            style={{ backgroundColor: '#f5a623', height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }}
-                        >
-                            {actionLoading ? <ActivityIndicator color="#0f172a" /> : <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 15 }}>Save Configuration 💾</Text>}
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                            <TouchableOpacity
+                                onPress={handleTestConnection}
+                                disabled={testLoading || actionLoading}
+                                style={{ flex: 1, backgroundColor: '#0f172a', height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#3b82f6' }}
+                            >
+                                {testLoading ? <ActivityIndicator color="#3b82f6" /> : <Text style={{ color: '#3b82f6', fontWeight: '800', fontSize: 13 }}>Test API ⚡</Text>}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleSaveConfig}
+                                disabled={actionLoading || testLoading}
+                                style={{ flex: 2, backgroundColor: '#f5a623', height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }}
+                            >
+                                {actionLoading ? <ActivityIndicator color="#0f172a" /> : <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Save Config 💾</Text>}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>

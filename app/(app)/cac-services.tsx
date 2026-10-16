@@ -58,49 +58,158 @@ type Pricing = {
   active?: boolean 
 };
 
-// Reusable Custom Dropdown (Mobile-first, compact & sleek)
-const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select option...", required = false, style }: any) => {
-  const [visible, setVisible] = useState(false);
+// Reusable Select Modal (Zero layout collision, high-performance modal picker with search)
+const SelectModal = ({ 
+  label, 
+  value, 
+  options = [], 
+  onSelect, 
+  placeholder = "Select option...", 
+  required = false, 
+  style, 
+  title,
+  searchable = true
+}: any) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const safeOptions = Array.isArray(options) ? options : [];
+
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) return safeOptions;
+    const q = searchQuery.toLowerCase().trim();
+    return safeOptions.filter((opt: string) => opt.toLowerCase().includes(q));
+  }, [safeOptions, searchQuery]);
+
   return (
-    <View style={[s.inputContainer, { zIndex: visible ? 100 : 1 }, style]}>
-      <Text style={s.inputLabel}>
-        {label} {required && <Text style={{ color: COLORS.error }}>*</Text>}
-      </Text>
+    <View style={[s.inputContainer, style]}>
+      {label ? (
+        <Text style={s.inputLabel}>
+          {label} {required && <Text style={{ color: COLORS.error }}>*</Text>}
+        </Text>
+      ) : null}
       <TouchableOpacity 
-        style={[s.inputBox, visible && s.inputBoxActive]} 
-        onPress={() => setVisible(!visible)}
+        style={s.inputBox} 
+        onPress={() => {
+          if (safeOptions.length === 0) {
+            Alert.alert('Notice', placeholder === 'Select State First' ? 'Please select State first.' : 'No options available.');
+            return;
+          }
+          setSearchQuery('');
+          setModalVisible(true);
+        }}
         activeOpacity={0.8}
       >
         <Text style={[s.inputText, !value && s.inputPlaceholderText]} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Ionicons name={visible ? "chevron-up" : "chevron-down"} size={14} color={COLORS.textSub} />
+        <Ionicons name="chevron-down" size={14} color={COLORS.navy} />
       </TouchableOpacity>
-      
-      {visible && (
-        <View style={s.dropdownList}>
-          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ maxHeight: 220 }}>
-            {safeOptions.length === 0 ? (
-              <Text style={{ textAlign: 'center', padding: 12, color: COLORS.textSub, fontSize: 12 }}>No options</Text>
-            ) : (
-              safeOptions.map((opt: string, i: number) => (
-                <TouchableOpacity 
-                  key={i} 
-                  style={[s.dropdownItem, value === opt && s.dropdownItemActive]} 
-                  onPress={() => { onSelect(opt); setVisible(false); }}
-                >
-                  <Text style={[s.dropdownItemTxt, value === opt && s.dropdownItemTxtActive]}>{opt}</Text>
-                  {value === opt && <Ionicons name="checkmark" size={15} color={COLORS.navy} />}
-                </TouchableOpacity>
-              ))
+
+      <Modal 
+        visible={modalVisible} 
+        transparent 
+        animationType="fade" 
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={s.modalBackdrop}>
+          <View style={s.selectModalCard}>
+            <View style={s.selectModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="list" size={18} color={COLORS.navy} />
+                <Text style={s.selectModalTitle}>{title || label || 'Select Option'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close-circle" size={22} color={COLORS.textSub} />
+              </TouchableOpacity>
+            </View>
+
+            {searchable && safeOptions.length > 5 && (
+              <View style={s.searchBox}>
+                <Ionicons name="search" size={14} color={COLORS.textSub} style={{ marginRight: 6 }} />
+                <TextInput
+                  style={s.searchInput}
+                  placeholder={`Search ${label || 'options'}...`}
+                  placeholderTextColor={PLACEHOLDER_COLOR}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoCorrect={false}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={15} color={COLORS.textSub} />
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
-          </ScrollView>
+
+            <ScrollView 
+              style={{ maxHeight: 320 }} 
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredOptions.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: COLORS.textSub }}>No results found</Text>
+                </View>
+              ) : (
+                filteredOptions.map((opt: string, i: number) => {
+                  const isSelected = value === opt;
+                  return (
+                    <TouchableOpacity 
+                      key={i} 
+                      style={[s.selectModalItem, isSelected && s.selectModalItemActive]} 
+                      onPress={() => { 
+                        onSelect(opt); 
+                        setModalVisible(false); 
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[s.selectModalItemTxt, isSelected && s.selectModalItemTxtActive]} numberOfLines={1}>
+                        {opt}
+                      </Text>
+                      {isSelected && <Ionicons name="checkmark-circle" size={17} color={COLORS.navy} />}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 };
+
+// Reusable Gender Selector (Segmented toggle with zero height shift)
+const GenderSelector = ({ label = "Gender", value, onSelect, style }: any) => {
+  return (
+    <View style={[s.inputContainer, style]}>
+      <Text style={s.inputLabel}>{label}</Text>
+      <View style={s.genderRow}>
+        {['Male', 'Female'].map((g) => {
+          const isSel = (value || 'Male') === g;
+          return (
+            <TouchableOpacity
+              key={g}
+              style={[s.genderBtn, isSel && s.genderBtnActive]}
+              onPress={() => onSelect(g)}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name={g === 'Male' ? "male" : "female"} 
+                size={13} 
+                color={isSel ? COLORS.white : COLORS.navy} 
+              />
+              <Text style={[s.genderBtnTxt, isSel && s.genderBtnTxtActive]}>{g}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+const CustomDropdown = SelectModal;
 
 const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
 const MONTHS = [
@@ -716,7 +825,7 @@ export default function CACServices() {
 
         <View style={s.formGrid2}>
           <CustomDatePicker style={{ flex: 1, minWidth: 0 }} label="Date of Birth" value={data.dob} onChange={(v: string) => updateField('dob', v)} required />
-          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="Gender" value={data.gender} options={['Male', 'Female']} onSelect={(v: string) => updateField('gender', v)} />
+          <GenderSelector style={{ flex: 1, minWidth: 0 }} label="Gender" value={data.gender} onSelect={(v: string) => updateField('gender', v)} />
         </View>
 
         <View style={s.formGrid2}>
@@ -758,8 +867,23 @@ export default function CACServices() {
         </View>
 
         <View style={s.formGrid2}>
-          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="State of Origin" value={data.state} options={STATE_LIST} onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} />
-          <CustomDropdown style={{ flex: 1, minWidth: 0 }} label="LGA" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State First" />
+          <SelectModal 
+            style={{ flex: 1, minWidth: 0 }} 
+            label="State of Origin" 
+            title="Select State of Origin"
+            value={data.state} 
+            options={STATE_LIST} 
+            onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} 
+          />
+          <SelectModal 
+            style={{ flex: 1, minWidth: 0 }} 
+            label="LGA" 
+            title={data.state ? `${data.state} State LGAs` : 'Select LGA'}
+            value={data.lga} 
+            options={data.state ? NIGERIA_STATES[data.state] : []} 
+            onSelect={(v: string) => updateField('lga', v)} 
+            placeholder="Select State First" 
+          />
         </View>
 
         <View style={s.inputContainer}>
@@ -883,7 +1007,7 @@ export default function CACServices() {
         })}
       </View>
 
-      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
         {/* Dynamic Promotional Banner */}
         <DynamicBanners placement="cac" />
 
@@ -1281,17 +1405,19 @@ export default function CACServices() {
               <Text style={s.cardSectionTitle}>OPERATIONAL ADDRESS</Text>
               
               <View style={s.formGrid2}>
-                <CustomDropdown 
+                <SelectModal 
                   style={{ flex: 1, minWidth: 0 }}
                   label="State Location" 
+                  title="Select State Location"
                   value={state} 
                   options={STATE_LIST} 
                   onSelect={(val: string) => { setState(val); setLga(''); }} 
                   required 
                 />
-                <CustomDropdown 
+                <SelectModal 
                   style={{ flex: 1, minWidth: 0 }}
                   label="LGA / City" 
+                  title={state ? `${state} State LGAs` : 'Select LGA / City'}
                   value={lga} 
                   options={state ? NIGERIA_STATES[state] : []} 
                   onSelect={setLga} 
@@ -1690,12 +1816,12 @@ export default function CACServices() {
             {/* Official 24-Hour Price Lock Guarantee Banner */}
             <View style={s.guaranteeCard}>
               <View style={s.guaranteeIconCircle}>
-                <Ionicons name="shield-checkmark" size={22} color={COLORS.navy} />
+                <Ionicons name="shield-checkmark" size={20} color="#92400e" />
               </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={s.guaranteeTitle}>Official 24-Hour Quotation Lock Policy</Text>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={s.guaranteeTitle}>Official Rate Guaranteed</Text>
                 <Text style={s.guaranteeBody}>
-                  This verified rate is locked and guaranteed for 24 hours (until <Text style={{ fontWeight: '700', color: COLORS.navy }}>{new Date(quoteCalculation.quoteExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, {new Date(quoteCalculation.quoteExpiresAt).toLocaleDateString([], { day: 'numeric', month: 'short' })}</Text>). No unexpected price changes occur during processing.
+                  Locked for 24h until {new Date(quoteCalculation.quoteExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Verified registry pricing with zero hidden charges.
                 </Text>
               </View>
             </View>
@@ -1776,19 +1902,19 @@ export default function CACServices() {
         <View style={s.dockedActionRight}>
           {currentStep === 1 && (
             <TouchableOpacity style={s.dockedNextBtn} onPress={handleNextFromStep1} activeOpacity={0.85}>
-              <Text style={s.dockedNextBtnTxt}>Next: Business</Text>
+              <Text style={s.dockedNextBtnTxt}>Continue</Text>
               <Ionicons name="arrow-forward" size={14} color={COLORS.white} />
             </TouchableOpacity>
           )}
           {currentStep === 2 && (
             <TouchableOpacity style={s.dockedNextBtn} onPress={handleNextFromStep2} activeOpacity={0.85}>
-              <Text style={s.dockedNextBtnTxt}>Next: Officers</Text>
+              <Text style={s.dockedNextBtnTxt}>Continue</Text>
               <Ionicons name="arrow-forward" size={14} color={COLORS.white} />
             </TouchableOpacity>
           )}
           {currentStep === 3 && (
             <TouchableOpacity style={s.dockedNextBtn} onPress={handleNextFromStep3} activeOpacity={0.85}>
-              <Text style={s.dockedNextBtnTxt}>Next: Review</Text>
+              <Text style={s.dockedNextBtnTxt}>Review</Text>
               <Ionicons name="arrow-forward" size={14} color={COLORS.white} />
             </TouchableOpacity>
           )}
@@ -2092,17 +2218,105 @@ const s = StyleSheet.create({
   inputContainer: { marginBottom: 11, width: '100%', maxWidth: '100%' },
   inputLabel: { fontSize: 11, fontWeight: '700', color: '#334155', marginBottom: 4 },
   inputBox: {
-    height: 38, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8,
-    paddingHorizontal: 11, fontSize: 12, color: COLORS.textMain, backgroundColor: '#ffffff',
+    height: 42, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8,
+    paddingHorizontal: 12, fontSize: 12.5, color: COLORS.textMain, backgroundColor: '#ffffff',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     width: '100%', maxWidth: '100%',
   },
   inputBoxActive: { borderColor: COLORS.navy, borderWidth: 1.5 },
-  inputText: { fontSize: 12, color: COLORS.textMain },
-  inputPlaceholderText: { fontSize: 11.5, color: '#94a3b8' },
+  inputText: { fontSize: 12.5, color: COLORS.textMain },
+  inputPlaceholderText: { fontSize: 12, color: '#94a3b8' },
   formGrid2: { flexDirection: 'row', gap: 10, width: '100%', alignItems: 'flex-start' },
 
-  // Dropdown
+  // Select Modal Styles (Clean Modal Picker)
+  selectModalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 18,
+    padding: 18,
+    width: '100%',
+    maxWidth: 380,
+  },
+  selectModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  selectModalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12.5,
+    color: COLORS.textMain,
+    padding: 0,
+  },
+  selectModalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 3,
+  },
+  selectModalItemActive: {
+    backgroundColor: '#eff6ff',
+  },
+  selectModalItemTxt: {
+    fontSize: 13,
+    color: COLORS.textMain,
+  },
+  selectModalItemTxtActive: {
+    color: COLORS.navy,
+    fontWeight: '800',
+  },
+
+  // Gender Selector Segmented Toggle
+  genderRow: {
+    flexDirection: 'row',
+    height: 42,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    padding: 3,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  genderBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    gap: 5,
+  },
+  genderBtnActive: {
+    backgroundColor: COLORS.navy,
+  },
+  genderBtnTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSub,
+  },
+  genderBtnTxtActive: {
+    color: COLORS.white,
+  },
+
+  // Dropdown Legacy fallback
   dropdownList: {
     position: 'relative', marginTop: 4, backgroundColor: COLORS.white,
     borderRadius: 8, borderWidth: 1, borderColor: COLORS.border,

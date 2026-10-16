@@ -66,6 +66,7 @@ const REQUIRED_SECRETS = [
     { key: 'IDPRO_API_KEY', aliases: ['IDPRO_KEY'], desc: 'IDPRO Verification API', provider: 'IDPRO' },
     { key: 'PAYVESSEL_API_SECRET', aliases: ['PAYVESSEL_SECRET_KEY', 'PAYVESSEL_SECRET'], desc: 'PayVessel Secret Key', provider: 'PayVessel' },
     { key: 'PAYVESSEL_API_KEY', aliases: ['PAYVESSEL_KEY', 'PAYBESSEL_API_KEY'], desc: 'PayVessel API Key', provider: 'PayVessel' },
+    { key: 'PAYVESSEL_BUSINESS_ID', aliases: ['PAYVESSEL_BIZ_ID', 'PAYVESSEL_BUSINESS'], desc: 'PayVessel Business ID (e.g. PV_BIZ_...)', provider: 'PayVessel' },
     { key: 'OPENAI_API_KEY', aliases: ['OPENAI_KEY'], desc: 'OpenAI Secret Key for Cortex AI', provider: 'AI & Misc' },
     { key: 'CRYPTO_EXCHANGE_KEY', aliases: ['COINGECKO_KEY'], desc: 'CoinGecko API Key', provider: 'Crypto' },
     { key: 'DERIV_API_TOKEN', aliases: ['DERIV_TOKEN'], desc: 'Deriv Trading API Token', provider: 'Trading' },

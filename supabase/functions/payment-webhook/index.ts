@@ -2122,6 +2122,69 @@ $$ language plpgsql security definer;
                               (eventData.order && eventData.order.amount !== undefined) ||
                               (eventData.data && eventData.data.amount !== undefined);
 
+            // Check if this is a Payvessel Virtual Card event (spend, credit, authorization)
+            const isCardEvent = Boolean(
+                eventData.card_id ||
+                eventData.data?.card_id ||
+                eventData.event?.includes('card') ||
+                eventData.event?.includes('virtual')
+            );
+
+            if (isCardEvent) {
+                console.log("[Payvessel Webhook] Processing Virtual Card Event:", eventName);
+                const cardId = eventData.card_id || eventData.data?.card_id;
+                const txData = eventData.data || eventData.transaction || eventData;
+                const spendAmount = Number(txData.amount || 0);
+                const merchant = txData.merchant || txData.merchant_name || 'Online Merchant';
+                const status = (txData.status === 'success' || txData.status === 'successful' || isSuccess) ? 'COMPLETED' : 'DECLINED';
+                const txType = txData.type === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+
+                if (cardId) {
+                    const { data: matchedCard } = await supabaseAdmin
+                        .from('user_virtual_cards')
+                        .select('id, user_id, balance, card_id')
+                        .or(`card_id.eq.${cardId},id.eq.${cardId}`)
+                        .maybeSingle();
+
+                    if (matchedCard) {
+                        const currentCardBal = Number(matchedCard.balance) || 0;
+                        const newCardBal = txType === 'DEBIT' ? Math.max(0, currentCardBal - spendAmount) : (currentCardBal + spendAmount);
+
+                        if (status === 'COMPLETED' && spendAmount > 0) {
+                            await supabaseAdmin
+                                .from('user_virtual_cards')
+                                .update({ balance: newCardBal, updated_at: new Date().toISOString() })
+                                .eq('id', matchedCard.id);
+                        }
+
+                        await supabaseAdmin.from('card_transactions').insert({
+                            card_id: matchedCard.id,
+                            user_id: matchedCard.user_id,
+                            merchant_name: merchant,
+                            amount: spendAmount,
+                            currency: 'USD',
+                            status: status,
+                            type: txType,
+                            reference: txData.reference || `PV_CARD_${Date.now()}`,
+                            created_at: new Date().toISOString()
+                        });
+
+                        await dispatchUserPushNotification(
+                            supabaseAdmin,
+                            matchedCard.user_id,
+                            `Virtual Card ${txType === 'DEBIT' ? 'Spend' : 'Top-up'}`,
+                            `${txType === 'DEBIT' ? 'Spent' : 'Received'} $${spendAmount.toFixed(2)} at ${merchant}`,
+                            { cardId: matchedCard.id }
+                        );
+
+                        return new Response(JSON.stringify({ status: 'card_event_processed' }), {
+                            status: 200,
+                            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                        });
+                    }
+                }
+            }
+
             if (isSuccess) {
                 const transactionObj = eventData.transaction || eventData.data || {};
                 const orderObj = eventData.order || eventData.data || {};
