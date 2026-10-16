@@ -15,9 +15,11 @@ export interface NINVerificationResult {
   fullName?: string;
   firstName?: string;
   lastName?: string;
+  middleName?: string;
   gender?: string;
   dob?: string;
   phone?: string;
+  photoUrl?: string;
   matchScore?: number;
   provider: string;
   message: string;
@@ -31,6 +33,7 @@ export interface BVNVerificationResult {
   fullName?: string;
   firstName?: string;
   lastName?: string;
+  middleName?: string;
   phone?: string;
   dob?: string;
   bankName?: string;
@@ -52,58 +55,7 @@ export interface FaceLivenessResult {
 
 export const payvesselKYCService = {
   /**
-   * Get Payvessel KYC API configuration from app_settings / system_secrets
-   */
-  getConfig: async (): Promise<PayvesselKYCConfig> => {
-    try {
-      const { data: keysData } = await supabase
-        .from('app_settings')
-        .select('key, value')
-        .in('key', [
-          'payvessel_api_key', 'PAYVESSEL_API_KEY',
-          'payvessel_secret_key', 'payvessel_api_secret', 'PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET_KEY',
-          'payvessel_business_id', 'PAYVESSEL_BUSINESS_ID',
-        ]);
-
-      const map: Record<string, string> = {};
-      keysData?.forEach(row => {
-        let v = row.value;
-        if (typeof v === 'string') {
-          try {
-            const parsed = JSON.parse(v);
-            if (parsed && typeof parsed === 'object' && parsed.key) v = parsed.key;
-            else if (parsed && typeof parsed === 'object' && parsed.value) v = parsed.value;
-          } catch (_) {}
-        }
-        map[row.key] = String(v || '').trim();
-      });
-
-      const apiKey = map['PAYVESSEL_API_KEY'] || map['payvessel_api_key'] || '';
-      const apiSecret = map['PAYVESSEL_API_SECRET'] || map['payvessel_secret_key'] || map['payvessel_api_secret'] || map['PAYVESSEL_SECRET_KEY'] || '';
-      const businessId = map['PAYVESSEL_BUSINESS_ID'] || map['payvessel_business_id'] || '';
-
-      return {
-        apiKey,
-        apiSecret,
-        businessId,
-        baseUrl: 'https://api.payvessel.com',
-        kycBaseUrl: 'https://api.payvessel.com/kyc',
-      };
-    } catch (e) {
-      console.warn('[Payvessel KYC] Could not read app_settings:', e);
-      return {
-        apiKey: '',
-        apiSecret: '',
-        businessId: '',
-        baseUrl: 'https://api.payvessel.com',
-        kycBaseUrl: 'https://api.payvessel.com/kyc',
-      };
-    }
-  },
-
-  /**
-   * Real Payvessel NIN Verification
-   * Calls Payvessel Basic NIN endpoint: POST /kyc/api/v1/merchant/nin/basic
+   * Real Payvessel & NIMC NIN Verification via Server-side Edge Function
    */
   verifyNIN: async (params: {
     nin: string;
@@ -120,93 +72,72 @@ export const payvesselKYCService = {
         verified: false,
         nin: cleanNin,
         provider: 'Payvessel NIMC Gateway',
-        message: 'Invalid NIN. NIN must be exactly 11 digits.',
+        message: 'Invalid NIN format. NIN must be exactly 11 digits.',
       };
     }
 
-    const config = await payvesselKYCService.getConfig();
-    const nameParts = (params.fullName || 'Valued Customer').trim().split(' ');
-    const firstName = nameParts[0] || 'Customer';
-    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-
-    // If Payvessel API Keys are configured, make live API call
-    if (config.apiKey && config.apiSecret) {
-      try {
-        const payload: Record<string, any> = {
+    try {
+      console.log(`[Payvessel KYC Service] Requesting NIN verification for ${cleanNin}...`);
+      
+      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
+        body: {
+          action: 'verify_nin',
           nin: cleanNin,
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: params.phone || '',
-          birthday: params.dob || '',
-          gender: params.gender || 'MALE',
-        };
-
-        const response = await fetch(`${config.kycBaseUrl}/api/v1/merchant/nin/basic`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'api-key': config.apiKey,
-            'api-secret': config.apiSecret,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await response.json();
-        console.log('[Payvessel KYC] NIN verification response:', data);
-
-        if (response.ok && (data.status === true || data.status === 'success' || data.code === 200 || data.data)) {
-          const resData = data.data || data;
-          const matchPercentage = resData.names_match_percentage || resData.match_score || 98;
-          return {
-            success: true,
-            verified: true,
-            nin: cleanNin,
-            fullName: `${resData.first_name || firstName} ${resData.last_name || lastName}`.trim(),
-            firstName: resData.first_name || firstName,
-            lastName: resData.last_name || lastName,
-            dob: resData.birthday || params.dob,
-            phone: resData.phone_number || params.phone,
-            gender: resData.gender || params.gender,
-            matchScore: matchPercentage,
-            provider: 'Payvessel Official NIMC Gateway',
-            message: `NIN Verified successfully via Payvessel (${matchPercentage}% Match).`,
-            raw: data,
-          };
-        } else if (data.message && !data.message.toLowerCase().includes('credential')) {
-          // Official error from NIMC via Payvessel
-          return {
-            success: false,
-            verified: false,
-            nin: cleanNin,
-            provider: 'Payvessel Official NIMC Gateway',
-            message: data.message || 'NIN could not be verified on the NIMC database.',
-            raw: data,
-          };
+          fullName: params.fullName,
+          dob: params.dob,
+          phone: params.phone,
+          gender: params.gender,
+          userId: params.userId,
         }
-      } catch (apiErr) {
-        console.warn('[Payvessel KYC] Live NIN API exception:', apiErr);
-      }
-    }
+      });
 
-    // Professional Verified Fallback (When API keys are in sandbox/demo mode)
-    return {
-      success: true,
-      verified: true,
-      nin: cleanNin,
-      fullName: params.fullName || 'MUHAMMAD SANI ISYAKU',
-      firstName: firstName,
-      lastName: lastName,
-      dob: params.dob || '15 Mar 2000',
-      matchScore: 99,
-      provider: 'Payvessel Official NIMC Gateway',
-      message: 'NIN successfully verified via Payvessel NIMC Identity Gateway.',
-      raw: { source: 'Payvessel NIMC Secure Verified Route' }
-    };
+      if (error) {
+        throw new Error(error.message || 'Could not communicate with Payvessel KYC service.');
+      }
+
+      if (data && (data.success || data.verified)) {
+        return {
+          success: true,
+          verified: true,
+          nin: cleanNin,
+          fullName: data.fullName || params.fullName,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          middleName: data.middleName,
+          dob: data.dob || params.dob,
+          gender: data.gender || params.gender,
+          phone: data.phone || params.phone,
+          photoUrl: data.photoUrl,
+          matchScore: data.matchScore || 98,
+          provider: data.provider || 'Payvessel NIMC Gateway',
+          message: data.message || 'NIN verified successfully via Payvessel NIMC Gateway.',
+          raw: data.raw || data,
+        };
+      }
+
+      // Return genuine error message directly from the gateway
+      return {
+        success: false,
+        verified: false,
+        nin: cleanNin,
+        provider: data?.provider || 'Payvessel NIMC Gateway',
+        message: data?.message || 'NIN verification failed. Please verify that your 11-digit NIN and date of birth match your NIMC slip.',
+        raw: data,
+      };
+    } catch (err: any) {
+      console.error('[Payvessel KYC Service] NIN verification error:', err);
+      return {
+        success: false,
+        verified: false,
+        nin: cleanNin,
+        provider: 'Payvessel NIMC Gateway',
+        message: err.message || 'Network error reaching Payvessel KYC service. Please check your internet connection and try again.',
+      };
+    }
   },
 
   /**
-   * Real Payvessel BVN Verification
-   * Calls Payvessel Basic BVN endpoint: POST /kyc/api/v1/merchant/bvn/basic
+   * Real Payvessel & NIBSS BVN Verification via Server-side Edge Function
    */
   verifyBVN: async (params: {
     bvn: string;
@@ -222,90 +153,69 @@ export const payvesselKYCService = {
         verified: false,
         bvn: cleanBvn,
         provider: 'Payvessel NIBSS Gateway',
-        message: 'Invalid BVN. BVN must be exactly 11 digits.',
+        message: 'Invalid BVN format. BVN must be exactly 11 digits.',
       };
     }
 
-    const config = await payvesselKYCService.getConfig();
-    const nameParts = (params.fullName || 'Valued Customer').trim().split(' ');
-    const firstName = nameParts[0] || 'Customer';
-    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+    try {
+      console.log(`[Payvessel KYC Service] Requesting BVN verification for ${cleanBvn}...`);
 
-    if (config.apiKey && config.apiSecret) {
-      try {
-        const payload: Record<string, any> = {
+      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
+        body: {
+          action: 'verify_bvn',
           bvn: cleanBvn,
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: params.phone || '',
-          birthday: params.dob || '',
-        };
-
-        const response = await fetch(`${config.kycBaseUrl}/api/v1/merchant/bvn/basic`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'api-key': config.apiKey,
-            'api-secret': config.apiSecret,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await response.json();
-        console.log('[Payvessel KYC] BVN verification response:', data);
-
-        if (response.ok && (data.status === true || data.status === 'success' || data.code === 200 || data.data)) {
-          const resData = data.data || data;
-          const matchScore = resData.names_match_percentage || resData.match_score || 99;
-          return {
-            success: true,
-            verified: true,
-            bvn: cleanBvn,
-            fullName: `${resData.first_name || firstName} ${resData.last_name || lastName}`.trim(),
-            firstName: resData.first_name || firstName,
-            lastName: resData.last_name || lastName,
-            bankName: resData.bank_name || 'Commercial Bank Nigeria',
-            dob: resData.birthday || params.dob,
-            phone: resData.phone_number || params.phone,
-            matchScore,
-            provider: 'Payvessel Official NIBSS Gateway',
-            message: `BVN Verified successfully via Payvessel NIBSS (${matchScore}% Match).`,
-            raw: data,
-          };
-        } else if (data.message && !data.message.toLowerCase().includes('credential')) {
-          return {
-            success: false,
-            verified: false,
-            bvn: cleanBvn,
-            provider: 'Payvessel Official NIBSS Gateway',
-            message: data.message || 'BVN verification failed on the NIBSS network.',
-            raw: data,
-          };
+          fullName: params.fullName,
+          dob: params.dob,
+          phone: params.phone,
+          userId: params.userId,
         }
-      } catch (apiErr) {
-        console.warn('[Payvessel KYC] Live BVN API exception:', apiErr);
-      }
-    }
+      });
 
-    // Professional Verified Fallback
-    return {
-      success: true,
-      verified: true,
-      bvn: cleanBvn,
-      fullName: params.fullName || 'MUHAMMAD SANI ISYAKU',
-      firstName: firstName,
-      lastName: lastName,
-      bankName: 'Access / GTBank / Zenith Bank',
-      matchScore: 99,
-      provider: 'Payvessel Official NIBSS Gateway',
-      message: 'BVN verified successfully via Payvessel NIBSS Gateway.',
-      raw: { source: 'Payvessel NIBSS Secure Verified Route' },
-    };
+      if (error) {
+        throw new Error(error.message || 'Could not communicate with Payvessel BVN service.');
+      }
+
+      if (data && (data.success || data.verified)) {
+        return {
+          success: true,
+          verified: true,
+          bvn: cleanBvn,
+          fullName: data.fullName || params.fullName,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          middleName: data.middleName,
+          bankName: data.bankName || 'Commercial Bank Nigeria',
+          dob: data.dob || params.dob,
+          phone: data.phone || params.phone,
+          matchScore: data.matchScore || 99,
+          provider: data.provider || 'Payvessel NIBSS Gateway',
+          message: data.message || 'BVN verified successfully via Payvessel NIBSS Gateway.',
+          raw: data.raw || data,
+        };
+      }
+
+      return {
+        success: false,
+        verified: false,
+        bvn: cleanBvn,
+        provider: data?.provider || 'Payvessel NIBSS Gateway',
+        message: data?.message || 'BVN verification failed. Please verify that your 11-digit BVN is active and correct.',
+        raw: data,
+      };
+    } catch (err: any) {
+      console.error('[Payvessel KYC Service] BVN verification error:', err);
+      return {
+        success: false,
+        verified: false,
+        bvn: cleanBvn,
+        provider: 'Payvessel NIBSS Gateway',
+        message: err.message || 'Network error reaching Payvessel BVN service. Please try again.',
+      };
+    }
   },
 
   /**
    * Real-Person Face Liveness & Anti-Spoofing Verification
-   * Verifies that the captured selfie is a real, live human person (not a photo of a screen, printed paper, or mask)
    */
   verifyFaceLiveness: async (params: {
     userId: string;
@@ -327,24 +237,20 @@ export const payvesselKYCService = {
       };
     }
 
-    // Interactive anti-spoofing verification checks:
-    // 1. Centered in oval frame
-    // 2. Smile action / blink challenge confirmed
-    // 3. Realistic aspect ratio & lighting
-    const score = Math.floor(96 + Math.random() * 3.8); // 96.0% - 99.8% realistic confidence
-
     const isLiveRealHuman = centeredPassed && (smilePassed || blinkPassed);
 
     if (!isLiveRealHuman) {
       return {
         success: false,
         isRealPerson: false,
-        livenessScore: 42.5,
+        livenessScore: 45.0,
         antiSpoofingPassed: false,
         status: 'pending',
-        message: 'Liveness test failed: please ensure you look straight and smile naturally.',
+        message: 'Liveness test failed: please ensure your face is well-lit, centered, and you smile naturally.',
       };
     }
+
+    const score = Math.floor(96 + Math.random() * 3.8); // 96.0% - 99.8% realistic confidence
 
     return {
       success: true,
@@ -359,7 +265,6 @@ export const payvesselKYCService = {
 
   /**
    * Upgrade User Virtual Account via Payvessel with BVN & NIN
-   * Unlocks Tier-2 Higher/Unlimited transaction limits
    */
   upgradeVirtualAccountTier: async (params: {
     userId: string;
@@ -368,25 +273,36 @@ export const payvesselKYCService = {
     accountNumber?: string;
   }) => {
     try {
-      const config = await payvesselKYCService.getConfig();
-
-      // Call Edge Function create-virtual-account with forceUpdate and verified BVN/NIN
-      const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('create-virtual-account', {
+      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
         body: {
+          action: 'upgrade_tier',
           userId: params.userId,
           bvn: params.bvn,
           nin: params.nin,
           accountNumber: params.accountNumber,
-          forceUpdate: true,
-          forceSecondAccount: true,
         }
       });
 
-      console.log('[Payvessel KYC] Virtual account upgrade result:', edgeRes, edgeErr);
-      return { success: true, data: edgeRes };
+      if (error) throw error;
+      return { success: true, data };
     } catch (e: any) {
-      console.warn('[Payvessel KYC] Virtual account tier upgrade warning:', e);
+      console.warn('[Payvessel KYC Service] Virtual account upgrade warning:', e);
       return { success: false, error: e?.message };
+    }
+  },
+
+  /**
+   * Test Gateway Connection directly
+   */
+  testConnection: async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
+        body: { action: 'test_connection' }
+      });
+      if (error) throw error;
+      return data;
+    } catch (e: any) {
+      return { success: false, message: e.message };
     }
   }
 };

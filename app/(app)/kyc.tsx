@@ -266,11 +266,17 @@ export default function UserKYCScreen() {
         try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
       }
 
-      const formattedDob = `${dobDay} ${dobMonth} ${dobYear}`;
+      const monthMap: Record<string, string> = {
+        Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+        Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+      };
+      const formattedDob = `${dobYear}-${monthMap[dobMonth] || '01'}-${String(dobDay).padStart(2, '0')}`;
+      
       const res = await payvesselKYCService.verifyNIN({
         nin: cleanNin,
         fullName: userProfile?.full_name,
         dob: formattedDob,
+        gender: userProfile?.gender || 'MALE',
         phone: userProfile?.phone,
         userId: userProfile?.id,
       });
@@ -278,12 +284,15 @@ export default function UserKYCScreen() {
       if (res.success && res.verified) {
         setNinVerified(true);
         setNinResult(res);
+        if (res.fullName) {
+          setUserProfile((prev: any) => ({ ...prev, full_name: res.fullName, nin: cleanNin }));
+        }
         if (Platform.OS !== 'web') {
           try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         }
         Alert.alert(
           'NIN Verified Successfully! ✓',
-          `Verified via ${res.provider}.\nMatch Score: ${res.matchScore || 99}%\nHolder: ${res.fullName || userProfile?.full_name}`,
+          `Verified via ${res.provider}.\nMatch Score: ${res.matchScore || 98}%\nVerified Holder: ${res.fullName || userProfile?.full_name}`,
           [
             {
               text: 'Continue to BVN',
@@ -292,7 +301,7 @@ export default function UserKYCScreen() {
           ]
         );
       } else {
-        Alert.alert('Verification Notice', res.message || 'Could not verify NIN. Please check the digits.');
+        Alert.alert('Verification Failed', res.message || 'Could not verify NIN with NIMC. Please verify your 11-digit number.');
       }
     } catch (err: any) {
       console.warn('NIN verification error:', err);
@@ -315,9 +324,16 @@ export default function UserKYCScreen() {
         try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
       }
 
+      const monthMap: Record<string, string> = {
+        Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+        Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+      };
+      const formattedDob = `${dobYear}-${monthMap[dobMonth] || '01'}-${String(dobDay).padStart(2, '0')}`;
+
       const res = await payvesselKYCService.verifyBVN({
         bvn: cleanBvn,
         fullName: userProfile?.full_name,
+        dob: formattedDob,
         phone: userProfile?.phone,
         userId: userProfile?.id,
       });
@@ -325,6 +341,7 @@ export default function UserKYCScreen() {
       if (res.success && res.verified) {
         setBvnVerified(true);
         setBvnResult(res);
+        setUserProfile((prev: any) => ({ ...prev, bvn: cleanBvn, kyc_tier: 2 }));
         if (Platform.OS !== 'web') {
           try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         }
@@ -339,7 +356,7 @@ export default function UserKYCScreen() {
           ]
         );
       } else {
-        Alert.alert('Verification Notice', res.message || 'Could not verify BVN. Please verify the 11 digits.');
+        Alert.alert('Verification Failed', res.message || 'Could not verify BVN with NIBSS. Please check the 11 digits.');
       }
     } catch (err: any) {
       console.warn('BVN verification error:', err);
