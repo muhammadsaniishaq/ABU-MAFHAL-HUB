@@ -71,12 +71,16 @@ export default function UserKYCScreen() {
   const [ninVerifying, setNinVerifying] = useState(false);
   const [ninVerified, setNinVerified] = useState(false);
   const [ninResult, setNinResult] = useState<NINVerificationResult | null>(null);
+  const [ninError, setNinError] = useState<string | null>(null);
+  const [ninProviderError, setNinProviderError] = useState(false);
 
   // Step 3: BVN + Payvessel Live Gateway
   const [bvnInput, setBvnInput] = useState('');
   const [bvnVerifying, setBvnVerifying] = useState(false);
   const [bvnVerified, setBvnVerified] = useState(false);
   const [bvnResult, setBvnResult] = useState<BVNVerificationResult | null>(null);
+  const [bvnError, setBvnError] = useState<string | null>(null);
+  const [bvnProviderError, setBvnProviderError] = useState(false);
 
   // Step 4: Upload ID Card
   const [docImageUri, setDocImageUri] = useState<string | null>(null);
@@ -255,9 +259,13 @@ export default function UserKYCScreen() {
 
   // Step 2 Validation (NIN via Payvessel NIMC Gateway)
   const handleVerifyNIN = async () => {
+    setNinError(null);
+    setNinProviderError(false);
     const cleanNin = ninInput.replace(/\s+/g, '');
     if (!cleanNin || cleanNin.length !== 11 || !/^\d{11}$/.test(cleanNin)) {
-      return Alert.alert('Invalid NIN', 'Please enter your valid 11-digit National Identification Number (NIN).');
+      const msg = 'Da fatan a shigar da lambar NIN mai lambobi 11 daidai (Please enter your valid 11-digit NIN).';
+      setNinError(msg);
+      return Alert.alert('Invalid NIN', msg);
     }
 
     try {
@@ -284,6 +292,8 @@ export default function UserKYCScreen() {
       if (res.success && res.verified) {
         setNinVerified(true);
         setNinResult(res);
+        setNinError(null);
+        setNinProviderError(false);
         if (res.fullName) {
           setUserProfile((prev: any) => ({ ...prev, full_name: res.fullName, nin: cleanNin }));
         }
@@ -301,11 +311,17 @@ export default function UserKYCScreen() {
           ]
         );
       } else {
-        Alert.alert('Verification Failed', res.message || 'Could not verify NIN with NIMC. Please verify your 11-digit number.');
+        const errorMsg = res.message || 'Could not verify NIN with NIMC. Please verify your 11-digit number.';
+        setNinError(errorMsg);
+        setNinProviderError(Boolean(res.providerError));
+        Alert.alert('Verification Failed', errorMsg);
       }
     } catch (err: any) {
       console.warn('NIN verification error:', err);
-      Alert.alert('Gateway Error', err?.message || 'Could not reach Payvessel NIMC gateway. Please try again.');
+      const errDetail = err?.message || 'Could not reach Payvessel NIMC gateway. Please try again.';
+      setNinError(errDetail);
+      setNinProviderError(true);
+      Alert.alert('Gateway Error', errDetail);
     } finally {
       setNinVerifying(false);
     }
@@ -313,9 +329,13 @@ export default function UserKYCScreen() {
 
   // Step 3 Validation (BVN via Payvessel NIBSS Gateway)
   const handleVerifyBVN = async () => {
+    setBvnError(null);
+    setBvnProviderError(false);
     const cleanBvn = bvnInput.replace(/\s+/g, '');
     if (!cleanBvn || cleanBvn.length !== 11 || !/^\d{11}$/.test(cleanBvn)) {
-      return Alert.alert('Invalid BVN', 'Please enter your valid 11-digit Bank Verification Number (BVN). Both NIN and BVN are required.');
+      const msg = 'Da fatan a shigar da lambar BVN mai lambobi 11 daidai (Please enter your valid 11-digit BVN).';
+      setBvnError(msg);
+      return Alert.alert('Invalid BVN', msg);
     }
 
     try {
@@ -341,6 +361,8 @@ export default function UserKYCScreen() {
       if (res.success && res.verified) {
         setBvnVerified(true);
         setBvnResult(res);
+        setBvnError(null);
+        setBvnProviderError(false);
         setUserProfile((prev: any) => ({ ...prev, bvn: cleanBvn, kyc_tier: 2 }));
         if (Platform.OS !== 'web') {
           try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
@@ -356,11 +378,17 @@ export default function UserKYCScreen() {
           ]
         );
       } else {
-        Alert.alert('Verification Failed', res.message || 'Could not verify BVN with NIBSS. Please check the 11 digits.');
+        const errorMsg = res.message || 'Could not verify BVN with NIBSS. Please check the 11 digits.';
+        setBvnError(errorMsg);
+        setBvnProviderError(Boolean(res.providerError));
+        Alert.alert('Verification Failed', errorMsg);
       }
     } catch (err: any) {
       console.warn('BVN verification error:', err);
-      Alert.alert('Gateway Error', err?.message || 'Could not reach Payvessel NIBSS gateway. Please try again.');
+      const errDetail = err?.message || 'Could not reach Payvessel NIBSS gateway. Please try again.';
+      setBvnError(errDetail);
+      setBvnProviderError(true);
+      Alert.alert('Gateway Error', errDetail);
     } finally {
       setBvnVerifying(false);
     }
@@ -806,7 +834,10 @@ export default function UserKYCScreen() {
                         keyboardType="numeric"
                         maxLength={11}
                         value={ninInput}
-                        onChangeText={setNinInput}
+                        onChangeText={(val) => {
+                          setNinInput(val);
+                          if (ninError) setNinError(null);
+                        }}
                       />
                     </View>
                   </View>
@@ -818,6 +849,46 @@ export default function UserKYCScreen() {
                       Your NIN is validated live with NIMC via Payvessel Identity API.
                     </Text>
                   </View>
+
+                  {/* Error / Gateway Notice Banner */}
+                  {ninError && (
+                    <View style={s.errorBannerBox}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                        <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8, marginTop: 2 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.errorBannerTitle}>
+                            {ninProviderError ? 'Sabar NIMC na Fuskantar Jinkiri' : 'Kuskuren NIN'}
+                          </Text>
+                          <Text style={s.errorBannerTxt}>{ninError}</Text>
+                        </View>
+                      </View>
+
+                      <View style={s.errorBannerActionRow}>
+                        <TouchableOpacity 
+                          style={s.errorRetryBtn}
+                          onPress={handleVerifyNIN}
+                          disabled={ninVerifying}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="refresh" size={13} color={C.navy} style={{ marginRight: 5 }} />
+                          <Text style={s.errorRetryBtnTxt}>Sake Gwada NIN</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                          style={s.errorBypassBtn}
+                          onPress={() => {
+                            if (ninInput.trim().length === 11) {
+                              setUserProfile((prev: any) => ({ ...prev, nin: ninInput.trim() }));
+                            }
+                            setCurrentStep(3);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={s.errorBypassBtnTxt}>Ci gaba da BVN →</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
 
                   {/* Date of Birth Input */}
                   <View style={[s.fieldGroup, { marginTop: 16 }]}>
@@ -954,7 +1025,10 @@ export default function UserKYCScreen() {
                         keyboardType="numeric"
                         maxLength={11}
                         value={bvnInput}
-                        onChangeText={setBvnInput}
+                        onChangeText={(val) => {
+                          setBvnInput(val);
+                          if (bvnError) setBvnError(null);
+                        }}
                       />
                     </View>
                   </View>
@@ -966,6 +1040,46 @@ export default function UserKYCScreen() {
                       Your BVN is verified live via Payvessel NIBSS channel. Dial *565*0# on your registered SIM to retrieve it.
                     </Text>
                   </View>
+
+                  {/* Error / Gateway Notice Banner */}
+                  {bvnError && (
+                    <View style={s.errorBannerBox}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                        <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8, marginTop: 2 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.errorBannerTitle}>
+                            {bvnProviderError ? 'Sabar NIBSS na Fuskantar Jinkiri' : 'Kuskuren BVN'}
+                          </Text>
+                          <Text style={s.errorBannerTxt}>{bvnError}</Text>
+                        </View>
+                      </View>
+
+                      <View style={s.errorBannerActionRow}>
+                        <TouchableOpacity 
+                          style={s.errorRetryBtn}
+                          onPress={handleVerifyBVN}
+                          disabled={bvnVerifying}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="refresh" size={13} color={C.navy} style={{ marginRight: 5 }} />
+                          <Text style={s.errorRetryBtnTxt}>Sake Gwada BVN</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                          style={s.errorBypassBtn}
+                          onPress={() => {
+                            if (bvnInput.trim().length === 11) {
+                              setUserProfile((prev: any) => ({ ...prev, bvn: bvnInput.trim() }));
+                            }
+                            setCurrentStep(4);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={s.errorBypassBtnTxt}>Ci gaba da ID Card →</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
 
                   {/* Tier-2 Upgrade Benefit Banner */}
                   <View style={s.upgradePerkBox}>
@@ -3399,5 +3513,59 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: '#047857',
     marginTop: 2,
+  },
+  errorBannerBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.2,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    padding: 13,
+    marginTop: 14,
+  },
+  errorBannerTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#991B1B',
+    marginBottom: 3,
+  },
+  errorBannerTxt: {
+    fontSize: 11.5,
+    color: '#7F1D1D',
+    lineHeight: 16,
+  },
+  errorBannerActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#FEE2E2',
+  },
+  errorRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  errorRetryBtnTxt: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: C.navy,
+  },
+  errorBypassBtn: {
+    flex: 1,
+    alignItems: 'flex-end',
+    paddingVertical: 6,
+  },
+  errorBypassBtnTxt: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#2563EB',
+    textDecorationLine: 'underline',
   },
 });

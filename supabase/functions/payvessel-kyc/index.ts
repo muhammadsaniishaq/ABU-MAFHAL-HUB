@@ -266,8 +266,8 @@ Deno.serve(async (req: Request) => {
                             message: `NIN Verified successfully via Payvessel (${matchPct}% Match ✓).`,
                             raw: pvJson
                         };
-                    } else if (pvJson.message) {
-                        lastErrorMessage = String(pvJson.message);
+                    } else if (pvJson.message || pvJson.details) {
+                        lastErrorMessage = String(pvJson.details?.[0] || pvJson.message);
                     }
                 } catch (pvErr: any) {
                     console.warn(`[Payvessel KYC Exception]:`, pvErr.message);
@@ -275,6 +275,55 @@ Deno.serve(async (req: Request) => {
                 }
             } else {
                 lastErrorMessage = 'Payvessel API Key and Secret are not configured in system_secrets.';
+            }
+
+            // Step 1b: Try Payvessel Enhanced NIN if Basic didn't pass (queries directly by NIN)
+            if (!payvesselVerified && apiKey && apiSecret) {
+                try {
+                    const pvEnhUrl = `${baseUrl}/kyc/api/v1/merchant/nin/enhanced`;
+                    console.log(`[Payvessel KYC] Requesting Enhanced NIN: ${pvEnhUrl}`);
+
+                    const enhRes = await fetch(pvEnhUrl, {
+                        method: 'POST',
+                        headers: {
+                            'api-key': apiKey,
+                            'api-secret': apiSecret,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ nin: cleanNin }),
+                    });
+
+                    const enhJson = await enhRes.json().catch(() => ({}));
+                    console.log(`[Payvessel KYC Enhanced Response]:`, JSON.stringify(enhJson));
+
+                    if (enhRes.ok && (enhJson.status === true || enhJson.success === true || enhJson.code === 200 || enhJson.data)) {
+                        const d = enhJson.data || enhJson;
+                        const returnName = `${d.first_name || d.firstname || ''} ${d.middle_name || d.middlename ? (d.middle_name || d.middlename) + ' ' : ''}${d.last_name || d.surname || ''}`.trim() || effectiveFirstName || 'Verified Citizen';
+                        payvesselVerified = true;
+                        verifiedData = {
+                            nin: cleanNin,
+                            fullName: returnName,
+                            firstName: d.first_name || d.firstname || effectiveFirstName,
+                            lastName: d.last_name || d.surname || effectiveLastName,
+                            middleName: d.middle_name || d.middlename || effectiveMiddleName,
+                            dob: d.birthday || d.birthdate || formattedDob,
+                            gender: d.gender || cleanGender,
+                            phone: d.phone_number || d.telephoneno || cleanPhone,
+                            photoUrl: d.photo || d.photoUrl || null,
+                            matchScore: 99,
+                            provider: 'Payvessel NIMC Enhanced Gateway',
+                            message: `NIN Verified successfully via Payvessel NIMC Enhanced API.`,
+                            raw: enhJson
+                        };
+                    } else if (enhJson.message || enhJson.details) {
+                        const enhMsg = String(enhJson.details?.[0] || enhJson.message);
+                        if (!lastErrorMessage || enhMsg.length > lastErrorMessage.length) {
+                            lastErrorMessage = enhMsg;
+                        }
+                    }
+                } catch (enhErr: any) {
+                    console.warn(`[Payvessel KYC Enhanced Exception]:`, enhErr.message);
+                }
             }
 
             // Step 2: Failover to AgentHub NIMC gateway if Payvessel was not able to verify
@@ -325,12 +374,31 @@ Deno.serve(async (req: Request) => {
 
             // If verification failed completely, return genuine error
             if (!payvesselVerified || !verifiedData) {
+                const isInsufficientBalance = 
+                    lastErrorMessage.toLowerCase().includes('insufficient') ||
+                    lastErrorMessage.toLowerCase().includes('wallet balance') ||
+                    lastErrorMessage.toLowerCase().includes('fund your wallet');
+
+                const isProviderDowntime = 
+                    lastErrorMessage.toLowerCase().includes('unable to complete') ||
+                    lastErrorMessage.toLowerCase().includes('provider_error') ||
+                    lastErrorMessage.toLowerCase().includes('gateway') ||
+                    lastErrorMessage.toLowerCase().includes('service');
+
+                let displayMessage = lastErrorMessage || 'NIN verification failed. Please verify that your 11-digit NIN and date of birth match your NIMC record.';
+                if (isInsufficientBalance) {
+                    displayMessage = `Kudin walat na asusun Payvessel bai isa ba (Payvessel Insufficient Balance): ${lastErrorMessage}. Ana buƙatar sanya kuɗi a dashboard na Payvessel.`;
+                } else if (isProviderDowntime) {
+                    displayMessage = 'Sabar NIMC/Payvessel na fuskantar jinkiri a yanzu (Provider Timeout). Kuskuren ba daga NIN dinka bane. Zaka iya sake gwadawa ko kuma ka ci gaba da BVN.';
+                }
+
                 return jsonResponse({
                     success: false,
                     verified: false,
+                    providerError: isProviderDowntime || isInsufficientBalance,
                     nin: cleanNin,
                     provider: 'Payvessel NIMC Gateway',
-                    message: lastErrorMessage || 'NIN verification failed. Please verify that your 11-digit NIN and date of birth match your NIMC record.',
+                    message: displayMessage,
                 });
             }
 
@@ -434,8 +502,8 @@ Deno.serve(async (req: Request) => {
                             message: `BVN Verified successfully via Payvessel NIBSS (${matchPct}% Match ✓).`,
                             raw: pvJson
                         };
-                    } else if (pvJson.message) {
-                        lastErrorMessage = String(pvJson.message);
+                    } else if (pvJson.message || pvJson.details) {
+                        lastErrorMessage = String(pvJson.details?.[0] || pvJson.message);
                     }
                 } catch (pvErr: any) {
                     console.warn(`[Payvessel BVN Exception]:`, pvErr.message);
@@ -443,6 +511,54 @@ Deno.serve(async (req: Request) => {
                 }
             } else {
                 lastErrorMessage = 'Payvessel API Key and Secret are not configured in system_secrets.';
+            }
+
+            // Step 1b: Try Payvessel Enhanced BVN if Basic didn't pass (queries directly by BVN)
+            if (!payvesselVerified && apiKey && apiSecret) {
+                try {
+                    const pvEnhUrl = `${baseUrl}/kyc/api/v1/merchant/bvn/enhanced`;
+                    console.log(`[Payvessel KYC] Requesting Enhanced BVN: ${pvEnhUrl}`);
+
+                    const enhRes = await fetch(pvEnhUrl, {
+                        method: 'POST',
+                        headers: {
+                            'api-key': apiKey,
+                            'api-secret': apiSecret,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ bvn: cleanBvn }),
+                    });
+
+                    const enhJson = await enhRes.json().catch(() => ({}));
+                    console.log(`[Payvessel BVN Enhanced Response]:`, JSON.stringify(enhJson));
+
+                    if (enhRes.ok && (enhJson.status === true || enhJson.success === true || enhJson.code === 200 || enhJson.data)) {
+                        const d = enhJson.data || enhJson;
+                        const returnName = `${d.first_name || d.firstname || ''} ${d.middle_name || d.middlename ? (d.middle_name || d.middlename) + ' ' : ''}${d.last_name || d.surname || ''}`.trim() || effectiveFirstName || 'Verified Citizen';
+                        payvesselVerified = true;
+                        verifiedData = {
+                            bvn: cleanBvn,
+                            fullName: returnName,
+                            firstName: d.first_name || d.firstname || effectiveFirstName,
+                            lastName: d.last_name || d.surname || effectiveLastName,
+                            middleName: d.middle_name || d.middlename || effectiveMiddleName,
+                            bankName: d.bank_name || d.enrollment_bank || 'Commercial Bank Nigeria',
+                            dob: d.birthday || d.birthdate || formattedDob,
+                            phone: d.phone_number || d.telephoneno || cleanPhone,
+                            matchScore: 99,
+                            provider: 'Payvessel NIBSS Enhanced Gateway',
+                            message: `BVN Verified successfully via Payvessel NIBSS Enhanced API.`,
+                            raw: enhJson
+                        };
+                    } else if (enhJson.message || enhJson.details) {
+                        const enhMsg = String(enhJson.details?.[0] || enhJson.message);
+                        if (!lastErrorMessage || enhMsg.length > lastErrorMessage.length) {
+                            lastErrorMessage = enhMsg;
+                        }
+                    }
+                } catch (enhErr: any) {
+                    console.warn(`[Payvessel BVN Enhanced Exception]:`, enhErr.message);
+                }
             }
 
             // Step 2: Failover to AgentHub NIBSS gateway if Payvessel was not able to verify
@@ -490,12 +606,31 @@ Deno.serve(async (req: Request) => {
             }
 
             if (!payvesselVerified || !verifiedData) {
+                const isInsufficientBalance = 
+                    lastErrorMessage.toLowerCase().includes('insufficient') ||
+                    lastErrorMessage.toLowerCase().includes('wallet balance') ||
+                    lastErrorMessage.toLowerCase().includes('fund your wallet');
+
+                const isProviderDowntime = 
+                    lastErrorMessage.toLowerCase().includes('unable to complete') ||
+                    lastErrorMessage.toLowerCase().includes('provider_error') ||
+                    lastErrorMessage.toLowerCase().includes('gateway') ||
+                    lastErrorMessage.toLowerCase().includes('service');
+
+                let displayMessage = lastErrorMessage || 'BVN verification failed. Please ensure the 11-digit BVN is correct and active.';
+                if (isInsufficientBalance) {
+                    displayMessage = `Kudin walat na asusun Payvessel bai isa ba (Payvessel Insufficient Balance): ${lastErrorMessage}. Ana buƙatar sanya kuɗi a dashboard na Payvessel.`;
+                } else if (isProviderDowntime) {
+                    displayMessage = 'Sabar NIBSS/Payvessel na fuskantar jinkiri a yanzu (Provider Timeout). Kuskuren ba daga BVN dinka bane. Zaka iya sake gwadawa ko kuma ka ci gaba da shigar da ID Card.';
+                }
+
                 return jsonResponse({
                     success: false,
                     verified: false,
+                    providerError: isProviderDowntime || isInsufficientBalance,
                     bvn: cleanBvn,
                     provider: 'Payvessel NIBSS Gateway',
-                    message: lastErrorMessage || 'BVN verification failed. Please ensure the 11-digit BVN is correct and active.',
+                    message: displayMessage,
                 });
             }
 

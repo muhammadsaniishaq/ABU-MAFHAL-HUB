@@ -23,6 +23,7 @@ export interface NINVerificationResult {
   matchScore?: number;
   provider: string;
   message: string;
+  providerError?: boolean;
   raw?: any;
 }
 
@@ -40,6 +41,7 @@ export interface BVNVerificationResult {
   matchScore?: number;
   provider: string;
   message: string;
+  providerError?: boolean;
   raw?: any;
 }
 
@@ -119,6 +121,7 @@ export const payvesselKYCService = {
       return {
         success: false,
         verified: false,
+        providerError: Boolean(data?.providerError),
         nin: cleanNin,
         provider: data?.provider || 'Payvessel NIMC Gateway',
         message: data?.message || 'NIN verification failed. Please verify that your 11-digit NIN and date of birth match your NIMC slip.',
@@ -129,6 +132,7 @@ export const payvesselKYCService = {
       return {
         success: false,
         verified: false,
+        providerError: true,
         nin: cleanNin,
         provider: 'Payvessel NIMC Gateway',
         message: err.message || 'Network error reaching Payvessel KYC service. Please check your internet connection and try again.',
@@ -197,6 +201,7 @@ export const payvesselKYCService = {
       return {
         success: false,
         verified: false,
+        providerError: Boolean(data?.providerError),
         bvn: cleanBvn,
         provider: data?.provider || 'Payvessel NIBSS Gateway',
         message: data?.message || 'BVN verification failed. Please verify that your 11-digit BVN is active and correct.',
@@ -207,6 +212,7 @@ export const payvesselKYCService = {
       return {
         success: false,
         verified: false,
+        providerError: true,
         bvn: cleanBvn,
         provider: 'Payvessel NIBSS Gateway',
         message: err.message || 'Network error reaching Payvessel BVN service. Please try again.',
