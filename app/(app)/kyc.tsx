@@ -59,6 +59,10 @@ export default function UserKYCScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
 
+  // KYC Verification Fee Config States
+  const [kycFee, setKycFee] = useState<number>(150);
+  const [kycFeeEnabled, setKycFeeEnabled] = useState<boolean>(true);
+
   // Step 1: Consent & Privacy
   const [consentAgreed, setConsentAgreed] = useState(true);
 
@@ -123,6 +127,15 @@ export default function UserKYCScreen() {
         .single();
 
       setUserProfile({ ...profile, id: user.id });
+
+      // Fetch dynamic KYC fee configured by admin
+      try {
+        const kycConfig = await payvesselKYCService.getKYCConfig();
+        setKycFee(kycConfig.fee);
+        setKycFeeEnabled(kycConfig.feeEnabled);
+      } catch (err) {
+        console.warn('KYC Config fetch error:', err);
+      }
 
       // Pre-fill profile values if already present
       if (profile?.nin) {
@@ -268,6 +281,19 @@ export default function UserKYCScreen() {
       return Alert.alert('Invalid NIN', msg);
     }
 
+    // Pre-check: Verify User Wallet Balance
+    const userBal = Number(userProfile?.balance ?? userProfile?.credit_balance ?? 0);
+    if (kycFeeEnabled && kycFee > 0 && userBal < kycFee) {
+      return Alert.alert(
+        'Kudin Walat Bai Isa Ba (₦' + userBal.toLocaleString() + ')',
+        `Kudin walat ɗinka bai isa ba don biyan kuɗin tabbatar da KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`,
+        [
+          { text: 'Soke (Cancel)', style: 'cancel' },
+          { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+        ]
+      );
+    }
+
     try {
       setNinVerifying(true);
       if (Platform.OS !== 'web') {
@@ -294,15 +320,29 @@ export default function UserKYCScreen() {
         setNinResult(res);
         setNinError(null);
         setNinProviderError(false);
-        if (res.fullName) {
-          setUserProfile((prev: any) => ({ ...prev, full_name: res.fullName, nin: cleanNin }));
-        }
+
+        const newBal = res.newBalance !== undefined 
+          ? res.newBalance 
+          : (kycFeeEnabled && kycFee > 0 ? Math.max(0, userBal - kycFee) : userBal);
+
+        setUserProfile((prev: any) => ({
+          ...prev,
+          full_name: res.fullName || prev?.full_name,
+          nin: cleanNin,
+          balance: newBal
+        }));
+
         if (Platform.OS !== 'web') {
           try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         }
+
+        const feeNotice = (kycFeeEnabled && kycFee > 0)
+          ? `\n\n💰 Kuɗin KYC: An cire ₦${kycFee.toLocaleString()} daga walat ɗinka (Sauran kuɗi: ₦${newBal.toLocaleString()}).`
+          : '';
+
         Alert.alert(
           'NIN Verified Successfully! ✓',
-          `Verified via ${res.provider}.\nMatch Score: ${res.matchScore || 98}%\nVerified Holder: ${res.fullName || userProfile?.full_name}`,
+          `Verified via ${res.provider}.\nMatch Score: ${res.matchScore || 98}%\nVerified Holder: ${res.fullName || userProfile?.full_name}${feeNotice}`,
           [
             {
               text: 'Continue to BVN',
@@ -314,7 +354,19 @@ export default function UserKYCScreen() {
         const errorMsg = res.message || 'Could not verify NIN with NIMC. Please verify your 11-digit number.';
         setNinError(errorMsg);
         setNinProviderError(Boolean(res.providerError));
-        Alert.alert('Verification Failed', errorMsg);
+
+        if (res.insufficientUserBalance) {
+          Alert.alert(
+            'Kudin Walat Bai Isa Ba',
+            errorMsg,
+            [
+              { text: 'Soke (Cancel)', style: 'cancel' },
+              { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+            ]
+          );
+        } else {
+          Alert.alert('Verification Failed', errorMsg);
+        }
       }
     } catch (err: any) {
       console.warn('NIN verification error:', err);
@@ -336,6 +388,19 @@ export default function UserKYCScreen() {
       const msg = 'Da fatan a shigar da lambar BVN mai lambobi 11 daidai (Please enter your valid 11-digit BVN).';
       setBvnError(msg);
       return Alert.alert('Invalid BVN', msg);
+    }
+
+    // Pre-check: Verify User Wallet Balance
+    const userBal = Number(userProfile?.balance ?? userProfile?.credit_balance ?? 0);
+    if (kycFeeEnabled && kycFee > 0 && userBal < kycFee) {
+      return Alert.alert(
+        'Kudin Walat Bai Isa Ba (₦' + userBal.toLocaleString() + ')',
+        `Kudin walat ɗinka bai isa ba don biyan kuɗin tabbatar da KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`,
+        [
+          { text: 'Soke (Cancel)', style: 'cancel' },
+          { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+        ]
+      );
     }
 
     try {
@@ -363,13 +428,29 @@ export default function UserKYCScreen() {
         setBvnResult(res);
         setBvnError(null);
         setBvnProviderError(false);
-        setUserProfile((prev: any) => ({ ...prev, bvn: cleanBvn, kyc_tier: 2 }));
+
+        const newBal = res.newBalance !== undefined 
+          ? res.newBalance 
+          : (kycFeeEnabled && kycFee > 0 ? Math.max(0, userBal - kycFee) : userBal);
+
+        setUserProfile((prev: any) => ({
+          ...prev,
+          bvn: cleanBvn,
+          kyc_tier: 2,
+          balance: newBal
+        }));
+
         if (Platform.OS !== 'web') {
           try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         }
+
+        const feeNotice = (kycFeeEnabled && kycFee > 0)
+          ? `\n\n💰 Kuɗin KYC: An cire ₦${kycFee.toLocaleString()} daga walat ɗinka (Sauran kuɗi: ₦${newBal.toLocaleString()}).`
+          : '';
+
         Alert.alert(
           'BVN Verified Successfully! ✓',
-          `Verified via ${res.provider}.\nBank Record: ${res.bankName || 'Commercial Bank Nigeria'}\nTier-2 Limits Upgrade Unlocked!`,
+          `Verified via ${res.provider}.\nBank Record: ${res.bankName || 'Commercial Bank Nigeria'}\nTier-2 Limits Upgrade Unlocked!${feeNotice}`,
           [
             {
               text: 'Continue to ID Upload',
@@ -381,7 +462,19 @@ export default function UserKYCScreen() {
         const errorMsg = res.message || 'Could not verify BVN with NIBSS. Please check the 11 digits.';
         setBvnError(errorMsg);
         setBvnProviderError(Boolean(res.providerError));
-        Alert.alert('Verification Failed', errorMsg);
+
+        if (res.insufficientUserBalance) {
+          Alert.alert(
+            'Kudin Walat Bai Isa Ba',
+            errorMsg,
+            [
+              { text: 'Soke (Cancel)', style: 'cancel' },
+              { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+            ]
+          );
+        } else {
+          Alert.alert('Verification Failed', errorMsg);
+        }
       }
     } catch (err: any) {
       console.warn('BVN verification error:', err);
@@ -823,6 +916,71 @@ export default function UserKYCScreen() {
               ) : (
                 /* Form Inputs */
                 <>
+                  {/* KYC Fee Information & Wallet Balance Banner */}
+                  {kycFeeEnabled && kycFee > 0 && (
+                    <View style={{
+                      backgroundColor: '#FFFBEB',
+                      borderColor: '#F59E0B',
+                      borderWidth: 1.5,
+                      borderRadius: 12,
+                      padding: 12,
+                      marginBottom: 16,
+                      shadowColor: '#F59E0B',
+                      shadowOpacity: 0.08,
+                      shadowRadius: 4,
+                      elevation: 2
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="cash" size={15} color="#D97706" />
+                          </View>
+                          <Text style={{ fontSize: 13, fontWeight: '900', color: '#92400E' }}>
+                            Kuɗin Tabbatarwa: ₦{kycFee.toLocaleString()}
+                          </Text>
+                        </View>
+                        <View style={{
+                          backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#DCFCE7' : '#FEE2E2',
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#86EFAC' : '#FCA5A5'
+                        }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#15803D' : '#DC2626' }}>
+                            Walat: ₦{Number(userProfile?.balance || 0).toLocaleString()}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={{ fontSize: 11, color: '#B45309', lineHeight: 16 }}>
+                        Za a cire ₦{kycFee.toLocaleString()} daga walat ɗinka idan an tabbatar da NIN ɗinka da nasara ta hanyar NIMC.
+                      </Text>
+
+                      {Number(userProfile?.balance || 0) < kycFee && (
+                        <TouchableOpacity 
+                          onPress={() => router.push('/(app)/wallet')}
+                          style={{
+                            marginTop: 8,
+                            backgroundColor: '#D97706',
+                            paddingVertical: 7,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6
+                          }}
+                        >
+                          <Ionicons name="wallet-outline" size={14} color="#FFFFFF" />
+                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>
+                            Kudin Walat Bai Isa Ba — Sanya Kuɗi (Fund Wallet)
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
                   <View style={s.fieldGroup}>
                     <Text style={s.fieldLabel}>NIN Number (11 digits)</Text>
                     <View style={s.textInputWrapper}>
@@ -1014,6 +1172,71 @@ export default function UserKYCScreen() {
               ) : (
                 /* Form Inputs */
                 <>
+                  {/* KYC Fee Information & Wallet Balance Banner */}
+                  {kycFeeEnabled && kycFee > 0 && (
+                    <View style={{
+                      backgroundColor: '#FFFBEB',
+                      borderColor: '#F59E0B',
+                      borderWidth: 1.5,
+                      borderRadius: 12,
+                      padding: 12,
+                      marginBottom: 16,
+                      shadowColor: '#F59E0B',
+                      shadowOpacity: 0.08,
+                      shadowRadius: 4,
+                      elevation: 2
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="cash" size={15} color="#D97706" />
+                          </View>
+                          <Text style={{ fontSize: 13, fontWeight: '900', color: '#92400E' }}>
+                            Kuɗin Tabbatarwa: ₦{kycFee.toLocaleString()}
+                          </Text>
+                        </View>
+                        <View style={{
+                          backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#DCFCE7' : '#FEE2E2',
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#86EFAC' : '#FCA5A5'
+                        }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#15803D' : '#DC2626' }}>
+                            Walat: ₦{Number(userProfile?.balance || 0).toLocaleString()}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={{ fontSize: 11, color: '#B45309', lineHeight: 16 }}>
+                        Za a cire ₦{kycFee.toLocaleString()} daga walat ɗinka idan an tabbatar da BVN ɗinka da nasara ta hanyar NIBSS.
+                      </Text>
+
+                      {Number(userProfile?.balance || 0) < kycFee && (
+                        <TouchableOpacity 
+                          onPress={() => router.push('/(app)/wallet')}
+                          style={{
+                            marginTop: 8,
+                            backgroundColor: '#D97706',
+                            paddingVertical: 7,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6
+                          }}
+                        >
+                          <Ionicons name="wallet-outline" size={14} color="#FFFFFF" />
+                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>
+                            Kudin Walat Bai Isa Ba — Sanya Kuɗi (Fund Wallet)
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
                   <View style={s.fieldGroup}>
                     <Text style={s.fieldLabel}>BVN Number (11 digits)</Text>
                     <View style={s.textInputWrapper}>

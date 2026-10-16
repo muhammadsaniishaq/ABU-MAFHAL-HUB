@@ -24,6 +24,11 @@ export interface NINVerificationResult {
   provider: string;
   message: string;
   providerError?: boolean;
+  insufficientUserBalance?: boolean;
+  requiredFee?: number;
+  currentBalance?: number;
+  feeDeducted?: number;
+  newBalance?: number;
   raw?: any;
 }
 
@@ -42,6 +47,11 @@ export interface BVNVerificationResult {
   provider: string;
   message: string;
   providerError?: boolean;
+  insufficientUserBalance?: boolean;
+  requiredFee?: number;
+  currentBalance?: number;
+  feeDeducted?: number;
+  newBalance?: number;
   raw?: any;
 }
 
@@ -53,6 +63,49 @@ export interface FaceLivenessResult {
   photoUrl?: string;
   status: 'approved' | 'pending';
   message: string;
+}
+
+/**
+ * Safely unpack data from supabase.functions.invoke result,
+ * correctly extracting response JSON from error.context if status was non-2xx
+ */
+async function parseInvokeResponse(res: { data: any; error: any }): Promise<{ data: any; errorMessage: string }> {
+  let data = res.data;
+  let errorMessage = '';
+
+  if (res.error) {
+    if (res.error.context) {
+      try {
+        if (typeof res.error.context.json === 'function') {
+          const body = await res.error.context.json();
+          if (body && typeof body === 'object') {
+            data = body;
+            errorMessage = body.message || body.error || '';
+          }
+        } else if (typeof res.error.context.text === 'function') {
+          const text = await res.error.context.text();
+          try {
+            const body = JSON.parse(text);
+            if (body && typeof body === 'object') {
+              data = body;
+              errorMessage = body.message || body.error || '';
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
+    if (!errorMessage) {
+      const raw = String(res.error.message || '');
+      if (raw.toLowerCase().includes('non-2xx')) {
+        errorMessage = 'Sabar Payvessel ta dawo da kuskure (Gateway Status Error). Da fatan a sake gwadawa ko kuma a duba kudin walat a dashboard na Payvessel.';
+      } else {
+        errorMessage = raw || 'Could not communicate with Payvessel KYC service.';
+      }
+    }
+  }
+
+  return { data, errorMessage };
 }
 
 export const payvesselKYCService = {
@@ -81,7 +134,7 @@ export const payvesselKYCService = {
     try {
       console.log(`[Payvessel KYC Service] Requesting NIN verification for ${cleanNin}...`);
       
-      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
+      const invokeRes = await supabase.functions.invoke('payvessel-kyc', {
         body: {
           action: 'verify_nin',
           nin: cleanNin,
@@ -93,9 +146,7 @@ export const payvesselKYCService = {
         }
       });
 
-      if (error) {
-        throw new Error(error.message || 'Could not communicate with Payvessel KYC service.');
-      }
+      const { data, errorMessage } = await parseInvokeResponse(invokeRes);
 
       if (data && (data.success || data.verified)) {
         return {
@@ -113,6 +164,8 @@ export const payvesselKYCService = {
           matchScore: data.matchScore || 98,
           provider: data.provider || 'Payvessel NIMC Gateway',
           message: data.message || 'NIN verified successfully via Payvessel NIMC Gateway.',
+          feeDeducted: data.feeDeducted,
+          newBalance: data.newBalance,
           raw: data.raw || data,
         };
       }
@@ -121,21 +174,28 @@ export const payvesselKYCService = {
       return {
         success: false,
         verified: false,
-        providerError: Boolean(data?.providerError),
+        providerError: Boolean(data?.providerError || (errorMessage && !data?.insufficientUserBalance)),
+        insufficientUserBalance: Boolean(data?.insufficientUserBalance),
+        requiredFee: data?.requiredFee,
+        currentBalance: data?.currentBalance,
         nin: cleanNin,
         provider: data?.provider || 'Payvessel NIMC Gateway',
-        message: data?.message || 'NIN verification failed. Please verify that your 11-digit NIN and date of birth match your NIMC slip.',
+        message: data?.message || errorMessage || 'NIN verification failed. Please verify that your 11-digit NIN and date of birth match your NIMC slip.',
         raw: data,
       };
     } catch (err: any) {
       console.error('[Payvessel KYC Service] NIN verification error:', err);
+      const raw = String(err?.message || '');
+      const cleanMsg = raw.toLowerCase().includes('non-2xx')
+        ? 'Sabar Payvessel ta dawo da kuskure (Gateway Status Error). Da fatan a sake gwadawa ko kuma a duba kudin walat a dashboard na Payvessel.'
+        : (raw || 'Network error reaching Payvessel KYC service. Please check your internet connection and try again.');
       return {
         success: false,
         verified: false,
         providerError: true,
         nin: cleanNin,
         provider: 'Payvessel NIMC Gateway',
-        message: err.message || 'Network error reaching Payvessel KYC service. Please check your internet connection and try again.',
+        message: cleanMsg,
       };
     }
   },
@@ -164,7 +224,7 @@ export const payvesselKYCService = {
     try {
       console.log(`[Payvessel KYC Service] Requesting BVN verification for ${cleanBvn}...`);
 
-      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
+      const invokeRes = await supabase.functions.invoke('payvessel-kyc', {
         body: {
           action: 'verify_bvn',
           bvn: cleanBvn,
@@ -175,9 +235,7 @@ export const payvesselKYCService = {
         }
       });
 
-      if (error) {
-        throw new Error(error.message || 'Could not communicate with Payvessel BVN service.');
-      }
+      const { data, errorMessage } = await parseInvokeResponse(invokeRes);
 
       if (data && (data.success || data.verified)) {
         return {
@@ -194,6 +252,8 @@ export const payvesselKYCService = {
           matchScore: data.matchScore || 99,
           provider: data.provider || 'Payvessel NIBSS Gateway',
           message: data.message || 'BVN verified successfully via Payvessel NIBSS Gateway.',
+          feeDeducted: data.feeDeducted,
+          newBalance: data.newBalance,
           raw: data.raw || data,
         };
       }
@@ -201,21 +261,28 @@ export const payvesselKYCService = {
       return {
         success: false,
         verified: false,
-        providerError: Boolean(data?.providerError),
+        providerError: Boolean(data?.providerError || (errorMessage && !data?.insufficientUserBalance)),
+        insufficientUserBalance: Boolean(data?.insufficientUserBalance),
+        requiredFee: data?.requiredFee,
+        currentBalance: data?.currentBalance,
         bvn: cleanBvn,
         provider: data?.provider || 'Payvessel NIBSS Gateway',
-        message: data?.message || 'BVN verification failed. Please verify that your 11-digit BVN is active and correct.',
+        message: data?.message || errorMessage || 'BVN verification failed. Please verify that your 11-digit BVN is active and correct.',
         raw: data,
       };
     } catch (err: any) {
       console.error('[Payvessel KYC Service] BVN verification error:', err);
+      const raw = String(err?.message || '');
+      const cleanMsg = raw.toLowerCase().includes('non-2xx')
+        ? 'Sabar Payvessel ta dawo da kuskure (Gateway Status Error). Da fatan a sake gwadawa ko kuma a duba kudin walat a dashboard na Payvessel.'
+        : (raw || 'Network error reaching Payvessel BVN service. Please try again.');
       return {
         success: false,
         verified: false,
         providerError: true,
         bvn: cleanBvn,
         provider: 'Payvessel NIBSS Gateway',
-        message: err.message || 'Network error reaching Payvessel BVN service. Please try again.',
+        message: cleanMsg,
       };
     }
   },
@@ -279,7 +346,7 @@ export const payvesselKYCService = {
     accountNumber?: string;
   }) => {
     try {
-      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
+      const invokeRes = await supabase.functions.invoke('payvessel-kyc', {
         body: {
           action: 'upgrade_tier',
           userId: params.userId,
@@ -289,8 +356,8 @@ export const payvesselKYCService = {
         }
       });
 
-      if (error) throw error;
-      return { success: true, data };
+      const { data, errorMessage } = await parseInvokeResponse(invokeRes);
+      return { success: Boolean(data?.success), data, error: data?.message || errorMessage };
     } catch (e: any) {
       console.warn('[Payvessel KYC Service] Virtual account upgrade warning:', e);
       return { success: false, error: e?.message };
@@ -302,13 +369,43 @@ export const payvesselKYCService = {
    */
   testConnection: async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('payvessel-kyc', {
+      const invokeRes = await supabase.functions.invoke('payvessel-kyc', {
         body: { action: 'test_connection' }
       });
-      if (error) throw error;
-      return data;
+      const { data, errorMessage } = await parseInvokeResponse(invokeRes);
+      return data || { success: false, message: errorMessage };
     } catch (e: any) {
       return { success: false, message: e.message };
+    }
+  },
+
+  /**
+   * Fetch Active KYC Verification Pricing Config
+   */
+  getKYCConfig: async (): Promise<{ fee: number; feeEnabled: boolean }> => {
+    try {
+      const { data: settings } = await supabase
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['kyc_verification_fee', 'kyc_fee_enabled']);
+
+      let fee = 150;
+      let feeEnabled = true;
+
+      if (settings && Array.isArray(settings)) {
+        for (const s of settings) {
+          if (s.key === 'kyc_verification_fee') {
+            const num = Number(s.value);
+            if (!isNaN(num)) fee = Math.max(0, num);
+          }
+          if (s.key === 'kyc_fee_enabled') {
+            feeEnabled = s.value === 'true' || s.value === true;
+          }
+        }
+      }
+      return { fee, feeEnabled };
+    } catch {
+      return { fee: 150, feeEnabled: true };
     }
   }
 };

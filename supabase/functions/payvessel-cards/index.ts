@@ -177,8 +177,8 @@ serve(async (req) => {
 
         // Require authenticated user for financial card actions
         if (!user) {
-            return new Response(JSON.stringify({ error: 'Unauthorized: Valid user token required.' }), {
-                status: 401,
+            return new Response(JSON.stringify({ status: false, error: 'Unauthorized: Valid user token required.' }), {
+                status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
         }
@@ -215,7 +215,7 @@ serve(async (req) => {
                 return new Response(JSON.stringify({
                     status: false,
                     error: `Insufficient wallet balance. Required: ₦${Math.ceil(totalRequiredNGN).toLocaleString()} (Creation Fee $${creationFeeUSD.toFixed(2)} + Pre-fund $${fundingAmount.toFixed(2)}). Current Balance: ₦${Math.floor(currentBalance).toLocaleString()}`
-                }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
             // 2. Fetch verified BVN and NIN from profile or kyc_requests
@@ -563,14 +563,14 @@ serve(async (req) => {
             });
         }
 
-        return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
-            status: 400,
+        return new Response(JSON.stringify({ status: false, error: `Unknown action: ${action}` }), {
+            status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
     } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
-            status: 500,
+        return new Response(JSON.stringify({ status: false, error: err.message || 'Internal server error' }), {
+            status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }

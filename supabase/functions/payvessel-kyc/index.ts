@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const jsonResponse = (body: object, status: number = 200) =>
     new Response(JSON.stringify(body), {
-        status,
+        status: 200, // Always return HTTP 200 so Supabase invoke never throws "non-2xx status code"
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
@@ -83,10 +83,16 @@ Deno.serve(async (req: Request) => {
         const agentHubKey = findSecret('AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY');
         const idProKey = findSecret('IDPRO_API_KEY', 'IDPRO_KEY');
 
+        // Configurable KYC Verification Fee (Default ₦150)
+        const feeSettingStr = masterSecrets['KYC_VERIFICATION_FEE'] || findSecret('KYC_VERIFICATION_FEE', 'kyc_verification_fee');
+        const kycFee = feeSettingStr !== '' && !isNaN(Number(feeSettingStr)) ? Math.max(0, Number(feeSettingStr)) : 150;
+        const feeEnabledStr = masterSecrets['KYC_FEE_ENABLED'] ?? findSecret('KYC_FEE_ENABLED', 'kyc_fee_enabled');
+        const kycFeeEnabled = feeEnabledStr === '' ? true : (String(feeEnabledStr).toLowerCase() === 'true' || feeEnabledStr === '1');
+
         const isSandbox = apiKey.startsWith('pv_test_') || apiKey.startsWith('test_') || apiKey.startsWith('sb_') || findSecret('PAYVESSEL_ENV').toLowerCase() === 'sandbox';
         const baseUrl = isSandbox ? 'https://sandbox.payvessel.com' : 'https://api.payvessel.com';
 
-        console.log(`[Payvessel KYC] Action: ${action}, Environment: ${isSandbox ? 'SANDBOX' : 'PRODUCTION'}, Has API Key: ${Boolean(apiKey)}, Has Secret: ${Boolean(apiSecret)}`);
+        console.log(`[Payvessel KYC] Action: ${action}, Environment: ${isSandbox ? 'SANDBOX' : 'PRODUCTION'}, KYC Fee: ₦${kycFee} (Enabled: ${kycFeeEnabled}), Has API Key: ${Boolean(apiKey)}, Has Secret: ${Boolean(apiSecret)}`);
 
         // Helper: Format Date of Birth to YYYY-MM-DD
         const normalizeDob = (rawDob?: string): string => {
@@ -198,6 +204,20 @@ Deno.serve(async (req: Request) => {
         }
 
         // ----------------------------------------------------
+        // ACTION: GET KYC CONFIG / PRICING
+        // ----------------------------------------------------
+        if (action === 'get_kyc_config') {
+            return jsonResponse({
+                success: true,
+                fee: kycFee,
+                feeEnabled: kycFeeEnabled,
+                currency: 'NGN',
+                providerCost: 70,
+                profitMargin: Math.max(0, kycFee - 70),
+            });
+        }
+
+        // ----------------------------------------------------
         // ACTION: VERIFY NIN (National Identity Number)
         // ----------------------------------------------------
         if (action === 'verify_nin') {
@@ -214,6 +234,30 @@ Deno.serve(async (req: Request) => {
             }
 
             console.log(`[Payvessel KYC] Verifying NIN: ${cleanNin} for ${effectiveFirstName} ${effectiveLastName}`);
+
+            // Pre-check: Ensure user wallet has sufficient balance for KYC fee
+            let currentUserBalance = 0;
+            if (userId && kycFeeEnabled && kycFee > 0) {
+                const { data: userProf } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, balance, credit_balance, full_name')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                currentUserBalance = Number(userProf?.balance ?? userProf?.credit_balance ?? 0);
+                if (currentUserBalance < kycFee) {
+                    console.warn(`[Payvessel KYC] User ${userId} insufficient balance: ₦${currentUserBalance} < ₦${kycFee}`);
+                    return jsonResponse({
+                        success: false,
+                        verified: false,
+                        insufficientUserBalance: true,
+                        requiredFee: kycFee,
+                        currentBalance: currentUserBalance,
+                        provider: 'Payvessel NIMC Gateway',
+                        message: `Kudin walat ɗinka (₦${currentUserBalance.toLocaleString()}) bai isa ba don biyan kuɗin KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`
+                    });
+                }
+            }
 
             let payvesselVerified = false;
             let verifiedData: any = null;
@@ -402,17 +446,64 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
-            // Save verified NIN to user profile and KYC table in database
+            // Save verified NIN to user profile, deduct fee from balance, and record KYC transaction
             if (userId) {
-                await supabaseAdmin
-                    .from('profiles')
-                    .update({
-                        nin: cleanNin,
-                        full_name: verifiedData.fullName,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', userId)
-                    .catch(console.warn);
+                let newBal = currentUserBalance;
+                if (kycFeeEnabled && kycFee > 0) {
+                    newBal = Math.max(0, currentUserBalance - kycFee);
+
+                    // Update balance and NIN
+                    const { error: balErr } = await supabaseAdmin
+                        .from('profiles')
+                        .update({
+                            balance: newBal,
+                            nin: cleanNin,
+                            full_name: verifiedData.fullName,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', userId);
+
+                    if (balErr) {
+                        await supabaseAdmin
+                            .from('profiles')
+                            .update({
+                                credit_balance: newBal,
+                                nin: cleanNin,
+                                full_name: verifiedData.fullName,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', userId)
+                            .catch(console.warn);
+                    }
+
+                    // Record debit transaction in transactions table
+                    await supabaseAdmin
+                        .from('transactions')
+                        .insert({
+                            user_id: userId,
+                            amount: kycFee,
+                            type: 'debit',
+                            title: 'KYC NIN Verification Fee',
+                            status: 'completed',
+                            description: `Automated KYC Identity Verification Fee (NIN: ${cleanNin})`,
+                            reference: `kyc_nin_${Date.now()}`,
+                            created_at: new Date().toISOString()
+                        })
+                        .catch(console.warn);
+
+                    verifiedData.feeDeducted = kycFee;
+                    verifiedData.newBalance = newBal;
+                } else {
+                    await supabaseAdmin
+                        .from('profiles')
+                        .update({
+                            nin: cleanNin,
+                            full_name: verifiedData.fullName,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', userId)
+                        .catch(console.warn);
+                }
 
                 await supabaseAdmin
                     .from('kyc_requests')
@@ -421,7 +512,7 @@ Deno.serve(async (req: Request) => {
                         document_type: 'nin',
                         document_number: cleanNin,
                         status: 'approved',
-                        admin_note: `Automated Payvessel NIMC Identity Check Passed (Match: ${verifiedData.matchScore || 99}%). Verified Holder: ${verifiedData.fullName}`,
+                        admin_note: `Automated Payvessel NIMC Identity Check Passed (Match: ${verifiedData.matchScore || 99}%). Verified Holder: ${verifiedData.fullName}${kycFeeEnabled && kycFee > 0 ? ` (Fee Debited: ₦${kycFee})` : ''}`,
                     })
                     .catch(console.warn);
             }
@@ -450,6 +541,30 @@ Deno.serve(async (req: Request) => {
             }
 
             console.log(`[Payvessel KYC] Verifying BVN: ${cleanBvn} for ${effectiveFirstName} ${effectiveLastName}`);
+
+            // Pre-check: Ensure user wallet has sufficient balance for KYC fee
+            let currentUserBalance = 0;
+            if (userId && kycFeeEnabled && kycFee > 0) {
+                const { data: userProf } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, balance, credit_balance, full_name')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                currentUserBalance = Number(userProf?.balance ?? userProf?.credit_balance ?? 0);
+                if (currentUserBalance < kycFee) {
+                    console.warn(`[Payvessel KYC] User ${userId} insufficient balance: ₦${currentUserBalance} < ₦${kycFee}`);
+                    return jsonResponse({
+                        success: false,
+                        verified: false,
+                        insufficientUserBalance: true,
+                        requiredFee: kycFee,
+                        currentBalance: currentUserBalance,
+                        provider: 'Payvessel NIBSS Gateway',
+                        message: `Kudin walat ɗinka (₦${currentUserBalance.toLocaleString()}) bai isa ba don biyan kuɗin KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`
+                    });
+                }
+            }
 
             let payvesselVerified = false;
             let verifiedData: any = null;
@@ -634,17 +749,62 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
-            // Save verified BVN to user profile, promote to Tier-2, and record in KYC requests
+            // Save verified BVN to user profile, promote to Tier-2, deduct fee, and record KYC transaction
             if (userId) {
-                await supabaseAdmin
-                    .from('profiles')
-                    .update({
-                        bvn: cleanBvn,
-                        kyc_tier: 2,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', userId)
-                    .catch(console.warn);
+                let newBal = currentUserBalance;
+                if (kycFeeEnabled && kycFee > 0) {
+                    newBal = Math.max(0, currentUserBalance - kycFee);
+
+                    const { error: balErr } = await supabaseAdmin
+                        .from('profiles')
+                        .update({
+                            balance: newBal,
+                            bvn: cleanBvn,
+                            kyc_tier: 2,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', userId);
+
+                    if (balErr) {
+                        await supabaseAdmin
+                            .from('profiles')
+                            .update({
+                                credit_balance: newBal,
+                                bvn: cleanBvn,
+                                kyc_tier: 2,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', userId)
+                            .catch(console.warn);
+                    }
+
+                    await supabaseAdmin
+                        .from('transactions')
+                        .insert({
+                            user_id: userId,
+                            amount: kycFee,
+                            type: 'debit',
+                            title: 'KYC BVN Verification Fee',
+                            status: 'completed',
+                            description: `Automated KYC Bank Identity Verification Fee (BVN: ${cleanBvn})`,
+                            reference: `kyc_bvn_${Date.now()}`,
+                            created_at: new Date().toISOString()
+                        })
+                        .catch(console.warn);
+
+                    verifiedData.feeDeducted = kycFee;
+                    verifiedData.newBalance = newBal;
+                } else {
+                    await supabaseAdmin
+                        .from('profiles')
+                        .update({
+                            bvn: cleanBvn,
+                            kyc_tier: 2,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', userId)
+                        .catch(console.warn);
+                }
 
                 await supabaseAdmin
                     .from('kyc_requests')
@@ -653,7 +813,7 @@ Deno.serve(async (req: Request) => {
                         document_type: 'bvn',
                         document_number: cleanBvn,
                         status: 'approved',
-                        admin_note: `Automated Payvessel NIBSS Bank Identity Check Passed (Match: ${verifiedData.matchScore || 99}%). Tier-2 limits unlocked. Bank: ${verifiedData.bankName}`,
+                        admin_note: `Automated Payvessel NIBSS Bank Identity Check Passed (Match: ${verifiedData.matchScore || 99}%). Tier-2 limits unlocked. Bank: ${verifiedData.bankName}${kycFeeEnabled && kycFee > 0 ? ` (Fee Debited: ₦${kycFee})` : ''}`,
                     })
                     .catch(console.warn);
             }

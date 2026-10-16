@@ -77,6 +77,12 @@ export default function KYCManagerScreen() {
     const [autoVirtualAccEnabled, setAutoVirtualAccEnabled] = useState(true);
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
+    // KYC Verification Fee States
+    const [kycFee, setKycFee] = useState<number>(150);
+    const [kycFeeInput, setKycFeeInput] = useState<string>('150');
+    const [kycFeeEnabled, setKycFeeEnabled] = useState<boolean>(true);
+    const [isSavingKycFee, setIsSavingKycFee] = useState<boolean>(false);
+
     useEffect(() => {
         fetchKYCData();
         fetchAutoSettings();
@@ -105,9 +111,79 @@ export default function KYCManagerScreen() {
                 const val = typeof dvaSetting.value === 'string' ? JSON.parse(dvaSetting.value) : dvaSetting.value;
                 setAutoVirtualAccEnabled(Boolean(val));
             }
+
+            // Fetch KYC Verification Fee
+            const { data: feeSetting } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'kyc_verification_fee')
+                .maybeSingle();
+
+            if (feeSetting?.value != null) {
+                const parsed = Number(feeSetting.value);
+                if (!isNaN(parsed)) {
+                    setKycFee(parsed);
+                    setKycFeeInput(String(parsed));
+                }
+            }
+
+            // Fetch KYC Fee Enabled
+            const { data: feeEnabledSetting } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'kyc_fee_enabled')
+                .maybeSingle();
+
+            if (feeEnabledSetting?.value != null) {
+                setKycFeeEnabled(feeEnabledSetting.value === 'true' || feeEnabledSetting.value === true);
+            }
         } catch (e) {
             console.error("Error fetching auto settings:", e);
         }
+    };
+
+    const handleSaveKycFee = async (newVal?: number) => {
+        const feeToSave = newVal !== undefined ? Math.max(0, newVal) : Math.max(0, Number(kycFeeInput) || 0);
+        setIsSavingKycFee(true);
+        try {
+            await supabase.from('app_settings').upsert({
+                key: 'kyc_verification_fee',
+                value: String(feeToSave),
+                updated_at: new Date().toISOString()
+            });
+            setKycFee(feeToSave);
+            setKycFeeInput(String(feeToSave));
+            showToast(`An sabunta farashin KYC zuwa ₦${feeToSave.toLocaleString()}! ✓`);
+            Alert.alert(
+                "Farashin KYC Ya Sabunta 💰",
+                `An saita kuɗin KYC zuwa ₦${feeToSave.toLocaleString()} a nasarance.\n\nKudin Payvessel: ₦70\nRibar da ake samu: ₦${Math.max(0, feeToSave - 70)} a kowanne KYC.`
+            );
+        } catch (e: any) {
+            Alert.alert("Setting Error", e.message || "Failed to update KYC fee");
+        } finally {
+            setIsSavingKycFee(false);
+        }
+    };
+
+    const handleToggleKycFeeEnabled = async (enabled: boolean) => {
+        setKycFeeEnabled(enabled);
+        try {
+            await supabase.from('app_settings').upsert({
+                key: 'kyc_fee_enabled',
+                value: String(enabled),
+                updated_at: new Date().toISOString()
+            });
+            showToast(enabled ? `An kunna kudin KYC (₦${kycFee})! 💰` : "An kashe kudin KYC (Kyauta ne yanzu)!");
+        } catch (e: any) {
+            Alert.alert("Setting Error", e.message || "Failed to update setting");
+        }
+    };
+
+    const adjustKycFee = (delta: number) => {
+        const current = Number(kycFeeInput) || kycFee || 150;
+        const updated = Math.max(0, current + delta);
+        setKycFee(updated);
+        setKycFeeInput(String(updated));
     };
 
     const toggleAutoKycSetting = async (newValue: boolean) => {
@@ -640,6 +716,169 @@ export default function KYCManagerScreen() {
                                 <View style={{ width: 11, height: 11, borderRadius: 5.5, backgroundColor: '#0F172A' }} />
                             </View>
                         </TouchableOpacity>
+                    </View>
+
+                    {/* Executive KYC Verification Fee Controller */}
+                    <View style={{
+                        marginTop: 6,
+                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: 'rgba(245, 166, 35, 0.35)',
+                        padding: 8,
+                    }}>
+                        {/* Title & Status Row */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                <Ionicons name="cash-outline" size={13} color={L.gold} />
+                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>
+                                    KYC Verification Fee / Farashi
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity 
+                                onPress={() => handleToggleKycFeeEnabled(!kycFeeEnabled)}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    backgroundColor: kycFeeEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: kycFeeEnabled ? L.emerald : '#64748B'
+                                }}
+                            >
+                                <Text style={{ color: kycFeeEnabled ? L.emerald : '#94A3B8', fontSize: 8, fontWeight: '800' }}>
+                                    {kycFeeEnabled ? 'CHARGES: ACTIVE' : 'FEE: DISABLED (FREE)'}
+                                </Text>
+                                <View style={{ width: 18, height: 10, borderRadius: 5, backgroundColor: kycFeeEnabled ? L.emerald : '#475569', padding: 1, alignItems: kycFeeEnabled ? 'flex-end' : 'flex-start' }}>
+                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' }} />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Price & Economics Row */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, backgroundColor: 'rgba(0,0,0,0.25)', padding: 6, borderRadius: 6 }}>
+                            <View>
+                                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>
+                                        ₦{(Number(kycFeeInput) || kycFee).toLocaleString()}
+                                    </Text>
+                                    <Text style={{ color: '#94A3B8', fontSize: 8 }}>/ verification</Text>
+                                </View>
+                                <Text style={{ color: '#CBD5E1', fontSize: 7, marginTop: 1 }}>
+                                    Payvessel Kudin Su: <Text style={{ color: '#F87171', fontWeight: 'bold' }}>₦70</Text> • Ribar Mu: <Text style={{ color: L.emerald, fontWeight: 'bold' }}>₦{Math.max(0, (Number(kycFeeInput) || kycFee) - 70)}</Text>
+                                </Text>
+                            </View>
+
+                            {/* Quick Adjust Buttons */}
+                            <View style={{ flexDirection: 'row', gap: 4 }}>
+                                <TouchableOpacity 
+                                    onPress={() => adjustKycFee(-50)}
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                                >
+                                    <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '800' }}>-50</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    onPress={() => adjustKycFee(-10)}
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                                >
+                                    <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '800' }}>-10</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    onPress={() => adjustKycFee(10)}
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                                >
+                                    <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '800' }}>+10</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    onPress={() => adjustKycFee(50)}
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                                >
+                                    <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '800' }}>+50</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Presets & Input + Save Row */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            {/* Preset Buttons */}
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, alignItems: 'center' }}>
+                                {[
+                                    { label: '₦0 (Kyauta)', val: 0 },
+                                    { label: '₦100', val: 100 },
+                                    { label: '₦150 (Standard)', val: 150 },
+                                    { label: '₦200', val: 200 },
+                                    { label: '₦250', val: 250 },
+                                    { label: '₦500', val: 500 },
+                                ].map((p) => {
+                                    const isSel = (Number(kycFeeInput) || kycFee) === p.val;
+                                    return (
+                                        <TouchableOpacity
+                                            key={p.val}
+                                            onPress={() => {
+                                                setKycFeeInput(String(p.val));
+                                                setKycFee(p.val);
+                                            }}
+                                            style={{
+                                                backgroundColor: isSel ? L.gold : 'rgba(255,255,255,0.06)',
+                                                paddingHorizontal: 6,
+                                                paddingVertical: 3,
+                                                borderRadius: 4,
+                                                borderWidth: 1,
+                                                borderColor: isSel ? L.gold : 'rgba(255,255,255,0.12)'
+                                            }}
+                                        >
+                                            <Text style={{ color: isSel ? '#0F172A' : '#CBD5E1', fontSize: 8, fontWeight: '800' }}>
+                                                {p.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+
+                            {/* Direct Amount Input */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 5, paddingHorizontal: 6, height: 26, width: 80 }}>
+                                <Text style={{ color: '#0F172A', fontSize: 9, fontWeight: '800', marginRight: 2 }}>₦</Text>
+                                <TextInput
+                                    value={kycFeeInput}
+                                    onChangeText={(txt) => setKycFeeInput(txt.replace(/\D/g, ''))}
+                                    keyboardType="numeric"
+                                    placeholder="150"
+                                    placeholderTextColor="#94A3B8"
+                                    style={{ flex: 1, color: '#0F172A', fontSize: 9, fontWeight: '800', padding: 0 }}
+                                />
+                            </View>
+
+                            {/* Save Price Button */}
+                            <TouchableOpacity
+                                onPress={() => handleSaveKycFee()}
+                                disabled={isSavingKycFee}
+                                style={{
+                                    backgroundColor: L.gold,
+                                    paddingHorizontal: 8,
+                                    height: 26,
+                                    borderRadius: 5,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexDirection: 'row',
+                                    gap: 3
+                                }}
+                            >
+                                {isSavingKycFee ? (
+                                    <ActivityIndicator size="small" color="#0F172A" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="save-outline" size={10} color="#0F172A" />
+                                        <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 8, textTransform: 'uppercase' }}>
+                                            Ajiye
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
 
