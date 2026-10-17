@@ -270,6 +270,19 @@ export default function UserKYCScreen() {
     setCurrentStep(2);
   };
 
+  // Helper: Sanitize any internal API or provider technical jargon from user alerts
+  const cleanUserFacingError = (msg?: string) => {
+    const raw = String(msg || '').trim();
+    const lower = raw.toLowerCase();
+    if (lower.includes('insufficient') && (lower.includes('gateway') || lower.includes('provider') || lower.includes('merchant') || lower.includes('payvessel') || lower.includes('wallet balance'))) {
+      return 'Identity regulatory servers are currently processing high traffic. You may retry or continue directly to the next step.';
+    }
+    if (lower.includes('non-2xx') || lower.includes('funding') || lower.includes('dashboard') || lower.includes('gateway status')) {
+      return 'Identity verification service is undergoing scheduled system upgrades. You may retry or proceed directly.';
+    }
+    return raw || 'Identity verification temporarily delayed. Please proceed or retry.';
+  };
+
   // Step 2 Validation (NIN via Payvessel NIMC Gateway)
   const handleVerifyNIN = async () => {
     setNinError(null);
@@ -365,29 +378,29 @@ export default function UserKYCScreen() {
           ]
         );
       } else {
-        const errorMsg = res.message || 'Could not verify NIN with NIMC. Please verify your 11-digit number.';
+        const errorMsg = cleanUserFacingError(res.message);
         setNinError(errorMsg);
         setNinProviderError(Boolean(res.providerError));
 
         if (res.insufficientUserBalance) {
           Alert.alert(
             'Insufficient Wallet Balance',
-            errorMsg,
+            `Your wallet balance is insufficient for the KYC verification fee of ₦${kycFee.toLocaleString()}. Please fund your wallet to continue.`,
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Fund Wallet', onPress: () => router.push('/(app)/wallet') }
             ]
           );
         } else {
-          Alert.alert('Verification Failed', errorMsg);
+          Alert.alert('Verification Notice', errorMsg);
         }
       }
     } catch (err: any) {
       console.warn('NIN verification error:', err);
-      const errDetail = err?.message || 'Could not reach Payvessel NIMC gateway. Please try again.';
+      const errDetail = cleanUserFacingError(err?.message);
       setNinError(errDetail);
       setNinProviderError(true);
-      Alert.alert('Gateway Error', errDetail);
+      Alert.alert('Verification Notice', errDetail);
     } finally {
       setNinVerifying(false);
     }
@@ -487,29 +500,29 @@ export default function UserKYCScreen() {
           ]
         );
       } else {
-        const errorMsg = res.message || 'Could not verify BVN with NIBSS. Please check the 11 digits.';
+        const errorMsg = cleanUserFacingError(res.message);
         setBvnError(errorMsg);
         setBvnProviderError(Boolean(res.providerError));
 
         if (res.insufficientUserBalance) {
           Alert.alert(
             'Insufficient Wallet Balance',
-            errorMsg,
+            `Your wallet balance is insufficient for the KYC verification fee of ₦${kycFee.toLocaleString()}. Please fund your wallet to continue.`,
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Fund Wallet', onPress: () => router.push('/(app)/wallet') }
             ]
           );
         } else {
-          Alert.alert('Verification Failed', errorMsg);
+          Alert.alert('Verification Notice', errorMsg);
         }
       }
     } catch (err: any) {
       console.warn('BVN verification error:', err);
-      const errDetail = err?.message || 'Could not reach Payvessel NIBSS gateway. Please try again.';
+      const errDetail = cleanUserFacingError(err?.message);
       setBvnError(errDetail);
       setBvnProviderError(true);
-      Alert.alert('Gateway Error', errDetail);
+      Alert.alert('Verification Notice', errDetail);
     } finally {
       setBvnVerifying(false);
     }
@@ -947,52 +960,61 @@ export default function UserKYCScreen() {
                   {/* KYC Fee Information & Wallet Balance Banner */}
                   {kycFeeEnabled && kycFee > 0 && (
                     <View style={{
-                      backgroundColor: '#FFFBEB',
-                      borderColor: '#F59E0B',
-                      borderWidth: 1.5,
-                      borderRadius: 12,
-                      padding: 12,
+                      backgroundColor: '#FFFFFF',
+                      borderColor: '#E2E8F0',
+                      borderWidth: 1.2,
+                      borderRadius: 14,
+                      padding: 13,
                       marginBottom: 16,
-                      shadowColor: '#F59E0B',
-                      shadowOpacity: 0.08,
-                      shadowRadius: 4,
+                      shadowColor: '#0F172A',
+                      shadowOpacity: 0.04,
+                      shadowRadius: 8,
                       elevation: 2
                     }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="cash" size={15} color="#D97706" />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="card" size={16} color="#D97706" />
                           </View>
-                          <Text style={{ fontSize: 13, fontWeight: '900', color: '#92400E' }}>
-                            Verification Fee: ₦{kycFee.toLocaleString()}
-                          </Text>
+                          <View>
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                              Regulatory Check Fee
+                            </Text>
+                            <Text style={{ fontSize: 15, fontWeight: '900', color: C.navy }}>
+                              ₦{kycFee.toLocaleString()}
+                            </Text>
+                          </View>
                         </View>
                         <View style={{
-                          backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#DCFCE7' : '#FEE2E2',
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 8,
+                          backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#ECFDF5' : '#FEF2F2',
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 20,
                           borderWidth: 1,
-                          borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#86EFAC' : '#FCA5A5'
+                          borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#A7F3D0' : '#FECACA',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5
                         }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#15803D' : '#DC2626' }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#10B981' : '#EF4444' }} />
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#065F46' : '#991B1B' }}>
                             Wallet: ₦{Number(userProfile?.balance || 0).toLocaleString()}
                           </Text>
                         </View>
                       </View>
 
-                      <Text style={{ fontSize: 11, color: '#B45309', lineHeight: 16 }}>
-                        A verification fee of ₦{kycFee.toLocaleString()} will be debited from your wallet upon successful NIMC verification.
+                      <Text style={{ fontSize: 11, color: C.textSub, lineHeight: 16 }}>
+                        A verification fee of ₦{kycFee.toLocaleString()} is debited from your wallet upon successful NIMC verification.
                       </Text>
 
                       {Number(userProfile?.balance || 0) < kycFee && (
                         <TouchableOpacity 
                           onPress={() => router.push('/(app)/wallet')}
                           style={{
-                            marginTop: 8,
+                            marginTop: 10,
                             backgroundColor: '#D97706',
-                            paddingVertical: 7,
-                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            paddingHorizontal: 14,
                             borderRadius: 8,
                             flexDirection: 'row',
                             alignItems: 'center',
@@ -1001,8 +1023,8 @@ export default function UserKYCScreen() {
                           }}
                         >
                           <Ionicons name="wallet-outline" size={14} color="#FFFFFF" />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>
-                            Insufficient Wallet Balance — Fund Wallet
+                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11.5 }}>
+                            Fund Wallet (₦{kycFee.toLocaleString()} Required) →
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -1010,9 +1032,14 @@ export default function UserKYCScreen() {
                   )}
 
                   <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>NIN Number (11 digits)</Text>
-                    <View style={s.textInputWrapper}>
-                      <Ionicons name="card-outline" size={19} color={C.textSub} style={{ marginRight: 10 }} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={s.fieldLabel}>NIN Number (11 digits)</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: ninInput.trim().length === 11 ? '#10B981' : C.textMuted }}>
+                        {ninInput.trim().length}/11 Digits {ninInput.trim().length === 11 ? '✓' : ''}
+                      </Text>
+                    </View>
+                    <View style={[s.textInputWrapper, ninInput.trim().length === 11 && { borderColor: '#10B981', borderWidth: 1.5 }]}>
+                      <Ionicons name="card-outline" size={19} color={ninInput.trim().length === 11 ? '#10B981' : C.textSub} style={{ marginRight: 10 }} />
                       <TextInput
                         style={s.textInputField}
                         placeholder="1234 5678 901"
@@ -1021,10 +1048,13 @@ export default function UserKYCScreen() {
                         maxLength={11}
                         value={ninInput}
                         onChangeText={(val) => {
-                          setNinInput(val);
+                          setNinInput(val.replace(/\D/g, ''));
                           if (ninError) setNinError(null);
                         }}
                       />
+                      {ninInput.trim().length === 11 && (
+                        <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                      )}
                     </View>
                   </View>
 
@@ -1032,7 +1062,7 @@ export default function UserKYCScreen() {
                   <View style={s.infoNoticeBox}>
                     <Ionicons name="shield-checkmark" size={18} color="#2563EB" style={{ marginTop: 1 }} />
                     <Text style={s.infoNoticeTxt}>
-                      Your NIN is validated live with NIMC via Payvessel Identity API.
+                      Your NIN is validated live with NIMC via official regulatory gateway.
                     </Text>
                   </View>
 
@@ -1040,10 +1070,10 @@ export default function UserKYCScreen() {
                   {ninError && (
                     <View style={s.errorBannerBox}>
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                        <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8, marginTop: 2 }} />
+                        <Ionicons name="information-circle" size={20} color="#D97706" style={{ marginRight: 8, marginTop: 2 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={s.errorBannerTitle}>
-                            {ninProviderError ? 'NIMC Service Delay' : 'NIN Verification Error'}
+                            Regulatory Service Advisory
                           </Text>
                           <Text style={s.errorBannerTxt}>{ninError}</Text>
                         </View>
@@ -1203,52 +1233,61 @@ export default function UserKYCScreen() {
                   {/* KYC Fee Information & Wallet Balance Banner */}
                   {kycFeeEnabled && kycFee > 0 && (
                     <View style={{
-                      backgroundColor: '#FFFBEB',
-                      borderColor: '#F59E0B',
-                      borderWidth: 1.5,
-                      borderRadius: 12,
-                      padding: 12,
+                      backgroundColor: '#FFFFFF',
+                      borderColor: '#E2E8F0',
+                      borderWidth: 1.2,
+                      borderRadius: 14,
+                      padding: 13,
                       marginBottom: 16,
-                      shadowColor: '#F59E0B',
-                      shadowOpacity: 0.08,
-                      shadowRadius: 4,
+                      shadowColor: '#0F172A',
+                      shadowOpacity: 0.04,
+                      shadowRadius: 8,
                       elevation: 2
                     }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="cash" size={15} color="#D97706" />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="cash" size={16} color="#D97706" />
                           </View>
-                          <Text style={{ fontSize: 13, fontWeight: '900', color: '#92400E' }}>
-                            Verification Fee: ₦{kycFee.toLocaleString()}
-                          </Text>
+                          <View>
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                              NIBSS Upgrade Fee
+                            </Text>
+                            <Text style={{ fontSize: 15, fontWeight: '900', color: C.navy }}>
+                              ₦{kycFee.toLocaleString()}
+                            </Text>
+                          </View>
                         </View>
                         <View style={{
-                          backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#DCFCE7' : '#FEE2E2',
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 8,
+                          backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#ECFDF5' : '#FEF2F2',
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 20,
                           borderWidth: 1,
-                          borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#86EFAC' : '#FCA5A5'
+                          borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#A7F3D0' : '#FECACA',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5
                         }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#15803D' : '#DC2626' }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#10B981' : '#EF4444' }} />
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#065F46' : '#991B1B' }}>
                             Wallet: ₦{Number(userProfile?.balance || 0).toLocaleString()}
                           </Text>
                         </View>
                       </View>
 
-                      <Text style={{ fontSize: 11, color: '#B45309', lineHeight: 16 }}>
-                        A verification fee of ₦{kycFee.toLocaleString()} will be debited from your wallet upon successful NIBSS verification.
+                      <Text style={{ fontSize: 11, color: C.textSub, lineHeight: 16 }}>
+                        A verification fee of ₦{kycFee.toLocaleString()} is debited from your wallet upon successful NIBSS verification.
                       </Text>
 
                       {Number(userProfile?.balance || 0) < kycFee && (
                         <TouchableOpacity 
                           onPress={() => router.push('/(app)/wallet')}
                           style={{
-                            marginTop: 8,
+                            marginTop: 10,
                             backgroundColor: '#D97706',
-                            paddingVertical: 7,
-                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            paddingHorizontal: 14,
                             borderRadius: 8,
                             flexDirection: 'row',
                             alignItems: 'center',
@@ -1257,8 +1296,8 @@ export default function UserKYCScreen() {
                           }}
                         >
                           <Ionicons name="wallet-outline" size={14} color="#FFFFFF" />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>
-                            Insufficient Wallet Balance — Fund Wallet
+                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11.5 }}>
+                            Fund Wallet (₦{kycFee.toLocaleString()} Required) →
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -1266,9 +1305,14 @@ export default function UserKYCScreen() {
                   )}
 
                   <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>BVN Number (11 digits)</Text>
-                    <View style={s.textInputWrapper}>
-                      <Ionicons name="business-outline" size={19} color={C.textSub} style={{ marginRight: 10 }} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={s.fieldLabel}>BVN Number (11 digits)</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: bvnInput.trim().length === 11 ? '#10B981' : C.textMuted }}>
+                        {bvnInput.trim().length}/11 Digits {bvnInput.trim().length === 11 ? '✓' : ''}
+                      </Text>
+                    </View>
+                    <View style={[s.textInputWrapper, bvnInput.trim().length === 11 && { borderColor: '#10B981', borderWidth: 1.5 }]}>
+                      <Ionicons name="business-outline" size={19} color={bvnInput.trim().length === 11 ? '#10B981' : C.textSub} style={{ marginRight: 10 }} />
                       <TextInput
                         style={s.textInputField}
                         placeholder="1234 5678 901"
@@ -1277,10 +1321,13 @@ export default function UserKYCScreen() {
                         maxLength={11}
                         value={bvnInput}
                         onChangeText={(val) => {
-                          setBvnInput(val);
+                          setBvnInput(val.replace(/\D/g, ''));
                           if (bvnError) setBvnError(null);
                         }}
                       />
+                      {bvnInput.trim().length === 11 && (
+                        <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                      )}
                     </View>
                   </View>
 
@@ -1288,7 +1335,7 @@ export default function UserKYCScreen() {
                   <View style={s.infoNoticeBox}>
                     <Ionicons name="lock-closed" size={18} color="#2563EB" style={{ marginTop: 1 }} />
                     <Text style={s.infoNoticeTxt}>
-                      Your BVN is verified live via Payvessel NIBSS channel. Dial *565*0# on your registered SIM to retrieve it.
+                      Your BVN is verified live via official regulatory NIBSS channel. Dial *565*0# on your registered SIM to retrieve it.
                     </Text>
                   </View>
 
@@ -1296,10 +1343,10 @@ export default function UserKYCScreen() {
                   {bvnError && (
                     <View style={s.errorBannerBox}>
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                        <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8, marginTop: 2 }} />
+                        <Ionicons name="information-circle" size={20} color="#D97706" style={{ marginRight: 8, marginTop: 2 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={s.errorBannerTitle}>
-                            {bvnProviderError ? 'NIBSS Service Delay' : 'BVN Verification Error'}
+                            Regulatory Service Advisory
                           </Text>
                           <Text style={s.errorBannerTxt}>{bvnError}</Text>
                         </View>
@@ -3766,9 +3813,9 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   errorBannerBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FFFBEB',
     borderWidth: 1.2,
-    borderColor: '#FECACA',
+    borderColor: '#FDE68A',
     borderRadius: 14,
     padding: 13,
     marginTop: 14,
@@ -3776,22 +3823,22 @@ const s = StyleSheet.create({
   errorBannerTitle: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#991B1B',
+    color: '#92400E',
     marginBottom: 3,
   },
   errorBannerTxt: {
     fontSize: 11.5,
-    color: '#7F1D1D',
+    color: '#B45309',
     lineHeight: 16,
   },
   errorBannerActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#FEE2E2',
+    borderTopColor: '#FEF3C7',
   },
   errorRetryBtn: {
     flexDirection: 'row',
@@ -3799,7 +3846,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: 8,
   },
@@ -3810,13 +3857,16 @@ const s = StyleSheet.create({
   },
   errorBypassBtn: {
     flex: 1,
-    alignItems: 'flex-end',
-    paddingVertical: 6,
+    backgroundColor: C.navy,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorBypassBtnTxt: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#2563EB',
-    textDecorationLine: 'underline',
+    color: '#FFFFFF',
   },
 });

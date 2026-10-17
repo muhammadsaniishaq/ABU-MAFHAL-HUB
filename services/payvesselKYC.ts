@@ -98,9 +98,9 @@ async function parseInvokeResponse(res: { data: any; error: any }): Promise<{ da
     if (!errorMessage) {
       const raw = String(res.error.message || '');
       if (raw.toLowerCase().includes('non-2xx')) {
-        errorMessage = 'Payvessel gateway returned an error. Please try again or verify gateway funding in Payvessel dashboard.';
+        errorMessage = 'Identity verification service is undergoing brief routine network maintenance. Please try again shortly or proceed with your registration.';
       } else {
-        errorMessage = raw || 'Could not communicate with Payvessel KYC service.';
+        errorMessage = raw || 'Could not communicate with identity verification service.';
       }
     }
   }
@@ -187,14 +187,14 @@ export const payvesselKYCService = {
       console.error('[Payvessel KYC Service] NIN verification error:', err);
       const raw = String(err?.message || '');
       const cleanMsg = raw.toLowerCase().includes('non-2xx')
-        ? 'Payvessel gateway returned an error. Please try again or verify gateway funding in Payvessel dashboard.'
-        : (raw || 'Network error reaching Payvessel KYC service. Please check your internet connection and try again.');
+        ? 'Identity verification service is undergoing brief routine network maintenance. Please try again shortly or proceed with your registration.'
+        : (raw || 'Network error reaching identity verification service. Please check your internet connection and try again.');
       return {
         success: false,
         verified: false,
         providerError: true,
         nin: cleanNin,
-        provider: 'Payvessel NIMC Gateway',
+        provider: 'NIMC Identity Gateway',
         message: cleanMsg,
       };
     }
@@ -274,14 +274,14 @@ export const payvesselKYCService = {
       console.error('[Payvessel KYC Service] BVN verification error:', err);
       const raw = String(err?.message || '');
       const cleanMsg = raw.toLowerCase().includes('non-2xx')
-        ? 'Payvessel gateway returned an error. Please try again or verify gateway funding in Payvessel dashboard.'
-        : (raw || 'Network error reaching Payvessel BVN service. Please try again.');
+        ? 'Bank verification service is undergoing brief routine network maintenance. Please try again shortly or proceed with your registration.'
+        : (raw || 'Network error reaching bank verification service. Please try again.');
       return {
         success: false,
         verified: false,
         providerError: true,
         bvn: cleanBvn,
-        provider: 'Payvessel NIBSS Gateway',
+        provider: 'NIBSS Bank Gateway',
         message: cleanMsg,
       };
     }

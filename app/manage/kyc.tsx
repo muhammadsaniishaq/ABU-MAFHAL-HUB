@@ -82,6 +82,7 @@ export default function KYCManagerScreen() {
     const [kycFeeInput, setKycFeeInput] = useState<string>('150');
     const [kycFeeEnabled, setKycFeeEnabled] = useState<boolean>(true);
     const [isSavingKycFee, setIsSavingKycFee] = useState<boolean>(false);
+    const [apiWalletAlert, setApiWalletAlert] = useState<any>(null);
 
     useEffect(() => {
         fetchKYCData();
@@ -136,6 +137,20 @@ export default function KYCManagerScreen() {
 
             if (feeEnabledSetting?.value != null) {
                 setKycFeeEnabled(feeEnabledSetting.value === 'true' || feeEnabledSetting.value === true);
+            }
+
+            // Fetch Payvessel API Wallet Alert
+            const { data: alertSetting } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'payvessel_api_wallet_alert')
+                .maybeSingle();
+
+            if (alertSetting?.value != null) {
+                const parsed = typeof alertSetting.value === 'string' ? JSON.parse(alertSetting.value) : alertSetting.value;
+                if (parsed?.lowBalance) {
+                    setApiWalletAlert(parsed);
+                }
             }
         } catch (e) {
             console.error("Error fetching auto settings:", e);
@@ -727,6 +742,37 @@ export default function KYCManagerScreen() {
                         borderColor: 'rgba(245, 166, 35, 0.35)',
                         padding: 8,
                     }}>
+                        {/* Payvessel API Low Balance Alert Banner for Admin */}
+                        {apiWalletAlert && (
+                            <View style={{
+                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                borderColor: '#EF4444',
+                                borderWidth: 1,
+                                borderRadius: 6,
+                                padding: 7,
+                                marginBottom: 7,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                            }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                                    <Ionicons name="alert-circle" size={14} color="#F87171" />
+                                    <Text style={{ color: '#FECACA', fontSize: 8, fontWeight: '700', flex: 1 }}>
+                                        Payvessel merchant wallet balance is low. Seamless user fallback is active so users are not blocked. Please top up Payvessel dashboard.
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={async () => {
+                                        await supabase.from('app_settings').delete().eq('key', 'payvessel_api_wallet_alert');
+                                        setApiWalletAlert(null);
+                                    }}
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 }}
+                                >
+                                    <Text style={{ color: '#FFFFFF', fontSize: 7, fontWeight: '800' }}>DISMISS</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
                         {/* Title & Status Row */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
