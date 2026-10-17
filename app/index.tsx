@@ -28,88 +28,56 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
+type SplashTheme = 'dark' | 'light';
+
 export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // 0: Loading / Globe, 1: Hub Phone, 2: Value Props & Get Started
+  // 0: Global Fintech Gateway (Globe), 1: All-in-One Powerhouse (3D Phone Hub), 2: Institutional Value & Get Started
   const [pageIdx, setPageIdx] = useState(0);
-  const [loadingProgress, setLoadingProgress] = useState(15);
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
+  const [theme, setTheme] = useState<SplashTheme>('dark');
   const [customSlideImages, setCustomSlideImages] = useState<(string | null)[]>([null, null, null]);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [hasValidSession, setHasValidSession] = useState(false);
 
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
-  const autoTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Reanimated smooth levitation motions
+  // Reanimated motions for fluid luxury transitions
   const floatY = useSharedValue(0);
   const scaleAnim = useSharedValue(1);
   const slideOpacity = useSharedValue(1);
+  const slideTranslateX = useSharedValue(0);
 
   useEffect(() => {
-    // Gentle 60fps levitation cycle
+    // Continuous 60fps luxury levitation cycle
     floatY.value = withRepeat(
       withSequence(
-        withTiming(-8, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 2400, easing: Easing.inOut(Easing.sin) })
+        withTiming(-9, { duration: 2500, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 2500, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
     );
 
+    loadSavedTheme();
     checkAuthSession();
     loadCustomSplashImages();
-
-    // Initial loading bar animation on Slide 0
-    let prog = 15;
-    const interval = setInterval(() => {
-      prog += Math.floor(Math.random() * 18) + 12;
-      if (prog >= 100) {
-        prog = 100;
-        setLoadingProgress(100);
-        clearInterval(interval);
-      } else {
-        setLoadingProgress(prog);
-      }
-    }, 180);
-
-    return () => {
-      clearInterval(interval);
-      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
-    };
   }, []);
 
-  // When loading bar completes on Slide 0
+  // Slide transition animation on pageIdx change (100% manual, no auto-slide!)
   useEffect(() => {
-    if (loadingProgress >= 100) {
-      if (hasValidSession) {
-        const isPreview = Platform.OS === 'web' && typeof window !== 'undefined' && (
-          window.location.search.includes('preview') || window.location.search.includes('splash')
-        );
-        if (!isPreview) {
-          setTimeout(() => router.replace('/dashboard' as any), 350);
-          return;
-        }
-      }
+    const initialOffset = slideDirection === 'forward' ? 36 : -36;
+    slideOpacity.value = 0.15;
+    slideTranslateX.value = initialOffset;
+    scaleAnim.value = 0.95;
 
-      // If user has not touched and not logged in, auto-transition to Slide 1
-      if (pageIdx === 0) {
-        autoTimerRef.current = setTimeout(() => {
-          setPageIdx(1);
-        }, 800);
-      }
-    }
-  }, [loadingProgress, hasValidSession, pageIdx]);
-
-  // Page index transition spring
-  useEffect(() => {
-    slideOpacity.value = 0.3;
-    scaleAnim.value = 0.96;
     slideOpacity.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
-    scaleAnim.value = withSpring(1, { damping: 15, stiffness: 120 });
-  }, [pageIdx]);
+    slideTranslateX.value = withSpring(0, { damping: 18, stiffness: 140 });
+    scaleAnim.value = withSpring(1, { damping: 16, stiffness: 130 });
+  }, [pageIdx, slideDirection]);
 
   const floatAnimStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: floatY.value }],
@@ -117,8 +85,33 @@ export default function SplashScreen() {
 
   const slideAnimStyle = useAnimatedStyle(() => ({
     opacity: slideOpacity.value,
-    transform: [{ scale: scaleAnim.value }],
+    transform: [
+      { translateX: slideTranslateX.value },
+      { scale: scaleAnim.value },
+    ],
   }));
+
+  const loadSavedTheme = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('app_splash_theme_pref');
+      if (saved === 'dark' || saved === 'light') {
+        setTheme(saved);
+      }
+    } catch (e) {
+      console.log('Error loading splash theme preference:', e);
+    }
+  };
+
+  const toggleTheme = async () => {
+    haptic();
+    const nextTheme: SplashTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    try {
+      await AsyncStorage.setItem('app_splash_theme_pref', nextTheme);
+    } catch (e) {
+      console.log('Error saving splash theme preference:', e);
+    }
+  };
 
   const checkAuthSession = async () => {
     try {
@@ -199,16 +192,18 @@ export default function SplashScreen() {
     }
   }, []);
 
+  // MANUAL NAVIGATION CONTROLS - ZERO AUTO SLIDE!
   const goTo = (idx: number) => {
-    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+    if (idx === pageIdx) return;
     haptic();
+    setSlideDirection(idx > pageIdx ? 'forward' : 'backward');
     setPageIdx(idx);
   };
 
   const nextSlide = () => {
-    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     haptic();
     if (pageIdx < 2) {
+      setSlideDirection('forward');
       setPageIdx(p => p + 1);
     } else {
       router.push('/(auth)/signup' as any);
@@ -216,19 +211,20 @@ export default function SplashScreen() {
   };
 
   const prevSlide = () => {
-    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     haptic();
     if (pageIdx > 0) {
+      setSlideDirection('backward');
       setPageIdx(p => p - 1);
     }
   };
 
   const skipAll = () => {
-    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     haptic();
+    setSlideDirection('forward');
     setPageIdx(2);
   };
 
+  // TOUCH GESTURE - MANUAL SWIPE RECOGNITION
   const handleTouchStart = (e: any) => {
     touchStartX.current = e.nativeEvent.pageX;
     touchStartY.current = e.nativeEvent.pageY;
@@ -237,17 +233,47 @@ export default function SplashScreen() {
   const handleTouchEnd = (e: any) => {
     const dx = e.nativeEvent.pageX - touchStartX.current;
     const dy = e.nativeEvent.pageY - touchStartY.current;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 36) {
-      dx < 0 ? nextSlide() : prevSlide();
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 42) {
+      if (dx < 0) {
+        if (pageIdx < 2) nextSlide();
+      } else {
+        if (pageIdx > 0) prevSlide();
+      }
     }
   };
 
+  // ── LUXURY THEME PALETTE DEFINITIONS ──
+  const isDark = theme === 'dark';
+  const colors = {
+    bgGradient: isDark
+      ? (['#060C1B', '#0A142F', '#0E1E45'] as const)
+      : (['#FFFFFF', '#FDFBF7', '#F5EFE6'] as const),
+    statusBar: isDark ? ('light-content' as const) : ('dark-content' as const),
+    textPrimary: isDark ? '#FFFFFF' : '#0D1B3E',
+    textSecondary: isDark ? '#94A3B8' : '#64748B',
+    textMuted: isDark ? '#64748B' : '#94A3B8',
+    gold: isDark ? '#F59E0B' : '#D97706',
+    goldGlow: isDark ? 'rgba(245, 158, 11, 0.4)' : 'rgba(217, 119, 6, 0.25)',
+    cardBg: isDark ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.95)',
+    cardBorder: isDark ? 'rgba(245, 158, 11, 0.25)' : '#E2E8F0',
+    navBtnBg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+    navBtnBorder: isDark ? 'rgba(245, 158, 11, 0.3)' : '#E2E8F0',
+    logoBg: isDark ? '#0A1329' : '#FFFFFF',
+    logoBorder: isDark ? 'rgba(245, 158, 11, 0.5)' : '#FEF3C7',
+    badgeBg: isDark ? 'rgba(245, 158, 11, 0.14)' : 'rgba(217, 119, 6, 0.1)',
+    badgeBorder: isDark ? 'rgba(245, 158, 11, 0.35)' : 'rgba(217, 119, 6, 0.25)',
+    btnPrimaryBg: isDark ? (['#F59E0B', '#D97706'] as const) : (['#081026', '#050A18'] as const),
+    btnPrimaryTxt: isDark ? '#060B18' : '#F59E0B',
+    btnSecondaryBg: isDark ? 'rgba(15, 23, 42, 0.85)' : '#FFFFFF',
+    btnSecondaryBorder: isDark ? 'rgba(245, 158, 11, 0.35)' : '#E2E8F0',
+    btnSecondaryTxt: isDark ? '#F8FAFC' : '#0D1B3E',
+    dotInactive: isDark ? 'rgba(255, 255, 255, 0.22)' : '#CBD5E1',
+    dotActive: isDark ? '#F59E0B' : '#D97706',
+  };
+
   return (
-    <LinearGradient
-      colors={['#FFFFFF', '#FAF8F5', '#F5EFE6']}
-      style={styles.screenBg}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <LinearGradient colors={colors.bgGradient} style={styles.screenBg}>
+      <StatusBar barStyle={colors.statusBar} backgroundColor="transparent" translucent />
 
       <View
         style={[
@@ -260,38 +286,92 @@ export default function SplashScreen() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* ── TOP NAV BAR (Back chevron & Skip button) ── */}
+        {/* ── TOP NAV BAR (Back Chevron, Theme Switcher, Skip Button) ── */}
         <View style={styles.topNav}>
+          {/* Back Button or Spacer */}
           {pageIdx > 0 ? (
             <TouchableOpacity
               onPress={prevSlide}
-              style={styles.navBtn}
+              style={[
+                styles.navBtn,
+                { backgroundColor: colors.navBtnBg, borderColor: colors.navBtnBorder },
+              ]}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               activeOpacity={0.7}
             >
-              <Ionicons name="chevron-back" size={22} color="#0D1B3E" />
+              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           ) : (
             <View style={styles.navPlaceholder} />
           )}
 
-          {pageIdx < 2 ? (
+          {/* Centered Quick Session Resume Pill if Already Logged In */}
+          {hasValidSession && (
             <TouchableOpacity
-              onPress={skipAll}
-              style={styles.skipBtn}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              activeOpacity={0.7}
+              onPress={() => router.replace('/dashboard' as any)}
+              style={[
+                styles.resumeSessionPill,
+                { backgroundColor: colors.badgeBg, borderColor: colors.badgeBorder },
+              ]}
+              activeOpacity={0.8}
             >
-              <Text style={styles.skipTxt}>Skip</Text>
+              <Ionicons name="sparkles" size={13} color={colors.gold} />
+              <Text style={[styles.resumeSessionTxt, { color: colors.gold }]}>Go to Dashboard</Text>
+              <Ionicons name="arrow-forward" size={12} color={colors.gold} />
             </TouchableOpacity>
-          ) : (
-            <View style={styles.navPlaceholder} />
           )}
+
+          {/* Right Action Group: Theme Toggle & Skip */}
+          <View style={styles.topRightActions}>
+            {/* 🌙 / ☀️ THEME SWITCHER */}
+            <TouchableOpacity
+              onPress={toggleTheme}
+              style={[
+                styles.themeToggleBtn,
+                { backgroundColor: colors.navBtnBg, borderColor: colors.navBtnBorder },
+              ]}
+              activeOpacity={0.75}
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={isDark ? 'sunny' : 'moon'}
+                size={16}
+                color={isDark ? '#F59E0B' : '#0D1B3E'}
+              />
+              <Text style={[styles.themeToggleTxt, { color: colors.textPrimary }]}>
+                {isDark ? 'Light' : 'Dark'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Skip Button (Shown on Slide 0 and 1) */}
+            {pageIdx < 2 && (
+              <TouchableOpacity
+                onPress={skipAll}
+                style={[
+                  styles.skipBtn,
+                  { backgroundColor: colors.navBtnBg, borderColor: colors.navBtnBorder },
+                ]}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.skipTxt, { color: colors.textPrimary }]}>Skip</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
-        {/* ── CONSTANT BRAND HEADER (AM LOGO, ABU MAFHAL, SUB, TAGLINE) ── */}
+        {/* ── LUXURY BRAND HEADER ── */}
         <View style={styles.brandHeader}>
-          <View style={styles.logoRingWrapper}>
+          <View
+            style={[
+              styles.logoRingWrapper,
+              {
+                backgroundColor: colors.logoBg,
+                borderColor: colors.logoBorder,
+                shadowColor: colors.gold,
+              },
+            ]}
+          >
             <Image
               source={require('../assets/images/am_luxury_logo.png')}
               style={styles.luxuryLogo}
@@ -299,24 +379,40 @@ export default function SplashScreen() {
             />
           </View>
 
-          <Text style={styles.brandTitle}>ABU MAFHAL</Text>
+          <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>ABU MAFHAL</Text>
 
           <View style={styles.subRow}>
-            <View style={styles.subLine} />
-            <Text style={styles.subText}>S U B</Text>
-            <View style={styles.subLine} />
+            <View style={[styles.subLine, { backgroundColor: colors.gold }]} />
+            <Text style={[styles.subText, { color: colors.gold }]}>S U B</Text>
+            <View style={[styles.subLine, { backgroundColor: colors.gold }]} />
           </View>
 
-          <Text style={styles.tagline}>Shop, Pay & Subscribe Globally</Text>
+          <Text style={[styles.tagline, { color: colors.textSecondary }]}>
+            Elevated Digital Payments & Global Access
+          </Text>
         </View>
 
-        {/* ── SLIDE CONTENT AREA ── */}
+        {/* ── ANIMATED SLIDE BODY (NO AUTO SLIDE - SMOOTH INTERACTIVE TRANSITION) ── */}
         <Animated.View style={[styles.slideBody, slideAnimStyle]}>
           {/* ══════════════════════════════════════════════════════════════
-               SCREEN 0: GLOBE WITH GOLD ORBITS & LOADING EXPERIENCE
+               SLIDE 0: 3D GLOBE - GLOBAL FINTECH GATEWAY
                ══════════════════════════════════════════════════════════════ */}
           {pageIdx === 0 && (
             <View style={styles.slideInner}>
+              {/* Top Badge Pill */}
+              <View
+                style={[
+                  styles.featureBadge,
+                  { backgroundColor: colors.badgeBg, borderColor: colors.badgeBorder },
+                ]}
+              >
+                <Ionicons name="sparkles" size={13} color={colors.gold} />
+                <Text style={[styles.featureBadgeTxt, { color: colors.gold }]}>
+                  GLOBAL FINTECH GATEWAY
+                </Text>
+              </View>
+
+              {/* 3D Floating Globe Hero */}
               <View style={styles.heroCenter}>
                 <Animated.View style={[styles.heroImgHolder, floatAnimStyle]}>
                   {customSlideImages[0] ? (
@@ -335,25 +431,87 @@ export default function SplashScreen() {
                 </Animated.View>
               </View>
 
-              <View style={styles.screen0Bottom}>
-                <View style={styles.loadingTrack}>
+              {/* Slide Content & Micro-features */}
+              <View style={styles.slideFooterArea}>
+                <Text style={[styles.slideMainHeading, { color: colors.textPrimary }]}>
+                  Connect to Global Commerce
+                </Text>
+                <Text style={[styles.slideDescription, { color: colors.textSecondary }]}>
+                  Your premier destination for instant mobile topups, virtual USD cards, electricity tokens, and international bills.
+                </Text>
+
+                {/* 3 Feature Pills */}
+                <View style={styles.featureChipsRow}>
+                  <View
+                    style={[
+                      styles.chipItem,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <Ionicons name="flash" size={12} color={colors.gold} />
+                    <Text style={[styles.chipTxt, { color: colors.textPrimary }]}>Sub-second VTU</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.chipItem,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <Ionicons name="card" size={12} color={colors.gold} />
+                    <Text style={[styles.chipTxt, { color: colors.textPrimary }]}>Virtual Cards</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.chipItem,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <Ionicons name="shield-checkmark" size={12} color={colors.gold} />
+                    <Text style={[styles.chipTxt, { color: colors.textPrimary }]}>Bank-Grade</Text>
+                  </View>
+                </View>
+
+                {/* Next Slide CTA Pill Button */}
+                <TouchableOpacity
+                  onPress={nextSlide}
+                  style={styles.slideActionPillBtn}
+                  activeOpacity={0.88}
+                >
                   <LinearGradient
-                    colors={['#F59E0B', '#D97706']}
+                    colors={colors.btnPrimaryBg}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={[styles.loadingFill, { width: `${loadingProgress}%` }]}
-                  />
-                </View>
-                <Text style={styles.loadingText}>Loading Your Experience...</Text>
+                    style={styles.slideActionPillGrad}
+                  >
+                    <Text style={[styles.slideActionPillTxt, { color: colors.btnPrimaryTxt }]}>
+                      Explore Services
+                    </Text>
+                    <Ionicons name="arrow-forward" size={16} color={colors.btnPrimaryTxt} />
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             </View>
           )}
 
           {/* ══════════════════════════════════════════════════════════════
-               SCREEN 1: 3D PHONE HUB WITH ORBITING SERVICE ICONS
+               SLIDE 1: 3D PHONE HUB - ALL-IN-ONE AUTOMATION
                ══════════════════════════════════════════════════════════════ */}
           {pageIdx === 1 && (
             <View style={styles.slideInner}>
+              {/* Top Badge Pill */}
+              <View
+                style={[
+                  styles.featureBadge,
+                  { backgroundColor: colors.badgeBg, borderColor: colors.badgeBorder },
+                ]}
+              >
+                <Ionicons name="phone-portrait-outline" size={13} color={colors.gold} />
+                <Text style={[styles.featureBadgeTxt, { color: colors.gold }]}>
+                  SEAMLESS AUTOMATION
+                </Text>
+              </View>
+
+              {/* 3D Hub Phone Hero */}
               <View style={styles.heroCenter}>
                 <Animated.View style={[styles.heroImgHolder, floatAnimStyle]}>
                   {customSlideImages[1] ? (
@@ -372,110 +530,213 @@ export default function SplashScreen() {
                 </Animated.View>
               </View>
 
-              <View style={styles.screen1Bottom}>
-                {/* Gold Pagination Pill */}
-                <View style={styles.paginationRow}>
-                  <TouchableOpacity onPress={() => goTo(0)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-                    <View style={styles.dotInactive} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => goTo(1)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-                    <View style={styles.dotActiveCapsule} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => goTo(2)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-                    <View style={styles.dotInactive} />
-                  </TouchableOpacity>
+              {/* Slide Content & Service Highlights */}
+              <View style={styles.slideFooterArea}>
+                <Text style={[styles.slideMainHeading, { color: colors.textPrimary }]}>
+                  All-in-One Digital Powerhouse
+                </Text>
+                <Text style={[styles.slideDescription, { color: colors.textSecondary }]}>
+                  Enjoy blazing-fast automated delivery, zero downtime, and real-time transaction updates 24 hours a day.
+                </Text>
+
+                {/* 4 Quick Category Tags */}
+                <View style={styles.servicePillGrid}>
+                  <View
+                    style={[
+                      styles.serviceTag,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <Ionicons name="wifi" size={13} color={colors.gold} />
+                    <Text style={[styles.serviceTagTxt, { color: colors.textPrimary }]}>Data & Airtime</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.serviceTag,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <Ionicons name="card-outline" size={13} color={colors.gold} />
+                    <Text style={[styles.serviceTagTxt, { color: colors.textPrimary }]}>Virtual USD</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.serviceTag,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <Ionicons name="bulb-outline" size={13} color={colors.gold} />
+                    <Text style={[styles.serviceTagTxt, { color: colors.textPrimary }]}>Electricity</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.serviceTag,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <Ionicons name="tv-outline" size={13} color={colors.gold} />
+                    <Text style={[styles.serviceTagTxt, { color: colors.textPrimary }]}>Cable TV</Text>
+                  </View>
                 </View>
 
-                <Text style={styles.slideTitle}>Your All-in-One Digital Hub</Text>
-                <Text style={styles.slideSubtitle}>Fast   •   Secure   •   Global</Text>
-
+                {/* Continue CTA */}
                 <TouchableOpacity
-                  onPress={() => goTo(2)}
-                  style={styles.continuePillBtn}
-                  activeOpacity={0.85}
+                  onPress={nextSlide}
+                  style={styles.slideActionPillBtn}
+                  activeOpacity={0.88}
                 >
-                  <Text style={styles.continuePillTxt}>Continue</Text>
-                  <Ionicons name="arrow-forward" size={15} color="#D97706" />
+                  <LinearGradient
+                    colors={colors.btnPrimaryBg}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.slideActionPillGrad}
+                  >
+                    <Text style={[styles.slideActionPillTxt, { color: colors.btnPrimaryTxt }]}>
+                      Continue
+                    </Text>
+                    <Ionicons name="arrow-forward" size={16} color={colors.btnPrimaryTxt} />
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
           )}
 
           {/* ══════════════════════════════════════════════════════════════
-               SCREEN 2: VALUE PROPOSITIONS & GET STARTED ACTION
+               SLIDE 2: VALUE PROPOSITIONS & GET STARTED ACTION
                ══════════════════════════════════════════════════════════════ */}
           {pageIdx === 2 && (
             <View style={styles.slideInner}>
+              {/* Top Badge Pill */}
+              <View
+                style={[
+                  styles.featureBadge,
+                  { backgroundColor: colors.badgeBg, borderColor: colors.badgeBorder },
+                ]}
+              >
+                <Ionicons name="shield-checkmark-outline" size={13} color={colors.gold} />
+                <Text style={[styles.featureBadgeTxt, { color: colors.gold }]}>
+                  TRUST & EXCELLENCE
+                </Text>
+              </View>
+
               {/* Subtle World Map Watermark in background */}
               <View style={styles.worldMapHolder} pointerEvents="none">
                 <Image
                   source={require('../assets/images/splash_world_map_bg.png')}
-                  style={styles.worldMapImg}
+                  style={[styles.worldMapImg, { opacity: isDark ? 0.2 : 0.35 }]}
                   resizeMode="contain"
                 />
               </View>
 
-              {/* 3 Value Proposition Cards */}
-              <View style={styles.valuePropsContainer}>
+              {/* Headline & Value Proposition Cards */}
+              <View style={styles.slide2Content}>
+                <Text style={[styles.slideMainHeading, { color: colors.textPrimary, marginBottom: 4 }]}>
+                  Experience Luxury Fintech
+                </Text>
+                <Text style={[styles.slideDescription, { color: colors.textSecondary, marginBottom: 14 }]}>
+                  Join thousands experiencing effortless transactions with institutional reliability.
+                </Text>
+
+                {/* 3 Value Proposition Cards */}
                 <View style={styles.valuePropsRow}>
-                  {/* Card 1: Secure Payments */}
-                  <View style={styles.valueCard}>
-                    <LinearGradient
-                      colors={['#FEF3C7', '#FDE68A']}
-                      style={styles.valueIconBox}
-                    >
-                      <Ionicons name="shield-checkmark" size={21} color="#D97706" />
-                    </LinearGradient>
-                    <Text style={styles.valueCardTitle}>Secure{'\n'}Payments</Text>
+                  {/* Card 1: Bank-Grade Security */}
+                  <View
+                    style={[
+                      styles.valueCard,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <View style={[styles.valueIconBox, { backgroundColor: colors.badgeBg }]}>
+                      <Ionicons name="shield-checkmark" size={20} color={colors.gold} />
+                    </View>
+                    <Text style={[styles.valueCardTitle, { color: colors.textPrimary }]}>
+                      Secure{'\n'}Payments
+                    </Text>
+                    <Text style={[styles.valueCardSub, { color: colors.textMuted }]}>
+                      256-bit SSL
+                    </Text>
                   </View>
 
-                  {/* Card 2: Global Access */}
-                  <View style={styles.valueCard}>
-                    <LinearGradient
-                      colors={['#FEF3C7', '#FDE68A']}
-                      style={styles.valueIconBox}
-                    >
-                      <Ionicons name="globe-outline" size={21} color="#D97706" />
-                    </LinearGradient>
-                    <Text style={styles.valueCardTitle}>Global{'\n'}Access</Text>
+                  {/* Card 2: Instant Delivery */}
+                  <View
+                    style={[
+                      styles.valueCard,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <View style={[styles.valueIconBox, { backgroundColor: colors.badgeBg }]}>
+                      <Ionicons name="flash" size={20} color={colors.gold} />
+                    </View>
+                    <Text style={[styles.valueCardTitle, { color: colors.textPrimary }]}>
+                      Instant{'\n'}Delivery
+                    </Text>
+                    <Text style={[styles.valueCardSub, { color: colors.textMuted }]}>
+                      Sub-second
+                    </Text>
                   </View>
 
-                  {/* Card 3: Fast & Reliable */}
-                  <View style={styles.valueCard}>
-                    <LinearGradient
-                      colors={['#FEF3C7', '#FDE68A']}
-                      style={styles.valueIconBox}
-                    >
-                      <Ionicons name="flash" size={21} color="#D97706" />
-                    </LinearGradient>
-                    <Text style={styles.valueCardTitle}>Fast &{'\n'}Reliable</Text>
+                  {/* Card 3: 24/7 VIP Support */}
+                  <View
+                    style={[
+                      styles.valueCard,
+                      { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                    ]}
+                  >
+                    <View style={[styles.valueIconBox, { backgroundColor: colors.badgeBg }]}>
+                      <Ionicons name="headset" size={20} color={colors.gold} />
+                    </View>
+                    <Text style={[styles.valueCardTitle, { color: colors.textPrimary }]}>
+                      24/7 VIP{'\n'}Support
+                    </Text>
+                    <Text style={[styles.valueCardSub, { color: colors.textMuted }]}>
+                      Live Chat
+                    </Text>
                   </View>
                 </View>
               </View>
 
               {/* Action Buttons */}
               <View style={styles.actionsContainer}>
+                {/* Primary CTA: Get Started */}
                 <TouchableOpacity
                   onPress={() => {
                     haptic();
                     router.push('/(auth)/signup' as any);
                   }}
                   activeOpacity={0.88}
-                  style={styles.primaryGetStartedBtn}
+                  style={styles.primaryBtnWrapper}
                 >
-                  <Text style={styles.primaryGetStartedTxt}>Get Started</Text>
-                  <Ionicons name="arrow-forward" size={18} color="#F59E0B" style={{ marginLeft: 6 }} />
+                  <LinearGradient
+                    colors={colors.btnPrimaryBg}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.primaryGetStartedBtn}
+                  >
+                    <Text style={[styles.primaryGetStartedTxt, { color: colors.btnPrimaryTxt }]}>
+                      Get Started
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color={colors.btnPrimaryTxt} />
+                  </LinearGradient>
                 </TouchableOpacity>
 
+                {/* Secondary CTA: I Already Have an Account */}
                 <TouchableOpacity
                   onPress={() => {
                     haptic();
                     router.push('/(auth)/login' as any);
                   }}
                   activeOpacity={0.8}
-                  style={styles.secondaryAccountBtn}
+                  style={[
+                    styles.secondaryAccountBtn,
+                    {
+                      backgroundColor: colors.btnSecondaryBg,
+                      borderColor: colors.btnSecondaryBorder,
+                    },
+                  ]}
                 >
-                  <Text style={styles.secondaryAccountTxt}>I Already Have an Account</Text>
+                  <Text style={[styles.secondaryAccountTxt, { color: colors.btnSecondaryTxt }]}>
+                    I Already Have an Account
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -483,13 +744,50 @@ export default function SplashScreen() {
               <View style={styles.skylineHolder} pointerEvents="none">
                 <Image
                   source={require('../assets/images/splash_skyline_3d.png')}
-                  style={styles.skylineImg}
+                  style={[styles.skylineImg, { opacity: isDark ? 0.35 : 0.6 }]}
                   resizeMode="contain"
                 />
               </View>
             </View>
           )}
         </Animated.View>
+
+        {/* ── INTERACTIVE PAGINATION CAPSULES (TAP TO NAVIGATE) ── */}
+        <View style={styles.paginationArea}>
+          <View style={styles.paginationRow}>
+            {[0, 1, 2].map(idx => {
+              const isActive = pageIdx === idx;
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => goTo(idx)}
+                  hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+                  style={styles.dotTouchTarget}
+                  activeOpacity={0.7}
+                >
+                  {isActive ? (
+                    <View
+                      style={[
+                        styles.dotActiveCapsule,
+                        {
+                          backgroundColor: colors.dotActive,
+                          shadowColor: colors.dotActive,
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.dotInactive,
+                        { backgroundColor: colors.dotInactive },
+                      ]}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       </View>
     </LinearGradient>
   );
@@ -511,107 +809,143 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Top Navigation (Back & Skip) ──
+  // ── Top Navigation Bar ──
   topNav: {
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: 38,
-    zIndex: 10,
+    height: 40,
+    zIndex: 20,
   },
   navBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   navPlaceholder: {
     width: 36,
     height: 36,
   },
-  skipBtn: {
-    paddingHorizontal: 14,
+  resumeSessionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+  },
+  resumeSessionTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  topRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  themeToggleTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  skipBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   skipTxt: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: '#0D1B3E',
   },
 
   // ── Luxury Brand Header ──
   brandHeader: {
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 2,
+    marginBottom: 4,
   },
   logoRingWrapper: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    elevation: 8,
-    borderWidth: 2,
-    borderColor: '#FEF3C7',
-    marginBottom: 10,
-  },
-  luxuryLogo: {
     width: 78,
     height: 78,
     borderRadius: 39,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 16,
+    elevation: 9,
+    borderWidth: 2,
+    marginBottom: 8,
+  },
+  luxuryLogo: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   brandTitle: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '900',
-    color: '#0D1B3E',
-    letterSpacing: 2.2,
+    letterSpacing: 2.4,
     textTransform: 'uppercase',
   },
   subRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 3,
+    marginTop: 2,
     gap: 10,
   },
   subLine: {
-    width: 34,
+    width: 30,
     height: 1.5,
-    backgroundColor: '#D97706',
     borderRadius: 1,
   },
   subText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
-    color: '#D97706',
     letterSpacing: 4.5,
   },
   tagline: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: '600',
-    color: '#64748B',
-    marginTop: 5,
+    marginTop: 4,
+    textAlign: 'center',
   },
 
-  // ── Slide Body ──
+  // ── Animated Slide Body ──
   slideBody: {
     flex: 1,
     width: '100%',
     justifyContent: 'center',
+    marginVertical: 4,
   },
   slideInner: {
     flex: 1,
@@ -620,7 +954,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Hero Images Holder ──
+  // ── Feature Badge ──
+  featureBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 2,
+  },
+  featureBadgeTxt: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+
+  // ── Hero Images ──
   heroCenter: {
     flex: 1,
     width: '100%',
@@ -633,214 +985,262 @@ const styles = StyleSheet.create({
   },
   heroImg: {
     width: SW * 0.72,
-    height: SH * 0.35,
-    maxWidth: 300,
-    maxHeight: 280,
+    height: SH * 0.33,
+    maxWidth: 290,
+    maxHeight: 270,
   },
   globeImg: {
-    width: Math.min(SW * 0.76, 290),
-    height: Math.min(SH * 0.38, 255),
+    width: Math.min(SW * 0.74, 280),
+    height: Math.min(SH * 0.35, 245),
   },
   hubPhoneImg: {
-    width: Math.min(SW * 0.76, 280),
-    height: Math.min(SH * 0.38, 255),
+    width: Math.min(SW * 0.74, 275),
+    height: Math.min(SH * 0.35, 245),
   },
 
-  // ── Screen 0: Loading bar ──
-  screen0Bottom: {
+  // ── Slide Content Typography & Elements ──
+  slideFooterArea: {
     width: '100%',
     alignItems: 'center',
-    paddingBottom: 28,
+    paddingBottom: 6,
   },
-  loadingTrack: {
-    width: 175,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#E2E8F0',
-    overflow: 'hidden',
+  slideMainHeading: {
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: -0.2,
+    marginBottom: 5,
+  },
+  slideDescription: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 14,
     marginBottom: 12,
   },
-  loadingFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  loadingText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#64748B',
-  },
 
-  // ── Screen 1: Pagination & Typography ──
-  screen1Bottom: {
-    width: '100%',
-    alignItems: 'center',
-    paddingBottom: 20,
-  },
-  paginationRow: {
+  // ── Slide 0 Feature Chips ──
+  featureChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    marginBottom: 16,
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 14,
+    flexWrap: 'wrap',
   },
-  dotTouch: {
-    padding: 3,
+  chipItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  dotInactive: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#CBD5E1',
+  chipTxt: {
+    fontSize: 11,
+    fontWeight: '700',
   },
-  dotActiveCapsule: {
-    width: 26,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D97706',
+
+  // ── Slide 1 Service Grid ──
+  servicePillGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    marginBottom: 14,
+    paddingHorizontal: 10,
   },
-  slideTitle: {
-    fontSize: 20.5,
-    fontWeight: '800',
-    color: '#0D1B3E',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  slideSubtitle: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-  continuePillBtn: {
+  serviceTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#FEF3C7',
-    shadowColor: '#D97706',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  continuePillTxt: {
-    fontSize: 13,
+  serviceTagTxt: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#0D1B3E',
   },
 
-  // ── Screen 2: Value propositions & Actions ──
+  // ── Slide Action Buttons ──
+  slideActionPillBtn: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  slideActionPillGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 24,
+    paddingVertical: 11,
+  },
+  slideActionPillTxt: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
+  // ── Slide 2: Value propositions & Actions ──
   worldMapHolder: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 180,
+    height: 160,
     alignItems: 'center',
-    opacity: 0.35,
   },
   worldMapImg: {
     width: '100%',
     height: '100%',
   },
-  valuePropsContainer: {
+  slide2Content: {
     width: '100%',
-    marginTop: 14,
-    marginBottom: 20,
+    alignItems: 'center',
+    marginTop: 6,
   },
   valuePropsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 9,
     width: '100%',
+    marginBottom: 14,
   },
   valueCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 6,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
   valueIconBox: {
-    width: 44,
-    height: 44,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 7,
   },
   valueCardTitle: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
-    color: '#0D1B3E',
     textAlign: 'center',
     lineHeight: 14,
+    marginBottom: 2,
+  },
+  valueCardSub: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 
-  // ── Action Buttons ──
+  // ── Slide 2 Action Buttons ──
   actionsContainer: {
     width: '100%',
-    gap: 10,
+    gap: 9,
     zIndex: 10,
+    marginBottom: 4,
   },
-  primaryGetStartedBtn: {
+  primaryBtnWrapper: {
     width: '100%',
-    height: 52,
     borderRadius: 26,
-    backgroundColor: '#070D1E',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#070D1E',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
+    overflow: 'hidden',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
+  primaryGetStartedBtn: {
+    width: '100%',
+    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   primaryGetStartedTxt: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '800',
-    color: '#F59E0B',
     letterSpacing: 0.3,
   },
   secondaryAccountBtn: {
     width: '100%',
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
+    height: 48,
+    borderRadius: 24,
     borderWidth: 1.2,
-    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryAccountTxt: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
-    color: '#0D1B3E',
   },
 
   // ── Skyline Silhouette at Bottom ──
   skylineHolder: {
     width: '100%',
-    height: 90,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginTop: 8,
+    marginTop: 2,
   },
   skylineImg: {
     width: '100%',
     height: '100%',
+  },
+
+  // ── Interactive Pagination Area ──
+  paginationArea: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 6,
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dotTouchTarget: {
+    padding: 4,
+  },
+  dotInactive: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  dotActiveCapsule: {
+    width: 28,
+    height: 8,
+    borderRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 3,
   },
 });
