@@ -453,7 +453,7 @@ Deno.serve(async (req: Request) => {
                     newBal = Math.max(0, currentUserBalance - kycFee);
 
                     // Update balance and NIN
-                    await supabaseAdmin
+                    const { error: balErr } = await supabaseAdmin
                         .from('profiles')
                         .update({
                             balance: newBal,
@@ -461,11 +461,11 @@ Deno.serve(async (req: Request) => {
                             full_name: verifiedData.fullName,
                             updated_at: new Date().toISOString()
                         })
-                        .eq('id', userId)
-                        .catch(console.warn);
+                        .eq('id', userId);
+                    if (balErr) console.warn('[Payvessel KYC] Profile balance/NIN update warning:', balErr);
 
                     // Record debit transaction in transactions table
-                    await supabaseAdmin
+                    const { error: txErr } = await supabaseAdmin
                         .from('transactions')
                         .insert({
                             user_id: userId,
@@ -476,24 +476,24 @@ Deno.serve(async (req: Request) => {
                             description: `Automated KYC Identity Verification Fee (NIN: ${cleanNin})`,
                             reference: `kyc_nin_${Date.now()}`,
                             created_at: new Date().toISOString()
-                        })
-                        .catch(console.warn);
+                        });
+                    if (txErr) console.warn('[Payvessel KYC] Transaction insert warning:', txErr);
 
                     verifiedData.feeDeducted = kycFee;
                     verifiedData.newBalance = newBal;
                 } else {
-                    await supabaseAdmin
+                    const { error: profErr } = await supabaseAdmin
                         .from('profiles')
                         .update({
                             nin: cleanNin,
                             full_name: verifiedData.fullName,
                             updated_at: new Date().toISOString()
                         })
-                        .eq('id', userId)
-                        .catch(console.warn);
+                        .eq('id', userId);
+                    if (profErr) console.warn('[Payvessel KYC] Profile NIN update warning:', profErr);
                 }
 
-                await supabaseAdmin
+                const { error: kycErr } = await supabaseAdmin
                     .from('kyc_requests')
                     .insert({
                         user_id: userId,
@@ -501,8 +501,8 @@ Deno.serve(async (req: Request) => {
                         document_number: cleanNin,
                         status: 'approved',
                         admin_note: `Automated Payvessel NIMC Identity Check Passed (Match: ${verifiedData.matchScore || 99}%). Verified Holder: ${verifiedData.fullName}${kycFeeEnabled && kycFee > 0 ? ` (Fee Debited: ₦${kycFee})` : ''}`,
-                    })
-                    .catch(console.warn);
+                    });
+                if (kycErr) console.warn('[Payvessel KYC] KYC request insert warning:', kycErr);
             }
 
             return jsonResponse({
@@ -743,7 +743,7 @@ Deno.serve(async (req: Request) => {
                 if (kycFeeEnabled && kycFee > 0) {
                     newBal = Math.max(0, currentUserBalance - kycFee);
 
-                    await supabaseAdmin
+                    const { error: balErr } = await supabaseAdmin
                         .from('profiles')
                         .update({
                             balance: newBal,
@@ -751,10 +751,10 @@ Deno.serve(async (req: Request) => {
                             kyc_tier: 2,
                             updated_at: new Date().toISOString()
                         })
-                        .eq('id', userId)
-                        .catch(console.warn);
+                        .eq('id', userId);
+                    if (balErr) console.warn('[Payvessel KYC] Profile balance/BVN update warning:', balErr);
 
-                    await supabaseAdmin
+                    const { error: txErr } = await supabaseAdmin
                         .from('transactions')
                         .insert({
                             user_id: userId,
@@ -765,24 +765,24 @@ Deno.serve(async (req: Request) => {
                             description: `Automated KYC Bank Identity Verification Fee (BVN: ${cleanBvn})`,
                             reference: `kyc_bvn_${Date.now()}`,
                             created_at: new Date().toISOString()
-                        })
-                        .catch(console.warn);
+                        });
+                    if (txErr) console.warn('[Payvessel KYC] Transaction insert warning:', txErr);
 
                     verifiedData.feeDeducted = kycFee;
                     verifiedData.newBalance = newBal;
                 } else {
-                    await supabaseAdmin
+                    const { error: profErr } = await supabaseAdmin
                         .from('profiles')
                         .update({
                             bvn: cleanBvn,
                             kyc_tier: 2,
                             updated_at: new Date().toISOString()
                         })
-                        .eq('id', userId)
-                        .catch(console.warn);
+                        .eq('id', userId);
+                    if (profErr) console.warn('[Payvessel KYC] Profile BVN update warning:', profErr);
                 }
 
-                await supabaseAdmin
+                const { error: kycErr } = await supabaseAdmin
                     .from('kyc_requests')
                     .insert({
                         user_id: userId,
@@ -790,8 +790,8 @@ Deno.serve(async (req: Request) => {
                         document_number: cleanBvn,
                         status: 'approved',
                         admin_note: `Automated Payvessel NIBSS Bank Identity Check Passed (Match: ${verifiedData.matchScore || 99}%). Tier-2 limits unlocked. Bank: ${verifiedData.bankName}${kycFeeEnabled && kycFee > 0 ? ` (Fee Debited: ₦${kycFee})` : ''}`,
-                    })
-                    .catch(console.warn);
+                    });
+                if (kycErr) console.warn('[Payvessel KYC] KYC request insert warning:', kycErr);
             }
 
             return jsonResponse({
