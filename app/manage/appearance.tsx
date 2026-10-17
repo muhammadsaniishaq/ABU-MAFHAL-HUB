@@ -170,13 +170,16 @@ export default function AppDesigner() {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setUploadingSlide(true);
         const image = result.assets[0];
-        const fileExt = (image.uri.split('.').pop() || 'jpg').split('?')[0];
+        const fileExt = (image.uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
         const fileName = `splash/slide_${Date.now()}.${fileExt}`;
+        const isGif = fileExt === 'gif' || (image.mimeType && image.mimeType.includes('gif'));
+        const isPng = fileExt === 'png' || (image.mimeType && image.mimeType.includes('png'));
+        const mimeType = isGif ? 'image/gif' : (isPng ? 'image/png' : 'image/jpeg');
         const uploadRes = await uploadMediaFile({
           uri: image.uri,
           bucket: 'banners',
           fileName,
-          mimeType: 'image/jpeg',
+          mimeType,
           base64: image.base64,
           isVideo: false,
         });
