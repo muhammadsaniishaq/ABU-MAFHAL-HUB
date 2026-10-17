@@ -98,7 +98,7 @@ async function parseInvokeResponse(res: { data: any; error: any }): Promise<{ da
     if (!errorMessage) {
       const raw = String(res.error.message || '');
       if (raw.toLowerCase().includes('non-2xx')) {
-        errorMessage = 'Sabar Payvessel ta dawo da kuskure (Gateway Status Error). Da fatan a sake gwadawa ko kuma a duba kudin walat a dashboard na Payvessel.';
+        errorMessage = 'Payvessel gateway returned an error. Please try again or verify gateway funding in Payvessel dashboard.';
       } else {
         errorMessage = raw || 'Could not communicate with Payvessel KYC service.';
       }
@@ -187,7 +187,7 @@ export const payvesselKYCService = {
       console.error('[Payvessel KYC Service] NIN verification error:', err);
       const raw = String(err?.message || '');
       const cleanMsg = raw.toLowerCase().includes('non-2xx')
-        ? 'Sabar Payvessel ta dawo da kuskure (Gateway Status Error). Da fatan a sake gwadawa ko kuma a duba kudin walat a dashboard na Payvessel.'
+        ? 'Payvessel gateway returned an error. Please try again or verify gateway funding in Payvessel dashboard.'
         : (raw || 'Network error reaching Payvessel KYC service. Please check your internet connection and try again.');
       return {
         success: false,
@@ -274,7 +274,7 @@ export const payvesselKYCService = {
       console.error('[Payvessel KYC Service] BVN verification error:', err);
       const raw = String(err?.message || '');
       const cleanMsg = raw.toLowerCase().includes('non-2xx')
-        ? 'Sabar Payvessel ta dawo da kuskure (Gateway Status Error). Da fatan a sake gwadawa ko kuma a duba kudin walat a dashboard na Payvessel.'
+        ? 'Payvessel gateway returned an error. Please try again or verify gateway funding in Payvessel dashboard.'
         : (raw || 'Network error reaching Payvessel BVN service. Please try again.');
       return {
         success: false,

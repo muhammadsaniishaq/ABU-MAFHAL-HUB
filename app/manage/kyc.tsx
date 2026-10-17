@@ -153,10 +153,10 @@ export default function KYCManagerScreen() {
             });
             setKycFee(feeToSave);
             setKycFeeInput(String(feeToSave));
-            showToast(`An sabunta farashin KYC zuwa ₦${feeToSave.toLocaleString()}! ✓`);
+            showToast(`KYC verification fee updated to ₦${feeToSave.toLocaleString()}! ✓`);
             Alert.alert(
-                "Farashin KYC Ya Sabunta 💰",
-                `An saita kuɗin KYC zuwa ₦${feeToSave.toLocaleString()} a nasarance.\n\nKudin Payvessel: ₦70\nRibar da ake samu: ₦${Math.max(0, feeToSave - 70)} a kowanne KYC.`
+                "KYC Fee Updated 💰",
+                `KYC verification fee successfully set to ₦${feeToSave.toLocaleString()}.\n\nPayvessel Cost: ₦70\nNet Margin: ₦${Math.max(0, feeToSave - 70)} per KYC.`
             );
         } catch (e: any) {
             Alert.alert("Setting Error", e.message || "Failed to update KYC fee");
@@ -173,7 +173,7 @@ export default function KYCManagerScreen() {
                 value: String(enabled),
                 updated_at: new Date().toISOString()
             });
-            showToast(enabled ? `An kunna kudin KYC (₦${kycFee})! 💰` : "An kashe kudin KYC (Kyauta ne yanzu)!");
+            showToast(enabled ? `KYC fee enabled (₦${kycFee})! 💰` : "KYC fee disabled (Free KYC now)!");
         } catch (e: any) {
             Alert.alert("Setting Error", e.message || "Failed to update setting");
         }
@@ -732,7 +732,7 @@ export default function KYCManagerScreen() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 <Ionicons name="cash-outline" size={13} color={L.gold} />
                                 <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>
-                                    KYC Verification Fee / Farashi
+                                    KYC Verification Fee Control
                                 </Text>
                             </View>
 
@@ -769,7 +769,7 @@ export default function KYCManagerScreen() {
                                     <Text style={{ color: '#94A3B8', fontSize: 8 }}>/ verification</Text>
                                 </View>
                                 <Text style={{ color: '#CBD5E1', fontSize: 7, marginTop: 1 }}>
-                                    Payvessel Kudin Su: <Text style={{ color: '#F87171', fontWeight: 'bold' }}>₦70</Text> • Ribar Mu: <Text style={{ color: L.emerald, fontWeight: 'bold' }}>₦{Math.max(0, (Number(kycFeeInput) || kycFee) - 70)}</Text>
+                                    Payvessel Cost: <Text style={{ color: '#F87171', fontWeight: 'bold' }}>₦70</Text> • Net Margin: <Text style={{ color: L.emerald, fontWeight: 'bold' }}>₦{Math.max(0, (Number(kycFeeInput) || kycFee) - 70)}</Text>
                                 </Text>
                             </View>
 
@@ -807,7 +807,7 @@ export default function KYCManagerScreen() {
                             {/* Preset Buttons */}
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, alignItems: 'center' }}>
                                 {[
-                                    { label: '₦0 (Kyauta)', val: 0 },
+                                    { label: '₦0 (Free)', val: 0 },
                                     { label: '₦100', val: 100 },
                                     { label: '₦150 (Standard)', val: 150 },
                                     { label: '₦200', val: 200 },
@@ -873,7 +873,7 @@ export default function KYCManagerScreen() {
                                     <>
                                         <Ionicons name="save-outline" size={10} color="#0F172A" />
                                         <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 8, textTransform: 'uppercase' }}>
-                                            Ajiye
+                                            Save Fee
                                         </Text>
                                     </>
                                 )}

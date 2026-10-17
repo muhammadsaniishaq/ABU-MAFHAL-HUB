@@ -98,9 +98,9 @@ export default function UserKYCScreen() {
   const [livenessAnalysisLog, setLivenessAnalysisLog] = useState<string>('');
 
   // Step 6: Residential Address
-  const [state, setState] = useState('Yobe');
-  const [lga, setLga] = useState('Gashua');
-  const [addressInput, setAddressInput] = useState('No. 12, Main Road, Gashua');
+  const [state, setState] = useState('Abuja');
+  const [lga, setLga] = useState('Municipal');
+  const [addressInput, setAddressInput] = useState('Plot 104, Central Business District, Abuja');
   const [useAddressForAll, setUseAddressForAll] = useState(true);
   const [showStateDropdown, setShowStateDropdown] = useState(false);
   const [showLgaDropdown, setShowLgaDropdown] = useState(false);
@@ -276,20 +276,34 @@ export default function UserKYCScreen() {
     setNinProviderError(false);
     const cleanNin = ninInput.replace(/\s+/g, '');
     if (!cleanNin || cleanNin.length !== 11 || !/^\d{11}$/.test(cleanNin)) {
-      const msg = 'Da fatan a shigar da lambar NIN mai lambobi 11 daidai (Please enter your valid 11-digit NIN).';
+      const msg = 'Please enter your valid 11-digit National Identity Number (NIN).';
       setNinError(msg);
       return Alert.alert('Invalid NIN', msg);
     }
 
-    // Pre-check: Verify User Wallet Balance
-    const userBal = Number(userProfile?.balance ?? userProfile?.credit_balance ?? 0);
+    // Pre-check: Fetch live wallet balance from Supabase
+    let userBal = Number(userProfile?.balance ?? 0);
+    try {
+      if (userProfile?.id) {
+        const { data: freshProf } = await supabase
+          .from('profiles')
+          .select('balance')
+          .eq('id', userProfile.id)
+          .maybeSingle();
+        if (freshProf && freshProf.balance !== undefined) {
+          userBal = Number(freshProf.balance) || 0;
+          setUserProfile((prev: any) => ({ ...prev, balance: userBal }));
+        }
+      }
+    } catch {}
+
     if (kycFeeEnabled && kycFee > 0 && userBal < kycFee) {
       return Alert.alert(
-        'Kudin Walat Bai Isa Ba (₦' + userBal.toLocaleString() + ')',
-        `Kudin walat ɗinka bai isa ba don biyan kuɗin tabbatar da KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`,
+        'Insufficient Wallet Balance (₦' + userBal.toLocaleString() + ')',
+        `Your wallet balance of ₦${userBal.toLocaleString()} is insufficient for the KYC verification fee of ₦${kycFee.toLocaleString()}. Please fund your wallet to continue.`,
         [
-          { text: 'Soke (Cancel)', style: 'cancel' },
-          { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Fund Wallet', onPress: () => router.push('/(app)/wallet') }
         ]
       );
     }
@@ -337,7 +351,7 @@ export default function UserKYCScreen() {
         }
 
         const feeNotice = (kycFeeEnabled && kycFee > 0)
-          ? `\n\n💰 Kuɗin KYC: An cire ₦${kycFee.toLocaleString()} daga walat ɗinka (Sauran kuɗi: ₦${newBal.toLocaleString()}).`
+          ? `\n\n💰 KYC Fee: ₦${kycFee.toLocaleString()} debited from your wallet (New balance: ₦${newBal.toLocaleString()}).`
           : '';
 
         Alert.alert(
@@ -357,11 +371,11 @@ export default function UserKYCScreen() {
 
         if (res.insufficientUserBalance) {
           Alert.alert(
-            'Kudin Walat Bai Isa Ba',
+            'Insufficient Wallet Balance',
             errorMsg,
             [
-              { text: 'Soke (Cancel)', style: 'cancel' },
-              { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Fund Wallet', onPress: () => router.push('/(app)/wallet') }
             ]
           );
         } else {
@@ -385,20 +399,34 @@ export default function UserKYCScreen() {
     setBvnProviderError(false);
     const cleanBvn = bvnInput.replace(/\s+/g, '');
     if (!cleanBvn || cleanBvn.length !== 11 || !/^\d{11}$/.test(cleanBvn)) {
-      const msg = 'Da fatan a shigar da lambar BVN mai lambobi 11 daidai (Please enter your valid 11-digit BVN).';
+      const msg = 'Please enter your valid 11-digit Bank Verification Number (BVN).';
       setBvnError(msg);
       return Alert.alert('Invalid BVN', msg);
     }
 
-    // Pre-check: Verify User Wallet Balance
-    const userBal = Number(userProfile?.balance ?? userProfile?.credit_balance ?? 0);
+    // Pre-check: Fetch live wallet balance from Supabase
+    let userBal = Number(userProfile?.balance ?? 0);
+    try {
+      if (userProfile?.id) {
+        const { data: freshProf } = await supabase
+          .from('profiles')
+          .select('balance')
+          .eq('id', userProfile.id)
+          .maybeSingle();
+        if (freshProf && freshProf.balance !== undefined) {
+          userBal = Number(freshProf.balance) || 0;
+          setUserProfile((prev: any) => ({ ...prev, balance: userBal }));
+        }
+      }
+    } catch {}
+
     if (kycFeeEnabled && kycFee > 0 && userBal < kycFee) {
       return Alert.alert(
-        'Kudin Walat Bai Isa Ba (₦' + userBal.toLocaleString() + ')',
-        `Kudin walat ɗinka bai isa ba don biyan kuɗin tabbatar da KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`,
+        'Insufficient Wallet Balance (₦' + userBal.toLocaleString() + ')',
+        `Your wallet balance of ₦${userBal.toLocaleString()} is insufficient for the KYC verification fee of ₦${kycFee.toLocaleString()}. Please fund your wallet to continue.`,
         [
-          { text: 'Soke (Cancel)', style: 'cancel' },
-          { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Fund Wallet', onPress: () => router.push('/(app)/wallet') }
         ]
       );
     }
@@ -445,7 +473,7 @@ export default function UserKYCScreen() {
         }
 
         const feeNotice = (kycFeeEnabled && kycFee > 0)
-          ? `\n\n💰 Kuɗin KYC: An cire ₦${kycFee.toLocaleString()} daga walat ɗinka (Sauran kuɗi: ₦${newBal.toLocaleString()}).`
+          ? `\n\n💰 KYC Fee: ₦${kycFee.toLocaleString()} debited from your wallet (New balance: ₦${newBal.toLocaleString()}).`
           : '';
 
         Alert.alert(
@@ -465,11 +493,11 @@ export default function UserKYCScreen() {
 
         if (res.insufficientUserBalance) {
           Alert.alert(
-            'Kudin Walat Bai Isa Ba',
+            'Insufficient Wallet Balance',
             errorMsg,
             [
-              { text: 'Soke (Cancel)', style: 'cancel' },
-              { text: 'Sanya Kuɗi (Fund Wallet)', onPress: () => router.push('/(app)/wallet') }
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Fund Wallet', onPress: () => router.push('/(app)/wallet') }
             ]
           );
         } else {
@@ -936,7 +964,7 @@ export default function UserKYCScreen() {
                             <Ionicons name="cash" size={15} color="#D97706" />
                           </View>
                           <Text style={{ fontSize: 13, fontWeight: '900', color: '#92400E' }}>
-                            Kuɗin Tabbatarwa: ₦{kycFee.toLocaleString()}
+                            Verification Fee: ₦{kycFee.toLocaleString()}
                           </Text>
                         </View>
                         <View style={{
@@ -948,13 +976,13 @@ export default function UserKYCScreen() {
                           borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#86EFAC' : '#FCA5A5'
                         }}>
                           <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#15803D' : '#DC2626' }}>
-                            Walat: ₦{Number(userProfile?.balance || 0).toLocaleString()}
+                            Wallet: ₦{Number(userProfile?.balance || 0).toLocaleString()}
                           </Text>
                         </View>
                       </View>
 
                       <Text style={{ fontSize: 11, color: '#B45309', lineHeight: 16 }}>
-                        Za a cire ₦{kycFee.toLocaleString()} daga walat ɗinka idan an tabbatar da NIN ɗinka da nasara ta hanyar NIMC.
+                        A verification fee of ₦{kycFee.toLocaleString()} will be debited from your wallet upon successful NIMC verification.
                       </Text>
 
                       {Number(userProfile?.balance || 0) < kycFee && (
@@ -974,7 +1002,7 @@ export default function UserKYCScreen() {
                         >
                           <Ionicons name="wallet-outline" size={14} color="#FFFFFF" />
                           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>
-                            Kudin Walat Bai Isa Ba — Sanya Kuɗi (Fund Wallet)
+                            Insufficient Wallet Balance — Fund Wallet
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -1015,7 +1043,7 @@ export default function UserKYCScreen() {
                         <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8, marginTop: 2 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={s.errorBannerTitle}>
-                            {ninProviderError ? 'Sabar NIMC na Fuskantar Jinkiri' : 'Kuskuren NIN'}
+                            {ninProviderError ? 'NIMC Service Delay' : 'NIN Verification Error'}
                           </Text>
                           <Text style={s.errorBannerTxt}>{ninError}</Text>
                         </View>
@@ -1029,7 +1057,7 @@ export default function UserKYCScreen() {
                           activeOpacity={0.8}
                         >
                           <Ionicons name="refresh" size={13} color={C.navy} style={{ marginRight: 5 }} />
-                          <Text style={s.errorRetryBtnTxt}>Sake Gwada NIN</Text>
+                          <Text style={s.errorRetryBtnTxt}>Retry NIN</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
@@ -1042,7 +1070,7 @@ export default function UserKYCScreen() {
                           }}
                           activeOpacity={0.8}
                         >
-                          <Text style={s.errorBypassBtnTxt}>Ci gaba da BVN →</Text>
+                          <Text style={s.errorBypassBtnTxt}>Continue to BVN →</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1192,7 +1220,7 @@ export default function UserKYCScreen() {
                             <Ionicons name="cash" size={15} color="#D97706" />
                           </View>
                           <Text style={{ fontSize: 13, fontWeight: '900', color: '#92400E' }}>
-                            Kuɗin Tabbatarwa: ₦{kycFee.toLocaleString()}
+                            Verification Fee: ₦{kycFee.toLocaleString()}
                           </Text>
                         </View>
                         <View style={{
@@ -1204,13 +1232,13 @@ export default function UserKYCScreen() {
                           borderColor: (Number(userProfile?.balance || 0) >= kycFee) ? '#86EFAC' : '#FCA5A5'
                         }}>
                           <Text style={{ fontSize: 11, fontWeight: '800', color: (Number(userProfile?.balance || 0) >= kycFee) ? '#15803D' : '#DC2626' }}>
-                            Walat: ₦{Number(userProfile?.balance || 0).toLocaleString()}
+                            Wallet: ₦{Number(userProfile?.balance || 0).toLocaleString()}
                           </Text>
                         </View>
                       </View>
 
                       <Text style={{ fontSize: 11, color: '#B45309', lineHeight: 16 }}>
-                        Za a cire ₦{kycFee.toLocaleString()} daga walat ɗinka idan an tabbatar da BVN ɗinka da nasara ta hanyar NIBSS.
+                        A verification fee of ₦{kycFee.toLocaleString()} will be debited from your wallet upon successful NIBSS verification.
                       </Text>
 
                       {Number(userProfile?.balance || 0) < kycFee && (
@@ -1230,7 +1258,7 @@ export default function UserKYCScreen() {
                         >
                           <Ionicons name="wallet-outline" size={14} color="#FFFFFF" />
                           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>
-                            Kudin Walat Bai Isa Ba — Sanya Kuɗi (Fund Wallet)
+                            Insufficient Wallet Balance — Fund Wallet
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -1271,7 +1299,7 @@ export default function UserKYCScreen() {
                         <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8, marginTop: 2 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={s.errorBannerTitle}>
-                            {bvnProviderError ? 'Sabar NIBSS na Fuskantar Jinkiri' : 'Kuskuren BVN'}
+                            {bvnProviderError ? 'NIBSS Service Delay' : 'BVN Verification Error'}
                           </Text>
                           <Text style={s.errorBannerTxt}>{bvnError}</Text>
                         </View>
@@ -1285,7 +1313,7 @@ export default function UserKYCScreen() {
                           activeOpacity={0.8}
                         >
                           <Ionicons name="refresh" size={13} color={C.navy} style={{ marginRight: 5 }} />
-                          <Text style={s.errorRetryBtnTxt}>Sake Gwada BVN</Text>
+                          <Text style={s.errorRetryBtnTxt}>Retry BVN</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
@@ -1298,7 +1326,7 @@ export default function UserKYCScreen() {
                           }}
                           activeOpacity={0.8}
                         >
-                          <Text style={s.errorBypassBtnTxt}>Ci gaba da ID Card →</Text>
+                          <Text style={s.errorBypassBtnTxt}>Continue to ID Upload →</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1710,7 +1738,7 @@ export default function UserKYCScreen() {
                   <Ionicons name="home-outline" size={18} color={C.textSub} style={{ marginRight: 10 }} />
                   <TextInput
                     style={s.textInputField}
-                    placeholder="No. 12, Main Road, Gashua"
+                    placeholder="Plot 104, Central Business District, Abuja"
                     placeholderTextColor={C.textMuted}
                     value={addressInput}
                     onChangeText={setAddressInput}

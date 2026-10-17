@@ -240,11 +240,11 @@ Deno.serve(async (req: Request) => {
             if (userId && kycFeeEnabled && kycFee > 0) {
                 const { data: userProf } = await supabaseAdmin
                     .from('profiles')
-                    .select('id, balance, credit_balance, full_name')
+                    .select('id, balance, full_name')
                     .eq('id', userId)
                     .maybeSingle();
 
-                currentUserBalance = Number(userProf?.balance ?? userProf?.credit_balance ?? 0);
+                currentUserBalance = Number(userProf?.balance ?? 0);
                 if (currentUserBalance < kycFee) {
                     console.warn(`[Payvessel KYC] User ${userId} insufficient balance: ₦${currentUserBalance} < ₦${kycFee}`);
                     return jsonResponse({
@@ -254,7 +254,7 @@ Deno.serve(async (req: Request) => {
                         requiredFee: kycFee,
                         currentBalance: currentUserBalance,
                         provider: 'Payvessel NIMC Gateway',
-                        message: `Kudin walat ɗinka (₦${currentUserBalance.toLocaleString()}) bai isa ba don biyan kuɗin KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`
+                        message: `Insufficient wallet balance (₦${currentUserBalance.toLocaleString()}) for the required KYC verification fee of ₦${kycFee.toLocaleString()}. Please fund your wallet to continue.`
                     });
                 }
             }
@@ -431,9 +431,9 @@ Deno.serve(async (req: Request) => {
 
                 let displayMessage = lastErrorMessage || 'NIN verification failed. Please verify that your 11-digit NIN and date of birth match your NIMC record.';
                 if (isInsufficientBalance) {
-                    displayMessage = `Kudin walat na asusun Payvessel bai isa ba (Payvessel Insufficient Balance): ${lastErrorMessage}. Ana buƙatar sanya kuɗi a dashboard na Payvessel.`;
+                    displayMessage = `Provider gateway balance is low (${lastErrorMessage}). Merchant account funding is required on Payvessel.`;
                 } else if (isProviderDowntime) {
-                    displayMessage = 'Sabar NIMC/Payvessel na fuskantar jinkiri a yanzu (Provider Timeout). Kuskuren ba daga NIN dinka bane. Zaka iya sake gwadawa ko kuma ka ci gaba da BVN.';
+                    displayMessage = 'NIMC / Payvessel service is experiencing temporary network delays. Your NIN is valid. Please try again or proceed with BVN.';
                 }
 
                 return jsonResponse({
@@ -453,7 +453,7 @@ Deno.serve(async (req: Request) => {
                     newBal = Math.max(0, currentUserBalance - kycFee);
 
                     // Update balance and NIN
-                    const { error: balErr } = await supabaseAdmin
+                    await supabaseAdmin
                         .from('profiles')
                         .update({
                             balance: newBal,
@@ -461,20 +461,8 @@ Deno.serve(async (req: Request) => {
                             full_name: verifiedData.fullName,
                             updated_at: new Date().toISOString()
                         })
-                        .eq('id', userId);
-
-                    if (balErr) {
-                        await supabaseAdmin
-                            .from('profiles')
-                            .update({
-                                credit_balance: newBal,
-                                nin: cleanNin,
-                                full_name: verifiedData.fullName,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', userId)
-                            .catch(console.warn);
-                    }
+                        .eq('id', userId)
+                        .catch(console.warn);
 
                     // Record debit transaction in transactions table
                     await supabaseAdmin
@@ -547,11 +535,11 @@ Deno.serve(async (req: Request) => {
             if (userId && kycFeeEnabled && kycFee > 0) {
                 const { data: userProf } = await supabaseAdmin
                     .from('profiles')
-                    .select('id, balance, credit_balance, full_name')
+                    .select('id, balance, full_name')
                     .eq('id', userId)
                     .maybeSingle();
 
-                currentUserBalance = Number(userProf?.balance ?? userProf?.credit_balance ?? 0);
+                currentUserBalance = Number(userProf?.balance ?? 0);
                 if (currentUserBalance < kycFee) {
                     console.warn(`[Payvessel KYC] User ${userId} insufficient balance: ₦${currentUserBalance} < ₦${kycFee}`);
                     return jsonResponse({
@@ -561,7 +549,7 @@ Deno.serve(async (req: Request) => {
                         requiredFee: kycFee,
                         currentBalance: currentUserBalance,
                         provider: 'Payvessel NIBSS Gateway',
-                        message: `Kudin walat ɗinka (₦${currentUserBalance.toLocaleString()}) bai isa ba don biyan kuɗin KYC na ₦${kycFee.toLocaleString()}. Da fatan a saka kuɗi a walat ɗinka domin ci gaba.`
+                        message: `Insufficient wallet balance (₦${currentUserBalance.toLocaleString()}) for the required KYC verification fee of ₦${kycFee.toLocaleString()}. Please fund your wallet to continue.`
                     });
                 }
             }
@@ -734,9 +722,9 @@ Deno.serve(async (req: Request) => {
 
                 let displayMessage = lastErrorMessage || 'BVN verification failed. Please ensure the 11-digit BVN is correct and active.';
                 if (isInsufficientBalance) {
-                    displayMessage = `Kudin walat na asusun Payvessel bai isa ba (Payvessel Insufficient Balance): ${lastErrorMessage}. Ana buƙatar sanya kuɗi a dashboard na Payvessel.`;
+                    displayMessage = `Provider gateway balance is low (${lastErrorMessage}). Merchant account funding is required on Payvessel.`;
                 } else if (isProviderDowntime) {
-                    displayMessage = 'Sabar NIBSS/Payvessel na fuskantar jinkiri a yanzu (Provider Timeout). Kuskuren ba daga BVN dinka bane. Zaka iya sake gwadawa ko kuma ka ci gaba da shigar da ID Card.';
+                    displayMessage = 'NIBSS / Payvessel service is experiencing temporary network delays. Your BVN is valid. Please try again or proceed with ID upload.';
                 }
 
                 return jsonResponse({
@@ -755,7 +743,7 @@ Deno.serve(async (req: Request) => {
                 if (kycFeeEnabled && kycFee > 0) {
                     newBal = Math.max(0, currentUserBalance - kycFee);
 
-                    const { error: balErr } = await supabaseAdmin
+                    await supabaseAdmin
                         .from('profiles')
                         .update({
                             balance: newBal,
@@ -763,20 +751,8 @@ Deno.serve(async (req: Request) => {
                             kyc_tier: 2,
                             updated_at: new Date().toISOString()
                         })
-                        .eq('id', userId);
-
-                    if (balErr) {
-                        await supabaseAdmin
-                            .from('profiles')
-                            .update({
-                                credit_balance: newBal,
-                                bvn: cleanBvn,
-                                kyc_tier: 2,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', userId)
-                            .catch(console.warn);
-                    }
+                        .eq('id', userId)
+                        .catch(console.warn);
 
                     await supabaseAdmin
                         .from('transactions')
