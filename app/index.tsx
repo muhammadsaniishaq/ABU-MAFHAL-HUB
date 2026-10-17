@@ -29,7 +29,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
-type LuxuryTheme = 'pearl' | 'champagne';
+// 4 Elite Luxury Themes: Pearl, Champagne, Sapphire, Emerald
+export type LuxuryTheme = 'pearl' | 'champagne' | 'sapphire' | 'emerald';
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -142,8 +143,8 @@ export default function SplashScreen() {
   const loadSavedTheme = async () => {
     try {
       const saved = await AsyncStorage.getItem('app_splash_luxury_theme');
-      if (saved === 'pearl' || saved === 'champagne') {
-        setTheme(saved);
+      if (saved && ['pearl', 'champagne', 'sapphire', 'emerald'].includes(saved)) {
+        setTheme(saved as LuxuryTheme);
       }
     } catch (e) {
       console.log('Theme load notice:', e);
@@ -152,7 +153,9 @@ export default function SplashScreen() {
 
   const toggleTheme = async () => {
     haptic();
-    const nextTheme: LuxuryTheme = theme === 'pearl' ? 'champagne' : 'pearl';
+    const themeCycle: LuxuryTheme[] = ['pearl', 'champagne', 'sapphire', 'emerald'];
+    const currentIdx = themeCycle.indexOf(theme);
+    const nextTheme = themeCycle[(currentIdx + 1) % themeCycle.length];
     setTheme(nextTheme);
     try {
       await AsyncStorage.setItem('app_splash_luxury_theme', nextTheme);
@@ -314,7 +317,6 @@ export default function SplashScreen() {
   };
 
   // HIGH-PERFORMANCE TOUCH SWIPE HANDLERS (IDAN AN JA GEFE)
-  // Works flawlessly on Android, iOS, and Web touch/mouse!
   const onTouchStartCapture = (e: any) => {
     const pageX = e.nativeEvent?.pageX ?? e.nativeEvent?.clientX ?? 0;
     const pageY = e.nativeEvent?.pageY ?? e.nativeEvent?.clientY ?? 0;
@@ -346,10 +348,8 @@ export default function SplashScreen() {
     // Responsive swipe threshold (32px)
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 32) {
       if (dx < 0 && pageIdx < 2) {
-        // Swiped Left -> Next
         nextSlide();
       } else if (dx > 0 && pageIdx > 0) {
-        // Swiped Right -> Previous
         prevSlide();
       } else {
         slideTranslateX.value = withSpring(0, { damping: 18, stiffness: 200 });
@@ -359,67 +359,135 @@ export default function SplashScreen() {
     }
   };
 
-  // LUXURY THEME PALETTES (100% BRIGHT & RADIANT)
-  const isPearl = theme === 'pearl';
-  const colors = isPearl
-    ? {
-        bgGradient: ['#FFFFFF', '#FDFBF7', '#F5EFE6'] as const,
-        primaryText: '#0D1B3E',
-        secondaryText: '#64748B',
-        accentGold: '#D97706',
-        accentGoldDark: '#B45309',
-        cardBg: 'rgba(255, 255, 255, 0.90)',
-        cardBorder: 'rgba(217, 119, 6, 0.32)',
-        cardShadow: '#D97706',
-        navBtnBg: 'rgba(255, 255, 255, 0.95)',
-        navBtnBorder: '#E2E8F0',
-        badgeBg: 'rgba(217, 119, 6, 0.1)',
-        badgeBorder: 'rgba(217, 119, 6, 0.3)',
-        badgeText: '#B45309',
-        primaryBtnBg: ['#0D1B3E', '#060B18'] as const,
-        primaryBtnText: '#F59E0B',
-        secondaryBtnBg: '#FFFFFF',
-        secondaryBtnBorder: '#E2E8F0',
-        secondaryBtnText: '#0D1B3E',
-        dotInactive: '#CBD5E1',
-        dotActive: '#D97706',
-        themeSwitchLabel: 'Champagne',
-        themeSwitchIcon: 'color-palette-outline' as const,
-      }
-    : {
-        bgGradient: ['#FFFDF9', '#FAF2E4', '#F0E2C8'] as const,
-        primaryText: '#0A142F',
-        secondaryText: '#57534E',
-        accentGold: '#B45309',
-        accentGoldDark: '#92400E',
-        cardBg: 'rgba(255, 255, 255, 0.92)',
-        cardBorder: 'rgba(180, 83, 9, 0.35)',
-        cardShadow: '#B45309',
-        navBtnBg: 'rgba(255, 255, 255, 0.95)',
-        navBtnBorder: '#E7DEC8',
-        badgeBg: 'rgba(180, 83, 9, 0.12)',
-        badgeBorder: 'rgba(180, 83, 9, 0.32)',
-        badgeText: '#92400E',
-        primaryBtnBg: ['#1E1B4B', '#0D1B3E'] as const,
-        primaryBtnText: '#FBBF24',
-        secondaryBtnBg: '#FFFFFF',
-        secondaryBtnBorder: '#E5D8BC',
-        secondaryBtnText: '#0A142F',
-        dotInactive: '#D6C7A8',
-        dotActive: '#B45309',
-        themeSwitchLabel: 'Pearl',
-        themeSwitchIcon: 'sparkles-outline' as const,
-      };
+  // ── 4 ELITE LUXURY THEME PALETTES ──
+  const getThemePalette = () => {
+    switch (theme) {
+      case 'champagne':
+        return {
+          bgGradient: ['#FFFDF9', '#FAF2E4', '#F0E2C8'] as const,
+          primaryText: '#0A142F',
+          secondaryText: '#57534E',
+          accentGold: '#B45309',
+          accentGoldDark: '#92400E',
+          cardBg: 'rgba(255, 255, 255, 0.92)',
+          cardBorder: 'rgba(180, 83, 9, 0.35)',
+          cardShadow: '#B45309',
+          navBtnBg: 'rgba(255, 255, 255, 0.95)',
+          navBtnBorder: '#E7DEC8',
+          badgeBg: 'rgba(180, 83, 9, 0.12)',
+          badgeBorder: 'rgba(180, 83, 9, 0.32)',
+          badgeText: '#92400E',
+          primaryBtnBg: ['#1E1B4B', '#0D1B3E'] as const,
+          primaryBtnText: '#FBBF24',
+          secondaryBtnBg: '#FFFFFF',
+          secondaryBtnBorder: '#E5D8BC',
+          secondaryBtnText: '#0A142F',
+          dotInactive: '#D6C7A8',
+          dotActive: '#B45309',
+          haloBg: 'rgba(253, 230, 138, 0.75)',
+          themeSwitchLabel: 'Champagne',
+          themeSwitchIcon: 'color-palette-outline' as const,
+          isDark: false,
+        };
+
+      case 'sapphire':
+        return {
+          bgGradient: ['#070D1E', '#0B1736', '#030712'] as const,
+          primaryText: '#FFFFFF',
+          secondaryText: '#94A3B8',
+          accentGold: '#38BDF8',
+          accentGoldDark: '#0284C7',
+          cardBg: 'rgba(11, 23, 54, 0.85)',
+          cardBorder: 'rgba(56, 189, 248, 0.35)',
+          cardShadow: '#0284C7',
+          navBtnBg: 'rgba(15, 27, 60, 0.9)',
+          navBtnBorder: '#1E293B',
+          badgeBg: 'rgba(56, 189, 248, 0.15)',
+          badgeBorder: 'rgba(56, 189, 248, 0.4)',
+          badgeText: '#38BDF8',
+          primaryBtnBg: ['#0284C7', '#0369A1'] as const,
+          primaryBtnText: '#FFFFFF',
+          secondaryBtnBg: 'rgba(15, 23, 42, 0.85)',
+          secondaryBtnBorder: '#334155',
+          secondaryBtnText: '#E2E8F0',
+          dotInactive: '#1E293B',
+          dotActive: '#38BDF8',
+          haloBg: 'rgba(56, 189, 248, 0.3)',
+          themeSwitchLabel: 'Sapphire',
+          themeSwitchIcon: 'moon-outline' as const,
+          isDark: true,
+        };
+
+      case 'emerald':
+        return {
+          bgGradient: ['#04140E', '#08251B', '#020B08'] as const,
+          primaryText: '#FFFFFF',
+          secondaryText: '#A7F3D0',
+          accentGold: '#F59E0B',
+          accentGoldDark: '#D97706',
+          cardBg: 'rgba(6, 30, 22, 0.85)',
+          cardBorder: 'rgba(245, 158, 11, 0.35)',
+          cardShadow: '#D97706',
+          navBtnBg: 'rgba(8, 37, 27, 0.9)',
+          navBtnBorder: '#064E3B',
+          badgeBg: 'rgba(245, 158, 11, 0.15)',
+          badgeBorder: 'rgba(245, 158, 11, 0.4)',
+          badgeText: '#FBBF24',
+          primaryBtnBg: ['#F59E0B', '#D97706'] as const,
+          primaryBtnText: '#0F172A',
+          secondaryBtnBg: 'rgba(6, 30, 22, 0.88)',
+          secondaryBtnBorder: 'rgba(245, 158, 11, 0.3)',
+          secondaryBtnText: '#FDE68A',
+          dotInactive: '#064E3B',
+          dotActive: '#F59E0B',
+          haloBg: 'rgba(245, 158, 11, 0.35)',
+          themeSwitchLabel: 'Emerald',
+          themeSwitchIcon: 'diamond-outline' as const,
+          isDark: true,
+        };
+
+      case 'pearl':
+      default:
+        return {
+          bgGradient: ['#FFFFFF', '#FDFBF7', '#F5EFE6'] as const,
+          primaryText: '#0D1B3E',
+          secondaryText: '#64748B',
+          accentGold: '#D97706',
+          accentGoldDark: '#B45309',
+          cardBg: 'rgba(255, 255, 255, 0.90)',
+          cardBorder: 'rgba(217, 119, 6, 0.32)',
+          cardShadow: '#D97706',
+          navBtnBg: 'rgba(255, 255, 255, 0.95)',
+          navBtnBorder: '#E2E8F0',
+          badgeBg: 'rgba(217, 119, 6, 0.1)',
+          badgeBorder: 'rgba(217, 119, 6, 0.3)',
+          badgeText: '#B45309',
+          primaryBtnBg: ['#0D1B3E', '#060B18'] as const,
+          primaryBtnText: '#F59E0B',
+          secondaryBtnBg: '#FFFFFF',
+          secondaryBtnBorder: '#E2E8F0',
+          secondaryBtnText: '#0D1B3E',
+          dotInactive: '#CBD5E1',
+          dotActive: '#D97706',
+          haloBg: 'rgba(254, 243, 199, 0.75)',
+          themeSwitchLabel: 'Pearl',
+          themeSwitchIcon: 'sparkles-outline' as const,
+          isDark: false,
+        };
+    }
+  };
+
+  const colors = getThemePalette();
 
   return (
     <LinearGradient colors={colors.bgGradient} style={styles.screenBg}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* Ambient background glowing orbs */}
       <View style={styles.bgDecorationsHolder} pointerEvents="none">
-        <View style={[styles.ambientOrbTop, { backgroundColor: isPearl ? '#FEF3C7' : '#FDE68A' }]} />
-        <View style={[styles.ambientOrbBottom, { backgroundColor: isPearl ? '#F5EFE6' : '#F3E8D8' }]} />
-        <View style={styles.constellationRing} />
+        <View style={[styles.ambientOrbTop, { backgroundColor: colors.haloBg }]} />
+        <View style={[styles.ambientOrbBottom, { backgroundColor: colors.haloBg }]} />
+        <View style={[styles.constellationRing, { borderColor: colors.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(217, 119, 6, 0.08)' }]} />
       </View>
 
       <View
@@ -470,7 +538,7 @@ export default function SplashScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Right Action Group: Theme Switcher & Skip Button */}
+          {/* Right Action Group: Multi-Theme Switcher & Skip Button */}
           <View style={styles.topRightActions}>
             <TouchableOpacity
               onPress={toggleTheme}
@@ -503,11 +571,11 @@ export default function SplashScreen() {
           </View>
         </View>
 
-        {/* ── LUXURY BRAND CREST (PRESERVES VERTICAL ROOM) ── */}
+        {/* ── LUXURY BRAND CREST (LARGE & BEAUTIFUL AS REQUESTED) ── */}
         <View style={styles.brandHeader}>
           <Animated.View style={[styles.logoHaloGlow, pulseAnimStyle]}>
-            <View style={styles.logoOuterHalo}>
-              <View style={styles.logoRingWrapper}>
+            <View style={[styles.logoOuterHalo, { borderColor: colors.accentGold }]}>
+              <View style={[styles.logoRingWrapper, { backgroundColor: colors.isDark ? '#0F172A' : '#FFFFFF' }]}>
                 <Image
                   source={
                     adminLogoUrl
@@ -533,6 +601,14 @@ export default function SplashScreen() {
             <Text style={[styles.subText, { color: colors.accentGold }]}>S U B</Text>
             <Text style={[styles.subDiamond, { color: colors.accentGold }]}>◆</Text>
             <View style={[styles.subLine, { backgroundColor: colors.accentGold }]} />
+          </View>
+
+          {/* ── FUTURISTIC DECORATION FEATURE: LIVE RADAR SETTLEMENT TICKER ── */}
+          <View style={[styles.radarTickerBar, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            <View style={styles.liveGreenBeacon} />
+            <Text style={[styles.radarTickerText, { color: colors.primaryText }]}>
+              ⚡ Instant 0.1s VTU • ₦ NGN ⇄ $ USD • 99.9% Uptime
+            </Text>
           </View>
         </View>
 
@@ -560,8 +636,8 @@ export default function SplashScreen() {
                 {/* Floating Left Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipLeft, floatAnimStyle]}>
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
-                    style={styles.orbitalChipGrad}
+                    colors={colors.isDark ? ['rgba(15,23,42,0.95)', 'rgba(30,41,59,0.9)'] : ['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
+                    style={[styles.orbitalChipGrad, { borderColor: colors.cardBorder }]}
                   >
                     <Ionicons name="flash" size={11} color={colors.accentGold} />
                     <Text style={[styles.orbitalChipTxt, { color: colors.primaryText }]}>
@@ -573,8 +649,8 @@ export default function SplashScreen() {
                 {/* Floating Right Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipRight, floatReverseAnimStyle]}>
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
-                    style={styles.orbitalChipGrad}
+                    colors={colors.isDark ? ['rgba(15,23,42,0.95)', 'rgba(30,41,59,0.9)'] : ['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
+                    style={[styles.orbitalChipGrad, { borderColor: colors.cardBorder }]}
                   >
                     <Ionicons name="globe-outline" size={11} color={colors.accentGold} />
                     <Text style={[styles.orbitalChipTxt, { color: colors.primaryText }]}>
@@ -596,11 +672,11 @@ export default function SplashScreen() {
                     ]}
                   >
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={60} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
                     ) : null}
 
                     <LinearGradient
-                      colors={['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
+                      colors={colors.isDark ? ['rgba(15,23,42,0.6)', 'rgba(30,41,59,0.4)', 'rgba(15,23,42,0.6)'] : ['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
                       style={StyleSheet.absoluteFill}
                     />
 
@@ -608,11 +684,7 @@ export default function SplashScreen() {
                     <View
                       style={[
                         styles.heroAmbientHalo,
-                        {
-                          backgroundColor: isPearl
-                            ? 'rgba(254, 243, 199, 0.75)'
-                            : 'rgba(253, 230, 138, 0.75)',
-                        },
+                        { backgroundColor: colors.haloBg },
                       ]}
                     />
 
@@ -627,28 +699,28 @@ export default function SplashScreen() {
                       resizeMode="contain"
                     />
 
-                    {/* 4-Directional Feathered Blur Vignettes to Melt Dark/Square Edges */}
+                    {/* 4-Directional Feathered Blur Vignettes to Melt Dark/Square Edges into Theme */}
                     <LinearGradient
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.4)', 'transparent']}
+                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.2)', 'transparent']}
                       style={styles.vignetteTop}
                       pointerEvents="none"
                     />
                     <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.4)', colors.bgGradient[1]]}
+                      colors={['transparent', 'rgba(255,255,255,0.2)', colors.bgGradient[1]]}
                       style={styles.vignetteBottom}
                       pointerEvents="none"
                     />
                     <LinearGradient
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.3)', 'transparent']}
+                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.15)', 'transparent']}
                       style={styles.vignetteLeft}
                       pointerEvents="none"
                     />
                     <LinearGradient
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      colors={['transparent', 'rgba(255,255,255,0.3)', colors.bgGradient[0]]}
+                      colors={['transparent', 'rgba(255,255,255,0.15)', colors.bgGradient[0]]}
                       style={styles.vignetteRight}
                       pointerEvents="none"
                     />
@@ -658,9 +730,9 @@ export default function SplashScreen() {
                     <View style={[styles.cornerStarBottomRight, { borderColor: colors.accentGold }]} />
 
                     {/* Bottom Ticker Pill Inside Card */}
-                    <View style={styles.cardStatusTicker}>
+                    <View style={[styles.cardStatusTicker, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                       <View style={styles.greenPulseDot} />
-                      <Text style={styles.cardStatusTickerTxt}>
+                      <Text style={[styles.cardStatusTickerTxt, { color: colors.primaryText }]}>
                         Instant Global & Local Payments
                       </Text>
                     </View>
@@ -679,15 +751,15 @@ export default function SplashScreen() {
 
                 {/* 3 Refined Value Chips */}
                 <View style={styles.featureChipsRow}>
-                  <View style={styles.chipItem}>
+                  <View style={[styles.chipItem, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="flash" size={12} color={colors.accentGold} />
                     <Text style={[styles.chipTxt, { color: colors.primaryText }]}>Sub-second VTU</Text>
                   </View>
-                  <View style={styles.chipItem}>
+                  <View style={[styles.chipItem, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="card" size={12} color={colors.accentGold} />
                     <Text style={[styles.chipTxt, { color: colors.primaryText }]}>Virtual USD</Text>
                   </View>
-                  <View style={styles.chipItem}>
+                  <View style={[styles.chipItem, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="shield-checkmark" size={12} color={colors.accentGold} />
                     <Text style={[styles.chipTxt, { color: colors.primaryText }]}>Bank-Grade</Text>
                   </View>
@@ -736,8 +808,8 @@ export default function SplashScreen() {
                 {/* Floating Left Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipLeft, floatAnimStyle]}>
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
-                    style={styles.orbitalChipGrad}
+                    colors={colors.isDark ? ['rgba(15,23,42,0.95)', 'rgba(30,41,59,0.9)'] : ['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
+                    style={[styles.orbitalChipGrad, { borderColor: colors.cardBorder }]}
                   >
                     <Ionicons name="wifi" size={11} color={colors.accentGold} />
                     <Text style={[styles.orbitalChipTxt, { color: colors.primaryText }]}>
@@ -749,8 +821,8 @@ export default function SplashScreen() {
                 {/* Floating Right Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipRight, floatReverseAnimStyle]}>
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
-                    style={styles.orbitalChipGrad}
+                    colors={colors.isDark ? ['rgba(15,23,42,0.95)', 'rgba(30,41,59,0.9)'] : ['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
+                    style={[styles.orbitalChipGrad, { borderColor: colors.cardBorder }]}
                   >
                     <Ionicons name="bulb-outline" size={11} color={colors.accentGold} />
                     <Text style={[styles.orbitalChipTxt, { color: colors.primaryText }]}>
@@ -771,11 +843,11 @@ export default function SplashScreen() {
                     ]}
                   >
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={60} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
                     ) : null}
 
                     <LinearGradient
-                      colors={['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
+                      colors={colors.isDark ? ['rgba(15,23,42,0.6)', 'rgba(30,41,59,0.4)', 'rgba(15,23,42,0.6)'] : ['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
                       style={StyleSheet.absoluteFill}
                     />
 
@@ -783,11 +855,7 @@ export default function SplashScreen() {
                     <View
                       style={[
                         styles.heroAmbientHalo,
-                        {
-                          backgroundColor: isPearl
-                            ? 'rgba(254, 243, 199, 0.75)'
-                            : 'rgba(253, 230, 138, 0.75)',
-                        },
+                        { backgroundColor: colors.haloBg },
                       ]}
                     />
 
@@ -804,26 +872,26 @@ export default function SplashScreen() {
 
                     {/* 4-Directional Feathered Blur Vignettes */}
                     <LinearGradient
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.4)', 'transparent']}
+                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.2)', 'transparent']}
                       style={styles.vignetteTop}
                       pointerEvents="none"
                     />
                     <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.4)', colors.bgGradient[1]]}
+                      colors={['transparent', 'rgba(255,255,255,0.2)', colors.bgGradient[1]]}
                       style={styles.vignetteBottom}
                       pointerEvents="none"
                     />
                     <LinearGradient
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.3)', 'transparent']}
+                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.15)', 'transparent']}
                       style={styles.vignetteLeft}
                       pointerEvents="none"
                     />
                     <LinearGradient
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      colors={['transparent', 'rgba(255,255,255,0.3)', colors.bgGradient[0]]}
+                      colors={['transparent', 'rgba(255,255,255,0.15)', colors.bgGradient[0]]}
                       style={styles.vignetteRight}
                       pointerEvents="none"
                     />
@@ -833,9 +901,9 @@ export default function SplashScreen() {
                     <View style={[styles.cornerStarBottomRight, { borderColor: colors.accentGold }]} />
 
                     {/* Bottom Ticker Pill Inside Card */}
-                    <View style={styles.cardStatusTicker}>
+                    <View style={[styles.cardStatusTicker, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                       <View style={styles.greenPulseDot} />
-                      <Text style={styles.cardStatusTickerTxt}>
+                      <Text style={[styles.cardStatusTickerTxt, { color: colors.primaryText }]}>
                         99.9% Automated Processing Uptime
                       </Text>
                     </View>
@@ -854,19 +922,19 @@ export default function SplashScreen() {
 
                 {/* 4 Refined Service Tags */}
                 <View style={styles.servicePillGrid}>
-                  <View style={styles.serviceTag}>
+                  <View style={[styles.serviceTag, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="wifi" size={12} color={colors.accentGold} />
                     <Text style={[styles.serviceTagTxt, { color: colors.primaryText }]}>Data & Airtime</Text>
                   </View>
-                  <View style={styles.serviceTag}>
+                  <View style={[styles.serviceTag, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="card" size={12} color={colors.accentGold} />
                     <Text style={[styles.serviceTagTxt, { color: colors.primaryText }]}>Virtual USD</Text>
                   </View>
-                  <View style={styles.serviceTag}>
+                  <View style={[styles.serviceTag, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="bulb" size={12} color={colors.accentGold} />
                     <Text style={[styles.serviceTagTxt, { color: colors.primaryText }]}>Electricity</Text>
                   </View>
-                  <View style={styles.serviceTag}>
+                  <View style={[styles.serviceTag, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="tv" size={12} color={colors.accentGold} />
                     <Text style={[styles.serviceTagTxt, { color: colors.primaryText }]}>Cable TV</Text>
                   </View>
@@ -915,8 +983,8 @@ export default function SplashScreen() {
                 {/* Floating Left Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipLeft, floatAnimStyle]}>
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
-                    style={styles.orbitalChipGrad}
+                    colors={colors.isDark ? ['rgba(15,23,42,0.95)', 'rgba(30,41,59,0.9)'] : ['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
+                    style={[styles.orbitalChipGrad, { borderColor: colors.cardBorder }]}
                   >
                     <Ionicons name="shield-checkmark" size={11} color="#16A34A" />
                     <Text style={[styles.orbitalChipTxt, { color: colors.primaryText }]}>
@@ -928,8 +996,8 @@ export default function SplashScreen() {
                 {/* Floating Right Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipRight, floatReverseAnimStyle]}>
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
-                    style={styles.orbitalChipGrad}
+                    colors={colors.isDark ? ['rgba(15,23,42,0.95)', 'rgba(30,41,59,0.9)'] : ['rgba(255,255,255,0.95)', 'rgba(254,243,199,0.85)']}
+                    style={[styles.orbitalChipGrad, { borderColor: colors.cardBorder }]}
                   >
                     <Ionicons name="card" size={11} color={colors.accentGold} />
                     <Text style={[styles.orbitalChipTxt, { color: colors.primaryText }]}>
@@ -950,11 +1018,11 @@ export default function SplashScreen() {
                     ]}
                   >
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={60} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
                     ) : null}
 
                     <LinearGradient
-                      colors={['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
+                      colors={colors.isDark ? ['rgba(15,23,42,0.6)', 'rgba(30,41,59,0.4)', 'rgba(15,23,42,0.6)'] : ['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
                       style={StyleSheet.absoluteFill}
                     />
 
@@ -962,11 +1030,7 @@ export default function SplashScreen() {
                     <View
                       style={[
                         styles.heroAmbientHalo,
-                        {
-                          backgroundColor: isPearl
-                            ? 'rgba(254, 243, 199, 0.75)'
-                            : 'rgba(253, 230, 138, 0.75)',
-                        },
+                        { backgroundColor: colors.haloBg },
                       ]}
                     />
 
@@ -983,26 +1047,26 @@ export default function SplashScreen() {
 
                     {/* 4-Directional Feathered Blur Vignettes */}
                     <LinearGradient
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.4)', 'transparent']}
+                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.2)', 'transparent']}
                       style={styles.vignetteTop}
                       pointerEvents="none"
                     />
                     <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.4)', colors.bgGradient[1]]}
+                      colors={['transparent', 'rgba(255,255,255,0.2)', colors.bgGradient[1]]}
                       style={styles.vignetteBottom}
                       pointerEvents="none"
                     />
                     <LinearGradient
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.3)', 'transparent']}
+                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.15)', 'transparent']}
                       style={styles.vignetteLeft}
                       pointerEvents="none"
                     />
                     <LinearGradient
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      colors={['transparent', 'rgba(255,255,255,0.3)', colors.bgGradient[0]]}
+                      colors={['transparent', 'rgba(255,255,255,0.15)', colors.bgGradient[0]]}
                       style={styles.vignetteRight}
                       pointerEvents="none"
                     />
@@ -1012,9 +1076,9 @@ export default function SplashScreen() {
                     <View style={[styles.cornerStarBottomRight, { borderColor: colors.accentGold }]} />
 
                     {/* Bottom Ticker Pill Inside Card */}
-                    <View style={styles.cardStatusTicker}>
+                    <View style={[styles.cardStatusTicker, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                       <Ionicons name="shield-checkmark" size={11} color="#16A34A" />
-                      <Text style={styles.cardStatusTickerTxt}>
+                      <Text style={[styles.cardStatusTickerTxt, { color: colors.primaryText }]}>
                         Bank-Grade 256-bit Encryption
                       </Text>
                     </View>
@@ -1033,19 +1097,19 @@ export default function SplashScreen() {
 
                 {/* 3 Value Proposition Cards */}
                 <View style={styles.valuePropsRow}>
-                  <View style={styles.valueCard}>
+                  <View style={[styles.valueCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="shield-checkmark" size={17} color={colors.accentGold} />
                     <Text style={[styles.valueCardTitle, { color: colors.primaryText }]}>
                       Secure
                     </Text>
                   </View>
-                  <View style={styles.valueCard}>
+                  <View style={[styles.valueCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="globe-outline" size={17} color={colors.accentGold} />
                     <Text style={[styles.valueCardTitle, { color: colors.primaryText }]}>
                       Global
                     </Text>
                   </View>
-                  <View style={styles.valueCard}>
+                  <View style={[styles.valueCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                     <Ionicons name="flash" size={17} color={colors.accentGold} />
                     <Text style={[styles.valueCardTitle, { color: colors.primaryText }]}>
                       Instant
@@ -1164,7 +1228,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 120,
-    opacity: 0.45,
+    opacity: 0.4,
   },
   ambientOrbBottom: {
     position: 'absolute',
@@ -1173,7 +1237,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    opacity: 0.5,
+    opacity: 0.45,
   },
   constellationRing: {
     position: 'absolute',
@@ -1183,7 +1247,6 @@ const styles = StyleSheet.create({
     height: 380,
     borderRadius: 190,
     borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.08)',
     borderStyle: 'dashed',
   },
   container: {
@@ -1274,11 +1337,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // ── Luxury Brand Crest (Clean & Compact) ──
+  // ── Luxury Brand Crest (Grand, Prominent & Beautiful) ──
   brandHeader: {
     alignItems: 'center',
     marginTop: 0,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   logoHaloGlow: {
     shadowColor: '#D97706',
@@ -1286,16 +1349,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.32,
     shadowRadius: 16,
     elevation: 8,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   logoOuterHalo: {
     width: 94,
     height: 94,
     borderRadius: 47,
     padding: 3.5,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(254, 243, 199, 0.4)',
     borderWidth: 2,
-    borderColor: 'rgba(217, 119, 6, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1303,11 +1365,10 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FEF3C7',
+    borderColor: 'rgba(217, 119, 6, 0.3)',
   },
   realBrandLogo: {
     width: 74,
@@ -1347,6 +1408,29 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 3.8,
+  },
+
+  // ── Futuristic Radar Ticker ──
+  radarTickerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  liveGreenBeacon: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  radarTickerText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 
   // ── Slide Viewport (Smooth, Fast & Fluid) ──
@@ -1398,7 +1482,7 @@ const styles = StyleSheet.create({
   heroGlassContainer: {
     width: '92%',
     maxWidth: 345,
-    height: 310, // Substantially taller vertically!
+    height: 310,
     borderRadius: 30,
     borderWidth: 1.5,
     overflow: 'hidden',
@@ -1441,7 +1525,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.35)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
@@ -1514,17 +1597,17 @@ const styles = StyleSheet.create({
   // ── TALL HERO PICTURE SIZES ──
   heroImageGlobe: {
     width: 285,
-    height: 255, // Substantially taller
+    height: 255,
     zIndex: 2,
   },
   heroImagePhone: {
     width: 280,
-    height: 255, // Substantially taller
+    height: 255,
     zIndex: 2,
   },
   heroImageCardStack: {
     width: 295,
-    height: 240, // Substantially taller
+    height: 240,
     zIndex: 2,
   },
 
@@ -1534,12 +1617,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     zIndex: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -1555,7 +1636,6 @@ const styles = StyleSheet.create({
   cardStatusTickerTxt: {
     fontSize: 9.5,
     fontWeight: '700',
-    color: '#0D1B3E',
   },
 
   // ── Refined Slide Typography & Action Buttons ──
@@ -1597,12 +1677,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -1628,12 +1706,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -1678,7 +1754,6 @@ const styles = StyleSheet.create({
   },
   valueCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 14,
     paddingVertical: 7,
     paddingHorizontal: 4,
@@ -1686,7 +1761,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,

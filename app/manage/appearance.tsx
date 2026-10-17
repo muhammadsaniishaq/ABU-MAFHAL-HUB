@@ -252,7 +252,7 @@ export default function AppDesigner() {
     },
   ];
 
-  // Robust, crash-free camera & gallery picker
+  // Robust, crash-free camera & gallery picker with optimized compression
   const pickMediaSafely = async (source: 'camera' | 'library'): Promise<ImagePicker.ImagePickerAsset | null> => {
     try {
       if (source === 'camera') {
@@ -268,7 +268,7 @@ export default function AppDesigner() {
         }
         const result = await safeLaunchPicker(() => ImagePicker.launchCameraAsync({
           allowsEditing: false,
-          quality: 0.9,
+          quality: 0.75,
           base64: true,
         }));
         if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -288,7 +288,7 @@ export default function AppDesigner() {
         const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: false,
-          quality: 0.9,
+          quality: 0.75,
           base64: true,
         }));
         if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -326,22 +326,43 @@ export default function AppDesigner() {
     try {
       setUploadingSlide(true);
       const asset = await pickMediaSafely(source);
-      if (!asset) return;
+      if (!asset) {
+        setUploadingSlide(false);
+        return;
+      }
 
-      const fileExt = (asset.uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
+      // Clean, robust file extension detection (no corrupt .ng/xxxx extensions)
+      let fileExt = 'jpg';
+      if (asset.mimeType?.includes('png')) fileExt = 'png';
+      else if (asset.mimeType?.includes('gif')) fileExt = 'gif';
+      else if (asset.mimeType?.includes('webp')) fileExt = 'webp';
+      else {
+        const cleanUri = (asset.uri || '').split('?')[0].split('#')[0];
+        const extCandidate = cleanUri.split('.').pop()?.toLowerCase();
+        if (extCandidate && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extCandidate)) {
+          fileExt = extCandidate === 'jpeg' ? 'jpg' : extCandidate;
+        }
+      }
+
       const fileName = `splash/slide_${slot + 1}_${Date.now()}.${fileExt}`;
-      const isGif = fileExt === 'gif' || (asset.mimeType && asset.mimeType.includes('gif'));
-      const isPng = fileExt === 'png' || (asset.mimeType && asset.mimeType.includes('png'));
-      const mimeType = isGif ? 'image/gif' : (isPng ? 'image/png' : 'image/jpeg');
+      const mimeType = fileExt === 'png' ? 'image/png' : (fileExt === 'gif' ? 'image/gif' : 'image/jpeg');
 
-      const uploadRes = await uploadMediaFile({
-        uri: asset.uri,
-        bucket: 'banners',
-        fileName,
-        mimeType,
-        base64: asset.base64,
-        isVideo: false,
-      });
+      // 30s timeout guarantee so it never hangs indefinitely
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Network timeout: Don Allah duba network dinka ka sake gwadawa.')), 30000)
+      );
+
+      const uploadRes = await Promise.race([
+        uploadMediaFile({
+          uri: asset.uri,
+          bucket: 'banners',
+          fileName,
+          mimeType,
+          base64: asset.base64,
+          isVideo: false,
+        }),
+        timeoutPromise,
+      ]) as any;
 
       if (!uploadRes.success || !uploadRes.publicUrl) {
         throw new Error(uploadRes.error || 'Failed to upload photo to storage');
@@ -402,13 +423,14 @@ export default function AppDesigner() {
   const saveSplashSlidesToDB = async (slides: any[]) => {
     setSavingSlides(true);
     try {
+      const jsonPayload = JSON.stringify(slides);
       await supabase.from('app_settings').upsert({
         key: 'app_splash_slides',
-        value: slides,
+        value: jsonPayload,
         description: 'Custom splash screen slide images',
       }, { onConflict: 'key' });
 
-      await AsyncStorage.setItem('cached_splash_slides_v3', JSON.stringify(slides));
+      await AsyncStorage.setItem('cached_splash_slides_v3', jsonPayload);
     } catch (e: any) {
       Alert.alert('Save Error', e.message);
     } finally {
