@@ -1,7 +1,8 @@
 import {
   View, Text, TouchableOpacity, ScrollView, Platform, Image,
-  ActivityIndicator, Alert, StyleSheet, TextInput, Switch, Dimensions
+  ActivityIndicator, Alert, StyleSheet, TextInput, Switch, Dimensions, Modal
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
@@ -75,10 +76,16 @@ export default function AppDesigner() {
   const [loadingSettings, setLoadingSettings] = useState(true);
 
   // Splash slides states
-  type SplashSlide = { id: string; url: string; order: number };
+  type SplashSlide = { id: string; url: string; order: number; title?: string };
   const [splashSlides, setSplashSlides] = useState<SplashSlide[]>([]);
   const [uploadingSlide, setUploadingSlide] = useState(false);
   const [savingSlides, setSavingSlides] = useState(false);
+  const [activeSlotTarget, setActiveSlotTarget] = useState<number>(0);
+  const [showSlidePickerModal, setShowSlidePickerModal] = useState(false);
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [urlInputValue, setUrlInputValue] = useState('');
+  const [showLivePreviewModal, setShowLivePreviewModal] = useState(false);
+  const [previewActiveIndex, setPreviewActiveIndex] = useState(0);
 
   // Celebration / Festive states
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings>({
@@ -145,56 +152,245 @@ export default function AppDesigner() {
         .select('value')
         .eq('key', 'app_splash_slides')
         .maybeSingle();
+
       if (data?.value) {
-        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-        if (Array.isArray(parsed)) setSplashSlides(parsed);
+        let parsed = data.value;
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch {}
+        }
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch {}
+        }
+        if (Array.isArray(parsed)) {
+          const normalized = [0, 1, 2].map(slot => {
+            const found = parsed.find((s: any) => s.order === slot);
+            return found || { id: `slide_${slot}`, url: '', order: slot };
+          });
+          setSplashSlides(normalized);
+          await AsyncStorage.setItem('cached_splash_slides_v3', JSON.stringify(normalized));
+          return;
+        }
       }
+      setSplashSlides([
+        { id: 'slide_0', url: '', order: 0 },
+        { id: 'slide_1', url: '', order: 1 },
+        { id: 'slide_2', url: '', order: 2 },
+      ]);
     } catch (e) {
       console.log('No splash slides yet:', e);
     }
   };
 
-  const handleUploadSplashSlide = async () => {
+  // Core 3-Screen Luxury Splash Structure
+  const CORE_SPLASH_SCREENS = [
+    {
+      slot: 0,
+      badge: 'Screen 1',
+      tag: 'GLOBAL FINTECH GATEWAY',
+      title: 'Your Gateway to Seamless Payments',
+      subtitle: 'Instant automated delivery for data bundles, airtime, utility bills, and worldwide virtual card transactions.',
+      defaultAsset: require('../../assets/images/splash_globe_3d.png'),
+      defaultLabel: '3D Golden World Globe (Built-in)',
+      accent: '#D97706',
+      accentLight: '#FEF3C7',
+      icon: 'globe-outline' as const,
+    },
+    {
+      slot: 1,
+      badge: 'Screen 2',
+      tag: 'ALL-IN-ONE AUTOMATION',
+      title: 'Your All-in-One Digital Hub',
+      subtitle: 'Fast, secure, and automated transactions. Manage all your airtime, data bundles, electricity, and cable TV in one spot.',
+      defaultAsset: require('../../assets/images/splash_hub_phone_3d.png'),
+      defaultLabel: '3D Smartphone Hub (Built-in)',
+      accent: '#4F46E5',
+      accentLight: '#EEF2FF',
+      icon: 'phone-portrait-outline' as const,
+    },
+    {
+      slot: 2,
+      badge: 'Screen 3',
+      tag: 'TRUST, SPEED & SECURITY',
+      title: 'Experience Luxury Fintech',
+      subtitle: 'Join thousands enjoying seamless transactions nationwide with institutional security & instant wallet funding.',
+      defaultAsset: require('../../assets/images/vc_card_stack_3d_real.png'),
+      defaultLabel: '3D Metallic Virtual Cards Stack (Built-in)',
+      accent: '#16A34A',
+      accentLight: '#F0FDF4',
+      icon: 'shield-checkmark-outline' as const,
+    },
+  ];
+
+  const SPLASH_3D_PRESETS = [
+    {
+      id: 'preset_globe',
+      title: '3D Gold Globe Ring',
+      category: 'Global Fintech',
+      url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+      desc: 'Deep black & shimmering gold luxury orb',
+    },
+    {
+      id: 'preset_cards',
+      title: 'Cyber Virtual Cards',
+      category: 'Virtual Banking',
+      url: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=800&auto=format&fit=crop&q=80',
+      desc: 'Floating corporate black and gold debit cards',
+    },
+    {
+      id: 'preset_neon',
+      title: 'Digital Hub Mobile',
+      category: 'Sub-second VTU',
+      url: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&auto=format&fit=crop&q=80',
+      desc: 'Futuristic glowing connectivity lines',
+    },
+    {
+      id: 'preset_skyline',
+      title: 'Executive Financial Tower',
+      category: 'Institutional',
+      url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
+      desc: 'Glass architectural wealth & stability',
+    },
+  ];
+
+  // Robust, crash-free camera & gallery picker
+  const pickMediaSafely = async (source: 'camera' | 'library'): Promise<ImagePicker.ImagePickerAsset | null> => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Denied', 'Allow photo access to upload splash slides.');
-        return;
+      if (source === 'camera') {
+        if (Platform.OS !== 'web') {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert(
+              "Izinin Kamara (Camera Permission)",
+              "Don Allah bada izinin amfani da kamara a wayarka domin daukar hoto."
+            );
+            return null;
+          }
+        }
+        const result = await safeLaunchPicker(() => ImagePicker.launchCameraAsync({
+          allowsEditing: false,
+          quality: 0.9,
+          base64: true,
+        }));
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          return result.assets[0];
+        }
+      } else {
+        if (Platform.OS !== 'web') {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert(
+              "Izinin Hotuna (Gallery Permission)",
+              "Don Allah bada izinin shiga hotunanka a wayarka domin zaban hoto."
+            );
+            return null;
+          }
+        }
+        const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.9,
+          base64: true,
+        }));
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          return result.assets[0];
+        }
       }
-      const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.9,
-        base64: true,
-      }));
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setUploadingSlide(true);
-        const image = result.assets[0];
-        const fileExt = (image.uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
-        const fileName = `splash/slide_${Date.now()}.${fileExt}`;
-        const isGif = fileExt === 'gif' || (image.mimeType && image.mimeType.includes('gif'));
-        const isPng = fileExt === 'png' || (image.mimeType && image.mimeType.includes('png'));
-        const mimeType = isGif ? 'image/gif' : (isPng ? 'image/png' : 'image/jpeg');
-        const uploadRes = await uploadMediaFile({
-          uri: image.uri,
-          bucket: 'banners',
-          fileName,
-          mimeType,
-          base64: image.base64,
-          isVideo: false,
-        });
-        if (!uploadRes.success || !uploadRes.publicUrl) throw new Error(uploadRes.error || 'Upload failed');
-        const newSlide = { id: Date.now().toString(), url: uploadRes.publicUrl, order: splashSlides.length };
-        const updated = [...splashSlides, newSlide];
-        setSplashSlides(updated);
-        await saveSplashSlidesToDB(updated);
-        Alert.alert('Done! 🎉', 'Splash slide uploaded and added.');
-      }
+      return null;
     } catch (e: any) {
-      Alert.alert('Upload Failed', e.message);
+      console.error("Image pick error:", e);
+      Alert.alert("Daukar Hoto", e.message || "Ba a samu nasarar daukar hoton ba.");
+      return null;
+    }
+  };
+
+  const getSlideForSlot = (slot: number): SplashSlide | undefined => {
+    return splashSlides.find(s => s.order === slot);
+  };
+
+  const applySlideImage = async (slot: number, imageUrl: string) => {
+    const current = [...splashSlides];
+    const updated = [0, 1, 2].map((sIndex) => {
+      if (sIndex === slot) {
+        return { id: `slide_${sIndex}`, url: imageUrl, order: sIndex };
+      }
+      const found = current.find(s => s.order === sIndex);
+      return found || { id: `slide_${sIndex}`, url: '', order: sIndex };
+    });
+    setSplashSlides(updated);
+    await saveSplashSlidesToDB(updated);
+    Alert.alert("An Sabunta Hoto! 🎉", `Hoton Page/Slide #${slot + 1} an sabunta shi cikin nasara.`);
+  };
+
+  const handleUploadFromSource = async (slot: number, source: 'camera' | 'library') => {
+    setShowSlidePickerModal(false);
+    try {
+      setUploadingSlide(true);
+      const asset = await pickMediaSafely(source);
+      if (!asset) return;
+
+      const fileExt = (asset.uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
+      const fileName = `splash/slide_${slot + 1}_${Date.now()}.${fileExt}`;
+      const isGif = fileExt === 'gif' || (asset.mimeType && asset.mimeType.includes('gif'));
+      const isPng = fileExt === 'png' || (asset.mimeType && asset.mimeType.includes('png'));
+      const mimeType = isGif ? 'image/gif' : (isPng ? 'image/png' : 'image/jpeg');
+
+      const uploadRes = await uploadMediaFile({
+        uri: asset.uri,
+        bucket: 'banners',
+        fileName,
+        mimeType,
+        base64: asset.base64,
+        isVideo: false,
+      });
+
+      if (!uploadRes.success || !uploadRes.publicUrl) {
+        throw new Error(uploadRes.error || 'Failed to upload photo to storage');
+      }
+
+      await applySlideImage(slot, uploadRes.publicUrl);
+    } catch (e: any) {
+      Alert.alert("Upload Error", e.message || "Could not upload image");
     } finally {
       setUploadingSlide(false);
     }
+  };
+
+  const handleApplyUrl = async () => {
+    const trimmed = urlInputValue.trim();
+    if (!trimmed || !trimmed.startsWith('http')) {
+      Alert.alert("Invalid URL", "Please enter a valid https:// image link.");
+      return;
+    }
+    setShowUrlModal(false);
+    setUrlInputValue('');
+    await applySlideImage(activeSlotTarget, trimmed);
+  };
+
+  const handleResetSlideToDefault = async (slot: number) => {
+    Alert.alert(
+      "Koma Default 3D Asset ↺",
+      `Kuna son share hoton Page #${slot + 1} ku dawo da asalin 3D asset din splash din?`,
+      [
+        { text: "A'a (Cancel)", style: "cancel" },
+        {
+          text: "Eh, Koma Default",
+          style: "destructive",
+          onPress: async () => {
+            const current = [...splashSlides];
+            const updated = [0, 1, 2].map((sIndex) => {
+              if (sIndex === slot) {
+                return { id: `slide_${sIndex}`, url: '', order: sIndex };
+              }
+              const found = current.find(s => s.order === sIndex);
+              return found || { id: `slide_${sIndex}`, url: '', order: sIndex };
+            });
+            setSplashSlides(updated);
+            await saveSplashSlidesToDB(updated);
+            Alert.alert("An Mayar da Default ✓", `Page #${slot + 1} ya koma babban 3D graphic dinsa.`);
+          }
+        }
+      ]
+    );
   };
 
   const handleDeleteSplashSlide = async (id: string) => {
@@ -208,9 +404,11 @@ export default function AppDesigner() {
     try {
       await supabase.from('app_settings').upsert({
         key: 'app_splash_slides',
-        value: JSON.stringify(slides),
+        value: slides,
         description: 'Custom splash screen slide images',
       }, { onConflict: 'key' });
+
+      await AsyncStorage.setItem('cached_splash_slides_v3', JSON.stringify(slides));
     } catch (e: any) {
       Alert.alert('Save Error', e.message);
     } finally {
@@ -295,26 +493,27 @@ export default function AppDesigner() {
   };
 
   const handleUploadLogo = async (type: 'logo' | 'icon') => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permissionResult.granted === false) {
-        Alert.alert("Permission Denied", "You need to allow access to your photos to upload brand assets.");
-        return;
-      }
-
-      const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.8,
-        base64: true,
-      }));
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await uploadToSupabase(result.assets[0], type);
-      }
-    } catch (error: any) {
-      Alert.alert("Error", "Could not pick image: " + error.message);
-    }
+    Alert.alert(
+      type === 'icon' ? "Upload App Icon Square" : "Upload Full Logo Banner",
+      "Zabi yadda kake son daukar hoto / choose image source:",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "📸 Dauki Hoto (Camera)",
+          onPress: async () => {
+            const asset = await pickMediaSafely('camera');
+            if (asset) await uploadToSupabase(asset, type);
+          }
+        },
+        {
+          text: "🖼️ Zabi daga Gallery",
+          onPress: async () => {
+            const asset = await pickMediaSafely('library');
+            if (asset) await uploadToSupabase(asset, type);
+          }
+        }
+      ]
+    );
   };
 
   const uploadToSupabase = async (image: ImagePicker.ImagePickerAsset, type: 'logo' | 'icon') => {
@@ -666,111 +865,394 @@ export default function AppDesigner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════════
-            TAB 4: SPLASH SLIDES
+            TAB 4: MODERN SPLASH ARCHITECTURE & VISUALS
         ═══════════════════════════════════════════════════════════════════════ */}
         {activeTab === 'splash' && (
           <View style={{ gap: 16 }}>
-            {/* Header info card */}
+            {/* Header info & action card */}
             <View style={s.card}>
               <View style={s.cardHeaderRow}>
-                <View style={[s.iconBadge, { backgroundColor: T.indigoL }]}>
-                  <Ionicons name="phone-portrait" size={20} color={T.indigo} />
+                <View style={[s.iconBadge, { backgroundColor: T.goldL }]}>
+                  <Ionicons name="sparkles" size={20} color={T.gold} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={s.cardTitle}>Splash Screen Slides</Text>
-                  <Text style={s.cardSubtitle}>These images appear on the animated splash/onboarding screen when the app loads</Text>
+                  <Text style={s.cardTitle}>Splash Screen Architecture & Visuals</Text>
+                  <Text style={s.cardSubtitle}>
+                    Saita hotunan splash screen din manhaja na farko (Screen 1, 2, 3) cikin salon zamani.
+                  </Text>
                 </View>
               </View>
-            </View>
 
-            {/* Upload button */}
-            <TouchableOpacity
-              style={[s.uploadActionBtn, uploadingSlide && { opacity: 0.6 }]}
-              onPress={handleUploadSplashSlide}
-              disabled={uploadingSlide}
-              activeOpacity={0.8}
-            >
-              {uploadingSlide ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-                  <Text style={s.uploadActionText}>Upload New Slide Image</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Slides list */}
-            {splashSlides.length === 0 ? (
-              <View style={[s.card, { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 }]}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: T.goldL, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                  <Ionicons name="sparkles" size={24} color={T.gold} />
-                </View>
-                <Text style={{ color: T.navy, fontWeight: '800', fontSize: 15, textAlign: 'center' }}>
-                  Luxury 3-Screen 3D Splash Active
-                </Text>
-                <Text style={{ color: T.textSub, fontSize: 12, marginTop: 4, textAlign: 'center', lineHeight: 18 }}>
-                  Screen 1: Global Digital Hub (3D Globe & Experience Loader){'\n'}
-                  Screen 2: Your All-in-One Digital Hub (3D Phone with Services){'\n'}
-                  Screen 3: Value Props, Skyline & Fast Onboarding
-                </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                <TouchableOpacity
+                  style={[s.splashHeaderActionBtn, { backgroundColor: T.navy }]}
+                  onPress={() => setShowLivePreviewModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="phone-portrait-outline" size={15} color={T.goldB} />
+                  <Text style={[s.splashHeaderActionTxt, { color: '#FFFFFF' }]}>Live Phone Mockup</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginTop: 14,
-                    paddingHorizontal: 16,
-                    paddingVertical: 9,
-                    borderRadius: 20,
-                    backgroundColor: T.navy,
-                  }}
+                  style={[s.splashHeaderActionBtn, { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: T.gold }]}
                   onPress={() => router.push('/?preview=splash' as any)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="play-circle-outline" size={16} color={T.gold} />
-                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Preview Splash Now</Text>
+                  <Ionicons name="play-circle" size={15} color={T.gold} />
+                  <Text style={[s.splashHeaderActionTxt, { color: T.navy }]}>Launch Full Splash</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              splashSlides.map((slide, idx) => (
-                <View key={slide.id} style={s.card}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                    <View style={[s.iconBadge, { backgroundColor: T.goldL }]}>
-                      <Text style={{ fontSize: 13, fontWeight: '900', color: T.gold }}>#{idx + 1}</Text>
+            </View>
+
+            {/* ── 3 CORE SCREEN CARDS ── */}
+            {CORE_SPLASH_SCREENS.map((core) => {
+              const customSlide = getSlideForSlot(core.slot);
+              const hasCustomImage = Boolean(customSlide?.url && customSlide.url.trim().length > 0);
+
+              return (
+                <View key={core.slot} style={[s.card, { borderColor: hasCustomImage ? T.gold : T.border }]}>
+                  {/* Top Bar with Badge & Status */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={[s.iconBadge, { width: 30, height: 30, borderRadius: 8, backgroundColor: core.accentLight }]}>
+                        <Ionicons name={core.icon} size={16} color={core.accent} />
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navy }}>{core.badge}</Text>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: core.accent, letterSpacing: 0.5 }}>{core.tag}</Text>
+                      </View>
                     </View>
-                    <Text style={[s.cardTitle, { marginLeft: 8, flex: 1 }]}>Slide {idx + 1}</Text>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteSplashSlide(slide.id)}
-                      style={{ padding: 6 }}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={T.red} />
-                    </TouchableOpacity>
+
+                    <View style={[
+                      s.splashStatusPill,
+                      { backgroundColor: hasCustomImage ? T.greenL : T.goldL, borderColor: hasCustomImage ? T.green : T.gold }
+                    ]}>
+                      <View style={[s.pulseDot, { backgroundColor: hasCustomImage ? T.green : T.gold }]} />
+                      <Text style={[s.splashStatusTxt, { color: hasCustomImage ? T.green : T.gold }]}>
+                        {hasCustomImage ? 'Custom Photo Active' : '3D Built-in Active'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={s.splashPreviewBox}>
-                    <Image
-                      source={{ uri: slide.url }}
-                      style={{ width: '100%', height: '100%', borderRadius: 10 }}
-                      resizeMode="cover"
+
+                  {/* Artwork Preview Box */}
+                  <View style={s.modernArtworkBox}>
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.85)', 'rgba(254,243,199,0.35)', 'rgba(255,255,255,0.7)']}
+                      style={StyleSheet.absoluteFill}
                     />
+
+                    {/* Corner golden accents */}
+                    <View style={[s.cornerAccent, { top: 6, left: 6, borderTopWidth: 2, borderLeftWidth: 2 }]} />
+                    <View style={[s.cornerAccent, { bottom: 6, right: 6, borderBottomWidth: 2, borderRightWidth: 2 }]} />
+
+                    {hasCustomImage ? (
+                      <Image
+                        source={{ uri: customSlide!.url }}
+                        style={{ width: '90%', height: '85%' }}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Image
+                        source={core.defaultAsset}
+                        style={{ width: '90%', height: '85%' }}
+                        resizeMode="contain"
+                      />
+                    )}
+
+                    <View style={s.artworkCaptionPill}>
+                      <Text style={s.artworkCaptionTxt} numberOfLines={1}>
+                        {hasCustomImage ? 'Custom Asset Live' : core.defaultLabel}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Content Summary */}
+                  <View style={{ marginVertical: 10 }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: T.navy }}>{core.title}</Text>
+                    <Text style={{ fontSize: 10, color: T.textSub, marginTop: 2, lineHeight: 14 }}>{core.subtitle}</Text>
+                  </View>
+
+                  {/* Modern Action Buttons Grid */}
+                  <View style={s.modernActionsGrid}>
+                    <TouchableOpacity
+                      style={[s.modernMiniBtn, { backgroundColor: T.navy }]}
+                      onPress={() => handleUploadFromSource(core.slot, 'camera')}
+                      disabled={uploadingSlide}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="camera" size={13} color={T.gold} />
+                      <Text style={[s.modernMiniBtnTxt, { color: '#FFFFFF' }]}>Dauki Kamara</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[s.modernMiniBtn, { backgroundColor: T.goldL, borderWidth: 1, borderColor: T.gold }]}
+                      onPress={() => handleUploadFromSource(core.slot, 'library')}
+                      disabled={uploadingSlide}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="images" size={13} color={T.gold} />
+                      <Text style={[s.modernMiniBtnTxt, { color: T.navy }]}>Gallery</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[s.modernMiniBtn, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: T.border }]}
+                      onPress={() => {
+                        setActiveSlotTarget(core.slot);
+                        setUrlInputValue(customSlide?.url || '');
+                        setShowUrlModal(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="link-outline" size={13} color={T.textSub} />
+                      <Text style={[s.modernMiniBtnTxt, { color: T.textSub }]}>Saka URL</Text>
+                    </TouchableOpacity>
+
+                    {hasCustomImage && (
+                      <TouchableOpacity
+                        style={[s.modernMiniBtn, { backgroundColor: T.redL, borderWidth: 1, borderColor: '#FECDD3' }]}
+                        onPress={() => handleResetSlideToDefault(core.slot)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="refresh" size={13} color={T.red} />
+                        <Text style={[s.modernMiniBtnTxt, { color: T.red }]}>Reset 3D</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
-              ))
-            )}
+              );
+            })}
 
-            {splashSlides.length > 0 && (
-              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
-                {savingSlides
-                  ? <ActivityIndicator color={T.gold} size="small" />
-                  : <Ionicons name="cloud-done" size={16} color={T.green} />}
-                <Text style={{ color: T.textSub, fontSize: 11, fontWeight: '700' }}>
-                  {savingSlides ? 'Saving…' : `${splashSlides.length} slide${splashSlides.length !== 1 ? 's' : ''} saved & live`}
-                </Text>
+            {/* ── CURATED 3D PRESETS GALLERY ── */}
+            <View style={s.card}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <View style={[s.iconBadge, { backgroundColor: T.indigoL, width: 32, height: 32 }]}>
+                  <Ionicons name="color-palette" size={16} color={T.indigo} />
+                </View>
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <Text style={s.cardTitle}>Curated 3D Modern Presets</Text>
+                  <Text style={s.cardSubtitle}>Zabi kyawawan hotuna na 3D domin amfani a kowane slide nan take</Text>
+                </View>
               </View>
-            )}
+
+              <View style={{ gap: 10 }}>
+                {SPLASH_3D_PRESETS.map((preset) => (
+                  <View key={preset.id} style={s.presetCardRow}>
+                    <Image source={{ uri: preset.url }} style={s.presetThumb} resizeMode="cover" />
+                    <View style={{ flex: 1, marginLeft: 10, marginRight: 6 }}>
+                      <Text style={{ fontSize: 11.5, fontWeight: '900', color: T.navy }}>{preset.title}</Text>
+                      <Text style={{ fontSize: 8.5, fontWeight: '800', color: T.gold, marginTop: 1 }}>{preset.category}</Text>
+                      <Text style={{ fontSize: 9, color: T.textSub, marginTop: 2 }} numberOfLines={1}>{preset.desc}</Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      {[0, 1, 2].map((slot) => (
+                        <TouchableOpacity
+                          key={slot}
+                          onPress={() => applySlideImage(slot, preset.url)}
+                          style={s.presetApplyPill}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={s.presetApplyTxt}>S#{slot + 1}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Saving / Sync Indicator */}
+            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
+              {uploadingSlide || savingSlides ? (
+                <>
+                  <ActivityIndicator color={T.gold} size="small" />
+                  <Text style={{ color: T.gold, fontSize: 11, fontWeight: '800' }}>
+                    {uploadingSlide ? 'Ana loda hoton zuwa storage…' : 'Ana adana saitunan splash…'}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="cloud-done" size={16} color={T.green} />
+                  <Text style={{ color: T.textSub, fontSize: 11, fontWeight: '700' }}>
+                    All splash screens synced & live
+                  </Text>
+                </>
+              )}
+            </View>
           </View>
         )}
+
+        {/* ═══════════════════════════════════════════════════════════════════════
+            MODAL 1: DIRECT IMAGE URL INPUT MODAL
+        ═══════════════════════════════════════════════════════════════════════ */}
+        <Modal visible={showUrlModal} transparent animationType="fade" onRequestClose={() => setShowUrlModal(false)}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalBox}>
+              <View style={s.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="link" size={18} color={T.gold} />
+                  <Text style={s.modalTitle}>Saka Direct Image URL (Slide #{activeSlotTarget + 1})</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowUrlModal(false)}>
+                  <Ionicons name="close-circle" size={22} color={T.textSub} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: 10.5, color: T.textSub, marginBottom: 12 }}>
+                Saka link din hoto ko GIF mai inganci (misali daga CDN ko hoton kamfani).
+              </Text>
+
+              <TextInput
+                style={s.modalInput}
+                placeholder="https://example.com/banner.png"
+                placeholderTextColor="#94A3B8"
+                value={urlInputValue}
+                onChangeText={setUrlInputValue}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              {urlInputValue.trim().startsWith('http') && (
+                <View style={s.modalPreviewMini}>
+                  <Image source={{ uri: urlInputValue.trim() }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="contain" />
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <TouchableOpacity
+                  style={[s.modalBtn, { backgroundColor: '#F1F5F9' }]}
+                  onPress={() => setShowUrlModal(false)}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: T.textSub }}>Soke (Cancel)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.modalBtn, { backgroundColor: T.navy }]}
+                  onPress={handleApplyUrl}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: T.gold }}>Aiwatar da Hoton ✓</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ═══════════════════════════════════════════════════════════════════════
+            MODAL 2: INTERACTIVE LIVE PHONE MOCKUP PREVIEW
+        ═══════════════════════════════════════════════════════════════════════ */}
+        <Modal visible={showLivePreviewModal} transparent animationType="slide" onRequestClose={() => setShowLivePreviewModal(false)}>
+          <View style={s.modalOverlay}>
+            <View style={s.phoneFrameBox}>
+              {/* Phone Header Notch & Bezel */}
+              <View style={s.phoneTopBar}>
+                <View style={s.phoneSpeakerNotch} />
+                <TouchableOpacity
+                  style={s.phoneCloseBtn}
+                  onPress={() => setShowLivePreviewModal(false)}
+                >
+                  <Ionicons name="close" size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Phone Screen Canvas */}
+              <View style={s.phoneScreenCanvas}>
+                {/* Mini Brand Header */}
+                <View style={{ alignItems: 'center', marginTop: 10, marginBottom: 8 }}>
+                  <View style={s.miniBrandHalo}>
+                    <Image
+                      source={logoUrl ? { uri: logoUrl } : require('../../assets/images/logo.png')}
+                      style={{ width: 44, height: 44, borderRadius: 22 }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: T.navy, marginTop: 4 }}>ABU MAFHAL SUB</Text>
+                  <Text style={{ fontSize: 8, color: T.gold, fontWeight: '800', letterSpacing: 1.5 }}>LUXURY FINTECH HUB</Text>
+                </View>
+
+                {/* Active Slide Rendering in Phone */}
+                {(() => {
+                  const core = CORE_SPLASH_SCREENS[previewActiveIndex];
+                  const custom = getSlideForSlot(core.slot);
+                  const hasCustom = Boolean(custom?.url && custom.url.trim().length > 0);
+
+                  return (
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 }}>
+                      {/* Badge */}
+                      <View style={[s.splashStatusPill, { backgroundColor: T.goldL, borderColor: T.goldB }]}>
+                        <Ionicons name="sparkles" size={10} color={T.gold} />
+                        <Text style={[s.splashStatusTxt, { color: T.navy, fontSize: 8.5 }]}>{core.tag}</Text>
+                      </View>
+
+                      {/* Floating Artwork */}
+                      <View style={s.phoneHeroArtworkBox}>
+                        <LinearGradient
+                          colors={['rgba(255,255,255,0.9)', 'rgba(254,243,199,0.4)', 'rgba(255,255,255,0.7)']}
+                          style={StyleSheet.absoluteFill}
+                        />
+                        <Image
+                          source={hasCustom ? { uri: custom!.url } : core.defaultAsset}
+                          style={{ width: '88%', height: '88%' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+
+                      {/* Content */}
+                      <View style={{ alignItems: 'center', marginTop: 8 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navy, textAlign: 'center' }}>
+                          {core.title}
+                        </Text>
+                        <Text style={{ fontSize: 9, color: T.textSub, textAlign: 'center', marginTop: 3, lineHeight: 13 }}>
+                          {core.subtitle}
+                        </Text>
+                      </View>
+
+                      {/* Bottom Slide Indicators & Next Button */}
+                      <View style={{ width: '100%', alignItems: 'center', marginVertical: 12 }}>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                          {[0, 1, 2].map((idx) => (
+                            <TouchableOpacity
+                              key={idx}
+                              onPress={() => setPreviewActiveIndex(idx)}
+                              style={[
+                                s.phoneDot,
+                                previewActiveIndex === idx && { width: 22, backgroundColor: T.gold }
+                              ]}
+                            />
+                          ))}
+                        </View>
+
+                        <TouchableOpacity
+                          style={s.phoneActionButton}
+                          onPress={() => {
+                            if (previewActiveIndex < 2) setPreviewActiveIndex(p => p + 1);
+                            else setPreviewActiveIndex(0);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>
+                            {previewActiveIndex < 2 ? 'Next Screen ➔' : 'Get Started Now ✦'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })()}
+              </View>
+
+              {/* Bottom Test Button */}
+              <TouchableOpacity
+                style={s.phoneFullTestBtn}
+                onPress={() => {
+                  setShowLivePreviewModal(false);
+                  router.push('/?preview=splash' as any);
+                }}
+              >
+                <Ionicons name="open-outline" size={14} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>Launch Full App Splash</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
       </ScrollView>
     </View>
@@ -993,4 +1475,282 @@ const s = StyleSheet.create({
     gap: 6,
   },
   uploadActionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+
+  // Modern Splash Manager Styles
+  splashHeaderActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
+  },
+  splashHeaderActionTxt: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  splashStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  splashStatusTxt: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  modernArtworkBox: {
+    height: 180,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  cornerAccent: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderColor: T.gold,
+  },
+  artworkCaptionPill: {
+    position: 'absolute',
+    bottom: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  artworkCaptionTxt: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  modernActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  modernMiniBtn: {
+    flex: 1,
+    minWidth: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    gap: 4,
+  },
+  modernMiniBtnTxt: {
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  presetCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  presetThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#0F172A',
+  },
+  presetApplyPill: {
+    backgroundColor: T.navy,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  presetApplyTxt: {
+    color: T.goldB,
+    fontSize: 8.5,
+    fontWeight: '900',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalBox: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: T.gold,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderColor: T.border,
+  },
+  modalTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: T.navy,
+  },
+  modalInput: {
+    backgroundColor: T.bg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12,
+    color: T.navy,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  modalPreviewMini: {
+    height: 120,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: T.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Phone Mockup Frame Styles
+  phoneFrameBox: {
+    width: Math.min(340, W - 32),
+    height: Math.min(620, Dimensions.get('window').height * 0.88),
+    backgroundColor: '#0B0F19',
+    borderRadius: 36,
+    padding: 8,
+    borderWidth: 4,
+    borderColor: '#334155',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 30,
+    elevation: 12,
+  },
+  phoneTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
+  phoneSpeakerNotch: {
+    width: 60,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#1E293B',
+    alignSelf: 'center',
+  },
+  phoneCloseBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phoneScreenCanvas: {
+    flex: 1,
+    backgroundColor: '#FDFBF7',
+    borderRadius: 28,
+    overflow: 'hidden',
+    paddingTop: 8,
+  },
+  miniBrandHalo: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: T.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phoneHeroArtworkBox: {
+    width: '100%',
+    height: 170,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginVertical: 6,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  phoneDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#CBD5E1',
+  },
+  phoneActionButton: {
+    width: '100%',
+    backgroundColor: T.navy,
+    paddingVertical: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: T.gold,
+  },
+  phoneFullTestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    marginTop: 6,
+  },
 });

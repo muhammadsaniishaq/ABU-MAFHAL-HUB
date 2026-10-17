@@ -93,11 +93,13 @@ export default function CardManager() {
             const fee = cardCreationFeeUSD.trim();
 
             // Upsert in system_secrets
-            await supabase.from('system_secrets').upsert([
-                { key: 'PAYVESSEL_API_KEY', value: ak },
-                { key: 'PAYVESSEL_API_SECRET', value: sk },
-                { key: 'PAYVESSEL_BUSINESS_ID', value: bid }
-            ], { onConflict: 'key' }).catch(() => {});
+            try {
+                await supabase.from('system_secrets').upsert([
+                    { key: 'PAYVESSEL_API_KEY', value: ak },
+                    { key: 'PAYVESSEL_API_SECRET', value: sk },
+                    { key: 'PAYVESSEL_BUSINESS_ID', value: bid }
+                ], { onConflict: 'key' });
+            } catch (_) {}
 
             // Also upsert in app_settings for full backward compatibility
             await supabase.from('app_settings').upsert([
