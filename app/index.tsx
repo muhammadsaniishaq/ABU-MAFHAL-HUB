@@ -7,10 +7,7 @@ import {
   StyleSheet,
   Platform,
   StatusBar,
-  ScrollView,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-  useWindowDimensions,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +19,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
   withRepeat,
   withSequence,
   Easing,
@@ -29,53 +27,60 @@ import Animated, {
 import { supabase, processOAuthReturn } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const { width: SW, height: SH } = Dimensions.get('window');
+
 type LuxuryTheme = 'pearl' | 'champagne';
 
 export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const slideWidth = Math.min(windowWidth, 430);
 
   // 0: Global Fintech Gateway, 1: All-in-One Digital Hub, 2: Institutional Value & Get Started
   const [pageIdx, setPageIdx] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
   const [theme, setTheme] = useState<LuxuryTheme>('pearl');
   const [hasValidSession, setHasValidSession] = useState(false);
   const [customSlideImages, setCustomSlideImages] = useState<(string | null)[]>([null, null, null]);
   const [adminLogoUrl, setAdminLogoUrl] = useState<string | null>(null);
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  // Gesture tracking refs for instant, feather-light swipe response
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const isSwiping = useRef(false);
 
-  // Reanimated motions for fluid luxury levitation, complementary orbit badges, and breathing logo
+  // Reanimated motions for fluid luxury levitation and instant slide change
   const floatY = useSharedValue(0);
   const floatYReverse = useSharedValue(0);
   const pulseScale = useSharedValue(1);
 
+  // Slide transition values
+  const slideTranslateX = useSharedValue(0);
+  const slideOpacity = useSharedValue(1);
+  const slideScale = useSharedValue(1);
+
   useEffect(() => {
-    // Smooth 60fps levitation for primary hero card & left orbital chip
+    // 60fps smooth floating levitation
     floatY.value = withRepeat(
       withSequence(
-        withTiming(-10, { duration: 2500, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-9, { duration: 2500, easing: Easing.inOut(Easing.sin) }),
         withTiming(0, { duration: 2500, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
     );
 
-    // Staggered complementary levitation for right orbital chip
     floatYReverse.value = withRepeat(
       withSequence(
-        withTiming(8, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(-4, { duration: 2800, easing: Easing.inOut(Easing.sin) })
+        withTiming(7, { duration: 2700, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-4, { duration: 2700, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
     );
 
-    // Continuous breathing pulse for brand logo halo ring
     pulseScale.value = withRepeat(
       withSequence(
-        withTiming(1.06, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1.05, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
         withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
@@ -102,6 +107,18 @@ export default function SplashScreen() {
     };
   }, []);
 
+  // INSTANT, CRISP SLIDE ENTRANCE ANIMATION (ZERO LAG, BUTTERY SMOOTH)
+  useEffect(() => {
+    const initialOffset = slideDirection === 'forward' ? 38 : -38;
+    slideOpacity.value = 0.25;
+    slideTranslateX.value = initialOffset;
+    slideScale.value = 0.96;
+
+    slideOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
+    slideTranslateX.value = withSpring(0, { damping: 18, stiffness: 180 });
+    slideScale.value = withSpring(1, { damping: 18, stiffness: 180 });
+  }, [pageIdx, slideDirection]);
+
   const floatAnimStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: floatY.value }],
   }));
@@ -112,6 +129,14 @@ export default function SplashScreen() {
 
   const pulseAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
+  }));
+
+  const slideTransitionStyle = useAnimatedStyle(() => ({
+    opacity: slideOpacity.value,
+    transform: [
+      { translateX: slideTranslateX.value },
+      { scale: slideScale.value },
+    ],
   }));
 
   const loadSavedTheme = async () => {
@@ -136,7 +161,6 @@ export default function SplashScreen() {
     }
   };
 
-  // HELPER: Extract guaranteed URLs for [Page 1, Page 2, Page 3]
   const extractSlideUrls = (raw: any): (string | null)[] => {
     if (!raw) return [null, null, null];
     let parsed = raw;
@@ -159,17 +183,14 @@ export default function SplashScreen() {
     ];
   };
 
-  // LOAD ADMIN CUSTOM SLIDE IMAGES / GIFS & LOGO FROM SUPABASE
   const loadAdminConfig = async () => {
     try {
-      // 1. Check cached slide images
       const cached = await AsyncStorage.getItem('cached_splash_slides_v3');
       if (cached) {
         const cachedUrls = extractSlideUrls(cached);
         setCustomSlideImages(cachedUrls);
       }
 
-      // 2. Fetch latest splash slides from admin app_settings (key: app_splash_slides)
       const { data: slidesData } = await supabase
         .from('app_settings')
         .select('value')
@@ -186,7 +207,6 @@ export default function SplashScreen() {
         await AsyncStorage.setItem('cached_splash_slides_v3', slidesToStore);
       }
 
-      // 3. Fetch custom app logo if configured in admin (key: app_logo)
       const { data: logoData } = await supabase
         .from('app_settings')
         .select('value')
@@ -262,17 +282,19 @@ export default function SplashScreen() {
     }
   }, []);
 
-  // MANUAL & SWIPE SLIDE NAVIGATION
+  // INSTANT FLUID NAVIGATION CONTROLS
   const goTo = (idx: number) => {
-    if (idx < 0 || idx > 2) return;
+    if (idx === pageIdx || idx < 0 || idx > 2) return;
     haptic();
+    setSlideDirection(idx > pageIdx ? 'forward' : 'backward');
     setPageIdx(idx);
-    scrollViewRef.current?.scrollTo({ x: idx * slideWidth, animated: true });
   };
 
   const nextSlide = () => {
     if (pageIdx < 2) {
-      goTo(pageIdx + 1);
+      haptic();
+      setSlideDirection('forward');
+      setPageIdx(p => p + 1);
     } else {
       haptic();
       router.push('/(auth)/signup' as any);
@@ -281,7 +303,9 @@ export default function SplashScreen() {
 
   const prevSlide = () => {
     if (pageIdx > 0) {
-      goTo(pageIdx - 1);
+      haptic();
+      setSlideDirection('backward');
+      setPageIdx(p => p - 1);
     }
   };
 
@@ -289,17 +313,53 @@ export default function SplashScreen() {
     goTo(2);
   };
 
-  // NATIVE HORIZONTAL SWIPE EVENT HANDLER
-  const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const newIdx = Math.round(offsetX / slideWidth);
-    if (newIdx !== pageIdx && newIdx >= 0 && newIdx <= 2) {
-      haptic();
-      setPageIdx(newIdx);
+  // HIGH-PERFORMANCE TOUCH SWIPE HANDLERS (IDAN AN JA GEFE)
+  // Works flawlessly on Android, iOS, and Web touch/mouse!
+  const onTouchStartCapture = (e: any) => {
+    const pageX = e.nativeEvent?.pageX ?? e.nativeEvent?.clientX ?? 0;
+    const pageY = e.nativeEvent?.pageY ?? e.nativeEvent?.clientY ?? 0;
+    touchStartX.current = pageX;
+    touchStartY.current = pageY;
+    isSwiping.current = true;
+  };
+
+  const onTouchMoveCapture = (e: any) => {
+    if (!isSwiping.current) return;
+    const pageX = e.nativeEvent?.pageX ?? e.nativeEvent?.clientX ?? 0;
+    const pageY = e.nativeEvent?.pageY ?? e.nativeEvent?.clientY ?? 0;
+    const dx = pageX - touchStartX.current;
+    const dy = pageY - touchStartY.current;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      slideTranslateX.value = dx * 0.35;
     }
   };
 
-  // LUXURY THEME PALETTES (100% BRIGHT & RADIANT, ZERO HARSH BLACK BACKGROUND)
+  const onTouchEndCapture = (e: any) => {
+    if (!isSwiping.current) return;
+    isSwiping.current = false;
+    const pageX = e.nativeEvent?.pageX ?? e.nativeEvent?.clientX ?? 0;
+    const pageY = e.nativeEvent?.pageY ?? e.nativeEvent?.clientY ?? 0;
+    const dx = pageX - touchStartX.current;
+    const dy = pageY - touchStartY.current;
+
+    // Responsive swipe threshold (32px)
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 32) {
+      if (dx < 0 && pageIdx < 2) {
+        // Swiped Left -> Next
+        nextSlide();
+      } else if (dx > 0 && pageIdx > 0) {
+        // Swiped Right -> Previous
+        prevSlide();
+      } else {
+        slideTranslateX.value = withSpring(0, { damping: 18, stiffness: 200 });
+      }
+    } else {
+      slideTranslateX.value = withSpring(0, { damping: 18, stiffness: 200 });
+    }
+  };
+
+  // LUXURY THEME PALETTES (100% BRIGHT & RADIANT)
   const isPearl = theme === 'pearl';
   const colors = isPearl
     ? {
@@ -308,7 +368,7 @@ export default function SplashScreen() {
         secondaryText: '#64748B',
         accentGold: '#D97706',
         accentGoldDark: '#B45309',
-        cardBg: 'rgba(255, 255, 255, 0.88)',
+        cardBg: 'rgba(255, 255, 255, 0.90)',
         cardBorder: 'rgba(217, 119, 6, 0.32)',
         cardShadow: '#D97706',
         navBtnBg: 'rgba(255, 255, 255, 0.95)',
@@ -359,7 +419,6 @@ export default function SplashScreen() {
       <View style={styles.bgDecorationsHolder} pointerEvents="none">
         <View style={[styles.ambientOrbTop, { backgroundColor: isPearl ? '#FEF3C7' : '#FDE68A' }]} />
         <View style={[styles.ambientOrbBottom, { backgroundColor: isPearl ? '#F5EFE6' : '#F3E8D8' }]} />
-        {/* Subtle connected constellation particle lines in background */}
         <View style={styles.constellationRing} />
       </View>
 
@@ -371,6 +430,9 @@ export default function SplashScreen() {
             paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 34 : 20) + 4,
           },
         ]}
+        onTouchStart={onTouchStartCapture}
+        onTouchMove={onTouchMoveCapture}
+        onTouchEnd={onTouchEndCapture}
       >
         {/* ── TOP NAV BAR (Back chevron, Theme Switcher, Skip Button) ── */}
         <View style={styles.topNav}>
@@ -441,7 +503,7 @@ export default function SplashScreen() {
           </View>
         </View>
 
-        {/* ── COMPACT LUXURY BRAND CREST (PRESERVES MAXIMUM VERTICAL ROOM FOR TALL HERO VISUAL) ── */}
+        {/* ── LUXURY BRAND CREST (PRESERVES VERTICAL ROOM) ── */}
         <View style={styles.brandHeader}>
           <Animated.View style={[styles.logoHaloGlow, pulseAnimStyle]}>
             <View style={styles.logoOuterHalo}>
@@ -474,170 +536,13 @@ export default function SplashScreen() {
           </View>
         </View>
 
-        {/* ── INTERCONNECTED PROGRESS CONSTELLATION TIMELINE (CONNECTED DECORATION) ── */}
-        <View style={styles.interconnectedProgressContainer}>
-          {/* Node 1: Gateway */}
-          <TouchableOpacity
-            onPress={() => goTo(0)}
-            activeOpacity={0.8}
-            style={styles.progressNodeWrapper}
-          >
-            <View
-              style={[
-                styles.progressNodeCircle,
-                pageIdx === 0
-                  ? [styles.progressNodeActive, { borderColor: colors.accentGold }]
-                  : pageIdx > 0
-                  ? [styles.progressNodeCompleted, { backgroundColor: colors.accentGold }]
-                  : styles.progressNodeInactive,
-              ]}
-            >
-              {pageIdx > 0 ? (
-                <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-              ) : (
-                <Text
-                  style={[
-                    styles.progressNodeText,
-                    pageIdx === 0 && { color: colors.accentGold, fontWeight: '900' },
-                  ]}
-                >
-                  1
-                </Text>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.progressNodeLabel,
-                pageIdx === 0
-                  ? { color: colors.accentGold, fontWeight: '800' }
-                  : { color: colors.secondaryText },
-              ]}
-            >
-              Gateway
-            </Text>
-          </TouchableOpacity>
-
-          {/* Connected Link 1-2 */}
-          <View style={styles.progressConnectorLineBg}>
-            <View
-              style={[
-                styles.progressConnectorLineFill,
-                {
-                  width: pageIdx >= 1 ? '100%' : '0%',
-                  backgroundColor: colors.accentGold,
-                },
-              ]}
-            />
-          </View>
-
-          {/* Node 2: Automation */}
-          <TouchableOpacity
-            onPress={() => goTo(1)}
-            activeOpacity={0.8}
-            style={styles.progressNodeWrapper}
-          >
-            <View
-              style={[
-                styles.progressNodeCircle,
-                pageIdx === 1
-                  ? [styles.progressNodeActive, { borderColor: colors.accentGold }]
-                  : pageIdx > 1
-                  ? [styles.progressNodeCompleted, { backgroundColor: colors.accentGold }]
-                  : styles.progressNodeInactive,
-              ]}
-            >
-              {pageIdx > 1 ? (
-                <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-              ) : (
-                <Text
-                  style={[
-                    styles.progressNodeText,
-                    pageIdx === 1 && { color: colors.accentGold, fontWeight: '900' },
-                  ]}
-                >
-                  2
-                </Text>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.progressNodeLabel,
-                pageIdx === 1
-                  ? { color: colors.accentGold, fontWeight: '800' }
-                  : { color: colors.secondaryText },
-              ]}
-            >
-              Hub
-            </Text>
-          </TouchableOpacity>
-
-          {/* Connected Link 2-3 */}
-          <View style={styles.progressConnectorLineBg}>
-            <View
-              style={[
-                styles.progressConnectorLineFill,
-                {
-                  width: pageIdx >= 2 ? '100%' : '0%',
-                  backgroundColor: colors.accentGold,
-                },
-              ]}
-            />
-          </View>
-
-          {/* Node 3: Security */}
-          <TouchableOpacity
-            onPress={() => goTo(2)}
-            activeOpacity={0.8}
-            style={styles.progressNodeWrapper}
-          >
-            <View
-              style={[
-                styles.progressNodeCircle,
-                pageIdx === 2
-                  ? [styles.progressNodeActive, { borderColor: colors.accentGold }]
-                  : styles.progressNodeInactive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.progressNodeText,
-                  pageIdx === 2 && { color: colors.accentGold, fontWeight: '900' },
-                ]}
-              >
-                3
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.progressNodeLabel,
-                pageIdx === 2
-                  ? { color: colors.accentGold, fontWeight: '800' }
-                  : { color: colors.secondaryText },
-              ]}
-            >
-              Security
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── NATIVE HORIZONTAL SWIPEABLE SLIDES CAROUSEL (JA SCREEN DIN WAYA) ── */}
-        <View style={styles.carouselViewport}>
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            bounces={false}
-            scrollEventThrottle={16}
-            onMomentumScrollEnd={handleScrollEnd}
-            style={{ width: slideWidth }}
-            contentContainerStyle={{ width: slideWidth * 3 }}
-          >
-            {/* ══════════════════════════════════════════════════════════════
-                 SLIDE 0: 3D GLOBE / ADMIN CUSTOM IMAGE (TALL HERO VISUAL)
-                 ══════════════════════════════════════════════════════════════ */}
-            <View style={[styles.slideInner, { width: slideWidth }]}>
-              {/* Category Badge */}
+        {/* ── LIGHTWEIGHT, ZERO-LAG SLIDE VIEWPORT (INSTANT TRANSITIONS & 100% FLUID SWIPE) ── */}
+        <Animated.View style={[styles.slideViewport, slideTransitionStyle]}>
+          {/* ══════════════════════════════════════════════════════════════
+               SLIDE 0: 3D GLOBE / ADMIN CUSTOM IMAGE (TALL HERO VISUAL)
+               ══════════════════════════════════════════════════════════════ */}
+          {pageIdx === 0 && (
+            <View style={styles.slideInner}>
               <View
                 style={[
                   styles.featureBadge,
@@ -691,7 +596,7 @@ export default function SplashScreen() {
                     ]}
                   >
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={65} tint="light" style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
                     ) : null}
 
                     <LinearGradient
@@ -808,12 +713,13 @@ export default function SplashScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+          )}
 
-            {/* ══════════════════════════════════════════════════════════════
-                 SLIDE 1: 3D PHONE HUB / ADMIN CUSTOM IMAGE (TALL HERO VISUAL)
-                 ══════════════════════════════════════════════════════════════ */}
-            <View style={[styles.slideInner, { width: slideWidth }]}>
-              {/* Category Badge */}
+          {/* ══════════════════════════════════════════════════════════════
+               SLIDE 1: 3D PHONE HUB / ADMIN CUSTOM IMAGE (TALL HERO VISUAL)
+               ══════════════════════════════════════════════════════════════ */}
+          {pageIdx === 1 && (
+            <View style={styles.slideInner}>
               <View
                 style={[
                   styles.featureBadge,
@@ -826,7 +732,6 @@ export default function SplashScreen() {
                 </Text>
               </View>
 
-              {/* TALL HERO VISUAL WITH CONNECTED ORBITAL CHIPS */}
               <View style={styles.heroCenter}>
                 {/* Floating Left Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipLeft, floatAnimStyle]}>
@@ -866,7 +771,7 @@ export default function SplashScreen() {
                     ]}
                   >
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={65} tint="light" style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
                     ) : null}
 
                     <LinearGradient
@@ -987,12 +892,13 @@ export default function SplashScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+          )}
 
-            {/* ══════════════════════════════════════════════════════════════
-                 SLIDE 2: 3D CARD STACK / ADMIN CUSTOM IMAGE (TALL HERO VISUAL)
-                 ══════════════════════════════════════════════════════════════ */}
-            <View style={[styles.slideInner, { width: slideWidth }]}>
-              {/* Category Badge */}
+          {/* ══════════════════════════════════════════════════════════════
+               SLIDE 2: 3D CARD STACK / ADMIN CUSTOM IMAGE (TALL HERO VISUAL)
+               ══════════════════════════════════════════════════════════════ */}
+          {pageIdx === 2 && (
+            <View style={styles.slideInner}>
               <View
                 style={[
                   styles.featureBadge,
@@ -1005,7 +911,6 @@ export default function SplashScreen() {
                 </Text>
               </View>
 
-              {/* TALL HERO VISUAL WITH CONNECTED ORBITAL CHIPS */}
               <View style={styles.heroCenter}>
                 {/* Floating Left Orbital Chip */}
                 <Animated.View style={[styles.orbitalChipLeft, floatAnimStyle]}>
@@ -1045,7 +950,7 @@ export default function SplashScreen() {
                     ]}
                   >
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={65} tint="light" style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
                     ) : null}
 
                     <LinearGradient
@@ -1193,8 +1098,8 @@ export default function SplashScreen() {
                 </View>
               </View>
             </View>
-          </ScrollView>
-        </View>
+          )}
+        </Animated.View>
 
         {/* ── INTERACTIVE PAGINATION CAPSULES (TAP TO NAVIGATE) ── */}
         <View style={styles.paginationArea}>
@@ -1272,7 +1177,7 @@ const styles = StyleSheet.create({
   },
   constellationRing: {
     position: 'absolute',
-    top: '32%',
+    top: '30%',
     alignSelf: 'center',
     width: 380,
     height: 380,
@@ -1369,150 +1274,92 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // ── Compact Luxury Brand Header (Frees vertical space for tall hero visual) ──
+  // ── Luxury Brand Crest (Clean & Compact) ──
   brandHeader: {
     alignItems: 'center',
     marginTop: 0,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   logoHaloGlow: {
     shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 16,
+    elevation: 8,
+    marginBottom: 5,
   },
   logoOuterHalo: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    padding: 2.5,
+    width: 94,
+    height: 94,
+    borderRadius: 47,
+    padding: 3.5,
     backgroundColor: '#FEF3C7',
-    borderWidth: 1.5,
-    borderColor: 'rgba(217, 119, 6, 0.35)',
+    borderWidth: 2,
+    borderColor: 'rgba(217, 119, 6, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoRingWrapper: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#FEF3C7',
   },
   realBrandLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
   },
   brandTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   brandStarIcon: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
   },
   brandTitle: {
-    fontSize: 17,
+    fontSize: 19.5,
     fontWeight: '900',
-    letterSpacing: 2.2,
+    letterSpacing: 2.4,
     textTransform: 'uppercase',
   },
   subRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 1,
-    gap: 5,
+    marginTop: 2,
+    gap: 6,
   },
   subLine: {
-    width: 18,
-    height: 1.2,
+    width: 22,
+    height: 1.5,
     borderRadius: 1,
   },
   subDiamond: {
-    fontSize: 7.5,
+    fontSize: 8,
   },
   subText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '800',
-    letterSpacing: 3.5,
+    letterSpacing: 3.8,
   },
 
-  // ── Connected Constellation Progress Timeline ──
-  interconnectedProgressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    paddingHorizontal: 20,
-    marginVertical: 4,
-  },
-  progressNodeWrapper: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  progressNodeCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressNodeActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  progressNodeCompleted: {
-    borderColor: 'transparent',
-  },
-  progressNodeInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderColor: '#E2E8F0',
-  },
-  progressNodeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#94A3B8',
-  },
-  progressNodeLabel: {
-    fontSize: 9.5,
-    fontWeight: '600',
-  },
-  progressConnectorLineBg: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 8,
-    marginBottom: 12,
-    borderRadius: 1,
-    overflow: 'hidden',
-  },
-  progressConnectorLineFill: {
-    height: '100%',
-    borderRadius: 1,
-  },
-
-  // ── Carousel Viewport (Native Horizontal Scroll) ──
-  carouselViewport: {
+  // ── Slide Viewport (Smooth, Fast & Fluid) ──
+  slideViewport: {
     flex: 1,
     width: '100%',
+    justifyContent: 'center',
   },
   slideInner: {
     flex: 1,
+    width: '100%',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 8,
   },
 
   // ── Feature Badge ──
