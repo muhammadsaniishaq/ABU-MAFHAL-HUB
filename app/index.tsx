@@ -679,12 +679,29 @@ export default function SplashScreen() {
                       },
                     ]}
                   >
+                    {/* 1. Blurred Ambient Image Backdrop (Diffuses exact photo colors into background) */}
+                    <Image
+                      source={
+                        customSlideImages[0]
+                          ? { uri: customSlideImages[0]! }
+                          : require('../assets/images/splash_globe_3d.png')
+                      }
+                      style={styles.blurredBackdropAura}
+                      blurRadius={Platform.OS === 'ios' ? 25 : 18}
+                      resizeMode="cover"
+                    />
+
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={60} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={50} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
                     ) : null}
 
+                    {/* 2. Soft Ambient Tint matching active theme */}
                     <LinearGradient
-                      colors={colors.isDark ? ['rgba(15,23,42,0.6)', 'rgba(30,41,59,0.4)', 'rgba(15,23,42,0.6)'] : ['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
+                      colors={
+                        colors.isDark
+                          ? ['rgba(7, 13, 30, 0.72)', 'rgba(11, 23, 54, 0.45)', 'rgba(7, 13, 30, 0.72)']
+                          : ['rgba(255, 255, 255, 0.75)', 'rgba(254, 243, 199, 0.4)', 'rgba(255, 255, 255, 0.75)']
+                      }
                       style={StyleSheet.absoluteFill}
                     />
 
@@ -696,42 +713,44 @@ export default function SplashScreen() {
                       ]}
                     />
 
-                    {/* HERO PICTURE: TALL 3D GLOBE OR ADMIN CUSTOM PHOTO */}
-                    <Image
-                      source={
-                        customSlideImages[0]
-                          ? { uri: customSlideImages[0]! }
-                          : require('../assets/images/splash_globe_3d.png')
-                      }
-                      style={styles.heroImageGlobe}
-                      resizeMode="contain"
-                    />
+                    {/* 3. CENTER HERO PICTURE & SEAMLESS 4-WAY EDGE MELTING (ZERO SHARP BORDERS) */}
+                    <View style={styles.heroImageCenterHolder}>
+                      <Image
+                        source={
+                          customSlideImages[0]
+                            ? { uri: customSlideImages[0]! }
+                            : require('../assets/images/splash_globe_3d.png')
+                        }
+                        style={styles.heroImageGlobe}
+                        resizeMode="contain"
+                      />
 
-                    {/* 4-Directional Feathered Blur Vignettes to Melt Dark/Square Edges into Theme */}
-                    <LinearGradient
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.2)', 'transparent']}
-                      style={styles.vignetteTop}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.2)', colors.bgGradient[1]]}
-                      style={styles.vignetteBottom}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.15)', 'transparent']}
-                      style={styles.vignetteLeft}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      colors={['transparent', 'rgba(255,255,255,0.15)', colors.bgGradient[0]]}
-                      style={styles.vignetteRight}
-                      pointerEvents="none"
-                    />
+                      {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
+                      <LinearGradient
+                        colors={[colors.cardBg, 'transparent']}
+                        style={styles.vignetteTop}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        colors={['transparent', colors.cardBg]}
+                        style={styles.vignetteBottom}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        colors={[colors.cardBg, 'transparent']}
+                        style={styles.vignetteLeft}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        colors={['transparent', colors.cardBg]}
+                        style={styles.vignetteRight}
+                        pointerEvents="none"
+                      />
+                    </View>
 
                     {/* Corner decorative golden accents */}
                     <View style={[styles.cornerStarTopLeft, { borderColor: colors.accentGold }]} />
@@ -850,12 +869,29 @@ export default function SplashScreen() {
                       },
                     ]}
                   >
+                    {/* 1. Blurred Ambient Image Backdrop (Diffuses exact photo colors into background) */}
+                    <Image
+                      source={
+                        customSlideImages[1]
+                          ? { uri: customSlideImages[1]! }
+                          : require('../assets/images/splash_hub_phone_3d.png')
+                      }
+                      style={styles.blurredBackdropAura}
+                      blurRadius={Platform.OS === 'ios' ? 25 : 18}
+                      resizeMode="cover"
+                    />
+
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={60} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={50} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
                     ) : null}
 
+                    {/* 2. Soft Ambient Tint matching active theme */}
                     <LinearGradient
-                      colors={colors.isDark ? ['rgba(15,23,42,0.6)', 'rgba(30,41,59,0.4)', 'rgba(15,23,42,0.6)'] : ['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
+                      colors={
+                        colors.isDark
+                          ? ['rgba(7, 13, 30, 0.72)', 'rgba(11, 23, 54, 0.45)', 'rgba(7, 13, 30, 0.72)']
+                          : ['rgba(255, 255, 255, 0.75)', 'rgba(254, 243, 199, 0.4)', 'rgba(255, 255, 255, 0.75)']
+                      }
                       style={StyleSheet.absoluteFill}
                     />
 
@@ -867,42 +903,44 @@ export default function SplashScreen() {
                       ]}
                     />
 
-                    {/* HERO PICTURE: TALL 3D PHONE HUB OR ADMIN CUSTOM PHOTO */}
-                    <Image
-                      source={
-                        customSlideImages[1]
-                          ? { uri: customSlideImages[1]! }
-                          : require('../assets/images/splash_hub_phone_3d.png')
-                      }
-                      style={styles.heroImagePhone}
-                      resizeMode="contain"
-                    />
+                    {/* 3. CENTER HERO PICTURE & SEAMLESS 4-WAY EDGE MELTING (ZERO SHARP BORDERS) */}
+                    <View style={styles.heroImageCenterHolder}>
+                      <Image
+                        source={
+                          customSlideImages[1]
+                            ? { uri: customSlideImages[1]! }
+                            : require('../assets/images/splash_hub_phone_3d.png')
+                        }
+                        style={styles.heroImagePhone}
+                        resizeMode="contain"
+                      />
 
-                    {/* 4-Directional Feathered Blur Vignettes */}
-                    <LinearGradient
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.2)', 'transparent']}
-                      style={styles.vignetteTop}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.2)', colors.bgGradient[1]]}
-                      style={styles.vignetteBottom}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.15)', 'transparent']}
-                      style={styles.vignetteLeft}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      colors={['transparent', 'rgba(255,255,255,0.15)', colors.bgGradient[0]]}
-                      style={styles.vignetteRight}
-                      pointerEvents="none"
-                    />
+                      {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
+                      <LinearGradient
+                        colors={[colors.cardBg, 'transparent']}
+                        style={styles.vignetteTop}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        colors={['transparent', colors.cardBg]}
+                        style={styles.vignetteBottom}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        colors={[colors.cardBg, 'transparent']}
+                        style={styles.vignetteLeft}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        colors={['transparent', colors.cardBg]}
+                        style={styles.vignetteRight}
+                        pointerEvents="none"
+                      />
+                    </View>
 
                     {/* Corner decorative golden accents */}
                     <View style={[styles.cornerStarTopLeft, { borderColor: colors.accentGold }]} />
@@ -1025,12 +1063,29 @@ export default function SplashScreen() {
                       },
                     ]}
                   >
+                    {/* 1. Blurred Ambient Image Backdrop (Diffuses exact photo colors into background) */}
+                    <Image
+                      source={
+                        customSlideImages[2]
+                          ? { uri: customSlideImages[2]! }
+                          : require('../assets/images/vc_card_stack_3d_real.png')
+                      }
+                      style={styles.blurredBackdropAura}
+                      blurRadius={Platform.OS === 'ios' ? 25 : 18}
+                      resizeMode="cover"
+                    />
+
                     {Platform.OS !== 'web' ? (
-                      <BlurView intensity={60} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+                      <BlurView intensity={50} tint={colors.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
                     ) : null}
 
+                    {/* 2. Soft Ambient Tint matching active theme */}
                     <LinearGradient
-                      colors={colors.isDark ? ['rgba(15,23,42,0.6)', 'rgba(30,41,59,0.4)', 'rgba(15,23,42,0.6)'] : ['rgba(255,255,255,0.7)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.6)']}
+                      colors={
+                        colors.isDark
+                          ? ['rgba(7, 13, 30, 0.72)', 'rgba(11, 23, 54, 0.45)', 'rgba(7, 13, 30, 0.72)']
+                          : ['rgba(255, 255, 255, 0.75)', 'rgba(254, 243, 199, 0.4)', 'rgba(255, 255, 255, 0.75)']
+                      }
                       style={StyleSheet.absoluteFill}
                     />
 
@@ -1042,42 +1097,44 @@ export default function SplashScreen() {
                       ]}
                     />
 
-                    {/* HERO PICTURE: TALL 3D CARD STACK OR ADMIN CUSTOM PHOTO */}
-                    <Image
-                      source={
-                        customSlideImages[2]
-                          ? { uri: customSlideImages[2]! }
-                          : require('../assets/images/vc_card_stack_3d_real.png')
-                      }
-                      style={styles.heroImageCardStack}
-                      resizeMode="contain"
-                    />
+                    {/* 3. CENTER HERO PICTURE & SEAMLESS 4-WAY EDGE MELTING (ZERO SHARP BORDERS) */}
+                    <View style={styles.heroImageCenterHolder}>
+                      <Image
+                        source={
+                          customSlideImages[2]
+                            ? { uri: customSlideImages[2]! }
+                            : require('../assets/images/vc_card_stack_3d_real.png')
+                        }
+                        style={styles.heroImageCardStack}
+                        resizeMode="contain"
+                      />
 
-                    {/* 4-Directional Feathered Blur Vignettes */}
-                    <LinearGradient
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.2)', 'transparent']}
-                      style={styles.vignetteTop}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.2)', colors.bgGradient[1]]}
-                      style={styles.vignetteBottom}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      colors={[colors.bgGradient[0], 'rgba(255,255,255,0.15)', 'transparent']}
-                      style={styles.vignetteLeft}
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      colors={['transparent', 'rgba(255,255,255,0.15)', colors.bgGradient[0]]}
-                      style={styles.vignetteRight}
-                      pointerEvents="none"
-                    />
+                      {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
+                      <LinearGradient
+                        colors={[colors.cardBg, 'transparent']}
+                        style={styles.vignetteTop}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        colors={['transparent', colors.cardBg]}
+                        style={styles.vignetteBottom}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        colors={[colors.cardBg, 'transparent']}
+                        style={styles.vignetteLeft}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        colors={['transparent', colors.cardBg]}
+                        style={styles.vignetteRight}
+                        pointerEvents="none"
+                      />
+                    </View>
 
                     {/* Corner decorative golden accents */}
                     <View style={[styles.cornerStarTopLeft, { borderColor: colors.accentGold }]} />
@@ -1544,13 +1601,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
+  // Blurred Ambient Backdrop Aura (Diffuses image colors into card)
+  blurredBackdropAura: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.5,
+    transform: [{ scale: 1.15 }],
+    zIndex: 1,
+  },
+  heroImageCenterHolder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 28,
+    zIndex: 3,
+  },
+
   // 4-Directional Feathered Blur Linear Overlays
   vignetteTop: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 48,
+    height: 64,
     zIndex: 6,
   },
   vignetteBottom: {
@@ -1558,7 +1633,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 56,
+    height: 68,
     zIndex: 6,
   },
   vignetteLeft: {
@@ -1566,7 +1641,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: 36,
+    width: 48,
     zIndex: 6,
   },
   vignetteRight: {
@@ -1574,7 +1649,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: 36,
+    width: 48,
     zIndex: 6,
   },
   cornerStarTopLeft: {

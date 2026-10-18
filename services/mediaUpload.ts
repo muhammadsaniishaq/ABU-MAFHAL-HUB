@@ -67,21 +67,21 @@ export async function uploadMediaFile(options: UploadMediaOptions): Promise<Uplo
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token || supabaseAnonKey;
+    const authHeaders = {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseAnonKey,
+      'Content-Type': mimeType,
+      'x-upsert': 'true',
+    };
 
     // A. For videos or files without base64: Use streaming FileSystem.uploadAsync
-    // This streams directly from device disk into the network without JS memory spikes (no OOM).
     if (isVideo || !base64) {
       const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucket}/${finalFileName}`;
       
       const res = await FileSystem.uploadAsync(uploadUrl, uri, {
         httpMethod: 'POST',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'apikey': supabaseAnonKey,
-          'Content-Type': mimeType,
-          'x-upsert': 'true',
-        },
+        headers: authHeaders,
       });
 
       if (res.status >= 200 && res.status < 300) {
@@ -94,12 +94,7 @@ export async function uploadMediaFile(options: UploadMediaOptions): Promise<Uplo
       const resFallback = await FileSystem.uploadAsync(fallbackUrl, uri, {
         httpMethod: 'POST',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'apikey': supabaseAnonKey,
-          'Content-Type': mimeType,
-          'x-upsert': 'true',
-        },
+        headers: authHeaders,
       });
 
       if (resFallback.status >= 200 && resFallback.status < 300) {
@@ -111,7 +106,8 @@ export async function uploadMediaFile(options: UploadMediaOptions): Promise<Uplo
     }
 
     // B. For images with base64: decode and upload via Supabase storage
-    const arrayBuffer = decode(base64);
+    const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
+    const arrayBuffer = decode(cleanBase64);
     const { error: uploadErr } = await supabase.storage
       .from(bucket)
       .upload(finalFileName, arrayBuffer, { contentType: mimeType, upsert: true });
