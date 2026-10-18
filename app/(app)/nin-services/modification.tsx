@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Image, Modal, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Image, Modal, StyleSheet, Platform, KeyboardAvoidingView, Linking } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../services/supabase';
+import { api } from '../../../services/api';
 import { verificationHistory } from '../../../services/verificationHistory';
 import * as Clipboard from 'expo-clipboard';
 
@@ -18,6 +19,9 @@ const MODIFICATION_SERVICES = [
 export default function NINModificationScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+
+    // Page View Mode: 'submit' | 'track'
+    const [pageTab, setPageTab] = useState<'submit' | 'track'>('submit');
 
     // Tab State
     const [selectedServiceId, setSelectedServiceId] = useState('nin_mod_name');
@@ -46,6 +50,12 @@ export default function NINModificationScreen() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [userBalance, setUserBalance] = useState<number | null>(null);
+
+    // Track Status States (Free query via /request/status)
+    const [trackReference, setTrackReference] = useState('');
+    const [trackLoading, setTrackLoading] = useState(false);
+    const [trackResult, setTrackResult] = useState<any>(null);
+    const [copiedRef, setCopiedRef] = useState(false);
 
     // Custom Alert State
     const [customAlert, setCustomAlert] = useState<{
@@ -217,15 +227,16 @@ export default function NINModificationScreen() {
                 throw new Error(error.message || 'Failed to submit modification request.');
             }
 
+            const returnedRef = data?.data?.reference || data?.reference || refCode;
             const resObj = {
-                id: refCode,
-                reference: refCode,
+                id: returnedRef,
+                reference: returnedRef,
                 nin: cleanNin,
                 serviceName: activeService.name,
                 code: activeService.code,
                 amount: activeService.fee,
-                status: 'Processing',
-                message: 'Your NIN modification request has been submitted successfully. Our admin team will process and update your NIMC record.',
+                status: data?.data?.request_status || data?.data?.status || 'Processing',
+                message: data?.data?.message || 'Your NIN modification request has been submitted successfully. Our admin team will process and update your NIMC record.',
                 date: new Date().toISOString()
             };
 
@@ -239,12 +250,50 @@ export default function NINModificationScreen() {
                 search_number: cleanNin,
                 holder_name: currentFullName.trim() || newFirstName.trim() || 'NIN Holder',
                 layout: activeService.name,
-                details: { ref: refCode, amount: activeService.fee }
+                details: { ref: returnedRef, amount: activeService.fee }
             });
         } catch (e: any) {
             showAlert('Submission Error', e.message || 'An error occurred while submitting your NIN modification request. Please try again.', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTrackStatus = async (refToQuery?: string) => {
+        const query = (refToQuery || trackReference).trim();
+        if (!query) {
+            showAlert('Reference Required', 'Please enter your Request Reference code (e.g. API3F9A21C... or MOD-501-...).', 'warning');
+            return;
+        }
+
+        setTrackLoading(true);
+        setTrackResult(null);
+
+        try {
+            const res = await api.identity.checkNINModificationStatus(query);
+            if (res && res.data) {
+                const raw = res.data?.data || res.data;
+                const status = (raw.request_status || raw.status || 'PROCESSING').toUpperCase();
+                setTrackResult({
+                    status,
+                    request_status: raw.request_status || raw.status,
+                    reference: raw.reference || query,
+                    service: raw.service || raw.type || 'NIN Modification',
+                    response: raw.response || raw.message,
+                    refunded: Boolean(raw.refunded),
+                    amount: raw.amount,
+                    attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+                    slip_url: raw.slip_url || (Array.isArray(raw.attachments) && raw.attachments[0]) || null,
+                    submitted_at: raw.submitted_at,
+                    updated_at: raw.updated_at,
+                });
+            } else {
+                showAlert('Status Inquiry', res?.message || 'No status record found for this reference.', 'info');
+            }
+        } catch (e: any) {
+            showAlert('Status Check Error', e.message || 'Failed to check status. Please check your connection.', 'error');
+        } finally {
+            setTrackLoading(false);
         }
     };
 
@@ -425,7 +474,18 @@ export default function NINModificationScreen() {
                         <View style={{ backgroundColor: '#ffffff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', marginTop: 16, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
                                 <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>REFERENCE</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '700', fontSize: 11 }}>{result.reference}</Text>
+                                <TouchableOpacity 
+                                    onPress={async () => {
+                                        await Clipboard.setStringAsync(result.reference);
+                                        setCopiedRef(true);
+                                        setTimeout(() => setCopiedRef(false), 2000);
+                                    }}
+                                    style={{ flexDirection: 'row', alignItems: 'center' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 11, marginRight: 4 }}>{result.reference}</Text>
+                                    <Ionicons name={copiedRef ? "checkmark" : "copy-outline"} size={13} color="#f5a623" />
+                                </TouchableOpacity>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
@@ -452,8 +512,22 @@ export default function NINModificationScreen() {
                         </View>
 
                         <TouchableOpacity 
+                            onPress={() => {
+                                setTrackReference(result.reference);
+                                setPageTab('track');
+                                setResult(null);
+                                handleTrackStatus(result.reference);
+                            }} 
+                            style={{ backgroundColor: '#f5a623', height: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 14, shadowColor: '#f5a623', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 3 }}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="search" size={17} color="#060d21" style={{ marginRight: 6 }} />
+                            <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 13 }}>Track Real-time Status (Free)</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
                             onPress={() => setResult(null)} 
-                            style={{ backgroundColor: '#060d21', height: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 16, shadowColor: '#060d21', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 }}
+                            style={{ backgroundColor: '#060d21', height: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 10, shadowColor: '#060d21', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 }}
                             activeOpacity={0.8}
                         >
                             <Ionicons name="add-circle-outline" size={18} color="#f5a623" style={{ marginRight: 6 }} />
@@ -486,27 +560,225 @@ export default function NINModificationScreen() {
                                     )}
                                 </View>
 
-                                {/* Step Tracker Bar */}
-                                <View style={styles.stepProgressRow}>
-                                    <View style={styles.stepItem}>
-                                        <View style={[styles.stepDot, styles.stepDotActive]}><Text style={styles.stepDotNum}>1</Text></View>
-                                        <Text style={[styles.stepText, styles.stepTextActive]}>Select Type</Text>
-                                    </View>
-                                    <View style={styles.stepLineActive} />
-                                    <View style={styles.stepItem}>
-                                        <View style={[styles.stepDot, targetNin.length === 11 && styles.stepDotActive]}><Text style={styles.stepDotNum}>2</Text></View>
-                                        <Text style={[styles.stepText, targetNin.length === 11 && styles.stepTextActive]}>Fill Details</Text>
-                                    </View>
-                                    <View style={styles.stepLine} />
-                                    <View style={styles.stepItem}>
-                                        <View style={styles.stepDot}><Text style={styles.stepDotNum}>3</Text></View>
-                                        <Text style={styles.stepText}>Submit</Text>
-                                    </View>
+                                {/* Mode Selector: Submit Modification vs Track Status */}
+                                <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: 3, marginTop: 12 }}>
+                                    <TouchableOpacity
+                                        onPress={() => setPageTab('submit')}
+                                        style={{
+                                            flex: 1,
+                                            paddingVertical: 7,
+                                            alignItems: 'center',
+                                            borderRadius: 8,
+                                            backgroundColor: pageTab === 'submit' ? '#f5a623' : 'transparent',
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={{
+                                            fontSize: 12,
+                                            fontWeight: '800',
+                                            color: pageTab === 'submit' ? '#060d21' : '#ffffff',
+                                        }}>
+                                            Submit Request
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setPageTab('track')}
+                                        style={{
+                                            flex: 1,
+                                            paddingVertical: 7,
+                                            alignItems: 'center',
+                                            borderRadius: 8,
+                                            backgroundColor: pageTab === 'track' ? '#f5a623' : 'transparent',
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={{
+                                            fontSize: 12,
+                                            fontWeight: '800',
+                                            color: pageTab === 'track' ? '#060d21' : '#ffffff',
+                                        }}>
+                                            Track Status (Free)
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
+
+                                {/* Step Tracker Bar (Shown only in Submit Mode) */}
+                                {pageTab === 'submit' && (
+                                    <View style={styles.stepProgressRow}>
+                                        <View style={styles.stepItem}>
+                                            <View style={[styles.stepDot, styles.stepDotActive]}><Text style={styles.stepDotNum}>1</Text></View>
+                                            <Text style={[styles.stepText, styles.stepTextActive]}>Select Type</Text>
+                                        </View>
+                                        <View style={styles.stepLineActive} />
+                                        <View style={styles.stepItem}>
+                                            <View style={[styles.stepDot, targetNin.length === 11 && styles.stepDotActive]}><Text style={styles.stepDotNum}>2</Text></View>
+                                            <Text style={[styles.stepText, targetNin.length === 11 && styles.stepTextActive]}>Fill Details</Text>
+                                        </View>
+                                        <View style={styles.stepLine} />
+                                        <View style={styles.stepItem}>
+                                            <View style={styles.stepDot}><Text style={styles.stepDotNum}>3</Text></View>
+                                            <Text style={styles.stepText}>Submit</Text>
+                                        </View>
+                                    </View>
+                                )}
                             </View>
                         </LinearGradient>
 
-                        <View style={{ paddingHorizontal: 14, marginTop: 10, maxWidth: 460, width: '100%', alignSelf: 'center' }}>
+                        {pageTab === 'track' ? (
+                            <View style={{ paddingHorizontal: 14, marginTop: 14, maxWidth: 460, width: '100%', alignSelf: 'center' }}>
+                                <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                        <Ionicons name="search-circle" size={20} color="#f5a623" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 14 }}>Real-Time Status Inquiry</Text>
+                                    </View>
+                                    <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 14, lineHeight: 16 }}>
+                                        Check the progress and results of any request submitted to the SKBTECH modification gateway using its reference code. Status checks are completely free.
+                                    </Text>
+
+                                    <Text style={{ color: '#334155', fontWeight: '700', fontSize: 11, marginBottom: 6 }}>
+                                        Request Reference Number
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', paddingHorizontal: 12, height: 44, marginRight: 8 }}>
+                                            <Ionicons name="barcode-outline" size={17} color="#64748b" style={{ marginRight: 8 }} />
+                                            <TextInput
+                                                style={{ flex: 1, fontSize: 12, fontWeight: '700', color: '#0f172a' }}
+                                                placeholder="e.g. API3F9A21C... or MOD-501-..."
+                                                placeholderTextColor="#94a3b8"
+                                                value={trackReference}
+                                                onChangeText={setTrackReference}
+                                                autoCapitalize="characters"
+                                                autoCorrect={false}
+                                            />
+                                            {trackReference.length > 0 && (
+                                                <TouchableOpacity onPress={() => setTrackReference('')}>
+                                                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+
+                                        <TouchableOpacity
+                                            onPress={async () => {
+                                                const text = await Clipboard.getStringAsync();
+                                                if (text) setTrackReference(text.trim());
+                                            }}
+                                            style={{ backgroundColor: '#f1f5f9', height: 44, paddingHorizontal: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1' }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={{ color: '#334155', fontWeight: '700', fontSize: 11 }}>Paste</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <TouchableOpacity
+                                        onPress={() => handleTrackStatus()}
+                                        disabled={trackLoading}
+                                        style={{ backgroundColor: '#060d21', height: 44, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#060d21', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 }}
+                                        activeOpacity={0.8}
+                                    >
+                                        {trackLoading ? (
+                                            <ActivityIndicator size="small" color="#f5a623" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="search" size={16} color="#f5a623" style={{ marginRight: 6 }} />
+                                                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13 }}>Check Status</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+
+                                    {/* Track Result Card */}
+                                    {trackResult && (
+                                        <View style={{ marginTop: 16, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', padding: 14 }}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Current Status</Text>
+                                                <View style={{
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 3,
+                                                    borderRadius: 99,
+                                                    backgroundColor: trackResult.status === 'COMPLETED' ? '#dcfce7' : trackResult.status === 'FAILED' ? '#fee2e2' : '#fef3c7'
+                                                }}>
+                                                    <Text style={{
+                                                        fontSize: 10,
+                                                        fontWeight: '800',
+                                                        color: trackResult.status === 'COMPLETED' ? '#166534' : trackResult.status === 'FAILED' ? '#991b1b' : '#92400e',
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        {trackResult.status}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                                                <Text style={{ color: '#64748b', fontSize: 11 }}>Reference</Text>
+                                                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 11 }}>{trackResult.reference}</Text>
+                                            </View>
+
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                                                <Text style={{ color: '#64748b', fontSize: 11 }}>Service</Text>
+                                                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 11 }}>{trackResult.service}</Text>
+                                            </View>
+
+                                            {trackResult.response && (
+                                                <View style={{ marginTop: 8, padding: 10, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                                    <Text style={{ color: '#64748b', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 }}>Portal Feedback</Text>
+                                                    <Text style={{ color: '#0f172a', fontSize: 11.5, fontWeight: '600', lineHeight: 16 }}>{trackResult.response}</Text>
+                                                </View>
+                                            )}
+
+                                            {trackResult.refunded && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginTop: 8, borderWidth: 1, borderColor: '#FEE2E2' }}>
+                                                    <Ionicons name="wallet-outline" size={14} color="#DC2626" style={{ marginRight: 6 }} />
+                                                    <Text style={{ color: '#DC2626', fontSize: 11, fontWeight: '700' }}>Service fee automatically refunded to your wallet.</Text>
+                                                </View>
+                                            )}
+
+                                            {((trackResult.attachments && trackResult.attachments.length > 0) || trackResult.slip_url) && (
+                                                <TouchableOpacity
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: '#059669',
+                                                        paddingVertical: 10,
+                                                        paddingHorizontal: 14,
+                                                        borderRadius: 8,
+                                                        marginTop: 10,
+                                                    }}
+                                                    onPress={() => {
+                                                        const url = trackResult.slip_url || trackResult.attachments[0];
+                                                        if (url && typeof url === 'string') Linking.openURL(url);
+                                                    }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons name="document-text-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>Download Updated Slip / Document</Text>
+                                                </TouchableOpacity>
+                                            )}
+
+                                            {trackResult.updated_at && (
+                                                <Text style={{ color: '#94a3b8', fontSize: 9.5, marginTop: 8, textAlign: 'right' }}>
+                                                    Updated: {new Date(trackResult.updated_at).toLocaleString()}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Guidelines Card */}
+                                <View style={{ marginTop: 14, backgroundColor: 'rgba(245, 166, 35, 0.08)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.2)' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                        <Ionicons name="information-circle-outline" size={16} color="#d97706" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#92400e', fontWeight: '800', fontSize: 12 }}>Tracking Guidelines</Text>
+                                    </View>
+                                    <Text style={{ color: '#78350f', fontSize: 11, lineHeight: 16 }}>
+                                        • Status requests query the official provider database in real-time.{'\n'}
+                                        • Polling is recommended every few minutes — not more than once a minute.{'\n'}
+                                        • If a request fails, your service fee is automatically refunded back to your wallet.
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={{ paddingHorizontal: 14, marginTop: 10, maxWidth: 460, width: '100%', alignSelf: 'center' }}>
                             
                             {/* Terms Badge Bar */}
                             <TouchableOpacity 
@@ -744,8 +1016,8 @@ export default function NINModificationScreen() {
                                     • If your request fails due to an invalid submission, You will have to resubmit the application.
                                 </Text>
                             </View>
-
                         </View>
+                    )}
                     </ScrollView>
                 </KeyboardAvoidingView>
             )}

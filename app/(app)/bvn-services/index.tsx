@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, Dimensions } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -9,10 +9,13 @@ import { supabase } from '../../../services/supabase';
 import DynamicBanners from '../../../components/DynamicBanners';
 import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
 
+const { width } = Dimensions.get('window');
+
 interface BVNServiceItem {
     id: string;
     pricingId: string;
     title: string;
+    shortTitle: string;
     desc: string;
     icon: keyof typeof Ionicons.glyphMap;
     route: string;
@@ -20,7 +23,6 @@ interface BVNServiceItem {
     badge: string;
     defaultPrice: number;
     color: string;
-    bgColor: string;
 }
 
 const BVN_SERVICES: BVNServiceItem[] = [
@@ -28,92 +30,118 @@ const BVN_SERVICES: BVNServiceItem[] = [
         id: 'verify',
         pricingId: 'bvn_num_advanced',
         title: 'BVN Verification',
+        shortTitle: 'Verify BVN',
         desc: 'Instant biometric lookup & HD Printable Card',
         icon: 'finger-print',
         route: '/(app)/bvn-services/verify',
         category: 'instant',
         badge: 'INSTANT API',
         defaultPrice: 100,
-        color: '#D97706',
-        bgColor: '#FEF3C7',
+        color: '#F5A623',
     },
     {
         id: 'premium-slip',
         pricingId: 'bvn_premium_slip',
         title: 'BVN Premium Slip',
+        shortTitle: 'Print Slip',
         desc: 'Official electronic printable PDF slip',
         icon: 'document-text',
         route: '/(app)/bvn-services/premium-slip',
         category: 'instant',
         badge: 'PDF SLIP',
         defaultPrice: 100,
-        color: '#2563EB',
-        bgColor: '#EFF6FF',
+        color: '#F5A623',
     },
     {
         id: 'retrieval',
         pricingId: 'bvn_retrieval_phone',
-        title: 'BVN Retrieval (Phone/CRM)',
-        desc: 'Recover lost BVN via phone number or CRM lookup',
+        title: 'Phone Retrieval',
+        shortTitle: 'By Phone',
+        desc: 'Recover lost BVN using linked phone number',
+        icon: 'call',
+        route: '/(app)/bvn-services/retrieval',
+        category: 'retrieval',
+        badge: 'PHONE',
+        defaultPrice: 800,
+        color: '#F5A623',
+    },
+    {
+        id: 'central-risk',
+        pricingId: 'bvn_central_risk',
+        title: 'CRM Retrieval',
+        shortTitle: 'CRM Ticket',
+        desc: 'Retrieve BVN via Central Risk Management ticket',
         icon: 'search',
         route: '/(app)/bvn-services/retrieval',
         category: 'retrieval',
-        badge: 'PHONE / CRM',
-        defaultPrice: 800,
-        color: '#0D9488',
-        bgColor: '#F0FDFA',
+        badge: 'CRM',
+        defaultPrice: 700,
+        color: '#F5A623',
     },
     {
         id: 'vnin-to-nibss',
         pricingId: 'vnin_to_nibss',
         title: 'VNIN to NIBSS',
+        shortTitle: 'NIBSS Link',
         desc: 'Link VNIN directly to NIBSS database records',
         icon: 'link',
         route: '/(app)/bvn-services/vnin-to-nibss',
         category: 'retrieval',
         badge: 'NIBSS SYNC',
         defaultPrice: 700,
-        color: '#4F46E5',
-        bgColor: '#EEF2FF',
+        color: '#F5A623',
     },
     {
         id: 'modification',
         pricingId: 'bvn_mod_name',
         title: 'BVN Modification',
-        desc: 'Official correction of Name, DOB or Phone',
+        shortTitle: 'Modification',
+        desc: 'Official correction of Name, DOB, Phone or Address',
         icon: 'create',
         route: '/(app)/bvn-services/modification',
         category: 'modification',
         badge: 'ASSISTED',
         defaultPrice: 6000,
-        color: '#DC2626',
-        bgColor: '#FEF2F2',
+        color: '#F5A623',
     },
     {
         id: 'enrollment',
         pricingId: 'bvn_enrollment',
         title: 'User Enrollment',
+        shortTitle: 'Enrollment',
         desc: 'Assisted new BVN holder biometric setup',
         icon: 'person-add',
         route: '/(app)/bvn-services/enrollment',
         category: 'modification',
         badge: 'NEW ENROLL',
         defaultPrice: 2000,
-        color: '#059669',
-        bgColor: '#ECFDF5',
+        color: '#F5A623',
+    },
+    {
+        id: 'track',
+        pricingId: 'track_status',
+        title: 'Track Request',
+        shortTitle: 'Track Status',
+        desc: 'Free live progress query on retrieval or modification',
+        icon: 'shield-checkmark',
+        route: '/(app)/bvn-services/retrieval',
+        category: 'retrieval',
+        badge: 'FREE',
+        defaultPrice: 0,
+        color: '#F5A623',
     },
     {
         id: 'history',
         pricingId: 'history',
-        title: 'BVN History & Logs',
+        title: 'History & Logs',
+        shortTitle: 'History',
         desc: 'Past searches & free instant reprints',
         icon: 'time',
         route: '/(app)/bvn-services/history',
         category: 'desk',
         badge: 'HISTORY',
         defaultPrice: 0,
-        color: '#64748B',
-        bgColor: '#F1F5F9',
+        color: '#F5A623',
     },
 ];
 
@@ -178,25 +206,17 @@ export default function BVNServicesGatewayScreen() {
                             };
                         });
                     }
-                    if (Array.isArray(parsed?.hidden_services)) {
-                        parsed.hidden_services.forEach((id: string) => {
-                            map[id] = { ...(map[id] || {}), status: 'hidden' };
-                        });
-                    }
-                } catch (e) {
-                    console.warn('Error parsing bvn_service_controls in user app:', e);
-                }
+                } catch (_) {}
             }
 
-            // 2. Fetch from service_pricing table
-            const { data: pricingRows } = await supabase
+            // 2. Fetch prices from service_pricing table
+            const { data: pricingData } = await supabase
                 .from('service_pricing')
-                .select('id, cost_price, markup_price, selling_price, status, maintenance_msg')
-                .eq('service_category', 'bvn');
+                .select('id, cost_price, markup_price, selling_price, status, maintenance_msg');
 
-            if (pricingRows && pricingRows.length > 0) {
-                pricingRows.forEach(row => {
-                    if (row.status) {
+            if (pricingData) {
+                pricingData.forEach((row: any) => {
+                    if (row.status === 'maintenance' || row.status === 'hidden') {
                         map[row.id] = {
                             status: row.status,
                             msg: row.maintenance_msg || map[row.id]?.msg,
@@ -281,18 +301,18 @@ export default function BVNServicesGatewayScreen() {
 
             {/* Obsidian & Imperial Gold Modern Header */}
             <LinearGradient
-                colors={['#070D1E', '#0F172A', '#1E293B']}
+                colors={['#060D21', '#0B192C', '#122547']}
                 style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 16 }]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-                        <Ionicons name="arrow-back" size={18} color="#ffffff" />
+                        <Ionicons name="arrow-back" size={18} color="#F5A623" />
                     </TouchableOpacity>
                     <View style={styles.headerRightActions}>
                         <View style={styles.secureBadge}>
-                            <View style={[styles.secureDot, globalBVNStatus === 'maintenance' && { backgroundColor: '#F59E0B' }]} />
+                            <View style={[styles.secureDot, globalBVNStatus === 'maintenance' && { backgroundColor: '#EF4444' }]} />
                             <Text style={styles.secureText}>
                                 {globalBVNStatus === 'maintenance' ? 'GATEWAY UNDER MAINTENANCE' : 'SKBTECH LIVE • NIBSS CONNECTED'}
                             </Text>
@@ -302,7 +322,7 @@ export default function BVNServicesGatewayScreen() {
                             style={styles.historyBtn}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="time-outline" size={14} color="#FCD34D" style={{ marginRight: 4 }} />
+                            <Ionicons name="time-outline" size={14} color="#F5A623" style={{ marginRight: 4 }} />
                             <Text style={styles.historyBtnTxt}>History</Text>
                         </TouchableOpacity>
                     </View>
@@ -310,7 +330,7 @@ export default function BVNServicesGatewayScreen() {
 
                 <View style={styles.titleRow}>
                     <View style={styles.titleIconBox}>
-                        <Ionicons name="finger-print" size={20} color="#D97706" />
+                        <Ionicons name="finger-print" size={20} color="#F5A623" />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.titleText}>Bank Verification Number</Text>
@@ -318,11 +338,11 @@ export default function BVNServicesGatewayScreen() {
                     </View>
                 </View>
 
-                {/* Compact Wallet Bar */}
+                {/* Compact Wallet Bar in Navy & Gold */}
                 <View style={styles.walletBar}>
                     <View style={styles.walletLeft}>
                         <View style={styles.walletIconWrap}>
-                            <Ionicons name="wallet-outline" size={15} color="#D97706" />
+                            <Ionicons name="wallet-outline" size={15} color="#F5A623" />
                         </View>
                         <View style={{ marginLeft: 8 }}>
                             <Text style={styles.walletLabel}>Available Balance</Text>
@@ -336,7 +356,7 @@ export default function BVNServicesGatewayScreen() {
                         onPress={() => router.push('/(app)/wallet/fund' as any)}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="add-circle" size={13} color="#070D1E" />
+                        <Ionicons name="add-circle" size={13} color="#060D21" />
                         <Text style={styles.fundBtnText}>Top Up</Text>
                     </TouchableOpacity>
                 </View>
@@ -346,12 +366,12 @@ export default function BVNServicesGatewayScreen() {
                 style={styles.content} 
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 24) + 60 }]} 
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#D97706" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F5A623" />}
             >
                 {/* Global Maintenance Banner */}
                 {globalBVNStatus === 'maintenance' && (
                     <View style={styles.globalMaintBanner}>
-                        <Ionicons name="construct-outline" size={18} color="#B45309" />
+                        <Ionicons name="construct-outline" size={18} color="#F5A623" />
                         <View style={{ flex: 1 }}>
                             <Text style={styles.globalMaintTitle}>Routine Gateway Maintenance</Text>
                             <Text style={styles.globalMaintDesc}>{globalBVNMsg}</Text>
@@ -363,18 +383,18 @@ export default function BVNServicesGatewayScreen() {
                 {isVisible(heroService) && (
                     <TouchableOpacity
                         onPress={() => handleServicePress(heroService)}
-                        activeOpacity={0.9}
+                        activeOpacity={0.88}
                         style={styles.heroCard}
                     >
                         <LinearGradient
-                            colors={['#0F172A', '#1C2541', '#0B132B']}
+                            colors={['#0F2148', '#0A1633', '#060D21']}
                             style={styles.heroGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                         >
                             <View style={styles.heroTopRow}>
                                 <View style={styles.heroBadge}>
-                                    <Ionicons name="flash" size={10} color="#F59E0B" style={{ marginRight: 4 }} />
+                                    <Ionicons name="flash" size={10} color="#F5A623" style={{ marginRight: 4 }} />
                                     <Text style={styles.heroBadgeTxt}>INSTANT API • SKBTECH</Text>
                                 </View>
                                 {heroMaint ? (
@@ -390,7 +410,7 @@ export default function BVNServicesGatewayScreen() {
 
                             <View style={styles.heroBody}>
                                 <View style={styles.heroIconBox}>
-                                    <Ionicons name="finger-print" size={28} color="#F59E0B" />
+                                    <Ionicons name="finger-print" size={28} color="#F5A623" />
                                 </View>
                                 <View style={styles.heroTextWrap}>
                                     <Text style={styles.heroTitle}>{heroService.title}</Text>
@@ -406,97 +426,76 @@ export default function BVNServicesGatewayScreen() {
                                 </View>
                                 <View style={styles.heroActionBtn}>
                                     <Text style={styles.heroActionTxt}>Verify Now</Text>
-                                    <Ionicons name="arrow-forward" size={12} color="#070D1E" />
+                                    <Ionicons name="arrow-forward" size={12} color="#060D21" />
                                 </View>
                             </View>
                         </LinearGradient>
                     </TouchableOpacity>
                 )}
 
+                {/* Decorative Trust Strip (Navy & Gold) */}
+                <View style={styles.trustStrip}>
+                    <View style={styles.trustItem}>
+                        <Ionicons name="shield-checkmark" size={14} color="#F5A623" />
+                        <Text style={styles.trustText}>NIBSS Direct</Text>
+                    </View>
+                    <View style={styles.trustDivider} />
+                    <View style={styles.trustItem}>
+                        <Ionicons name="flash" size={14} color="#F5A623" />
+                        <Text style={styles.trustText}>HD Slips</Text>
+                    </View>
+                    <View style={styles.trustDivider} />
+                    <View style={styles.trustItem}>
+                        <Ionicons name="refresh-circle" size={15} color="#F5A623" />
+                        <Text style={styles.trustText}>Auto-Refund</Text>
+                    </View>
+                </View>
+
                 {/* Dynamic Marketing Banner Slider */}
                 <DynamicBanners />
 
-                {/* Category Filter Pills */}
-                <View style={styles.categoryRow}>
-                    {[
-                        { id: 'all', label: 'All Services' },
-                        { id: 'instant', label: 'Instant API' },
-                        { id: 'retrieval', label: 'Retrieval & CRM' },
-                        { id: 'modification', label: 'Modifications' },
-                    ].map(tab => {
-                        const active = filterCategory === tab.id;
-                        return (
-                            <TouchableOpacity
-                                key={tab.id}
-                                onPress={() => setFilterCategory(tab.id as any)}
-                                style={[styles.categoryBtn, active && styles.categoryBtnActive]}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={[styles.categoryTxt, active && styles.categoryTxtActive]}>
-                                    {tab.label}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
+                {/* Section Header with Category Filter Pills */}
+                <View style={styles.sectionHeaderRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="grid-outline" size={15} color="#F5A623" style={{ marginRight: 6 }} />
+                        <Text style={styles.sectionTitle}>ALL BVN SERVICES</Text>
+                    </View>
 
-                {/* Services List / Grid */}
-                <View style={styles.serviceList}>
-                    {filteredServices
-                        .filter(s => s.id !== 'verify' || filterCategory !== 'all')
-                        .map((service) => {
-                            const isMaint = serviceStatuses[service.pricingId]?.status === 'maintenance';
-                            const priceVal = prices[service.pricingId] || service.defaultPrice;
-
+                    {/* Filter Pills */}
+                    <View style={styles.categoryRow}>
+                        {[
+                            { id: 'all', label: 'All' },
+                            { id: 'instant', label: 'Instant' },
+                            { id: 'retrieval', label: 'Retrieval' },
+                            { id: 'modification', label: 'Mods' },
+                        ].map(tab => {
+                            const active = filterCategory === tab.id;
                             return (
                                 <TouchableOpacity
-                                    key={service.id}
-                                    onPress={() => handleServicePress(service)}
-                                    style={[styles.serviceRow, isMaint && styles.serviceRowMaint]}
+                                    key={tab.id}
+                                    onPress={() => setFilterCategory(tab.id as any)}
+                                    style={[styles.categoryBtn, active && styles.categoryBtnActive]}
                                     activeOpacity={0.8}
                                 >
-                                    <View style={[styles.serviceIconWrap, { backgroundColor: service.bgColor }]}>
-                                        <Ionicons name={service.icon} size={20} color={isMaint ? '#B45309' : service.color} />
-                                    </View>
-
-                                    <View style={styles.serviceTextCol}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                                            <Text style={styles.serviceRowTitle}>{service.title}</Text>
-                                            {service.badge ? (
-                                                <View style={styles.badgePill}>
-                                                    <Text style={styles.badgePillTxt}>{service.badge}</Text>
-                                                </View>
-                                            ) : null}
-                                        </View>
-                                        <Text style={styles.serviceRowDesc} numberOfLines={1}>{service.desc}</Text>
-                                    </View>
-
-                                    <View style={styles.servicePriceCol}>
-                                        {isMaint ? (
-                                            <View style={styles.maintPillSmall}>
-                                                <Text style={styles.maintPillSmallTxt}>MAINT</Text>
-                                            </View>
-                                        ) : priceVal > 0 ? (
-                                            <View style={styles.priceChip}>
-                                                <Text style={styles.priceChipTxt}>₦{priceVal.toLocaleString()}</Text>
-                                            </View>
-                                        ) : (
-                                            <View style={[styles.priceChip, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
-                                                <Text style={[styles.priceChipTxt, { color: '#64748B' }]}>FREE</Text>
-                                            </View>
-                                        )}
-                                        <Ionicons name="chevron-forward" size={14} color="#CBD5E1" style={{ marginLeft: 6 }} />
-                                    </View>
+                                    <Text style={[styles.categoryTxt, active && styles.categoryTxtActive]}>
+                                        {tab.label}
+                                    </Text>
                                 </TouchableOpacity>
                             );
                         })}
+                    </View>
                 </View>
 
-                {/* Support Banner */}
+                {/* 🌟 3-COLUMN MODERN GRID (NAVY & GOLD) 🌟 */}
+                <View style={styles.gridContainer}>
+                    {filteredServices.map((service) => renderServiceGridCard(service))}
+                </View>
+
+                {/* Executive 24/7 Support Strip */}
                 <View style={styles.supportBanner}>
                     <View style={styles.supportLeft}>
                         <View style={styles.supportIconWrap}>
-                            <Ionicons name="headset-outline" size={16} color="#D97706" />
+                            <Ionicons name="headset-outline" size={18} color="#F5A623" />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.supportTitle}>Need Help with BVN?</Text>
@@ -509,7 +508,7 @@ export default function BVNServicesGatewayScreen() {
                         onPress={() => router.push('/(app)/support' as any)}
                     >
                         <Text style={styles.supportBtnTxt}>Support</Text>
-                        <Ionicons name="chevron-forward" size={12} color="#D97706" />
+                        <Ionicons name="chevron-forward" size={12} color="#060D21" />
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -523,22 +522,84 @@ export default function BVNServicesGatewayScreen() {
             />
         </View>
     );
+
+    function renderServiceGridCard(service: BVNServiceItem) {
+        const isMaint = serviceStatuses[service.pricingId]?.status === 'maintenance' || serviceStatuses[service.id]?.status === 'maintenance';
+        const priceVal = prices[service.pricingId] || service.defaultPrice;
+
+        return (
+            <TouchableOpacity
+                key={service.id}
+                onPress={() => handleServicePress(service)}
+                style={[styles.gridCard, isMaint && styles.gridCardMaint]}
+                activeOpacity={0.78}
+            >
+                <LinearGradient
+                    colors={['#0F2148', '#0A1633']}
+                    style={styles.gridCardGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
+                    {/* Top Micro-Bar: Category Tag & Price */}
+                    <View style={styles.gridCardTopRow}>
+                        <View style={styles.gridCategoryBadge}>
+                            <Text style={styles.gridCategoryBadgeTxt}>{service.badge}</Text>
+                        </View>
+
+                        {isMaint ? (
+                            <Text style={styles.gridMaintTxt}>MAINT</Text>
+                        ) : priceVal > 0 ? (
+                            <Text style={styles.gridPriceTxt}>₦{priceVal >= 1000 ? `${(priceVal / 1000).toFixed(priceVal % 1000 === 0 ? 0 : 1)}k` : priceVal}</Text>
+                        ) : (
+                            <Text style={[styles.gridPriceTxt, { color: '#10B981' }]}>FREE</Text>
+                        )}
+                    </View>
+
+                    {/* Centered Glowing Gold Icon */}
+                    <View style={styles.gridIconFrame}>
+                        <Ionicons name={service.icon} size={22} color="#F5A623" />
+                    </View>
+
+                    {/* Title */}
+                    <Text style={styles.gridCardTitle} numberOfLines={2}>
+                        {service.shortTitle || service.title}
+                    </Text>
+
+                    {/* Bottom Feature Pill */}
+                    <View style={styles.gridCardBottomChip}>
+                        <Text style={styles.gridCardBottomChipTxt} numberOfLines={1}>
+                            {service.id === 'verify' ? 'Card & Slip' :
+                             service.id === 'premium-slip' ? 'PDF Print' :
+                             service.id === 'retrieval' ? 'Phone Lookup' :
+                             service.id === 'central-risk' ? 'Ticket Search' :
+                             service.id === 'vnin-to-nibss' ? 'NIBSS Sync' :
+                             service.id === 'modification' ? 'Name/DOB' :
+                             service.id === 'enrollment' ? 'Agent Desk' :
+                             service.id === 'track' ? 'Status Check' : 'Past Records'}
+                        </Text>
+                    </View>
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    }
 }
 
 const styles = StyleSheet.create({
     container: { 
         flex: 1, 
-        backgroundColor: '#F8FAFC' 
+        backgroundColor: '#060D21' 
     },
     headerGradient: { 
         paddingHorizontal: 16, 
         borderBottomLeftRadius: 22, 
         borderBottomRightRadius: 22,
-        shadowColor: '#070D1E',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(245, 166, 35, 0.25)',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.18,
+        shadowOpacity: 0.35,
         shadowRadius: 10,
-        elevation: 4,
+        elevation: 6,
     },
     headerTop: { 
         flexDirection: 'row', 
@@ -550,7 +611,9 @@ const styles = StyleSheet.create({
         width: 34, 
         height: 34, 
         borderRadius: 12, 
-        backgroundColor: 'rgba(255,255,255,0.08)', 
+        backgroundColor: 'rgba(245, 166, 35, 0.12)', 
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
         alignItems: 'center', 
         justifyContent: 'center' 
     },
@@ -562,22 +625,22 @@ const styles = StyleSheet.create({
     secureBadge: { 
         flexDirection: 'row', 
         alignItems: 'center', 
-        backgroundColor: 'rgba(255,255,255,0.08)', 
+        backgroundColor: 'rgba(245, 166, 35, 0.12)', 
         paddingHorizontal: 8, 
         paddingVertical: 4, 
         borderRadius: 8, 
         borderWidth: 1, 
-        borderColor: 'rgba(255,255,255,0.12)' 
+        borderColor: 'rgba(245, 166, 35, 0.25)' 
     },
     secureDot: { 
-        width: 5, 
-        height: 5, 
-        borderRadius: 2.5, 
+        width: 6, 
+        height: 6, 
+        borderRadius: 3, 
         backgroundColor: '#10B981', 
-        marginRight: 5 
+        marginRight: 6 
     },
     secureText: { 
-        color: '#ffffff', 
+        color: '#F5A623', 
         fontSize: 9, 
         fontWeight: '800', 
         letterSpacing: 0.4 
@@ -585,133 +648,136 @@ const styles = StyleSheet.create({
     historyBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(217,119,6,0.18)',
+        backgroundColor: 'rgba(245, 166, 35, 0.12)',
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: 'rgba(245,158,11,0.3)',
+        borderColor: 'rgba(245, 166, 35, 0.35)',
     },
     historyBtnTxt: {
-        color: '#FCD34D',
+        color: '#F5A623',
         fontSize: 10.5,
         fontWeight: '800',
     },
     titleRow: { 
         flexDirection: 'row', 
         alignItems: 'center', 
-        gap: 10, 
-        marginBottom: 10 
+        marginBottom: 12 
     },
-    titleIconBox: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: 'rgba(217,119,6,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
+    titleIconBox: { 
+        width: 38, 
+        height: 38, 
+        borderRadius: 12, 
+        backgroundColor: 'rgba(245, 166, 35, 0.15)', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        marginRight: 10,
         borderWidth: 1,
-        borderColor: 'rgba(245,158,11,0.4)',
+        borderColor: 'rgba(245, 166, 35, 0.35)',
     },
     titleText: { 
         color: '#ffffff', 
         fontSize: 18, 
-        fontWeight: '900',
-        letterSpacing: -0.2,
+        fontWeight: '900', 
+        letterSpacing: -0.3 
     },
     subtitleText: { 
         color: '#94A3B8', 
         fontSize: 11, 
         marginTop: 1 
     },
-    walletBar: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        backgroundColor: 'rgba(255,255,255,0.06)', 
-        borderRadius: 12, 
-        paddingHorizontal: 12, 
-        paddingVertical: 8, 
-        borderWidth: 1, 
-        borderColor: 'rgba(245,158,11,0.25)' 
+    walletBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'rgba(245, 166, 35, 0.08)',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.25)',
     },
-    walletLeft: { 
-        flexDirection: 'row', 
-        alignItems: 'center' 
+    walletLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     walletIconWrap: {
         width: 28,
         height: 28,
         borderRadius: 8,
-        backgroundColor: 'rgba(217,119,6,0.2)',
+        backgroundColor: 'rgba(245, 166, 35, 0.15)',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
     },
-    walletLabel: { 
-        color: '#94A3B8', 
-        fontSize: 9.5, 
-        fontWeight: '600' 
+    walletLabel: {
+        color: '#CBD5E1',
+        fontSize: 9.5,
+        fontWeight: '600',
     },
-    walletVal: { 
-        color: '#ffffff', 
-        fontSize: 13, 
-        fontWeight: '900', 
-        marginTop: 1 
+    walletVal: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 1,
     },
-    fundBtn: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        backgroundColor: '#F59E0B', 
-        paddingHorizontal: 10, 
-        paddingVertical: 5, 
-        borderRadius: 8, 
-        gap: 4 
+    fundBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5A623',
+        paddingHorizontal: 11,
+        paddingVertical: 5,
+        borderRadius: 8,
+        gap: 4,
     },
-    fundBtnText: { 
-        color: '#070D1E', 
-        fontSize: 11, 
-        fontWeight: '900' 
+    fundBtnText: {
+        color: '#060D21',
+        fontSize: 11,
+        fontWeight: '900',
     },
+
     content: { 
         flex: 1 
     },
     scrollContent: { 
-        paddingHorizontal: 16,
-        paddingTop: 14 
+        paddingHorizontal: 14, 
+        paddingTop: 12 
     },
 
     globalMaintBanner: {
         flexDirection: 'row',
         gap: 8,
-        backgroundColor: '#FFFBEB',
+        backgroundColor: 'rgba(245, 166, 35, 0.12)',
         borderRadius: 12,
         padding: 12,
         borderWidth: 1,
-        borderColor: '#FDE68A',
-        marginBottom: 14,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
+        marginBottom: 12,
     },
     globalMaintTitle: {
         fontSize: 12,
         fontWeight: '900',
-        color: '#B45309',
+        color: '#F5A623',
     },
     globalMaintDesc: {
         fontSize: 10.5,
-        color: '#92400E',
+        color: '#CBD5E1',
         marginTop: 2,
         lineHeight: 14,
     },
 
-    // Hero Card
+    // Hero Card in Navy & Gold
     heroCard: {
-        borderRadius: 18,
-        marginBottom: 14,
+        borderRadius: 16,
+        marginBottom: 12,
         overflow: 'hidden',
-        borderWidth: 1.5,
-        borderColor: '#D97706',
-        shadowColor: '#D97706',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.35)',
+        shadowColor: '#F5A623',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
+        shadowOpacity: 0.18,
         shadowRadius: 10,
         elevation: 4,
     },
@@ -727,275 +793,328 @@ const styles = StyleSheet.create({
     heroBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(245,158,11,0.18)',
+        backgroundColor: 'rgba(245, 166, 35, 0.15)',
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 8,
+        borderRadius: 6,
         borderWidth: 1,
-        borderColor: 'rgba(245,158,11,0.3)',
+        borderColor: 'rgba(245, 166, 35, 0.3)',
     },
     heroBadgeTxt: {
+        color: '#F5A623',
         fontSize: 9,
         fontWeight: '900',
-        color: '#FCD34D',
-        letterSpacing: 0.4,
+        letterSpacing: 0.5,
     },
     heroPricePill: {
-        backgroundColor: '#D97706',
+        backgroundColor: '#F5A623',
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 8,
     },
     heroPriceTxt: {
-        color: '#FFFFFF',
-        fontSize: 10.5,
+        color: '#060D21',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    maintPill: {
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+    },
+    maintPillText: {
+        color: '#EF4444',
+        fontSize: 9.5,
         fontWeight: '900',
     },
     heroBody: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
         marginBottom: 12,
     },
     heroIconBox: {
         width: 48,
         height: 48,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 24,
+        backgroundColor: 'rgba(245, 166, 35, 0.15)',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: 'rgba(245,158,11,0.4)',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.35)',
+        marginRight: 12,
     },
     heroTextWrap: {
         flex: 1,
     },
     heroTitle: {
-        fontSize: 15,
-        fontWeight: '900',
         color: '#FFFFFF',
-        marginBottom: 2,
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: -0.2,
     },
     heroDesc: {
-        fontSize: 11,
         color: '#CBD5E1',
+        fontSize: 11,
+        marginTop: 2,
         lineHeight: 15,
     },
     heroFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.1)',
         paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(245, 166, 35, 0.15)',
     },
     heroFormatsRow: {
         flexDirection: 'row',
         gap: 5,
     },
     formatChip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        color: '#CBD5E1',
         fontSize: 9,
         fontWeight: '700',
-        color: '#FCD34D',
-        backgroundColor: 'rgba(255,255,255,0.08)',
         paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 6,
+        borderRadius: 4,
         borderWidth: 1,
-        borderColor: 'rgba(245,158,11,0.25)',
+        borderColor: 'rgba(255, 255, 255, 0.12)',
     },
     heroActionBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#F5A623',
         paddingHorizontal: 12,
-        paddingVertical: 5,
+        paddingVertical: 6,
         borderRadius: 8,
         gap: 4,
     },
     heroActionTxt: {
-        color: '#070D1E',
+        color: '#060D21',
         fontSize: 11,
         fontWeight: '900',
     },
 
-    // Category Filter
-    categoryRow: {
+    // Trust Strip
+    trustStrip: {
         flexDirection: 'row',
-        gap: 6,
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        backgroundColor: 'rgba(245, 166, 35, 0.08)',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.2)',
         marginBottom: 12,
     },
-    categoryBtn: {
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 10,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+    trustItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
     },
-    categoryBtnActive: {
-        backgroundColor: '#070D1E',
-        borderColor: '#070D1E',
+    trustDivider: {
+        width: 1,
+        height: 14,
+        backgroundColor: 'rgba(245, 166, 35, 0.25)',
     },
-    categoryTxt: {
+    trustText: {
+        color: '#CBD5E1',
         fontSize: 10,
         fontWeight: '700',
-        color: '#64748B',
-    },
-    categoryTxtActive: {
-        color: '#FFFFFF',
-        fontWeight: '900',
     },
 
-    // Service Rows
-    serviceList: {
-        gap: 8,
-        marginBottom: 16,
-    },
-    serviceRow: {
+    // Section Header & Filter Tabs
+    sectionHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 14,
-        padding: 12,
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    sectionTitle: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    categoryRow: { 
+        flexDirection: 'row', 
+        backgroundColor: 'rgba(255, 255, 255, 0.06)', 
+        borderRadius: 8, 
+        padding: 2,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 1,
+        borderColor: 'rgba(245, 166, 35, 0.2)',
     },
-    serviceRowMaint: {
-        opacity: 0.7,
-        backgroundColor: '#FFFBEB',
-        borderColor: '#FDE68A',
+    categoryBtn: { 
+        paddingHorizontal: 8, 
+        paddingVertical: 4, 
+        borderRadius: 6 
     },
-    serviceIconWrap: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
+    categoryBtnActive: { 
+        backgroundColor: '#F5A623' 
+    },
+    categoryTxt: { 
+        color: '#94A3B8', 
+        fontSize: 10, 
+        fontWeight: '700' 
+    },
+    categoryTxtActive: { 
+        color: '#060D21', 
+        fontWeight: '900' 
+    },
+
+    // 🌟 3-COLUMN MODERN GRID 🌟
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    gridCard: {
+        width: '31.8%',
+        marginBottom: 10,
+        borderRadius: 14,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.22)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    gridCardMaint: {
+        opacity: 0.6,
+        borderColor: 'rgba(239, 68, 68, 0.3)',
+    },
+    gridCardGradient: {
+        paddingVertical: 10,
+        paddingHorizontal: 6,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: 128,
+    },
+    gridCardTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 2,
+    },
+    gridCategoryBadge: {
+        backgroundColor: 'rgba(245, 166, 35, 0.15)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 0.5,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
+    },
+    gridCategoryBadgeTxt: {
+        color: '#F5A623',
+        fontSize: 7,
+        fontWeight: '900',
+    },
+    gridPriceTxt: {
+        color: '#F5A623',
+        fontSize: 9,
+        fontWeight: '900',
+    },
+    gridMaintTxt: {
+        color: '#EF4444',
+        fontSize: 8,
+        fontWeight: '900',
+    },
+    gridIconFrame: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(245, 166, 35, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.35)',
+        marginVertical: 6,
     },
-    serviceTextCol: {
-        flex: 1,
-    },
-    serviceRowTitle: {
-        fontSize: 13,
+    gridCardTitle: {
+        color: '#FFFFFF',
+        fontSize: 10.5,
         fontWeight: '800',
-        color: '#0F172A',
+        textAlign: 'center',
+        lineHeight: 13.5,
+        minHeight: 27,
     },
-    serviceRowDesc: {
-        fontSize: 10.5,
-        color: '#64748B',
-    },
-    badgePill: {
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 5,
-        paddingVertical: 1.5,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    badgePillTxt: {
-        fontSize: 8,
-        fontWeight: '900',
-        color: '#B45309',
-    },
-    servicePriceCol: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginLeft: 8,
-    },
-    priceChip: {
-        backgroundColor: '#FEF3C7',
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+    gridCardBottomChip: {
+        backgroundColor: 'rgba(245, 166, 35, 0.1)',
         borderRadius: 6,
-    },
-    priceChipTxt: {
-        color: '#B45309',
-        fontSize: 10.5,
-        fontWeight: '900',
-    },
-    maintPill: {
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    maintPillText: {
-        fontSize: 8.5,
-        fontWeight: '900',
-        color: '#B45309',
-    },
-    maintPillSmall: {
-        backgroundColor: '#FEF3C7',
         paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 4,
+        borderWidth: 0.5,
+        borderColor: 'rgba(245, 166, 35, 0.25)',
+        marginTop: 4,
+        width: '100%',
+        alignItems: 'center',
     },
-    maintPillSmallTxt: {
-        fontSize: 8,
-        fontWeight: '900',
-        color: '#B45309',
+    gridCardBottomChipTxt: {
+        color: '#CBD5E1',
+        fontSize: 8.5,
+        fontWeight: '700',
     },
 
     // Support Banner
     supportBanner: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        backgroundColor: 'rgba(245, 166, 35, 0.08)',
         borderRadius: 14,
         padding: 12,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: 'rgba(245, 166, 35, 0.25)',
+        marginTop: 4,
     },
     supportLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
+        marginRight: 10,
     },
     supportIconWrap: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: '#FEF3C7',
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(245, 166, 35, 0.15)',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.35)',
         marginRight: 10,
     },
     supportTitle: {
+        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '800',
-        color: '#0F172A',
     },
     supportDesc: {
+        color: '#94A3B8',
         fontSize: 10,
-        color: '#64748B',
         marginTop: 1,
     },
     supportButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        backgroundColor: '#F5A623',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-        gap: 2,
+        gap: 4,
     },
     supportBtnTxt: {
+        color: '#060D21',
         fontSize: 11,
-        fontWeight: '800',
-        color: '#B45309',
+        fontWeight: '900',
     },
 });

@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, Modal, Image, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, Modal, Image, StyleSheet, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -241,13 +241,17 @@ export default function BVNRetrievalScreen() {
             const res = await api.identity.checkBVNRetrievalStatus(query);
             if (res && res.data) {
                 const raw = res.data?.data || res.data;
+                const status = (res.data.request_status || res.data.current_status || res.data.status || 'PROCESSING').toUpperCase();
                 setTrackResult({
-                    status: res.data.current_status || res.data.status || 'PROCESSING',
-                    message: res.data.message || 'Status retrieved',
-                    bvn: raw.bvn || raw.BVN || null,
+                    status,
+                    message: res.data.response || res.data.message || 'Status retrieved',
+                    bvn: res.data.bvn || raw.bvn || raw.BVN || null,
                     searchedPhone: raw.searched_phone || raw.searchedPhone || null,
                     searchedName: raw.searched_name || raw.searchedName || null,
-                    lastUpdated: res.data.last_updated || new Date().toISOString()
+                    attachments: res.data.attachments || raw.attachments || [],
+                    slip_url: res.data.slip_url || raw.slip_url || (Array.isArray(res.data.attachments) && res.data.attachments[0]) || null,
+                    refunded: res.data.refunded || raw.refunded || false,
+                    lastUpdated: res.data.updated_at || res.data.last_updated || new Date().toISOString()
                 });
             } else {
                 showAlert("Status", res?.message || "No record found.");
@@ -504,11 +508,45 @@ export default function BVNRetrievalScreen() {
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
-                                    <Text style={styles.trackPendingText}>
-                                        {trackResult.status === 'PROCESSING' 
-                                            ? "Your retrieval request is being processed. Please check back shortly."
-                                            : trackResult.message}
-                                    </Text>
+                                    <View style={{ marginTop: 6, marginBottom: 4 }}>
+                                        <Text style={[
+                                            styles.trackPendingText,
+                                            trackResult.status === 'FAILED' && { color: '#DC2626', fontWeight: '600' }
+                                        ]}>
+                                            {trackResult.status === 'PROCESSING' 
+                                                ? "Your retrieval request is being processed. Please check back shortly."
+                                                : trackResult.message}
+                                        </Text>
+                                        {trackResult.refunded && (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginTop: 6, borderWidth: 1, borderColor: '#FEE2E2' }}>
+                                                <Ionicons name="wallet-outline" size={14} color="#DC2626" style={{ marginRight: 6 }} />
+                                                <Text style={{ color: '#DC2626', fontSize: 11, fontWeight: '700' }}>Service fee automatically refunded to your wallet.</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+
+                                {((trackResult.attachments && trackResult.attachments.length > 0) || trackResult.slip_url) && (
+                                    <TouchableOpacity
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#059669',
+                                            paddingVertical: 10,
+                                            paddingHorizontal: 14,
+                                            borderRadius: 8,
+                                            marginTop: 10,
+                                        }}
+                                        onPress={() => {
+                                            const url = trackResult.slip_url || trackResult.attachments[0];
+                                            if (url && typeof url === 'string') Linking.openURL(url);
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="document-text-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>Download Slip / Document</Text>
+                                    </TouchableOpacity>
                                 )}
 
                                 {trackResult.searchedName && (

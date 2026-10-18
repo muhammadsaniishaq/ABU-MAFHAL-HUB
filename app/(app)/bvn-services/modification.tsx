@@ -9,7 +9,8 @@ import {
     Platform,
     Modal,
     StyleSheet,
-    Dimensions
+    Dimensions,
+    Linking
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
@@ -676,14 +677,71 @@ export default function BVNModificationScreen() {
                         {statusResult && (
                             <View style={styles.statusResultCard}>
                                 <View style={styles.statusResultHeader}>
-                                    <Ionicons name="shield-checkmark" size={16} color="#059669" />
+                                    <Ionicons 
+                                        name={
+                                            String(statusResult.status || statusResult.request_status || '').toLowerCase() === 'completed' 
+                                                ? "checkmark-circle" 
+                                                : String(statusResult.status || statusResult.request_status || '').toLowerCase() === 'failed'
+                                                ? "close-circle"
+                                                : "time"
+                                        } 
+                                        size={18} 
+                                        color={
+                                            String(statusResult.status || statusResult.request_status || '').toLowerCase() === 'completed'
+                                                ? "#059669"
+                                                : String(statusResult.status || statusResult.request_status || '').toLowerCase() === 'failed'
+                                                ? "#DC2626"
+                                                : "#D97706"
+                                        } 
+                                    />
                                     <Text style={styles.statusResultTitle}>Portal Feedback</Text>
                                 </View>
                                 <Text style={styles.statusResultVal}>
-                                    Current Status: <Text style={{ color: '#059669', fontWeight: '900' }}>{statusResult.current_status || statusResult.status || 'PROCESSING'}</Text>
+                                    Current Status:{' '}
+                                    <Text style={{ 
+                                        color: String(statusResult.status || statusResult.request_status || '').toLowerCase() === 'completed'
+                                            ? "#059669"
+                                            : String(statusResult.status || statusResult.request_status || '').toLowerCase() === 'failed'
+                                            ? "#DC2626"
+                                            : "#D97706", 
+                                        fontWeight: '900',
+                                        textTransform: 'uppercase'
+                                    }}>
+                                        {statusResult.current_status || statusResult.request_status || statusResult.status || 'PROCESSING'}
+                                    </Text>
                                 </Text>
-                                {statusResult.message && (
-                                    <Text style={styles.statusResultMsg}>{statusResult.message}</Text>
+                                {(statusResult.response || statusResult.message) && (
+                                    <Text style={styles.statusResultMsg}>{statusResult.response || statusResult.message}</Text>
+                                )}
+
+                                {statusResult.refunded && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginTop: 8, borderWidth: 1, borderColor: '#FEE2E2' }}>
+                                        <Ionicons name="wallet-outline" size={14} color="#DC2626" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#DC2626', fontSize: 11, fontWeight: '700' }}>Service fee automatically refunded to your wallet.</Text>
+                                    </View>
+                                )}
+
+                                {((statusResult.attachments && statusResult.attachments.length > 0) || statusResult.slip_url) && (
+                                    <TouchableOpacity
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#059669',
+                                            paddingVertical: 10,
+                                            paddingHorizontal: 14,
+                                            borderRadius: 8,
+                                            marginTop: 10,
+                                        }}
+                                        onPress={() => {
+                                            const url = statusResult.slip_url || (Array.isArray(statusResult.attachments) && statusResult.attachments[0]);
+                                            if (url && typeof url === 'string') Linking.openURL(url);
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="document-text-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>Download Updated Document / Slip</Text>
+                                    </TouchableOpacity>
                                 )}
                             </View>
                         )}

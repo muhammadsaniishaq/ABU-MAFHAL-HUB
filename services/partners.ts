@@ -41,6 +41,8 @@ export interface VerificationResult {
     data?: any;
     message: string;
     pdf_base64?: string;
+    slip_url?: string | null;
+    attachments?: string[];
     error?: string;
 }
 
@@ -68,6 +70,9 @@ export interface IdentityVerifier {
     checkVNINStatus?(referenceOrRequestId: string): Promise<VerificationResult>;
     requestBVNModification?(params: BVNModificationParams | any, priceId?: string): Promise<VerificationResult>;
     checkBVNModificationStatus?(requestIdOrReference: string): Promise<VerificationResult>;
+    checkNINModificationStatus?(requestIdOrReference: string): Promise<VerificationResult>;
+    checkRequestStatus?(reference: string): Promise<VerificationResult>;
+    checkCRMStatus?(reference: string): Promise<VerificationResult>;
     submitBVNEnrollment?(params: any, priceId?: string): Promise<VerificationResult>;
     checkBVNEnrollmentStatus?(requestIdOrReference: string): Promise<VerificationResult>;
     generateBVNPremiumSlip?(bvn: string, priceId?: string, reference?: string): Promise<VerificationResult>;

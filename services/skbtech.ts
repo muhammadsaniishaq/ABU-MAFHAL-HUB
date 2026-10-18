@@ -59,16 +59,16 @@ export const SKBTechIdentityVerifier = {
         const isSuccessStatus =
           providerResponse.success === true ||
           rawStatus === true ||
-          ['true', 'success', 'pending', 'processing', 'completed'].includes(String(rawStatus || '').toLowerCase());
+          ['true', 'success', 'pending', 'processing', 'completed', 'failed'].includes(String(rawStatus || '').toLowerCase());
 
         if (isSuccessStatus) {
           const personData = providerResponse.data ?? providerResponse;
           return {
             isValid: true,
-            message: providerResponse.message || 'Request Processed Successfully',
+            message: providerResponse.message || providerResponse.response || 'Request Processed Successfully',
             data: personData,
             pdf_base64: providerResponse.pdf_base64 || providerResponse.data?.pdf_base64 || data.pdf_base64,
-            slip_url: providerResponse.slip_url || providerResponse.data?.slip_url || data.slip_url || null,
+            slip_url: providerResponse.slip_url || providerResponse.data?.slip_url || data.slip_url || (Array.isArray(providerResponse.attachments) && providerResponse.attachments[0]) || null,
           };
         }
       }
@@ -349,6 +349,14 @@ export const SKBTechIdentityVerifier = {
   },
 
   checkBVNModificationStatus: async (requestIdOrReference: string) => {
+    return SKBTechIdentityVerifier.checkRequestStatus(requestIdOrReference);
+  },
+
+  checkNINModificationStatus: async (requestIdOrReference: string) => {
+    return SKBTechIdentityVerifier.checkRequestStatus(requestIdOrReference);
+  },
+
+  checkCRMStatus: async (requestIdOrReference: string) => {
     return SKBTechIdentityVerifier.checkRequestStatus(requestIdOrReference);
   },
 

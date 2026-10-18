@@ -60,11 +60,18 @@ serve(async (req: Request) => {
     }
 
     // ── Free Status Checks Detection ──────────────────────────────────────────
+    // Note: /request/status is FREE per SKBTECH API doc 20
     const isStatusCheck =
       searchType === 'request-status' ||
-      searchType === 'ipe-status' ||
-      searchType === 'nin-personalization-status' ||
-      searchType.endsWith('-status');
+      searchType === 'request_status' ||
+      searchType === 'status' ||
+      searchType === 'bvn-retrieval-status' ||
+      searchType === 'bvn-modification-status' ||
+      searchType === 'nin-modification-status' ||
+      searchType === 'central-risk-status' ||
+      searchType === 'crm-status' ||
+      searchType === 'vnin-to-nibss-status' ||
+      searchType === '/request/status';
 
     let description = `Verification: ${searchType}`;
     let priceId = requestData.priceId || '';
@@ -390,8 +397,13 @@ serve(async (req: Request) => {
 
       // ── Status Poll Endpoint (Free) ──
       case 'request-status':
+      case 'request_status':
+      case 'status':
       case 'bvn-retrieval-status':
       case 'bvn-modification-status':
+      case 'nin-modification-status':
+      case 'central-risk-status':
+      case 'crm-status':
       case 'vnin-to-nibss-status':
         endpoint = '/request/status';
         payload.reference = requestData.reference || requestData.request_id || searchValue;
@@ -472,7 +484,59 @@ serve(async (req: Request) => {
       return jsonOk({ error: friendlyError, raw: skbData });
     }
 
-    // ── Handle Successful Async / Manual Requests ────────────────────────────
+    // ── Handle /request/status Response (Free Polling) ───────────────────────
+    if (endpoint === '/request/status') {
+      let extractedBvn: string | null = null;
+      if (skbData.response && typeof skbData.response === 'string') {
+        const match = skbData.response.match(/\b\d{11}\b/);
+        if (match) extractedBvn = match[0];
+      }
+
+      const attachments = Array.isArray(skbData.attachments) ? skbData.attachments : [];
+      let primarySlipUrl: string | null = null;
+      let primaryPdfBase64: string | null = null;
+
+      for (const att of attachments) {
+        if (typeof att === 'string') {
+          if (att.startsWith('http://') || att.startsWith('https://')) {
+            if (!primarySlipUrl) primarySlipUrl = att;
+          } else if (att.startsWith('data:') || att.length > 200) {
+            if (!primaryPdfBase64) primaryPdfBase64 = att;
+          }
+        }
+      }
+
+      const isCompleted = skbData.request_status === 'completed';
+      const isFailed = skbData.request_status === 'failed';
+      const defaultMsg = isCompleted
+        ? 'Request completed successfully.'
+        : isFailed
+        ? (skbData.refunded ? 'Request failed and fee was refunded to your wallet.' : 'Request failed.')
+        : `Request status: ${skbData.request_status || 'processing'}. Please check back shortly.`;
+
+      return jsonOk({
+        data: {
+          status: skbData.request_status || (skbData.success ? 'completed' : 'processing'),
+          request_status: skbData.request_status,
+          reference: skbData.reference,
+          service: skbData.service || skbData.type,
+          type: skbData.type || skbData.service,
+          refunded: Boolean(skbData.refunded),
+          amount: skbData.amount,
+          response: skbData.response,
+          bvn: extractedBvn,
+          attachments,
+          slip_url: primarySlipUrl,
+          pdf_base64: primaryPdfBase64,
+          submitted_at: skbData.submitted_at,
+          updated_at: skbData.updated_at,
+          message: skbData.response || defaultMsg,
+          data: skbData,
+        }
+      });
+    }
+
+    // ── Handle Initial Submission of Async Requests ──────────────────────────
     if (skbData.request_status === 'pending' || skbData.request_status === 'processing') {
       return jsonOk({
         data: {
@@ -484,33 +548,6 @@ serve(async (req: Request) => {
           price: skbData.price,
           message: skbData.message || 'Request submitted and queued for processing by the SKBTECH team.',
           data: skbData,
-        }
-      });
-    }
-
-    // ── Handle /request/status Response ──────────────────────────────────────
-    if (endpoint === '/request/status') {
-      let extractedBvn: string | null = null;
-      if (skbData.response && typeof skbData.response === 'string') {
-        const match = skbData.response.match(/\b\d{11}\b/);
-        if (match) extractedBvn = match[0];
-      }
-
-      return jsonOk({
-        data: {
-          status: skbData.request_status,
-          request_status: skbData.request_status,
-          reference: skbData.reference,
-          service: skbData.service,
-          type: skbData.type,
-          refunded: skbData.refunded,
-          amount: skbData.amount,
-          response: skbData.response,
-          bvn: extractedBvn,
-          attachments: skbData.attachments || [],
-          submitted_at: skbData.submitted_at,
-          updated_at: skbData.updated_at,
-          message: skbData.response || `Status: ${skbData.request_status}`,
         }
       });
     }

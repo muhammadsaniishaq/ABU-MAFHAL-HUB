@@ -868,6 +868,12 @@ export const api = {
         requestBVNModification: (params: BVNModificationParams | any, priceId?: string) => identityVerifier.requestBVNModification?.(params, priceId),
         /** Check BVN modification status */
         checkBVNModificationStatus: (requestIdOrReference: string) => identityVerifier.checkBVNModificationStatus?.(requestIdOrReference),
+        /** Check NIN modification status */
+        checkNINModificationStatus: (requestIdOrReference: string) => identityVerifier.checkNINModificationStatus?.(requestIdOrReference),
+        /** Check any request status (BVN Retrieval, CRM, BVN & NIN Modification) using reference */
+        checkRequestStatus: (reference: string) => identityVerifier.checkRequestStatus?.(reference),
+        /** Check CRM request status using ticket ID or reference */
+        checkCRMStatus: (reference: string) => identityVerifier.checkCRMStatus?.(reference),
         /** Submit demographic data for New BVN User / Android Enrollment */
         submitBVNEnrollment: (params: any, priceId?: string) => identityVerifier.submitBVNEnrollment?.(params, priceId),
         /** Check BVN user enrollment status */
