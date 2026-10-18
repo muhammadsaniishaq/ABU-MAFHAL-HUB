@@ -43,6 +43,7 @@ const NL= C.navyLight;// navy light bg
 
 const MODS = {
   operations: [
+    { t:'SKBTECH API (NIN/BVN)', i:'key',         r:'/manage/api?category=Identity', c:G, b:GL, tag:'LIVE API' },
     { t:'Users Control',   i:'people',          r:'/manage/users',          c:N,  b:NL,  badge:0, tag:'Core' },
     { t:'Transactions',    i:'receipt',         r:'/manage/transactions',   c:N,  b:NL,  tag:'Live' },
     { t:'Splash Screens',  i:'phone-portrait',  r:'/manage/appearance?tab=splash', c:G, b:GL, tag:'New' },
@@ -109,6 +110,7 @@ const MODS = {
 };
 
 const QUICK = [
+  { l:'SKBTECH API',    i:'key',              r:'/manage/api?category=Identity', c:G, b:GL, tag:'API Key' },
   { l:'Master Hub',     i:'ribbon',           r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
   { l:'Transactions',   i:'receipt',          r:'/manage/transactions',   c:N,  b:NL,  tag:'Live' },
   { l:'Splash Slides',  i:'phone-portrait',   r:'/manage/appearance?tab=splash', c:G, b:GL, tag:'New' },
@@ -414,6 +416,49 @@ export default function AdminDashboard() {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+        {/* ── SKBTECH IDENTITY API BANNER ── */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
+          <TouchableOpacity 
+            activeOpacity={0.88}
+            onPress={() => router.push('/manage/api?category=Identity' as any)}
+            style={{
+              backgroundColor: '#0F172A',
+              borderRadius: 16,
+              borderWidth: 1.5,
+              borderColor: C.goldBorder,
+              padding: 14,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 8,
+              elevation: 3,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.goldLight, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                  <Ionicons name="key" size={20} color={C.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>SKBTECH Official API Gateway</Text>
+                    <View style={{ backgroundColor: C.goldLight, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                      <Text style={{ color: C.gold, fontSize: 8, fontWeight: '900' }}>NIN & BVN</Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: '#CBD5E1', fontSize: 11, marginTop: 2 }}>
+                    Sanya API Key anan domin dukkan ayyukan NIN da BVN suyi aiki kai-tsaye
+                  </Text>
+                </View>
+              </View>
+              <View style={{ backgroundColor: C.gold, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+                <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 11 }}>Sanya Key</Text>
+                <Ionicons name="arrow-forward" size={12} color="#0F172A" />
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* ── QUICK ACTIONS ── */}

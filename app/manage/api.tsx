@@ -3,7 +3,7 @@ import {
     ActivityIndicator, Alert, Platform, Modal, KeyboardAvoidingView 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -88,11 +88,14 @@ interface SecretItem {
 }
 
 export default function APIVaultScreen() {
+    const params = useLocalSearchParams();
+
     // VTU Active Vendor List & Strategy
     const [vtuVendor, setVtuVendor] = useState('bilalsadasub,bigi,clubkonnect');
     const [failoverMode, setFailoverMode] = useState<'smart' | 'sequential'>('smart');
     
     // Core Active API Credentials State
+    const [skbtechApiKey, setSkbtechApiKey] = useState('');
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [bilalToken, setBilalToken] = useState('');
     const [flutterwaveSecret, setFlutterwaveSecret] = useState('');
@@ -212,6 +215,12 @@ export default function APIVaultScreen() {
         fetchApiVaultData();
     }, []);
 
+    useEffect(() => {
+        if (params?.category && typeof params.category === 'string') {
+            setSelectedCategory(params.category);
+        }
+    }, [params?.category]);
+
     const showToast = (msg: string) => {
         setToastMessage(msg);
         setTimeout(() => setToastMessage(null), 3000);
@@ -224,6 +233,7 @@ export default function APIVaultScreen() {
             // 1. Fetch from AsyncStorage (Local Device/Browser Cache)
             const allKeysToRead = [
                 'VTU_VENDOR', 'FAILOVER_MODE', 
+                'SKBTECH_API_KEY', 'SKB_API_KEY', 'SKBTECH_KEY', 'SKB_KEY',
                 'AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY',
                 'BILALSADASUB_TOKEN', 'BILAL_TOKEN', 'BILALSADASUB_API_KEY', 'BILAL_API_KEY',
                 'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET', 'FLUTTERWAVE_PUBLIC_KEY', 'FLUTTERWAVE_PUB',
@@ -283,6 +293,9 @@ export default function APIVaultScreen() {
 
         const mode = getFirstValid(map, 'FAILOVER_MODE', 'failover_mode');
         if (mode) setFailoverMode(mode === 'sequential' ? 'sequential' : 'smart');
+
+        const skbKey = getFirstValid(map, 'SKBTECH_API_KEY', 'SKB_API_KEY', 'SKBTECH_KEY', 'SKB_KEY');
+        if (skbKey) setSkbtechApiKey(skbKey);
 
         const ahKey = getFirstValid(map, 'AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY');
         if (ahKey) setAgentHubApiKey(ahKey);
@@ -375,7 +388,7 @@ export default function APIVaultScreen() {
 
     const toggleShowAllKeys = () => {
         const allKeys = [
-            'AGENTHUB_API_KEY', 'BILALSADASUB_TOKEN', 'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_PUBLIC_KEY',
+            'SKBTECH_API_KEY', 'AGENTHUB_API_KEY', 'BILALSADASUB_TOKEN', 'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_PUBLIC_KEY',
             'PAYSTACK_SECRET_KEY', 'CLUBKONNECT_API_KEY', 'CLUBKONNECT_USER_ID', 'IDPRO_API_KEY',
             'PAYVESSEL_API_KEY', 'PAYVESSEL_SECRET_KEY', 'NINEBOOST_API_KEY', 'NOWPAYMENTS_API_KEY',
             'BIGI_API_TOKEN', 'BIGI_API_PIN', 'TERMII_API_KEY', 'MONNIFY_API_KEY', 'MONNIFY_SECRET_KEY'
@@ -424,6 +437,7 @@ export default function APIVaultScreen() {
 
         setTimeout(() => {
             const mockBalances: Record<string, string> = {
+                skbtech: 'Active & Verified (21 Endpoints)',
                 flutterwave: '₦215,400 Payout Float',
                 bilalsadasub: '₦45,280 Float',
                 bigi: '₦18,950 Float',
@@ -519,7 +533,8 @@ export default function APIVaultScreen() {
             const keyPairsToSave: { canonical: string; aliases: string[]; value: string; desc: string }[] = [
                 { canonical: 'VTU_VENDOR', aliases: ['vtu_vendor'], value: vtuVendor, desc: 'Active VTU Provider List' },
                 { canonical: 'FAILOVER_MODE', aliases: ['failover_mode'], value: failoverMode, desc: 'Failover Routing Strategy' },
-                { canonical: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], value: agentHubApiKey, desc: 'AgentHub API Key (NIN/BVN)' },
+                { canonical: 'SKBTECH_API_KEY', aliases: ['SKB_API_KEY', 'SKBTECH_KEY', 'SKB_KEY'], value: skbtechApiKey, desc: 'SKBTECH Official API Key (NIN & BVN Services)' },
+                { canonical: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], value: agentHubApiKey, desc: 'Legacy AgentHub Key (Backup)' },
                 { canonical: 'BILALSADASUB_TOKEN', aliases: ['BILAL_TOKEN', 'BILALSADASUB_API_KEY'], value: bilalToken, desc: 'Bilalsadasub API Token' },
                 { canonical: 'FLUTTERWAVE_SECRET_KEY', aliases: ['FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET'], value: flutterwaveSecret, desc: 'Flutterwave Secret Key for Instant Bank Payouts' },
                 { canonical: 'FLUTTERWAVE_PUBLIC_KEY', aliases: ['FLUTTERWAVE_PUB'], value: flutterwavePublicKey, desc: 'Flutterwave Public Key' },
@@ -594,17 +609,32 @@ export default function APIVaultScreen() {
 
     const secretItems: SecretItem[] = [
         {
+            id: 'skbtech',
+            keyName: 'SKBTECH_API_KEY',
+            title: 'SKBTECH Verification API',
+            provider: 'SKBTECH (skbtech.com.ng)',
+            category: 'Identity',
+            value: skbtechApiKey,
+            setValue: setSkbtechApiKey,
+            placeholder: 'Paste your SKBTECH API Key here (from skbtech.com.ng/developer)...',
+            description: 'Primary Official API for NIN Slips, BVN Verifications, Retrievals & Modifications.',
+            icon: 'finger-print',
+            badgeTag: 'PRIMARY LIVE',
+            baseUrl: 'https://skbtech.com.ng/api/v1',
+            isSecret: true
+        },
+        {
             id: 'agenthub',
             keyName: 'AGENTHUB_API_KEY',
             title: 'AgentHub Verification API',
-            provider: 'AgentHub.ng',
+            provider: 'AgentHub.ng (Backup)',
             category: 'Identity',
             value: agentHubApiKey,
             setValue: setAgentHubApiKey,
-            placeholder: 'Enter AgentHub API Key...',
-            description: 'Instant NIN, BVN, CAC, TAX & Identity slip verifications.',
+            placeholder: 'Legacy AgentHub Key...',
+            description: 'Backup Identity verification engine.',
             icon: 'card-outline',
-            badgeTag: 'ESSENTIAL',
+            badgeTag: 'BACKUP',
             isSecret: true
         },
         {
@@ -1015,6 +1045,106 @@ export default function APIVaultScreen() {
                                 </TouchableOpacity>
                             );
                         })}
+                    </View>
+                </View>
+
+                {/* 🌟 PROMINENT SKBTECH IDENTITY API HERO CARD 🌟 */}
+                <View style={{
+                    backgroundColor: '#0F172A',
+                    borderRadius: 18,
+                    borderWidth: 2,
+                    borderColor: '#F59E0B',
+                    padding: 16,
+                    marginBottom: 16,
+                    shadowColor: '#F59E0B',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.18,
+                    shadowRadius: 10,
+                    elevation: 4
+                }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="finger-print" size={20} color="#D97706" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 14 }}>SKBTECH Official API Gateway</Text>
+                                <Text style={{ color: '#FCD34D', fontSize: 10, fontWeight: '700' }}>Official Live Engine for NIN & BVN Services</Text>
+                            </View>
+                        </View>
+                        <View style={{ backgroundColor: skbtechApiKey.trim() ? '#059669' : '#DC2626', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 }}>
+                            <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '900' }}>
+                                {skbtechApiKey.trim() ? 'LIVE ACTIVE' : 'KEY REQUIRED'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <Text style={{ color: '#E2E8F0', fontSize: 11, marginBottom: 12, lineHeight: 16 }}>
+                        Sanya API Key din ku na SKBTECH anan (daga <Text style={{ color: '#FCD34D', fontWeight: 'bold' }}>skbtech.com.ng/developer</Text>). Dukkan ayyukan NIN da BVN za suyi aiki kai-tsaye ta wannan API din.
+                    </Text>
+
+                    {/* Direct Key Input */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#CBD5E1', paddingHorizontal: 10, height: 44, marginBottom: 10 }}>
+                        <Ionicons name="key-outline" size={17} color="#0F172A" style={{ marginRight: 6 }} />
+                        <TextInput
+                            style={{ flex: 1, fontSize: 12, color: '#0F172A', fontWeight: '700' }}
+                            placeholder="Paste your SKBTECH API Key here..."
+                            placeholderTextColor="#94A3B8"
+                            value={skbtechApiKey}
+                            onChangeText={setSkbtechApiKey}
+                            secureTextEntry={!visibleKeys['SKBTECH_API_KEY']}
+                            autoCapitalize="none"
+                        />
+                        <TouchableOpacity 
+                            onPress={() => setVisibleKeys(prev => ({ ...prev, SKBTECH_API_KEY: !prev['SKBTECH_API_KEY'] }))}
+                            style={{ padding: 6 }}
+                        >
+                            <Ionicons name={visibleKeys['SKBTECH_API_KEY'] ? 'eye-off-outline' : 'eye-outline'} size={17} color="#64748B" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            onPress={async () => {
+                                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                                    try {
+                                        const txt = await navigator.clipboard.readText();
+                                        if (txt && txt.trim()) {
+                                            setSkbtechApiKey(txt.trim());
+                                            showToast("Pasted SKBTECH Key! ✨");
+                                        }
+                                    } catch (_) {}
+                                }
+                            }}
+                            style={{ marginLeft: 4, backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
+                        >
+                            <Text style={{ color: '#B45309', fontSize: 10, fontWeight: '800' }}>Paste</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Actions: Save Key Now & Test Connection */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity
+                            onPress={handleSaveVault}
+                            disabled={saving}
+                            style={{ flex: 1.2, backgroundColor: '#D97706', paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            activeOpacity={0.8}
+                        >
+                            {saving ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name="save-outline" size={15} color="#FFFFFF" />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>Ajiye / Save Key</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => testSingleConnection('skbtech', skbtechApiKey)}
+                            style={{ flex: 0.8, backgroundColor: '#1E293B', paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#475569', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="flash-outline" size={14} color="#F59E0B" />
+                            <Text style={{ color: '#FCD34D', fontWeight: '800', fontSize: 11 }}>Test API</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 

@@ -198,11 +198,33 @@ serve(async (req: Request) => {
     }
 
     if (!SKBTECH_API_KEY) {
+      const { data: settings } = await supabaseAdmin
+        .from('app_settings')
+        .select('key, value');
+      if (settings && Array.isArray(settings)) {
+        for (const s of settings) {
+          const k = String(s.key || '').toUpperCase();
+          if (['SKBTECH_API_KEY', 'SKB_API_KEY', 'SKBTECH_KEY', 'SKB_KEY'].includes(k) && s.value) {
+            let v = s.value;
+            if (typeof v === 'string' && (v.startsWith('{') || v.startsWith('"'))) {
+              try {
+                const parsed = JSON.parse(v);
+                v = typeof parsed === 'string' ? parsed : (parsed.key || parsed.value || v);
+              } catch (_) {}
+            }
+            SKBTECH_API_KEY = typeof v === 'string' ? v.trim() : String(v);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!SKBTECH_API_KEY) {
       if (hasDeducted) {
         await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: SKBTECH API Key not configured');
         hasDeducted = false;
       }
-      return jsonOk({ error: 'Identity verification provider key is not configured in API Vault. Please add SKBTECH_API_KEY in Admin Secrets.' });
+      return jsonOk({ error: 'Identity verification provider key is not configured in Admin -> API Vault. Please add SKBTECH_API_KEY in Admin API settings.' });
     }
 
     // ── Map searchType to SKBTECH API Endpoint & Payload ─────────────────────
