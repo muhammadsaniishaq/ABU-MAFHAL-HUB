@@ -37,20 +37,26 @@ export async function uploadMediaFile(options: UploadMediaOptions): Promise<Uplo
   const ext = (uri.split('.').pop() || (isVideo ? 'mp4' : 'jpg')).split('?')[0];
   const finalFileName = options.fileName || `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
 
-  // 1. Web Environment: standard blob upload
+  // 1. Web Environment: direct base64 ArrayBuffer or blob upload
   if (Platform.OS === 'web') {
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      let uploadPayload: any;
+      if (base64) {
+        const clean = base64.includes(',') ? base64.split(',')[1] : base64;
+        uploadPayload = decode(clean);
+      } else {
+        const response = await fetch(uri);
+        uploadPayload = await response.blob();
+      }
       const { error: uploadError } = await supabase.storage
         .from(bucket)
-        .upload(finalFileName, blob, { contentType: mimeType, upsert: true });
+        .upload(finalFileName, uploadPayload, { contentType: mimeType, upsert: true });
 
       if (uploadError) {
         // Fallback to 'avatars' bucket
         const { error: fallbackError } = await supabase.storage
           .from('avatars')
-          .upload(finalFileName, blob, { contentType: mimeType, upsert: true });
+          .upload(finalFileName, uploadPayload, { contentType: mimeType, upsert: true });
         if (fallbackError) throw fallbackError;
         const { data } = supabase.storage.from('avatars').getPublicUrl(finalFileName);
         return { success: true, publicUrl: data.publicUrl };

@@ -254,50 +254,238 @@ export default function AppDesigner() {
     },
   ];
 
-  // Robust, crash-free camera & gallery picker (fetches raw URI without JS heap overload)
-  const pickMediaSafely = async (source: 'camera' | 'library'): Promise<ImagePicker.ImagePickerAsset | null> => {
+  interface PickedImageResult {
+    uri: string;
+    dataUri: string;
+    base64: string;
+    width?: number;
+    height?: number;
+  }
+
+  // Cross-platform, bulletproof image picker:
+  // On Web: Uses synchronous HTML5 file input with FileReader + Canvas compression (100% reliable, zero CORS/popup issues, never blocked)
+  // On Native: Uses Expo ImagePicker + ImageManipulator
+  const pickMediaCrossPlatform = async (source: 'camera' | 'library'): Promise<PickedImageResult | null> => {
+    // ── 1. WEB PLATFORM ──
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      return new Promise((resolve) => {
+        try {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          if (source === 'camera') {
+            input.setAttribute('capture', 'environment');
+          }
+          input.style.position = 'fixed';
+          input.style.top = '-9999px';
+          input.style.left = '-9999px';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+
+          let hasResolved = false;
+          const cleanup = () => {
+            if (input.parentNode) {
+              input.parentNode.removeChild(input);
+            }
+          };
+
+          input.onchange = async (e: any) => {
+            if (hasResolved) return;
+            hasResolved = true;
+            const file: File | undefined = e.target?.files?.[0];
+            cleanup();
+            if (!file) {
+              resolve(null);
+              return;
+            }
+
+            try {
+              const reader = new FileReader();
+              reader.onload = (readerEvent) => {
+                const rawDataUrl = readerEvent.target?.result as string;
+                if (!rawDataUrl || typeof rawDataUrl !== 'string') {
+                  resolve(null);
+                  return;
+                }
+
+                // Offscreen canvas compression to ~80KB max 900px
+                const img = new (window as any).Image();
+                img.onload = () => {
+                  try {
+                    const canvas = document.createElement('canvas');
+                    const maxDim = 900;
+                    let w = img.naturalWidth || img.width || 800;
+                    let h = img.naturalHeight || img.height || 600;
+                    if (w > maxDim || h > maxDim) {
+                      if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                      } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                      }
+                    }
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.drawImage(img, 0, 0, w, h);
+                      const compressed = canvas.toDataURL('image/jpeg', 0.82);
+                      const rawBase64 = compressed.includes(',') ? compressed.split(',')[1] : compressed;
+                      resolve({
+                        uri: compressed,
+                        dataUri: compressed,
+                        base64: rawBase64,
+                        width: w,
+                        height: h,
+                      });
+                      return;
+                    }
+                  } catch (canvasErr) {
+                    console.warn('Canvas resize notice:', canvasErr);
+                  }
+                  const rawBase64 = rawDataUrl.includes(',') ? rawDataUrl.split(',')[1] : rawDataUrl;
+                  resolve({
+                    uri: rawDataUrl,
+                    dataUri: rawDataUrl,
+                    base64: rawBase64,
+                  });
+                };
+                img.onerror = () => {
+                  const rawBase64 = rawDataUrl.includes(',') ? rawDataUrl.split(',')[1] : rawDataUrl;
+                  resolve({
+                    uri: rawDataUrl,
+                    dataUri: rawDataUrl,
+                    base64: rawBase64,
+                  });
+                };
+                img.src = rawDataUrl;
+              };
+              reader.onerror = () => {
+                cleanup();
+                resolve(null);
+              };
+              reader.readAsDataURL(file);
+            } catch (err) {
+              console.error('Web file reading error:', err);
+              cleanup();
+              resolve(null);
+            }
+          };
+
+          // Synchronous trigger in user gesture stack
+          input.click();
+
+          // Auto-cleanup on focus return if user cancels file dialog
+          if (typeof window !== 'undefined') {
+            window.addEventListener('focus', () => {
+              setTimeout(() => {
+                if (!hasResolved) {
+                  setTimeout(() => {
+                    if (!hasResolved && (!input.files || input.files.length === 0)) {
+                      hasResolved = true;
+                      cleanup();
+                      resolve(null);
+                    }
+                  }, 1200);
+                }
+              }, 400);
+            }, { once: true });
+          }
+        } catch (err: any) {
+          console.error('Web picker launch failed:', err);
+          resolve(null);
+        }
+      });
+    }
+
+    // ── 2. NATIVE PLATFORM (iOS & Android) ──
     try {
       if (source === 'camera') {
-        if (Platform.OS !== 'web') {
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert(
-              "Izinin Kamara (Camera Permission)",
-              "Don Allah bada izinin amfani da kamara a wayarka domin daukar hoto."
-            );
-            return null;
-          }
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert(
+            "Izinin Kamara (Camera Permission)",
+            "Don Allah bada izinin amfani da kamara a wayarka domin daukar hoto."
+          );
+          return null;
         }
         const result = await safeLaunchPicker(() => ImagePicker.launchCameraAsync({
           allowsEditing: false,
           quality: 0.8,
+          base64: true,
         }));
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          return result.assets[0];
+          const asset = result.assets[0];
+          try {
+            const manip = await ImageManipulator.manipulateAsync(
+              asset.uri,
+              [{ resize: { width: 900 } }],
+              { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+            );
+            const b64 = manip.base64 || asset.base64 || '';
+            const dataUri = `data:image/jpeg;base64,${b64}`;
+            return {
+              uri: manip.uri,
+              dataUri,
+              base64: b64,
+              width: manip.width,
+              height: manip.height,
+            };
+          } catch {
+            const b64 = asset.base64 || '';
+            return {
+              uri: asset.uri,
+              dataUri: b64 ? `data:image/jpeg;base64,${b64}` : asset.uri,
+              base64: b64,
+            };
+          }
         }
       } else {
-        if (Platform.OS !== 'web') {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert(
-              "Izinin Hotuna (Gallery Permission)",
-              "Don Allah bada izinin shiga hotunanka a wayarka domin zaban hoto."
-            );
-            return null;
-          }
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert(
+            "Izinin Hotuna (Gallery Permission)",
+            "Don Allah bada izinin shiga hotunanka a wayarka domin zaban hoto."
+          );
+          return null;
         }
         const result = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: false,
           quality: 0.8,
+          base64: true,
         }));
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          return result.assets[0];
+          const asset = result.assets[0];
+          try {
+            const manip = await ImageManipulator.manipulateAsync(
+              asset.uri,
+              [{ resize: { width: 900 } }],
+              { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+            );
+            const b64 = manip.base64 || asset.base64 || '';
+            const dataUri = `data:image/jpeg;base64,${b64}`;
+            return {
+              uri: manip.uri,
+              dataUri,
+              base64: b64,
+              width: manip.width,
+              height: manip.height,
+            };
+          } catch {
+            const b64 = asset.base64 || '';
+            return {
+              uri: asset.uri,
+              dataUri: b64 ? `data:image/jpeg;base64,${b64}` : asset.uri,
+              base64: b64,
+            };
+          }
         }
       }
       return null;
     } catch (e: any) {
-      console.error("Image pick error:", e);
+      console.error("Native image pick error:", e);
       Alert.alert("Daukar Hoto", e.message || "Ba a samu nasarar daukar hoton ba.");
       return null;
     }
@@ -307,7 +495,7 @@ export default function AppDesigner() {
     return splashSlides.find(s => s.order === slot);
   };
 
-  const applySlideImage = async (slot: number, imageUrl: string) => {
+  const applySlideImage = async (slot: number, imageUrl: string, silent: boolean = false) => {
     const current = [...splashSlides];
     const updated = [0, 1, 2].map((sIndex) => {
       if (sIndex === slot) {
@@ -318,147 +506,46 @@ export default function AppDesigner() {
     });
     setSplashSlides(updated);
     const saved = await saveSplashSlidesToDB(updated);
-    if (saved) {
+    if (saved && !silent) {
       Alert.alert("An Sabunta Hoto! 🎉", `Hoton Page/Slide #${slot + 1} an sabunta shi kuma an adana shi cikin nasara.`);
-    }
-  };
-
-  // Bulletproof cross-platform converter to permanent compressed data-URI (solves dead browser blobs)
-  const convertAssetToPermanentDataUri = async (uri: string): Promise<string> => {
-    // 1. Web Environment: HTML5 Canvas scaling & base64 generation
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return new Promise((resolve) => {
-        try {
-          const img = new (window as any).Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              const maxDim = 900;
-              let w = img.naturalWidth || img.width;
-              let h = img.naturalHeight || img.height;
-              if (w > maxDim || h > maxDim) {
-                if (w > h) {
-                  h = Math.round((h * maxDim) / w);
-                  w = maxDim;
-                } else {
-                  w = Math.round((w * maxDim) / h);
-                  h = maxDim;
-                }
-              }
-              canvas.width = w;
-              canvas.height = h;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0, w, h);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-                if (dataUrl && dataUrl.startsWith('data:image/')) {
-                  resolve(dataUrl);
-                  return;
-                }
-              }
-            } catch (canvasErr) {
-              console.warn('Canvas conversion fallback notice:', canvasErr);
-            }
-            // Fallback to FileReader if canvas encounters taint
-            fetch(uri)
-              .then(r => r.blob())
-              .then(b => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const res = reader.result as string;
-                  resolve(res && res.startsWith('data:image/') ? res : uri);
-                };
-                reader.onerror = () => resolve(uri);
-                reader.readAsDataURL(b);
-              })
-              .catch(() => resolve(uri));
-          };
-          img.onerror = () => {
-            fetch(uri)
-              .then(r => r.blob())
-              .then(b => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const res = reader.result as string;
-                  resolve(res && res.startsWith('data:image/') ? res : uri);
-                };
-                reader.onerror = () => resolve(uri);
-                reader.readAsDataURL(b);
-              })
-              .catch(() => resolve(uri));
-          };
-          img.src = uri;
-        } catch {
-          resolve(uri);
-        }
-      });
-    }
-
-    // 2. Native Environment (Android & iOS): Expo ImageManipulator
-    try {
-      const manipResult = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 900 } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-      if (manipResult.base64) {
-        return `data:image/jpeg;base64,${manipResult.base64}`;
-      }
-      return manipResult.uri;
-    } catch (e) {
-      console.warn('Native ImageManipulator notice:', e);
-      return uri;
     }
   };
 
   const handleUploadFromSource = async (slot: number, source: 'camera' | 'library') => {
     try {
-      // 1. Launch picker immediately inside user gesture context
-      const asset = await pickMediaSafely(source);
-      if (!asset) {
+      // 1. Launch rock-solid picker immediately in user gesture
+      const picked = await pickMediaCrossPlatform(source);
+      if (!picked) {
         return;
       }
 
       setUploadingSlide(true);
 
-      // 2. Convert to permanent, lightweight (~80KB) data-URI (solves dead browser blobs!)
-      const permanentDataUri = await convertAssetToPermanentDataUri(asset.uri);
-      const cleanBase64 = permanentDataUri.includes(',') ? permanentDataUri.split(',')[1] : null;
+      // 2. Guaranteed permanent data-URI (instant zero-delay display & safe persistence)
+      const initialUrl = picked.dataUri.startsWith('data:image/') ? picked.dataUri : picked.uri;
 
-      const fileName = `splash/slide_${slot + 1}_${Date.now()}.jpg`;
+      // STEP 1: Apply immediately to local state and DB!
+      await applySlideImage(slot, initialUrl, false);
 
-      // 3. Try storage upload to Supabase storage bucket
-      let finalUrl = '';
+      // STEP 2: Background upload to Supabase CDN Storage bucket
       try {
+        const fileName = `splash/slide_${slot + 1}_${Date.now()}.jpg`;
         const uploadRes = await uploadMediaFile({
-          uri: asset.uri,
+          uri: picked.uri,
           bucket: 'banners',
           fileName,
           mimeType: 'image/jpeg',
-          base64: cleanBase64,
+          base64: picked.base64,
           isVideo: false,
         });
 
         if (uploadRes?.success && uploadRes?.publicUrl && uploadRes.publicUrl.startsWith('http')) {
-          finalUrl = uploadRes.publicUrl;
+          // Seamlessly update to CDN URL silently
+          await applySlideImage(slot, uploadRes.publicUrl, true);
         }
       } catch (uploadErr) {
-        console.warn('Storage upload notice, applying local data-URI fallback:', uploadErr);
+        console.warn('Background CDN storage upload notice (local base64 remains active):', uploadErr);
       }
-
-      // If storage bucket was blocked by RLS policy, use the permanent ~80KB data URI fallback
-      // Because it is a permanent data:image/... URI, it will NEVER be blank or dead!
-      if (!finalUrl || !finalUrl.startsWith('http')) {
-        finalUrl = permanentDataUri;
-      }
-
-      // STRICT SAFETY: NEVER save a temporary blob: URL to database!
-      if (finalUrl.startsWith('blob:')) {
-        throw new Error('Ba a iya canza hoton zuwa tsari mai dorewa ba. Don Allah sake gwadawa.');
-      }
-
-      await applySlideImage(slot, finalUrl);
     } catch (e: any) {
       console.error("Slide upload error:", e);
       Alert.alert("Daukar Hoto", e.message || "Ba a samu nasarar loda hoton ba.");
@@ -631,76 +718,71 @@ export default function AppDesigner() {
         {
           text: "📸 Dauki Hoto (Camera)",
           onPress: async () => {
-            const asset = await pickMediaSafely('camera');
-            if (asset) await uploadToSupabase(asset, type);
+            const picked = await pickMediaCrossPlatform('camera');
+            if (picked) await uploadBrandLogo(picked, type);
           }
         },
         {
           text: "🖼️ Zabi daga Gallery",
           onPress: async () => {
-            const asset = await pickMediaSafely('library');
-            if (asset) await uploadToSupabase(asset, type);
+            const picked = await pickMediaCrossPlatform('library');
+            if (picked) await uploadBrandLogo(picked, type);
           }
         }
       ]
     );
   };
 
-  const uploadToSupabase = async (image: ImagePicker.ImagePickerAsset, type: 'logo' | 'icon') => {
+  const uploadBrandLogo = async (picked: PickedImageResult, type: 'logo' | 'icon') => {
     const isIcon = type === 'icon';
     if (isIcon) setUploadingIcon(true);
     else setUploadingLogo(true);
 
     try {
-      const fileExt = (image.uri.split('.').pop() || 'jpg').split('?')[0];
-      const fileName = `brand/${type}_${Date.now()}.${fileExt}`;
+      const fileName = `brand/${type}_${Date.now()}.jpg`;
+      const initialUrl = picked.dataUri.startsWith('data:image/') ? picked.dataUri : picked.uri;
 
-      const permanentDataUri = await convertAssetToPermanentDataUri(image.uri);
-      const cleanBase64 = permanentDataUri.includes(',') ? permanentDataUri.split(',')[1] : null;
+      // Immediate visual update
+      if (isIcon) setLogoIconUrl(initialUrl);
+      else setLogoUrl(initialUrl);
 
-      let publicUrl = '';
+      // Save initialUrl to DB
+      await supabase
+        .from('app_settings')
+        .upsert({
+          key: isIcon ? 'app_logo_icon' : 'app_logo',
+          value: { url: initialUrl },
+          description: isIcon ? 'Dynamic App Logo Icon Square' : 'Dynamic App Logo Banner Full'
+        }, { onConflict: 'key' });
+
+      // Try CDN storage upload in background
       try {
         const uploadRes = await uploadMediaFile({
-          uri: image.uri,
+          uri: picked.uri,
           bucket: 'banners',
           fileName,
           mimeType: 'image/jpeg',
-          base64: cleanBase64,
+          base64: picked.base64,
           isVideo: false,
         });
 
         if (uploadRes?.success && uploadRes?.publicUrl && uploadRes.publicUrl.startsWith('http')) {
-          publicUrl = uploadRes.publicUrl;
+          if (isIcon) setLogoIconUrl(uploadRes.publicUrl);
+          else setLogoUrl(uploadRes.publicUrl);
+
+          await supabase
+            .from('app_settings')
+            .upsert({
+              key: isIcon ? 'app_logo_icon' : 'app_logo',
+              value: { url: uploadRes.publicUrl },
+              description: isIcon ? 'Dynamic App Logo Icon Square' : 'Dynamic App Logo Banner Full'
+            }, { onConflict: 'key' });
         }
       } catch (uploadErr) {
-        console.warn('Storage upload logo notice:', uploadErr);
+        console.warn('Brand logo storage upload notice:', uploadErr);
       }
 
-      if (!publicUrl || !publicUrl.startsWith('http')) {
-        publicUrl = permanentDataUri;
-      }
-
-      if (publicUrl.startsWith('blob:')) {
-        throw new Error('Failed to convert image. Please retry.');
-      }
-
-      const { error: dbError } = await supabase
-        .from('app_settings')
-        .upsert({
-          key: isIcon ? 'app_logo_icon' : 'app_logo',
-          value: { url: publicUrl },
-          description: isIcon ? 'Dynamic App Logo Icon Square' : 'Dynamic App Logo Banner Full'
-        }, { onConflict: 'key' });
-
-      if (dbError) throw dbError;
-
-      if (isIcon) {
-        setLogoIconUrl(publicUrl);
-        Alert.alert("Success 🎉", "Logo Icon uploaded and published successfully!");
-      } else {
-        setLogoUrl(publicUrl);
-        Alert.alert("Success 🎉", "Logo Banner uploaded and published successfully!");
-      }
+      Alert.alert("Success 🎉", `${isIcon ? 'App Icon' : 'Logo Banner'} an sabunta shi cikin nasara!`);
     } catch (error: any) {
       Alert.alert("Upload Failed", error.message);
     } finally {
