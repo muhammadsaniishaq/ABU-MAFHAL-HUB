@@ -329,10 +329,10 @@ serve(async (req: Request) => {
 
     if (!SKBTECH_API_KEY) {
       if (hasDeducted) {
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: SKBTECH API Key not configured');
+        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Verification provider key unconfigured');
         hasDeducted = false;
       }
-      return jsonOk({ error: 'Identity verification provider key is not configured in Admin -> API Vault. Please add SKBTECH_API_KEY in Admin API settings.' });
+      return jsonOk({ error: 'Identity verification gateway is currently undergoing scheduled optimization. Please try again in a few moments.' });
     }
 
     // ── Map searchType to SKBTECH API Endpoint & Payload ─────────────────────
@@ -583,15 +583,32 @@ serve(async (req: Request) => {
     if (!skbRes.ok || skbData.success === false) {
       const errMsg = skbData.message || skbData.error || 'The verification could not be completed at this time.';
 
-      // Check for common error cases to give human-friendly messages
+      // Check for common error cases to give human-friendly, professional messages
       let friendlyError = errMsg;
       const lower = errMsg.toLowerCase();
-      if (lower.includes('insufficient balance') || lower.includes('insufficient wallet')) {
-        friendlyError = 'Provider gateway balance is low. Please notify administrator.';
-      } else if (lower.includes('record not found') || lower.includes('not found') || lower.includes('no record') || lower.includes('does not exist')) {
-        friendlyError = 'The provided record could not be found in the identity database. Please verify the details.';
-      } else if (lower.includes('invalid api key')) {
-        friendlyError = 'Invalid API credentials. Please verify your SKBTECH API Key in Admin Settings.';
+      if (
+        lower.includes('insufficient balance') ||
+        lower.includes('insufficient wallet') ||
+        lower.includes('balance is low') ||
+        lower.includes('wallet balance') ||
+        lower.includes('fund your wallet') ||
+        lower.includes('provider gateway') ||
+        lower.includes('provider balance')
+      ) {
+        // 🛡️ Never expose provider wallet exhaustion or provider balance to end users
+        friendlyError = 'Identity verification gateway is currently undergoing scheduled optimization. Please try again in a few moments.';
+      } else if (
+        lower.includes('record not found') ||
+        lower.includes('not found') ||
+        lower.includes('no record') ||
+        lower.includes('does not exist') ||
+        lower.includes('not exist') ||
+        lower.includes('invalid or not found') ||
+        lower.includes('no matching')
+      ) {
+        friendlyError = 'No citizen record was found matching the details provided. Please verify the information and try again.';
+      } else if (lower.includes('invalid api key') || lower.includes('unauthorized') || lower.includes('api credentials')) {
+        friendlyError = 'Identity verification gateway is momentarily unavailable. Please try again shortly.';
       }
 
       if (hasDeducted) {

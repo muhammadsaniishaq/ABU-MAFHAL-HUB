@@ -179,10 +179,48 @@ export default function VerifyBVNScreen() {
                 fetchWalletBalance();
                 loadHistory();
             } else {
-                showAlert("Verification Failed", res?.message || "BVN record not found.", "error");
+                const msg = res?.message || 'BVN record could not be found.';
+                const lower = msg.toLowerCase();
+                if (
+                    lower.includes('provider api wallet') ||
+                    lower.includes('agenthub') ||
+                    lower.includes('skbtech') ||
+                    lower.includes('provider balance') ||
+                    lower.includes('provider gateway') ||
+                    lower.includes('balance is low') ||
+                    lower.includes('api key')
+                ) {
+                    showAlert("Service Temporarily Unavailable", "Identity verification gateway is currently undergoing scheduled optimization. Please try again in a few moments.", "warning");
+                } else if (
+                    lower.includes('not found') ||
+                    lower.includes('no record') ||
+                    lower.includes('does not exist') ||
+                    lower.includes('not exist') ||
+                    lower.includes('invalid or not found') ||
+                    lower.includes('no matching')
+                ) {
+                    showAlert("No Record Found", "No citizen record was found matching this BVN. Please verify the 11-digit number and try again.", "error");
+                } else if (lower.includes('insufficient') || (lower.includes('balance') && lower.includes('wallet'))) {
+                    showAlert("Insufficient Balance", "Your wallet balance is insufficient for this verification. Please fund your wallet to proceed.", "warning");
+                } else {
+                    showAlert("Verification Notice", msg, "error");
+                }
             }
         } catch (e: any) {
-            showAlert("Error", e.message || "An error occurred during verification.", "error");
+            const errM = e.message || '';
+            const lowerM = errM.toLowerCase();
+            if (
+                lowerM.includes('not found') ||
+                lowerM.includes('no record') ||
+                lowerM.includes('does not exist') ||
+                lowerM.includes('not exist') ||
+                lowerM.includes('invalid or not found') ||
+                lowerM.includes('no matching')
+            ) {
+                showAlert("No Record Found", "No citizen record was found matching this BVN. Please check the digits and try again.", "error");
+            } else {
+                showAlert("Network Notice", errM || "A network error occurred. Please check your connection and try again.", "error");
+            }
         } finally {
             setLoading(false);
         }

@@ -2212,24 +2212,61 @@ export default function VerifyNINScreen() {
             } else {
                 const msg = response.message || 'Unable to verify this NIN. Please check the number and try again.';
                 const lowerMsg = msg.toLowerCase();
-                if (lowerMsg.includes('provider api wallet') || lowerMsg.includes('agenthub') || lowerMsg.includes('skbtech') || lowerMsg.includes('provider balance') || lowerMsg.includes('provider gateway')) {
-                    showAlert('Provider Gateway Balance Low', 'The provider API wallet balance on skbtech.com.ng is exhausted. Please fund your SKBTECH wallet at https://skbtech.com.ng to enable live verifications.', 'warning');
-                } else if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
-                    showAlert('Insufficient Wallet Balance', msg, 'warning');
+                if (
+                    lowerMsg.includes('provider api wallet') ||
+                    lowerMsg.includes('agenthub') ||
+                    lowerMsg.includes('skbtech') ||
+                    lowerMsg.includes('provider balance') ||
+                    lowerMsg.includes('provider gateway') ||
+                    lowerMsg.includes('gateway balance') ||
+                    lowerMsg.includes('balance is low') ||
+                    lowerMsg.includes('api key')
+                ) {
+                    showAlert('Service Temporarily Unavailable', 'Identity verification gateway is currently undergoing scheduled optimization. Please try again in a few moments.', 'warning');
+                } else if (lowerMsg.includes('insufficient') || (lowerMsg.includes('balance') && lowerMsg.includes('wallet'))) {
+                    showAlert('Insufficient Balance', 'Your wallet balance is insufficient for this verification. Please fund your wallet to proceed.', 'warning');
                 } else if (lowerMsg.includes('unauthorized') || lowerMsg.includes('auth')) {
-                    showAlert('Session Expired', 'Please log out and log in again, then retry.', 'error');
-                } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
-                    showAlert('No Record Found', 'The NIN you entered does not exist or has no record. Please check the number and try again.', 'error');
+                    showAlert('Session Expired', 'Your session has expired. Please log out and log in again, then retry.', 'error');
+                } else if (
+                    lowerMsg.includes('not found') ||
+                    lowerMsg.includes('no record') ||
+                    lowerMsg.includes('does not exist') ||
+                    lowerMsg.includes('not exist') ||
+                    lowerMsg.includes('invalid or not found') ||
+                    lowerMsg.includes('no matching')
+                ) {
+                    showAlert('No Record Found', 'No citizen record was found matching this NIN. Please check the number and try again.', 'error');
+                } else if (lowerMsg.includes('timed out') || lowerMsg.includes('timeout')) {
+                    showAlert('Connection Timed Out', 'The identity verification gateway took too long to respond. If any fee was deducted, it has been automatically refunded to your wallet. Please try again.', 'warning');
                 } else {
-                    showAlert('Verification Failed', msg, 'error');
+                    showAlert('Verification Notice', msg, 'error');
                 }
             }
         } catch (e: any) {
             const errM = e.message || '';
-            if (errM.toLowerCase().includes('not found') || errM.toLowerCase().includes('no record') || errM.toLowerCase().includes('does not exist') || errM.toLowerCase().includes('not exist') || errM.toLowerCase().includes('invalid or not found')) {
-                showAlert('No Record Found', 'The NIN you entered does not exist or has no record. Please check the number and try again.', 'error');
+            const lowerM = errM.toLowerCase();
+            if (
+                lowerM.includes('provider api wallet') ||
+                lowerM.includes('agenthub') ||
+                lowerM.includes('skbtech') ||
+                lowerM.includes('provider balance') ||
+                lowerM.includes('provider gateway') ||
+                lowerM.includes('balance is low')
+            ) {
+                showAlert('Service Temporarily Unavailable', 'Identity verification gateway is currently undergoing scheduled optimization. Please try again in a few moments.', 'warning');
+            } else if (
+                lowerM.includes('not found') ||
+                lowerM.includes('no record') ||
+                lowerM.includes('does not exist') ||
+                lowerM.includes('not exist') ||
+                lowerM.includes('invalid or not found') ||
+                lowerM.includes('no matching')
+            ) {
+                showAlert('No Record Found', 'No citizen record was found matching this NIN. Please check the number and try again.', 'error');
+            } else if (lowerM.includes('timed out') || lowerM.includes('timeout')) {
+                showAlert('Connection Timed Out', 'The identity verification gateway took too long to respond. If any fee was deducted, it has been refunded. Please try again in a few moments.', 'warning');
             } else {
-                showAlert('Network Error', errM || 'A network error occurred. Please check your connection and try again.', 'error');
+                showAlert('Network Notice', errM || 'A network error occurred. Please check your connection and try again.', 'error');
             }
         } finally {
             clearTimeout(timer1);

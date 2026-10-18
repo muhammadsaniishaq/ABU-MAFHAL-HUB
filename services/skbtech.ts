@@ -34,6 +34,57 @@ export interface SKBStatusResponse {
   updated_at?: string;
 }
 
+export function sanitizeVerificationMessage(rawMsg: string | null | undefined): string {
+  if (!rawMsg) return 'Verification service is momentarily unavailable. Please try again shortly.';
+  const lower = String(rawMsg).toLowerCase();
+
+  // 1. 🛡️ Confidentiality: Completely mask provider wallet / API key / balance exhaustion from end-users
+  if (
+    lower.includes('provider api wallet') ||
+    lower.includes('agenthub') ||
+    lower.includes('skbtech') ||
+    lower.includes('provider balance') ||
+    lower.includes('provider gateway') ||
+    lower.includes('gateway balance') ||
+    lower.includes('balance is low') ||
+    lower.includes('fund your wallet at') ||
+    lower.includes('api key') ||
+    lower.includes('api credentials') ||
+    lower.includes('config error') ||
+    lower.includes('upstream error') ||
+    lower.includes('developer page')
+  ) {
+    return 'Identity verification gateway is currently undergoing scheduled optimization. Please try again in a few moments.';
+  }
+
+  // 2. ✨ Professional "No Record Found" message
+  if (
+    lower.includes('record not found') ||
+    lower.includes('not found') ||
+    lower.includes('no record') ||
+    lower.includes('does not exist') ||
+    lower.includes('not exist') ||
+    lower.includes('invalid or not found') ||
+    lower.includes('no matching') ||
+    lower.includes('could not be retrieved') ||
+    lower.includes('could not be found')
+  ) {
+    return 'No citizen record was found matching the details provided. Please verify the information and try again.';
+  }
+
+  // 3. User wallet balance
+  if (lower.includes('insufficient') && (lower.includes('balance') || lower.includes('wallet'))) {
+    return 'Your wallet balance is insufficient for this verification. Please fund your wallet to proceed.';
+  }
+
+  // 4. Timeouts
+  if (lower.includes('timed out') || lower.includes('timeout')) {
+    return 'The identity verification gateway took too long to respond. If any fee was deducted, it has been automatically refunded. Please try again.';
+  }
+
+  return rawMsg;
+}
+
 export const SKBTechIdentityVerifier = {
   // ── Core Invoker: delegates to Supabase Edge Function `verify-nin` ────────────
   async invokeEdge(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
@@ -58,14 +109,11 @@ export const SKBTechIdentityVerifier = {
 
       if (error) {
         let msg = error.message || 'Verification failed. Please try again.';
-        if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
-          msg = 'Insufficient wallet balance. Please fund your wallet and try again.';
-        }
-        return { isValid: false, message: msg };
+        return { isValid: false, message: sanitizeVerificationMessage(msg) };
       }
 
       if (data?.error) {
-        return { isValid: false, message: data.error, data: data.details };
+        return { isValid: false, message: sanitizeVerificationMessage(data.error), data: data.details };
       }
 
       if (data?.data) {
@@ -75,7 +123,7 @@ export const SKBTechIdentityVerifier = {
         if (rawStatus === 'failed') {
           return {
             isValid: false,
-            message: providerResponse.message || providerResponse.response || 'Verification failed. Record could not be retrieved from registry.',
+            message: sanitizeVerificationMessage(providerResponse.message || providerResponse.response || 'No matching citizen record found.'),
           };
         }
 
@@ -107,7 +155,7 @@ export const SKBTechIdentityVerifier = {
           if (!hasIdentityRecord) {
             return {
               isValid: false,
-              message: providerResponse.message || 'No matching citizen record found on NIMC/BVN registry.',
+              message: 'No citizen record was found matching the details provided. Please verify the information and try again.',
             };
           }
 
@@ -122,7 +170,7 @@ export const SKBTechIdentityVerifier = {
       }
 
       if (data?.message) {
-        return { isValid: false, message: data.message };
+        return { isValid: false, message: sanitizeVerificationMessage(data.message) };
       }
 
       return { isValid: false, message: 'Could not verify details. Please check the input and try again.' };
