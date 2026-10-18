@@ -39,7 +39,8 @@ export default function SplashScreen() {
   // 0: Global Fintech Gateway, 1: All-in-One Digital Hub, 2: Institutional Value & Get Started
   const [pageIdx, setPageIdx] = useState(0);
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
-  const [theme, setTheme] = useState<LuxuryTheme>('pearl');
+  // Default to Midnight Sapphire Dark Luxury (eliminates blinding white page glare)
+  const [theme, setTheme] = useState<LuxuryTheme>('sapphire');
   const [hasValidSession, setHasValidSession] = useState(false);
   const [customSlideImages, setCustomSlideImages] = useState<(string | null)[]>([null, null, null]);
   const [adminLogoUrl, setAdminLogoUrl] = useState<string | null>(null);
@@ -143,8 +144,15 @@ export default function SplashScreen() {
   const loadSavedTheme = async () => {
     try {
       const saved = await AsyncStorage.getItem('app_splash_luxury_theme');
-      if (saved && ['pearl', 'champagne', 'sapphire', 'emerald'].includes(saved)) {
-        setTheme(saved as LuxuryTheme);
+      if (saved && ['sapphire', 'emerald', 'champagne', 'pearl'].includes(saved)) {
+        // If previously saved as pearl, upgrade to dark sapphire as requested
+        if (saved === 'pearl') {
+          setTheme('sapphire');
+        } else {
+          setTheme(saved as LuxuryTheme);
+        }
+      } else {
+        setTheme('sapphire');
       }
     } catch (e) {
       console.log('Theme load notice:', e);
@@ -153,7 +161,7 @@ export default function SplashScreen() {
 
   const toggleTheme = async () => {
     haptic();
-    const themeCycle: LuxuryTheme[] = ['pearl', 'champagne', 'sapphire', 'emerald'];
+    const themeCycle: LuxuryTheme[] = ['sapphire', 'emerald', 'champagne', 'pearl'];
     const currentIdx = themeCycle.indexOf(theme);
     const nextTheme = themeCycle[(currentIdx + 1) % themeCycle.length];
     setTheme(nextTheme);
