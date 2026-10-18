@@ -1064,14 +1064,14 @@ export default function VerifyPhoneScreen() {
         
         const firstName = personData.firstname || personData.first_name || personData.firstName || '';
         const middleName = personData.middlename || personData.middle_name || personData.middleName || '';
-        const surname = personData.surname || personData.last_name || personData.lastname || personData.lastName || 'RESIDENT';
+        const surname = personData.surname || personData.last_name || personData.lastname || personData.lastName || '';
         const fullName = [firstName, middleName, surname].filter(Boolean).join(' ') || 'NIN Holder';
         const rawNin = personData.nin || personData.number || 'N/A';
         const cleanNin = String(rawNin).replace(/\D/g, '');
         const displayNin = cleanNin.length === 11
             ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
             : cleanNin || 'N/A';
-        const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '105829-40LQTYW4PVJY';
+        const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '';
         const dob = formatDob(personData.dob || personData.birthdate || personData.dateOfBirth || '');
         const gender = (personData.gender || personData.sex || 'M').trim().toUpperCase().startsWith('F') ? 'FEMALE' : 'MALE';
         const phoneVal = personData.phone || personData.phoneNumber || personData.telephoneno || phone || 'Not Provided';

@@ -488,17 +488,17 @@ export default function VerifyNINScreen() {
                 : cleanNin;
             const watermarkText = cleanNin.length === 11 ? `${cleanNin.slice(0, 4)} ${cleanNin.slice(4)}` : cleanNin;
             const photoWatermark = cleanNin.length === 11 ? cleanNin.slice(4) : '';
-            const surname = result.data.surname || result.data.last_name || 'RESIDENT';
+            const surname = result.data.surname || result.data.last_name || result.data.lastname || '';
             const first = result.data.firstname || result.data.first_name || '';
             const middle = result.data.middlename || result.data.middle_name || '';
             const givenNames = [first, middle].filter(Boolean).join(' ');
             const rawIssue = result.data.issueDate || result.data.issue_date || '';
-            const issueDate = rawIssue ? formatDob(rawIssue) : '01 JAN 2021';
+            const issueDate = rawIssue ? formatDob(rawIssue) : '';
             const trackingId = result.data.tracking_id || result.data.trackingId || '';
             const phone = result.data.telephoneno || result.data.phoneNumber || result.data.phone || '';
-            const residenceState = result.data.residence_state || result.data.residenceState || result.data.state || 'YOBE';
+            const residenceState = result.data.residence_state || result.data.residenceState || result.data.state || '';
             const residenceLga = result.data.residence_lga || result.data.residenceLga || result.data.lga || '';
-            const birthState = result.data.birthstate || result.data.birthState || 'YOBE';
+            const birthState = result.data.birthstate || result.data.birthState || '';
             const birthLga = result.data.birthlga || result.data.birthLga || '';
             const address = result.data.residence_address || result.data.address || '';
 
@@ -2283,7 +2283,7 @@ export default function VerifyNINScreen() {
         
         const firstName = personData.firstname || personData.first_name || personData.firstName || '';
         const middleName = personData.middlename || personData.middle_name || personData.middleName || '';
-        const surname = personData.surname || personData.last_name || personData.lastname || personData.lastName || 'RESIDENT';
+        const surname = personData.surname || personData.last_name || personData.lastname || personData.lastName || '';
         const fullName = [firstName, middleName, surname].filter(Boolean).join(' ') || 'NIN Holder';
         const rawNin = personData.nin || personData.number || nin || '';
         const cleanNin = String(rawNin).replace(/\D/g, '');
@@ -2293,7 +2293,7 @@ export default function VerifyNINScreen() {
         const maskedNin = cleanNin.length === 11
             ? `${cleanNin.slice(0,4)} ••• ${cleanNin.slice(7)}`
             : cleanNin;
-        const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '105829-40LQTYW4PVJY';
+        const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '';
         const dob = formatDob(personData.dob || personData.birthdate || personData.dateOfBirth || '');
         const gender = (personData.gender || personData.sex || 'M').trim().toUpperCase().startsWith('F') ? 'FEMALE' : 'MALE';
         const phone = personData.phone || personData.phoneNumber || personData.telephoneno || 'Not Provided';

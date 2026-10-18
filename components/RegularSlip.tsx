@@ -9,10 +9,24 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Ellipse, Path } from 'react-native-svg';
 
 const getVal = (data: any, keys: string[], fallback = ''): string => {
-    const target = data?.data && typeof data.data === 'object' && !Array.isArray(data.data) ? { ...data.data, ...data } : (data || {});
-    for (const k of keys) {
-        const v = target[k];
-        if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+    if (!data) return fallback;
+    const candidates = [
+        data,
+        data?.data,
+        data?.user_data,
+        data?.nin_data,
+        data?.personData,
+        data?.result,
+        data?.response,
+        data?.data?.user_data,
+        data?.data?.data
+    ].filter(x => x && typeof x === 'object' && !Array.isArray(x));
+
+    for (const target of candidates) {
+        for (const k of keys) {
+            const v = target[k] ?? target[k.toLowerCase()] ?? target[k.toUpperCase()];
+            if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+        }
     }
     return fallback;
 };
@@ -48,21 +62,21 @@ const Silhouette = () => (
 );
 
 export const RegularSlip = ({ data }: { data: any }) => {
-    const firstName  = getVal(data, ['firstname','first_name','firstName','first']);
-    const lastName   = getVal(data, ['surname','last_name','lastName','lastname','last'], 'RESIDENT');
+    const firstName  = getVal(data, ['firstname','first_name','firstName','first','prenom','given_name']);
+    const lastName   = getVal(data, ['surname','last_name','lastName','lastname','last','nom']);
     const middleName = getVal(data, ['middlename','middle_name','middleName','middle']);
-    const rawDob     = getVal(data, ['birthdate','dob','dateOfBirth','date_of_birth'], '01-OCT-1960');
-    const rawNin     = getVal(data, ['nin','number','nin_number','national_id'], '00000000000');
-    const rawPhoto   = getVal(data, ['photo','image','picture','avatar','face_image']);
-    const rawIssue   = getVal(data, ['issueDate','issue_date','issuance_date'], '');
-    const trackingId = getVal(data, ['tracking_id', 'trackingId', 'tracking'], 'H6Y0NYFH0000373');
-    const rawGender  = getVal(data, ['gender','sex','gender_id'], 'M');
-    const gender     = rawGender.trim().toUpperCase().startsWith('M') ? 'M' : 'F';
-    const address    = getVal(data, ['residence_address', 'address'], '47, Harmony Avenue\nKETU ALAPERE\nLagos');
+    const rawDob     = getVal(data, ['birthdate','dob','dateOfBirth','date_of_birth','birth_date']);
+    const rawNin     = getVal(data, ['nin','number','nin_number','national_id','vnin']);
+    const rawPhoto   = getVal(data, ['photo','image','picture','avatar','face_image','base64image']);
+    const rawIssue   = getVal(data, ['issueDate','issue_date','issuance_date']);
+    const trackingId = getVal(data, ['tracking_id', 'trackingId', 'tracking', 'tracking_no']);
+    const rawGender  = getVal(data, ['gender','sex','gender_id']);
+    const gender     = rawGender ? (rawGender.trim().toUpperCase().startsWith('M') ? 'M' : 'F') : '';
+    const address    = getVal(data, ['residence_address', 'address', 'residenceAddress', 'street']);
 
-    const dob = formatDob(rawDob);
+    const dob = rawDob ? formatDob(rawDob) : '';
     const cleanNin = rawNin.replace(/\D/g, '');
-    const issueDate = rawIssue ? formatDob(rawIssue) : '09/09/2018';
+    const issueDate = rawIssue ? formatDob(rawIssue) : '';
     const photoUri = resolvePhoto(rawPhoto);
 
     // Format address lines

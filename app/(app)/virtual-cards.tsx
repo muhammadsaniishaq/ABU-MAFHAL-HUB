@@ -55,6 +55,9 @@ export default function VirtualCardsScreen() {
   const [showFullDetails, setShowFullDetails] = useState(false);
   const [hideBalance, setHideBalance] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [apiErrorModal, setApiErrorModal] = useState<{ visible: boolean; title: string; message: string; isBalanceNotice?: boolean }>({ visible: false, title: '', message: '', isBalanceNotice: false });
+  const [bizBalance, setBizBalance] = useState<{ available_balance: string; currency: string } | null>(null);
+  const [isAdminUser, setIsAdminUser] = useState(false);
 
   // Live Exchange Rate
   const usdRate = Number(settings?.usd_exchange_rate) || 1600;
@@ -108,7 +111,7 @@ export default function VirtualCardsScreen() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('balance, full_name')
+          .select('balance, full_name, role')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -117,6 +120,16 @@ export default function VirtualCardsScreen() {
           if (profile.full_name) {
             setUserName(profile.full_name.toUpperCase());
             setCardNameInput(`${profile.full_name.split(' ')[0]} USD Card`);
+          }
+
+          if (profile.role === 'admin' || profile.role === 'manager') {
+            setIsAdminUser(true);
+            try {
+              const bRes = await payvesselCardService.getBusinessBalance();
+              if (bRes?.status && bRes?.data) {
+                setBizBalance(bRes.data);
+              }
+            } catch (_) {}
           }
         }
 
@@ -227,7 +240,15 @@ export default function VirtualCardsScreen() {
       const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
       if (profile) setWalletBalance(Number(profile.balance) || 0);
     } catch (e: any) {
-      triggerToast(e.message || 'Card creation failed');
+      const msg = e.message || 'Card creation failed.';
+      const isBal = msg.toLowerCase().includes('merchant') || msg.toLowerCase().includes('insufficient usd') || msg.toLowerCase().includes('wallet');
+      setApiErrorModal({
+        visible: true,
+        title: isBal ? 'PayVessel Portal Notice' : 'Card Creation Notice',
+        message: msg,
+        isBalanceNotice: isBal
+      });
+      triggerToast('PayVessel API returned a notice');
     } finally {
       setActionLoading(false);
     }
@@ -262,7 +283,13 @@ export default function VirtualCardsScreen() {
       setTopUpAmountInput('50');
       triggerToast(`Card funded with ${selectedCard.currency === 'USD' ? '$' : '₦'}${amount} 🎉`);
     } catch (e: any) {
-      triggerToast(e.message || 'Top-up failed');
+      setApiErrorModal({
+        visible: true,
+        title: 'Card Top-Up Notice',
+        message: e.message || 'Top-up could not be completed.',
+        isBalanceNotice: false
+      });
+      triggerToast('Top-up notice');
     } finally {
       setActionLoading(false);
     }
@@ -470,6 +497,27 @@ export default function VirtualCardsScreen() {
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {isAdminUser && bizBalance && (
+          <View style={{
+            backgroundColor: '#0F172A',
+            borderRadius: 14,
+            padding: 12,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: '#334155'
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+                <Text style={{ color: '#F8FAFC', fontSize: 11.5, fontWeight: '800' }}>PayVessel Issuing Gateway</Text>
+              </View>
+              <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '800' }}>
+                Wallet: ₦{Number(bizBalance.available_balance || 0).toLocaleString()}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {loading ? (
           <View style={s.loaderBox}>
             <ActivityIndicator size="large" color="#D97706" />
@@ -1903,6 +1951,67 @@ export default function VirtualCardsScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ══════════════════════════════════════════════════════════════
+           MODAL 11: LIVE PAYVESSEL API NOTICE / ERROR DIALOG
+           ══════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={apiErrorModal.visible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setApiErrorModal(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { maxHeight: 440, padding: 22 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 14 }}>
+              <View style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: apiErrorModal.isBalanceNotice ? '#FEF3C7' : '#FEE2E2',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12
+              }}>
+                <Ionicons
+                  name={apiErrorModal.isBalanceNotice ? 'wallet-outline' : 'alert-circle-outline'}
+                  size={32}
+                  color={apiErrorModal.isBalanceNotice ? '#D97706' : '#DC2626'}
+                />
+              </View>
+              <Text style={[s.modalHeading, { textAlign: 'center' }]}>{apiErrorModal.title}</Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 220, marginBottom: 18 }}>
+              <Text style={{ fontSize: 13.5, color: '#334155', lineHeight: 21, textAlign: 'center' }}>
+                {apiErrorModal.message}
+              </Text>
+              {apiErrorModal.isBalanceNotice && (
+                <View style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  padding: 12,
+                  marginTop: 12
+                }}>
+                  <Text style={{ fontSize: 11.5, color: '#475569', lineHeight: 18, textAlign: 'left' }}>
+                    💡 <Text style={{ fontWeight: '800' }}>Platform Guidance:</Text> Live Virtual Dollar Cards are issued through the official PayVessel Issuing Gateway. When issuing cards, PayVessel validates KYC and debits the merchant USD issuing account.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setApiErrorModal(prev => ({ ...prev, visible: false }))}
+              style={[s.goldContinueBtn, { marginTop: 0 }]}
+              activeOpacity={0.88}
+            >
+              <Text style={s.goldContinueBtnTxt}>Understood</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

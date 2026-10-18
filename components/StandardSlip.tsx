@@ -8,10 +8,24 @@ import { View, Text, Image, StyleSheet, Platform } from 'react-native';
 import Svg, { Ellipse, Path } from 'react-native-svg';
 
 const getVal = (data: any, keys: string[], fallback = ''): string => {
-    const target = data?.data && typeof data.data === 'object' && !Array.isArray(data.data) ? { ...data.data, ...data } : (data || {});
-    for (const k of keys) {
-        const v = target[k];
-        if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+    if (!data) return fallback;
+    const candidates = [
+        data,
+        data?.data,
+        data?.user_data,
+        data?.nin_data,
+        data?.personData,
+        data?.result,
+        data?.response,
+        data?.data?.user_data,
+        data?.data?.data
+    ].filter(x => x && typeof x === 'object' && !Array.isArray(x));
+
+    for (const target of candidates) {
+        for (const k of keys) {
+            const v = target[k] ?? target[k.toLowerCase()] ?? target[k.toUpperCase()];
+            if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+        }
     }
     return fallback;
 };
@@ -47,28 +61,28 @@ const Silhouette = () => (
 );
 
 export const StandardSlip = ({ data }: { data: any }) => {
-    const firstName  = getVal(data, ['firstname','first_name','firstName','first']);
-    const lastName   = getVal(data, ['surname','last_name','lastName','lastname','last'], 'RESIDENT');
+    const firstName  = getVal(data, ['firstname','first_name','firstName','first','prenom','given_name']);
+    const lastName   = getVal(data, ['surname','last_name','lastName','lastname','last','nom']);
     const middleName = getVal(data, ['middlename','middle_name','middleName','middle']);
-    const rawDob     = getVal(data, ['birthdate','dob','dateOfBirth','date_of_birth'], '01-OCT-1960');
-    const rawNin     = getVal(data, ['nin','number','nin_number','national_id'], '00000000000');
-    const rawPhoto   = getVal(data, ['photo','image','picture','avatar','face_image']);
-    const rawIssue   = getVal(data, ['issueDate','issue_date','issuance_date'], '');
+    const rawDob     = getVal(data, ['birthdate','dob','dateOfBirth','date_of_birth','birth_date']);
+    const rawNin     = getVal(data, ['nin','number','nin_number','national_id','vnin']);
+    const rawPhoto   = getVal(data, ['photo','image','picture','avatar','face_image','base64image']);
+    const rawIssue   = getVal(data, ['issueDate','issue_date','issuance_date']);
  
-    const dob = formatDob(rawDob);
+    const dob = rawDob ? formatDob(rawDob) : '';
     const cleanNin = rawNin.replace(/\D/g, '');
     const fmtNin = cleanNin.length === 11
         ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
-        : cleanNin || '0000 000 0000';
+        : cleanNin;
     
     // Spaced out 4-3-4 representation
     const displayNin = cleanNin.length === 11
         ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
-        : '0000 000 0000';
+        : cleanNin;
 
-    const givenNames = [firstName, middleName].filter(Boolean).join(' ') || 'PROUD NIGERIAN';
+    const givenNames = [firstName, middleName].filter(Boolean).join(' ');
     const photoUri = resolvePhoto(rawPhoto);
-    const issueDate = rawIssue ? formatDob(rawIssue) : '01 JAN 2021';
+    const issueDate = rawIssue ? formatDob(rawIssue) : '';
     
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=NIN-${cleanNin}-Token-${lastName.replace(/\s+/g, '-')}-Token-${firstName.replace(/\s+/g, '-')}&color=000000&margin=1`;
 

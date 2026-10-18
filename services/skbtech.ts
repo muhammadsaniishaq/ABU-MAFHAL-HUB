@@ -55,14 +55,47 @@ export const SKBTechIdentityVerifier = {
 
       if (data?.data) {
         const providerResponse = data.data;
-        const rawStatus = providerResponse.status ?? providerResponse.request_status;
+        const rawStatus = String(providerResponse.status ?? providerResponse.request_status ?? '').toLowerCase();
+
+        if (rawStatus === 'failed') {
+          return {
+            isValid: false,
+            message: providerResponse.message || providerResponse.response || 'Verification failed. Record could not be retrieved from registry.',
+          };
+        }
+
         const isSuccessStatus =
           providerResponse.success === true ||
-          rawStatus === true ||
-          ['true', 'success', 'pending', 'processing', 'completed', 'failed'].includes(String(rawStatus || '').toLowerCase());
+          rawStatus === 'true' ||
+          rawStatus === 'success' ||
+          rawStatus === 'completed' ||
+          rawStatus === 'pending' ||
+          rawStatus === 'processing';
 
         if (isSuccessStatus) {
           const personData = providerResponse.data ?? providerResponse;
+          
+          // Ensure we actually have data fields, not an empty object
+          const hasIdentityRecord = Boolean(
+            personData.nin ||
+            personData.bvn ||
+            personData.firstname ||
+            personData.surname ||
+            personData.first_name ||
+            personData.last_name ||
+            personData.pdf_base64 ||
+            personData.slip_url ||
+            rawStatus === 'pending' ||
+            rawStatus === 'processing'
+          );
+
+          if (!hasIdentityRecord) {
+            return {
+              isValid: false,
+              message: providerResponse.message || 'No matching citizen record found on NIMC/BVN registry.',
+            };
+          }
+
           return {
             isValid: true,
             message: providerResponse.message || providerResponse.response || 'Request Processed Successfully',
