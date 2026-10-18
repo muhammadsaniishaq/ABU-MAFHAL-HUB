@@ -51,11 +51,11 @@ export default function BVNPremiumSlipScreen() {
         try {
             const { data } = await supabase
                 .from('service_pricing')
-                .select('cost_price, markup_price, selling_price')
+                .select('cost_price, markup_price')
                 .eq('id', 'bvn_premium_slip')
                 .maybeSingle();
             if (data) {
-                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                const total = Number(data.cost_price || 0) + Number(data.markup_price || 0);
                 if (total > 0) setServicePrice(total);
             }
         } catch (e) {

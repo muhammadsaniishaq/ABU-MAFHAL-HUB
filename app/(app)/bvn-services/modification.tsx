@@ -185,16 +185,14 @@ export default function BVNModificationScreen() {
             // 2. Fetch service_pricing
             const { data } = await supabase
                 .from('service_pricing')
-                .select('id, cost_price, markup_price, selling_price, status, maintenance_msg')
+                .select('id, cost_price, markup_price, status, maintenance_msg')
                 .eq('service_category', 'bvn');
 
             if (data && data.length > 0) {
                 MODIFICATION_TYPES.forEach(item => {
                     const found = data.find(d => d.id === item.priceId);
                     if (found) {
-                        const total = found.selling_price
-                            ? Number(found.selling_price)
-                            : (Number(found.cost_price || 0) + Number(found.markup_price || 0));
+                        const total = Number(found.cost_price || 0) + Number(found.markup_price || 0);
                         if (total > 0) {
                             newMap[item.code] = total;
                         }
@@ -337,7 +335,7 @@ export default function BVNModificationScreen() {
 
             const res = await api.identity.requestBVNModification(payload, currentPriceId);
 
-            if (res && (res.isValid || res.data)) {
+            if (res && res.isValid) {
                 const data = res.data?.data || res.data || {};
                 const requestId = data.request_id || data.requestId || ref;
 

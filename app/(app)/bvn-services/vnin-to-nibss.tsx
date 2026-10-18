@@ -57,11 +57,11 @@ export default function VNINToNIBSSScreen() {
         try {
             const { data } = await supabase
                 .from('service_pricing')
-                .select('cost_price, markup_price, selling_price')
+                .select('cost_price, markup_price')
                 .eq('id', 'vnin_to_nibss')
                 .maybeSingle();
             if (data) {
-                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                const total = Number(data.cost_price || 0) + Number(data.markup_price || 0);
                 if (total > 0) setServicePrice(total);
             }
         } catch (e) {
@@ -124,7 +124,7 @@ export default function VNINToNIBSSScreen() {
                 bvn: cleanBvn
             });
 
-            if (res && (res.isValid || res.data)) {
+            if (res && res.isValid) {
                 const responseData = res.data || { status: 'COMPLETED', reference: customReference };
                 setResult(responseData);
                 showAlert("Submitted", "VNIN to NIBSS linking request submitted successfully.", "success");

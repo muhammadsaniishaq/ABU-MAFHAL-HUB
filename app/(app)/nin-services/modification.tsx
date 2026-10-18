@@ -227,6 +227,10 @@ export default function NINModificationScreen() {
                 throw new Error(error.message || 'Failed to submit modification request.');
             }
 
+            if (data?.error) {
+                throw new Error(data.error);
+            }
+
             const returnedRef = data?.data?.reference || data?.reference || refCode;
             const resObj = {
                 id: returnedRef,

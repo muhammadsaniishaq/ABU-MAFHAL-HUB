@@ -231,14 +231,16 @@ export default function VerifyPhoneScreen() {
     }, []);
 
     const handleVerify = async () => {
-        const cleanPhone = phone.trim();
-        if (cleanPhone.length !== 11) {
-            return showAlert('Incomplete Phone Number', `Phone number is incomplete (${cleanPhone.length}/11 digits). Please enter all 11 digits (e.g. 080xxxxxxxx).`, 'warning');
+        const rawPhone = phone.trim();
+        if (!rawPhone) {
+            return showAlert('Phone Number Required', 'Please enter your registered 11-digit phone number.', 'warning');
         }
-        const pVal = validateNigerianPhone(cleanPhone);
+        const pVal = validateNigerianPhone(rawPhone);
         if (!pVal.isValid) {
-            return showAlert('Invalid Phone Number', pVal.error || 'Please enter a valid 11-digit Nigerian phone number.', 'warning');
+            return showAlert('Invalid Phone Number', pVal.error || 'Please enter a valid 11-digit Nigerian phone number (e.g. 080xxxxxxxx).', 'warning');
         }
+        const cleanPhone = pVal.clean11;
+
         const layoutItem = layouts.find(l => l.id === selectedLayout);
         const totalPrice = layoutItem ? layoutItem.price : 0;
         if ((userBalance || 0) < totalPrice) {
@@ -251,12 +253,15 @@ export default function VerifyPhoneScreen() {
             
             if (response.isValid && response.data) {
                 let personData = response.data?.data ?? response.data;
-                setResult({ status: 'success', data: personData });
+                const pdfB64 = response.data?.pdf_base64 || response.pdf_base64 || personData?.pdf_base64;
+                if (pdfB64 && !personData.pdf_base64) {
+                    personData.pdf_base64 = pdfB64;
+                }
+                setResult({ status: 'success', data: personData, pdf_base64: pdfB64 });
                 await saveHistoryItem(personData);
+                fetchWalletBalance();
 
-                // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
-
-
+                // Note: Deduction and Transaction Logging are securely handled by the backend Edge Function
             } else {
                 const msg = response.message || 'Unable to verify this phone number. Please check and try again.';
                 const lowerMsg = msg.toLowerCase();
@@ -428,6 +433,75 @@ export default function VerifyPhoneScreen() {
         if (!result || !result.data) return;
         setIsSaving(true);
         try {
+            const pdfBase64 = result.data?.pdf_base64 || result.pdf_base64 || result.data?.data?.pdf_base64 || result.data?.slip || result.slip_url || result.data?.slip_url;
+            if (pdfBase64) {
+                // If it's a direct web link/URL:
+                if (String(pdfBase64).startsWith('http://') || String(pdfBase64).startsWith('https://')) {
+                    if (Platform.OS === 'web') {
+                        const link = document.createElement('a');
+                        link.href = pdfBase64;
+                        link.target = '_blank';
+                        link.download = `nin_slip_phone_${phone || 'official'}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        showAlert("Download Complete", "Official NIN Slip opening/downloaded.", "success");
+                        return;
+                    } else {
+                        const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                        const fileUri = `${docDir}nin_slip_phone_${phone || 'official'}.pdf`;
+                        await FileSystem.downloadAsync(pdfBase64, fileUri);
+                        if (await Sharing.isAvailableAsync()) {
+                            await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                        } else {
+                            showAlert("Downloaded", `PDF saved to ${fileUri}`, "success");
+                        }
+                        return;
+                    }
+                }
+
+                // If it's Base64, clean prefix:
+                let cleanBase64 = String(pdfBase64);
+                if (cleanBase64.includes('base64,')) {
+                    cleanBase64 = cleanBase64.split('base64,')[1];
+                }
+                cleanBase64 = cleanBase64.trim().replace(/\s/g, '');
+
+                if (Platform.OS === 'web') {
+                    try {
+                        const byteCharacters = atob(cleanBase64);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: 'application/pdf' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        link.download = `nin_slip_phone_${phone || 'official'}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+                        showAlert("Download Complete", "Official NIN Slip PDF downloaded.", "success");
+                        return;
+                    } catch (e: any) {
+                        console.warn("Direct Base64 PDF download failed, falling back to html2pdf:", e);
+                    }
+                } else {
+                    const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                    const fileUri = `${docDir}nin_slip_phone_${phone || 'official'}.pdf`;
+                    await FileSystem.writeAsStringAsync(fileUri, cleanBase64, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
+                    if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                    } else {
+                        showAlert("Downloaded", "PDF saved to device.", "success");
+                    }
+                    return;
+                }
+            }
+
             const first = result.data.firstname || '';
             const middle = result.data.middlename || '';
             const surname = result.data.surname || '';
@@ -988,15 +1062,22 @@ export default function VerifyPhoneScreen() {
         const personData = result.data?.data || result.data || {};
         const pdfBase64 = personData.pdf_base64 || result.pdf_base64 || result.data?.pdf_base64;
         
-        const fullName = [personData.firstname || personData.first_name, personData.middlename || personData.middle_name, personData.surname || personData.last_name].filter(Boolean).join(' ') || 'NIN Holder';
-        const displayNin = personData.nin || personData.number || 'N/A';
+        const firstName = personData.firstname || personData.first_name || personData.firstName || '';
+        const middleName = personData.middlename || personData.middle_name || personData.middleName || '';
+        const surname = personData.surname || personData.last_name || personData.lastname || personData.lastName || 'RESIDENT';
+        const fullName = [firstName, middleName, surname].filter(Boolean).join(' ') || 'NIN Holder';
+        const rawNin = personData.nin || personData.number || 'N/A';
+        const cleanNin = String(rawNin).replace(/\D/g, '');
+        const displayNin = cleanNin.length === 11
+            ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
+            : cleanNin || 'N/A';
         const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '105829-40LQTYW4PVJY';
-        const formattedDate = (() => {
-            const d = new Date();
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const pad = (n: number) => n.toString().padStart(2, '0');
-            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        })();
+        const dob = formatDob(personData.dob || personData.birthdate || personData.dateOfBirth || '');
+        const gender = (personData.gender || personData.sex || 'M').trim().toUpperCase().startsWith('F') ? 'FEMALE' : 'MALE';
+        const phoneVal = personData.phone || personData.phoneNumber || personData.telephoneno || phone || 'Not Provided';
+        const stateOfOrigin = personData.birthstate || personData.birthState || personData.state_of_origin || 'N/A';
+        const lgaOfOrigin = personData.birthlga || personData.birthLga || personData.lga_of_origin || 'N/A';
+        const residenceAddress = personData.residence_address || personData.address || 'N/A';
 
         const userPhoto = personData.photo || personData.image || personData.picture;
         const photoUri = userPhoto
@@ -1004,8 +1085,9 @@ export default function VerifyPhoneScreen() {
             : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRL363G0d9u3u5YQ&s';
 
         return (
-            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#f5a623', headerShadowVisible: false }} />
+            <View style={{ flex: 1, backgroundColor: '#071630' }}>
+                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#071630' }, headerTintColor: '#F5A623', headerShadowVisible: false }} />
+                <StatusBar style="light" />
 
                 {/* Offscreen Hidden ViewShot for PDF & PNG download rendering */}
                 <View style={{ position: 'absolute', top: -9999, left: -9999, opacity: 0, pointerEvents: 'none' }}>
@@ -1016,29 +1098,33 @@ export default function VerifyPhoneScreen() {
                     </View>
                 </View>
 
-                {/* Format Choice Modal matching user screenshot */}
+                {/* Format Choice Modal */}
                 <Modal
                     transparent
                     visible={isDownloadModalOpen}
                     animationType="fade"
                     onRequestClose={() => setIsDownloadModalOpen(false)}
                 >
-                    <View style={{ flex: 1, backgroundColor: 'rgba(6, 13, 33, 0.75)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
-                            <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 16 }}>Download slip as</Text>
-                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 4, marginBottom: 20 }}>Choose a format</Text>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(7, 22, 48, 0.85)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <View style={{ backgroundColor: '#0B2246', borderRadius: 24, padding: 22, width: '100%', maxWidth: 350, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)' }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                <Ionicons name="download-outline" size={24} color="#F5A623" />
+                            </View>
+                            <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 16 }}>Download Official Slip</Text>
+                            <Text style={{ color: '#CBD5E1', fontSize: 11, marginTop: 4, marginBottom: 18 }}>Choose your preferred format</Text>
 
-                            <View style={{ flexDirection: 'row', gap: 16, width: '100%', marginBottom: 20 }}>
+                            <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
                                 <TouchableOpacity 
                                     onPress={() => {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPdf();
                                     }}
-                                    style={{ flex: 1, backgroundColor: '#fffbeb', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fde68a' }}
+                                    style={{ flex: 1, backgroundColor: 'rgba(245, 166, 35, 0.12)', borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#F5A623' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="document-text-outline" size={32} color="#d97706" />
-                                    <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF</Text>
+                                    <Ionicons name="document-text" size={28} color="#F5A623" />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, marginTop: 6 }}>PDF Document</Text>
+                                    <Text style={{ color: '#CBD5E1', fontSize: 10, marginTop: 2 }}>Print-ready</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -1046,106 +1132,199 @@ export default function VerifyPhoneScreen() {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPng();
                                     }}
-                                    style={{ flex: 1, backgroundColor: '#fffbeb', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fde68a' }}
+                                    style={{ flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.12)', borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#10B981' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="copy-outline" size={32} color="#d97706" />
-                                    <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image</Text>
+                                    <Ionicons name="image" size={28} color="#10B981" />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, marginTop: 6 }}>Image (PNG)</Text>
+                                    <Text style={{ color: '#CBD5E1', fontSize: 10, marginTop: 2 }}>HD Card</Text>
                                 </TouchableOpacity>
                             </View>
 
                             <TouchableOpacity onPress={() => setIsDownloadModalOpen(false)} style={{ paddingVertical: 6 }}>
-                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                                <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </Modal>
 
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
-                    {/* Header Gradient Banner (Navy & Gold Brand) */}
-                    <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="shield-checkmark-outline" size={16} color="#f5a623" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginLeft: 6 }}>Verification Details</Text>
-                        </View>
-                        <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
-                            {selectedLayout.toUpperCase()} • NIN
-                        </Text>
-                    </LinearGradient>
+                {/* Top Compact Brand Bar */}
+                <View style={{ paddingHorizontal: 16, paddingTop: insets.top > 0 ? insets.top + 6 : 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <TouchableOpacity onPress={() => setResult(null)} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.25)' }} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={18} color="#F5A623" />
+                    </TouchableOpacity>
 
-                    {/* Centered User Photo and Avatar with Checkmark Badge */}
-                    <View style={{ alignItems: 'center', marginTop: -42, paddingHorizontal: 16 }}>
-                        <View style={{ position: 'relative' }}>
-                            <Image source={{ uri: photoUri }} style={{ width: 92, height: 104, borderRadius: 18, borderWidth: 4, borderColor: '#ffffff', backgroundColor: '#f1f5f9' }} />
-                            <View style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 }}>
-                                <Ionicons name="checkmark-circle-sharp" size={20} color="#16a34a" />
-                            </View>
-                        </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 15 }}>Verified Identity</Text>
+                    </View>
 
-                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12, textAlign: 'center', letterSpacing: 0.3 }}>
-                            {fullName}
-                        </Text>
+                    <TouchableOpacity onPress={() => setIsDownloadModalOpen(true)} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F5A623' }} activeOpacity={0.7}>
+                        <Ionicons name="download-outline" size={18} color="#F5A623" />
+                    </TouchableOpacity>
+                </View>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: '#86efac', marginTop: 8 }}>
-                            <Ionicons name="checkmark" size={14} color="#16a34a" />
-                            <Text style={{ color: '#15803d', fontWeight: '800', fontSize: 12, marginLeft: 4 }}>Verified</Text>
-                        </View>
-
-                        {/* Summary Details Card Container */}
-                        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 440, marginTop: 20, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT ID</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 12 }}>{trackingId}</Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN NUMBER</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>{displayNin}</Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT TYPE</Text>
-                                <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 }}>
-                                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 11 }}>NIN</Text>
+                {/* 🌟 1-PAGE MODERN COMPACT DOSSIER (Fully Mobile Responsive) 🌟 */}
+                <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 16, justifyContent: 'space-between' }}>
+                    
+                    {/* Main White Dossier Card */}
+                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6 }}>
+                        
+                        {/* Header: Photo + Name + NIN with Copy */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                            <View style={{ position: 'relative' }}>
+                                <View style={{ padding: 2, borderRadius: 16, borderWidth: 2, borderColor: '#F5A623', backgroundColor: '#FFFFFF' }}>
+                                    <Image source={{ uri: photoUri }} style={{ width: 72, height: 84, borderRadius: 12, backgroundColor: '#E2E8F0' }} />
+                                </View>
+                                <View style={{ position: 'absolute', bottom: -3, right: -3, width: 22, height: 22, borderRadius: 11, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' }}>
+                                    <Ionicons name="checkmark" size={13} color="#FFFFFF" />
                                 </View>
                             </View>
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>SLIP</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>{selectedLayout}</Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>DATE & TIME</Text>
-                                <Text style={{ color: '#475569', fontWeight: '700', fontSize: 12 }}>{formattedDate}</Text>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                    <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99 }}>
+                                        <Text style={{ color: '#15803D', fontWeight: '800', fontSize: 9.5 }}>VERIFIED 100%</Text>
+                                    </View>
+                                    <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>NIMC RECORD</Text>
+                                </View>
+                                <Text style={{ color: '#071630', fontWeight: '900', fontSize: 14.5, textTransform: 'uppercase', lineHeight: 18 }} numberOfLines={2}>
+                                    {fullName}
+                                </Text>
+                                
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                    <Text style={{ color: '#071630', fontWeight: '800', fontSize: 13, letterSpacing: 0.6, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                        {displayNin}
+                                    </Text>
+                                    <TouchableOpacity 
+                                        onPress={async () => {
+                                            try {
+                                                await Clipboard.setString(cleanNin);
+                                                showAlert('NIN Copied', `${cleanNin} copied to clipboard.`, 'success');
+                                            } catch (_) {}
+                                        }}
+                                        style={{ backgroundColor: '#071630', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center' }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="copy-outline" size={10} color="#F5A623" style={{ marginRight: 3 }} />
+                                        <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>Copy</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
 
-                        {/* Primary Download Slip Button (Gold Brand Theme) */}
-                        <TouchableOpacity 
-                            onPress={() => setIsDownloadModalOpen(true)}
-                            style={{ backgroundColor: '#d97706', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 440, marginTop: 20, shadowColor: '#d97706', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
-                            activeOpacity={0.8}
-                        >
-                            {isSaving ? <ActivityIndicator color="#ffffff" size="small" /> : (
-                                <>
-                                    <Ionicons name="download-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
-                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Download Slip</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
+                        {/* Compact 2-Column Citizen Dossier Grid */}
+                        <View style={{ paddingTop: 10, gap: 9 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>DATE OF BIRTH</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1 }}>{dob || 'N/A'}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>GENDER</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1 }}>{gender}</Text>
+                                </View>
+                            </View>
 
-                        {/* Back Link */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>PHONE NUMBER</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1 }}>{phoneVal}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>STATE OF ORIGIN</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1, textTransform: 'uppercase' }}>{stateOfOrigin}</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>LGA OF ORIGIN</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1, textTransform: 'uppercase' }}>{lgaOfOrigin}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>TRACKING ID</Text>
+                                    <Text style={{ color: '#071630', fontSize: 10.5, fontWeight: '800', marginTop: 1, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }} numberOfLines={1}>
+                                        {trackingId}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {residenceAddress && residenceAddress !== 'N/A' && (
+                                <View style={{ paddingTop: 2 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>RESIDENTIAL ADDRESS</Text>
+                                    <Text style={{ color: '#071630', fontSize: 11, fontWeight: '700', marginTop: 1 }} numberOfLines={2}>
+                                        {residenceAddress}
+                                    </Text>
+                                </View>
+                            )}
+
+                            {/* Slip Format Selection Pills */}
+                            <View style={{ paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                                <Text style={{ color: '#94A3B8', fontSize: 9, fontWeight: '800', textTransform: 'uppercase', marginBottom: 5 }}>SLIP FORMAT</Text>
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    {[
+                                        { id: 'premium', label: 'Premium' },
+                                        { id: 'standard', label: 'Standard' },
+                                        { id: 'regular', label: 'Regular' },
+                                        { id: 'info', label: 'Basic' },
+                                    ].map(item => {
+                                        const isSel = selectedLayout === item.id;
+                                        return (
+                                            <TouchableOpacity 
+                                                key={item.id}
+                                                onPress={() => setSelectedLayout(item.id)}
+                                                style={{ flex: 1, paddingVertical: 5, borderRadius: 8, alignItems: 'center', backgroundColor: isSel ? '#071630' : '#F1F5F9' }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={{ color: isSel ? '#F5A623' : '#64748B', fontWeight: isSel ? '900' : '700', fontSize: 10.5 }}>
+                                                    {item.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Bottom Action Buttons Hub (Thumb-Friendly, Fits on 1 Screen) */}
+                    <View style={{ gap: 8, marginTop: 10 }}>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity 
+                                onPress={handleDownloadPdf}
+                                disabled={isSaving}
+                                style={{ flex: 1, backgroundColor: '#F5A623', height: 46, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#F5A623', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
+                                activeOpacity={0.8}
+                            >
+                                {isSaving ? <ActivityIndicator color="#071630" size="small" /> : (
+                                    <>
+                                        <Ionicons name="document-text" size={18} color="#071630" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#071630', fontWeight: '900', fontSize: 13.5 }}>Download PDF</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={handleDownloadPng}
+                                disabled={isSaving}
+                                style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', height: 46, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#F5A623' }}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="image" size={18} color="#F5A623" style={{ marginRight: 6 }} />
+                                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13.5 }}>Save PNG</Text>
+                            </TouchableOpacity>
+                        </View>
+
                         <TouchableOpacity 
                             onPress={() => setResult(null)} 
-                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 4 }}
-                            activeOpacity={0.8}
+                            style={{ height: 36, alignItems: 'center', justifyContent: 'center' }}
+                            activeOpacity={0.7}
                         >
-                            <Ionicons name="chevron-back" size={16} color="#d97706" style={{ marginRight: 2 }} />
-                            <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 14 }}>Back to Slip List</Text>
+                            <Text style={{ color: '#94A3B8', fontWeight: '800', fontSize: 12.5 }}>← Verify Another Number</Text>
                         </TouchableOpacity>
                     </View>
-                </ScrollView>
+                </View>
             </View>
         );
     }

@@ -55,11 +55,11 @@ export default function VerifyBVNScreen() {
         try {
             const { data } = await supabase
                 .from('service_pricing')
-                .select('cost_price, markup_price, selling_price')
+                .select('cost_price, markup_price')
                 .eq('id', 'bvn_num_advanced')
                 .maybeSingle();
             if (data) {
-                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                const total = Number(data.cost_price || 0) + Number(data.markup_price || 0);
                 if (total > 0) setServicePrice(total);
             }
         } catch (e) {
@@ -148,7 +148,7 @@ export default function VerifyBVNScreen() {
         try {
             const res = await api.identity.validateBVN(cleanBvn, 'bvn_num_advanced');
 
-            if (res && (res.isValid || res.data)) {
+            if (res && res.isValid) {
                 const rawData = res.data?.data || res.data || {};
                 setResult(rawData);
                 showAlert("Verification Successful", "BVN record verified successfully!", "success");
@@ -473,6 +473,164 @@ export default function VerifyBVNScreen() {
     const displayBvn = result?.idNumber || result?.bvn || bvn;
     const rawPhoto = result?.image || result?.photo || '';
     const photoUri = rawPhoto ? (rawPhoto.startsWith('data:') ? rawPhoto : `data:image/jpeg;base64,${rawPhoto}`) : null;
+
+    if (result) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#071630' }}>
+                <Stack.Screen options={{ headerShown: false }} />
+                <StatusBar style="light" />
+
+                {/* Top Compact Brand Bar */}
+                <View style={{ paddingHorizontal: 16, paddingTop: insets.top > 0 ? insets.top + 6 : 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <TouchableOpacity onPress={() => setResult(null)} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.25)' }} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={18} color="#F5A623" />
+                    </TouchableOpacity>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 15 }}>BVN Verified</Text>
+                    </View>
+
+                    <TouchableOpacity onPress={handleDownloadPdf} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F5A623' }} activeOpacity={0.7}>
+                        <Ionicons name="download-outline" size={18} color="#F5A623" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* 🌟 1-PAGE COMPACT BVN DOSSIER (Fully Mobile Responsive) 🌟 */}
+                <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 16, justifyContent: 'space-between' }}>
+                    
+                    {/* Main White Dossier Card */}
+                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6 }}>
+                        
+                        {/* Header: Photo + Name + BVN with Copy */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                            <View style={{ position: 'relative' }}>
+                                <View style={{ padding: 2, borderRadius: 16, borderWidth: 2, borderColor: '#F5A623', backgroundColor: '#FFFFFF' }}>
+                                    {photoUri ? (
+                                        <Image source={{ uri: photoUri }} style={{ width: 72, height: 84, borderRadius: 12, backgroundColor: '#E2E8F0' }} />
+                                    ) : (
+                                        <View style={{ width: 72, height: 84, borderRadius: 12, backgroundColor: '#071630', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ color: '#F5A623', fontWeight: '900', fontSize: 26 }}>{displayFullName.charAt(0)}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <View style={{ position: 'absolute', bottom: -3, right: -3, width: 22, height: 22, borderRadius: 11, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' }}>
+                                    <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                                </View>
+                            </View>
+
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                    <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99 }}>
+                                        <Text style={{ color: '#15803D', fontWeight: '800', fontSize: 9.5 }}>VERIFIED 100%</Text>
+                                    </View>
+                                    <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>NIBSS RECORD</Text>
+                                </View>
+                                <Text style={{ color: '#071630', fontWeight: '900', fontSize: 14.5, textTransform: 'uppercase', lineHeight: 18 }} numberOfLines={2}>
+                                    {displayFullName}
+                                </Text>
+                                
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                    <Text style={{ color: '#071630', fontWeight: '800', fontSize: 13, letterSpacing: 0.6, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                        {displayBvn}
+                                    </Text>
+                                    <TouchableOpacity 
+                                        onPress={() => copyToClipboard(displayBvn)}
+                                        style={{ backgroundColor: '#071630', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center' }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="copy-outline" size={10} color="#F5A623" style={{ marginRight: 3 }} />
+                                        <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>Copy</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Compact 2-Column BVN Dossier Grid */}
+                        <View style={{ paddingTop: 10, gap: 10 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>NIN NUMBER</Text>
+                                    <Text style={{ color: '#10B981', fontSize: 12.5, fontWeight: '800', marginTop: 1 }}>{result.nin || 'N/A'}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>DATE OF BIRTH</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1 }}>{result.dateOfBirth || result.dob || result.birthdate || 'N/A'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>GENDER</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1, textTransform: 'uppercase' }}>{result.gender || 'N/A'}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>PHONE NUMBER</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1 }}>{result.mobile || result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>STATE OF ORIGIN</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1, textTransform: 'uppercase' }}>{result.stateOfOrigin || result.state || 'N/A'}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#94A3B8', fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase' }}>LGA OF ORIGIN</Text>
+                                    <Text style={{ color: '#071630', fontSize: 12, fontWeight: '800', marginTop: 1, textTransform: 'uppercase' }}>{result.lgaOfOrigin || result.lga || 'N/A'}</Text>
+                                </View>
+                            </View>
+
+                            {/* Status Note */}
+                            <View style={{ backgroundColor: '#FEF9E7', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#FDE68A', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                <Ionicons name="ribbon-outline" size={15} color="#B45309" />
+                                <Text style={{ color: '#B45309', fontSize: 10.5, fontWeight: '700', flex: 1 }}>
+                                    Official NIBSS Central Repository Verified Record • 100% Authentic
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Bottom Action Buttons Hub (Thumb-Friendly, Fits on 1 Screen) */}
+                    <View style={{ gap: 8, marginTop: 10 }}>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity 
+                                onPress={handleDownloadPdf}
+                                disabled={isSaving}
+                                style={{ flex: 1, backgroundColor: '#F5A623', height: 46, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#F5A623', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
+                                activeOpacity={0.8}
+                            >
+                                {isSaving ? <ActivityIndicator color="#071630" size="small" /> : (
+                                    <>
+                                        <Ionicons name="document-text" size={18} color="#071630" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#071630', fontWeight: '900', fontSize: 13.5 }}>Download PDF</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={handleDownloadPng}
+                                disabled={isSaving}
+                                style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', height: 46, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#F5A623' }}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="image" size={18} color="#F5A623" style={{ marginRight: 6 }} />
+                                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13.5 }}>Save PNG</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={() => setResult(null)} 
+                            style={{ height: 36, alignItems: 'center', justifyContent: 'center' }}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={{ color: '#94A3B8', fontWeight: '800', fontSize: 12.5 }}>← Verify Another BVN</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>

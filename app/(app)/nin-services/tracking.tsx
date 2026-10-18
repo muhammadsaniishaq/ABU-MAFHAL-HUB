@@ -192,17 +192,21 @@ export default function TrackingScreen() {
         setLoading(true);
         try {
             const res = await api.identity.submitNINPersonalization(cleanID, undefined, selectedSlip);
-            setResult(res);
-            await saveHistoryItem(res);
+            if (res && res.isValid) {
+                setResult(res);
+                await saveHistoryItem(res);
+                showAlert('Tracking Complete', 'Personalization record retrieved successfully.', 'success');
+            } else {
+                showAlert('Tracking Failed', res?.message || 'Could not retrieve personalization record.', 'error');
+            }
 
-            // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
-
-            await fetchWalletBalance(); // Update balance
+            // Note: Deduction and Transaction Logging are securely handled by the backend Edge Function
+            await fetchWalletBalance();
         } catch (e: any) {
             const errM = e.message || '';
             const lowerMsg = errM.toLowerCase();
             if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
-                showAlert('Service Unavailable', 'This verification service is temporarily unavailable. Please try again later.', 'warning');
+                showAlert('Insufficient Balance', 'Your wallet balance is insufficient for this personalization check. Please fund your wallet and try again.', 'error');
             } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
                 showAlert('No Record Found', 'The record or identity you entered does not exist or has no personalization history.', 'error');
             } else {

@@ -320,8 +320,15 @@ serve(async (req: Request) => {
       case 'phone':
       case 'nin-phone':
         endpoint = '/nin/by-phone';
-        payload.phone = searchValue;
-        if (requestData.variant) payload.variant = String(requestData.variant).toLowerCase();
+        let phoneInput = String(requestData.phone || requestData.phone_number || searchValue || '').trim();
+        let pDigits = phoneInput.replace(/\D/g, '');
+        if (pDigits.startsWith('234') && pDigits.length === 13) {
+          pDigits = '0' + pDigits.slice(3);
+        } else if (pDigits.length === 10 && !pDigits.startsWith('0')) {
+          pDigits = '0' + pDigits;
+        }
+        payload.phone = pDigits || phoneInput;
+        payload.variant = String(requestData.variant || requestData.layout || requestData.slip_type || 'premium').toLowerCase();
         break;
 
       case 'demographic':
@@ -400,7 +407,14 @@ serve(async (req: Request) => {
       case 'bvn-retrieval':
       case 'bvn-phone':
         endpoint = '/bvn/retrieve-by-phone';
-        payload.phone = requestData.phone || requestData.phone_number || searchValue;
+        let bvnPhoneInput = String(requestData.phone || requestData.phone_number || searchValue || '').trim();
+        let bDigits = bvnPhoneInput.replace(/\D/g, '');
+        if (bDigits.startsWith('234') && bDigits.length === 13) {
+          bDigits = '0' + bDigits.slice(3);
+        } else if (bDigits.length === 10 && !bDigits.startsWith('0')) {
+          bDigits = '0' + bDigits;
+        }
+        payload.phone = bDigits || bvnPhoneInput;
         let fn = (requestData.first_name || requestData.firstname || '').trim();
         let ln = (requestData.last_name || requestData.lastname || requestData.surname || '').trim();
         let mn = (requestData.middle_name || requestData.middlename || '').trim();
@@ -611,59 +625,67 @@ serve(async (req: Request) => {
     // ── Normalize Instant Identity Record Responses ──────────────────────────
     const rawPerson: Record<string, any> = {};
 
-    // 1. Merge root skbData fields (excluding wrapper keys)
-    for (const [k, v] of Object.entries(skbData)) {
-      if (!['user_data', 'data', 'details'].includes(k) && v !== undefined && v !== null) {
-        rawPerson[k] = v;
-      }
-    }
-
-    // 2. Helper to unpack arrays/objects and map key-value descriptors
+    // 1. Recursive helper to unpack all levels of nested structures into rawPerson
     const unpackContainer = (container: any) => {
       if (!container) return;
       if (Array.isArray(container)) {
         for (const item of container) {
-          if (!item) continue;
-          if (typeof item === 'object') {
-            // Check if item is a key-value pair descriptor e.g. { field: 'First Name', value: 'JOHN' }
-            const keyProp = item.field || item.title || item.key || item.label || item.name || item.property;
-            const valProp = item.value ?? item.val ?? item.data ?? item.text ?? item.content;
-            if (keyProp && valProp !== undefined) {
-              const cleanKey = String(keyProp).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-              rawPerson[cleanKey] = valProp;
-            }
-            // Also shallow copy all object properties
-            for (const [k, v] of Object.entries(item)) {
-              if (v !== undefined && v !== null && k !== 'field' && k !== 'title') {
-                rawPerson[k] = v;
-              }
-            }
+          unpackContainer(item);
+        }
+        return;
+      }
+      if (typeof container === 'object') {
+        // If it has a key-value descriptor e.g. { field: 'First Name', value: 'JOHN' }
+        const keyProp = container.field || container.title || container.key || container.label || container.name || container.property;
+        const valProp = container.value ?? container.val ?? container.data ?? container.text ?? container.content;
+        if (keyProp && valProp !== undefined && typeof keyProp === 'string' && typeof valProp !== 'object') {
+          const cleanKey = String(keyProp).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+          rawPerson[cleanKey] = valProp;
+        }
+
+        // Copy top level primitive fields
+        for (const [k, v] of Object.entries(container)) {
+          if (v !== undefined && v !== null && typeof v !== 'object') {
+            rawPerson[k] = v;
           }
         }
-      } else if (typeof container === 'object') {
-        Object.assign(rawPerson, container);
+
+        // Recursively unpack nested containers from SKBTECH response
+        if (container.response) unpackContainer(container.response);
+        if (container.user_data) unpackContainer(container.user_data);
+        if (container.records) unpackContainer(container.records);
+        if (container.data) unpackContainer(container.data);
+        if (container.details) unpackContainer(container.details);
       }
     };
 
-    // Unpack user_data, data, and details
-    unpackContainer(skbData.user_data);
-    unpackContainer(skbData.data);
-    unpackContainer(skbData.details);
+    unpackContainer(skbData);
 
-    // 3. Extract Slip Document / PDF / Image URLs
-    let slipDoc = skbData.pdf_base64 || rawPerson.pdf_base64 || skbData.slip || rawPerson.slip ||
-                  skbData.slip_url || rawPerson.slip_url || skbData.pdf || rawPerson.pdf ||
-                  skbData.document || rawPerson.document || '';
-    
+    // 2. Extract Slip Document / PDF / Image URLs
+    let slipDoc = skbData.pdf_base64 ||
+                  skbData.data?.pdf_base64 ||
+                  rawPerson.pdf_base64 ||
+                  skbData.slip ||
+                  rawPerson.slip ||
+                  skbData.slip_url ||
+                  rawPerson.slip_url ||
+                  skbData.pdf ||
+                  rawPerson.pdf ||
+                  skbData.document ||
+                  rawPerson.document || '';
+
     // Check attachments array (SKBTECH returns links to slips in attachments)
     if (!slipDoc && Array.isArray(skbData.attachments) && skbData.attachments.length > 0) {
       slipDoc = skbData.attachments[0];
+    }
+    if (!slipDoc && Array.isArray(skbData.data?.attachments) && skbData.data.attachments.length > 0) {
+      slipDoc = skbData.data.attachments[0];
     }
     if (!slipDoc && Array.isArray(rawPerson.attachments) && rawPerson.attachments.length > 0) {
       slipDoc = rawPerson.attachments[0];
     }
 
-    // 4. Extract and normalize demographic fields
+    // 3. Extract and normalize demographic fields
     let firstName = rawPerson.firstname || rawPerson.firstName || rawPerson.first_name || rawPerson.first || rawPerson.given_name || rawPerson.given_names || '';
     let lastName = rawPerson.surname || rawPerson.lastname || rawPerson.lastName || rawPerson.last_name || rawPerson.last || '';
     let middleName = rawPerson.middlename || rawPerson.middleName || rawPerson.middle_name || rawPerson.middle || '';
@@ -683,18 +705,26 @@ serve(async (req: Request) => {
       }
     }
 
-    const ninNum = rawPerson.nin || rawPerson.number || rawPerson.nin_number || rawPerson.national_id || (searchType.includes('nin') ? searchValue : '');
-    const bvnNum = rawPerson.bvn || rawPerson.bvn_number || (searchType.includes('bvn') ? searchValue : '');
-    const phoneNum = rawPerson.phone || rawPerson.phoneNumber || rawPerson.phone_number || rawPerson.telephoneno || rawPerson.mobile || '';
-    const dobVal = rawPerson.dob || rawPerson.dateOfBirth || rawPerson.date_of_birth || rawPerson.birthdate || rawPerson.birth_date || '';
+    const ninNum = rawPerson.nin || rawPerson.number || rawPerson.nin_number || rawPerson.national_id || (searchType.includes('nin') && !searchType.includes('phone') ? searchValue : '');
+    const bvnNum = rawPerson.bvn || rawPerson.bvn_number || (searchType.includes('bvn') && !searchType.includes('phone') ? searchValue : '');
+    const phoneNum = rawPerson.telephoneno || rawPerson.phone || rawPerson.phoneNumber || rawPerson.phone_number || rawPerson.mobile || '';
+    const dobVal = rawPerson.birthdate || rawPerson.dob || rawPerson.dateOfBirth || rawPerson.date_of_birth || rawPerson.birth_date || '';
     const genderVal = rawPerson.gender || rawPerson.sex || rawPerson.gender_id || '';
-    const photoVal = rawPerson.photo || rawPerson.image || rawPerson.picture || rawPerson.base64Image || rawPerson.base64_image || rawPerson.face || rawPerson.avatar || '';
+    
+    // Format photo: guarantee data:image/jpeg;base64, prefix if raw base64
+    let photoVal = rawPerson.photo || rawPerson.image || rawPerson.picture || rawPerson.base64Image || rawPerson.base64_image || rawPerson.face || rawPerson.avatar || '';
+    if (photoVal && typeof photoVal === 'string') {
+      if (!photoVal.startsWith('http') && !photoVal.startsWith('data:')) {
+        photoVal = `data:image/jpeg;base64,${photoVal}`;
+      }
+    }
+
     const trackingIdVal = rawPerson.tracking_id || rawPerson.trackingId || rawPerson.trackingID || rawPerson.ref || rawPerson.reference || rawPerson.ticket_id || '';
     const stateVal = rawPerson.residence_state || rawPerson.state || rawPerson.residenceState || rawPerson.state_of_residence || '';
     const lgaVal = rawPerson.residence_lga || rawPerson.lga || rawPerson.residenceLga || rawPerson.lga_of_residence || '';
     const bStateVal = rawPerson.birthstate || rawPerson.birthState || rawPerson.state_of_origin || rawPerson.origin_state || '';
     const bLgaVal = rawPerson.birthlga || rawPerson.birthLga || rawPerson.lga_of_origin || rawPerson.origin_lga || '';
-    const addressVal = rawPerson.residence_address || rawPerson.address || rawPerson.address_line_1 || rawPerson.residenceAddress || '';
+    const addressVal = rawPerson.residence_adressline1 || rawPerson.residence_address || rawPerson.address || rawPerson.address_line_1 || rawPerson.residenceAddress || '';
     const issueDateVal = rawPerson.issueDate || rawPerson.issue_date || rawPerson.issuance_date || '';
 
     const normalized: any = {

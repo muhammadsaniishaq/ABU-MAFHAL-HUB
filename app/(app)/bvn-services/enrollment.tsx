@@ -72,11 +72,11 @@ export default function BVNEnrollmentScreen() {
         try {
             const { data } = await supabase
                 .from('service_pricing')
-                .select('cost_price, markup_price, selling_price')
+                .select('cost_price, markup_price')
                 .eq('id', 'bvn_enrollment')
                 .maybeSingle();
             if (data) {
-                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                const total = Number(data.cost_price || 0) + Number(data.markup_price || 0);
                 if (total > 0) setServicePrice(total);
             }
         } catch (e) {
@@ -151,7 +151,7 @@ export default function BVNEnrollmentScreen() {
 
             const res = await api.identity.submitBVNEnrollment(payload, 'bvn_enrollment');
 
-            if (res && (res.isValid || res.data)) {
+            if (res && res.isValid) {
                 const data = res.data?.data || res.data || {};
                 const reqId = data.request_id || data.requestId || clientRef;
 

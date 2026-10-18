@@ -226,17 +226,21 @@ export default function ValidationScreen() {
             };
             const serviceCode = codeMap[selectedStatus] || '329';
             const res = await api.identity.submitNINValidation(cleanNin, serviceCode, undefined, selectedStatus);
-            setResult(res);
-            await saveHistoryItem(res);
+            if (res && res.isValid) {
+                setResult(res);
+                await saveHistoryItem(res);
+                showAlert('Validation Successful', 'NIN validation processed successfully.', 'success');
+            } else {
+                showAlert('Validation Failed', res?.message || 'Could not validate NIN record.', 'error');
+            }
 
-            // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
-
-            await fetchWalletBalance(); // Update balance
+            // Note: Deduction and Transaction Logging are securely handled by the backend Edge Function
+            await fetchWalletBalance();
         } catch (e: any) {
             const errM = e.message || '';
             const lowerMsg = errM.toLowerCase();
             if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
-                showAlert('Service Unavailable', 'This verification service is temporarily unavailable. Please try again later.', 'warning');
+                showAlert('Insufficient Balance', 'Your wallet balance is insufficient for this service. Please fund your wallet and try again.', 'error');
             } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
                 showAlert('No Record Found', 'The record or identity you entered does not exist or has no validation history.', 'error');
             } else {

@@ -189,7 +189,7 @@ export default function BVNServicesGatewayScreen() {
 
       const { data: pricingData } = await supabase
         .from('service_pricing')
-        .select('id, cost_price, markup_price, selling_price, status, maintenance_msg');
+        .select('id, cost_price, markup_price, status, maintenance_msg');
 
       if (pricingData) {
         pricingData.forEach((row: any) => {
@@ -199,9 +199,7 @@ export default function BVNServicesGatewayScreen() {
               msg: row.maintenance_msg || map[row.id]?.msg,
             };
           }
-          const total = row.selling_price
-            ? Number(row.selling_price)
-            : (Number(row.cost_price || 0) + Number(row.markup_price || 0));
+          const total = Number(row.cost_price || 0) + Number(row.markup_price || 0);
           if (total > 0) {
             priceMap[row.id] = total;
           }

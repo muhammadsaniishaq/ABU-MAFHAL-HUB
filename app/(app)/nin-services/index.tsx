@@ -212,14 +212,13 @@ export default function NINServicesScreen() {
 
       const { data: priceData } = await supabase
         .from('service_pricing')
-        .select('id, cost_price, markup_price, selling_price, status');
+        .select('id, cost_price, markup_price, status');
 
       if (priceData && Array.isArray(priceData)) {
         for (const item of priceData) {
           const cost = parseFloat(item.cost_price?.toString() || '0');
           const markup = parseFloat(item.markup_price?.toString() || '0');
-          const selling = item.selling_price ? parseFloat(item.selling_price.toString()) : (cost + markup);
-          const finalPrice = selling > 0 ? selling : (cost + markup);
+          const finalPrice = cost + markup;
           priceMap[item.id] = finalPrice;
 
           if (item.status === 'maintenance' || item.status === 'inactive') {
