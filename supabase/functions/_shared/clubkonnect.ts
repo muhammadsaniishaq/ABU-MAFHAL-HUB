@@ -40,15 +40,25 @@ export class ClubKonnectClient {
     }
   }
 
+  private getNetworkCode(net: string): string {
+    const s = (net || '').toString().toLowerCase().trim();
+    if (s === '01' || s.includes('mtn')) return '01';
+    if (s === '02' || s.includes('glo')) return '02';
+    if (s === '03' || s.includes('9mobile') || s.includes('etisalat') || s.includes('t2')) return '03';
+    if (s === '04' || s.includes('airtel')) return '04';
+    return s;
+  }
+
   // 1. Wallet Balance
   getWalletBalance() {
     return this.request('/APIWalletBalanceV1.asp', {});
   }
 
   // 2. Airtime
-  buyAirtime(mobileNetwork: '01'|'02'|'03'|'04', mobileNumber: string, amount: number, requestId: string) {
+  buyAirtime(mobileNetwork: string, mobileNumber: string, amount: number, requestId: string) {
+    const code = this.getNetworkCode(mobileNetwork);
     return this.request('/APIAirtimeV1.asp', {
-      MobileNetwork: mobileNetwork,
+      MobileNetwork: code,
       MobileNumber: mobileNumber,
       Amount: amount.toString(),
       RequestID: requestId,
@@ -58,8 +68,9 @@ export class ClubKonnectClient {
 
   // 3. Data Bundle
   buyData(mobileNetwork: string, mobileNumber: string, planId: string, requestId: string) {
+    const code = this.getNetworkCode(mobileNetwork);
     return this.request('/APIDatabundleV1.asp', {
-      MobileNetwork: mobileNetwork,
+      MobileNetwork: code,
       MobileNumber: mobileNumber,
       DataPlan: planId,
       RequestID: requestId,

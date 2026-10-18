@@ -241,11 +241,13 @@ Deno.serve(async (req: Request) => {
 
             console.log(`[Bills] Searching Data Plan: ID="${rawPlanId}", Network="${targetNetwork}", Vendor="${requestedVendor || 'any'}"`);
 
+            const cleanRawId = rawPlanId.replace(/^bigi_/i, '');
+
             // 1. Scope query by Network + Plan ID + Active status to prevent cross-network collisions
             let query = rpcClient
                 .from('data_plans')
                 .select('*')
-                .eq('plan_id', rawPlanId)
+                .or(`plan_id.eq.${rawPlanId},plan_id.eq.bigi_${cleanRawId},plan_id.eq.${cleanRawId}`)
                 .eq('is_active', true);
 
             if (targetNetwork === 'vital') {
@@ -265,7 +267,7 @@ Deno.serve(async (req: Request) => {
                 let fallbackQuery = rpcClient
                     .from('data_plans')
                     .select('*')
-                    .eq('plan_id', rawPlanId)
+                    .or(`plan_id.eq.${rawPlanId},plan_id.eq.bigi_${cleanRawId},plan_id.eq.${cleanRawId}`)
                     .eq('is_active', true);
                 if (targetNetwork === 'vital') {
                     fallbackQuery = fallbackQuery.or('network.ilike.vital,network.ilike.vitel');
@@ -520,31 +522,126 @@ Deno.serve(async (req: Request) => {
                             }
                         } else if (vendor === 'clubkonnect' && ckUserId && ckApiKey) {
                             const ckClient = new ClubKonnectClient(ckUserId, ckApiKey);
+                            const netParam = (providerParams.networkCode as string) || (providerParams.network as string);
                             if (type === 'airtime') {
-                                result = await ckClient.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
+                                result = await ckClient.buyAirtime(netParam, providerParams.phone as string, providerParams.amount as number, requestId);
                             } else {
-                                result = await ckClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                                result = await ckClient.buyData(netParam, providerParams.phone as string, providerParams.planId as string, requestId);
                             }
                         } else {
                             continue;
                         }
 
                         const statusStr = String(result?.status || result?.msg || '').toUpperCase();
-                        const isExplicitFailed = statusStr.includes('FAIL') || statusStr.includes('ERR') || statusStr.includes('REJECT') || statusStr.includes('CANCEL') || statusStr.includes('INVALID');
-                        const isSuccessStatus = !isExplicitFailed && (statusStr.includes('RECEIVED') || statusStr.includes('COMPLETED') || statusStr.includes('SUCCESS') || statusStr === '00' || statusStr === '0' || statusStr === '200');
+                        const isExplicitFailed = statusStr.includes('FAIL') || statusStr.includes('ERR') || statusStr.includes('REJECT') || statusStr.includes('CANCEL') || statusStr.includes('INVALID') || statusStr.includes('INSUFFICIENT');
+                        const isSuccessStatus = !isExplicitFailed && (
+                            statusStr.includes('RECEIVED') || 
+                            statusStr.includes('COMPLETED') || 
+                            statusStr.includes('SUCCESS') || 
+                            statusStr === '00' || 
+                            statusStr === '0' || 
+                            statusStr === '200' ||
+                            statusStr === '100' ||
+                            result?.statuscode === '100' ||
+                            result?.statuscode === '200' ||
+                            result?.success === true
+                        );
 
                         if (result && isSuccessStatus) {
                             console.log(`[Bills] VTU Transaction Succeeded via: ${vendor}`);
                             break;
                         } else {
                             console.warn(`[Bills] Vendor ${vendor} returned non-success result:`, JSON.stringify(result));
-                            lastError = new Error(result?.message || result?.msg || `Transaction failed at provider network`);
+                            lastError = new Error(result?.message || result?.msg || `Transaction failed at provider ${vendor}`);
                             result = null;
                         }
                     } catch (err: any) {
                         console.warn(`[Bills] Vendor ${vendor} failed: ${err.message}. Trying next fallback provider...`);
                         lastError = new Error(err.message || "Transaction failed at provider network");
                         result = null;
+                    }
+                }
+
+                // SMART FAILOVER: If primary Data vendor failed, look for matching plan on other active vendors!
+                if (!result && type === 'data' && plan) {
+                    const primaryVendor = vendorOrder[0];
+                    console.log(`[Bills] Primary Data Vendor "${primaryVendor}" failed (${lastError?.message}). Attempting automated cross-vendor fallback...`);
+                    
+                    const otherVendors = ['bilalsadasub', 'bigi', 'clubkonnect'].filter(v => v !== primaryVendor);
+                    for (const fbVendor of otherVendors) {
+                        try {
+                            if (fbVendor === 'bilalsadasub' && !bilalToken) continue;
+                            if (fbVendor === 'bigi' && (!bigiToken || !bigiPin)) continue;
+                            if (fbVendor === 'clubkonnect' && (!ckUserId || !ckApiKey)) continue;
+
+                            let fbQuery = rpcClient
+                                .from('data_plans')
+                                .select('*')
+                                .eq('api_vendor', fbVendor)
+                                .eq('is_active', true)
+                                .order('cost_price', { ascending: true });
+
+                            if (targetNetwork === 'vital') {
+                                fbQuery = fbQuery.or('network.ilike.vital,network.ilike.vitel');
+                            } else {
+                                fbQuery = fbQuery.ilike('network', targetNetwork);
+                            }
+
+                            if (plan.volume) {
+                                fbQuery = fbQuery.ilike('volume', plan.volume.trim());
+                            }
+
+                            const { data: fbPlans } = await fbQuery;
+                            if (!fbPlans || fbPlans.length === 0) continue;
+
+                            // Match compatible plan where cost price does not exceed charged amount
+                            let chosenFb = fbPlans.find(p => p.plan_type === plan.plan_type && Number(p.cost_price || 0) <= amountToCharge);
+                            if (!chosenFb) {
+                                chosenFb = fbPlans.find(p => Number(p.cost_price || 0) <= amountToCharge);
+                            }
+                            if (!chosenFb) continue;
+
+                            console.log(`[Bills] Found Cross-Vendor Fallback Plan on ${fbVendor}: "${chosenFb.name}" (ID: ${chosenFb.plan_id}, Cost: ₦${chosenFb.cost_price})`);
+
+                            let fbResult: any = null;
+                            if (fbVendor === 'bigi') {
+                                const bigiClient = new BigiClient(bigiToken, bigiPin);
+                                fbResult = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, chosenFb.plan_id, requestId);
+                            } else if (fbVendor === 'bilalsadasub') {
+                                const bilalClient = new BilalsadasubClient(bilalToken);
+                                fbResult = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, chosenFb.plan_id, requestId);
+                            } else if (fbVendor === 'clubkonnect') {
+                                const ckClient = new ClubKonnectClient(ckUserId, ckApiKey);
+                                const netParam = (providerParams.networkCode as string) || (providerParams.network as string);
+                                fbResult = await ckClient.buyData(netParam, providerParams.phone as string, chosenFb.plan_id, requestId);
+                            }
+
+                            const fbStatusStr = String(fbResult?.status || fbResult?.msg || '').toUpperCase();
+                            const isFbFailed = fbStatusStr.includes('FAIL') || fbStatusStr.includes('ERR') || fbStatusStr.includes('REJECT') || fbStatusStr.includes('CANCEL') || fbStatusStr.includes('INVALID') || fbStatusStr.includes('INSUFFICIENT');
+                            const isFbOk = !isFbFailed && (
+                                fbStatusStr.includes('RECEIVED') || 
+                                fbStatusStr.includes('COMPLETED') || 
+                                fbStatusStr.includes('SUCCESS') || 
+                                fbStatusStr === '00' || 
+                                fbStatusStr === '0' || 
+                                fbStatusStr === '200' ||
+                                fbStatusStr === '100' ||
+                                fbResult?.statuscode === '100' ||
+                                fbResult?.statuscode === '200' ||
+                                fbResult?.success === true
+                            );
+
+                            if (fbResult && isFbOk) {
+                                console.log(`[Bills] Cross-Vendor Fallback Succeeded via ${fbVendor}!`);
+                                result = fbResult;
+                                lastError = null;
+                                break;
+                            } else {
+                                console.warn(`[Bills] Fallback Vendor ${fbVendor} non-success:`, JSON.stringify(fbResult));
+                            }
+                        } catch (fbErr: any) {
+                            console.warn(`[Bills] Fallback Vendor ${fbVendor} error: ${fbErr.message}`);
+                        }
                     }
                 }
 
@@ -581,12 +678,22 @@ Deno.serve(async (req: Request) => {
             
             console.log(`[Bills] Provider Result: ${JSON.stringify(result)}`);
 
-            const isSuccess = result && (
+            const statusUpper = String(result?.status || result?.msg || '').toUpperCase();
+            const isExplicitFail = statusUpper.includes('FAIL') || statusUpper.includes('ERR') || statusUpper.includes('REJECT') || statusUpper.includes('CANCEL') || statusUpper.includes('INVALID');
+            const isSuccess = result && !isExplicitFail && (
                 result.status === 'ORDER_RECEIVED' || 
                 result.status === 'ORDER_COMPLETED' || 
                 result.status === 'SUCCESS' ||
                 result.status === 'success' ||
-                result.success === true
+                result.status === '200' ||
+                result.status === '100' ||
+                result.status === '00' ||
+                result.statuscode === '100' ||
+                result.statuscode === '200' ||
+                result.success === true ||
+                statusUpper.includes('RECEIVED') ||
+                statusUpper.includes('COMPLETED') ||
+                statusUpper.includes('SUCCESS')
             );
 
             if (isSuccess) {

@@ -9,8 +9,11 @@ export class BigiClient {
     }
 
     private getHeaders() {
+        const auth = this.token.startsWith('Bearer ') || this.token.startsWith('Token ')
+            ? this.token
+            : `Token ${this.token}`;
         return {
-            'Authorization': `Token ${this.token}`,
+            'Authorization': auth,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         };
@@ -107,16 +110,48 @@ export class BigiClient {
     async buyData(network: string, phone: string, planId: string, requestId: string) {
         const networkId = this.getNetworkId(network);
         const formattedPhone = this.cleanPhone(phone);
-        const res = await fetch(`${this.baseUrl}/vtu/data/purchase/`, {
+
+        // Strip prefixes like "bigi_" or non-digits to ensure clean integer plan ID
+        const cleanPlanId = (planId || '').toString().replace(/^bigi_/i, '').replace(/^[^\d]+/, '');
+        const planInt = parseInt(cleanPlanId || planId, 10);
+        const finalPlanId = isNaN(planInt) ? planId : planInt;
+
+        const payload = {
+            network: networkId,
+            phone_number: formattedPhone,
+            plan: finalPlanId,
+            pin: this.pin
+        };
+
+        console.log(`[BigiClient] Dispatching Data: Network=${networkId}, Phone=${formattedPhone}, Plan=${finalPlanId}`);
+
+        let res = await fetch(`${this.baseUrl}/vtu/data/purchase/`, {
             method: 'POST',
             headers: this.getHeaders(),
-            body: JSON.stringify({
-                network: networkId,
-                phone_number: formattedPhone,
-                plan: parseInt(planId, 10),
-                pin: this.pin
-            })
+            body: JSON.stringify(payload)
         });
+
+        if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${this.baseUrl}/vtu/data/purchase`, {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify(payload)
+            });
+        }
+
+        // If 401 Unauthorized with Token, try Bearer
+        if (res.status === 401 && this.token) {
+            res = await fetch(`${this.baseUrl}/vtu/data/purchase/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+        }
+
         const data = await res.json().catch(() => null);
         console.log(`[BigiClient] Data Response (Status ${res.status}):`, JSON.stringify(data));
         
