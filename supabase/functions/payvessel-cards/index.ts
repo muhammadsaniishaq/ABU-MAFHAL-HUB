@@ -325,7 +325,6 @@ serve(async (req) => {
             let pvStatus = 0;
 
             try {
-                // Official endpoint WITH trailing slash
                 const pvRes = await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/`, {
                     method: 'POST',
                     headers: {
@@ -349,10 +348,9 @@ serve(async (req) => {
             // Strictly evaluate PayVessel response: Do NOT create fake demo cards if API fails!
             const isApiSuccess = (pvStatus === 200 || pvStatus === 201) &&
                 (payvesselResult?.status === true || payvesselResult?.success === true) &&
-                Boolean(payvesselResult?.data?.card_id || payvesselResult?.data?.id || payvesselResult?.data?.card_number || payvesselResult?.data?.pan);
+                Boolean(payvesselResult?.data?.card_id || payvesselResult?.data?.id);
 
             if (!isApiSuccess) {
-                // Extract clean, helpful error message from PayVessel
                 let errMsg = payvesselResult?.message || payvesselResult?.error || '';
                 if (!errMsg && Array.isArray(payvesselResult?.details)) {
                     errMsg = payvesselResult.details.map((d: any) => d.detail || d.message).join(', ');
@@ -361,7 +359,6 @@ serve(async (req) => {
                     errMsg = `Card issuance failed (HTTP ${pvStatus}). Please check PayVessel portal balance or KYC.`;
                 }
 
-                // If business wallet balance is insufficient on PayVessel
                 if (errMsg.toLowerCase().includes('insufficient') && errMsg.toLowerCase().includes('wallet')) {
                     errMsg = 'PayVessel Error: Insufficient USD balance in your PayVessel merchant wallet. Please fund your PayVessel USD wallet on the PayVessel portal to issue virtual cards.';
                 }
@@ -374,11 +371,31 @@ serve(async (req) => {
             }
 
             // 4. Extract Real Card Details Returned by PayVessel
-            const cardData = payvesselResult.data;
-            const cardId = cardData.card_id || cardData.id || `PV_${Date.now()}`;
+            let cardData = payvesselResult.data;
+            const remoteCardId = cardData.id || cardData.card_id;
+
+            // Poll once for active card credentials if PayVessel initialized as PENDING
+            if (!cardData.card_number && remoteCardId) {
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    const pollRes = await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${remoteCardId}/`, {
+                        method: 'GET',
+                        headers: {
+                            'api-key': apiKey,
+                            'api-secret': apiSecret,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const pollData = await pollRes.json().catch(() => ({}));
+                    if (pollData?.data?.card_number) {
+                        cardData = { ...cardData, ...pollData.data };
+                    }
+                } catch (_) {}
+            }
+
             const fullCardNumber = String(cardData.card_number || cardData.pan || '').replace(/\D/g, '').replace(/(\d{4})/g, '$1 ').trim();
             const cleanDigits = fullCardNumber.replace(/\D/g, '');
-            const cardSuffix = cleanDigits.slice(-4) || '0000';
+            const cardSuffix = cleanDigits.slice(-4) || '••••';
             const maskedCardNumber = cleanDigits.length >= 8
                 ? `${cleanDigits.slice(0, 4)} •••• •••• ${cardSuffix}`
                 : fullCardNumber || `•••• ${cardSuffix}`;
@@ -386,6 +403,7 @@ serve(async (req) => {
             const cvv = String(cardData.cvv || '');
             const expiryMonth = String(cardData.expiry_month || cardData.expiry?.split('/')?.[0] || '12').padStart(2, '0');
             const expiryYear = String(cardData.expiry_year || cardData.expiry?.split('/')?.[1] || (new Date().getFullYear() + 3)).slice(-2);
+            const cardStatus = (cardData.status || 'active').toLowerCase();
 
             // 5. Deduct User Main Wallet Balance only upon 100% verified API success
             const newWalletBalance = currentBalance - totalRequiredNGN;
@@ -399,25 +417,25 @@ serve(async (req) => {
                 amount: -totalRequiredNGN,
                 status: 'completed',
                 category: 'card_creation',
-                reference: `CARD_ISSUE_${cardId}`,
+                reference: `CARD_ISSUE_${remoteCardId}`,
                 created_at: new Date().toISOString()
             });
 
             // 7. Store Real Card in user_virtual_cards
             const cardRecord = {
                 user_id: user.id,
-                card_id: cardId,
+                card_id: remoteCardId,
                 card_name: card_name || `ABU MAFHAL USD Card`,
                 card_number_masked: maskedCardNumber,
-                card_number_full: fullCardNumber,
-                cvv: cvv,
+                card_number_full: fullCardNumber || undefined,
+                cvv: cvv || undefined,
                 expiry_month: expiryMonth,
                 expiry_year: expiryYear,
                 card_holder_name: `${firstName} ${lastName}`.toUpperCase(),
                 currency: 'USD',
                 card_type: cardBrand,
                 balance: fundingAmount,
-                status: (cardData.status || 'active').toLowerCase(),
+                status: cardStatus,
                 spending_limit_monthly: 10000.00,
                 spending_limit_transaction: 2500.00,
                 online_payments_enabled: true,
@@ -494,6 +512,77 @@ serve(async (req) => {
         }
 
         // ════════════════════════════════════════════════════════════════
+        // ACTION: SYNC SINGLE CARD DETAILS FROM PAYVESSEL
+        // ════════════════════════════════════════════════════════════════
+        if (action === 'sync_card') {
+            const { card_id } = body;
+            if (!card_id) {
+                return new Response(JSON.stringify({ status: false, error: 'card_id required' }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const { data: localCard } = await supabase
+                .from('user_virtual_cards')
+                .select('*')
+                .or(`id.eq.${card_id},card_id.eq.${card_id}`)
+                .maybeSingle();
+
+            const remoteCardId = localCard?.card_id || card_id;
+            let syncData: any = null;
+
+            if (apiKey && apiSecret && remoteCardId) {
+                try {
+                    const syncRes = await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${remoteCardId}/`, {
+                        method: 'GET',
+                        headers: {
+                            'api-key': apiKey,
+                            'api-secret': apiSecret,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    syncData = await syncRes.json().catch(() => ({}));
+                    console.log('[Payvessel Sync Card Response]:', JSON.stringify(syncData));
+
+                    const remote = syncData?.data || syncData;
+                    if (remote && (remote.card_number || remote.status || remote.balance !== undefined)) {
+                        const updates: any = {};
+                        if (remote.balance !== undefined) updates.balance = Number(remote.balance);
+                        if (remote.status) updates.status = String(remote.status).toLowerCase();
+                        if (remote.card_number) {
+                            const panClean = String(remote.card_number).replace(/\D/g, '');
+                            updates.card_number_full = panClean.replace(/(\d{4})/g, '$1 ').trim();
+                            if (panClean.length >= 8) {
+                                updates.card_number_masked = `${panClean.slice(0, 4)} •••• •••• ${panClean.slice(-4)}`;
+                            }
+                        }
+                        if (remote.cvv) updates.cvv = String(remote.cvv);
+                        if (remote.expiry) {
+                            const expParts = String(remote.expiry).split('/');
+                            if (expParts.length === 2) {
+                                updates.expiry_month = expParts[0].padStart(2, '0');
+                                updates.expiry_year = expParts[1].slice(-2);
+                            }
+                        }
+                        updates.updated_at = new Date().toISOString();
+
+                        if (localCard) {
+                            await supabase.from('user_virtual_cards').update(updates).eq('id', localCard.id);
+                        }
+                    }
+                } catch (e: any) {
+                    console.warn('[Payvessel Sync Notice]:', e);
+                }
+            }
+
+            return new Response(JSON.stringify({
+                status: true,
+                data: syncData?.data || syncData
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        // ════════════════════════════════════════════════════════════════
         // ACTION: FUND CARD (PayVessel API)
         // ════════════════════════════════════════════════════════════════
         if (action === 'fund_card') {
@@ -515,13 +604,19 @@ serve(async (req) => {
                 }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
-            // Call PayVessel Official Fund Endpoint with trailing slash
+            const { data: localCard } = await supabase
+                .from('user_virtual_cards')
+                .select('*')
+                .or(`id.eq.${card_id},card_id.eq.${card_id}`)
+                .maybeSingle();
+
+            const remoteCardId = localCard?.card_id || card_id;
             let apiFundSuccess = false;
             let apiFundMsg = '';
 
-            if (apiKey && apiSecret) {
+            if (apiKey && apiSecret && remoteCardId) {
                 try {
-                    const pvFundRes = await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${card_id}/fund/`, {
+                    const pvFundRes = await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${remoteCardId}/fund/`, {
                         method: 'POST',
                         headers: {
                             'api-key': apiKey,
@@ -529,7 +624,7 @@ serve(async (req) => {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            card_id: card_id,
+                            card_id: remoteCardId,
                             amount: fundUSD,
                             business_id: businessId || undefined
                         })
@@ -553,17 +648,18 @@ serve(async (req) => {
                 }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
-            const { data: card } = await supabase.from('user_virtual_cards').select('balance, id, card_name').eq('id', card_id).single();
-            const newCardBalance = (Number(card?.balance) || 0) + fundUSD;
+            const newCardBalance = (Number(localCard?.balance) || 0) + fundUSD;
             const newWallet = Number(profile.balance) - requiredNGN;
 
             await supabase.from('profiles').update({ balance: newWallet }).eq('id', user.id);
-            await supabase.from('user_virtual_cards').update({ balance: newCardBalance }).eq('id', card_id);
+            if (localCard) {
+                await supabase.from('user_virtual_cards').update({ balance: newCardBalance }).eq('id', localCard.id);
+            }
 
             await supabase.from('transactions').insert({
                 user_id: user.id,
                 title: 'Virtual Card Top-up',
-                description: `Funded $${fundUSD.toFixed(2)} into ${card?.card_name || 'USD Virtual Card'}`,
+                description: `Funded $${fundUSD.toFixed(2)} into ${localCard?.card_name || 'USD Virtual Card'}`,
                 amount: -requiredNGN,
                 status: 'completed',
                 category: 'card_funding',
@@ -585,23 +681,33 @@ serve(async (req) => {
             const { card_id } = body;
             const newStatus = action === 'freeze' ? 'frozen' : 'active';
 
-            if (apiKey && apiSecret) {
+            const { data: localCard } = await supabase
+                .from('user_virtual_cards')
+                .select('*')
+                .or(`id.eq.${card_id},card_id.eq.${card_id}`)
+                .maybeSingle();
+
+            const remoteCardId = localCard?.card_id || card_id;
+
+            if (apiKey && apiSecret && remoteCardId) {
                 try {
-                    await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${card_id}/${action}/`, {
+                    await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${remoteCardId}/${action}/`, {
                         method: 'POST',
                         headers: {
                             'api-key': apiKey,
                             'api-secret': apiSecret,
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ card_id: card_id, business_id: businessId || undefined })
+                        body: JSON.stringify({ card_id: remoteCardId, business_id: businessId || undefined })
                     });
                 } catch (e) {
                     console.warn('[Payvessel Cards] Freeze/Unfreeze API notice:', e);
                 }
             }
 
-            await supabase.from('user_virtual_cards').update({ status: newStatus }).eq('id', card_id);
+            if (localCard) {
+                await supabase.from('user_virtual_cards').update({ status: newStatus }).eq('id', localCard.id);
+            }
 
             return new Response(JSON.stringify({ status: true, new_status: newStatus }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -614,23 +720,33 @@ serve(async (req) => {
         if (action === 'terminate') {
             const { card_id } = body;
 
-            if (apiKey && apiSecret) {
+            const { data: localCard } = await supabase
+                .from('user_virtual_cards')
+                .select('*')
+                .or(`id.eq.${card_id},card_id.eq.${card_id}`)
+                .maybeSingle();
+
+            const remoteCardId = localCard?.card_id || card_id;
+
+            if (apiKey && apiSecret && remoteCardId) {
                 try {
-                    await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${card_id}/terminate/`, {
+                    await fetch(`${baseUrl}/pms/api/external/request/virtual-cards/${remoteCardId}/terminate/`, {
                         method: 'POST',
                         headers: {
                             'api-key': apiKey,
                             'api-secret': apiSecret,
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ card_id: card_id, business_id: businessId || undefined })
+                        body: JSON.stringify({ card_id: remoteCardId, business_id: businessId || undefined })
                     });
                 } catch (e) {
                     console.warn('[Payvessel Cards] Terminate API notice:', e);
                 }
             }
 
-            await supabase.from('user_virtual_cards').update({ status: 'terminated' }).eq('id', card_id);
+            if (localCard) {
+                await supabase.from('user_virtual_cards').update({ status: 'terminated' }).eq('id', localCard.id);
+            }
 
             return new Response(JSON.stringify({ status: true, message: 'Card terminated' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
