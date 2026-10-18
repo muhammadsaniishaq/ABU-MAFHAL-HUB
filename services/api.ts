@@ -17,8 +17,8 @@ const airtimeProvider: AirtimeProvider = ClubKonnectProvider;
 // const airtimeProvider: AirtimeProvider = MockAirtimeProvider; // Backup
 const dataProvider: DataProvider = ClubKonnectProvider;
 const cryptoExchange: CryptoExchange = BinanceCryptoExchange; // Fixed Demo API limit issue
-import { AgentHubIdentityVerifier } from './agenthub';
-const identityVerifier = AgentHubIdentityVerifier; // AgentHub Edge Function (replaces IDPro)
+import { SKBTechIdentityVerifier } from './skbtech';
+const identityVerifier = SKBTechIdentityVerifier; // SKBTECH Official API (replaces legacy AgentHub/IDPro)
 
 // --- High-Concurrency In-Memory Plan Cache ---
 const _dataPlanMemoryCache: Record<string, { data: any[]; timestamp: number }> = {};

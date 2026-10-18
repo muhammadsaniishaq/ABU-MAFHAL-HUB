@@ -168,6 +168,7 @@ export default function AdminSettings() {
     const [flutterwaveKey, setFlutterwaveKey] = useState('');
 
     // Identity & Communication Keys
+    const [skbtechApiKey, setSkbtechApiKey] = useState('');
     const [identityApiKey, setIdentityApiKey] = useState('');
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [smileIdKey, setSmileIdKey] = useState('');
@@ -268,6 +269,7 @@ export default function AdminSettings() {
                     if (secret.key === 'PAYVESSEL_API_SECRET') setPayvesselSecret(secret.value);
                     if (secret.key === 'PAYVESSEL_BUSINESS_ID') setPayvesselBusinessId(secret.value);
                     if (secret.key === 'FLUTTERWAVE_SECRET_KEY') setFlutterwaveKey(secret.value);
+                    if (secret.key === 'SKBTECH_API_KEY') setSkbtechApiKey(secret.value);
                     if (secret.key === 'IDENTITY_API_KEY') setIdentityApiKey(secret.value);
                     if (secret.key === 'AGENTHUB_API_KEY') setAgentHubApiKey(secret.value);
                     if (secret.key === 'SMILE_ID_KEY') setSmileIdKey(secret.value);
@@ -293,6 +295,7 @@ export default function AdminSettings() {
                 { key: 'PAYVESSEL_API_SECRET', value: payvesselSecret, description: 'Payvessel API Secret' },
                 { key: 'PAYVESSEL_BUSINESS_ID', value: payvesselBusinessId, description: 'Payvessel Business ID' },
                 { key: 'FLUTTERWAVE_SECRET_KEY', value: flutterwaveKey, description: 'Flutterwave Secret Key' },
+                { key: 'SKBTECH_API_KEY', value: skbtechApiKey, description: 'SKBTECH API Key (skbtech.com.ng for NIN/BVN & Slips)' },
                 { key: 'IDENTITY_API_KEY', value: identityApiKey, description: 'Identity Provider API Key' },
                 { key: 'AGENTHUB_API_KEY', value: agentHubApiKey, description: 'AgentHub API Key (agenthub.ng)' },
                 { key: 'SMILE_ID_KEY', value: smileIdKey, description: 'SmileID API Key' },
@@ -1109,14 +1112,19 @@ export default function AdminSettings() {
                         <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'all' || expandedApi === 'identity' ? null : 'identity')} style={[s.accordionHeader, s.accordionHeaderActive]} activeOpacity={0.8}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="finger-print" size={18} color="#fff" style={{ marginRight: 8 }} />
-                                <Text style={[s.accordionTitle, { color: '#fff' }]}>🆔 Identity & Verification Services (AgentHub)</Text>
+                                <Text style={[s.accordionTitle, { color: '#fff' }]}>🆔 Identity & Verification Services (SKBTECH)</Text>
                             </View>
                             <Ionicons name={expandedApi === 'all' || expandedApi === 'identity' ? "chevron-up" : "chevron-down"} size={18} color="#fff" />
                         </TouchableOpacity>
                         {(expandedApi === 'all' || expandedApi === 'identity') && (
                             <View style={s.accordionBody}>
-                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 AgentHub API Key (agenthub.ng)</Text>
-                                <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Used for NIN Verification, BVN Lookup, and VNIN Slip Generation.</Text>
+                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 SKBTECH API Key (skbtech.com.ng)</Text>
+                                <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Primary API key for NIN Verification, BVN Retrieval, Modification, and Slips.</Text>
+                                <ApiInputRow placeholder="SKBTECH API Key (from skbtech.com.ng/developer)" value={skbtechApiKey} onChangeText={setSkbtechApiKey} isSecret={true} />
+                                
+                                <View style={s.divider} />
+                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 Legacy AgentHub API Key (agenthub.ng)</Text>
+                                <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Backup key for legacy identity services.</Text>
                                 <ApiInputRow placeholder="AgentHub API Key (Bearer Token)" value={agentHubApiKey} onChangeText={setAgentHubApiKey} isSecret={true} />
                                 
                                 <View style={s.divider} />

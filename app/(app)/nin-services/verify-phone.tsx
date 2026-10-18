@@ -260,8 +260,8 @@ export default function VerifyPhoneScreen() {
             } else {
                 const msg = response.message || 'Unable to verify this phone number. Please check and try again.';
                 const lowerMsg = msg.toLowerCase();
-                if (lowerMsg.includes('provider api wallet') || lowerMsg.includes('agenthub developer account') || lowerMsg.includes('provider balance')) {
-                    showAlert('Provider Gateway Balance Low', 'The provider API wallet balance on agenthub.ng is exhausted. Please top up your provider wallet at https://agenthub.ng to enable live verifications.', 'warning');
+                if (lowerMsg.includes('provider api wallet') || lowerMsg.includes('agenthub') || lowerMsg.includes('skbtech') || lowerMsg.includes('provider balance') || lowerMsg.includes('provider gateway')) {
+                    showAlert('Provider Gateway Balance Low', 'The provider API wallet balance on skbtech.com.ng is exhausted. Please fund your SKBTECH wallet at https://skbtech.com.ng to enable live verifications.', 'warning');
                 } else if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
                     showAlert('Insufficient Wallet Balance', msg, 'warning');
                 } else if (lowerMsg.includes('unauthorized') || lowerMsg.includes('auth')) {

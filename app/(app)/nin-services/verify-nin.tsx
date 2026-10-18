@@ -30,9 +30,9 @@ import { StandardSlip } from '../../../components/StandardSlip';
 import { RegularSlip } from '../../../components/RegularSlip';
 import { InformationSlip } from '../../../components/InformationSlip';
 
-// API calls are handled via AgentHub Edge Function (services/agenthub.ts)
-const API_URL = "https://agenthub.ng/api/v1/identity/nin"; // AgentHub (was: idpro.ng)
-const API_TOKEN = ""; // Token managed server-side via AGENTHUB_API_KEY secret
+// API calls are handled securely via SKBTECH Edge Function (services/skbtech.ts)
+const API_URL = "https://skbtech.com.ng/api/v1/nin/premium-slip"; // SKBTECH Official API
+const API_TOKEN = ""; // Token managed server-side via SKBTECH_API_KEY secret
 
 const DEFAULT_LAYOUTS = [
     { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 100, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID' },
@@ -2159,8 +2159,8 @@ export default function VerifyNINScreen() {
             } else {
                 const msg = response.message || 'Unable to verify this NIN. Please check the number and try again.';
                 const lowerMsg = msg.toLowerCase();
-                if (lowerMsg.includes('provider api wallet') || lowerMsg.includes('agenthub developer account') || lowerMsg.includes('provider balance')) {
-                    showAlert('Provider Gateway Balance Low', 'The provider API wallet balance on agenthub.ng is exhausted. Please top up your provider wallet at https://agenthub.ng to enable live verifications.', 'warning');
+                if (lowerMsg.includes('provider api wallet') || lowerMsg.includes('agenthub') || lowerMsg.includes('skbtech') || lowerMsg.includes('provider balance') || lowerMsg.includes('provider gateway')) {
+                    showAlert('Provider Gateway Balance Low', 'The provider API wallet balance on skbtech.com.ng is exhausted. Please fund your SKBTECH wallet at https://skbtech.com.ng to enable live verifications.', 'warning');
                 } else if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
                     showAlert('Insufficient Wallet Balance', msg, 'warning');
                 } else if (lowerMsg.includes('unauthorized') || lowerMsg.includes('auth')) {
