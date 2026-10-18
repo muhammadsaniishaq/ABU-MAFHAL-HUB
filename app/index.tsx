@@ -172,6 +172,17 @@ export default function SplashScreen() {
     }
   };
 
+  const isValidSlideUrl = (url: any): string | null => {
+    if (!url || typeof url !== 'string') return null;
+    const trimmed = url.trim();
+    if (trimmed.length === 0) return null;
+    if (trimmed.startsWith('blob:')) return null; // Discard temporary local browser blobs
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/')) {
+      return trimmed;
+    }
+    return null;
+  };
+
   const extractSlideUrls = (raw: any): (string | null)[] => {
     if (!raw) return [null, null, null];
     let parsed = raw;
@@ -188,9 +199,9 @@ export default function SplashScreen() {
     const s2 = parsed.find((s: any) => s.order === 2)?.url;
 
     return [
-      s0 && typeof s0 === 'string' && s0.trim().length > 0 ? s0.trim() : null,
-      s1 && typeof s1 === 'string' && s1.trim().length > 0 ? s1.trim() : null,
-      s2 && typeof s2 === 'string' && s2.trim().length > 0 ? s2.trim() : null,
+      isValidSlideUrl(s0),
+      isValidSlideUrl(s1),
+      isValidSlideUrl(s2),
     ];
   };
 

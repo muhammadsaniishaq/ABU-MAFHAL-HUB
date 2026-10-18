@@ -165,7 +165,8 @@ export default function AppDesigner() {
         if (Array.isArray(parsed)) {
           const normalized = [0, 1, 2].map(slot => {
             const found = parsed.find((s: any) => s.order === slot);
-            return found || { id: `slide_${slot}`, url: '', order: slot };
+            const cleanUrl = (found?.url && typeof found.url === 'string' && !found.url.startsWith('blob:')) ? found.url : '';
+            return { id: `slide_${slot}`, url: cleanUrl, order: slot };
           });
           setSplashSlides(normalized);
           await AsyncStorage.setItem('cached_splash_slides_v3', JSON.stringify(normalized));
@@ -322,6 +323,95 @@ export default function AppDesigner() {
     }
   };
 
+  // Bulletproof cross-platform converter to permanent compressed data-URI (solves dead browser blobs)
+  const convertAssetToPermanentDataUri = async (uri: string): Promise<string> => {
+    // 1. Web Environment: HTML5 Canvas scaling & base64 generation
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return new Promise((resolve) => {
+        try {
+          const img = new (window as any).Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              const maxDim = 900;
+              let w = img.naturalWidth || img.width;
+              let h = img.naturalHeight || img.height;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                  h = Math.round((h * maxDim) / w);
+                  w = maxDim;
+                } else {
+                  w = Math.round((w * maxDim) / h);
+                  h = maxDim;
+                }
+              }
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+                if (dataUrl && dataUrl.startsWith('data:image/')) {
+                  resolve(dataUrl);
+                  return;
+                }
+              }
+            } catch (canvasErr) {
+              console.warn('Canvas conversion fallback notice:', canvasErr);
+            }
+            // Fallback to FileReader if canvas encounters taint
+            fetch(uri)
+              .then(r => r.blob())
+              .then(b => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const res = reader.result as string;
+                  resolve(res && res.startsWith('data:image/') ? res : uri);
+                };
+                reader.onerror = () => resolve(uri);
+                reader.readAsDataURL(b);
+              })
+              .catch(() => resolve(uri));
+          };
+          img.onerror = () => {
+            fetch(uri)
+              .then(r => r.blob())
+              .then(b => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const res = reader.result as string;
+                  resolve(res && res.startsWith('data:image/') ? res : uri);
+                };
+                reader.onerror = () => resolve(uri);
+                reader.readAsDataURL(b);
+              })
+              .catch(() => resolve(uri));
+          };
+          img.src = uri;
+        } catch {
+          resolve(uri);
+        }
+      });
+    }
+
+    // 2. Native Environment (Android & iOS): Expo ImageManipulator
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 900 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      if (manipResult.base64) {
+        return `data:image/jpeg;base64,${manipResult.base64}`;
+      }
+      return manipResult.uri;
+    } catch (e) {
+      console.warn('Native ImageManipulator notice:', e);
+      return uri;
+    }
+  };
+
   const handleUploadFromSource = async (slot: number, source: 'camera' | 'library') => {
     try {
       // 1. Launch picker immediately inside user gesture context
@@ -332,55 +422,43 @@ export default function AppDesigner() {
 
       setUploadingSlide(true);
 
-      // 2. High-speed, memory-efficient image compression via ImageManipulator
-      // Resizes high-res phone pictures to 900px wide (<100KB), avoiding memory crashes and huge payloads
-      let uploadUri = asset.uri;
-      let uploadBase64: string | undefined = undefined;
-
-      try {
-        const manipResult = await ImageManipulator.manipulateAsync(
-          asset.uri,
-          [{ resize: { width: 900 } }],
-          { compress: 0.78, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-        );
-        uploadUri = manipResult.uri;
-        uploadBase64 = manipResult.base64;
-      } catch (manipErr) {
-        console.warn('Image compression fallback notice:', manipErr);
-      }
+      // 2. Convert to permanent, lightweight (~80KB) data-URI (solves dead browser blobs!)
+      const permanentDataUri = await convertAssetToPermanentDataUri(asset.uri);
+      const cleanBase64 = permanentDataUri.includes(',') ? permanentDataUri.split(',')[1] : null;
 
       const fileName = `splash/slide_${slot + 1}_${Date.now()}.jpg`;
 
       // 3. Try storage upload to Supabase storage bucket
-      let publicUrl = '';
+      let finalUrl = '';
       try {
         const uploadRes = await uploadMediaFile({
-          uri: uploadUri,
+          uri: asset.uri,
           bucket: 'banners',
           fileName,
           mimeType: 'image/jpeg',
-          base64: uploadBase64,
+          base64: cleanBase64,
           isVideo: false,
         });
 
-        if (uploadRes?.success && uploadRes?.publicUrl) {
-          publicUrl = uploadRes.publicUrl;
+        if (uploadRes?.success && uploadRes?.publicUrl && uploadRes.publicUrl.startsWith('http')) {
+          finalUrl = uploadRes.publicUrl;
         }
       } catch (uploadErr) {
         console.warn('Storage upload notice, applying local data-URI fallback:', uploadErr);
       }
 
-      // If storage bucket was blocked by RLS policy, use the compressed ~80KB data URI fallback
-      // Because it is only ~80KB, it uploads and saves to database in <50ms without CursorWindow issues!
-      if (!publicUrl) {
-        if (uploadBase64) {
-          publicUrl = `data:image/jpeg;base64,${uploadBase64}`;
-        } else {
-          publicUrl = uploadUri;
-        }
+      // If storage bucket was blocked by RLS policy, use the permanent ~80KB data URI fallback
+      // Because it is a permanent data:image/... URI, it will NEVER be blank or dead!
+      if (!finalUrl || !finalUrl.startsWith('http')) {
+        finalUrl = permanentDataUri;
       }
 
-      await applySlideImage(slot, publicUrl);
+      // STRICT SAFETY: NEVER save a temporary blob: URL to database!
+      if (finalUrl.startsWith('blob:')) {
+        throw new Error('Ba a iya canza hoton zuwa tsari mai dorewa ba. Don Allah sake gwadawa.');
+      }
+
+      await applySlideImage(slot, finalUrl);
     } catch (e: any) {
       console.error("Slide upload error:", e);
       Alert.alert("Daukar Hoto", e.message || "Ba a samu nasarar loda hoton ba.");
@@ -577,20 +655,34 @@ export default function AppDesigner() {
       const fileExt = (image.uri.split('.').pop() || 'jpg').split('?')[0];
       const fileName = `brand/${type}_${Date.now()}.${fileExt}`;
 
-      const uploadRes = await uploadMediaFile({
-        uri: image.uri,
-        bucket: 'banners',
-        fileName,
-        mimeType: 'image/jpeg',
-        base64: image.base64,
-        isVideo: false,
-      });
+      const permanentDataUri = await convertAssetToPermanentDataUri(image.uri);
+      const cleanBase64 = permanentDataUri.includes(',') ? permanentDataUri.split(',')[1] : null;
 
-      if (!uploadRes.success || !uploadRes.publicUrl) {
-        throw new Error(uploadRes.error || 'Failed to upload image to storage');
+      let publicUrl = '';
+      try {
+        const uploadRes = await uploadMediaFile({
+          uri: image.uri,
+          bucket: 'banners',
+          fileName,
+          mimeType: 'image/jpeg',
+          base64: cleanBase64,
+          isVideo: false,
+        });
+
+        if (uploadRes?.success && uploadRes?.publicUrl && uploadRes.publicUrl.startsWith('http')) {
+          publicUrl = uploadRes.publicUrl;
+        }
+      } catch (uploadErr) {
+        console.warn('Storage upload logo notice:', uploadErr);
       }
 
-      const publicUrl = uploadRes.publicUrl;
+      if (!publicUrl || !publicUrl.startsWith('http')) {
+        publicUrl = permanentDataUri;
+      }
+
+      if (publicUrl.startsWith('blob:')) {
+        throw new Error('Failed to convert image. Please retry.');
+      }
 
       const { error: dbError } = await supabase
         .from('app_settings')
