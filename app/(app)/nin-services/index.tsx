@@ -188,31 +188,41 @@ export default function NINServicesScreen() {
       const map: Record<string, { status: string; msg?: string }> = {};
       const priceMap: Record<string, number> = {};
 
+      // 1. Fetch saved controls from app_settings
       const { data: configData } = await supabase
         .from('app_settings')
-        .select('value')
-        .eq('key', 'nin_service_controls')
-        .maybeSingle();
+        .select('key, value')
+        .in('key', ['nin_service_controls', 'nin_global_status', 'nin_global_maintenance_msg']);
 
-      if (configData?.value) {
-        try {
-          const parsed = typeof configData.value === 'string' ? JSON.parse(configData.value) : configData.value;
-          if (parsed?.global_status) setGlobalNINStatus(parsed.global_status);
-          if (parsed?.global_maintenance_msg) setGlobalNINMsg(parsed.global_maintenance_msg);
-          if (parsed?.services && typeof parsed.services === 'object') {
-            for (const [k, v] of Object.entries(parsed.services as Record<string, any>)) {
-              map[k] = {
-                status: v.status || 'active',
-                msg: v.maintenance_message || 'Service is temporarily inactive or under maintenance.',
-              };
-            }
+      if (configData && configData.length > 0) {
+        configData.forEach(row => {
+          if (row.key === 'nin_global_status' && typeof row.value === 'string') {
+            setGlobalNINStatus(row.value as any);
+          } else if (row.key === 'nin_global_maintenance_msg' && typeof row.value === 'string') {
+            setGlobalNINMsg(row.value);
+          } else if (row.key === 'nin_service_controls' && row.value) {
+            try {
+              const parsed = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+              if (parsed?.global_status) setGlobalNINStatus(parsed.global_status);
+              if (parsed?.global_maintenance_msg) setGlobalNINMsg(parsed.global_maintenance_msg);
+              if (parsed?.services && typeof parsed.services === 'object') {
+                for (const [k, v] of Object.entries(parsed.services as Record<string, any>)) {
+                  map[k] = {
+                    status: v.status || 'active',
+                    msg: v.maintenance_msg || v.maintenance_message || 'Service is temporarily under maintenance.',
+                  };
+                }
+              }
+            } catch (_) {}
           }
-        } catch (_) {}
+        });
       }
 
+      // 2. Fetch live status & prices from service_pricing table
       const { data: priceData } = await supabase
         .from('service_pricing')
-        .select('id, cost_price, markup_price, status');
+        .select('id, cost_price, markup_price, status, maintenance_msg')
+        .eq('service_category', 'nin');
 
       if (priceData && Array.isArray(priceData)) {
         for (const item of priceData) {
@@ -221,12 +231,11 @@ export default function NINServicesScreen() {
           const finalPrice = cost + markup;
           priceMap[item.id] = finalPrice;
 
-          if (item.status === 'maintenance' || item.status === 'inactive') {
-            map[item.id] = {
-              status: item.status,
-              msg: 'Service is temporarily inactive or under maintenance.',
-            };
-          }
+          const st = item.status || 'active';
+          map[item.id] = {
+            status: st,
+            msg: item.maintenance_msg || (st === 'maintenance' ? 'Service is temporarily under maintenance.' : undefined),
+          };
         }
       }
 
@@ -260,11 +269,11 @@ export default function NINServicesScreen() {
     }
 
     // 2. Specific service maintenance check
-    const statusObj = serviceStatuses[service.pricingId];
+    const statusObj = serviceStatuses[service.pricingId] || serviceStatuses[service.id];
     if (statusObj && (statusObj.status === 'maintenance' || statusObj.status === 'inactive')) {
       showAlert(
-        `${service.title} Inactive`,
-        statusObj.msg || 'This service is currently undergoing routine maintenance.',
+        `${service.title} - Maintenance`,
+        statusObj.msg || 'This service is currently undergoing routine maintenance. Please try again shortly.',
         'warning'
       );
       return;
@@ -285,7 +294,8 @@ export default function NINServicesScreen() {
   };
 
   const isVisible = (service: ServiceItem) => {
-    const s = serviceStatuses[service.pricingId];
+    if (globalNINStatus === 'hidden') return false;
+    const s = serviceStatuses[service.pricingId] || serviceStatuses[service.id];
     if (s?.status === 'hidden') return false;
     return true;
   };

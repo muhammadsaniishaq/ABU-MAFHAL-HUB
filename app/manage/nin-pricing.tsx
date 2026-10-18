@@ -396,20 +396,31 @@ export default function EnterpriseNINPricingScreen() {
                 name: s.name,
                 cost_price: s.cost_price,
                 markup_price: s.markup_price,
-                selling_price: s.cost_price + s.markup_price,
                 status: s.status,
+                maintenance_msg: s.maintenance_msg || null,
                 updated_at: new Date().toISOString(),
             }));
 
-            try {
-                await supabase.from('service_pricing').upsert(rowsToUpsert, { onConflict: 'id' });
-            } catch (err) {
-                console.warn('service_pricing upsert retry:', err);
-                const simplifiedRows = rowsToUpsert.map(({ id, service_category, name, cost_price, markup_price }) => ({
-                    id, service_category, name, cost_price, markup_price, updated_at: new Date().toISOString()
+            const { error: upsertErr } = await supabase
+                .from('service_pricing')
+                .upsert(rowsToUpsert, { onConflict: 'id' });
+
+            if (upsertErr) {
+                console.warn('service_pricing upsert retry without maintenance_msg:', upsertErr);
+                const simplifiedRows = rowsToUpsert.map(({ id, service_category, name, cost_price, markup_price, status }) => ({
+                    id, service_category, name, cost_price, markup_price, status, updated_at: new Date().toISOString()
                 }));
-                await supabase.from('service_pricing').upsert(simplifiedRows, { onConflict: 'id' });
+                const { error: retryErr } = await supabase.from('service_pricing').upsert(simplifiedRows, { onConflict: 'id' });
+                if (retryErr) {
+                    console.error('service_pricing retry error:', retryErr);
+                }
             }
+
+            // Sync global NIN status keys in app_settings
+            await supabase.from('app_settings').upsert([
+                { key: 'nin_global_status', value: globalNINStatus, updated_at: new Date().toISOString() },
+                { key: 'nin_global_maintenance_msg', value: globalMaintenanceMsg, updated_at: new Date().toISOString() }
+            ], { onConflict: 'key' });
 
             // 4. Try logging to audit_logs safely
             try {

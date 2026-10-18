@@ -196,8 +196,16 @@ export default function BVNModificationScreen() {
                         if (total > 0) {
                             newMap[item.code] = total;
                         }
-                        if (found.status === 'hidden') hiddenSet.add(item.code);
-                        if (found.status === 'maintenance') maintObj[item.code] = found.maintenance_msg || 'Service is undergoing routine server maintenance.';
+                        if (found.status === 'hidden') {
+                            hiddenSet.add(item.code);
+                        } else if (found.status === 'active') {
+                            hiddenSet.delete(item.code);
+                        }
+                        if (found.status === 'maintenance') {
+                            maintObj[item.code] = found.maintenance_msg || 'Service is undergoing routine server maintenance.';
+                        } else if (found.status === 'active') {
+                            delete maintObj[item.code];
+                        }
                     }
                 });
             }

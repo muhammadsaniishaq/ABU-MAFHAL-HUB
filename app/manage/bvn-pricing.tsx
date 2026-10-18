@@ -366,14 +366,15 @@ export default function EnterpriseBVNPricingScreen() {
                 name: s.name,
                 cost_price: s.cost_price,
                 markup_price: s.markup_price,
-                selling_price: s.cost_price + s.markup_price,
                 status: s.status,
+                maintenance_msg: s.maintenance_msg || null,
                 updated_at: new Date().toISOString(),
             }));
 
             // Generic aliases
             const defaultMod = services.find(s => s.id === 'bvn_mod_name') || services[0];
             const defaultPhone = services.find(s => s.id === 'bvn_retrieval_phone') || services[8];
+            const crmService = services.find(s => s.id === 'bvn_retrieval_crm');
 
             rowsToUpsert.push({
                 id: 'bvn_modification',
@@ -381,8 +382,8 @@ export default function EnterpriseBVNPricingScreen() {
                 name: 'BVN Modification Request',
                 cost_price: defaultMod.cost_price,
                 markup_price: defaultMod.markup_price,
-                selling_price: defaultMod.cost_price + defaultMod.markup_price,
                 status: defaultMod.status,
+                maintenance_msg: defaultMod.maintenance_msg || null,
                 updated_at: new Date().toISOString(),
             });
 
@@ -392,21 +393,45 @@ export default function EnterpriseBVNPricingScreen() {
                 name: 'BVN Phone Retrieval',
                 cost_price: defaultPhone.cost_price,
                 markup_price: defaultPhone.markup_price,
-                selling_price: defaultPhone.cost_price + defaultPhone.markup_price,
                 status: defaultPhone.status,
+                maintenance_msg: defaultPhone.maintenance_msg || null,
                 updated_at: new Date().toISOString(),
             });
 
-            // Upsert with fallback in case columns are missing
-            try {
-                await supabase.from('service_pricing').upsert(rowsToUpsert, { onConflict: 'id' });
-            } catch (err) {
-                console.warn('service_pricing upsert retry:', err);
-                const simplifiedRows = rowsToUpsert.map(({ id, service_category, name, cost_price, markup_price }) => ({
-                    id, service_category, name, cost_price, markup_price, updated_at: new Date().toISOString()
-                }));
-                await supabase.from('service_pricing').upsert(simplifiedRows, { onConflict: 'id' });
+            if (crmService) {
+                rowsToUpsert.push({
+                    id: 'bvn_central_risk',
+                    service_category: 'bvn',
+                    name: 'BVN Central Risk CRM',
+                    cost_price: crmService.cost_price,
+                    markup_price: crmService.markup_price,
+                    status: crmService.status,
+                    maintenance_msg: crmService.maintenance_msg || null,
+                    updated_at: new Date().toISOString(),
+                });
             }
+
+            // Upsert directly to service_pricing without non-existent columns
+            const { error: upsertErr } = await supabase
+                .from('service_pricing')
+                .upsert(rowsToUpsert, { onConflict: 'id' });
+
+            if (upsertErr) {
+                console.warn('service_pricing upsert retry without maintenance_msg:', upsertErr);
+                const simplifiedRows = rowsToUpsert.map(({ id, service_category, name, cost_price, markup_price, status }) => ({
+                    id, service_category, name, cost_price, markup_price, status, updated_at: new Date().toISOString()
+                }));
+                const { error: retryErr } = await supabase.from('service_pricing').upsert(simplifiedRows, { onConflict: 'id' });
+                if (retryErr) {
+                    console.error('service_pricing retry error:', retryErr);
+                }
+            }
+
+            // Sync global BVN status keys in app_settings
+            await supabase.from('app_settings').upsert([
+                { key: 'bvn_global_status', value: globalBVNStatus, updated_at: new Date().toISOString() },
+                { key: 'bvn_global_maintenance_msg', value: globalMaintenanceMsg, updated_at: new Date().toISOString() }
+            ], { onConflict: 'key' });
 
             // 4. Try logging to audit_logs safely
             try {

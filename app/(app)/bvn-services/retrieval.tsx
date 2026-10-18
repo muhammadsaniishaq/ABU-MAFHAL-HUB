@@ -64,18 +64,23 @@ export default function BVNRetrievalScreen() {
         }
     };
 
+    const [tabStatus, setTabStatus] = useState<'active' | 'maintenance' | 'hidden'>('active');
+    const [tabMaintMsg, setTabMaintMsg] = useState('');
+
     const fetchServicePrice = async (currentTab: 'crm' | 'phone' | 'track' = activeTab) => {
         try {
             const targetId = currentTab === 'crm' ? 'bvn_retrieval_crm' : 'bvn_retrieval_phone';
             const { data } = await supabase
                 .from('service_pricing')
-                .select('id, cost_price, markup_price')
-                .in('id', [targetId, 'bvn_phone_basic']);
+                .select('id, cost_price, markup_price, status, maintenance_msg')
+                .in('id', [targetId, 'bvn_phone_basic', 'bvn_central_risk']);
 
             if (data && data.length > 0) {
                 const specific = data.find(d => d.id === targetId) || data[0];
                 const total = Number(specific.cost_price || 0) + Number(specific.markup_price || 0);
                 if (total > 0) setServicePrice(total);
+                if (specific.status) setTabStatus(specific.status as any);
+                if (specific.maintenance_msg) setTabMaintMsg(specific.maintenance_msg);
             }
         } catch (e) {
             console.warn('Failed to load BVN retrieval price', e);
@@ -126,6 +131,15 @@ export default function BVNRetrievalScreen() {
     };
 
     const handleSubmitRetrieval = async () => {
+        if (tabStatus === 'maintenance') {
+            showAlert("Service Under Maintenance", tabMaintMsg || "This retrieval channel is currently undergoing routine maintenance. Please try again shortly.", "warning");
+            return;
+        }
+        if (tabStatus === 'hidden') {
+            showAlert("Service Unavailable", "This retrieval channel is currently disabled.", "error");
+            return;
+        }
+
         if (userBalance !== null && userBalance < servicePrice) {
             showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet to continue.`, "error");
             return;

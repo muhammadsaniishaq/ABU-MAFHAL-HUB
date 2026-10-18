@@ -144,7 +144,36 @@ serve(async (req: Request) => {
         priceId = defaultPriceMap[searchType] || 'nin_premium';
       }
 
-      // Fetch dynamic price from service_pricing table
+      // 1. Check Global Gateway Status (BVN or NIN)
+      const isBVN = searchType.toLowerCase().startsWith('bvn') || priceId.toLowerCase().startsWith('bvn');
+      const globalKey = isBVN ? 'bvn_global_status' : 'nin_global_status';
+      const globalMsgKey = isBVN ? 'bvn_global_maintenance_msg' : 'nin_global_maintenance_msg';
+
+      const { data: globalSettings } = await supabaseAdmin
+        .from('app_settings')
+        .select('key, value')
+        .in('key', [globalKey, globalMsgKey]);
+
+      const globalStatus = globalSettings?.find((s: any) => s.key === globalKey)?.value;
+      const globalMaintMsg = globalSettings?.find((s: any) => s.key === globalMsgKey)?.value;
+
+      if (globalStatus === 'hidden') {
+        return new Response(JSON.stringify({
+          status: 'failed',
+          error: `${isBVN ? 'BVN' : 'NIN'} verification portal is currently disabled.`,
+          code: 'GATEWAY_HIDDEN'
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      if (globalStatus === 'maintenance') {
+        return new Response(JSON.stringify({
+          status: 'failed',
+          error: (typeof globalMaintMsg === 'string' ? globalMaintMsg : null) || `${isBVN ? 'BVN' : 'NIN'} gateway is currently undergoing scheduled optimization. Please try again shortly.`,
+          code: 'GATEWAY_MAINTENANCE'
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // 2. Fetch dynamic price & status from service_pricing table
       const { data: pricing } = await supabaseAdmin
         .from('service_pricing')
         .select('*')
@@ -152,6 +181,22 @@ serve(async (req: Request) => {
         .maybeSingle();
 
       if (pricing) {
+        if (pricing.status === 'hidden') {
+          return new Response(JSON.stringify({
+            status: 'failed',
+            error: `${pricing.name || 'This service'} is currently unavailable.`,
+            code: 'SERVICE_HIDDEN'
+          }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        if (pricing.status === 'maintenance') {
+          return new Response(JSON.stringify({
+            status: 'failed',
+            error: pricing.maintenance_msg || `${pricing.name || 'This service'} is currently undergoing routine maintenance. Please try again shortly.`,
+            code: 'SERVICE_MAINTENANCE'
+          }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
         const cost = parseFloat(pricing.cost_price?.toString() || '0');
         const markup = parseFloat(pricing.markup_price?.toString() || '0');
         const selling = pricing.selling_price ? parseFloat(pricing.selling_price.toString()) : (cost + markup);

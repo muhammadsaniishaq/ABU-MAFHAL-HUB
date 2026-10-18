@@ -58,7 +58,7 @@ const BVN_SERVICES: BVNServiceItem[] = [
   },
   {
     id: 'central-risk',
-    pricingId: 'bvn_central_risk',
+    pricingId: 'bvn_retrieval_crm',
     title: 'CRM Retrieval',
     shortTitle: 'CRM Ticket',
     desc: 'Central Risk Management ticket search',
@@ -165,45 +165,65 @@ export default function BVNServicesGatewayScreen() {
       const map: Record<string, { status: string; msg?: string }> = {};
       const priceMap: Record<string, number> = {};
 
+      // 1. Fetch saved controls from app_settings
       const { data: configData } = await supabase
         .from('app_settings')
-        .select('value')
-        .eq('key', 'bvn_service_controls')
-        .maybeSingle();
+        .select('key, value')
+        .in('key', ['bvn_service_controls', 'bvn_global_status', 'bvn_global_maintenance_msg']);
 
-      if (configData?.value) {
-        try {
-          const parsed = typeof configData.value === 'string' ? JSON.parse(configData.value) : configData.value;
-          if (parsed?.global_status) setGlobalBVNStatus(parsed.global_status);
-          if (parsed?.global_maintenance_msg) setGlobalBVNMsg(parsed.global_maintenance_msg);
-          if (parsed?.services) {
-            Object.entries(parsed.services).forEach(([id, svc]: [string, any]) => {
-              map[id] = {
-                status: svc.status || 'active',
-                msg: svc.maintenance_msg,
-              };
-            });
+      if (configData && configData.length > 0) {
+        configData.forEach(row => {
+          if (row.key === 'bvn_global_status' && typeof row.value === 'string') {
+            setGlobalBVNStatus(row.value as any);
+          } else if (row.key === 'bvn_global_maintenance_msg' && typeof row.value === 'string') {
+            setGlobalBVNMsg(row.value);
+          } else if (row.key === 'bvn_service_controls' && row.value) {
+            try {
+              const parsed = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+              if (parsed?.global_status) setGlobalBVNStatus(parsed.global_status);
+              if (parsed?.global_maintenance_msg) setGlobalBVNMsg(parsed.global_maintenance_msg);
+              if (parsed?.services) {
+                Object.entries(parsed.services).forEach(([id, svc]: [string, any]) => {
+                  map[id] = {
+                    status: svc.status || 'active',
+                    msg: svc.maintenance_msg,
+                  };
+                });
+              }
+            } catch (_) {}
           }
-        } catch (_) {}
+        });
       }
 
+      // 2. Fetch live status & prices from service_pricing table
       const { data: pricingData } = await supabase
         .from('service_pricing')
-        .select('id, cost_price, markup_price, status, maintenance_msg');
+        .select('id, cost_price, markup_price, status, maintenance_msg')
+        .eq('service_category', 'bvn');
 
       if (pricingData) {
         pricingData.forEach((row: any) => {
-          if (row.status === 'maintenance' || row.status === 'hidden') {
-            map[row.id] = {
-              status: row.status,
-              msg: row.maintenance_msg || map[row.id]?.msg,
-            };
-          }
+          const st = row.status || 'active';
+          map[row.id] = {
+            status: st,
+            msg: row.maintenance_msg || (st === 'maintenance' ? 'Service is temporarily under maintenance.' : undefined),
+          };
           const total = Number(row.cost_price || 0) + Number(row.markup_price || 0);
           if (total > 0) {
             priceMap[row.id] = total;
           }
         });
+      }
+
+      // Alias synchronizations
+      if (map['bvn_retrieval_crm']) {
+        map['bvn_central_risk'] = map['bvn_retrieval_crm'];
+      }
+      if (map['bvn_retrieval_phone']) {
+        map['retrieval'] = map['bvn_retrieval_phone'];
+      }
+      if (map['bvn_num_advanced']) {
+        map['verify'] = map['bvn_num_advanced'];
       }
 
       setServiceStatuses(map);
@@ -267,6 +287,7 @@ export default function BVNServicesGatewayScreen() {
   };
 
   const isVisible = (service: BVNServiceItem) => {
+    if (globalBVNStatus === 'hidden') return false;
     const statusById = serviceStatuses[service.id]?.status;
     const statusByPricingId = serviceStatuses[service.pricingId]?.status;
     return statusById !== 'hidden' && statusByPricingId !== 'hidden';

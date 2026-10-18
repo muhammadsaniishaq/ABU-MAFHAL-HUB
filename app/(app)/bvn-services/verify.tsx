@@ -37,6 +37,9 @@ export default function VerifyBVNScreen() {
         type: 'info',
     });
 
+    const [serviceStatus, setServiceStatus] = useState<'active' | 'maintenance' | 'hidden'>('active');
+    const [maintenanceMsg, setMaintenanceMsg] = useState('');
+
     const fetchWalletBalance = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -55,12 +58,14 @@ export default function VerifyBVNScreen() {
         try {
             const { data } = await supabase
                 .from('service_pricing')
-                .select('cost_price, markup_price')
+                .select('cost_price, markup_price, status, maintenance_msg')
                 .eq('id', 'bvn_num_advanced')
                 .maybeSingle();
             if (data) {
                 const total = Number(data.cost_price || 0) + Number(data.markup_price || 0);
                 if (total > 0) setServicePrice(total);
+                if (data.status) setServiceStatus(data.status as any);
+                if (data.maintenance_msg) setMaintenanceMsg(data.maintenance_msg);
             }
         } catch (e) {
             console.warn('Failed to load BVN price', e);
@@ -131,6 +136,15 @@ export default function VerifyBVNScreen() {
     };
 
     const handleVerify = async () => {
+        if (serviceStatus === 'maintenance') {
+            showAlert("Service Under Maintenance", maintenanceMsg || "BVN Verification is currently undergoing routine maintenance. Please try again shortly.", "warning");
+            return;
+        }
+        if (serviceStatus === 'hidden') {
+            showAlert("Service Unavailable", "BVN Verification is currently disabled.", "error");
+            return;
+        }
+
         const cleanBvn = bvn.trim().replace(/\D/g, '');
         if (!cleanBvn || cleanBvn.length !== 11) {
             showAlert("Invalid BVN", "Please enter a valid 11-digit BVN number.", "error");
