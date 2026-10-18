@@ -39,7 +39,22 @@ export const SKBTechIdentityVerifier = {
   async invokeEdge(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
     try {
       const body = { searchType, searchValue, ...extra };
-      const { data, error } = await supabase.functions.invoke('verify-nin', { body });
+
+      // 🛡️ 28-second client-side timeout guard so the mobile app never hangs indefinitely
+      const invokePromise = supabase.functions.invoke('verify-nin', { body });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                'Identity verification request took too long to respond. Please check your connection and try again.'
+              )
+            ),
+          28000
+        )
+      );
+
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]);
 
       if (error) {
         let msg = error.message || 'Verification failed. Please try again.';
@@ -156,6 +171,8 @@ export const SKBTechIdentityVerifier = {
   /** Lookup NIN details by linked phone number */
   verifyNINWithPhone: async (phone: string, priceId?: string, variant: string = 'premium') => {
     return SKBTechIdentityVerifier.invokeEdge('phone', phone, {
+      phone,
+      phone_number: phone,
       priceId: priceId || 'nin_phone',
       variant: variant.toLowerCase(),
     });

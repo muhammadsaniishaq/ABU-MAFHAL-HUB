@@ -372,7 +372,10 @@ serve(async (req: Request) => {
         } else if (pDigits.length === 10 && !pDigits.startsWith('0')) {
           pDigits = '0' + pDigits;
         }
-        payload.phone = pDigits || phoneInput;
+        const cleanPhoneInput = pDigits || phoneInput;
+        payload.phone = cleanPhoneInput;
+        payload.phone_number = cleanPhoneInput;
+        payload.search_value = cleanPhoneInput;
         payload.variant = String(requestData.variant || requestData.layout || requestData.slip_type || 'premium').toLowerCase();
         break;
 
@@ -540,7 +543,7 @@ serve(async (req: Request) => {
     // ── Execute SKBTECH POST Request ──────────────────────────────────────────
     const targetUrl = `${SKBTECH_BASE}${endpoint}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout to fail fast & refund before client drops
 
     let skbRes: Response;
     try {
@@ -557,10 +560,10 @@ serve(async (req: Request) => {
     } catch (netErr: any) {
       clearTimeout(timeoutId);
       if (hasDeducted) {
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Network timeout contacting provider');
+        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Provider request timed out');
         hasDeducted = false;
       }
-      return jsonOk({ error: `Connection to identity provider failed: ${netErr.message || 'Timeout'}. Please try again.` });
+      return jsonOk({ error: `Connection to identity provider timed out or failed (${netErr.message || 'Timeout'}). Your wallet balance has been refunded. Please try again.` });
     }
 
     const rawResponseText = await skbRes.text();
@@ -673,6 +676,15 @@ serve(async (req: Request) => {
     // 1. Recursive helper to unpack all levels of nested structures into rawPerson
     const unpackContainer = (container: any) => {
       if (!container) return;
+      if (typeof container === 'string') {
+        const colonIdx = container.indexOf(':');
+        if (colonIdx > 0) {
+          const k = container.slice(0, colonIdx).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+          const v = container.slice(colonIdx + 1).trim();
+          if (k && v && !rawPerson[k]) rawPerson[k] = v;
+        }
+        return;
+      }
       if (Array.isArray(container)) {
         for (const item of container) {
           unpackContainer(item);
@@ -688,10 +700,14 @@ serve(async (req: Request) => {
           rawPerson[cleanKey] = valProp;
         }
 
-        // Copy top level primitive fields
+        // Copy top level primitive fields and normalized keys
         for (const [k, v] of Object.entries(container)) {
           if (v !== undefined && v !== null && typeof v !== 'object') {
             rawPerson[k] = v;
+            const normKey = String(k).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            if (normKey && !rawPerson[normKey]) {
+              rawPerson[normKey] = v;
+            }
           }
         }
 

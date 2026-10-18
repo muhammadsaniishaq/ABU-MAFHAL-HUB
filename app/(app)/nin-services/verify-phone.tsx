@@ -31,10 +31,10 @@ import { RegularSlip } from '../../../components/RegularSlip';
 import { InformationSlip } from '../../../components/InformationSlip';
 
 const DEFAULT_LAYOUTS = [
-    { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 200, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID' },
-    { id: 'standard', db_id: 'nin_standard', name: 'Standard Card', price: 200, type: 'nonprem', image: require('../../../assets/images/standard.png'), badge: 'Color Card' },
-    { id: 'regular', db_id: 'nin_regular', name: 'Regular Slip', price: 180, type: 'nonprem', image: require('../../../assets/images/regular.png'), badge: 'B&W Slip' },
-    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../../assets/images/info.png'), badge: 'Full Sheet' },
+    { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 200, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID', status: 'active', maintenance_msg: '' },
+    { id: 'standard', db_id: 'nin_standard', name: 'Standard Card', price: 200, type: 'nonprem', image: require('../../../assets/images/standard.png'), badge: 'Color Card', status: 'active', maintenance_msg: '' },
+    { id: 'regular', db_id: 'nin_regular', name: 'Regular Slip', price: 180, type: 'nonprem', image: require('../../../assets/images/regular.png'), badge: 'B&W Slip', status: 'active', maintenance_msg: '' },
+    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../../assets/images/info.png'), badge: 'Full Sheet', status: 'active', maintenance_msg: '' },
 ];
 
 const formatDob = (raw: string): string => {
@@ -59,11 +59,18 @@ export default function VerifyPhoneScreen() {
     const [isAgreed, setIsAgreed] = useState(false);
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingStep, setLoadingStep] = useState('Connecting to NIMC Secure Gateway...');
     const [result, setResult] = useState<any>(null);
     const [layouts, setLayouts] = useState(DEFAULT_LAYOUTS);
     const [isSaving, setIsSaving] = useState(false);
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const viewShotRef = useRef<any>(null);
+
+    // Maintenance & Status States
+    const [globalStatus, setGlobalStatus] = useState<string>('active');
+    const [globalMaintMsg, setGlobalMaintMsg] = useState<string>('');
+    const [phoneServiceStatus, setPhoneServiceStatus] = useState<string>('active');
+    const [phoneServiceMsg, setPhoneServiceMsg] = useState<string>('');
 
     // Premium States
     const [userBalance, setUserBalance] = useState<number | null>(null);
@@ -211,13 +218,38 @@ export default function VerifyPhoneScreen() {
     useEffect(() => {
         const fetchPrices = async () => {
             try {
+                // 1. Fetch Global NIN Gateway Status
+                const { data: globalSettings } = await supabase
+                    .from('app_settings')
+                    .select('key, value')
+                    .in('key', ['nin_global_status', 'nin_global_maintenance_msg']);
+
+                if (globalSettings && globalSettings.length > 0) {
+                    const gStat = globalSettings.find(s => s.key === 'nin_global_status')?.value;
+                    const gMsg = globalSettings.find(s => s.key === 'nin_global_maintenance_msg')?.value;
+                    if (gStat) setGlobalStatus(String(gStat));
+                    if (gMsg) setGlobalMaintMsg(String(gMsg));
+                }
+
+                // 2. Fetch Dynamic Pricing & Service Status
                 const { data, error } = await supabase.from('service_pricing').select('*').eq('service_category', 'nin');
                 if (error || !data) return;
+
+                const phonePricing = data.find(d => d.id === 'nin_phone');
+                if (phonePricing) {
+                    setPhoneServiceStatus(phonePricing.status || 'active');
+                    if (phonePricing.maintenance_msg) setPhoneServiceMsg(phonePricing.maintenance_msg);
+                }
                 
                 setLayouts(prev => prev.map(layout => {
                     const dbPrice = data.find(d => d.id === layout.db_id);
                     if (dbPrice) {
-                        return { ...layout, price: Number(dbPrice.cost_price) + Number(dbPrice.markup_price) };
+                        return { 
+                            ...layout, 
+                            price: Number(dbPrice.cost_price) + Number(dbPrice.markup_price),
+                            status: dbPrice.status,
+                            maintenance_msg: dbPrice.maintenance_msg,
+                        };
                     }
                     return layout;
                 }));
@@ -231,6 +263,28 @@ export default function VerifyPhoneScreen() {
     }, []);
 
     const handleVerify = async () => {
+        // 🛡️ Global & Service Status Guards
+        if (globalStatus === 'hidden') {
+            return showAlert('Service Unavailable', 'The National Identification Number (NIN) portal is currently disabled by administrator.', 'warning');
+        }
+        if (globalStatus === 'maintenance') {
+            return showAlert(
+                'Gateway Maintenance',
+                globalMaintMsg || 'The NIN portal is undergoing scheduled maintenance by NIMC. Please try again shortly.',
+                'warning'
+            );
+        }
+        if (phoneServiceStatus === 'hidden') {
+            return showAlert('Service Unavailable', 'NIN lookup by phone number is temporarily disabled.', 'warning');
+        }
+        if (phoneServiceStatus === 'maintenance') {
+            return showAlert(
+                'Service Maintenance',
+                phoneServiceMsg || 'NIN Phone verification service is currently undergoing routine maintenance. Please try again shortly.',
+                'warning'
+            );
+        }
+
         const rawPhone = phone.trim();
         if (!rawPhone) {
             return showAlert('Phone Number Required', 'Please enter your registered 11-digit phone number.', 'warning');
@@ -242,12 +296,25 @@ export default function VerifyPhoneScreen() {
         const cleanPhone = pVal.clean11;
 
         const layoutItem = layouts.find(l => l.id === selectedLayout);
+        if (layoutItem?.status === 'maintenance') {
+            return showAlert(
+                'Card Format Maintenance',
+                layoutItem.maintenance_msg || `${layoutItem.name} format is currently undergoing maintenance. Please select another layout.`,
+                'warning'
+            );
+        }
+
         const totalPrice = layoutItem ? layoutItem.price : 0;
         if ((userBalance || 0) < totalPrice) {
             return showAlert('Insufficient Balance', `Your wallet balance (₦${(userBalance || 0).toLocaleString()}) is less than the required amount (₦${totalPrice.toLocaleString()}). Please fund your wallet.`, 'error');
         }
 
         setLoading(true);
+        setLoadingStep('Authorizing wallet fee deduction...');
+        const t1 = setTimeout(() => setLoadingStep('Searching NIMC database for linked phone...'), 1200);
+        const t2 = setTimeout(() => setLoadingStep('Retrieving citizen biometric details...'), 3500);
+        const t3 = setTimeout(() => setLoadingStep('Formatting digital identity card & slips...'), 6000);
+
         try {
             const response = await api.identity.verifyNINWithPhone(cleanPhone, layoutItem?.db_id, selectedLayout.toUpperCase());
             
@@ -272,20 +339,29 @@ export default function VerifyPhoneScreen() {
                 } else if (lowerMsg.includes('unauthorized') || lowerMsg.includes('auth')) {
                     showAlert('Session Expired', 'Please log out and log in again, then retry.', 'error');
                 } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
-                    showAlert('No Record Found', 'The phone number you entered does not exist or has no linked record.', 'error');
+                    showAlert('No Record Found', 'The phone number you entered does not exist or has no linked record on NIMC.', 'error');
+                } else if (lowerMsg.includes('timed out') || lowerMsg.includes('timeout')) {
+                    showAlert('Connection Timed Out', 'NIMC identity provider took too long to respond. If any fee was deducted, it has been automatically refunded to your wallet. Please try again.', 'warning');
                 } else {
                     showAlert('Verification Failed', msg, 'error');
                 }
             }
         } catch (e: any) {
             const errM = e.message || '';
-            if (errM.toLowerCase().includes('not found') || errM.toLowerCase().includes('no record') || errM.toLowerCase().includes('does not exist') || errM.toLowerCase().includes('not exist') || errM.toLowerCase().includes('invalid or not found')) {
+            const lowerM = errM.toLowerCase();
+            if (lowerM.includes('timed out') || lowerM.includes('timeout')) {
+                showAlert('Connection Timed Out', 'NIMC identity provider took too long to respond. If any fee was deducted, it has been refunded. Please try again in a few moments.', 'warning');
+            } else if (lowerM.includes('not found') || lowerM.includes('no record') || lowerM.includes('does not exist') || lowerM.includes('not exist') || lowerM.includes('invalid or not found')) {
                 showAlert('No Record Found', 'The phone number you entered does not exist or has no linked record.', 'error');
             } else {
                 showAlert('Network Error', errM || 'A network error occurred. Please check your connection and try again.', 'error');
             }
         } finally {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            clearTimeout(t3);
             setLoading(false);
+            fetchWalletBalance();
         }
     };
 
@@ -1351,7 +1427,14 @@ export default function VerifyPhoneScreen() {
                         <View style={styles.loaderCard}>
                             <ActivityIndicator size="large" color="#f5a623" />
                             <Text style={styles.loaderTitle}>Verifying Identity</Text>
-                            <Text style={styles.loaderSub}>Connecting to NIMC Secure Gateway...</Text>
+                            <Text style={styles.loaderSub}>{loadingStep}</Text>
+                            <TouchableOpacity 
+                                onPress={() => setLoading(false)}
+                                style={{ marginTop: 14, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.08)' }}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>Cancel</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 </Modal>
