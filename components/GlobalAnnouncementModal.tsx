@@ -15,7 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../services/supabase';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, Audio } from 'expo-av';
 import { useFocusEffect, usePathname } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
@@ -32,7 +32,7 @@ export default function GlobalAnnouncementModal() {
     const [visible, setVisible] = useState(false);
     const [config, setConfig] = useState<AnnouncementConfig | null>(null);
     const [mediaRatio, setMediaRatio] = useState<number | null>(null);
-    const [isMuted, setIsMuted] = useState(true);
+    const [isMuted, setIsMuted] = useState(false); // Unmuted with full volume by default
     const [isVideoPlaying, setIsVideoPlaying] = useState(true);
     const [isVideoLoading, setIsVideoLoading] = useState(true);
     const [playbackStatus, setPlaybackStatus] = useState<any>(null);
@@ -132,6 +132,9 @@ export default function GlobalAnnouncementModal() {
                 appStateSub = AppState.addEventListener('change', (nextAppState) => {
                     if (nextAppState === 'active') {
                         checkAnnouncement();
+                    } else {
+                        setIsVideoPlaying(false);
+                        setIsMuted(true);
                     }
                 });
             }
@@ -149,6 +152,22 @@ export default function GlobalAnnouncementModal() {
             subscription.unsubscribe();
         };
     }, []);
+
+    // Configure Audio Mode so that video plays with sound out loud by default
+    useEffect(() => {
+        if (visible && isVideo) {
+            Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+                staysActiveInBackground: false,
+                shouldDuckAndroid: true,
+            }).catch(() => {});
+            setIsMuted(false);
+            setIsVideoPlaying(true);
+        } else if (!visible) {
+            setIsVideoPlaying(false);
+            setIsMuted(true);
+        }
+    }, [visible, isVideo]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -230,6 +249,8 @@ export default function GlobalAnnouncementModal() {
     };
 
     const handleClose = async () => {
+        setIsVideoPlaying(false);
+        setIsMuted(true);
         setVisible(false);
     };
 
@@ -283,6 +304,7 @@ export default function GlobalAnnouncementModal() {
                                         shouldPlay={isVideoPlaying}
                                         isLooping
                                         isMuted={isMuted}
+                                        volume={1.0}
                                         onPlaybackStatusUpdate={(status: any) => {
                                             setPlaybackStatus(status);
                                             if (status?.isLoaded) {
@@ -371,7 +393,7 @@ export default function GlobalAnnouncementModal() {
                                     {/* Sound Toggle Button (Bottom-Right) */}
                                     <TouchableOpacity
                                         onPress={() => setIsMuted(prev => !prev)}
-                                        style={styles.videoSoundBtn}
+                                        style={[styles.videoSoundBtn, !isMuted && styles.videoSoundBtnActive]}
                                         activeOpacity={0.8}
                                     >
                                         <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={13} color="#FFFFFF" />
@@ -577,6 +599,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.2)',
         zIndex: 10,
+    },
+    videoSoundBtnActive: {
+        backgroundColor: 'rgba(16, 185, 129, 0.85)',
+        borderColor: 'rgba(255, 255, 255, 0.4)',
     },
     videoControlTxt: {
         color: '#FFFFFF',
