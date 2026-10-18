@@ -736,28 +736,28 @@ export default function SplashScreen() {
                         resizeMode="contain"
                       />
 
-                      {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
+                      {/* Seamless 4-Directional Vignette Fades strictly at image perimeter */}
                       <LinearGradient
-                        colors={[colors.cardBg, colors.cardBg + 'E6', colors.cardBg + '4D', 'transparent']}
+                        colors={[colors.cardBg + 'B3', 'transparent']}
                         style={styles.vignetteTop}
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={['transparent', colors.cardBg + '4D', colors.cardBg + 'E6', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + 'B3']}
                         style={styles.vignetteBottom}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={[colors.cardBg, colors.cardBg + 'B3', 'transparent']}
+                        colors={[colors.cardBg + '99', 'transparent']}
                         style={styles.vignetteLeft}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={['transparent', colors.cardBg + 'B3', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + '99']}
                         style={styles.vignetteRight}
                         pointerEvents="none"
                       />
@@ -926,28 +926,28 @@ export default function SplashScreen() {
                         resizeMode="contain"
                       />
 
-                      {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
+                      {/* Seamless 4-Directional Vignette Fades strictly at image perimeter */}
                       <LinearGradient
-                        colors={[colors.cardBg, colors.cardBg + 'E6', colors.cardBg + '4D', 'transparent']}
+                        colors={[colors.cardBg + 'B3', 'transparent']}
                         style={styles.vignetteTop}
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={['transparent', colors.cardBg + '4D', colors.cardBg + 'E6', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + 'B3']}
                         style={styles.vignetteBottom}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={[colors.cardBg, colors.cardBg + 'B3', 'transparent']}
+                        colors={[colors.cardBg + '99', 'transparent']}
                         style={styles.vignetteLeft}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={['transparent', colors.cardBg + 'B3', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + '99']}
                         style={styles.vignetteRight}
                         pointerEvents="none"
                       />
@@ -1120,28 +1120,28 @@ export default function SplashScreen() {
                         resizeMode="contain"
                       />
 
-                      {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
+                      {/* Seamless 4-Directional Vignette Fades strictly at image perimeter */}
                       <LinearGradient
-                        colors={[colors.cardBg, colors.cardBg + 'E6', colors.cardBg + '4D', 'transparent']}
+                        colors={[colors.cardBg + 'B3', 'transparent']}
                         style={styles.vignetteTop}
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={['transparent', colors.cardBg + '4D', colors.cardBg + 'E6', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + 'B3']}
                         style={styles.vignetteBottom}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={[colors.cardBg, colors.cardBg + 'B3', 'transparent']}
+                        colors={[colors.cardBg + '99', 'transparent']}
                         style={styles.vignetteLeft}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={['transparent', colors.cardBg + 'B3', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + '99']}
                         style={styles.vignetteRight}
                         pointerEvents="none"
                       />
@@ -1630,18 +1630,18 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     zIndex: 3,
     ...(Platform.OS === 'web' ? {
-      maskImage: 'radial-gradient(ellipse 90% 88% at 50% 50%, black 60%, transparent 100%)',
-      WebkitMaskImage: 'radial-gradient(ellipse 90% 88% at 50% 50%, black 60%, transparent 100%)',
+      maskImage: 'radial-gradient(ellipse 96% 94% at 50% 50%, black 90%, transparent 100%)',
+      WebkitMaskImage: 'radial-gradient(ellipse 96% 94% at 50% 50%, black 90%, transparent 100%)',
     } as any : {}),
   },
 
-  // 4-Directional Feathered Blur Linear Overlays
+  // 4-Directional Feathered Blur Linear Overlays (strictly at perimeter border)
   vignetteTop: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 75,
+    height: 20,
     zIndex: 6,
   },
   vignetteBottom: {
@@ -1649,7 +1649,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
+    height: 22,
     zIndex: 6,
   },
   vignetteLeft: {
@@ -1657,7 +1657,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: 56,
+    width: 16,
     zIndex: 6,
   },
   vignetteRight: {
@@ -1665,7 +1665,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: 56,
+    width: 16,
     zIndex: 6,
   },
   cornerStarTopLeft: {

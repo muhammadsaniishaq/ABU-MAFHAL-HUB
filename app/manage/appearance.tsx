@@ -1257,8 +1257,8 @@ export default function AppDesigner() {
                       style={[
                         { width: '92%', height: '88%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 16, position: 'relative' },
                         Platform.OS === 'web' ? {
-                          maskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
-                          WebkitMaskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
+                          maskImage: 'radial-gradient(ellipse 96% 94% at 50% 50%, black 90%, transparent 100%)',
+                          WebkitMaskImage: 'radial-gradient(ellipse 96% 94% at 50% 50%, black 90%, transparent 100%)',
                         } as any : {}
                       ]}
                     >
@@ -1269,10 +1269,10 @@ export default function AppDesigner() {
                       />
 
                       {/* 4-Way Smooth Vignette Fades to melt edges */}
-                      <LinearGradient colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.5)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32 }} pointerEvents="none" />
-                      <LinearGradient colors={['transparent', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.92)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 32 }} pointerEvents="none" />
-                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.9)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 28 }} pointerEvents="none" />
-                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.9)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 28 }} pointerEvents="none" />
+                      <LinearGradient colors={['rgba(255,255,255,0.7)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 14 }} pointerEvents="none" />
+                      <LinearGradient colors={['transparent', 'rgba(255,255,255,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 14 }} pointerEvents="none" />
+                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.6)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 12 }} pointerEvents="none" />
+                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.6)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 12 }} pointerEvents="none" />
                     </View>
 
                     <View style={s.artworkCaptionPill}>
@@ -1566,8 +1566,8 @@ export default function AppDesigner() {
                           style={[
                             { width: '90%', height: '88%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 14, position: 'relative' },
                             Platform.OS === 'web' ? {
-                              maskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
-                              WebkitMaskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
+                              maskImage: 'radial-gradient(ellipse 96% 94% at 50% 50%, black 90%, transparent 100%)',
+                              WebkitMaskImage: 'radial-gradient(ellipse 96% 94% at 50% 50%, black 90%, transparent 100%)',
                             } as any : {}
                           ]}
                         >
@@ -1578,10 +1578,10 @@ export default function AppDesigner() {
                           />
 
                           {/* 4-Way Smooth Vignette Fades */}
-                          <LinearGradient colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.5)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 26 }} pointerEvents="none" />
-                          <LinearGradient colors={['transparent', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.92)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 26 }} pointerEvents="none" />
-                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.9)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 22 }} pointerEvents="none" />
-                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.9)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 22 }} pointerEvents="none" />
+                          <LinearGradient colors={['rgba(255,255,255,0.7)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 12 }} pointerEvents="none" />
+                          <LinearGradient colors={['transparent', 'rgba(255,255,255,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 12 }} pointerEvents="none" />
+                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.6)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 10 }} pointerEvents="none" />
+                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.6)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 10 }} pointerEvents="none" />
                         </View>
                       </View>
 
