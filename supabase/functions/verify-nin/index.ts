@@ -76,6 +76,38 @@ serve(async (req: Request) => {
     let description = `Verification: ${searchType}`;
     let priceId = requestData.priceId || '';
 
+    // ── Minimum Wholesale Cost Safety Guard (Zero-Loss Guarantee) ─────────────
+    const getWholesaleFloor = (type: string, req: any): number => {
+      const modType = String(req.modification_type || '').toLowerCase();
+      if (type === 'nin-modification' || type === 'nin_modification') {
+        if (modType === 'change_of_dob' || req.new_dob || req.current_dob) return 37500;
+        return 7300;
+      }
+      if (type === 'bvn-modification') {
+        if (modType === 'change_of_dob' || req.new_dob) return 7500;
+        return 7000;
+      }
+      if (type === 'bvn-retrieval' || type === 'bvn-phone') {
+        return 1000;
+      }
+      if (type === 'bvn-central-risk' || type === 'central-risk') {
+        return 700;
+      }
+      if (type === 'demographic') {
+        return 100;
+      }
+      if (type === 'phone' || type === 'nin-phone') {
+        return 100;
+      }
+      if (type.startsWith('bvn')) {
+        return 100;
+      }
+      if (type.startsWith('nin') || type.startsWith('vnin')) {
+        return 80;
+      }
+      return 100;
+    };
+
     // ── Price Resolution & Wallet Deduction ──────────────────────────────────
     if (!isStatusCheck) {
       if (!priceId) {
@@ -149,32 +181,56 @@ serve(async (req: Request) => {
         }
       }
 
-      // Atomic Balance Deduction
-      if (FEE_AMOUNT > 0) {
-        const { error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
-          user_id: user.id,
-          amount: FEE_AMOUNT
-        });
+      // 🛡️ Zero-Loss Guarantee: Enforce minimum floor price against wholesale cost
+      const wholesaleFloor = getWholesaleFloor(searchType, requestData);
+      if (FEE_AMOUNT < wholesaleFloor) {
+        FEE_AMOUNT = wholesaleFloor;
+      }
 
-        if (deductError) {
-          if (deductError.message.toLowerCase().includes('insufficient')) {
-            return jsonOk({ error: `Insufficient wallet balance. You need ₦${FEE_AMOUNT.toLocaleString()}.` });
-          }
-          return jsonOk({ error: 'Failed to process wallet payment. Please try again.' });
-        }
+      if (FEE_AMOUNT <= 0) {
+        return jsonOk({ error: 'Service fee configuration error. Please contact administrator.' });
+      }
 
-        hasDeducted = true;
+      // 🛡️ Pre-Flight Balance Check: Verify user has sufficient balance before any operation
+      const { data: profile, error: profErr } = await supabaseAdmin
+        .from('profiles')
+        .select('balance')
+        .eq('id', user.id)
+        .maybeSingle();
 
-        // Record payment transaction
-        await supabaseAdmin.from('transactions').insert({
-          user_id: user.id,
-          amount: FEE_AMOUNT,
-          type: 'payment',
-          status: 'success',
-          reference: `id_${searchType}_${Date.now()}`,
-          description: description
+      const currentBalance = Number(profile?.balance ?? 0);
+      if (currentBalance < FEE_AMOUNT) {
+        return jsonOk({
+          error: `Insufficient wallet balance. Your balance is ₦${currentBalance.toLocaleString()}, but this service requires ₦${FEE_AMOUNT.toLocaleString()}. Please fund your wallet to proceed.`
         });
       }
+
+      // 🛡️ Atomic Balance Deduction: RPC verify success strictly
+      const { data: deductResult, error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+        user_id: user.id,
+        amount: FEE_AMOUNT
+      });
+
+      if (deductError || (deductResult && deductResult.success === false)) {
+        const errMsg = deductError?.message || deductResult?.error || 'Insufficient wallet balance.';
+        return jsonOk({ error: errMsg });
+      }
+
+      if (!deductResult || deductResult.success !== true) {
+        return jsonOk({ error: 'Failed to process wallet payment. Please try again.' });
+      }
+
+      hasDeducted = true;
+
+      // Record payment transaction
+      await supabaseAdmin.from('transactions').insert({
+        user_id: user.id,
+        amount: FEE_AMOUNT,
+        type: 'payment',
+        status: 'success',
+        reference: `id_${searchType}_${Date.now()}`,
+        description: description
+      });
     }
 
     // ── Retrieve SKBTECH API Key ─────────────────────────────────────────────

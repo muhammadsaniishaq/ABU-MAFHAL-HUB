@@ -128,8 +128,8 @@ export default function BVNRetrievalScreen() {
     };
 
     const handleSubmitRetrieval = async () => {
-        if (userBalance !== null && userBalance < 100) {
-            showAlert("Insufficient Balance", "Your wallet balance is low. Please fund your wallet to continue.");
+        if (userBalance !== null && userBalance < servicePrice) {
+            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet to continue.`, "error");
             return;
         }
 
