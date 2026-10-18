@@ -738,26 +738,26 @@ export default function SplashScreen() {
 
                       {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
                       <LinearGradient
-                        colors={[colors.cardBg, 'transparent']}
+                        colors={[colors.cardBg, colors.cardBg + 'E6', colors.cardBg + '4D', 'transparent']}
                         style={styles.vignetteTop}
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={['transparent', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + '4D', colors.cardBg + 'E6', colors.cardBg]}
                         style={styles.vignetteBottom}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={[colors.cardBg, 'transparent']}
+                        colors={[colors.cardBg, colors.cardBg + 'B3', 'transparent']}
                         style={styles.vignetteLeft}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={['transparent', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + 'B3', colors.cardBg]}
                         style={styles.vignetteRight}
                         pointerEvents="none"
                       />
@@ -928,26 +928,26 @@ export default function SplashScreen() {
 
                       {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
                       <LinearGradient
-                        colors={[colors.cardBg, 'transparent']}
+                        colors={[colors.cardBg, colors.cardBg + 'E6', colors.cardBg + '4D', 'transparent']}
                         style={styles.vignetteTop}
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={['transparent', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + '4D', colors.cardBg + 'E6', colors.cardBg]}
                         style={styles.vignetteBottom}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={[colors.cardBg, 'transparent']}
+                        colors={[colors.cardBg, colors.cardBg + 'B3', 'transparent']}
                         style={styles.vignetteLeft}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={['transparent', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + 'B3', colors.cardBg]}
                         style={styles.vignetteRight}
                         pointerEvents="none"
                       />
@@ -1122,26 +1122,26 @@ export default function SplashScreen() {
 
                       {/* Seamless 4-Directional Vignette Fades to Completely Dissolve Image into Theme */}
                       <LinearGradient
-                        colors={[colors.cardBg, 'transparent']}
+                        colors={[colors.cardBg, colors.cardBg + 'E6', colors.cardBg + '4D', 'transparent']}
                         style={styles.vignetteTop}
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={['transparent', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + '4D', colors.cardBg + 'E6', colors.cardBg]}
                         style={styles.vignetteBottom}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={[colors.cardBg, 'transparent']}
+                        colors={[colors.cardBg, colors.cardBg + 'B3', 'transparent']}
                         style={styles.vignetteLeft}
                         pointerEvents="none"
                       />
                       <LinearGradient
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        colors={['transparent', colors.cardBg]}
+                        colors={['transparent', colors.cardBg + 'B3', colors.cardBg]}
                         style={styles.vignetteRight}
                         pointerEvents="none"
                       />
@@ -1615,9 +1615,10 @@ const styles = StyleSheet.create({
   // Blurred Ambient Backdrop Aura (Diffuses image colors into card)
   blurredBackdropAura: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.5,
-    transform: [{ scale: 1.15 }],
+    opacity: 0.72,
+    transform: [{ scale: 1.25 }],
     zIndex: 1,
+    ...(Platform.OS === 'web' ? { filter: 'blur(32px)', WebkitFilter: 'blur(32px)' } as any : {}),
   },
   heroImageCenterHolder: {
     width: '100%',
@@ -1628,6 +1629,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 28,
     zIndex: 3,
+    ...(Platform.OS === 'web' ? {
+      maskImage: 'radial-gradient(ellipse 90% 88% at 50% 50%, black 60%, transparent 100%)',
+      WebkitMaskImage: 'radial-gradient(ellipse 90% 88% at 50% 50%, black 60%, transparent 100%)',
+    } as any : {}),
   },
 
   // 4-Directional Feathered Blur Linear Overlays
@@ -1636,7 +1641,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 64,
+    height: 75,
     zIndex: 6,
   },
   vignetteBottom: {
@@ -1644,7 +1649,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 68,
+    height: 80,
     zIndex: 6,
   },
   vignetteLeft: {
@@ -1652,7 +1657,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: 48,
+    width: 56,
     zIndex: 6,
   },
   vignetteRight: {
@@ -1660,7 +1665,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: 48,
+    width: 56,
     zIndex: 6,
   },
   cornerStarTopLeft: {

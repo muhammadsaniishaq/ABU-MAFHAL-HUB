@@ -258,12 +258,15 @@ export default function AppDesigner() {
     uri: string;
     dataUri: string;
     base64: string;
+    mimeType: string;
+    isGif: boolean;
     width?: number;
     height?: number;
   }
 
   // Cross-platform, bulletproof image picker:
-  // On Web: Uses synchronous HTML5 file input with FileReader + Canvas compression (100% reliable, zero CORS/popup issues, never blocked)
+  // Preserves full animated GIF frames (does not flatten GIFs into static JPEG!)
+  // On Web: Uses synchronous HTML5 file input with FileReader (100% reliable, zero CORS/popup issues, never blocked)
   // On Native: Uses Expo ImagePicker + ImageManipulator
   const pickMediaCrossPlatform = async (source: 'camera' | 'library'): Promise<PickedImageResult | null> => {
     // ── 1. WEB PLATFORM ──
@@ -299,6 +302,8 @@ export default function AppDesigner() {
               return;
             }
 
+            const isGif = file.type === 'image/gif' || file.name?.toLowerCase().endsWith('.gif');
+
             try {
               const reader = new FileReader();
               reader.onload = (readerEvent) => {
@@ -308,7 +313,22 @@ export default function AppDesigner() {
                   return;
                 }
 
-                // Offscreen canvas compression to ~80KB max 900px
+                const rawBase64 = rawDataUrl.includes(',') ? rawDataUrl.split(',')[1] : rawDataUrl;
+
+                // CRITICAL FOR ANIMATED GIFS: DO NOT pass through canvas!
+                // Canvas destroys animated GIF frames and turns it into a dead static image.
+                if (isGif) {
+                  resolve({
+                    uri: rawDataUrl,
+                    dataUri: rawDataUrl,
+                    base64: rawBase64,
+                    mimeType: 'image/gif',
+                    isGif: true,
+                  });
+                  return;
+                }
+
+                // Offscreen canvas compression for standard static images (JPEG/PNG) to ~80KB max 900px
                 const img = new (window as any).Image();
                 img.onload = () => {
                   try {
@@ -331,11 +351,13 @@ export default function AppDesigner() {
                     if (ctx) {
                       ctx.drawImage(img, 0, 0, w, h);
                       const compressed = canvas.toDataURL('image/jpeg', 0.82);
-                      const rawBase64 = compressed.includes(',') ? compressed.split(',')[1] : compressed;
+                      const compBase64 = compressed.includes(',') ? compressed.split(',')[1] : compressed;
                       resolve({
                         uri: compressed,
                         dataUri: compressed,
-                        base64: rawBase64,
+                        base64: compBase64,
+                        mimeType: 'image/jpeg',
+                        isGif: false,
                         width: w,
                         height: h,
                       });
@@ -344,19 +366,21 @@ export default function AppDesigner() {
                   } catch (canvasErr) {
                     console.warn('Canvas resize notice:', canvasErr);
                   }
-                  const rawBase64 = rawDataUrl.includes(',') ? rawDataUrl.split(',')[1] : rawDataUrl;
                   resolve({
                     uri: rawDataUrl,
                     dataUri: rawDataUrl,
                     base64: rawBase64,
+                    mimeType: 'image/jpeg',
+                    isGif: false,
                   });
                 };
                 img.onerror = () => {
-                  const rawBase64 = rawDataUrl.includes(',') ? rawDataUrl.split(',')[1] : rawDataUrl;
                   resolve({
                     uri: rawDataUrl,
                     dataUri: rawDataUrl,
                     base64: rawBase64,
+                    mimeType: 'image/jpeg',
+                    isGif: false,
                   });
                 };
                 img.src = rawDataUrl;
@@ -417,6 +441,20 @@ export default function AppDesigner() {
         }));
         if (!result.canceled && result.assets && result.assets.length > 0) {
           const asset = result.assets[0];
+          const isGif = asset.uri?.toLowerCase().endsWith('.gif') || (asset as any)?.mimeType === 'image/gif';
+          if (isGif) {
+            const b64 = asset.base64 || '';
+            const dataUri = b64 ? `data:image/gif;base64,${b64}` : asset.uri;
+            return {
+              uri: asset.uri,
+              dataUri,
+              base64: b64,
+              mimeType: 'image/gif',
+              isGif: true,
+              width: asset.width,
+              height: asset.height,
+            };
+          }
           try {
             const manip = await ImageManipulator.manipulateAsync(
               asset.uri,
@@ -429,6 +467,8 @@ export default function AppDesigner() {
               uri: manip.uri,
               dataUri,
               base64: b64,
+              mimeType: 'image/jpeg',
+              isGif: false,
               width: manip.width,
               height: manip.height,
             };
@@ -438,6 +478,8 @@ export default function AppDesigner() {
               uri: asset.uri,
               dataUri: b64 ? `data:image/jpeg;base64,${b64}` : asset.uri,
               base64: b64,
+              mimeType: 'image/jpeg',
+              isGif: false,
             };
           }
         }
@@ -458,6 +500,20 @@ export default function AppDesigner() {
         }));
         if (!result.canceled && result.assets && result.assets.length > 0) {
           const asset = result.assets[0];
+          const isGif = asset.uri?.toLowerCase().endsWith('.gif') || (asset as any)?.mimeType === 'image/gif';
+          if (isGif) {
+            const b64 = asset.base64 || '';
+            const dataUri = b64 ? `data:image/gif;base64,${b64}` : asset.uri;
+            return {
+              uri: asset.uri,
+              dataUri,
+              base64: b64,
+              mimeType: 'image/gif',
+              isGif: true,
+              width: asset.width,
+              height: asset.height,
+            };
+          }
           try {
             const manip = await ImageManipulator.manipulateAsync(
               asset.uri,
@@ -470,6 +526,8 @@ export default function AppDesigner() {
               uri: manip.uri,
               dataUri,
               base64: b64,
+              mimeType: 'image/jpeg',
+              isGif: false,
               width: manip.width,
               height: manip.height,
             };
@@ -479,6 +537,8 @@ export default function AppDesigner() {
               uri: asset.uri,
               dataUri: b64 ? `data:image/jpeg;base64,${b64}` : asset.uri,
               base64: b64,
+              mimeType: 'image/jpeg',
+              isGif: false,
             };
           }
         }
@@ -525,16 +585,20 @@ export default function AppDesigner() {
       const initialUrl = picked.dataUri.startsWith('data:image/') ? picked.dataUri : picked.uri;
 
       // STEP 1: Apply immediately to local state and DB!
+      // This displays the animated GIF or image INSTANTLY!
       await applySlideImage(slot, initialUrl, false);
 
       // STEP 2: Background upload to Supabase CDN Storage bucket
       try {
-        const fileName = `splash/slide_${slot + 1}_${Date.now()}.jpg`;
+        const ext = picked.isGif ? 'gif' : 'jpg';
+        const mime = picked.mimeType || (picked.isGif ? 'image/gif' : 'image/jpeg');
+        const fileName = `splash/slide_${slot + 1}_${Date.now()}.${ext}`;
+
         const uploadRes = await uploadMediaFile({
           uri: picked.uri,
           bucket: 'banners',
           fileName,
-          mimeType: 'image/jpeg',
+          mimeType: mime,
           base64: picked.base64,
           isVideo: false,
         });
@@ -544,7 +608,7 @@ export default function AppDesigner() {
           await applySlideImage(slot, uploadRes.publicUrl, true);
         }
       } catch (uploadErr) {
-        console.warn('Background CDN storage upload notice (local base64 remains active):', uploadErr);
+        console.warn('Background CDN storage upload notice (local data-URI remains active):', uploadErr);
       }
     } catch (e: any) {
       console.error("Slide upload error:", e);
@@ -739,7 +803,9 @@ export default function AppDesigner() {
     else setUploadingLogo(true);
 
     try {
-      const fileName = `brand/${type}_${Date.now()}.jpg`;
+      const ext = picked.isGif ? 'gif' : 'jpg';
+      const mime = picked.mimeType || (picked.isGif ? 'image/gif' : 'image/jpeg');
+      const fileName = `brand/${type}_${Date.now()}.${ext}`;
       const initialUrl = picked.dataUri.startsWith('data:image/') ? picked.dataUri : picked.uri;
 
       // Immediate visual update
@@ -761,7 +827,7 @@ export default function AppDesigner() {
           uri: picked.uri,
           bucket: 'banners',
           fileName,
-          mimeType: 'image/jpeg',
+          mimeType: mime,
           base64: picked.base64,
           isVideo: false,
         });
@@ -1162,16 +1228,23 @@ export default function AppDesigner() {
 
                   {/* Artwork Preview Box with Blurred Backdrop & Seamless Edge Melting */}
                   <View style={s.modernArtworkBox}>
-                    {/* Blurred Ambient Image Aura */}
+                    {/* Blurred Ambient Image Aura (True Gaussian blur on Web & Mobile) */}
                     <Image
                       source={hasCustomImage ? { uri: customSlide!.url } : core.defaultAsset}
-                      style={[StyleSheet.absoluteFillObject, { opacity: 0.35, transform: [{ scale: 1.15 }] }]}
-                      blurRadius={Platform.OS === 'ios' ? 22 : 14}
+                      style={[
+                        StyleSheet.absoluteFillObject,
+                        {
+                          opacity: 0.72,
+                          transform: [{ scale: 1.25 }],
+                          ...(Platform.OS === 'web' ? { filter: 'blur(30px)', WebkitFilter: 'blur(30px)' } as any : {}),
+                        }
+                      ]}
+                      blurRadius={Platform.OS === 'ios' ? 26 : 20}
                       resizeMode="cover"
                     />
 
                     <LinearGradient
-                      colors={['rgba(255,255,255,0.78)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.78)']}
+                      colors={['rgba(255,255,255,0.72)', 'rgba(254,243,199,0.25)', 'rgba(255,255,255,0.72)']}
                       style={StyleSheet.absoluteFill}
                     />
 
@@ -1180,23 +1253,31 @@ export default function AppDesigner() {
                     <View style={[s.cornerAccent, { bottom: 6, right: 6, borderBottomWidth: 2, borderRightWidth: 2 }]} />
 
                     {/* Inset centered image with seamless edge melting */}
-                    <View style={{ width: '92%', height: '88%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 16, position: 'relative' }}>
+                    <View
+                      style={[
+                        { width: '92%', height: '88%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 16, position: 'relative' },
+                        Platform.OS === 'web' ? {
+                          maskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
+                          WebkitMaskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
+                        } as any : {}
+                      ]}
+                    >
                       <Image
                         source={hasCustomImage ? { uri: customSlide!.url } : core.defaultAsset}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="contain"
                       />
 
-                      {/* 4-Way Vignette Fades to melt edges */}
-                      <LinearGradient colors={['rgba(255,255,255,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 26 }} pointerEvents="none" />
-                      <LinearGradient colors={['transparent', 'rgba(255,255,255,0.85)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 26 }} pointerEvents="none" />
-                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 22 }} pointerEvents="none" />
-                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.85)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 22 }} pointerEvents="none" />
+                      {/* 4-Way Smooth Vignette Fades to melt edges */}
+                      <LinearGradient colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.5)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32 }} pointerEvents="none" />
+                      <LinearGradient colors={['transparent', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.92)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 32 }} pointerEvents="none" />
+                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.9)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 28 }} pointerEvents="none" />
+                      <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.9)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 28 }} pointerEvents="none" />
                     </View>
 
                     <View style={s.artworkCaptionPill}>
                       <Text style={s.artworkCaptionTxt} numberOfLines={1}>
-                        {hasCustomImage ? 'Custom Asset Live' : core.defaultLabel}
+                        {hasCustomImage ? (customSlide?.url.includes('.gif') || customSlide?.url.startsWith('data:image/gif') ? 'Custom Animated GIF Live 🎬' : 'Custom Asset Live') : core.defaultLabel}
                       </Text>
                     </View>
                   </View>
@@ -1460,32 +1541,47 @@ export default function AppDesigner() {
 
                       {/* Floating Artwork with Blurred Backdrop & Seamless Edge Melting */}
                       <View style={s.phoneHeroArtworkBox}>
-                        {/* Blurred Ambient Image Aura */}
+                        {/* Blurred Ambient Image Aura (Gaussian blur for Web & Mobile) */}
                         <Image
                           source={hasCustom ? { uri: custom!.url } : core.defaultAsset}
-                          style={[StyleSheet.absoluteFillObject, { opacity: 0.35, transform: [{ scale: 1.15 }] }]}
-                          blurRadius={Platform.OS === 'ios' ? 22 : 14}
+                          style={[
+                            StyleSheet.absoluteFillObject,
+                            {
+                              opacity: 0.72,
+                              transform: [{ scale: 1.25 }],
+                              ...(Platform.OS === 'web' ? { filter: 'blur(30px)', WebkitFilter: 'blur(30px)' } as any : {}),
+                            }
+                          ]}
+                          blurRadius={Platform.OS === 'ios' ? 26 : 20}
                           resizeMode="cover"
                         />
 
                         <LinearGradient
-                          colors={['rgba(255,255,255,0.85)', 'rgba(254,243,199,0.3)', 'rgba(255,255,255,0.85)']}
+                          colors={['rgba(255,255,255,0.72)', 'rgba(254,243,199,0.25)', 'rgba(255,255,255,0.72)']}
                           style={StyleSheet.absoluteFill}
                         />
 
                         {/* Inset centered image with seamless edge melting */}
-                        <View style={{ width: '90%', height: '88%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 14, position: 'relative' }}>
+                        <View
+                          style={[
+                            { width: '90%', height: '88%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 14, position: 'relative' },
+                            Platform.OS === 'web' ? {
+                              maskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
+                              WebkitMaskImage: 'radial-gradient(ellipse 92% 90% at 50% 50%, black 65%, transparent 100%)',
+                            } as any : {}
+                          ]}
+                        >
                           <Image
                             source={hasCustom ? { uri: custom!.url } : core.defaultAsset}
                             style={{ width: '100%', height: '100%' }}
                             resizeMode="contain"
                           />
 
-                          {/* 4-Way Vignette Fades */}
-                          <LinearGradient colors={['rgba(255,255,255,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 22 }} pointerEvents="none" />
-                          <LinearGradient colors={['transparent', 'rgba(255,255,255,0.85)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 22 }} pointerEvents="none" />
-                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 18 }} pointerEvents="none" />
-                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.85)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 18 }} pointerEvents="none" />
+                          {/* 4-Way Smooth Vignette Fades */}
+                          <LinearGradient colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.5)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 26 }} pointerEvents="none" />
+                          <LinearGradient colors={['transparent', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.92)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 26 }} pointerEvents="none" />
+                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['rgba(255,255,255,0.9)', 'transparent']} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 22 }} pointerEvents="none" />
+                          <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} colors={['transparent', 'rgba(255,255,255,0.9)']} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 22 }} pointerEvents="none" />
                         </View>
                       </View>
 
