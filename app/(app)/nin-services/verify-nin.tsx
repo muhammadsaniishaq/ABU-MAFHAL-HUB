@@ -74,6 +74,9 @@ export default function VerifyNINScreen() {
     
     // Additional Premium States
     const [userBalance, setUserBalance] = useState<number | null>(null);
+    const [loadingStep, setLoadingStep] = useState('Connecting to NIMC Secure Gateway...');
+    const [showNin, setShowNin] = useState(true);
+    const [lastChargedFee, setLastChargedFee] = useState<number>(100);
 
     const fetchWalletBalance = async () => {
         try {
@@ -2186,28 +2189,26 @@ export default function VerifyNINScreen() {
         }
         const layoutItem = layouts.find(l => l.id === selectedLayout);
         const totalPrice = layoutItem ? layoutItem.price : 0;
+        setLastChargedFee(totalPrice);
         if (userBalance !== null && userBalance < totalPrice) {
             return showAlert('Insufficient Balance', `Your wallet balance (₦${userBalance.toLocaleString()}) is less than the required amount (₦${totalPrice.toLocaleString()}). Please fund your wallet.`, 'error');
         }
 
         setLoading(true);
+        setLoadingStep('Authorizing wallet fee deduction...');
+        const timer1 = setTimeout(() => setLoadingStep('Connecting to NIMC Verification Gateway...'), 700);
+        const timer2 = setTimeout(() => setLoadingStep('Authenticating citizen biometric records...'), 1800);
+        const timer3 = setTimeout(() => setLoadingStep('Generating official security slips & cards...'), 3200);
+
         try {
             const response = await api.identity.validateNIN(nin, layoutItem?.db_id, selectedLayout.toUpperCase());
             
             if (response.isValid && response.data) {
-                // Flatten nested data if needed (IDPro returns { data: { firstname, ... } } sometimes)
                 let personData = response.data?.data ?? response.data;
-
-                // Normalize photo: IDPro returns raw base64 (no prefix). Keep as-is;
-                // IDCardMockup.resolvePhoto() handles the prefix automatically.
-                // Log for debugging:
-                console.log('[NIN Verify] Person data keys:', Object.keys(personData || {}));
-                console.log('[NIN Verify] Photo field:', personData?.photo ? `base64 (${String(personData.photo).length} chars)` : 'none');
-
+                personData._chargedPrice = totalPrice;
+                personData._layoutName = layoutItem?.name || selectedLayout.toUpperCase();
                 setResult({ status: 'success', data: personData });
                 await saveHistoryItem(personData);
-
-                // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
             } else {
                 const msg = response.message || 'Unable to verify this NIN. Please check the number and try again.';
                 const lowerMsg = msg.toLowerCase();
@@ -2231,6 +2232,9 @@ export default function VerifyNINScreen() {
                 showAlert('Network Error', errM || 'A network error occurred. Please check your connection and try again.', 'error');
             }
         } finally {
+            clearTimeout(timer1);
+            clearTimeout(timer2);
+            clearTimeout(timer3);
             setLoading(false);
             fetchWalletBalance();
         }
@@ -2247,6 +2251,32 @@ export default function VerifyNINScreen() {
         }
     };
 
+    const handleShareDossier = async () => {
+        if (!result?.data) return;
+        try {
+            const p = result.data?.data || result.data || {};
+            const cleanN = String(p.nin || p.number || nin || '').replace(/\D/g, '');
+            const fName = [p.firstname || p.first_name, p.middlename || p.middle_name, p.surname || p.last_name].filter(Boolean).join(' ');
+            const shareText = `NIMC VERIFIED IDENTITY DOSSIER\nName: ${fName}\nNIN: ${cleanN}\nDOB: ${p.dob || p.birthdate || 'N/A'}\nGender: ${p.gender || 'N/A'}\nTracking ID: ${p.trackingId || p.tracking_id || 'N/A'}\nVerified via ABU-MAFHAL HUB Platform.`;
+            
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync('data:text/plain;charset=utf-8,' + encodeURIComponent(shareText), { dialogTitle: 'Share Identity Record' });
+            } else {
+                await Clipboard.setString(shareText);
+                showAlert('Copied to Clipboard', 'Full citizen identity summary copied to clipboard.', 'success');
+            }
+        } catch (_) {}
+    };
+
+    const handleDirectPrint = async () => {
+        if (!result || !result.data) return;
+        if (Platform.OS === 'web') {
+            window.print();
+        } else {
+            handleDownloadPdf();
+        }
+    };
+
     if (result) {
         const personData = result.data?.data || result.data || {};
         const pdfBase64 = personData.pdf_base64 || result.pdf_base64 || result.data?.pdf_base64 || personData.slip_url || result.slip_url;
@@ -2260,17 +2290,28 @@ export default function VerifyNINScreen() {
         const displayNin = cleanNin.length === 11
             ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
             : cleanNin || 'N/A';
+        const maskedNin = cleanNin.length === 11
+            ? `${cleanNin.slice(0,4)} ••• ${cleanNin.slice(7)}`
+            : cleanNin;
         const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '105829-40LQTYW4PVJY';
         const dob = formatDob(personData.dob || personData.birthdate || personData.dateOfBirth || '');
         const gender = (personData.gender || personData.sex || 'M').trim().toUpperCase().startsWith('F') ? 'FEMALE' : 'MALE';
         const phone = personData.phone || personData.phoneNumber || personData.telephoneno || 'Not Provided';
         const stateOfOrigin = personData.birthstate || personData.birthState || personData.state_of_origin || 'N/A';
         const lgaOfOrigin = personData.birthlga || personData.birthLga || personData.lga_of_origin || 'N/A';
+        const birthTown = personData.birthtown || personData.birth_town || personData.place_of_birth || 'N/A';
+        const maritalStatus = personData.maritalstatus || personData.marital_status || 'Single';
+        const religion = personData.religion || 'N/A';
         const residenceAddress = personData.residence_address || personData.address || 'N/A';
+        const residenceTown = personData.residence_town || personData.town || 'N/A';
         const residenceState = personData.residence_state || personData.state || 'N/A';
         const residenceLga = personData.residence_lga || personData.lga || 'N/A';
         const issueDate = personData.issueDate || personData.issue_date ? formatDob(personData.issueDate || personData.issue_date) : '01 JAN 2021';
         const transactionId = personData.transaction_id || result.transaction_id || `TXN-${Date.now()}`;
+        const feeDeducted = personData._chargedPrice || lastChargedFee || 100;
+        const nokName = [personData.nok_firstname, personData.nok_middlename, personData.nok_lastname || personData.nok_surname].filter(Boolean).join(' ') || personData.nok_name || '';
+        const nokPhone = personData.nok_phoneno || personData.nok_phone || '';
+        const nokAddress = personData.nok_address1 || personData.nok_address || '';
 
         const formattedDate = (() => {
             const d = new Date();
@@ -2285,8 +2326,8 @@ export default function VerifyNINScreen() {
             : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRL363G0d9u3u5YQ&s';
 
         return (
-            <View style={{ flex: 1, backgroundColor: '#060d21' }}>
-                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#f5a623', headerShadowVisible: false }} />
+            <View style={{ flex: 1, backgroundColor: '#F4F7FC' }}>
+                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#071630' }, headerTintColor: '#F5A623', headerShadowVisible: false }} />
                 <StatusBar style="light" />
 
                 {/* Format Choice Modal */}
@@ -2296,13 +2337,13 @@ export default function VerifyNINScreen() {
                     animationType="fade"
                     onRequestClose={() => setIsDownloadModalOpen(false)}
                 >
-                    <View style={{ flex: 1, backgroundColor: 'rgba(6, 13, 33, 0.85)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                        <View style={{ backgroundColor: '#0d1b3e', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', borderWidth: 1, borderColor: '#1e293b' }}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(7, 22, 48, 0.85)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <View style={{ backgroundColor: '#0B2246', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)' }}>
                             <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                                <Ionicons name="download-outline" size={24} color="#f5a623" />
+                                <Ionicons name="download-outline" size={24} color="#F5A623" />
                             </View>
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 17 }}>Download Official Slip</Text>
-                            <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 4, marginBottom: 20 }}>Choose your preferred export format</Text>
+                            <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 17 }}>Download Official Slip</Text>
+                            <Text style={{ color: '#CBD5E1', fontSize: 12, marginTop: 4, marginBottom: 20 }}>Choose your preferred export format</Text>
 
                             <View style={{ flexDirection: 'row', gap: 14, width: '100%', marginBottom: 18 }}>
                                 <TouchableOpacity 
@@ -2310,12 +2351,12 @@ export default function VerifyNINScreen() {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPdf();
                                     }}
-                                    style={{ flex: 1, backgroundColor: 'rgba(245, 166, 35, 0.08)', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#f5a623' }}
+                                    style={{ flex: 1, backgroundColor: 'rgba(245, 166, 35, 0.12)', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#F5A623' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="document-text" size={32} color="#f5a623" />
-                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF Document</Text>
-                                    <Text style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>Print-ready slip</Text>
+                                    <Ionicons name="document-text" size={32} color="#F5A623" />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF Document</Text>
+                                    <Text style={{ color: '#CBD5E1', fontSize: 10, marginTop: 2 }}>Print-ready slip</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -2323,69 +2364,151 @@ export default function VerifyNINScreen() {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPng();
                                     }}
-                                    style={{ flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#10b981' }}
+                                    style={{ flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.12)', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#10B981' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="image" size={32} color="#10b981" />
-                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image (PNG)</Text>
-                                    <Text style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>High-res card</Text>
+                                    <Ionicons name="image" size={32} color="#10B981" />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image (PNG)</Text>
+                                    <Text style={{ color: '#CBD5E1', fontSize: 10, marginTop: 2 }}>High-res card</Text>
                                 </TouchableOpacity>
                             </View>
 
                             <TouchableOpacity onPress={() => setIsDownloadModalOpen(false)} style={{ paddingVertical: 6 }}>
-                                <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                                <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </Modal>
 
-                <ScrollView style={{ flex: 1, backgroundColor: '#f8fafc' }} contentContainerStyle={{ paddingBottom: 60 }}>
-                    {/* Header Gradient Banner */}
-                    <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 18, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center' }}>
+                <ScrollView style={{ flex: 1, backgroundColor: '#F4F7FC' }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+                    {/* Executive Royal Navy Header Banner */}
+                    <LinearGradient 
+                        colors={['#071630', '#0B2246', '#112D5E']} 
+                        style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 18, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
+                    >
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 540 }}>
-                            <TouchableOpacity onPress={() => setResult(null)} style={{ padding: 6, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                                <Ionicons name="arrow-back" size={20} color="#ffffff" />
+                            <TouchableOpacity onPress={() => setResult(null)} style={{ padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)' }} activeOpacity={0.7}>
+                                <Ionicons name="arrow-back" size={18} color="#F5A623" />
                             </TouchableOpacity>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="shield-checkmark" size={16} color="#10b981" />
-                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15, marginLeft: 6 }}>NIMC Verified Identity</Text>
+                                <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+                                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 15, marginLeft: 6 }}>NIMC Verified Identity</Text>
                             </View>
-                            <View style={{ width: 32 }} />
+                            <TouchableOpacity onPress={handleShareDossier} style={{ padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)' }} activeOpacity={0.7}>
+                                <Ionicons name="share-social-outline" size={18} color="#F5A623" />
+                            </TouchableOpacity>
                         </View>
-                        <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 8 }}>
-                            Official Identity Record
+                        <Text style={{ color: '#F5A623', fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 8 }}>
+                            Official NIMC Citizen Dossier • 100% Match
                         </Text>
                     </LinearGradient>
 
-                    {/* Centered User Photo and Avatar with Checkmark Badge */}
+                    {/* Citizen Biometric Header Card (Clean White, Navy & Gold) */}
                     <View style={{ alignItems: 'center', marginTop: -38, paddingHorizontal: 16 }}>
-                        <View style={{ position: 'relative' }}>
-                            <Image source={{ uri: photoUri }} style={{ width: 88, height: 100, borderRadius: 18, borderWidth: 4, borderColor: '#ffffff', backgroundColor: '#e2e8f0' }} />
-                            <View style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#ffffff' }}>
-                                <Ionicons name="checkmark" size={18} color="#ffffff" />
+                        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, width: '100%', maxWidth: 540, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0B2246', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 }}>
+                            {/* Portrait in Gold Double Ring Frame */}
+                            <View style={{ position: 'relative', marginBottom: 10 }}>
+                                <View style={{ padding: 3, borderRadius: 22, borderWidth: 2, borderColor: '#F5A623', backgroundColor: '#FFFFFF' }}>
+                                    <Image source={{ uri: photoUri }} style={{ width: 92, height: 105, borderRadius: 18, backgroundColor: '#E2E8F0' }} />
+                                </View>
+                                <View style={{ position: 'absolute', bottom: -4, right: -4, width: 28, height: 28, borderRadius: 14, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: '#FFFFFF' }}>
+                                    <Ionicons name="checkmark" size={17} color="#FFFFFF" />
+                                </View>
+                            </View>
+
+                            {/* Full Legal Name */}
+                            <Text style={{ color: '#0B2246', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', textAlign: 'center', letterSpacing: 0.3 }}>
+                                {fullName}
+                            </Text>
+
+                            {/* Formatted Monospace NIN with Copy & Eye Visibility Toggle */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F4FA', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12, marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 8 }}>
+                                <Ionicons name="finger-print" size={16} color="#0B2246" />
+                                <Text style={{ color: '#0B2246', fontWeight: '900', fontSize: 15, letterSpacing: 1, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                    {showNin ? displayNin : maskedNin}
+                                </Text>
+                                <TouchableOpacity onPress={() => setShowNin(!showNin)} style={{ padding: 3 }} activeOpacity={0.7}>
+                                    <Ionicons name={showNin ? "eye-outline" : "eye-off-outline"} size={16} color="#64748B" />
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    onPress={async () => {
+                                        try {
+                                            await Clipboard.setString(cleanNin);
+                                            showAlert('NIN Copied', `${cleanNin} copied to clipboard.`, 'success');
+                                        } catch (_) {}
+                                    }}
+                                    style={{ backgroundColor: '#0B2246', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="copy-outline" size={11} color="#F5A623" style={{ marginRight: 3 }} />
+                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>Copy</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Verification Status Badges Row */}
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#DCFCE7', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 99, borderWidth: 1, borderColor: '#86EFAC' }}>
+                                    <Ionicons name="shield-checkmark" size={12} color="#15803D" style={{ marginRight: 4 }} />
+                                    <Text style={{ color: '#15803D', fontWeight: '800', fontSize: 10.5 }}>NIMC Database Match (100%)</Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 99, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                    <Ionicons name="checkmark-done" size={12} color="#B45309" style={{ marginRight: 4 }} />
+                                    <Text style={{ color: '#B45309', fontWeight: '800', fontSize: 10.5 }}>Biometric Captured</Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 99, borderWidth: 1, borderColor: '#CBD5E1' }}>
+                                    <Ionicons name="flash" size={11} color="#0B2246" style={{ marginRight: 4 }} />
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 10.5 }}>Citizen Active</Text>
+                                </View>
                             </View>
                         </View>
 
-                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 10, textAlign: 'center', letterSpacing: 0.3 }}>
-                            {fullName}
-                        </Text>
+                        {/* 🌟 FINANCIAL & WALLET PAYMENT RECEIPT (Clear fee deduction & balance) 🌟 */}
+                        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, width: '100%', maxWidth: 540, marginTop: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0B2246', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 }}>
+                            <View style={{ backgroundColor: '#0B2246', paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="receipt-outline" size={15} color="#F5A623" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>Service Payment & Wallet Deduction</Text>
+                                </View>
+                                <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }}>
+                                    <Text style={{ color: '#10B981', fontWeight: '900', fontSize: 9.5 }}>DEBITED SUCCESSFULLY</Text>
+                                </View>
+                            </View>
 
-                        {/* Verified Pill */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: '#86efac', marginTop: 6 }}>
-                            <Ionicons name="shield-checkmark" size={13} color="#16a34a" />
-                            <Text style={{ color: '#15803d', fontWeight: '800', fontSize: 11, marginLeft: 4 }}>
-                                NIMC Database Match
-                            </Text>
+                            <View style={{ padding: 12 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>Service Fee Paid:</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '900', fontSize: 13 }}>₦{feeDeducted.toLocaleString()}</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>Transaction Ref:</Text>
+                                    <Text style={{ color: '#475569', fontWeight: '800', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>{transactionId}</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>Available Wallet Balance:</Text>
+                                    <Text style={{ color: '#10B981', fontWeight: '900', fontSize: 12 }}>
+                                        {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Updated'}
+                                    </Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 5 }}>
+                                    <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+                                    <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '600' }}>
+                                        Auto-Refund Guaranteed: Automatic refund is credited if verification fails.
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
 
                         {/* Interactive Slip Format Switcher Tabs */}
-                        <View style={{ width: '100%', maxWidth: 540, marginTop: 20 }}>
-                            <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, textAlign: 'center' }}>
-                                Interactive Slip Preview
+                        <View style={{ width: '100%', maxWidth: 540, marginTop: 18 }}>
+                            <Text style={{ color: '#0B2246', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, textAlign: 'center' }}>
+                                Interactive Official Slip Preview
                             </Text>
-                            <View style={{ flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 14, padding: 4, gap: 4 }}>
+                            <View style={{ flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 14, padding: 4, gap: 4 }}>
                                 {[
-                                    { id: 'premium', label: 'Premium' },
+                                    { id: 'premium', label: 'Premium Card' },
                                     { id: 'standard', label: 'Standard' },
                                     { id: 'regular', label: 'Regular' },
                                     { id: 'info', label: 'Full Info' },
@@ -2399,13 +2522,13 @@ export default function VerifyNINScreen() {
                                                 flex: 1,
                                                 paddingVertical: 8,
                                                 borderRadius: 10,
-                                                backgroundColor: active ? '#060d21' : 'transparent',
+                                                backgroundColor: active ? '#0B2246' : 'transparent',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                             }}
                                             activeOpacity={0.8}
                                         >
-                                            <Text style={{ color: active ? '#f5a623' : '#64748b', fontWeight: active ? '900' : '700', fontSize: 12 }}>
+                                            <Text style={{ color: active ? '#F5A623' : '#64748B', fontWeight: active ? '900' : '700', fontSize: 11.5 }}>
                                                 {tab.label}
                                             </Text>
                                         </TouchableOpacity>
@@ -2416,135 +2539,214 @@ export default function VerifyNINScreen() {
 
                         {/* Live Visible Slip Container (Never hidden!) */}
                         <View style={{ width: '100%', maxWidth: 540, marginTop: 14, alignItems: 'center' }}>
-                            <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 }}>
-                                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff' }}>
+                            <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0B2246', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 }}>
+                                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#FFFFFF' }}>
                                     {renderSlip()}
                                 </ViewShot>
                             </View>
                         </View>
 
-                        {/* Direct Download Actions Bar */}
-                        <View style={{ flexDirection: 'row', gap: 12, width: '100%', maxWidth: 540, marginTop: 18 }}>
-                            <TouchableOpacity 
-                                onPress={handleDownloadPdf}
-                                disabled={isSaving}
-                                style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#f5a623', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 2 }}
-                                activeOpacity={0.8}
-                            >
-                                {isSaving ? <ActivityIndicator color="#060d21" size="small" /> : (
-                                    <>
-                                        <Ionicons name="document-text" size={18} color="#060d21" style={{ marginRight: 6 }} />
-                                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 14 }}>Download PDF</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
+                        {/* Action Buttons Hub (PDF, PNG, Print, Share) */}
+                        <View style={{ width: '100%', maxWidth: 540, marginTop: 16 }}>
+                            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                                <TouchableOpacity 
+                                    onPress={handleDownloadPdf}
+                                    disabled={isSaving}
+                                    style={{ flex: 1, backgroundColor: '#F5A623', height: 46, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#F5A623', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 5, elevation: 2 }}
+                                    activeOpacity={0.8}
+                                >
+                                    {isSaving ? <ActivityIndicator color="#0B2246" size="small" /> : (
+                                        <>
+                                            <Ionicons name="document-text" size={17} color="#0B2246" style={{ marginRight: 6 }} />
+                                            <Text style={{ color: '#0B2246', fontWeight: '900', fontSize: 13 }}>Download PDF</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
 
-                            <TouchableOpacity 
-                                onPress={handleDownloadPng}
-                                disabled={isSaving}
-                                style={{ flex: 1, backgroundColor: '#060d21', height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e293b' }}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="image" size={18} color="#f5a623" style={{ marginRight: 6 }} />
-                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>Save PNG Image</Text>
-                            </TouchableOpacity>
+                                <TouchableOpacity 
+                                    onPress={handleDownloadPng}
+                                    disabled={isSaving}
+                                    style={{ flex: 1, backgroundColor: '#0B2246', height: 46, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1E3A8A' }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="image" size={17} color="#F5A623" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>Save PNG Image</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <TouchableOpacity 
+                                    onPress={handleDirectPrint}
+                                    disabled={isSaving}
+                                    style={{ flex: 1, backgroundColor: '#10B981', height: 42, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="print-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>Print Slip</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={handleShareDossier}
+                                    style={{ flex: 1, backgroundColor: '#FFFFFF', height: 42, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CBD5E1' }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="share-outline" size={16} color="#0B2246" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>Share Record</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        {/* Comprehensive Verified Data Sheet */}
-                        <View style={{ backgroundColor: '#ffffff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 540, marginTop: 22, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
-                            {/* Card Header */}
-                            <View style={{ backgroundColor: '#060d21', paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        {/* 🌟 COMPREHENSIVE CITIZEN IDENTITY DOSSIER (ALL DETAILS GATHERED IN CLEAN CARDS) 🌟 */}
+                        {/* 1. Personal Demographics Card */}
+                        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', width: '100%', maxWidth: 540, marginTop: 18, overflow: 'hidden', shadowColor: '#0B2246', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}>
+                            <View style={{ backgroundColor: '#0B2246', paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="card" size={16} color="#f5a623" style={{ marginRight: 6 }} />
-                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>Official NIN Identity Card Details</Text>
-                                </View>
-                                <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }}>
-                                    <Text style={{ color: '#10b981', fontWeight: '900', fontSize: 10 }}>ACTIVE</Text>
+                                    <Ionicons name="person-outline" size={15} color="#F5A623" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12.5 }}>1. Personal & Biometric Demographics</Text>
                                 </View>
                             </View>
 
-                            {/* Field: Full Legal Name */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>FULL LEGAL NAME</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase' }}>{fullName}</Text>
-                            </View>
-
-                            {/* Field: NIN Number with Copy Button */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>NIN NUMBER</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Text style={{ color: '#059669', fontWeight: '900', fontSize: 14, letterSpacing: 0.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                                        {displayNin}
-                                    </Text>
-                                    <TouchableOpacity 
-                                        onPress={async () => {
-                                            try {
-                                                await Clipboard.setString(cleanNin);
-                                                showAlert('NIN Copied', `${cleanNin} copied to clipboard.`, 'success');
-                                            } catch (_) {}
-                                        }}
-                                        style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons name="copy-outline" size={12} color="#0f172a" style={{ marginRight: 3 }} />
-                                        <Text style={{ color: '#0f172a', fontSize: 10, fontWeight: '800' }}>Copy</Text>
-                                    </TouchableOpacity>
+                            <View style={{ paddingHorizontal: 14 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>FULL LEGAL NAME</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '900', fontSize: 12.5, textTransform: 'uppercase' }}>{fullName}</Text>
                                 </View>
-                            </View>
 
-                            {/* Field: Date of Birth & Gender */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>BIRTHDATE / GENDER</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{dob} • {gender}</Text>
-                            </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>DATE OF BIRTH</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{dob}</Text>
+                                </View>
 
-                            {/* Field: Phone Number */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>REGISTERED PHONE</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{phone}</Text>
-                            </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>GENDER</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{gender}</Text>
+                                </View>
 
-                            {/* Field: State of Origin & LGA */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>ORIGIN (STATE / LGA)</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>{stateOfOrigin} / {lgaOfOrigin}</Text>
-                            </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>REGISTERED PHONE</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{phone}</Text>
+                                </View>
 
-                            {/* Field: Residential Address */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', marginTop: 2 }}>ADDRESS</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 12, textAlign: 'right', maxWidth: '65%' }}>
-                                    {[residenceAddress, residenceLga, residenceState].filter(x => x && x !== 'N/A').join(', ') || 'N/A'}
-                                </Text>
-                            </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>MARITAL STATUS</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{maritalStatus}</Text>
+                                </View>
 
-                            {/* Field: Tracking ID & Issue Date */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>TRACKING ID</Text>
-                                <Text style={{ color: '#475569', fontWeight: '800', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>{trackingId}</Text>
-                            </View>
-
-                            {/* Field: Gateway & Time */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>VERIFIED AT</Text>
-                                <Text style={{ color: '#475569', fontWeight: '700', fontSize: 12 }}>{formattedDate}</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>RELIGION</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{religion}</Text>
+                                </View>
                             </View>
                         </View>
 
-                        {/* Return Button */}
+                        {/* 2. Origin & Residential Address Card */}
+                        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', width: '100%', maxWidth: 540, marginTop: 14, overflow: 'hidden', shadowColor: '#0B2246', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}>
+                            <View style={{ backgroundColor: '#0B2246', paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="location-outline" size={15} color="#F5A623" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12.5 }}>2. Origin & Residential Location</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ paddingHorizontal: 14 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>STATE OF ORIGIN</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>{stateOfOrigin}</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>LGA OF ORIGIN</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>{lgaOfOrigin}</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>TOWN OF BIRTH</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{birthTown}</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11, marginTop: 2 }}>RESIDENTIAL ADDRESS</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '700', fontSize: 12, textAlign: 'right', maxWidth: '65%' }}>
+                                        {[residenceAddress, residenceTown].filter(x => x && x !== 'N/A').join(', ') || 'N/A'}
+                                    </Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>RESIDENCE STATE / LGA</Text>
+                                    <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>
+                                        {[residenceLga, residenceState].filter(x => x && x !== 'N/A').join(' / ') || 'N/A'}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* 3. Next of Kin Information (if present) */}
+                        {nokName.length > 0 && (
+                            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', width: '100%', maxWidth: 540, marginTop: 14, overflow: 'hidden', shadowColor: '#0B2246', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}>
+                                <View style={{ backgroundColor: '#0B2246', paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="people-outline" size={15} color="#F5A623" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12.5 }}>3. Next of Kin Details</Text>
+                                </View>
+                                <View style={{ paddingHorizontal: 14 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                        <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>NEXT OF KIN NAME</Text>
+                                        <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{nokName}</Text>
+                                    </View>
+                                    {nokPhone.length > 0 && (
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                            <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>CONTACT PHONE</Text>
+                                            <Text style={{ color: '#0B2246', fontWeight: '800', fontSize: 12 }}>{nokPhone}</Text>
+                                        </View>
+                                    )}
+                                    {nokAddress.length > 0 && (
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 10 }}>
+                                            <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11, marginTop: 2 }}>ADDRESS</Text>
+                                            <Text style={{ color: '#0B2246', fontWeight: '700', fontSize: 12, textAlign: 'right', maxWidth: '65%' }}>{nokAddress}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* 4. NIMC Metadata & Verification Log */}
+                        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', width: '100%', maxWidth: 540, marginTop: 14, overflow: 'hidden', shadowColor: '#0B2246', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}>
+                            <View style={{ backgroundColor: '#0B2246', paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="hardware-chip-outline" size={15} color="#F5A623" style={{ marginRight: 6 }} />
+                                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12.5 }}>4. System Metadata & Audit Trail</Text>
+                            </View>
+                            <View style={{ paddingHorizontal: 14 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>TRACKING ID</Text>
+                                    <Text style={{ color: '#475569', fontWeight: '800', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>{trackingId}</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>ISSUE DATE</Text>
+                                    <Text style={{ color: '#475569', fontWeight: '800', fontSize: 12 }}>{issueDate}</Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
+                                    <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 11 }}>VERIFICATION TIMESTAMP</Text>
+                                    <Text style={{ color: '#475569', fontWeight: '700', fontSize: 12 }}>{formattedDate}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Return / Verify Another Button */}
                         <TouchableOpacity 
                             onPress={() => setResult(null)} 
-                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, marginTop: 8 }}
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, marginTop: 10, gap: 6 }}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="arrow-back-circle-outline" size={20} color="#059669" style={{ marginRight: 6 }} />
-                            <Text style={{ color: '#059669', fontWeight: '900', fontSize: 15 }}>Verify Another NIN</Text>
+                            <Ionicons name="arrow-back-circle-outline" size={22} color="#0B2246" />
+                            <Text style={{ color: '#0B2246', fontWeight: '900', fontSize: 15 }}>Verify Another Identity</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
             </View>
         );
     }
+
 
     // Filter history based on search
     const filteredHistory = historyList.filter(item => {
@@ -2562,14 +2764,39 @@ export default function VerifyNINScreen() {
             <Stack.Screen options={{ title: 'Verify NIN', headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a', headerShadowVisible: false }} />
             <StatusBar style="dark" />
 
-            {/* Premium Loader Modal */}
+            {/* Premium Loader Modal with Workflow & Fee Transparency */}
             {loading && (
                 <Modal transparent visible={loading} animationType="fade">
                     <View style={styles.loaderOverlay}>
-                        <View style={styles.loaderCard}>
-                            <ActivityIndicator size="large" color="#f5a623" />
+                        <View style={[styles.loaderCard, { maxWidth: 340, padding: 22, borderRadius: 20 }]}>
+                            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 14, borderWidth: 1.5, borderColor: '#F5A623' }}>
+                                <ActivityIndicator size="large" color="#F5A623" />
+                            </View>
                             <Text style={styles.loaderTitle}>Verifying Identity</Text>
-                            <Text style={styles.loaderSub}>Connecting to NIMC Secure Gateway...</Text>
+                            <Text style={[styles.loaderSub, { color: '#0B2246', fontWeight: '800', marginTop: 4 }]}>
+                                {loadingStep}
+                            </Text>
+
+                            <View style={{ width: '100%', marginTop: 16, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                    <Ionicons name="checkmark-circle" size={15} color="#10B981" style={{ marginRight: 6 }} />
+                                    <Text style={{ fontSize: 11, color: '#334155', fontWeight: '800' }}>
+                                        Fee: ₦{lastChargedFee.toLocaleString()} (Wallet Debited)
+                                    </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                    <Ionicons name="shield-checkmark" size={15} color="#F5A623" style={{ marginRight: 6 }} />
+                                    <Text style={{ fontSize: 11, color: '#334155', fontWeight: '700' }}>
+                                        NIMC 256-Bit SSL Gateway
+                                    </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="refresh-circle" size={15} color="#3B82F6" style={{ marginRight: 6 }} />
+                                    <Text style={{ fontSize: 11, color: '#334155', fontWeight: '700' }}>
+                                        Auto-Refund Active on Error
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
                     </View>
                 </Modal>

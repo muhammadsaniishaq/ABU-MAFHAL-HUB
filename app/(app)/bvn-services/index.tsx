@@ -387,7 +387,7 @@ export default function BVNServicesGatewayScreen() {
                         style={styles.heroCard}
                     >
                         <LinearGradient
-                            colors={['#0F2148', '#0A1633', '#060D21']}
+                            colors={['#0B2246', '#0F2C59', '#14376F']}
                             style={styles.heroGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
@@ -402,8 +402,9 @@ export default function BVNServicesGatewayScreen() {
                                         <Text style={styles.maintPillText}>MAINTENANCE</Text>
                                     </View>
                                 ) : (
-                                    <View style={styles.heroPricePill}>
-                                        <Text style={styles.heroPriceTxt}>₦{heroPrice.toLocaleString()}</Text>
+                                    <View style={styles.heroStatusPill}>
+                                        <Ionicons name="shield-checkmark" size={10} color="#10B981" style={{ marginRight: 3 }} />
+                                        <Text style={styles.heroStatusTxt}>OFFICIAL BVN</Text>
                                     </View>
                                 )}
                             </View>
@@ -525,7 +526,6 @@ export default function BVNServicesGatewayScreen() {
 
     function renderServiceGridCard(service: BVNServiceItem) {
         const isMaint = serviceStatuses[service.pricingId]?.status === 'maintenance' || serviceStatuses[service.id]?.status === 'maintenance';
-        const priceVal = prices[service.pricingId] || service.defaultPrice;
 
         return (
             <TouchableOpacity
@@ -534,13 +534,8 @@ export default function BVNServicesGatewayScreen() {
                 style={[styles.gridCard, isMaint && styles.gridCardMaint]}
                 activeOpacity={0.78}
             >
-                <LinearGradient
-                    colors={['#0F2148', '#0A1633']}
-                    style={styles.gridCardGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                >
-                    {/* Top Micro-Bar: Category Tag & Price */}
+                <View style={styles.gridCardInner}>
+                    {/* Top Micro-Bar: Category Tag & Status (NO AMOUNT ON FRONT PAGE) */}
                     <View style={styles.gridCardTopRow}>
                         <View style={styles.gridCategoryBadge}>
                             <Text style={styles.gridCategoryBadgeTxt}>{service.badge}</Text>
@@ -548,19 +543,20 @@ export default function BVNServicesGatewayScreen() {
 
                         {isMaint ? (
                             <Text style={styles.gridMaintTxt}>MAINT</Text>
-                        ) : priceVal > 0 ? (
-                            <Text style={styles.gridPriceTxt}>₦{priceVal >= 1000 ? `${(priceVal / 1000).toFixed(priceVal % 1000 === 0 ? 0 : 1)}k` : priceVal}</Text>
                         ) : (
-                            <Text style={[styles.gridPriceTxt, { color: '#10B981' }]}>FREE</Text>
+                            <View style={styles.gridActiveTag}>
+                                <View style={styles.gridActiveDot} />
+                                <Text style={styles.gridActiveTxt}>ACTIVE</Text>
+                            </View>
                         )}
                     </View>
 
-                    {/* Centered Glowing Gold Icon */}
+                    {/* Centered Glowing Gold & Navy Icon */}
                     <View style={styles.gridIconFrame}>
-                        <Ionicons name={service.icon} size={22} color="#F5A623" />
+                        <Ionicons name={service.icon} size={22} color="#0B2246" />
                     </View>
 
-                    {/* Title */}
+                    {/* Title in Deep Navy */}
                     <Text style={styles.gridCardTitle} numberOfLines={2}>
                         {service.shortTitle || service.title}
                     </Text>
@@ -578,7 +574,7 @@ export default function BVNServicesGatewayScreen() {
                              service.id === 'track' ? 'Status Check' : 'Past Records'}
                         </Text>
                     </View>
-                </LinearGradient>
+                </View>
             </TouchableOpacity>
         );
     }
@@ -587,19 +583,19 @@ export default function BVNServicesGatewayScreen() {
 const styles = StyleSheet.create({
     container: { 
         flex: 1, 
-        backgroundColor: '#060D21' 
+        backgroundColor: '#F4F7FC' 
     },
     headerGradient: { 
         paddingHorizontal: 16, 
         borderBottomLeftRadius: 22, 
         borderBottomRightRadius: 22,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(245, 166, 35, 0.25)',
-        shadowColor: '#000',
+        borderBottomColor: 'rgba(245, 166, 35, 0.3)',
+        shadowColor: '#071630',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.15,
         shadowRadius: 10,
-        elevation: 6,
+        elevation: 5,
     },
     headerTop: { 
         flexDirection: 'row', 
@@ -817,6 +813,22 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '900',
     },
+    heroStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(16, 185, 129, 0.18)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(16, 185, 129, 0.35)',
+    },
+    heroStatusTxt: {
+        color: '#10B981',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
     maintPill: {
         backgroundColor: 'rgba(239, 68, 68, 0.2)',
         paddingHorizontal: 8,
@@ -904,13 +916,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-around',
-        backgroundColor: 'rgba(245, 166, 35, 0.08)',
+        backgroundColor: '#FFFFFF',
         borderRadius: 12,
-        paddingVertical: 8,
+        paddingVertical: 9,
         paddingHorizontal: 10,
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.2)',
-        marginBottom: 12,
+        borderColor: '#E2E8F0',
+        marginBottom: 14,
+        shadowColor: '#0B2246',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
     },
     trustItem: {
         flexDirection: 'row',
@@ -920,10 +937,10 @@ const styles = StyleSheet.create({
     trustDivider: {
         width: 1,
         height: 14,
-        backgroundColor: 'rgba(245, 166, 35, 0.25)',
+        backgroundColor: '#E2E8F0',
     },
     trustText: {
-        color: '#CBD5E1',
+        color: '#334155',
         fontSize: 10,
         fontWeight: '700',
     },
@@ -936,18 +953,16 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     sectionTitle: {
-        color: '#FFFFFF',
+        color: '#0B2246',
         fontSize: 12,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
     categoryRow: { 
         flexDirection: 'row', 
-        backgroundColor: 'rgba(255, 255, 255, 0.06)', 
+        backgroundColor: '#E2E8F0', 
         borderRadius: 8, 
         padding: 2,
-        borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.2)',
     },
     categoryBtn: { 
         paddingHorizontal: 8, 
@@ -955,19 +970,19 @@ const styles = StyleSheet.create({
         borderRadius: 6 
     },
     categoryBtnActive: { 
-        backgroundColor: '#F5A623' 
+        backgroundColor: '#0B2246' 
     },
     categoryTxt: { 
-        color: '#94A3B8', 
+        color: '#64748B', 
         fontSize: 10, 
         fontWeight: '700' 
     },
     categoryTxtActive: { 
-        color: '#060D21', 
+        color: '#FFFFFF', 
         fontWeight: '900' 
     },
 
-    // 🌟 3-COLUMN MODERN GRID 🌟
+    // 🌟 3-COLUMN MODERN GRID (CLEAN WHITE CARDS, NAVY & GOLD) 🌟
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -979,19 +994,20 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         borderRadius: 14,
         overflow: 'hidden',
+        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.22)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 3,
+        borderColor: '#E2E8F0',
+        shadowColor: '#0B2246',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 5,
+        elevation: 2,
     },
     gridCardMaint: {
         opacity: 0.6,
-        borderColor: 'rgba(239, 68, 68, 0.3)',
+        borderColor: '#FECACA',
     },
-    gridCardGradient: {
+    gridCardInner: {
         paddingVertical: 10,
         paddingHorizontal: 6,
         alignItems: 'center',
@@ -1006,21 +1022,32 @@ const styles = StyleSheet.create({
         paddingHorizontal: 2,
     },
     gridCategoryBadge: {
-        backgroundColor: 'rgba(245, 166, 35, 0.15)',
+        backgroundColor: '#FEF3C7',
         paddingHorizontal: 4,
         paddingVertical: 1,
         borderRadius: 4,
         borderWidth: 0.5,
-        borderColor: 'rgba(245, 166, 35, 0.3)',
+        borderColor: '#FDE68A',
     },
     gridCategoryBadgeTxt: {
-        color: '#F5A623',
+        color: '#B45309',
         fontSize: 7,
         fontWeight: '900',
     },
-    gridPriceTxt: {
-        color: '#F5A623',
-        fontSize: 9,
+    gridActiveTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    gridActiveDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#10B981',
+    },
+    gridActiveTxt: {
+        color: '#10B981',
+        fontSize: 7.5,
         fontWeight: '900',
     },
     gridMaintTxt: {
@@ -1029,52 +1056,57 @@ const styles = StyleSheet.create({
         fontWeight: '900',
     },
     gridIconFrame: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(245, 166, 35, 0.12)',
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: '#F0F4FA',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.35)',
-        marginVertical: 6,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        marginVertical: 4,
     },
     gridCardTitle: {
-        color: '#FFFFFF',
+        color: '#0B2246',
         fontSize: 10.5,
-        fontWeight: '800',
+        fontWeight: '900',
         textAlign: 'center',
         lineHeight: 13.5,
         minHeight: 27,
     },
     gridCardBottomChip: {
-        backgroundColor: 'rgba(245, 166, 35, 0.1)',
-        borderRadius: 6,
-        paddingHorizontal: 6,
+        marginTop: 3,
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 5,
         paddingVertical: 2,
-        borderWidth: 0.5,
-        borderColor: 'rgba(245, 166, 35, 0.25)',
-        marginTop: 4,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
         width: '100%',
         alignItems: 'center',
     },
     gridCardBottomChipTxt: {
-        color: '#CBD5E1',
-        fontSize: 8.5,
+        color: '#64748B',
+        fontSize: 8,
         fontWeight: '700',
     },
 
-    // Support Banner
+    // Support Banner in Clean White
     supportBanner: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: 'rgba(245, 166, 35, 0.08)',
+        backgroundColor: '#FFFFFF',
         borderRadius: 14,
         padding: 12,
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.25)',
+        borderColor: '#E2E8F0',
         marginTop: 4,
+        shadowColor: '#0B2246',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
     },
     supportLeft: {
         flexDirection: 'row',
@@ -1083,37 +1115,37 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     supportIconWrap: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: 'rgba(245, 166, 35, 0.15)',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F0F4FA',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.35)',
+        borderColor: '#E2E8F0',
         marginRight: 10,
     },
     supportTitle: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '800',
+        color: '#0B2246',
+        fontSize: 12.5,
+        fontWeight: '900',
     },
     supportDesc: {
-        color: '#94A3B8',
-        fontSize: 10,
+        color: '#64748B',
+        fontSize: 10.5,
         marginTop: 1,
     },
     supportButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5A623',
+        backgroundColor: '#0B2246',
         paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingVertical: 7,
         borderRadius: 8,
-        gap: 4,
+        gap: 3,
     },
     supportBtnTxt: {
-        color: '#060D21',
+        color: '#FFFFFF',
         fontSize: 11,
         fontWeight: '900',
     },
