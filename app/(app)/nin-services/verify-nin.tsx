@@ -216,7 +216,7 @@ export default function VerifyNINScreen() {
         }
     };
 
-    const convertPdfBase64ToPng = async (pdfBase64: string): Promise<string> => {
+    const convertPdfBase64ToPng = async (pdfSource: string): Promise<string> => {
         return new Promise((resolve, reject) => {
             const runConversion = async () => {
                 try {
@@ -224,11 +224,23 @@ export default function VerifyNINScreen() {
                     if (!pdfjsLib) return reject(new Error("pdf.js library not loaded"));
                     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-                    const binaryString = atob(pdfBase64);
-                    const len = binaryString.length;
-                    const bytes = new Uint8Array(len);
-                    for (let i = 0; i < len; i++) {
-                        bytes[i] = binaryString.charCodeAt(i);
+                    let bytes: Uint8Array;
+                    if (String(pdfSource).startsWith('http://') || String(pdfSource).startsWith('https://')) {
+                        const fetchRes = await fetch(pdfSource);
+                        const arrayBuf = await fetchRes.arrayBuffer();
+                        bytes = new Uint8Array(arrayBuf);
+                    } else {
+                        let cleanBase64 = String(pdfSource);
+                        if (cleanBase64.includes('base64,')) {
+                            cleanBase64 = cleanBase64.split('base64,')[1];
+                        }
+                        cleanBase64 = cleanBase64.trim().replace(/\s/g, '');
+                        const binaryString = atob(cleanBase64);
+                        const len = binaryString.length;
+                        bytes = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
                     }
 
                     const loadingTask = pdfjsLib.getDocument({ data: bytes });
@@ -380,36 +392,76 @@ export default function VerifyNINScreen() {
         if (!result || !result.data) return;
         setIsSaving(true);
         try {
-            const pdfBase64 = result.data?.pdf_base64 || result.pdf_base64 || result.data?.data?.pdf_base64;
+            const pdfBase64 = result.data?.pdf_base64 || result.pdf_base64 || result.data?.data?.pdf_base64 || result.data?.slip || result.slip_url || result.data?.slip_url;
             if (pdfBase64) {
-                if (Platform.OS === 'web') {
-                    const byteCharacters = atob(pdfBase64);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: 'application/pdf' });
-                    const blobUrl = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = `nin_slip_${nin || 'official'}.pdf`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-                    showAlert("Download Complete", "Official NIN Slip PDF downloaded.", "success");
-                    return;
-                } else {
-                    const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
-                    const fileUri = `${docDir}nin_slip_${nin || 'official'}.pdf`;
-                    await FileSystem.writeAsStringAsync(fileUri, pdfBase64, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
-                    if (await Sharing.isAvailableAsync()) {
-                        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                // If it's a direct web link/URL:
+                if (String(pdfBase64).startsWith('http://') || String(pdfBase64).startsWith('https://')) {
+                    if (Platform.OS === 'web') {
+                        const link = document.createElement('a');
+                        link.href = pdfBase64;
+                        link.target = '_blank';
+                        link.download = `nin_slip_${nin || 'official'}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        showAlert("Download Complete", "Official NIN Slip opening/downloaded.", "success");
+                        return;
                     } else {
-                        showAlert("Downloaded", `PDF saved to ${fileUri}`, "success");
+                        const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                        const fileUri = `${docDir}nin_slip_${nin || 'official'}.pdf`;
+                        await FileSystem.downloadAsync(pdfBase64, fileUri);
+                        if (await Sharing.isAvailableAsync()) {
+                            await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                        } else {
+                            showAlert("Downloaded", `PDF saved to ${fileUri}`, "success");
+                        }
+                        return;
                     }
-                    return;
+                }
+
+                // If it's Base64, clean prefix:
+                let cleanBase64 = String(pdfBase64);
+                if (cleanBase64.includes('base64,')) {
+                    cleanBase64 = cleanBase64.split('base64,')[1];
+                }
+                cleanBase64 = cleanBase64.trim().replace(/\s/g, '');
+
+                if (Platform.OS === 'web') {
+                    try {
+                        const byteCharacters = atob(cleanBase64);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: 'application/pdf' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        link.download = `nin_slip_${nin || 'official'}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+                        showAlert("Download Complete", "Official NIN Slip PDF downloaded.", "success");
+                        return;
+                    } catch (decErr) {
+                        console.warn("Base64 decode failed, falling back to HTML renderer", decErr);
+                    }
+                } else {
+                    try {
+                        const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                        const fileUri = `${docDir}nin_slip_${nin || 'official'}.pdf`;
+                        await FileSystem.writeAsStringAsync(fileUri, cleanBase64, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
+                        if (await Sharing.isAvailableAsync()) {
+                            await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                        } else {
+                            showAlert("Downloaded", `PDF saved to ${fileUri}`, "success");
+                        }
+                        return;
+                    } catch (fsErr) {
+                        console.warn("Native file save failed, falling back to HTML generator", fsErr);
+                    }
                 }
             }
             let html = '';
@@ -2186,7 +2238,7 @@ export default function VerifyNINScreen() {
 
     const renderSlip = () => {
         if (!result || !result.data) return null;
-switch(selectedLayout) {
+        switch(selectedLayout) {
             case 'premium': return <IDCardMockup data={result.data} />;
             case 'standard': return <StandardSlip data={result.data} />;
             case 'regular': return <RegularSlip data={result.data} />;
@@ -2197,11 +2249,29 @@ switch(selectedLayout) {
 
     if (result) {
         const personData = result.data?.data || result.data || {};
-        const pdfBase64 = personData.pdf_base64 || result.pdf_base64 || result.data?.pdf_base64;
+        const pdfBase64 = personData.pdf_base64 || result.pdf_base64 || result.data?.pdf_base64 || personData.slip_url || result.slip_url;
         
-        const fullName = [personData.firstname || personData.first_name, personData.middlename || personData.middle_name, personData.surname || personData.last_name].filter(Boolean).join(' ') || 'NIN Holder';
-        const displayNin = personData.nin || personData.number || nin || 'N/A';
+        const firstName = personData.firstname || personData.first_name || personData.firstName || '';
+        const middleName = personData.middlename || personData.middle_name || personData.middleName || '';
+        const surname = personData.surname || personData.last_name || personData.lastname || personData.lastName || 'RESIDENT';
+        const fullName = [firstName, middleName, surname].filter(Boolean).join(' ') || 'NIN Holder';
+        const rawNin = personData.nin || personData.number || nin || '';
+        const cleanNin = String(rawNin).replace(/\D/g, '');
+        const displayNin = cleanNin.length === 11
+            ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
+            : cleanNin || 'N/A';
         const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '105829-40LQTYW4PVJY';
+        const dob = formatDob(personData.dob || personData.birthdate || personData.dateOfBirth || '');
+        const gender = (personData.gender || personData.sex || 'M').trim().toUpperCase().startsWith('F') ? 'FEMALE' : 'MALE';
+        const phone = personData.phone || personData.phoneNumber || personData.telephoneno || 'Not Provided';
+        const stateOfOrigin = personData.birthstate || personData.birthState || personData.state_of_origin || 'N/A';
+        const lgaOfOrigin = personData.birthlga || personData.birthLga || personData.lga_of_origin || 'N/A';
+        const residenceAddress = personData.residence_address || personData.address || 'N/A';
+        const residenceState = personData.residence_state || personData.state || 'N/A';
+        const residenceLga = personData.residence_lga || personData.lga || 'N/A';
+        const issueDate = personData.issueDate || personData.issue_date ? formatDob(personData.issueDate || personData.issue_date) : '01 JAN 2021';
+        const transactionId = personData.transaction_id || result.transaction_id || `TXN-${Date.now()}`;
+
         const formattedDate = (() => {
             const d = new Date();
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -2215,41 +2285,37 @@ switch(selectedLayout) {
             : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRL363G0d9u3u5YQ&s';
 
         return (
-            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+            <View style={{ flex: 1, backgroundColor: '#060d21' }}>
                 <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#f5a623', headerShadowVisible: false }} />
+                <StatusBar style="light" />
 
-                {/* Offscreen Hidden ViewShot for PDF & PNG download rendering */}
-                <View style={{ position: 'absolute', top: -9999, left: -9999, opacity: 0, pointerEvents: 'none' }}>
-                    <View nativeID="slip-preview-container" style={{ width: 420, backgroundColor: '#ffffff' }}>
-                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff' }}>
-                            {renderSlip()}
-                        </ViewShot>
-                    </View>
-                </View>
-
-                {/* Format Choice Modal matching user screenshot */}
+                {/* Format Choice Modal */}
                 <Modal
                     transparent
                     visible={isDownloadModalOpen}
                     animationType="fade"
                     onRequestClose={() => setIsDownloadModalOpen(false)}
                 >
-                    <View style={{ flex: 1, backgroundColor: 'rgba(6, 13, 33, 0.75)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
-                            <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 16 }}>Download slip as</Text>
-                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 4, marginBottom: 20 }}>Choose a format</Text>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(6, 13, 33, 0.85)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <View style={{ backgroundColor: '#0d1b3e', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', borderWidth: 1, borderColor: '#1e293b' }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                                <Ionicons name="download-outline" size={24} color="#f5a623" />
+                            </View>
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 17 }}>Download Official Slip</Text>
+                            <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 4, marginBottom: 20 }}>Choose your preferred export format</Text>
 
-                            <View style={{ flexDirection: 'row', gap: 16, width: '100%', marginBottom: 20 }}>
+                            <View style={{ flexDirection: 'row', gap: 14, width: '100%', marginBottom: 18 }}>
                                 <TouchableOpacity 
                                     onPress={() => {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPdf();
                                     }}
-                                    style={{ flex: 1, backgroundColor: '#fffbeb', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fde68a' }}
+                                    style={{ flex: 1, backgroundColor: 'rgba(245, 166, 35, 0.08)', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#f5a623' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="document-text-outline" size={32} color="#d97706" />
-                                    <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF</Text>
+                                    <Ionicons name="document-text" size={32} color="#f5a623" />
+                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF Document</Text>
+                                    <Text style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>Print-ready slip</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -2257,103 +2323,222 @@ switch(selectedLayout) {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPng();
                                     }}
-                                    style={{ flex: 1, backgroundColor: '#fffbeb', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fde68a' }}
+                                    style={{ flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#10b981' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="copy-outline" size={32} color="#d97706" />
-                                    <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image</Text>
+                                    <Ionicons name="image" size={32} color="#10b981" />
+                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image (PNG)</Text>
+                                    <Text style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>High-res card</Text>
                                 </TouchableOpacity>
                             </View>
 
                             <TouchableOpacity onPress={() => setIsDownloadModalOpen(false)} style={{ paddingVertical: 6 }}>
-                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                                <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </Modal>
 
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
-                    {/* Header Gradient Banner (Navy & Gold Brand) */}
-                    <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="shield-checkmark-outline" size={16} color="#f5a623" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginLeft: 6 }}>Verification Details</Text>
+                <ScrollView style={{ flex: 1, backgroundColor: '#f8fafc' }} contentContainerStyle={{ paddingBottom: 60 }}>
+                    {/* Header Gradient Banner */}
+                    <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 18, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 540 }}>
+                            <TouchableOpacity onPress={() => setResult(null)} style={{ padding: 6, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)' }}>
+                                <Ionicons name="arrow-back" size={20} color="#ffffff" />
+                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="shield-checkmark" size={16} color="#10b981" />
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15, marginLeft: 6 }}>NIMC Verified Identity</Text>
+                            </View>
+                            <View style={{ width: 32 }} />
                         </View>
-                        <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
-                            {selectedLayout.toUpperCase()} • NIN
+                        <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 8 }}>
+                            Official Identity Record
                         </Text>
                     </LinearGradient>
 
                     {/* Centered User Photo and Avatar with Checkmark Badge */}
-                    <View style={{ alignItems: 'center', marginTop: -42, paddingHorizontal: 16 }}>
+                    <View style={{ alignItems: 'center', marginTop: -38, paddingHorizontal: 16 }}>
                         <View style={{ position: 'relative' }}>
-                            <Image source={{ uri: photoUri }} style={{ width: 92, height: 104, borderRadius: 18, borderWidth: 4, borderColor: '#ffffff', backgroundColor: '#f1f5f9' }} />
-                            <View style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 }}>
-                                <Ionicons name="checkmark-circle-sharp" size={20} color="#16a34a" />
+                            <Image source={{ uri: photoUri }} style={{ width: 88, height: 100, borderRadius: 18, borderWidth: 4, borderColor: '#ffffff', backgroundColor: '#e2e8f0' }} />
+                            <View style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#ffffff' }}>
+                                <Ionicons name="checkmark" size={18} color="#ffffff" />
                             </View>
                         </View>
 
-                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12, textAlign: 'center', letterSpacing: 0.3 }}>
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 10, textAlign: 'center', letterSpacing: 0.3 }}>
                             {fullName}
                         </Text>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: '#86efac', marginTop: 8 }}>
-                            <Ionicons name="checkmark" size={14} color="#16a34a" />
-                            <Text style={{ color: '#15803d', fontWeight: '800', fontSize: 12, marginLeft: 4 }}>Verified</Text>
+                        {/* Verified Pill */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: '#86efac', marginTop: 6 }}>
+                            <Ionicons name="shield-checkmark" size={13} color="#16a34a" />
+                            <Text style={{ color: '#15803d', fontWeight: '800', fontSize: 11, marginLeft: 4 }}>
+                                NIMC Database Match
+                            </Text>
                         </View>
 
-                        {/* Summary Details Card Container */}
-                        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 440, marginTop: 20, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT ID</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 12 }}>{trackingId}</Text>
+                        {/* Interactive Slip Format Switcher Tabs */}
+                        <View style={{ width: '100%', maxWidth: 540, marginTop: 20 }}>
+                            <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, textAlign: 'center' }}>
+                                Interactive Slip Preview
+                            </Text>
+                            <View style={{ flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 14, padding: 4, gap: 4 }}>
+                                {[
+                                    { id: 'premium', label: 'Premium' },
+                                    { id: 'standard', label: 'Standard' },
+                                    { id: 'regular', label: 'Regular' },
+                                    { id: 'info', label: 'Full Info' },
+                                ].map((tab) => {
+                                    const active = selectedLayout === tab.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={tab.id}
+                                            onPress={() => setSelectedLayout(tab.id)}
+                                            style={{
+                                                flex: 1,
+                                                paddingVertical: 8,
+                                                borderRadius: 10,
+                                                backgroundColor: active ? '#060d21' : 'transparent',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={{ color: active ? '#f5a623' : '#64748b', fontWeight: active ? '900' : '700', fontSize: 12 }}>
+                                                {tab.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </View>
+                        </View>
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN NUMBER</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>{displayNin}</Text>
+                        {/* Live Visible Slip Container (Never hidden!) */}
+                        <View style={{ width: '100%', maxWidth: 540, marginTop: 14, alignItems: 'center' }}>
+                            <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 }}>
+                                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff' }}>
+                                    {renderSlip()}
+                                </ViewShot>
                             </View>
+                        </View>
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT TYPE</Text>
-                                <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 }}>
-                                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 11 }}>NIN</Text>
+                        {/* Direct Download Actions Bar */}
+                        <View style={{ flexDirection: 'row', gap: 12, width: '100%', maxWidth: 540, marginTop: 18 }}>
+                            <TouchableOpacity 
+                                onPress={handleDownloadPdf}
+                                disabled={isSaving}
+                                style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#f5a623', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 2 }}
+                                activeOpacity={0.8}
+                            >
+                                {isSaving ? <ActivityIndicator color="#060d21" size="small" /> : (
+                                    <>
+                                        <Ionicons name="document-text" size={18} color="#060d21" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 14 }}>Download PDF</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={handleDownloadPng}
+                                disabled={isSaving}
+                                style={{ flex: 1, backgroundColor: '#060d21', height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e293b' }}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="image" size={18} color="#f5a623" style={{ marginRight: 6 }} />
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>Save PNG Image</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Comprehensive Verified Data Sheet */}
+                        <View style={{ backgroundColor: '#ffffff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 540, marginTop: 22, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
+                            {/* Card Header */}
+                            <View style={{ backgroundColor: '#060d21', paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="card" size={16} color="#f5a623" style={{ marginRight: 6 }} />
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>Official NIN Identity Card Details</Text>
+                                </View>
+                                <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }}>
+                                    <Text style={{ color: '#10b981', fontWeight: '900', fontSize: 10 }}>ACTIVE</Text>
                                 </View>
                             </View>
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>SLIP</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>{selectedLayout}</Text>
+                            {/* Field: Full Legal Name */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>FULL LEGAL NAME</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase' }}>{fullName}</Text>
                             </View>
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>DATE & TIME</Text>
+                            {/* Field: NIN Number with Copy Button */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>NIN NUMBER</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Text style={{ color: '#059669', fontWeight: '900', fontSize: 14, letterSpacing: 0.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                        {displayNin}
+                                    </Text>
+                                    <TouchableOpacity 
+                                        onPress={async () => {
+                                            try {
+                                                await Clipboard.setString(cleanNin);
+                                                showAlert('NIN Copied', `${cleanNin} copied to clipboard.`, 'success');
+                                            } catch (_) {}
+                                        }}
+                                        style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="copy-outline" size={12} color="#0f172a" style={{ marginRight: 3 }} />
+                                        <Text style={{ color: '#0f172a', fontSize: 10, fontWeight: '800' }}>Copy</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Field: Date of Birth & Gender */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>BIRTHDATE / GENDER</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{dob} • {gender}</Text>
+                            </View>
+
+                            {/* Field: Phone Number */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>REGISTERED PHONE</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{phone}</Text>
+                            </View>
+
+                            {/* Field: State of Origin & LGA */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>ORIGIN (STATE / LGA)</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>{stateOfOrigin} / {lgaOfOrigin}</Text>
+                            </View>
+
+                            {/* Field: Residential Address */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', marginTop: 2 }}>ADDRESS</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 12, textAlign: 'right', maxWidth: '65%' }}>
+                                    {[residenceAddress, residenceLga, residenceState].filter(x => x && x !== 'N/A').join(', ') || 'N/A'}
+                                </Text>
+                            </View>
+
+                            {/* Field: Tracking ID & Issue Date */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>TRACKING ID</Text>
+                                <Text style={{ color: '#475569', fontWeight: '800', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>{trackingId}</Text>
+                            </View>
+
+                            {/* Field: Gateway & Time */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>VERIFIED AT</Text>
                                 <Text style={{ color: '#475569', fontWeight: '700', fontSize: 12 }}>{formattedDate}</Text>
                             </View>
                         </View>
 
-                        {/* Primary Download Slip Button (Gold Brand Theme) */}
-                        <TouchableOpacity 
-                            onPress={() => setIsDownloadModalOpen(true)}
-                            style={{ backgroundColor: '#d97706', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 440, marginTop: 20, shadowColor: '#d97706', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
-                            activeOpacity={0.8}
-                        >
-                            {isSaving ? <ActivityIndicator color="#ffffff" size="small" /> : (
-                                <>
-                                    <Ionicons name="download-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
-                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Download Slip</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Back Link */}
+                        {/* Return Button */}
                         <TouchableOpacity 
                             onPress={() => setResult(null)} 
-                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 4 }}
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, marginTop: 8 }}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="chevron-back" size={16} color="#d97706" style={{ marginRight: 2 }} />
-                            <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 14 }}>Back to Slip List</Text>
+                            <Ionicons name="arrow-back-circle-outline" size={20} color="#059669" style={{ marginRight: 6 }} />
+                            <Text style={{ color: '#059669', fontWeight: '900', fontSize: 15 }}>Verify Another NIN</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>

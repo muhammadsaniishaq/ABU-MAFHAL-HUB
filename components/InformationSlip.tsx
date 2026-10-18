@@ -8,8 +8,9 @@ import { View, Text, Image, StyleSheet, Platform } from 'react-native';
 import Svg, { Circle, Rect, Text as SvgText, Ellipse, Path } from 'react-native-svg';
 
 const getVal = (data: any, keys: string[], fallback = ''): string => {
+    const target = data?.data && typeof data.data === 'object' && !Array.isArray(data.data) ? { ...data.data, ...data } : (data || {});
     for (const k of keys) {
-        const v = data?.[k];
+        const v = target[k];
         if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
     }
     return fallback;
@@ -31,10 +32,11 @@ const formatDob = (raw: string): string => {
 };
 
 const resolvePhoto = (photo: string | undefined | null): string | null => {
-    if (!photo || photo.trim() === '') return null;
-    if (photo.startsWith('data:')) return photo;
-    if (photo.startsWith('http://') || photo.startsWith('https://')) return photo;
-    return `data:image/jpeg;base64,${photo}`;
+    if (!photo || String(photo).trim() === '') return null;
+    const p = String(photo).trim();
+    if (p.startsWith('data:')) return p;
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    return `data:image/jpeg;base64,${p}`;
 };
 
 const Silhouette = () => (

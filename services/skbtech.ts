@@ -68,6 +68,7 @@ export const SKBTechIdentityVerifier = {
             message: providerResponse.message || 'Request Processed Successfully',
             data: personData,
             pdf_base64: providerResponse.pdf_base64 || providerResponse.data?.pdf_base64 || data.pdf_base64,
+            slip_url: providerResponse.slip_url || providerResponse.data?.slip_url || data.slip_url || null,
           };
         }
       }

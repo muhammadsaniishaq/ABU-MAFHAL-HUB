@@ -234,17 +234,18 @@ serve(async (req: Request) => {
     const slipType = String(requestData.slip_type || requestData.layout || '').toUpperCase();
 
     switch (searchType) {
-      // ── NIN Endpoints ──
       case 'nin':
       case 'nin-slip':
       case 'nin-slip-v2':
+      case 'by-nin':
+      case 'nin-by-nin':
         if (slipType === 'STANDARD') {
           endpoint = '/nin/standard-slip';
         } else if (slipType === 'REGULAR') {
           endpoint = '/nin/regular-slip';
-        } else if (slipType === 'BASIC') {
+        } else if (slipType === 'BASIC' || slipType === 'INFO') {
           endpoint = '/nin/basic-slip';
-        } else if (slipType === 'BY_NIN' || slipType === 'DIRECT') {
+        } else if (slipType === 'BY_NIN' || slipType === 'DIRECT' || searchType === 'by-nin' || searchType === 'nin-by-nin') {
           endpoint = '/nin/by-nin';
         } else {
           // Default to premium full details
@@ -383,7 +384,8 @@ serve(async (req: Request) => {
       case 'vnin':
       case 'vnin-to-nibss':
         endpoint = '/vnin/premium-slip';
-        payload.vnin = requestData.vnin || searchValue;
+        payload.nin = requestData.nin || requestData.vnin || searchValue;
+        payload.vnin = requestData.vnin || requestData.nin || searchValue;
         break;
 
       // ── Status Poll Endpoint (Free) ──
@@ -514,38 +516,93 @@ serve(async (req: Request) => {
     }
 
     // ── Normalize Instant Identity Record Responses ──────────────────────────
-    let rawPerson: any = {};
+    const rawPerson: Record<string, any> = {};
 
-    if (Array.isArray(skbData.user_data)) {
-      if (skbData.user_data.length > 0 && typeof skbData.user_data[0] === 'object') {
-        rawPerson = { ...skbData.user_data[0] };
-      } else {
-        rawPerson = { user_data: skbData.user_data };
+    // 1. Merge root skbData fields (excluding wrapper keys)
+    for (const [k, v] of Object.entries(skbData)) {
+      if (!['user_data', 'data', 'details'].includes(k) && v !== undefined && v !== null) {
+        rawPerson[k] = v;
       }
-    } else if (skbData.user_data && typeof skbData.user_data === 'object') {
-      rawPerson = { ...skbData.user_data };
-    } else if (skbData.data && typeof skbData.data === 'object') {
-      rawPerson = { ...skbData.data };
-    } else {
-      rawPerson = { ...skbData };
     }
 
-    const firstName = rawPerson.firstname || rawPerson.firstName || rawPerson.first_name || '';
-    const lastName = rawPerson.surname || rawPerson.lastname || rawPerson.lastName || rawPerson.last_name || '';
-    const middleName = rawPerson.middlename || rawPerson.middleName || rawPerson.middle_name || '';
-    const ninNum = rawPerson.nin || rawPerson.number || (searchType.includes('nin') ? searchValue : '');
-    const bvnNum = rawPerson.bvn || (searchType.includes('bvn') ? searchValue : '');
-    const phoneNum = rawPerson.phone || rawPerson.phoneNumber || rawPerson.telephoneno || rawPerson.phone_number || '';
-    const dobVal = rawPerson.dob || rawPerson.dateOfBirth || rawPerson.birthdate || '';
-    const genderVal = rawPerson.gender || rawPerson.sex || '';
-    const photoVal = rawPerson.photo || rawPerson.image || rawPerson.base64Image || rawPerson.picture || rawPerson.face || '';
-    const pdfBase64Val = skbData.pdf_base64 || rawPerson.pdf_base64 || skbData.slip || rawPerson.slip || '';
-    const trackingIdVal = rawPerson.tracking_id || rawPerson.trackingId || rawPerson.ref || '';
-    const stateVal = rawPerson.residence_state || rawPerson.state || rawPerson.residenceState || '';
-    const lgaVal = rawPerson.residence_lga || rawPerson.lga || rawPerson.residenceLga || '';
-    const bStateVal = rawPerson.birthstate || rawPerson.birthState || '';
-    const bLgaVal = rawPerson.birthlga || rawPerson.birthLga || '';
-    const addressVal = rawPerson.residence_address || rawPerson.address || '';
+    // 2. Helper to unpack arrays/objects and map key-value descriptors
+    const unpackContainer = (container: any) => {
+      if (!container) return;
+      if (Array.isArray(container)) {
+        for (const item of container) {
+          if (!item) continue;
+          if (typeof item === 'object') {
+            // Check if item is a key-value pair descriptor e.g. { field: 'First Name', value: 'JOHN' }
+            const keyProp = item.field || item.title || item.key || item.label || item.name || item.property;
+            const valProp = item.value ?? item.val ?? item.data ?? item.text ?? item.content;
+            if (keyProp && valProp !== undefined) {
+              const cleanKey = String(keyProp).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+              rawPerson[cleanKey] = valProp;
+            }
+            // Also shallow copy all object properties
+            for (const [k, v] of Object.entries(item)) {
+              if (v !== undefined && v !== null && k !== 'field' && k !== 'title') {
+                rawPerson[k] = v;
+              }
+            }
+          }
+        }
+      } else if (typeof container === 'object') {
+        Object.assign(rawPerson, container);
+      }
+    };
+
+    // Unpack user_data, data, and details
+    unpackContainer(skbData.user_data);
+    unpackContainer(skbData.data);
+    unpackContainer(skbData.details);
+
+    // 3. Extract Slip Document / PDF / Image URLs
+    let slipDoc = skbData.pdf_base64 || rawPerson.pdf_base64 || skbData.slip || rawPerson.slip ||
+                  skbData.slip_url || rawPerson.slip_url || skbData.pdf || rawPerson.pdf ||
+                  skbData.document || rawPerson.document || '';
+    
+    // Check attachments array (SKBTECH returns links to slips in attachments)
+    if (!slipDoc && Array.isArray(skbData.attachments) && skbData.attachments.length > 0) {
+      slipDoc = skbData.attachments[0];
+    }
+    if (!slipDoc && Array.isArray(rawPerson.attachments) && rawPerson.attachments.length > 0) {
+      slipDoc = rawPerson.attachments[0];
+    }
+
+    // 4. Extract and normalize demographic fields
+    let firstName = rawPerson.firstname || rawPerson.firstName || rawPerson.first_name || rawPerson.first || rawPerson.given_name || rawPerson.given_names || '';
+    let lastName = rawPerson.surname || rawPerson.lastname || rawPerson.lastName || rawPerson.last_name || rawPerson.last || '';
+    let middleName = rawPerson.middlename || rawPerson.middleName || rawPerson.middle_name || rawPerson.middle || '';
+
+    // If full_name is present but parts are missing, split cleanly
+    if ((!firstName || !lastName) && (rawPerson.full_name || rawPerson.fullname || rawPerson.name)) {
+      const parts = String(rawPerson.full_name || rawPerson.fullname || rawPerson.name).trim().split(/\s+/);
+      if (parts.length === 1 && !firstName) {
+        firstName = parts[0];
+      } else if (parts.length === 2) {
+        if (!firstName) firstName = parts[0];
+        if (!lastName) lastName = parts[1];
+      } else if (parts.length >= 3) {
+        if (!firstName) firstName = parts[0];
+        if (!lastName) lastName = parts[parts.length - 1];
+        if (!middleName) middleName = parts.slice(1, -1).join(' ');
+      }
+    }
+
+    const ninNum = rawPerson.nin || rawPerson.number || rawPerson.nin_number || rawPerson.national_id || (searchType.includes('nin') ? searchValue : '');
+    const bvnNum = rawPerson.bvn || rawPerson.bvn_number || (searchType.includes('bvn') ? searchValue : '');
+    const phoneNum = rawPerson.phone || rawPerson.phoneNumber || rawPerson.phone_number || rawPerson.telephoneno || rawPerson.mobile || '';
+    const dobVal = rawPerson.dob || rawPerson.dateOfBirth || rawPerson.date_of_birth || rawPerson.birthdate || rawPerson.birth_date || '';
+    const genderVal = rawPerson.gender || rawPerson.sex || rawPerson.gender_id || '';
+    const photoVal = rawPerson.photo || rawPerson.image || rawPerson.picture || rawPerson.base64Image || rawPerson.base64_image || rawPerson.face || rawPerson.avatar || '';
+    const trackingIdVal = rawPerson.tracking_id || rawPerson.trackingId || rawPerson.trackingID || rawPerson.ref || rawPerson.reference || rawPerson.ticket_id || '';
+    const stateVal = rawPerson.residence_state || rawPerson.state || rawPerson.residenceState || rawPerson.state_of_residence || '';
+    const lgaVal = rawPerson.residence_lga || rawPerson.lga || rawPerson.residenceLga || rawPerson.lga_of_residence || '';
+    const bStateVal = rawPerson.birthstate || rawPerson.birthState || rawPerson.state_of_origin || rawPerson.origin_state || '';
+    const bLgaVal = rawPerson.birthlga || rawPerson.birthLga || rawPerson.lga_of_origin || rawPerson.origin_lga || '';
+    const addressVal = rawPerson.residence_address || rawPerson.address || rawPerson.address_line_1 || rawPerson.residenceAddress || '';
+    const issueDateVal = rawPerson.issueDate || rawPerson.issue_date || rawPerson.issuance_date || '';
 
     const normalized: any = {
       ...rawPerson,
@@ -561,13 +618,16 @@ serve(async (req: Request) => {
       middleName: middleName,
       nin: ninNum,
       number: ninNum,
+      nin_number: ninNum,
       bvn: bvnNum,
       phone: phoneNum,
       phoneNumber: phoneNum,
+      phone_number: phoneNum,
       telephoneno: phoneNum,
       dob: dobVal,
       birthdate: dobVal,
       dateOfBirth: dobVal,
+      date_of_birth: dobVal,
       gender: genderVal,
       sex: genderVal,
       photo: photoVal,
@@ -582,9 +642,15 @@ serve(async (req: Request) => {
       lga: lgaVal,
       birthstate: bStateVal,
       birthlga: bLgaVal,
+      state_of_origin: bStateVal,
+      lga_of_origin: bLgaVal,
       residence_address: addressVal,
       address: addressVal,
-      pdf_base64: pdfBase64Val,
+      issue_date: issueDateVal,
+      issueDate: issueDateVal,
+      pdf_base64: slipDoc,
+      slip: slipDoc,
+      slip_url: String(slipDoc).startsWith('http') ? slipDoc : null,
       transaction_id: skbData.transaction_id || `TXN-${Date.now()}`,
     };
 
@@ -593,7 +659,8 @@ serve(async (req: Request) => {
         status: 'success',
         message: skbData.message || 'Verification Successful',
         data: normalized,
-        pdf_base64: pdfBase64Val,
+        pdf_base64: slipDoc,
+        slip_url: String(slipDoc).startsWith('http') ? slipDoc : null,
         transaction_id: skbData.transaction_id,
       }
     });
