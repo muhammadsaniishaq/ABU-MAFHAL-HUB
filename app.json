@@ -44,7 +44,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-asset",
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       [
