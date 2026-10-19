@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, LayoutAnimation, Modal, FlatList, StyleSheet, Linking } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -293,7 +293,7 @@ export default function DataScreen() {
     // UI states
     const [balance, setBalance] = useState<number | null>(null);
     const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
-    const [contactModalTab, setContactModalTab] = useState<'phonebook' | 'beneficiaries'>('phonebook');
+    const [contactModalTab, setContactModalTab] = useState<'beneficiaries' | 'add' | 'phonebook'>('beneficiaries');
     const [loadingDeviceContacts, setLoadingDeviceContacts] = useState(false);
     const [contactsPermissionGranted, setContactsPermissionGranted] = useState<boolean | null>(null);
     const [showSecurityModal, setShowSecurityModal] = useState(false);
@@ -303,6 +303,13 @@ export default function DataScreen() {
     const [lastTransaction, setLastTransaction] = useState<any>(null);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [beneficiarySearch, setBeneficiarySearch] = useState('');
+
+    // Beneficiary Manager States
+    const [newBenName, setNewBenName] = useState('');
+    const [newBenPhone, setNewBenPhone] = useState('');
+    const [newBenNetwork, setNewBenNetwork] = useState('');
+    const [savingBen, setSavingBen] = useState(false);
+    const [dismissedMismatchPhone, setDismissedMismatchPhone] = useState('');
     
     // Premium features states
     const [autoRenew, setAutoRenew] = useState(false);
@@ -512,23 +519,219 @@ export default function DataScreen() {
     };
 
     const fetchBeneficiaries = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { data } = await supabase.from('beneficiaries').select('*').eq('user_id', user.id);
-            if (data) setBeneficiaries(data);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // 1. Instant load from local storage cache
+            const cached = await AsyncStorage.getItem(`@data_beneficiaries_${user.id}`);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setBeneficiaries(parsed);
+                    }
+                } catch (_) {}
+            }
+
+            // 2. Fetch latest from Supabase
+            const { data } = await supabase
+                .from('beneficiaries')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (data && Array.isArray(data)) {
+                const normalized = data.map((b: any) => {
+                    const rawPhone = b.phone_number || b.account_number || b.phone || '';
+                    const cleanPhone = cleanNigerianPhone(rawPhone);
+                    const rawNet = (b.bank_name || b.network || '').toLowerCase();
+                    let netId = '';
+                    if (rawNet.includes('mtn')) netId = 'mtn';
+                    else if (rawNet.includes('airtel')) netId = 'airtel';
+                    else if (rawNet.includes('glo')) netId = 'glo';
+                    else if (rawNet.includes('9mobile') || rawNet.includes('etisalat')) netId = '9mobile';
+                    else if (rawNet.includes('vitel') || rawNet.includes('vital')) netId = 'vitel';
+
+                    return {
+                        id: b.id ? String(b.id) : undefined,
+                        name: b.name || 'Beneficiary',
+                        phone: cleanPhone || rawPhone,
+                        network: netId || undefined,
+                        created_at: b.created_at,
+                    };
+                }).filter((b: any) => b.phone && b.phone.length >= 10);
+
+                // Deduplicate by phone
+                const uniqueBens: any[] = [];
+                const seen = new Set<string>();
+                normalized.forEach((b: any) => {
+                    if (!seen.has(b.phone)) {
+                        seen.add(b.phone);
+                        uniqueBens.push(b);
+                    }
+                });
+
+                setBeneficiaries(uniqueBens);
+                await AsyncStorage.setItem(`@data_beneficiaries_${user.id}`, JSON.stringify(uniqueBens));
+            }
+        } catch (err) {
+            console.warn("fetchBeneficiaries error:", err);
         }
     };
+
+    // Save a new beneficiary directly
+    const handleSaveNewBeneficiary = async (name: string, phone: string, netId?: string) => {
+        const cleaned = cleanNigerianPhone(phone);
+        if (!name.trim()) {
+            showBrandAlert("Name Required", "Please enter a name or nickname for the beneficiary.", "warning");
+            return;
+        }
+        if (!cleaned || cleaned.length !== 11) {
+            showBrandAlert("Invalid Phone", "Please enter a valid 11-digit Nigerian mobile number.", "warning");
+            return;
+        }
+        setSavingBen(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Please log in to save beneficiaries");
+
+            const targetNet = netId || getCarrierForPhone(cleaned)?.id || network || 'mtn';
+            const netName = NETWORKS_DATA.find(n => n.id === targetNet)?.name || targetNet.toUpperCase();
+
+            const { data, error } = await supabase.from('beneficiaries').insert({
+                user_id: user.id,
+                account_number: cleaned,
+                phone_number: cleaned,
+                name: name.trim(),
+                bank_name: netName,
+                type: 'data'
+            }).select().single();
+
+            const newBen = {
+                id: data?.id ? String(data.id) : `local-${Date.now()}`,
+                name: name.trim(),
+                phone: cleaned,
+                network: targetNet
+            };
+
+            const updated = [newBen, ...beneficiaries.filter((b: any) => b.phone !== cleaned)];
+            setBeneficiaries(updated);
+            await AsyncStorage.setItem(`@data_beneficiaries_${user.id}`, JSON.stringify(updated));
+
+            // Select this new beneficiary
+            setPhoneNumber(cleaned);
+            setNetwork(targetNet);
+            setRecipientName(name.trim());
+            setPurchaseMode('others');
+            setNewBenName('');
+            setNewBenPhone('');
+            setNewBenNetwork('');
+            setShowContactModal(false);
+
+            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+            showBrandAlert("Beneficiary Saved", `${name.trim()} (${cleaned}) added successfully!`, "success");
+        } catch (err: any) {
+            console.error("Save beneficiary error:", err);
+            showBrandAlert("Save Failed", err.message || "Failed to save beneficiary.", "error");
+        } finally {
+            setSavingBen(false);
+        }
+    };
+
+    // Delete a beneficiary
+    const handleDeleteBeneficiary = async (item: any) => {
+        Alert.alert(
+            "Delete Beneficiary",
+            `Are you sure you want to remove ${item.name} (${item.phone})?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (user) {
+                                if (item.id) {
+                                    await supabase.from('beneficiaries').delete().eq('id', item.id);
+                                } else {
+                                    await supabase.from('beneficiaries').delete().eq('user_id', user.id).eq('account_number', item.phone);
+                                }
+                                const updated = beneficiaries.filter((b: any) => b.phone !== item.phone && b.id !== item.id);
+                                setBeneficiaries(updated);
+                                await AsyncStorage.setItem(`@data_beneficiaries_${user.id}`, JSON.stringify(updated));
+                                showBrandAlert("Deleted", `${item.name} removed from beneficiaries.`, "info");
+                            }
+                        } catch (err) {
+                            console.warn("Delete beneficiary error:", err);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    // Helper to get network carrier based on 4-digit prefix
+    const getCarrierForPhone = useCallback((phone: string) => {
+        const cleanPhone = (phone || '').replace(/\D/g, '');
+        if (cleanPhone.length < 4) return null;
+        const prefix = cleanPhone.substring(0, 4);
+        for (const net of networksData) {
+            if (net.prefixes.includes(prefix)) {
+                return net;
+            }
+        }
+        return null;
+    }, [networksData]);
+
+    // Smart Carrier Detection & Mismatch Warning
+    const detectedCarrier = useMemo(() => {
+        return getCarrierForPhone(phoneNumber);
+    }, [phoneNumber, getCarrierForPhone]);
+
+    const isNetworkMismatch = Boolean(
+        network &&
+        detectedCarrier &&
+        detectedCarrier.id !== network &&
+        dismissedMismatchPhone !== phoneNumber &&
+        phoneNumber.length >= 4
+    );
+
+    // AI Smart Pick / Value Advisor for current network
+    const smartPickPlan = useMemo(() => {
+        if (!plans || plans.length === 0) return null;
+        const validPlans = plans.filter(p => {
+            const info = parsePlanInfo(p.volume, p.originalName || p.name, p.validity);
+            return info.volumeInGB >= 1 && p.price > 0;
+        });
+        if (validPlans.length === 0) return plans[0] || null;
+
+        let best = validPlans[0];
+        let bestRatio = Infinity;
+        for (const p of validPlans) {
+            const info = parsePlanInfo(p.volume, p.originalName || p.name, p.validity);
+            const ratio = p.price / info.volumeInGB;
+            // Prioritize popular everyday sizes (1GB, 2GB, 3GB, 5GB)
+            const isPopular = [1, 2, 3, 5].includes(info.volumeInGB);
+            const adjustedRatio = isPopular ? ratio * 0.9 : ratio;
+            if (adjustedRatio < bestRatio) {
+                bestRatio = adjustedRatio;
+                best = p;
+            }
+        }
+        return best;
+    }, [plans]);
 
     // Auto-detect Network
     const detectNetwork = useCallback((phone: string) => {
         const cleanPhone = phone.replace(/\D/g, '');
         if (cleanPhone.length >= 4) {
             const prefix = cleanPhone.substring(0, 4);
-            // We use the functional state update so we don't depend on `network` state
             setNetworksData(currentNetworks => {
                 const found = currentNetworks.find(n => n.prefixes.includes(prefix));
                 if (found) {
-                     setNetwork(prev => found.id !== prev ? found.id : prev);
+                    setNetwork(prev => found.id !== prev ? found.id : prev);
                 }
                 return currentNetworks;
             });
@@ -728,14 +931,28 @@ export default function DataScreen() {
             if (result.success) {
                 // Save Beneficiary if requested
                 if (isSaveBeneficiary && phoneNumber) {
+                    const benName = recipientName.trim() || `Beneficiary (${phoneNumber.slice(-4)})`;
+                    const netName = NETWORKS_DATA.find(n => n.id === network)?.name || network.toUpperCase();
                     await supabase.from('beneficiaries').insert({
                         user_id: user.id,
                         account_number: phoneNumber,
                         phone_number: phoneNumber,
-                        name: recipientName || `Data Beneficiary`,
-                        bank_name: NETWORKS_DATA.find(n => n.id === network)?.name || network,
+                        name: benName,
+                        bank_name: netName,
                         type: 'data'
-                    }).then(({error}: any) => { if (error) console.log(error) });
+                    }).then(({ data, error }: any) => {
+                        if (!error) {
+                            const newBen = {
+                                id: data?.id ? String(data.id) : `local-${Date.now()}`,
+                                name: benName,
+                                phone: phoneNumber,
+                                network: network
+                            };
+                            const updated = [newBen, ...beneficiaries.filter((b: any) => b.phone !== phoneNumber)];
+                            setBeneficiaries(updated);
+                            AsyncStorage.setItem(`@data_beneficiaries_${user.id}`, JSON.stringify(updated)).catch(() => {});
+                        }
+                    });
                 }
 
                 // Send Notification
@@ -913,13 +1130,31 @@ export default function DataScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Phone Number Input */}
+                    {/* Phone Number Input & Smart Beneficiaries Bar */}
                     {purchaseMode === 'others' && (
                         <View style={{ marginBottom: 12 }}>
-                            <View style={s.sectionHeader}>
-                                <Ionicons name="phone-portrait-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                                <Text style={s.sectionTitle}>Phone Number</Text>
+                            <View style={[s.sectionHeader, { justifyContent: 'space-between' }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="phone-portrait-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                    <Text style={s.sectionTitle}>Phone Number</Text>
+                                </View>
+                                {beneficiaries.length > 0 && (
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setContactModalTab('beneficiaries');
+                                            handleOpenContactModal();
+                                        }}
+                                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="people" size={13} color="#0056D2" style={{ marginRight: 3 }} />
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#0056D2' }}>
+                                            Manage ({beneficiaries.length})
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
+
                             <View style={[s.inputBoxContainer, phoneNumber.length > 0 && s.inputBoxFocused]}>
                                 <View style={s.inputBoxLogoWrapper}>
                                     {network ? (
@@ -955,65 +1190,219 @@ export default function DataScreen() {
                                     onPress={handleLaunchNativeContactPicker}
                                     style={[s.beneficiaryBtn, { marginLeft: 4, backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
                                     activeOpacity={0.7}
+                                    accessibilityLabel="Open Phone Contacts"
                                 >
                                     <Ionicons name="person-add" size={15} color="#16a34a" />
                                 </TouchableOpacity>
 
-                                {beneficiaries.length > 0 && (
-                                    <TouchableOpacity 
-                                        onPress={() => {
-                                            setGiftingBeneficiaryActive(false);
-                                            handleOpenContactModal();
-                                        }}
-                                        style={[s.beneficiaryBtn, { marginLeft: 4 }]}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons name="people" size={15} color="#0056D2" />
-                                    </TouchableOpacity>
-                                )}
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setGiftingBeneficiaryActive(false);
+                                        setContactModalTab('beneficiaries');
+                                        handleOpenContactModal();
+                                    }}
+                                    style={[s.beneficiaryBtn, { marginLeft: 4, backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
+                                    activeOpacity={0.7}
+                                    accessibilityLabel="Open Saved Beneficiaries"
+                                >
+                                    <Ionicons name="people" size={15} color="#0056D2" />
+                                </TouchableOpacity>
                             </View>
 
-                            {phoneNumber.length === 11 && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, paddingHorizontal: 4 }}>
-                                    <Ionicons name="checkmark-circle" size={13} color="#16a34a" style={{ marginRight: 4 }} />
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#16a34a' }}>
-                                        {network ? `${networksData.find(n => n.id === network)?.name || network.toUpperCase()} Active` : '11-digit Valid Number'}
+                            {/* Smart Live Formatted Phone & Digit Counter */}
+                            {phoneNumber.length > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, marginTop: -4, marginBottom: 6 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b' }}>
+                                            {phoneNumber.length >= 4 
+                                                ? `${phoneNumber.slice(0, 4)} ${phoneNumber.slice(4, 7)} ${phoneNumber.slice(7)}`.trim()
+                                                : phoneNumber}
+                                        </Text>
+                                        {detectedCarrier && (
+                                            <View style={{ marginLeft: 6, backgroundColor: '#f1f5f9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                                                <Text style={{ fontSize: 9.5, fontWeight: '800', color: detectedCarrier.color || '#475569' }}>
+                                                    {detectedCarrier.name}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: phoneNumber.length === 11 ? '#16a34a' : '#d97706' }}>
+                                        {phoneNumber.length === 11 ? '✓ 11/11 digits' : `${phoneNumber.length}/11 digits`}
                                     </Text>
                                 </View>
                             )}
 
-                            {/* Quick Beneficiaries Chips */}
-                            {beneficiaries.length > 0 && (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginTop: 2, marginBottom: 8 }}>
-                                    {beneficiaries.slice(0, 5).map((b: any, i: number) => {
-                                        const phone = b.phone_number || b.phone || b;
+                            {/* SMART FEATURE 1: Network Mismatch Warning & 1-Tap Switcher */}
+                            {isNetworkMismatch && detectedCarrier && (
+                                <View style={{
+                                    backgroundColor: '#fffbeb',
+                                    borderWidth: 1.5,
+                                    borderColor: '#f59e0b',
+                                    borderRadius: 14,
+                                    padding: 10,
+                                    marginBottom: 8,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    shadowColor: '#f59e0b',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 4,
+                                    elevation: 2,
+                                }}>
+                                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#fef3c7', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                        <Ionicons name="warning" size={18} color="#d97706" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#92400e' }}>
+                                            Network Mismatch Detected
+                                        </Text>
+                                        <Text style={{ fontSize: 10.5, color: '#b45309', marginTop: 1 }}>
+                                            Number prefix ({phoneNumber.slice(0, 4)}) is <Text style={{ fontWeight: '800' }}>{detectedCarrier.name}</Text>, but you chose <Text style={{ fontWeight: '800' }}>{networksData.find(n => n.id === network)?.name || network.toUpperCase()}</Text>.
+                                        </Text>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setNetwork(detectedCarrier.id);
+                                                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                                                showBrandAlert("Switched Network", `Switched to ${detectedCarrier.name} automatically!`, "success");
+                                            }}
+                                            style={{
+                                                backgroundColor: '#d97706',
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 5,
+                                                borderRadius: 8,
+                                                alignSelf: 'flex-start',
+                                                marginTop: 6,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <Ionicons name="flash" size={11} color="#ffffff" style={{ marginRight: 4 }} />
+                                            <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#ffffff' }}>
+                                                Switch to {detectedCarrier.name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => setDismissedMismatchPhone(phoneNumber)}
+                                        style={{ padding: 4, alignSelf: 'flex-start' }}
+                                    >
+                                        <Ionicons name="close" size={16} color="#92400e" />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {/* Interactive Beneficiaries Quick Bar */}
+                            <View style={{ marginTop: 2, marginBottom: 8 }}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 }}>
+                                    {/* + Add Beneficiary Chip */}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setContactModalTab('add');
+                                            setShowContactModal(true);
+                                        }}
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            backgroundColor: '#eff6ff',
+                                            borderColor: '#93c5fd',
+                                            borderWidth: 1,
+                                            borderStyle: 'dashed',
+                                            paddingHorizontal: 10,
+                                            paddingVertical: 6,
+                                            borderRadius: 14,
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="add-circle" size={14} color="#0056D2" style={{ marginRight: 4 }} />
+                                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0056D2' }}>
+                                            + Add
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* Beneficiary Chips */}
+                                    {beneficiaries.map((b: any, i: number) => {
+                                        const phone = b.phone_number || b.phone || b.account_number || b;
                                         const label = b.name || phone;
                                         const isSelected = phoneNumber === phone;
+                                        const benNet = b.network || getCarrierForPhone(phone)?.id;
+
                                         return (
                                             <TouchableOpacity
-                                                key={i}
-                                                onPress={() => handlePhoneChange(phone)}
+                                                key={b.id || i}
+                                                onPress={() => {
+                                                    setPhoneNumber(phone);
+                                                    if (benNet && NETWORKS_DATA.some(n => n.id === benNet)) {
+                                                        setNetwork(benNet);
+                                                    } else {
+                                                        detectNetwork(phone);
+                                                    }
+                                                    if (b.name) setRecipientName(b.name);
+                                                    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                                                }}
                                                 style={{
                                                     flexDirection: 'row',
                                                     alignItems: 'center',
                                                     backgroundColor: isSelected ? '#0d1b3e' : '#ffffff',
                                                     borderColor: isSelected ? '#0d1b3e' : '#e2e8f0',
-                                                    borderWidth: 1,
-                                                    paddingHorizontal: 9,
-                                                    paddingVertical: 4,
+                                                    borderWidth: 1.5,
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 5,
                                                     borderRadius: 14,
-                                                    marginRight: 6,
+                                                    shadowColor: '#000',
+                                                    shadowOffset: { width: 0, height: 1 },
+                                                    shadowOpacity: isSelected ? 0.12 : 0.02,
+                                                    shadowRadius: 3,
+                                                    elevation: isSelected ? 2 : 1,
                                                 }}
+                                                activeOpacity={0.75}
                                             >
-                                                <Ionicons name="person-circle-outline" size={12} color={isSelected ? '#f5a623' : '#64748b'} style={{ marginRight: 4 }} />
-                                                <Text style={{ fontSize: 10, fontWeight: '700', color: isSelected ? '#ffffff' : '#475569' }}>
-                                                    {label}
-                                                </Text>
+                                                <View style={{
+                                                    width: 18,
+                                                    height: 18,
+                                                    borderRadius: 9,
+                                                    backgroundColor: isSelected ? '#f5a623' : '#eff6ff',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    marginRight: 6,
+                                                }}>
+                                                    <Text style={{ fontSize: 9.5, fontWeight: '900', color: isSelected ? '#0d1b3e' : '#0056D2' }}>
+                                                        {(label || 'B').charAt(0).toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                                <View>
+                                                    <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? '#ffffff' : '#1e293b' }} numberOfLines={1}>
+                                                        {label}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 9, color: isSelected ? 'rgba(255,255,255,0.7)' : '#64748b' }}>
+                                                        {phone.slice(-4)} • {benNet ? benNet.toUpperCase() : 'SIM'}
+                                                    </Text>
+                                                </View>
                                             </TouchableOpacity>
                                         );
                                     })}
+
+                                    {/* View All Button */}
+                                    {beneficiaries.length > 3 && (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setContactModalTab('beneficiaries');
+                                                handleOpenContactModal();
+                                            }}
+                                            style={{
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 6,
+                                                borderRadius: 12,
+                                                backgroundColor: '#f1f5f9',
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#475569' }}>
+                                                View All →
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </ScrollView>
-                            )}
+                            </View>
                         </View>
                     )}
 
@@ -1490,6 +1879,76 @@ export default function DataScreen() {
                                             </View>
                                         </View>
                                     </View>
+                                    {/* SMART FEATURE 2: AI Smart Pick Recommendation */}
+                                    {network && smartPickPlan && (
+                                        <View style={{
+                                            backgroundColor: '#ffffff',
+                                            borderRadius: 16,
+                                            borderWidth: 1.5,
+                                            borderColor: '#fde68a',
+                                            padding: 12,
+                                            marginBottom: 12,
+                                            shadowColor: '#d97706',
+                                            shadowOffset: { width: 0, height: 2 },
+                                            shadowOpacity: 0.08,
+                                            shadowRadius: 6,
+                                            elevation: 2,
+                                            overflow: 'hidden',
+                                        }}>
+                                            <LinearGradient
+                                                colors={['#fffbeb', '#fef3c7']}
+                                                style={[StyleSheet.absoluteFillObject, { opacity: 0.95 }]}
+                                            />
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <View style={{ backgroundColor: '#f5a623', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, marginRight: 6 }}>
+                                                        <Text style={{ fontSize: 9.5, fontWeight: '900', color: '#0d1b3e', letterSpacing: 0.5 }}>⚡ AI SMART PICK</Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#78350f' }}>Recommended Value Bundle</Text>
+                                                </View>
+                                                <Text style={{ fontSize: 13, fontWeight: '900', color: '#b45309' }}>
+                                                    ₦{smartPickPlan.price.toLocaleString()}
+                                                </Text>
+                                            </View>
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <View style={{ flex: 1, marginRight: 10 }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0d1b3e' }} numberOfLines={1}>
+                                                        {smartPickPlan.name}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 10.5, color: '#92400e', marginTop: 1 }}>
+                                                        {smartPickPlan.validity || '30 Days'} • Lowest rate per GB on {networksData.find(n => n.id === network)?.name || network.toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setSelectedPlan(smartPickPlan);
+                                                        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+                                                    }}
+                                                    style={{
+                                                        backgroundColor: selectedPlan?.id === smartPickPlan.id ? '#0d1b3e' : '#f5a623',
+                                                        paddingHorizontal: 12,
+                                                        paddingVertical: 7,
+                                                        borderRadius: 10,
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                    }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons 
+                                                        name={selectedPlan?.id === smartPickPlan.id ? "checkmark-circle" : "flash"} 
+                                                        size={12} 
+                                                        color={selectedPlan?.id === smartPickPlan.id ? "#ffffff" : "#0d1b3e"} 
+                                                        style={{ marginRight: 4 }} 
+                                                    />
+                                                    <Text style={{ fontSize: 11, fontWeight: '800', color: selectedPlan?.id === smartPickPlan.id ? '#ffffff' : '#0d1b3e' }}>
+                                                        {selectedPlan?.id === smartPickPlan.id ? 'Selected' : 'Select'}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+
                                     {filteredPlans.map((plan) => {
                                         const isSelected = selectedPlan?.id === plan.id;
                                         const isFav = favorites.includes(plan.id);
@@ -1924,12 +2383,17 @@ export default function DataScreen() {
             return (c.name || '').toLowerCase().includes(query) || (c.phone || '').includes(query);
         });
 
-        const handleSelectRecipient = (phoneVal: string, nameVal?: string) => {
+        const handleSelectRecipient = (phoneVal: string, nameVal?: string, netVal?: string) => {
             const cleaned = cleanNigerianPhone(phoneVal);
             if (cleaned) {
                 setPhoneNumber(cleaned);
-                detectNetwork(cleaned);
+                if (netVal && NETWORKS_DATA.some(n => n.id === netVal)) {
+                    setNetwork(netVal);
+                } else {
+                    detectNetwork(cleaned);
+                }
                 if (nameVal) setRecipientName(nameVal);
+                setPurchaseMode('others');
                 try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
                 setShowContactModal(false);
             }
@@ -1953,7 +2417,7 @@ export default function DataScreen() {
                             borderTopLeftRadius: 28,
                             borderTopRightRadius: 28,
                             padding: 20,
-                            maxHeight: '82%',
+                            maxHeight: '85%',
                             width: '100%',
                             maxWidth: 600,
                             alignSelf: 'center',
@@ -1963,20 +2427,24 @@ export default function DataScreen() {
                         {/* Modal Header */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                             <View>
-                                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0d1b3e' }}>Select Contact</Text>
-                                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Choose from saved beneficiaries or phonebook</Text>
+                                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0d1b3e' }}>
+                                    {contactModalTab === 'add' ? 'Add Data Beneficiary' : 'Beneficiaries & Contacts'}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                                    {contactModalTab === 'add' ? 'Save a contact for instant 1-tap data top-ups' : 'Choose from saved recipients or device contacts'}
+                                </Text>
                             </View>
                             <TouchableOpacity onPress={() => setShowContactModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                 <Ionicons name="close-circle" size={28} color="#94a3b8" />
                             </TouchableOpacity>
                         </View>
 
-                        {/* Tabs: Beneficiaries vs Phone Contacts */}
-                        <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 14 }}>
+                        {/* 3 Tabs: Saved vs Add New vs Phone Contacts */}
+                        <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 14, gap: 4 }}>
                             <TouchableOpacity
                                 style={{
                                     flex: 1,
-                                    paddingVertical: 9,
+                                    paddingVertical: 8,
                                     borderRadius: 10,
                                     alignItems: 'center',
                                     backgroundColor: contactModalTab === 'beneficiaries' ? '#ffffff' : 'transparent',
@@ -1987,7 +2455,7 @@ export default function DataScreen() {
                                 }}
                                 onPress={() => setContactModalTab('beneficiaries')}
                             >
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: contactModalTab === 'beneficiaries' ? '#0056D2' : '#64748b' }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: contactModalTab === 'beneficiaries' ? '#0056D2' : '#64748b' }}>
                                     Saved ({beneficiaries.length})
                                 </Text>
                             </TouchableOpacity>
@@ -1995,7 +2463,34 @@ export default function DataScreen() {
                             <TouchableOpacity
                                 style={{
                                     flex: 1,
-                                    paddingVertical: 9,
+                                    paddingVertical: 8,
+                                    borderRadius: 10,
+                                    alignItems: 'center',
+                                    backgroundColor: contactModalTab === 'add' ? '#ffffff' : 'transparent',
+                                    shadowColor: contactModalTab === 'add' ? '#000' : 'transparent',
+                                    shadowOpacity: contactModalTab === 'add' ? 0.06 : 0,
+                                    shadowRadius: 4,
+                                    elevation: contactModalTab === 'add' ? 2 : 0,
+                                }}
+                                onPress={() => {
+                                    setContactModalTab('add');
+                                    if (phoneNumber && !newBenPhone) {
+                                        setNewBenPhone(phoneNumber);
+                                    }
+                                    if (network && !newBenNetwork) {
+                                        setNewBenNetwork(network);
+                                    }
+                                }}
+                            >
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: contactModalTab === 'add' ? '#0056D2' : '#64748b' }}>
+                                    + Add New
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 8,
                                     borderRadius: 10,
                                     alignItems: 'center',
                                     backgroundColor: contactModalTab === 'phonebook' ? '#ffffff' : 'transparent',
@@ -2011,98 +2506,273 @@ export default function DataScreen() {
                                     }
                                 }}
                             >
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: contactModalTab === 'phonebook' ? '#0056D2' : '#64748b' }}>
-                                    Phone Contacts ({deviceContacts.length})
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: contactModalTab === 'phonebook' ? '#0056D2' : '#64748b' }}>
+                                    Phonebook
                                 </Text>
                             </TouchableOpacity>
                         </View>
 
-                        {/* Search Bar */}
-                        <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: '#f8fafc',
-                            borderWidth: 1,
-                            borderColor: '#e2e8f0',
-                            borderRadius: 12,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            marginBottom: 12,
-                        }}>
-                            <Ionicons name="search" size={18} color="#94a3b8" />
-                            <TextInput
-                                style={{ flex: 1, marginLeft: 8, fontSize: 14, color: '#0f172a' }}
-                                placeholder="Search by name or number..."
-                                placeholderTextColor="#94a3b8"
-                                value={contactSearch}
-                                onChangeText={setContactSearch}
-                                autoCapitalize="none"
-                            />
-                            {contactSearch.length > 0 && (
-                                <TouchableOpacity onPress={() => setContactSearch('')}>
-                                    <Ionicons name="close-circle" size={18} color="#cbd5e1" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
+                        {/* Search Bar for Saved & Phonebook Tabs */}
+                        {contactModalTab !== 'add' && (
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: '#f8fafc',
+                                borderWidth: 1,
+                                borderColor: '#e2e8f0',
+                                borderRadius: 12,
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                marginBottom: 12,
+                            }}>
+                                <Ionicons name="search" size={18} color="#94a3b8" />
+                                <TextInput
+                                    style={{ flex: 1, marginLeft: 8, fontSize: 14, color: '#0f172a' }}
+                                    placeholder={contactModalTab === 'beneficiaries' ? "Search saved beneficiaries..." : "Search phone contacts..."}
+                                    placeholderTextColor="#94a3b8"
+                                    value={contactSearch}
+                                    onChangeText={setContactSearch}
+                                    autoCapitalize="none"
+                                />
+                                {contactSearch.length > 0 && (
+                                    <TouchableOpacity onPress={() => setContactSearch('')}>
+                                        <Ionicons name="close-circle" size={18} color="#cbd5e1" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
 
-                        {/* List Content */}
-                        {contactModalTab === 'beneficiaries' ? (
+                        {/* TAB 1: SAVED BENEFICIARIES */}
+                        {contactModalTab === 'beneficiaries' && (
                             filteredBeneficiaries.length === 0 ? (
-                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                                    <Ionicons name="people-outline" size={44} color="#cbd5e1" />
-                                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginTop: 10 }}>
-                                        {contactSearch ? 'No matching saved beneficiaries' : 'No saved beneficiaries yet'}
+                                <View style={{ paddingVertical: 36, alignItems: 'center' }}>
+                                    <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                                        <Ionicons name="people-outline" size={32} color="#3b82f6" />
+                                    </View>
+                                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#0f172a' }}>
+                                        {contactSearch ? 'No matching beneficiaries found' : 'No saved beneficiaries yet'}
                                     </Text>
-                                    <Text style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
-                                        Save frequent recipients during checkout or browse your device contacts.
+                                    <Text style={{ fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 4, paddingHorizontal: 20, marginBottom: 16 }}>
+                                        Save family, friends, or office numbers to recharge data with a single tap.
                                     </Text>
+                                    <TouchableOpacity
+                                        onPress={() => setContactModalTab('add')}
+                                        style={{ backgroundColor: '#0d1b3e', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center' }}
+                                    >
+                                        <Ionicons name="add" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                        <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13 }}>Add First Beneficiary</Text>
+                                    </TouchableOpacity>
                                 </View>
                             ) : (
-                                <FlatList
-                                    data={filteredBeneficiaries}
-                                    keyExtractor={(item, index) => item.id ? String(item.id) : `b-${index}`}
-                                    style={{ maxHeight: 360 }}
-                                    keyboardShouldPersistTaps="handled"
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={{
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                paddingVertical: 12,
-                                                borderBottomWidth: 1,
-                                                borderBottomColor: '#f1f5f9',
+                                <View style={{ maxHeight: 380 }}>
+                                    <FlatList
+                                        data={filteredBeneficiaries}
+                                        keyExtractor={(item, index) => item.id ? String(item.id) : `ben-${index}`}
+                                        keyboardShouldPersistTaps="handled"
+                                        renderItem={({ item }) => {
+                                            const benNet = item.network || getCarrierForPhone(item.phone)?.id;
+                                            return (
+                                                <View
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        paddingVertical: 10,
+                                                        borderBottomWidth: 1,
+                                                        borderBottomColor: '#f1f5f9',
+                                                    }}
+                                                >
+                                                    <View style={{
+                                                        width: 42,
+                                                        height: 42,
+                                                        borderRadius: 21,
+                                                        backgroundColor: '#eff6ff',
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                        marginRight: 12,
+                                                    }}>
+                                                        <Text style={{ fontSize: 16, fontWeight: '800', color: '#0056D2' }}>
+                                                            {(item.name || 'B').charAt(0).toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                    <TouchableOpacity 
+                                                        style={{ flex: 1 }}
+                                                        onPress={() => handleSelectRecipient(item.phone, item.name, item.network)}
+                                                    >
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                            <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>{item.name || 'Beneficiary'}</Text>
+                                                            {benNet && (
+                                                                <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                                                                    <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#16a34a' }}>{benNet.toUpperCase()}</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                        <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                                                            {item.phone.length >= 4 
+                                                                ? `${item.phone.slice(0, 4)} ${item.phone.slice(4, 7)} ${item.phone.slice(7)}` 
+                                                                : item.phone}
+                                                        </Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        onPress={() => handleSelectRecipient(item.phone, item.name, item.network)}
+                                                        style={{
+                                                            backgroundColor: '#0d1b3e',
+                                                            paddingHorizontal: 12,
+                                                            paddingVertical: 6,
+                                                            borderRadius: 8,
+                                                            marginRight: 8,
+                                                        }}
+                                                    >
+                                                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>Use</Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity 
+                                                        onPress={() => handleDeleteBeneficiary(item)}
+                                                        style={{ padding: 6 }}
+                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                    >
+                                                        <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            );
+                                        }}
+                                    />
+                                </View>
+                            )
+                        )}
+
+                        {/* TAB 2: ADD NEW BENEFICIARY */}
+                        {contactModalTab === 'add' && (
+                            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                                <View style={{ paddingVertical: 4 }}>
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0d1b3e', marginBottom: 4 }}>
+                                        Beneficiary Name / Nickname
+                                    </Text>
+                                    <TextInput
+                                        style={{
+                                            backgroundColor: '#f8fafc',
+                                            borderWidth: 1,
+                                            borderColor: '#cbd5e1',
+                                            borderRadius: 12,
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 10,
+                                            fontSize: 14,
+                                            color: '#0f172a',
+                                            marginBottom: 12,
+                                        }}
+                                        placeholder="e.g. Mum MTN, Brother, Office WiFi"
+                                        placeholderTextColor="#94a3b8"
+                                        value={newBenName}
+                                        onChangeText={setNewBenName}
+                                    />
+
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0d1b3e', marginBottom: 4 }}>
+                                        Phone Number (11 Digits)
+                                    </Text>
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: '#f8fafc',
+                                        borderWidth: 1,
+                                        borderColor: '#cbd5e1',
+                                        borderRadius: 12,
+                                        paddingHorizontal: 12,
+                                        marginBottom: 12,
+                                        height: 46,
+                                    }}>
+                                        <TextInput
+                                            style={{ flex: 1, fontSize: 14, color: '#0f172a' }}
+                                            placeholder="0803 123 4567"
+                                            placeholderTextColor="#94a3b8"
+                                            keyboardType="phone-pad"
+                                            value={newBenPhone}
+                                            maxLength={11}
+                                            onChangeText={(t) => {
+                                                setNewBenPhone(t);
+                                                const carrier = getCarrierForPhone(t);
+                                                if (carrier) setNewBenNetwork(carrier.id);
                                             }}
-                                            onPress={() => handleSelectRecipient(item.phone, item.name)}
+                                        />
+                                        <TouchableOpacity
+                                            onPress={async () => {
+                                                const clip = await Clipboard.getStringAsync();
+                                                if (clip) {
+                                                    const clean = cleanNigerianPhone(clip);
+                                                    setNewBenPhone(clean);
+                                                    const carrier = getCarrierForPhone(clean);
+                                                    if (carrier) setNewBenNetwork(carrier.id);
+                                                }
+                                            }}
+                                            style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#e2e8f0', borderRadius: 8 }}
                                         >
-                                            <View style={{
-                                                width: 40,
-                                                height: 40,
-                                                borderRadius: 20,
-                                                backgroundColor: '#eff6ff',
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                                marginRight: 12,
-                                            }}>
-                                                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0056D2' }}>
-                                                    {(item.name || 'B').charAt(0).toUpperCase()}
+                                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>Paste</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0d1b3e', marginBottom: 6 }}>
+                                        Mobile Network
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
+                                        {networksData.map((net) => {
+                                            const isSelected = newBenNetwork === net.id;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={net.id}
+                                                    onPress={() => setNewBenNetwork(net.id)}
+                                                    style={{
+                                                        paddingHorizontal: 12,
+                                                        paddingVertical: 7,
+                                                        borderRadius: 12,
+                                                        borderWidth: 1.5,
+                                                        borderColor: isSelected ? '#0d1b3e' : '#e2e8f0',
+                                                        backgroundColor: isSelected ? '#0d1b3e' : '#ffffff',
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: net.color || '#cbd5e1', marginRight: 6 }} />
+                                                    <Text style={{ fontSize: 12, fontWeight: isSelected ? '800' : '600', color: isSelected ? '#ffffff' : '#334155' }}>
+                                                        {net.name}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+
+                                    <TouchableOpacity
+                                        onPress={() => handleSaveNewBeneficiary(newBenName, newBenPhone, newBenNetwork)}
+                                        disabled={savingBen}
+                                        style={{
+                                            backgroundColor: '#0d1b3e',
+                                            paddingVertical: 13,
+                                            borderRadius: 14,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            shadowColor: '#0d1b3e',
+                                            shadowOffset: { width: 0, height: 3 },
+                                            shadowOpacity: 0.2,
+                                            shadowRadius: 5,
+                                            elevation: 4,
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        {savingBen ? (
+                                            <ActivityIndicator size="small" color="#ffffff" />
+                                        ) : (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Ionicons name="checkmark-circle" size={16} color="#f5a623" style={{ marginRight: 6 }} />
+                                                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+                                                    Save Beneficiary
                                                 </Text>
                                             </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>{item.name || 'Beneficiary'}</Text>
-                                                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{item.phone}</Text>
-                                            </View>
-                                            {item.network && (
-                                                <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginRight: 8 }}>
-                                                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>{item.network.toUpperCase()}</Text>
-                                                </View>
-                                            )}
-                                            <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                                        </TouchableOpacity>
-                                    )}
-                                />
-                            )
-                        ) : (
-                            // Phone Contacts Tab
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </ScrollView>
+                        )}
+
+                        {/* TAB 3: PHONE CONTACTS */}
+                        {contactModalTab === 'phonebook' && (
                             loadingDeviceContacts ? (
                                 <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                                     <ActivityIndicator size="small" color="#0056D2" />
