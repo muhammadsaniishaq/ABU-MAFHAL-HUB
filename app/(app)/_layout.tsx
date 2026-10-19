@@ -1,6 +1,6 @@
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { View, Platform, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Animated, Linking, useWindowDimensions } from 'react-native';
+import { View, Platform, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Animated, Linking, useWindowDimensions, Alert } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -55,6 +55,44 @@ export default function AppLayout() {
         // Refresh timestamp to extend active session
         AsyncStorage.setItem('last_security_verification_time', String(Date.now())).catch(err => console.log(err));
     }, []);
+
+    const handleOpenExternal = async (url?: string, label?: string) => {
+        setIsFabOpen(false);
+        if (!url || !url.trim()) {
+            Alert.alert(
+                'Link Not Set',
+                `${label || 'This link'} has not been set by the administrator yet. Please check back later!`
+            );
+            return;
+        }
+        let target = url.trim();
+        if (!target.startsWith('http://') && !target.startsWith('https://')) {
+            target = `https://${target}`;
+        }
+        try {
+            await Linking.openURL(target);
+        } catch (e) {
+            Alert.alert('Unable to Open', `Could not open ${label || 'link'}. Please try again later.`);
+        }
+    };
+
+    const handleOpenWhatsAppChat = async () => {
+        setIsFabOpen(false);
+        const rawPhone = settings?.support_whatsapp || '2348145853539';
+        const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+        const nativeUrl = `whatsapp://send?phone=${cleanPhone}&text=Hello%20Abu%20Mafhal%20Support`;
+        const webUrl = `https://wa.me/${cleanPhone}?text=Hello%20Abu%20Mafhal%20Support`;
+        try {
+            const canOpen = await Linking.canOpenURL(nativeUrl).catch(() => false);
+            if (canOpen) {
+                await Linking.openURL(nativeUrl);
+            } else {
+                await Linking.openURL(webUrl);
+            }
+        } catch {
+            Linking.openURL(webUrl).catch(() => Alert.alert('Notice', 'Unable to open WhatsApp chat.'));
+        }
+    };
 
     const tabsComponent = (
         <Tabs
@@ -265,26 +303,75 @@ export default function AppLayout() {
             {!hideFab && (
                 <View pointerEvents="box-none" style={{ position: 'absolute', bottom: fabBottom, right: 20, zIndex: 50, alignItems: 'center' }}>
                     {isFabOpen && (
-                        <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                        <View style={s.fabItemsContainer}>
+                            {/* 1. WhatsApp Group */}
                             <TouchableOpacity 
-                                onPress={() => { setIsFabOpen(false); Linking.openURL(`whatsapp://send?phone=${settings?.support_whatsapp || '2348145853539'}`).catch(() => alert('WhatsApp not installed')); }}
-                                style={{ backgroundColor: '#25D366', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
+                                onPress={() => handleOpenExternal(settings?.support_whatsapp_group || settings?.whatsapp_group_link, 'WhatsApp Group')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
                             >
-                                <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>WhatsApp Group</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#128C7E' }]}>
+                                    <Ionicons name="people" size={20} color="#fff" />
+                                </View>
                             </TouchableOpacity>
 
+                            {/* 2. WhatsApp Channel */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_whatsapp_channel || settings?.whatsapp_channel_link, 'WhatsApp Channel')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>WhatsApp Channel</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#25D366' }]}>
+                                    <Ionicons name="megaphone" size={18} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* 3. WhatsApp Direct Chat */}
+                            <TouchableOpacity 
+                                onPress={handleOpenWhatsAppChat}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>WhatsApp Support</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#25D366' }]}>
+                                    <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* 4. Support Tickets */}
                             <TouchableOpacity 
                                 onPress={() => { setIsFabOpen(false); router.push('/(app)/tickets'); }}
-                                style={{ backgroundColor: '#e11d48', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
                             >
-                                <Ionicons name="headset" size={20} color="#fff" />
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>Customer Tickets</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#e11d48' }]}>
+                                    <Ionicons name="headset" size={20} color="#fff" />
+                                </View>
                             </TouchableOpacity>
 
+                            {/* 5. AI Assistant */}
                             <TouchableOpacity 
                                 onPress={() => { setIsFabOpen(false); router.push('/ai-chat'); }}
-                                style={{ backgroundColor: '#4f46e5', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
                             >
-                                <Ionicons name="sparkles" size={20} color="#fff" />
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>AI Assistant</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#4f46e5' }]}>
+                                    <Ionicons name="sparkles" size={20} color="#fff" />
+                                </View>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -307,6 +394,49 @@ export default function AppLayout() {
 }
 
 const s = StyleSheet.create({
+  fabItemsContainer: {
+    alignItems: 'flex-end',
+    marginBottom: 12,
+  },
+  fabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 10,
+  },
+  fabLabelBox: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.16,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  fabLabelText: {
+    color: '#0f172a',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  fabCircleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 5,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
   // Floating Action Button
   fabContainer: {
     position: 'absolute',

@@ -40,13 +40,15 @@ export default function SupportScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(0);
 
-  const handleContact = (type: 'whatsapp' | 'email' | 'phone' | 'facebook' | 'twitter' | 'instagram' | 'telegram') => {
+  const handleContact = (type: 'whatsapp' | 'email' | 'phone' | 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'whatsapp_group' | 'whatsapp_channel') => {
     let url = '';
     const whatsappNumber = settings.support_whatsapp || '2348145853539';
     const emailAddress = settings.support_email || 'admin@abumafhal.com.ng';
     
     switch (type) {
       case 'whatsapp': url = `whatsapp://send?phone=${whatsappNumber}&text=Hello%20Abu%20Mafhal%20Support,%20I%20need%20assistance`; break;
+      case 'whatsapp_group': url = settings.support_whatsapp_group || settings.whatsapp_group_link || ''; break;
+      case 'whatsapp_channel': url = settings.support_whatsapp_channel || settings.whatsapp_channel_link || ''; break;
       case 'email': url = `mailto:${emailAddress}?subject=Support%20Request%20-%20Abu%20Mafhal%20Hub`; break;
       case 'phone': url = `tel:+${whatsappNumber}`; break;
       case 'facebook': url = `https://facebook.com/abumafhal`; break;
@@ -54,7 +56,12 @@ export default function SupportScreen() {
       case 'instagram': url = `https://instagram.com/abumafhal`; break;
       case 'telegram': url = `https://t.me/abumafhal`; break;
     }
-    Linking.openURL(url).catch(() => {});
+    if (!url) {
+      alert('Link is not set yet. Please check back later.');
+      return;
+    }
+    const target = url.startsWith('http') || url.startsWith('tel:') || url.startsWith('mailto:') || url.startsWith('whatsapp:') ? url : `https://${url}`;
+    Linking.openURL(target).catch(() => {});
   };
 
   const FAQs = [
@@ -194,6 +201,35 @@ export default function SupportScreen() {
             </View>
             <Text style={s.gridCardTitle}>Telegram Hub</Text>
             <Text style={s.gridCardSub}>Join official user community</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 2-COLUMN ACTION CARDS: WHATSAPP GROUP & CHANNEL */}
+        <View style={[s.twoGridRow, { marginTop: 10 }]}>
+          <TouchableOpacity style={s.gridCard} onPress={() => handleContact('whatsapp_group')} activeOpacity={0.75}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <View style={[s.gridIconCircle, { backgroundColor: 'rgba(18, 140, 126, 0.12)' }]}>
+                <Ionicons name="people" size={15} color="#128C7E" />
+              </View>
+              <View style={[s.activeBadge, { backgroundColor: 'rgba(18, 140, 126, 0.12)' }]}>
+                <Text style={[s.activeBadgeText, { color: '#128C7E' }]}>GROUP</Text>
+              </View>
+            </View>
+            <Text style={s.gridCardTitle}>WhatsApp Group</Text>
+            <Text style={s.gridCardSub}>Official discussion community</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.gridCard} onPress={() => handleContact('whatsapp_channel')} activeOpacity={0.75}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <View style={[s.gridIconCircle, { backgroundColor: 'rgba(37, 211, 102, 0.12)' }]}>
+                <Ionicons name="megaphone" size={15} color="#25D366" />
+              </View>
+              <View style={[s.activeBadge, { backgroundColor: 'rgba(37, 211, 102, 0.12)' }]}>
+                <Text style={[s.activeBadgeText, { color: '#16a34a' }]}>UPDATES</Text>
+              </View>
+            </View>
+            <Text style={s.gridCardTitle}>WhatsApp Channel</Text>
+            <Text style={s.gridCardSub}>Announcements & news channel</Text>
           </TouchableOpacity>
         </View>
 

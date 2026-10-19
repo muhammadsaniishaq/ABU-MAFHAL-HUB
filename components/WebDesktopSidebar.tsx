@@ -460,17 +460,49 @@ export default function WebDesktopSidebar({
             {/* 4. Footer: 24/7 WhatsApp & Sign Out */}
             <View style={[styles.sidebarFooter, collapsed && styles.sidebarFooterCollapsed]}>
                 {!collapsed && (
-                    <TouchableOpacity
-                        onPress={() => {
-                            const phone = settings?.support_whatsapp || '2348145853539';
-                            Linking.openURL(`https://wa.me/${phone}?text=Hello%20Abu%20Mafhal%20Support`).catch(() => {});
-                        }}
-                        style={styles.whatsAppSupportBtn}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="logo-whatsapp" size={15} color="#25D366" style={{ marginRight: 6 }} />
-                        <Text style={styles.whatsAppSupportText}>24/7 WhatsApp Help</Text>
-                    </TouchableOpacity>
+                    <View style={{ marginBottom: 10 }}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                const phone = settings?.support_whatsapp || '2348145853539';
+                                Linking.openURL(`https://wa.me/${phone}?text=Hello%20Abu%20Mafhal%20Support`).catch(() => {});
+                            }}
+                            style={styles.whatsAppSupportBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="logo-whatsapp" size={14} color="#25D366" style={{ marginRight: 6 }} />
+                            <Text style={styles.whatsAppSupportText}>24/7 WhatsApp Help</Text>
+                        </TouchableOpacity>
+
+                        {(settings?.support_whatsapp_group || settings?.whatsapp_group_link) ? (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    const url = settings?.support_whatsapp_group || settings?.whatsapp_group_link;
+                                    const target = url.startsWith('http') ? url : `https://${url}`;
+                                    Linking.openURL(target).catch(() => {});
+                                }}
+                                style={[styles.whatsAppSupportBtn, { borderColor: 'rgba(18, 140, 126, 0.3)', backgroundColor: 'rgba(18, 140, 126, 0.12)' }]}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="people" size={14} color="#128C7E" style={{ marginRight: 6 }} />
+                                <Text style={[styles.whatsAppSupportText, { color: '#128C7E' }]}>WhatsApp Group</Text>
+                            </TouchableOpacity>
+                        ) : null}
+
+                        {(settings?.support_whatsapp_channel || settings?.whatsapp_channel_link) ? (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    const url = settings?.support_whatsapp_channel || settings?.whatsapp_channel_link;
+                                    const target = url.startsWith('http') ? url : `https://${url}`;
+                                    Linking.openURL(target).catch(() => {});
+                                }}
+                                style={[styles.whatsAppSupportBtn, { borderColor: 'rgba(37, 211, 102, 0.3)', backgroundColor: 'rgba(37, 211, 102, 0.08)' }]}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="megaphone" size={14} color="#22c55e" style={{ marginRight: 6 }} />
+                                <Text style={[styles.whatsAppSupportText, { color: '#22c55e' }]}>WhatsApp Channel</Text>
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
                 )}
 
                 <View style={[styles.footerUserRow, collapsed && { justifyContent: 'center' }]}>

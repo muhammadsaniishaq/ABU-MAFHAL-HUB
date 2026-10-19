@@ -107,6 +107,8 @@ export default function AdminSettings() {
 
     // Comms
     const [supportWhatsapp, setSupportWhatsapp] = useState('');
+    const [supportWhatsappGroup, setSupportWhatsappGroup] = useState('');
+    const [supportWhatsappChannel, setSupportWhatsappChannel] = useState('');
     const [supportEmail, setSupportEmail] = useState('');
     const [supportFacebook, setSupportFacebook] = useState('');
     const [supportTwitter, setSupportTwitter] = useState('');
@@ -228,6 +230,8 @@ export default function AdminSettings() {
                     if (s.key === 'user_bulk_sms_price') setUserBulkSmsPrice(s.value);
                     
                     if (s.key === 'support_whatsapp') setSupportWhatsapp(s.value);
+                    if (s.key === 'support_whatsapp_group' || s.key === 'whatsapp_group_link') setSupportWhatsappGroup(s.value || '');
+                    if (s.key === 'support_whatsapp_channel' || s.key === 'whatsapp_channel_link') setSupportWhatsappChannel(s.value || '');
                     if (s.key === 'support_email') setSupportEmail(s.value);
                     if (s.key === 'support_facebook') setSupportFacebook(s.value);
                     if (s.key === 'support_twitter') setSupportTwitter(s.value);
@@ -393,6 +397,8 @@ export default function AdminSettings() {
                 { key: 'transfer_provider', value: transferProvider },
                 { key: 'user_bulk_sms_price', value: userBulkSmsPrice },
                 { key: 'support_whatsapp', value: supportWhatsapp },
+                { key: 'support_whatsapp_group', value: supportWhatsappGroup },
+                { key: 'support_whatsapp_channel', value: supportWhatsappChannel },
                 { key: 'support_email', value: supportEmail },
                 { key: 'support_facebook', value: supportFacebook },
                 { key: 'support_twitter', value: supportTwitter },
@@ -642,9 +648,11 @@ export default function AdminSettings() {
                             />
                         </View>
 
-                        <Text style={s.groupLabel}>App Communication</Text>
+                        <Text style={s.groupLabel}>App Communication & Communities</Text>
                         <View style={s.card}>
-                            <InputRow label="WhatsApp Support" value={supportWhatsapp} onChangeText={setSupportWhatsapp} prefix="WA" keyboardType="phone-pad" />
+                            <InputRow label="WhatsApp Support (Direct Phone)" value={supportWhatsapp} onChangeText={setSupportWhatsapp} prefix="WA" keyboardType="phone-pad" placeholder="2348145853539" />
+                            <InputRow label="WhatsApp Group Link" value={supportWhatsappGroup} onChangeText={setSupportWhatsappGroup} placeholder="https://chat.whatsapp.com/..." keyboardType="url" />
+                            <InputRow label="WhatsApp Channel Link" value={supportWhatsappChannel} onChangeText={setSupportWhatsappChannel} placeholder="https://whatsapp.com/channel/..." keyboardType="url" />
                             <InputRow label="Support Email" value={supportEmail} onChangeText={setSupportEmail} placeholder="help@abumafhal.com" keyboardType="email-address" />
                             <InputRow label="Telegram Link" value={supportTelegram} onChangeText={setSupportTelegram} placeholder="https://t.me/..." keyboardType="url" />
                             <InputRow label="Facebook Link" value={supportFacebook} onChangeText={setSupportFacebook} placeholder="https://facebook.com/..." keyboardType="url" />

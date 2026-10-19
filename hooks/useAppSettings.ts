@@ -18,6 +18,8 @@ export interface AppSettings {
     auto_approve_kyc: boolean;
     hide_user_balances: boolean;
     support_whatsapp: string;
+    support_whatsapp_group?: string;
+    support_whatsapp_channel?: string;
     support_email: string;
     support_facebook: string;
     support_twitter: string;
@@ -49,6 +51,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     auto_approve_kyc: false,
     hide_user_balances: false,
     support_whatsapp: '',
+    support_whatsapp_group: '',
+    support_whatsapp_channel: '',
     support_email: '',
     support_facebook: '',
     support_twitter: '',
