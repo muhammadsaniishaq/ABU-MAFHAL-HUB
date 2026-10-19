@@ -25,6 +25,9 @@ export interface AppSettings {
     support_twitter: string;
     support_instagram: string;
     support_telegram: string;
+    support_tiktok?: string;
+    support_youtube?: string;
+    support_linkedin?: string;
     support_office_address: string;
     funding_fee_type: string;
     funding_fee_value: string;
@@ -59,6 +62,9 @@ const DEFAULT_SETTINGS: AppSettings = {
     support_twitter: '',
     support_instagram: '',
     support_telegram: '',
+    support_tiktok: '',
+    support_youtube: '',
+    support_linkedin: '',
     support_office_address: 'No. 1 Abu Mafhal Ltd Goni Aji Street, Yobe State, Nigeria.',
     funding_fee_type: 'fixed',
     funding_fee_value: '0',

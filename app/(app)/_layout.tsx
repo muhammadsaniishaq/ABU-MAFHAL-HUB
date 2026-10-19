@@ -24,6 +24,7 @@ export default function AppLayout() {
     const insets = useSafeAreaInsets();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isFabOpen, setIsFabOpen] = useState(false);
+    const [isSocialFabOpen, setIsSocialFabOpen] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     usePushNotifications(); // Register for push notifications
 
@@ -58,6 +59,7 @@ export default function AppLayout() {
 
     const handleOpenExternal = async (url?: string, label?: string) => {
         setIsFabOpen(false);
+        setIsSocialFabOpen(false);
         if (!url || !url.trim()) {
             Alert.alert(
                 'Link Not Set',
@@ -66,7 +68,7 @@ export default function AppLayout() {
             return;
         }
         let target = url.trim();
-        if (!target.startsWith('http://') && !target.startsWith('https://')) {
+        if (!target.startsWith('http://') && !target.startsWith('https://') && !target.startsWith('whatsapp://')) {
             target = `https://${target}`;
         }
         try {
@@ -78,6 +80,7 @@ export default function AppLayout() {
 
     const handleOpenWhatsAppChat = async () => {
         setIsFabOpen(false);
+        setIsSocialFabOpen(false);
         const rawPhone = settings?.support_whatsapp || '2348145853539';
         const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
         const nativeUrl = `whatsapp://send?phone=${cleanPhone}&text=Hello%20Abu%20Mafhal%20Support`;
@@ -292,19 +295,167 @@ export default function AppLayout() {
             )}
 
             {/* FLOATING ACTION BUTTON (FAB) */}
-            {!hideFab && isFabOpen && (
+            {/* FLOATING ACTION BUTTON (FAB) BACKDROP */}
+            {!hideFab && (isFabOpen || isSocialFabOpen) && (
                 <TouchableOpacity 
                     activeOpacity={1} 
-                    onPress={() => setIsFabOpen(false)}
+                    onPress={() => {
+                        setIsFabOpen(false);
+                        setIsSocialFabOpen(false);
+                    }}
                     style={{ backgroundColor: 'rgba(0,0,0,0.5)', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}
                 />
             )}
             
             {!hideFab && (
-                <View pointerEvents="box-none" style={{ position: 'absolute', bottom: fabBottom, right: 20, zIndex: 50, alignItems: 'center' }}>
+                <View pointerEvents="box-none" style={{ position: 'absolute', bottom: fabBottom, right: 20, zIndex: 50, alignItems: 'flex-end' }}>
+                    {/* 1. SOCIAL MEDIA SPEED-DIAL (Opens above the Social Media FAB) */}
+                    {isSocialFabOpen && (
+                        <View style={s.fabItemsContainer}>
+                            {/* Facebook */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_facebook, 'Facebook')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>Facebook</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#1877F2' }]}>
+                                    <Ionicons name="logo-facebook" size={20} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Instagram */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_instagram, 'Instagram')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>Instagram</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#E4405F' }]}>
+                                    <Ionicons name="logo-instagram" size={20} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* TikTok */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_tiktok, 'TikTok')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>TikTok</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#000000' }]}>
+                                    <Ionicons name="logo-tiktok" size={18} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Twitter (X) */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_twitter, 'Twitter (X)')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>Twitter (X)</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#0F172A' }]}>
+                                    <Ionicons name="logo-twitter" size={18} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Telegram */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_telegram, 'Telegram')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>Telegram</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#0088CC' }]}>
+                                    <Ionicons name="paper-plane" size={18} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* YouTube */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_youtube, 'YouTube')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>YouTube</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#FF0000' }]}>
+                                    <Ionicons name="logo-youtube" size={18} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* LinkedIn */}
+                            <TouchableOpacity 
+                                onPress={() => handleOpenExternal(settings?.support_linkedin, 'LinkedIn')}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>LinkedIn</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#0A66C2' }]}>
+                                    <Ionicons name="logo-linkedin" size={18} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* WhatsApp Direct */}
+                            <TouchableOpacity 
+                                onPress={handleOpenWhatsAppChat}
+                                style={s.fabRow}
+                                activeOpacity={0.8}
+                            >
+                                <View style={s.fabLabelBox}>
+                                    <Text style={s.fabLabelText}>WhatsApp Chat</Text>
+                                </View>
+                                <View style={[s.fabCircleBtn, { backgroundColor: '#25D366' }]}>
+                                    <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* TOP BUTTON: SOCIAL MEDIA PLUS (Placed directly above the Support Plus) */}
+                    <View style={{ marginBottom: 10 }}>
+                        <TouchableOpacity 
+                            onPress={() => {
+                                setIsFabOpen(false);
+                                setIsSocialFabOpen(!isSocialFabOpen);
+                            }}
+                            activeOpacity={0.85}
+                            style={s.socialFabBtn}
+                        >
+                            <LinearGradient 
+                                colors={isSocialFabOpen ? ['#475569', '#1E293B'] : ['#8B5CF6', '#EC4899']} 
+                                start={{ x: 0, y: 0 }} 
+                                end={{ x: 1, y: 1 }} 
+                                style={s.socialFabInner}
+                            >
+                                <Ionicons name={isSocialFabOpen ? "close" : "add"} size={26} color="#fff" />
+                                {!isSocialFabOpen && (
+                                    <View style={s.socialFabBadge}>
+                                        <Ionicons name="share-social" size={10} color="#EC4899" />
+                                    </View>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* 2. CUSTOMER SUPPORT SPEED-DIAL (Opens above the Support FAB) */}
                     {isFabOpen && (
                         <View style={s.fabItemsContainer}>
-                            {/* 1. WhatsApp Group */}
+                            {/* WhatsApp Group */}
                             <TouchableOpacity 
                                 onPress={() => handleOpenExternal(settings?.support_whatsapp_group || settings?.whatsapp_group_link, 'WhatsApp Group')}
                                 style={s.fabRow}
@@ -318,7 +469,7 @@ export default function AppLayout() {
                                 </View>
                             </TouchableOpacity>
 
-                            {/* 2. WhatsApp Channel */}
+                            {/* WhatsApp Channel */}
                             <TouchableOpacity 
                                 onPress={() => handleOpenExternal(settings?.support_whatsapp_channel || settings?.whatsapp_channel_link, 'WhatsApp Channel')}
                                 style={s.fabRow}
@@ -332,7 +483,7 @@ export default function AppLayout() {
                                 </View>
                             </TouchableOpacity>
 
-                            {/* 3. WhatsApp Direct Chat */}
+                            {/* WhatsApp Direct Chat */}
                             <TouchableOpacity 
                                 onPress={handleOpenWhatsAppChat}
                                 style={s.fabRow}
@@ -346,7 +497,7 @@ export default function AppLayout() {
                                 </View>
                             </TouchableOpacity>
 
-                            {/* 4. Support Tickets */}
+                            {/* Support Tickets */}
                             <TouchableOpacity 
                                 onPress={() => { setIsFabOpen(false); router.push('/(app)/tickets'); }}
                                 style={s.fabRow}
@@ -360,7 +511,7 @@ export default function AppLayout() {
                                 </View>
                             </TouchableOpacity>
 
-                            {/* 5. AI Assistant */}
+                            {/* AI Assistant */}
                             <TouchableOpacity 
                                 onPress={() => { setIsFabOpen(false); router.push('/ai-chat'); }}
                                 style={s.fabRow}
@@ -376,9 +527,13 @@ export default function AppLayout() {
                         </View>
                     )}
 
+                    {/* BOTTOM BUTTON: SUPPORT & COMMUNITY PLUS FAB */}
                     <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                         <TouchableOpacity 
-                            onPress={() => setIsFabOpen(!isFabOpen)}
+                            onPress={() => {
+                                setIsSocialFabOpen(false);
+                                setIsFabOpen(!isFabOpen);
+                            }}
                             style={{ backgroundColor: '#0d1b3e', width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' }}
                         >
                             <Ionicons name={isFabOpen ? "close" : "add"} size={26} color="#fff" />
@@ -436,6 +591,44 @@ const s = StyleSheet.create({
     elevation: 5,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.4)',
+  },
+  socialFabBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  socialFabInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    position: 'relative',
+  },
+  socialFabBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.2,
+    borderColor: '#EC4899',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   // Floating Action Button
   fabContainer: {

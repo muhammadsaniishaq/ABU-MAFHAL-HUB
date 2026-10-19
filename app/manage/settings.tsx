@@ -114,6 +114,9 @@ export default function AdminSettings() {
     const [supportTwitter, setSupportTwitter] = useState('');
     const [supportInstagram, setSupportInstagram] = useState('');
     const [supportTelegram, setSupportTelegram] = useState('');
+    const [supportTiktok, setSupportTiktok] = useState('');
+    const [supportYoutube, setSupportYoutube] = useState('');
+    const [supportLinkedin, setSupportLinkedin] = useState('');
     const [supportOfficeAddress, setSupportOfficeAddress] = useState('');
     
     // Global Announcement
@@ -247,6 +250,9 @@ export default function AdminSettings() {
                     if (s.key === 'support_twitter') setSupportTwitter(s.value);
                     if (s.key === 'support_instagram') setSupportInstagram(s.value);
                     if (s.key === 'support_telegram') setSupportTelegram(s.value);
+                    if (s.key === 'support_tiktok') setSupportTiktok(s.value || '');
+                    if (s.key === 'support_youtube') setSupportYoutube(s.value || '');
+                    if (s.key === 'support_linkedin') setSupportLinkedin(s.value || '');
                     if (s.key === 'support_office_address') setSupportOfficeAddress(s.value);
                     if (s.key === 'global_announcement') {
                         try {
@@ -429,6 +435,9 @@ export default function AdminSettings() {
                 { key: 'support_twitter', value: supportTwitter },
                 { key: 'support_instagram', value: supportInstagram },
                 { key: 'support_telegram', value: supportTelegram },
+                { key: 'support_tiktok', value: supportTiktok },
+                { key: 'support_youtube', value: supportYoutube },
+                { key: 'support_linkedin', value: supportLinkedin },
                 { key: 'support_office_address', value: supportOfficeAddress },
                 { key: 'vtu_vendor', value: vtuVendor },
                 { key: 'global_announcement', value: JSON.stringify({
@@ -690,10 +699,13 @@ export default function AdminSettings() {
                             <InputRow label="WhatsApp Group Link" value={supportWhatsappGroup} onChangeText={setSupportWhatsappGroup} placeholder="https://chat.whatsapp.com/..." keyboardType="url" />
                             <InputRow label="WhatsApp Channel Link" value={supportWhatsappChannel} onChangeText={setSupportWhatsappChannel} placeholder="https://whatsapp.com/channel/..." keyboardType="url" />
                             <InputRow label="Support Email" value={supportEmail} onChangeText={setSupportEmail} placeholder="help@abumafhal.com" keyboardType="email-address" />
-                            <InputRow label="Telegram Link" value={supportTelegram} onChangeText={setSupportTelegram} placeholder="https://t.me/..." keyboardType="url" />
                             <InputRow label="Facebook Link" value={supportFacebook} onChangeText={setSupportFacebook} placeholder="https://facebook.com/..." keyboardType="url" />
-                            <InputRow label="Twitter (X) Link" value={supportTwitter} onChangeText={setSupportTwitter} placeholder="https://twitter.com/..." keyboardType="url" />
                             <InputRow label="Instagram Link" value={supportInstagram} onChangeText={setSupportInstagram} placeholder="https://instagram.com/..." keyboardType="url" />
+                            <InputRow label="TikTok Profile Link" value={supportTiktok} onChangeText={setSupportTiktok} placeholder="https://tiktok.com/@..." keyboardType="url" />
+                            <InputRow label="Twitter (X) Link" value={supportTwitter} onChangeText={setSupportTwitter} placeholder="https://twitter.com/..." keyboardType="url" />
+                            <InputRow label="Telegram Link" value={supportTelegram} onChangeText={setSupportTelegram} placeholder="https://t.me/..." keyboardType="url" />
+                            <InputRow label="YouTube Channel Link" value={supportYoutube} onChangeText={setSupportYoutube} placeholder="https://youtube.com/@..." keyboardType="url" />
+                            <InputRow label="LinkedIn Profile Link" value={supportLinkedin} onChangeText={setSupportLinkedin} placeholder="https://linkedin.com/in/..." keyboardType="url" />
                             <InputRow label="Office Address" value={supportOfficeAddress} onChangeText={setSupportOfficeAddress} placeholder="No. 1 Abu Mafhal Ltd Goni Aji Street, Yobe State..." />
                         </View>
 
