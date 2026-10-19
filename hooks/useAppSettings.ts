@@ -32,6 +32,7 @@ export interface AppSettings {
     transfer_fee_below_10k?: string;
     transfer_fee_above_10k?: string;
     transfer_provider?: 'flutterwave' | 'paystack';
+    offer_alert?: any;
     [key: string]: any;
 }
 
@@ -67,6 +68,16 @@ const DEFAULT_SETTINGS: AppSettings = {
     transfer_provider: 'flutterwave',
     company_name: 'Abu Mafhal Ltd',
     app_logo: '',
+    offer_alert: {
+        is_active: false,
+        badge: 'HOT DEAL 🔥',
+        title: '',
+        description: '',
+        target_page: '/data',
+        custom_url: '',
+        button_text: 'Buy Now ➔',
+        theme: 'amber',
+    },
     // Crypto Defaults
     crypto_enabled_btc: true,
     crypto_enabled_usdt: true,
@@ -163,7 +174,7 @@ export function useAppSettings() {
                             data.forEach((item: any) => {
                                 if (item.value === 'true' || item.value === 'false') {
                                     newSettings[item.key] = item.value === 'true';
-                                } else if (item.key === 'hidden_features' && typeof item.value === 'string') {
+                                } else if ((item.key === 'hidden_features' || item.key === 'offer_alert') && typeof item.value === 'string') {
                                     try {
                                         newSettings[item.key] = JSON.parse(item.value);
                                     } catch (_) {
@@ -206,7 +217,7 @@ export function useAppSettings() {
                     if (payload.new && mounted) {
                         const { key, value } = payload.new;
                         let parsedVal = (value === 'true' || value === 'false') ? value === 'true' : value;
-                        if (key === 'hidden_features' && typeof value === 'string') {
+                        if ((key === 'hidden_features' || key === 'offer_alert') && typeof value === 'string') {
                             try { parsedVal = JSON.parse(value); } catch (_) {}
                         }
                         globalSettings = { ...globalSettings, [key]: parsedVal };

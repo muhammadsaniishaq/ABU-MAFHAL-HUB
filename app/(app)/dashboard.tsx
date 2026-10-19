@@ -11,6 +11,7 @@ import { useAppSettings } from '../../hooks/useAppSettings';
 import GlobalAnnouncementModal from '../../components/GlobalAnnouncementModal';
 import CelebrationConfetti, { CelebrationSettings, triggerGlobalConfetti } from '../../components/CelebrationConfetti';
 import DynamicBanners from '../../components/DynamicBanners';
+import OfferAlertBanner from '../../components/OfferAlertBanner';
 
 const { width: W } = Dimensions.get('window');
 
@@ -719,6 +720,7 @@ export default function Dashboard() {
 
         {/* ── Content Sections: 2-column on Desktop, 1-column on Mobile/Tablet ── */}
         {(() => {
+          const offerAlertEl = <OfferAlertBanner />;
           const bannersEl = <DynamicBanners placement="dashboard" />;
 
           const dbErrorEl = dbError ? (
@@ -973,6 +975,7 @@ export default function Dashboard() {
               <View style={{ flexDirection: 'row', gap: 16, paddingHorizontal: 16, marginTop: 12, alignItems: 'flex-start' }}>
                 {/* Left Column (Desktop) */}
                 <View style={{ flex: 1.25 }}>
+                  {offerAlertEl}
                   {bannersEl}
                   {dbErrorEl}
                   {quickActionsEl}
@@ -995,6 +998,7 @@ export default function Dashboard() {
 
           return (
             <>
+              {offerAlertEl}
               {bannersEl}
               {dbErrorEl}
               {quickActionsEl}

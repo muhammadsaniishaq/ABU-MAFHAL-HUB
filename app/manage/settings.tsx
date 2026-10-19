@@ -122,6 +122,16 @@ export default function AdminSettings() {
     const [announcementType, setAnnouncementType] = useState('image');
     const [announcementActive, setAnnouncementActive] = useState(false);
     const [announcementFitMode, setAnnouncementFitMode] = useState<'contain' | 'cover'>('contain');
+
+    // Offer Alert State
+    const [offerActive, setOfferActive] = useState(false);
+    const [offerBadge, setOfferBadge] = useState('HOT DEAL 🔥');
+    const [offerTitle, setOfferTitle] = useState('');
+    const [offerDescription, setOfferDescription] = useState('');
+    const [offerTargetPage, setOfferTargetPage] = useState('/data');
+    const [offerCustomUrl, setOfferCustomUrl] = useState('');
+    const [offerButtonText, setOfferButtonText] = useState('Buy Now ➔');
+    const [offerTheme, setOfferTheme] = useState<'amber' | 'emerald' | 'navy' | 'crimson' | 'indigo'>('amber');
     
     // UI State
     const [loading, setLoading] = useState(false);
@@ -249,6 +259,21 @@ export default function AdminSettings() {
                         } catch (e) {
                             setAnnouncementText(s.value);
                         }
+                    }
+                    if (s.key === 'offer_alert') {
+                        try {
+                            const parsed = typeof s.value === 'string' ? JSON.parse(s.value) : s.value;
+                            if (parsed) {
+                                setOfferActive(parsed.is_active === true);
+                                if (parsed.badge) setOfferBadge(parsed.badge);
+                                if (parsed.title) setOfferTitle(parsed.title);
+                                if (parsed.description) setOfferDescription(parsed.description);
+                                if (parsed.target_page) setOfferTargetPage(parsed.target_page);
+                                if (parsed.custom_url !== undefined) setOfferCustomUrl(parsed.custom_url);
+                                if (parsed.button_text) setOfferButtonText(parsed.button_text);
+                                if (parsed.theme) setOfferTheme(parsed.theme);
+                            }
+                        } catch (_) {}
                     }
                     if (s.key === 'hidden_features') {
                         try {
@@ -412,6 +437,17 @@ export default function AdminSettings() {
                     mediaType: announcementType,
                     isActive: announcementActive,
                     fitMode: announcementFitMode,
+                }) },
+                { key: 'offer_alert', value: JSON.stringify({
+                    is_active: offerActive,
+                    badge: offerBadge,
+                    title: offerTitle,
+                    description: offerDescription,
+                    target_page: offerTargetPage,
+                    custom_url: offerCustomUrl,
+                    button_text: offerButtonText,
+                    theme: offerTheme,
+                    updated_at: Date.now(),
                 }) }
             ];
             
@@ -799,6 +835,260 @@ export default function AdminSettings() {
                                     </View>
                                 </View>
                             ) : null}
+                        </View>
+
+                        {/* ─── OFFER ALERT & PROMO BANNER ─── */}
+                        <Text style={s.groupLabel}>Dashboard Offer Alert (Special Deals & Promo Banner)</Text>
+                        <View style={s.card}>
+                            <ToggleRow 
+                                title="Enable Offer Alert Banner" 
+                                subtitle="Display a high-converting small promo banner on the dashboard linking directly to buy" 
+                                icon="flame" 
+                                color="#F59E0B" 
+                                value={offerActive} 
+                                onValueChange={setOfferActive} 
+                            />
+                            <View style={s.divider} />
+
+                            <InputRow 
+                                label="Offer Badge / Tag" 
+                                value={offerBadge} 
+                                onChangeText={setOfferBadge} 
+                                placeholder="HOT DEAL 🔥" 
+                            />
+
+                            {/* PRESET BADGE CHIPS */}
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                                    Quick Badge Presets:
+                                </Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                                    {[
+                                        'HOT DEAL 🔥',
+                                        'SPECIAL OFFER ⚡',
+                                        'FLASH SALE ⏳',
+                                        '50% OFF 🏷️',
+                                        'WEEKEND PROMO 🎉',
+                                        'LIMITED STOCK ⏰',
+                                    ].map((badgeText) => (
+                                        <TouchableOpacity
+                                            key={badgeText}
+                                            onPress={() => setOfferBadge(badgeText)}
+                                            style={{
+                                                backgroundColor: offerBadge === badgeText ? '#FEF3C7' : '#F1F5F9',
+                                                borderWidth: 1,
+                                                borderColor: offerBadge === badgeText ? '#F59E0B' : '#E2E8F0',
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 5,
+                                                borderRadius: 14,
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={{ fontSize: 11, fontWeight: '700', color: offerBadge === badgeText ? '#B45309' : '#475569' }}>
+                                                {badgeText}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+
+                            <View style={s.divider} />
+                            <InputRow 
+                                label="Offer Title" 
+                                value={offerTitle} 
+                                onChangeText={setOfferTitle} 
+                                placeholder="Weekend Data Bonanza — MTN 1GB for ₦220!" 
+                            />
+
+                            <View style={s.divider} />
+                            <InputRow 
+                                label="Offer Subtitle / Description" 
+                                value={offerDescription} 
+                                onChangeText={setOfferDescription} 
+                                placeholder="Sayi data mai arha yanzu kafin lokaci ya cika..." 
+                                multiline 
+                            />
+
+                            <View style={s.divider} />
+
+                            {/* TARGET SERVICE / BUY PAGE */}
+                            <View style={s.inputGroup}>
+                                <Text style={s.label}>Destination Page (Where User Buys)</Text>
+                                <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>
+                                    Select the service page where the offer will lead users to buy:
+                                </Text>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                                    {[
+                                        { label: '📱 Data Bundles', route: '/data' },
+                                        { label: '📞 Airtime', route: '/airtime' },
+                                        { label: '🔄 Airtime to Cash', route: '/airtime-to-cash' },
+                                        { label: '🎫 Recharge PIN', route: '/recharge-pin' },
+                                        { label: '⚡ Bills & Power', route: '/bills' },
+                                        { label: '🚀 Social Boost', route: '/social-boost' },
+                                        { label: '💳 Virtual Cards', route: '/virtual-cards' },
+                                        { label: '🪙 Crypto', route: '/crypto' },
+                                        { label: '🏛️ CAC Reg', route: '/cac-services' },
+                                    ].map((target) => {
+                                        const isSelected = offerTargetPage === target.route && !offerCustomUrl;
+                                        return (
+                                            <TouchableOpacity
+                                                key={target.route}
+                                                onPress={() => {
+                                                    setOfferTargetPage(target.route);
+                                                    setOfferCustomUrl('');
+                                                }}
+                                                style={{
+                                                    backgroundColor: isSelected ? '#10B981' : '#F8FAFC',
+                                                    borderWidth: 1,
+                                                    borderColor: isSelected ? '#059669' : '#E2E8F0',
+                                                    paddingHorizontal: 12,
+                                                    paddingVertical: 7,
+                                                    borderRadius: 12,
+                                                }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={{ fontSize: 11.5, fontWeight: '700', color: isSelected ? '#FFFFFF' : '#334155' }}>
+                                                    {target.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+
+                            <View style={s.divider} />
+                            <InputRow 
+                                label="Or Custom Link / External URL (Optional)" 
+                                value={offerCustomUrl} 
+                                onChangeText={setOfferCustomUrl} 
+                                placeholder="https://... or whatsapp://..." 
+                                keyboardType="url" 
+                            />
+
+                            <View style={s.divider} />
+                            <InputRow 
+                                label="Action Button Text (CTA)" 
+                                value={offerButtonText} 
+                                onChangeText={setOfferButtonText} 
+                                placeholder="Buy Now ➔" 
+                            />
+
+                            {/* PRESET CTA BUTTONS */}
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                                    {[
+                                        'Buy Now ➔',
+                                        'Claim Offer ⚡',
+                                        'Sayi Yanzu ➔',
+                                        'Get Deal 🛒',
+                                        'Subscribe Now',
+                                        'Order Now ➔',
+                                    ].map((c) => (
+                                        <TouchableOpacity
+                                            key={c}
+                                            onPress={() => setOfferButtonText(c)}
+                                            style={{
+                                                backgroundColor: offerButtonText === c ? '#E0E7FF' : '#F1F5F9',
+                                                borderWidth: 1,
+                                                borderColor: offerButtonText === c ? '#6366F1' : '#E2E8F0',
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 4,
+                                                borderRadius: 12,
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={{ fontSize: 11, fontWeight: '700', color: offerButtonText === c ? '#4338CA' : '#475569' }}>
+                                                {c}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+
+                            <View style={s.divider} />
+
+                            {/* THEME SELECTOR */}
+                            <View style={s.inputGroup}>
+                                <Text style={s.label}>Banner Color Theme</Text>
+                                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                                    {[
+                                        { id: 'amber', label: 'Flame Amber', color: '#F59E0B' },
+                                        { id: 'emerald', label: 'Emerald Green', color: '#10B981' },
+                                        { id: 'navy', label: 'Royal Navy', color: '#1E293B' },
+                                        { id: 'crimson', label: 'Crimson Red', color: '#EF4444' },
+                                        { id: 'indigo', label: 'Cyber Indigo', color: '#6366F1' },
+                                    ].map((t) => {
+                                        const isSelected = offerTheme === t.id;
+                                        return (
+                                            <TouchableOpacity
+                                                key={t.id}
+                                                onPress={() => setOfferTheme(t.id as any)}
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    paddingHorizontal: 12,
+                                                    paddingVertical: 7,
+                                                    borderRadius: 12,
+                                                    backgroundColor: isSelected ? t.color : '#F8FAFC',
+                                                    borderWidth: 1.5,
+                                                    borderColor: t.color,
+                                                }}
+                                                activeOpacity={0.75}
+                                            >
+                                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isSelected ? '#FFFFFF' : t.color }} />
+                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: isSelected ? '#FFFFFF' : '#334155' }}>
+                                                    {t.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+
+                            {/* LIVE PREVIEW OF THE OFFER BANNER */}
+                            <View style={{ margin: 14, backgroundColor: '#0F172A', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#334155' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                                    <Ionicons name="eye" size={14} color="#F59E0B" />
+                                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#F59E0B', textTransform: 'uppercase' }}>
+                                        Live Dashboard Preview
+                                    </Text>
+                                </View>
+
+                                <View style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    padding: 10,
+                                    borderRadius: 14,
+                                    backgroundColor: offerTheme === 'amber' ? '#78350F' : offerTheme === 'emerald' ? '#064E3B' : offerTheme === 'crimson' ? '#881337' : offerTheme === 'indigo' ? '#312E81' : '#1E293B',
+                                    borderWidth: 1.2,
+                                    borderColor: offerTheme === 'amber' ? '#F59E0B' : offerTheme === 'emerald' ? '#10B981' : offerTheme === 'crimson' ? '#F43F5E' : offerTheme === 'indigo' ? '#6366F1' : '#F5A623',
+                                }}>
+                                    <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                        <Ionicons name="flame" size={18} color="#FFD700" />
+                                    </View>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                            <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5 }}>
+                                                <Text style={{ fontSize: 8.5, fontWeight: '900', color: '#000' }}>
+                                                    {offerBadge || 'HOT DEAL 🔥'}
+                                                </Text>
+                                            </View>
+                                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }} numberOfLines={1}>
+                                                {offerTitle || 'Special Offer Title Here'}
+                                            </Text>
+                                        </View>
+                                        <Text style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.85)' }} numberOfLines={1}>
+                                            {offerDescription || 'Offer details and discount information will appear here...'}
+                                        </Text>
+                                    </View>
+                                    <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16 }}>
+                                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#0F172A' }}>
+                                            {offerButtonText || 'Buy Now ➔'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
                         </View>
                         
                         <TouchableOpacity onPress={handleUpdateSettings} style={s.saveBtn} activeOpacity={0.8}>
