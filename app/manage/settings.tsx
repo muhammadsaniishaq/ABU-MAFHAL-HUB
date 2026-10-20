@@ -1425,62 +1425,7 @@ export default function AdminSettings() {
                         </TouchableOpacity>
                         {(expandedApi === 'all' || expandedApi === 'identity') && (
                             <View style={s.accordionBody}>
-                                {/* SKBTECH Dedicated Vault Notice & Direct Action */}
-                                <TouchableOpacity 
-                                    onPress={() => router.push('/manage/api')}
-                                    style={{
-                                        backgroundColor: '#0d1b3e',
-                                        borderRadius: 14,
-                                        padding: 14,
-                                        marginBottom: 14,
-                                        borderWidth: 1.5,
-                                        borderColor: '#f5a623',
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        shadowColor: '#000',
-                                        shadowOffset: { width: 0, height: 2 },
-                                        shadowOpacity: 0.1,
-                                        shadowRadius: 4,
-                                        elevation: 2,
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
-                                        <View style={{
-                                            width: 42,
-                                            height: 42,
-                                            borderRadius: 21,
-                                            backgroundColor: 'rgba(245, 166, 35, 0.18)',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            marginRight: 12,
-                                            borderWidth: 1,
-                                            borderColor: 'rgba(245, 166, 35, 0.4)',
-                                        }}>
-                                            <Ionicons name="key" size={20} color="#f5a623" />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#ffffff' }}>
-                                                    SKBTECH API Vault 🔐
-                                                </Text>
-                                                <View style={{ backgroundColor: '#22c55e', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
-                                                    <Text style={{ fontSize: 9.5, fontWeight: '900', color: '#ffffff' }}>OFFICIAL VAULT</Text>
-                                                </View>
-                                            </View>
-                                            <Text style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, lineHeight: 16 }}>
-                                                Dukkan saita da canza SKBTECH API Key ana yinsa ne kawai a kebe a cikin API Vault
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <View style={{ backgroundColor: '#f5a623', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}>
-                                        <Text style={{ color: '#0d1b3e', fontWeight: '800', fontSize: 12, marginRight: 4 }}>Bude Vault</Text>
-                                        <Ionicons name="arrow-forward" size={13} color="#0d1b3e" />
-                                    </View>
-                                </TouchableOpacity>
-                                
-                                <View style={s.divider} />
+
                                 <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 Legacy AgentHub API Key (agenthub.ng)</Text>
                                 <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Backup key for legacy identity services.</Text>
                                 <ApiInputRow placeholder="AgentHub API Key (Bearer Token)" value={agentHubApiKey} onChangeText={setAgentHubApiKey} isSecret={true} />

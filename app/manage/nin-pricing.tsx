@@ -547,37 +547,6 @@ export default function EnterpriseNINPricingScreen() {
                 </View>
             </LinearGradient>
 
-            {/* SKBTECH Official API Quick Link Banner */}
-            <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-                <TouchableOpacity
-                    onPress={() => router.push('/manage/api?category=Identity' as any)}
-                    activeOpacity={0.85}
-                    style={{
-                        backgroundColor: '#0F172A',
-                        borderRadius: 14,
-                        borderWidth: 1.5,
-                        borderColor: T.goldBorder,
-                        padding: 12,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                    }}
-                >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: T.goldBg, alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="key" size={16} color={T.gold} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>SKBTECH NIN API Active</Text>
-                            <Text style={{ color: '#94A3B8', fontSize: 10 }}>Official wholesale prices synced. Tap to configure API Key.</Text>
-                        </View>
-                    </View>
-                    <View style={{ backgroundColor: T.gold, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 10 }}>API Key</Text>
-                        <Ionicons name="arrow-forward" size={10} color="#0F172A" />
-                    </View>
-                </TouchableOpacity>
-            </View>
 
             {/* MASTER GLOBAL NIN GATEWAY CONTROL CARD */}
             <View style={styles.masterControlCard}>

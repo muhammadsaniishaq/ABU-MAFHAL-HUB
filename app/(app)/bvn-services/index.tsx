@@ -323,7 +323,7 @@ export default function BVNServicesGatewayScreen() {
             <View style={styles.secureBadge}>
               <View style={[styles.secureDot, globalBVNStatus === 'maintenance' && { backgroundColor: '#EF4444' }]} />
               <Text style={styles.secureText}>
-                {globalBVNStatus === 'maintenance' ? 'GATEWAY UNDER MAINTENANCE' : 'SKBTECH LIVE • NIBSS'}
+                {globalBVNStatus === 'maintenance' ? 'GATEWAY UNDER MAINTENANCE' : 'OFFICIAL LIVE • NIBSS'}
               </Text>
             </View>
             <TouchableOpacity
@@ -404,7 +404,7 @@ export default function BVNServicesGatewayScreen() {
               <View style={styles.heroTopRow}>
                 <View style={styles.heroBadge}>
                   <Ionicons name="flash" size={10} color="#F5A623" style={{ marginRight: 4 }} />
-                  <Text style={styles.heroBadgeTxt}>INSTANT API • SKBTECH</Text>
+                  <Text style={styles.heroBadgeTxt}>INSTANT API • NIBSS</Text>
                 </View>
                 {heroMaint ? (
                   <View style={styles.maintPill}>

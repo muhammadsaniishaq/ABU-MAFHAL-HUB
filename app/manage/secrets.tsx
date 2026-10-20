@@ -52,7 +52,6 @@ const extractStringValue = (val: any): string => {
 };
 
 const REQUIRED_SECRETS = [
-    { key: 'SKBTECH_API_KEY', aliases: ['SKBTECH_KEY', 'SKB_API_KEY', 'SKB_KEY'], desc: 'SKBTECH API Key (skbtech.com.ng for NIN/BVN Services & Slips)', provider: 'SKBTECH' },
     { key: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], desc: 'Legacy AgentHub Key (agenthub.ng fallback)', provider: 'Identity' },
     { key: 'BILALSADASUB_TOKEN', aliases: ['BILAL_TOKEN', 'BILALSADASUB_API_KEY'], desc: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)', provider: 'Bilalsadasub' },
     { key: 'PAYSTACK_SECRET_KEY', aliases: ['PAYSTACK_KEY', 'PAYSTACK_SECRET'], desc: 'Paystack Secret Key', provider: 'Paystack' },

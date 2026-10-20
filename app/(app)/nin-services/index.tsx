@@ -334,7 +334,7 @@ export default function NINServicesScreen() {
             <View style={styles.statusPill}>
               <View style={[styles.statusDot, globalNINStatus === 'maintenance' && { backgroundColor: '#EF4444' }]} />
               <Text style={styles.statusPillTxt}>
-                {globalNINStatus === 'maintenance' ? 'GATEWAY UNDER MAINTENANCE' : 'SKBTECH LIVE • NIMC'}
+                {globalNINStatus === 'maintenance' ? 'GATEWAY UNDER MAINTENANCE' : 'OFFICIAL LIVE • NIMC'}
               </Text>
             </View>
             <TouchableOpacity
@@ -414,7 +414,7 @@ export default function NINServicesScreen() {
               <View style={styles.heroTopRow}>
                 <View style={styles.heroBadge}>
                   <Ionicons name="flash" size={10} color="#F5A623" style={{ marginRight: 4 }} />
-                  <Text style={styles.heroBadgeTxt}>INSTANT API • SKBTECH</Text>
+                  <Text style={styles.heroBadgeTxt}>INSTANT API • NIMC</Text>
                 </View>
                 {heroMaint ? (
                   <View style={styles.maintPill}>
