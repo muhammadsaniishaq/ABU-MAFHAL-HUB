@@ -183,7 +183,6 @@ export default function AdminSettings() {
     const [flutterwaveKey, setFlutterwaveKey] = useState('');
 
     // Identity & Communication Keys
-    const [skbtechApiKey, setSkbtechApiKey] = useState('');
     const [identityApiKey, setIdentityApiKey] = useState('');
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [smileIdKey, setSmileIdKey] = useState('');
@@ -304,7 +303,6 @@ export default function AdminSettings() {
                     if (secret.key === 'PAYVESSEL_API_SECRET') setPayvesselSecret(secret.value);
                     if (secret.key === 'PAYVESSEL_BUSINESS_ID') setPayvesselBusinessId(secret.value);
                     if (secret.key === 'FLUTTERWAVE_SECRET_KEY') setFlutterwaveKey(secret.value);
-                    if (secret.key === 'SKBTECH_API_KEY') setSkbtechApiKey(secret.value);
                     if (secret.key === 'IDENTITY_API_KEY') setIdentityApiKey(secret.value);
                     if (secret.key === 'AGENTHUB_API_KEY') setAgentHubApiKey(secret.value);
                     if (secret.key === 'SMILE_ID_KEY') setSmileIdKey(secret.value);
@@ -330,7 +328,6 @@ export default function AdminSettings() {
                 { key: 'PAYVESSEL_API_SECRET', value: payvesselSecret, description: 'Payvessel API Secret' },
                 { key: 'PAYVESSEL_BUSINESS_ID', value: payvesselBusinessId, description: 'Payvessel Business ID' },
                 { key: 'FLUTTERWAVE_SECRET_KEY', value: flutterwaveKey, description: 'Flutterwave Secret Key' },
-                { key: 'SKBTECH_API_KEY', value: skbtechApiKey, description: 'SKBTECH API Key (skbtech.com.ng for NIN/BVN & Slips)' },
                 { key: 'IDENTITY_API_KEY', value: identityApiKey, description: 'Identity Provider API Key' },
                 { key: 'AGENTHUB_API_KEY', value: agentHubApiKey, description: 'AgentHub API Key (agenthub.ng)' },
                 { key: 'SMILE_ID_KEY', value: smileIdKey, description: 'SmileID API Key' },
@@ -1422,15 +1419,66 @@ export default function AdminSettings() {
                         <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'all' || expandedApi === 'identity' ? null : 'identity')} style={[s.accordionHeader, s.accordionHeaderActive]} activeOpacity={0.8}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="finger-print" size={18} color="#fff" style={{ marginRight: 8 }} />
-                                <Text style={[s.accordionTitle, { color: '#fff' }]}>🆔 Identity & Verification Services (SKBTECH)</Text>
+                                <Text style={[s.accordionTitle, { color: '#fff' }]}>🆔 Identity & Verification Services</Text>
                             </View>
                             <Ionicons name={expandedApi === 'all' || expandedApi === 'identity' ? "chevron-up" : "chevron-down"} size={18} color="#fff" />
                         </TouchableOpacity>
                         {(expandedApi === 'all' || expandedApi === 'identity') && (
                             <View style={s.accordionBody}>
-                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 SKBTECH API Key (skbtech.com.ng)</Text>
-                                <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Primary API key for NIN Verification, BVN Retrieval, Modification, and Slips.</Text>
-                                <ApiInputRow placeholder="SKBTECH API Key (from skbtech.com.ng/developer)" value={skbtechApiKey} onChangeText={setSkbtechApiKey} isSecret={true} />
+                                {/* SKBTECH Dedicated Vault Notice & Direct Action */}
+                                <TouchableOpacity 
+                                    onPress={() => router.push('/manage/api')}
+                                    style={{
+                                        backgroundColor: '#0d1b3e',
+                                        borderRadius: 14,
+                                        padding: 14,
+                                        marginBottom: 14,
+                                        borderWidth: 1.5,
+                                        borderColor: '#f5a623',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: 0.1,
+                                        shadowRadius: 4,
+                                        elevation: 2,
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+                                        <View style={{
+                                            width: 42,
+                                            height: 42,
+                                            borderRadius: 21,
+                                            backgroundColor: 'rgba(245, 166, 35, 0.18)',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginRight: 12,
+                                            borderWidth: 1,
+                                            borderColor: 'rgba(245, 166, 35, 0.4)',
+                                        }}>
+                                            <Ionicons name="key" size={20} color="#f5a623" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#ffffff' }}>
+                                                    SKBTECH API Vault 🔐
+                                                </Text>
+                                                <View style={{ backgroundColor: '#22c55e', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                                                    <Text style={{ fontSize: 9.5, fontWeight: '900', color: '#ffffff' }}>OFFICIAL VAULT</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, lineHeight: 16 }}>
+                                                Dukkan saita da canza SKBTECH API Key ana yinsa ne kawai a kebe a cikin API Vault
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <View style={{ backgroundColor: '#f5a623', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={{ color: '#0d1b3e', fontWeight: '800', fontSize: 12, marginRight: 4 }}>Bude Vault</Text>
+                                        <Ionicons name="arrow-forward" size={13} color="#0d1b3e" />
+                                    </View>
+                                </TouchableOpacity>
                                 
                                 <View style={s.divider} />
                                 <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 Legacy AgentHub API Key (agenthub.ng)</Text>
