@@ -452,5 +452,58 @@ export const payvesselCardService = {
 
         await supabase.from('user_virtual_cards').update({ status: 'terminated' }).eq('id', cardDbId);
         return true;
+    },
+
+    /**
+     * Fetch all issued cards for Admin view (bypasses RLS via edge function)
+     */
+    getAllAdminCards: async () => {
+        try {
+            const { data, error } = await supabase.functions.invoke('payvessel-cards', {
+                body: { action: 'get_all_cards_admin' }
+            });
+            if (!error && data?.status && Array.isArray(data.cards)) {
+                return data.cards;
+            }
+        } catch (_) {}
+
+        // Fallback to direct client query
+        const { data } = await supabase
+            .from('user_virtual_cards')
+            .select('*, profiles(full_name, email, phone_number)')
+            .order('created_at', { ascending: false });
+        return data || [];
+    },
+
+    /**
+     * Permanently delete a card (Admin / System)
+     */
+    deleteVirtualCard: async (cardDbId: string) => {
+        try {
+            const { data, error } = await supabase.functions.invoke('payvessel-cards', {
+                body: { action: 'delete_card', card_id: cardDbId }
+            });
+            if (error) throw error;
+            if (data?.status === false) throw new Error(data.error || 'Failed to delete card');
+            return true;
+        } catch (e: any) {
+            // Fallback direct delete
+            await supabase.from('card_transactions').delete().eq('card_id', cardDbId);
+            const { error: dbErr } = await supabase.from('user_virtual_cards').delete().eq('id', cardDbId);
+            if (dbErr) throw dbErr;
+            return true;
+        }
+    },
+
+    /**
+     * Purge all mock, test, and invalid virtual cards
+     */
+    purgeMockCards: async () => {
+        const { data, error } = await supabase.functions.invoke('payvessel-cards', {
+            body: { action: 'purge_mock_cards' }
+        });
+        if (error) throw error;
+        if (data?.status === false) throw new Error(data.error || 'Purge failed');
+        return data?.purged_count ?? 0;
     }
 };

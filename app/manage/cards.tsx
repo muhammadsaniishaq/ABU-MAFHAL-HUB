@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
+import { payvesselCardService } from '../../services/payvesselCards';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function CardManager() {
@@ -69,14 +70,8 @@ export default function CardManager() {
     const loadAdminCards = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('user_virtual_cards')
-                .select('*, profiles(full_name, email, phone_number)')
-                .order('created_at', { ascending: false });
-
-            if (!error && data) {
-                setCards(data);
-            }
+            const allCards = await payvesselCardService.getAllAdminCards();
+            setCards(allCards || []);
         } catch (e: any) {
             console.error('Error fetching admin cards:', e);
         } finally {
@@ -186,6 +181,58 @@ export default function CardManager() {
         );
     };
 
+    const handleAdminDeleteCard = async (card: any) => {
+        Alert.alert(
+            'Delete Card Permanently 🗑️',
+            `Are you sure you want to PERMANENTLY delete the card for ${card.card_holder_name} (${card.card_number_masked})? This will erase it completely from the database.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete Permanently',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setActionLoading(true);
+                            await payvesselCardService.deleteVirtualCard(card.id);
+                            setCards(prev => prev.filter(c => c.id !== card.id));
+                            Alert.alert('Deleted ✅', 'Virtual card permanently removed.');
+                        } catch (e: any) {
+                            Alert.alert('Error', e.message || 'Failed to delete card');
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handlePurgeMockCards = async () => {
+        Alert.alert(
+            'Purge Mock & Test Cards 🧹',
+            'This will scan and permanently delete any mock, demo, or test virtual cards from the system. Real cards with active PayVessel IDs will remain safe. Continue?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Purge Mock Cards',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setActionLoading(true);
+                            const count = await payvesselCardService.purgeMockCards();
+                            await loadAdminCards();
+                            Alert.alert('Purge Complete 🎉', `${count} mock / test card(s) were successfully deleted.`);
+                        } catch (e: any) {
+                            Alert.alert('Purge Notice', e.message || 'Error executing purge');
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const filteredCards = cards.filter(c => {
         const matchesStatus = activeFilter === 'all' || c.status === activeFilter;
         const matchesQuery = !searchQuery || 
@@ -217,13 +264,23 @@ export default function CardManager() {
                         <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Payvessel API Engine & Merchant Controls</Text>
                     </View>
 
-                    <TouchableOpacity 
-                        onPress={() => setShowConfigModal(true)}
-                        style={{ backgroundColor: '#f5a623', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                    >
-                        <Ionicons name="key-outline" size={16} color="#0f172a" />
-                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>API Config</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                        <TouchableOpacity 
+                            onPress={handlePurgeMockCards}
+                            style={{ backgroundColor: '#ef4444', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                        >
+                            <Ionicons name="trash-bin-outline" size={15} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 11 }}>Purge Mocks</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            onPress={() => setShowConfigModal(true)}
+                            style={{ backgroundColor: '#f5a623', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                        >
+                            <Ionicons name="key-outline" size={16} color="#0f172a" />
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>API Config</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Metric Summary Cards */}
@@ -332,7 +389,7 @@ export default function CardManager() {
                                     style={{ flex: 1, backgroundColor: card.status === 'active' ? '#ef4444' : '#22c55e', paddingVertical: 8, borderRadius: 10, alignItems: 'center' }}
                                 >
                                     <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
-                                        {card.status === 'active' ? 'Freeze Card ❄️' : 'Unfreeze Card 🔓'}
+                                        {card.status === 'active' ? 'Freeze ❄️' : 'Unfreeze 🔓'}
                                     </Text>
                                 </TouchableOpacity>
 
@@ -341,9 +398,17 @@ export default function CardManager() {
                                         onPress={() => handleAdminTerminateCard(card)}
                                         style={{ flex: 1, backgroundColor: '#334155', paddingVertical: 8, borderRadius: 10, alignItems: 'center' }}
                                     >
-                                        <Text style={{ color: '#f87171', fontWeight: '800', fontSize: 12 }}>Terminate 🗑️</Text>
+                                        <Text style={{ color: '#f87171', fontWeight: '800', fontSize: 12 }}>Terminate</Text>
                                     </TouchableOpacity>
                                 )}
+
+                                <TouchableOpacity
+                                    onPress={() => handleAdminDeleteCard(card)}
+                                    style={{ backgroundColor: '#7f1d1d', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+                                    accessibilityLabel="Delete card permanently"
+                                >
+                                    <Ionicons name="trash-outline" size={16} color="#fca5a5" />
+                                </TouchableOpacity>
                             </View>
                         </View>
                     ))

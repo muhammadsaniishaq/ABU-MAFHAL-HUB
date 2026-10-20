@@ -753,6 +753,113 @@ serve(async (req) => {
             });
         }
 
+        // ════════════════════════════════════════════════════════════════
+        // ACTION: GET ALL CARDS (ADMIN ONLY)
+        // ════════════════════════════════════════════════════════════════
+        if (action === 'get_all_cards_admin') {
+            const { data: adminProf } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+            const isAdmin = ['admin', 'super_admin', 'manager'].includes(adminProf?.role || '');
+            if (!isAdmin) {
+                return new Response(JSON.stringify({ status: false, error: 'Unauthorized: Admin privileges required.' }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const { data: allCards, error: cardsErr } = await supabase
+                .from('user_virtual_cards')
+                .select('*, profiles(full_name, email, phone_number)')
+                .order('created_at', { ascending: false });
+
+            if (cardsErr) throw cardsErr;
+
+            return new Response(JSON.stringify({ status: true, cards: allCards || [] }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // ACTION: PERMANENTLY DELETE CARD (ADMIN ONLY)
+        // ════════════════════════════════════════════════════════════════
+        if (action === 'delete_card') {
+            const { card_id } = body;
+            const { data: adminProf } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+            const isAdmin = ['admin', 'super_admin', 'manager'].includes(adminProf?.role || '');
+            if (!isAdmin) {
+                return new Response(JSON.stringify({ status: false, error: 'Unauthorized: Admin privileges required.' }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            if (!card_id) {
+                return new Response(JSON.stringify({ status: false, error: 'Missing card_id parameter.' }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const { data: localCard } = await supabase
+                .from('user_virtual_cards')
+                .select('*')
+                .or(`id.eq.${card_id},card_id.eq.${card_id}`)
+                .maybeSingle();
+
+            if (localCard) {
+                await supabase.from('card_transactions').delete().eq('card_id', localCard.id);
+                const { error: delErr } = await supabase.from('user_virtual_cards').delete().eq('id', localCard.id);
+                if (delErr) throw delErr;
+            }
+
+            return new Response(JSON.stringify({ status: true, message: 'Virtual card permanently deleted.' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // ACTION: PURGE MOCK & TEST CARDS (ADMIN ONLY)
+        // ════════════════════════════════════════════════════════════════
+        if (action === 'purge_mock_cards') {
+            const { data: adminProf } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+            const isAdmin = ['admin', 'super_admin', 'manager'].includes(adminProf?.role || '');
+            if (!isAdmin) {
+                return new Response(JSON.stringify({ status: false, error: 'Unauthorized: Admin privileges required.' }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const { data: allCards } = await supabase.from('user_virtual_cards').select('id, card_id, card_name, card_number_masked');
+            let deletedCount = 0;
+
+            if (allCards && allCards.length > 0) {
+                const mockIds = allCards.filter((c: any) => {
+                    const cid = (c.card_id || '').toLowerCase();
+                    const cname = (c.card_name || '').toLowerCase();
+                    const cnum = (c.card_number_masked || '').replace(/\s/g, '');
+                    return (
+                        cid.startsWith('mock') || cid.startsWith('test') || cid.startsWith('demo') ||
+                        cname.includes('mock') || cname.includes('test') || cname.includes('demo') || cname.includes('sample') ||
+                        cnum.includes('1111') || cnum.includes('4111') || cnum.startsWith('4000') || cnum.startsWith('5555')
+                    );
+                }).map((c: any) => c.id);
+
+                if (mockIds.length > 0) {
+                    await supabase.from('card_transactions').delete().in('card_id', mockIds);
+                    const { error: delErr } = await supabase.from('user_virtual_cards').delete().in('id', mockIds);
+                    if (!delErr) deletedCount = mockIds.length;
+                }
+            }
+
+            return new Response(JSON.stringify({
+                status: true,
+                message: `Purged ${deletedCount} mock / test virtual card(s).`,
+                purged_count: deletedCount
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
         return new Response(JSON.stringify({ status: false, error: `Unknown action: ${action}` }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
