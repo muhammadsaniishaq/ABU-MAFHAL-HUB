@@ -143,6 +143,7 @@ export default function AppLayout() {
             <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="kyc" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="virtual-cards" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="esim" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="transfer" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="saved-cards" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="beneficiaries" options={{ href: null, tabBarStyle: { display: 'none' } }} />
@@ -183,6 +184,7 @@ export default function AppLayout() {
         'cac-services': 'feature_cac',
         'cac-history': 'feature_cac',
         'virtual-cards': 'feature_cards',
+        'esim': 'feature_esim',
         'qr-pay': 'feature_qr',
         'social-boost': 'feature_social',
         'social-orders': 'feature_social',
