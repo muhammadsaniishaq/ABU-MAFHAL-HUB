@@ -31,6 +31,7 @@ import {
   EsimPackage,
   UserEsim,
 } from '../../services/payvesselEsim';
+import BrandAlertModal, { BrandAlertState } from '../../components/BrandAlertModal';
 
 // Brand Design Tokens
 const BRAND = {
@@ -118,6 +119,44 @@ export default function EsimScreen() {
   const [activeEsimModal, setActiveEsimModal] = useState<UserEsim | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [checkingStatusRef, setCheckingStatusRef] = useState<string | null>(null);
+
+  // Smooth Brand Alert State (works on both Web & Native)
+  const [brandAlert, setBrandAlert] = useState<BrandAlertState>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+    buttonText: 'OK',
+  });
+
+  const showBrandAlert = useCallback((
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'info',
+    buttonText: string = 'OK',
+    onConfirm?: () => void,
+    showCancel: boolean = false,
+    cancelText: string = 'Cancel',
+    onCancel?: () => void
+  ) => {
+    try {
+      if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (_) {}
+
+    setBrandAlert({
+      visible: true,
+      title,
+      message,
+      type,
+      buttonText,
+      onConfirm,
+      showCancel,
+      cancelText,
+      onCancel,
+    });
+  }, []);
 
   // Top-Up States
   const [topupModalEsim, setTopupModalEsim] = useState<UserEsim | null>(null);
@@ -226,14 +265,19 @@ export default function EsimScreen() {
 
   const handlePurchasePress = () => {
     if (!selectedPackage || !selectedRegion) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (_) {}
+
     if (walletBalance < selectedPackage.price_ngn) {
-      Alert.alert(
+      showBrandAlert(
         'Insufficient Balance',
-        `You need ₦${selectedPackage.price_ngn.toLocaleString()} to purchase this eSIM, but your wallet balance is ₦${walletBalance.toLocaleString()}. Please fund your wallet.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Fund Wallet', onPress: () => router.push('/wallet') }
-        ]
+        `You need ₦${selectedPackage.price_ngn.toLocaleString()} to purchase this eSIM bundle, but your current wallet balance is ₦${walletBalance.toLocaleString()}. Please fund your wallet.`,
+        'warning',
+        'Fund Wallet',
+        () => router.push('/wallet'),
+        true,
+        'Cancel'
       );
       return;
     }
@@ -263,7 +307,12 @@ export default function EsimScreen() {
       setActiveEsimModal(createdEsim);
       showToast('eSIM Activated Successfully! 🎉');
     } catch (e: any) {
-      Alert.alert('Activation Notice', e.message || 'Failed to complete eSIM order.');
+      showBrandAlert(
+        'Activation Notice',
+        e.message || 'Failed to complete eSIM order. Please verify your balance and try again.',
+        'error',
+        'OK'
+      );
     } finally {
       setActionLoading(false);
     }
@@ -307,7 +356,7 @@ export default function EsimScreen() {
       );
       showToast(`eSIM Status: ${newStatus} ✅`);
     } catch (e: any) {
-      Alert.alert('Status Check', e.message ?? 'Could not check eSIM status.');
+      showBrandAlert('Status Check', e.message ?? 'Could not check eSIM status.', 'info');
     } finally {
       setCheckingStatusRef(null);
     }
@@ -315,7 +364,7 @@ export default function EsimScreen() {
 
   const handleOpenTopup = async (esim: UserEsim) => {
     if (!esim.iccid) {
-      Alert.alert('Notice', 'This eSIM profile does not have an ICCID yet or is still provisioning. Please check status first.');
+      showBrandAlert('Notice', 'This eSIM profile does not have an ICCID yet or is still provisioning. Please check status first.', 'info');
       return;
     }
     setTopupModalEsim(esim);
@@ -346,13 +395,17 @@ export default function EsimScreen() {
     if (!topupModalEsim || !topupModalEsim.iccid || !selectedTopupPackage) return;
 
     if (walletBalance < selectedTopupPackage.price_ngn) {
-      Alert.alert(
+      showBrandAlert(
         'Insufficient Balance',
         `You need ₦${selectedTopupPackage.price_ngn.toLocaleString()} to top up this eSIM, but your wallet balance is ₦${walletBalance.toLocaleString()}. Please fund your wallet.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Fund Wallet', onPress: () => { setTopupModalEsim(null); router.push('/wallet'); } }
-        ]
+        'warning',
+        'Fund Wallet',
+        () => {
+          setTopupModalEsim(null);
+          router.push('/wallet');
+        },
+        true,
+        'Cancel'
       );
       return;
     }
@@ -371,7 +424,7 @@ export default function EsimScreen() {
       showToast('eSIM Top-Up Successful! 📶⚡');
       handleCheckStatus(topupModalEsim);
     } catch (e: any) {
-      Alert.alert('Top-Up Notice', e.message || 'Failed to complete eSIM top-up.');
+      showBrandAlert('Top-Up Notice', e.message || 'Failed to complete eSIM top-up.', 'error');
     } finally {
       setTopupSubmitting(false);
     }
@@ -666,46 +719,6 @@ export default function EsimScreen() {
               </Text>
             </View>
           </ScrollView>
-
-          {/* STICKY BOTTOM CHECKOUT ACTION BAR */}
-          {selectedPackage && (
-            <View style={[styles.stickyBottomBar, { paddingBottom: bottomBarPadding }]}>
-              <View style={styles.stickyBottomInner}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.stickySelectedLabel}>Selected Plan:</Text>
-                  <Text style={styles.stickySelectedVal} numberOfLines={1}>
-                    {selectedPackage.data_amount} • {selectedPackage.validity_days} Days
-                  </Text>
-                  <Text style={styles.stickyPriceVal}>
-                    ₦{selectedPackage.price_ngn.toLocaleString()}
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  onPress={handlePurchasePress}
-                  disabled={actionLoading}
-                  activeOpacity={0.85}
-                  style={styles.activateCtaButton}
-                >
-                  <LinearGradient
-                    colors={[BRAND.navyDark, BRAND.navy, BRAND.goldDark]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.activateCtaGradient}
-                  >
-                    {actionLoading ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Ionicons name="flash" size={17} color={BRAND.gold} />
-                        <Text style={styles.activateCtaText}>Activate Now</Text>
-                      </View>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
         </View>
       ) : (
         /* MY ESIMS TAB */
@@ -1224,6 +1237,67 @@ export default function EsimScreen() {
       {toastMessage && (
         <View style={styles.toastContainer}>
           <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
+
+      {/* Modern Brand Alert Modal */}
+      <BrandAlertModal
+        visible={brandAlert.visible}
+        title={brandAlert.title}
+        message={brandAlert.message}
+        type={brandAlert.type}
+        buttonText={brandAlert.buttonText || 'OK'}
+        onClose={() => {
+          const cb = brandAlert.onConfirm;
+          setBrandAlert(prev => ({ ...prev, visible: false }));
+          if (cb) cb();
+        }}
+        showCancel={brandAlert.showCancel}
+        cancelText={brandAlert.cancelText}
+        onCancel={() => {
+          const cb = brandAlert.onCancel;
+          setBrandAlert(prev => ({ ...prev, visible: false }));
+          if (cb) cb();
+        }}
+      />
+
+      {/* STICKY BOTTOM CHECKOUT ACTION BAR */}
+      {activeTab === 'buy' && selectedPackage && (
+        <View style={[styles.stickyBottomBar, { paddingBottom: bottomBarPadding }]}>
+          <View style={styles.stickyBottomInner}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.stickySelectedLabel}>Selected Plan:</Text>
+              <Text style={styles.stickySelectedVal} numberOfLines={1}>
+                {selectedPackage.data_amount} • {selectedPackage.validity_days} Days
+              </Text>
+              <Text style={styles.stickyPriceVal}>
+                ₦{selectedPackage.price_ngn.toLocaleString()}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={handlePurchasePress}
+              disabled={actionLoading}
+              activeOpacity={0.8}
+              style={styles.activateCtaButton}
+            >
+              <LinearGradient
+                colors={[BRAND.navyDark, BRAND.navy, BRAND.goldDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.activateCtaGradient}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="flash" size={17} color={BRAND.gold} />
+                    <Text style={styles.activateCtaText}>Activate Now</Text>
+                  </View>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
