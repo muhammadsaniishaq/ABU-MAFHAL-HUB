@@ -536,6 +536,34 @@ export default function LiquidityVaultScreen() {
                     error: (secretsMap['AIJALON_API_KEY'] || secretsMap['AIJALON_KEY']) ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
+                },
+                {
+                    id: 'skbtech',
+                    name: 'SKBTECH (NIN, BVN & Identity Portal)',
+                    category: 'Digital Identity & CAC',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: (secretsMap['SKBTECH_API_KEY'] || secretsMap['SKB_API_KEY'] || secretsMap['SKBTECH_KEY']) ? 'healthy' : 'unconfigured',
+                    error: (secretsMap['SKBTECH_API_KEY'] || secretsMap['SKB_API_KEY'] || secretsMap['SKBTECH_KEY']) ? undefined : 'API Key not configured in Vault (skbtech.com.ng)',
+                    allowDeposit: true,
+                    allowWithdrawal: false,
+                    depositAccount: {
+                        bankName: 'Monnify / Sterling Bank',
+                        accountNumber: '9081234567',
+                        accountName: 'SKBTECH Services / ABUMAFHAL',
+                        instructions: 'Transfer to this virtual account to top up SKBTECH balance.'
+                    }
+                },
+                {
+                    id: 'resend',
+                    name: 'Resend (Email Gateway & Transactional Mail)',
+                    category: 'SMS & Communications',
+                    balance: 0,
+                    currency: 'USD',
+                    status: (secretsMap['RESEND_API_KEY'] || secretsMap['RESEND_KEY']) ? 'healthy' : 'unconfigured',
+                    error: (secretsMap['RESEND_API_KEY'] || secretsMap['RESEND_KEY']) ? undefined : 'API Key not configured in Vault',
+                    allowDeposit: false,
+                    allowWithdrawal: false
                 }
             ];
 
@@ -571,7 +599,9 @@ export default function LiquidityVaultScreen() {
             termii: 'TERMII_API_KEY',
             flutterwave: 'FLUTTERWAVE_SECRET_KEY',
             monnify: 'MONNIFY_API_KEY',
-            aijalon: 'AIJALON_API_KEY'
+            aijalon: 'AIJALON_API_KEY',
+            skbtech: 'SKBTECH_API_KEY',
+            resend: 'RESEND_API_KEY'
         };
         const keyName = secretMap[p.id] || 'GENERIC_API_KEY';
         setTokenKeyName(keyName);
@@ -659,7 +689,9 @@ export default function LiquidityVaultScreen() {
                 termii: 'TERMII_API_KEY',
                 flutterwave: 'FLUTTERWAVE_SECRET_KEY',
                 monnify: 'MONNIFY_API_KEY',
-                aijalon: 'AIJALON_API_KEY'
+                aijalon: 'AIJALON_API_KEY',
+                skbtech: 'SKBTECH_API_KEY',
+                resend: 'RESEND_API_KEY'
             };
 
             const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';

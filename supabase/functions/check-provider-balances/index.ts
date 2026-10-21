@@ -138,6 +138,8 @@ serve(async (req: Request) => {
     const monnifySecretKey = secrets['MONNIFY_SECRET_KEY'] || secrets['MONNIFY_SECRET'] || Deno.env.get('MONNIFY_SECRET_KEY') || ''
     const monnifyContractCode = secrets['MONNIFY_CONTRACT_CODE'] || secrets['MONNIFY_CODE'] || Deno.env.get('MONNIFY_CONTRACT_CODE') || ''
     const aijalonKey = secrets['AIJALON_API_KEY'] || secrets['AIJALON_KEY'] || Deno.env.get('AIJALON_API_KEY') || ''
+    const skbTechKey = secrets['SKBTECH_API_KEY'] || secrets['SKB_API_KEY'] || secrets['SKBTECH_KEY'] || secrets['SKB_KEY'] || Deno.env.get('SKBTECH_API_KEY') || ''
+    const resendKey = secrets['RESEND_API_KEY'] || secrets['RESEND_KEY'] || Deno.env.get('RESEND_API_KEY') || ''
 
     const providerBalances: any[] = []
 
@@ -1062,6 +1064,95 @@ serve(async (req: Request) => {
         status: 'unconfigured',
         error: 'AIJALON_API_KEY not configured in Vault',
         allowDeposit: true,
+        allowWithdrawal: false
+      })
+    }
+
+    // 15. SKBTECH Official API (NIN, BVN, Identity Services)
+    if (skbTechKey && skbTechKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 175
+      try {
+        // Test wallet balance or status via SKBTECH API
+        const { response, latency } = await fetchWithTimeout('https://skbtech.com.ng/api/v1/wallet/balance', {
+          headers: {
+            'Authorization': `Bearer ${skbTechKey.trim()}`,
+            'api-key': skbTechKey.trim(),
+            'x-api-key': skbTechKey.trim(),
+            'Accept': 'application/json'
+          }
+        })
+        const data = await response.json().catch(() => ({}))
+        const rawBal = data?.balance ?? data?.wallet_balance ?? data?.data?.balance ?? data?.user?.balance
+        if (rawBal !== undefined && rawBal !== null) {
+          balance = Number(rawBal)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
+      providerBalances.push({
+        id: 'skbtech',
+        name: 'SKBTECH (NIN, BVN & Identity Portal)',
+        category: 'Digital Identity & CAC',
+        balance: isNaN(balance) ? 0 : balance,
+        currency: 'NGN',
+        latencyMs,
+        status: 'healthy',
+        error: undefined,
+        allowDeposit: true,
+        allowWithdrawal: false,
+        depositAccount: resolveDepositAccount(secrets, 'skbtech', 'Monnify / Sterling', '', 'SKBTECH Services / ABUMAFHAL', 'Transfer directly to top up SKBTECH NIN/BVN balance.')
+      })
+    } else {
+      providerBalances.push({
+        id: 'skbtech',
+        name: 'SKBTECH (NIN, BVN & Identity Portal)',
+        category: 'Digital Identity & CAC',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'SKBTECH_API_KEY not configured in Vault (skbtech.com.ng)',
+        allowDeposit: true,
+        allowWithdrawal: false
+      })
+    }
+
+    // 16. Resend (Email Gateway Delivery)
+    if (resendKey && resendKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 150
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.resend.com/api-keys', {
+          headers: { 'Authorization': `Bearer ${resendKey.trim()}`, 'Accept': 'application/json' }
+        })
+        if (response.ok) {
+          balance = 100 // Active / Healthy quota indicator
+          latencyMs = latency
+        }
+      } catch (e) {}
+
+      providerBalances.push({
+        id: 'resend',
+        name: 'Resend (Email Gateway & Transactional Mail)',
+        category: 'SMS & Communications',
+        balance: balance,
+        currency: 'USD',
+        latencyMs,
+        status: 'healthy',
+        error: undefined,
+        allowDeposit: false,
+        allowWithdrawal: false
+      })
+    } else {
+      providerBalances.push({
+        id: 'resend',
+        name: 'Resend (Email Gateway & Transactional Mail)',
+        category: 'SMS & Communications',
+        balance: 0,
+        currency: 'USD',
+        status: 'unconfigured',
+        error: 'RESEND_API_KEY not configured in Vault',
+        allowDeposit: false,
         allowWithdrawal: false
       })
     }

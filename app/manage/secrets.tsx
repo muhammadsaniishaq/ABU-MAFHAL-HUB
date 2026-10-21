@@ -52,6 +52,10 @@ const extractStringValue = (val: any): string => {
 };
 
 const REQUIRED_SECRETS = [
+    { key: 'SKBTECH_API_KEY', aliases: ['SKB_API_KEY', 'SKBTECH_KEY', 'SKB_KEY'], desc: 'Official SKBTECH API Key (skbtech.com.ng for NIN/BVN & Identity Services)', provider: 'Identity' },
+    { key: 'MONNIFY_API_KEY', aliases: ['MONNIFY_KEY', 'MONNIFY_PUBLIC_KEY'], desc: 'Monnify API Key (MK_PROD_...)', provider: 'Monnify' },
+    { key: 'MONNIFY_SECRET_KEY', aliases: ['MONNIFY_SECRET'], desc: 'Monnify Secret Key for Disbursements & Balance', provider: 'Monnify' },
+    { key: 'MONNIFY_CONTRACT_CODE', aliases: ['MONNIFY_CODE'], desc: 'Monnify 10-digit Contract Code / Wallet Number', provider: 'Monnify' },
     { key: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], desc: 'Legacy AgentHub Key (agenthub.ng fallback)', provider: 'Identity' },
     { key: 'BILALSADASUB_TOKEN', aliases: ['BILAL_TOKEN', 'BILALSADASUB_API_KEY'], desc: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)', provider: 'Bilalsadasub' },
     { key: 'PAYSTACK_SECRET_KEY', aliases: ['PAYSTACK_KEY', 'PAYSTACK_SECRET'], desc: 'Paystack Secret Key', provider: 'Paystack' },
