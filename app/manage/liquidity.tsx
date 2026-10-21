@@ -1506,6 +1506,10 @@ export default function LiquidityVaultScreen() {
                                     </Text>
                                 )}
                             </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => setSelectedTokenProvider(null)} style={styles.modalCloseBtn}>
+                                <Text style={styles.modalCloseBtnText}>Cancel</Text>
+                            </TouchableOpacity>
                         </ScrollView>
                     </View>
                 </View>
@@ -1579,6 +1583,10 @@ export default function LiquidityVaultScreen() {
                                 ) : (
                                     <Text style={styles.executeWithdrawBtnText}>Execute Live Withdrawal Transfer</Text>
                                 )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => setSelectedWithdrawProvider(null)} style={styles.modalCloseBtn}>
+                                <Text style={styles.modalCloseBtnText}>Cancel</Text>
                             </TouchableOpacity>
                         </ScrollView>
                     </View>
