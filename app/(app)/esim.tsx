@@ -27,6 +27,15 @@ import {
   UserEsim,
 } from '../../services/payvesselEsim';
 
+// Status color helper
+const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  ACTIVE:   { bg: 'rgba(34,197,94,0.18)',  border: '#22c55e', text: '#4ade80' },
+  PENDING:  { bg: 'rgba(245,166,35,0.18)', border: '#f5a623', text: '#fbbf24' },
+  EXPIRED:  { bg: 'rgba(100,116,139,0.2)', border: '#64748b', text: '#94a3b8' },
+  DEPLETED: { bg: 'rgba(100,116,139,0.2)', border: '#64748b', text: '#94a3b8' },
+  FAILED:   { bg: 'rgba(239,68,68,0.18)',  border: '#ef4444', text: '#f87171' },
+};
+
 const { width: W } = Dimensions.get('window');
 
 export default function EsimScreen() {
@@ -53,6 +62,14 @@ export default function EsimScreen() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [activeEsimModal, setActiveEsimModal] = useState<UserEsim | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [checkingStatusRef, setCheckingStatusRef] = useState<string | null>(null);
+
+  // Top-Up States
+  const [topupModalEsim, setTopupModalEsim] = useState<UserEsim | null>(null);
+  const [topupPackages, setTopupPackages] = useState<EsimPackage[]>([]);
+  const [selectedTopupPackage, setSelectedTopupPackage] = useState<EsimPackage | null>(null);
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [topupSubmitting, setTopupSubmitting] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -171,6 +188,94 @@ export default function EsimScreen() {
   const copyToClipboard = async (text: string, label: string) => {
     await Clipboard.setStringAsync(text);
     showToast(`${label} copied to clipboard! 📋`);
+  };
+
+  const handleCheckStatus = async (esim: UserEsim) => {
+    try {
+      setCheckingStatusRef(esim.order_reference);
+      const result = await payvesselEsimService.checkEsimStatus(esim.order_reference);
+      const newStatus = result.status?.toUpperCase() ?? 'UNKNOWN';
+      setMyEsims(prev =>
+        prev.map(e =>
+          e.order_reference === esim.order_reference
+            ? { ...e, status: newStatus as UserEsim['status'] }
+            : e
+        )
+      );
+      showToast(`eSIM Status: ${newStatus} ✅`);
+    } catch (e: any) {
+      Alert.alert('Status Check', e.message ?? 'Could not check eSIM status.');
+    } finally {
+      setCheckingStatusRef(null);
+    }
+  };
+
+  const handleOpenTopup = async (esim: UserEsim) => {
+    if (!esim.iccid) {
+      Alert.alert('Notice', 'This eSIM profile does not have an ICCID yet or is still provisioning. Please check status first.');
+      return;
+    }
+    setTopupModalEsim(esim);
+    setTopupLoading(true);
+    setTopupPackages([]);
+    setSelectedTopupPackage(null);
+
+    try {
+      let pkgs = await payvesselEsimService.getTopupPackages(esim.iccid);
+      if (!pkgs || pkgs.length === 0) {
+        // Fallback: load standard packages for this eSIM country
+        pkgs = await payvesselEsimService.getPackages(esim.country_code);
+      }
+      setTopupPackages(pkgs);
+      if (pkgs && pkgs.length > 0) setSelectedTopupPackage(pkgs[0]);
+    } catch (e: any) {
+      console.warn('Failed to fetch top-up packages, falling back:', e);
+      try {
+        const fallbackPkgs = await payvesselEsimService.getPackages(esim.country_code);
+        setTopupPackages(fallbackPkgs);
+        if (fallbackPkgs && fallbackPkgs.length > 0) setSelectedTopupPackage(fallbackPkgs[0]);
+      } catch (_) {}
+    } finally {
+      setTopupLoading(false);
+    }
+  };
+
+  const handleConfirmTopup = async () => {
+    if (!topupModalEsim || !topupModalEsim.iccid || !selectedTopupPackage) return;
+
+    if (walletBalance < selectedTopupPackage.price_ngn) {
+      Alert.alert(
+        'Insufficient Balance',
+        `You need ₦${selectedTopupPackage.price_ngn.toLocaleString()} to top up this eSIM, but your wallet balance is ₦${walletBalance.toLocaleString()}. Please fund your wallet.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Fund Wallet', onPress: () => { setTopupModalEsim(null); router.push('/wallet'); } }
+        ]
+      );
+      return;
+    }
+
+    try {
+      setTopupSubmitting(true);
+      await payvesselEsimService.topupEsim({
+        iccid: topupModalEsim.iccid,
+        package_code: selectedTopupPackage.package_code,
+        price_ngn: selectedTopupPackage.price_ngn,
+        price_usd: selectedTopupPackage.price_usd,
+      });
+
+      // Update local wallet balance
+      setWalletBalance(prev => Math.max(0, prev - selectedTopupPackage.price_ngn));
+      setTopupModalEsim(null);
+      showToast('eSIM Top-Up Successful! 📶⚡');
+
+      // Refresh status in background
+      handleCheckStatus(topupModalEsim);
+    } catch (e: any) {
+      Alert.alert('Top-Up Notice', e.message || 'Failed to complete eSIM top-up.');
+    } finally {
+      setTopupSubmitting(false);
+    }
   };
 
   const filteredRegions = regions.filter(r =>
@@ -450,8 +555,16 @@ export default function EsimScreen() {
                       </View>
                     </View>
 
-                    <View style={styles.statusBadge}>
-                      <Text style={styles.statusBadgeText}>{esim.status}</Text>
+                    <View style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor: (STATUS_COLORS[esim.status] ?? STATUS_COLORS.ACTIVE).bg,
+                        borderColor:     (STATUS_COLORS[esim.status] ?? STATUS_COLORS.ACTIVE).border,
+                      }
+                    ]}>
+                      <Text style={[styles.statusBadgeText, { color: (STATUS_COLORS[esim.status] ?? STATUS_COLORS.ACTIVE).text }]}>
+                        {esim.status}
+                      </Text>
                     </View>
                   </View>
 
@@ -466,17 +579,42 @@ export default function EsimScreen() {
                     </View>
                     <View>
                       <Text style={styles.metaLabel}>ICCID</Text>
-                      <Text style={styles.metaVal}>{esim.iccid ? esim.iccid.substring(0, 10) + '...' : 'Available'}</Text>
+                      <Text style={styles.metaVal}>{esim.iccid ? esim.iccid.substring(0, 10) + '...' : 'Provisioned'}</Text>
                     </View>
                   </View>
 
-                  <TouchableOpacity
-                    onPress={() => setActiveEsimModal(esim)}
-                    style={styles.viewQrBtn}
-                  >
-                    <Ionicons name="qr-code" size={16} color="#0ea5e9" />
-                    <Text style={styles.viewQrBtnText}>View QR Code & Setup Guide</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => setActiveEsimModal(esim)}
+                      style={[styles.viewQrBtn, { flex: 2 }]}
+                    >
+                      <Ionicons name="qr-code" size={16} color="#0ea5e9" />
+                      <Text style={styles.viewQrBtnText}>QR Code & Guide</Text>
+                    </TouchableOpacity>
+
+                    {esim.iccid ? (
+                      <TouchableOpacity
+                        onPress={() => handleOpenTopup(esim)}
+                        style={[styles.viewQrBtn, { flex: 1.5, borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.12)' }]}
+                      >
+                        <Ionicons name="flash" size={13} color="#f5a623" />
+                        <Text style={[styles.viewQrBtnText, { color: '#f5a623', fontSize: 11 }]}>Top Up</Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    <TouchableOpacity
+                      onPress={() => handleCheckStatus(esim)}
+                      disabled={checkingStatusRef === esim.order_reference}
+                      style={[styles.viewQrBtn, { flex: 1, borderColor: '#334155', backgroundColor: 'rgba(51,65,85,0.3)' }]}
+                    >
+                      {checkingStatusRef === esim.order_reference ? (
+                        <ActivityIndicator size={14} color="#94a3b8" />
+                      ) : (
+                        <Ionicons name="refresh-outline" size={14} color="#94a3b8" />
+                      )}
+                      <Text style={[styles.viewQrBtnText, { color: '#94a3b8', fontSize: 11 }]}>Status</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </View>
@@ -645,6 +783,116 @@ export default function EsimScreen() {
                   </View>
                 </TouchableOpacity>
               </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* TOP-UP MODAL */}
+      {topupModalEsim && (
+        <Modal visible={Boolean(topupModalEsim)} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { maxHeight: '85%' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.modalTitle}>Recharge eSIM Data</Text>
+                  <Text style={styles.modalSubtitle} numberOfLines={1}>
+                    {topupModalEsim.country_name} • ICCID: {topupModalEsim.iccid ? topupModalEsim.iccid.substring(0, 12) + '...' : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setTopupModalEsim(null)}>
+                  <Ionicons name="close-circle" size={28} color="#94a3b8" />
+                </TouchableOpacity>
+              </View>
+
+              {topupLoading ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#f5a623" />
+                  <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, textAlign: 'center' }}>
+                    Fetching top-up bundles from PayVessel...
+                  </Text>
+                </View>
+              ) : topupPackages.length === 0 ? (
+                <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                  <Ionicons name="alert-circle-outline" size={42} color="#f5a623" />
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', marginTop: 10, fontSize: 15 }}>
+                    No Top-Up Bundles Found
+                  </Text>
+                  <Text style={{ color: '#94a3b8', textAlign: 'center', marginTop: 6, fontSize: 12, paddingHorizontal: 16 }}>
+                    This profile might not support online top-up or the operator is updating catalog.
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300, marginVertical: 6 }}>
+                  <Text style={styles.sectionLabel}>SELECT RECHARGE PACKAGE</Text>
+                  <View style={{ gap: 8 }}>
+                    {topupPackages.map((pkg) => {
+                      const isSelected = selectedTopupPackage?.package_code === pkg.package_code;
+                      return (
+                        <TouchableOpacity
+                          key={pkg.package_code}
+                          onPress={() => setSelectedTopupPackage(pkg)}
+                          style={[
+                            styles.packageCard,
+                            isSelected && styles.packageCardSelected,
+                            { padding: 12 }
+                          ]}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={[styles.packageData, { fontSize: 16 }]}>{pkg.data_amount}</Text>
+                              <View style={[styles.dayBadge, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+                                <Text style={styles.dayBadgeText}>{pkg.validity_days} Days</Text>
+                              </View>
+                            </View>
+                            <Text style={[styles.packageName, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>
+                              {pkg.name}
+                            </Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={[styles.packageNgn, { fontSize: 15 }]}>
+                              ₦{pkg.price_ngn.toLocaleString()}
+                            </Text>
+                            <Text style={styles.packageUsd}>${pkg.price_usd.toFixed(2)} USD</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              )}
+
+              {selectedTopupPackage && (
+                <View style={[styles.confirmBreakdown, { marginTop: 10, marginBottom: 12 }]}>
+                  <View style={[styles.confirmRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                    <Text style={[styles.confirmRowLabel, { color: '#ffffff', fontWeight: 'bold' }]}>Wallet Deduction</Text>
+                    <Text style={[styles.confirmRowVal, { color: '#f5a623', fontSize: 17, fontWeight: '900' }]}>
+                      ₦{selectedTopupPackage.price_ngn.toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  onPress={() => setTopupModalEsim(null)}
+                  style={styles.cancelBtn}
+                >
+                  <Text style={styles.cancelBtnText}>Close</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleConfirmTopup}
+                  disabled={topupSubmitting || !selectedTopupPackage}
+                  style={[styles.confirmPayBtn, (!selectedTopupPackage || topupSubmitting) && { opacity: 0.6 }]}
+                >
+                  {topupSubmitting ? (
+                    <ActivityIndicator color="#0f172a" />
+                  ) : (
+                    <Text style={styles.confirmPayBtnText}>Top-Up Now ⚡</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
