@@ -813,7 +813,7 @@ export default function LiquidityVaultScreen() {
     const filteredProviders = providers.filter(p => {
         const matchesCategory = activeFilter === 'All'
             || (activeFilter === 'VTU' && p.category === 'VTU Telecom')
-            || (activeFilter === 'Identity' && p.category === 'Digital Identity & CAC')
+            || (activeFilter === 'Identity' && (p.category === 'Digital Identity & CAC' || p.category === 'Digital Identity'))
             || (activeFilter === 'Gateways' && p.category === 'Payment Gateway')
             || (activeFilter === 'Comms' && (p.category === 'SMS & Communications' || p.category === 'Marketing Services'));
         
@@ -1156,7 +1156,19 @@ export default function LiquidityVaultScreen() {
 
                                     <View style={styles.providerCardHeader}>
                                         <View style={{ flex: 1, paddingRight: 6 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                                                <View style={styles.providerIconMini}>
+                                                    <Ionicons 
+                                                        name={
+                                                            p.category?.includes('Identity') ? 'finger-print-outline' :
+                                                            p.category?.includes('Telecom') ? 'cellular-outline' :
+                                                            p.category?.includes('Payment') ? 'card-outline' :
+                                                            p.category?.includes('SMS') ? 'chatbubble-ellipses-outline' : 'cube-outline'
+                                                        } 
+                                                        size={12} 
+                                                        color={T.navy} 
+                                                    />
+                                                </View>
                                                 <Text style={styles.providerCategory}>{p.category || 'API Vendor'}</Text>
                                                 {p.latencyMs && (
                                                     <Text style={styles.latencyTag}>⚡ {p.latencyMs}ms</Text>
@@ -1803,6 +1815,14 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 2,
+    },
+    providerIconMini: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        backgroundColor: '#e2e8f0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     providerCategory: {
         color: T.textSub,
