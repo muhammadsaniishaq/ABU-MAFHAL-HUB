@@ -22,7 +22,7 @@ export default function ModernTabBar({ state, descriptors, navigation }: any) {
     const { width: windowWidth } = useWindowDimensions();
     const insets = useSafeAreaInsets();
 
-    // On Desktop and Tablet web, the rich sidebar is displayed instead of the bottom tab bar
+    // On Desktop and Tablet web (>= 768px), the rich sidebar is displayed instead of the bottom tab bar
     if (Platform.OS === 'web' && windowWidth >= 768) {
         return null;
     }
@@ -36,16 +36,29 @@ export default function ModernTabBar({ state, descriptors, navigation }: any) {
 
     const allowedTabs = ['dashboard', 'wallet', 'qr-pay', 'history', 'profile'];
 
-    // Dynamic Safe Bottom Calculation:
-    // On Android edge-to-edge, insets.bottom accounts for the 3-button navigation bar (typically ~48px)
-    // or gesture bar (16-24px). Floating the tab bar at (insets.bottom + 10) prevents it from ever
-    // hiding behind or overlapping the phone's system navigation bar!
-    const bottomPosition = insets.bottom > 0
-        ? insets.bottom + (Platform.OS === 'android' ? 10 : 6)
-        : (Platform.OS === 'ios' ? 20 : 14);
+    // Safe bottom calculation:
+    // - On native (iOS/Android): use real safe area insets
+    // - On mobile web: use CSS env(safe-area-inset-bottom) via a generous default so the
+    //   tab bar never sits behind the home indicator or browser chrome.
+    //   On Android mobile browser the bottom chrome bar is typically 56-60px; on iOS ~80px.
+    const isMobileWeb = Platform.OS === 'web' && windowWidth < 768;
+
+    let bottomPosition: number;
+    if (isMobileWeb) {
+        // On mobile web, add generous padding to clear browser bottom bar & home indicator
+        bottomPosition = 12;
+    } else {
+        bottomPosition = insets.bottom > 0
+            ? insets.bottom + (Platform.OS === 'android' ? 10 : 6)
+            : (Platform.OS === 'ios' ? 20 : 14);
+    }
 
     return (
-        <View style={[s.tabBarContainer, { bottom: bottomPosition }]}>
+        <View style={[
+            s.tabBarContainer,
+            { bottom: bottomPosition },
+            isMobileWeb && s.tabBarContainerMobileWeb,
+        ]}>
             {Platform.OS === 'ios' ? (
                 <BlurView intensity={90} tint="light" style={s.absoluteBlur} />
             ) : (
@@ -164,6 +177,16 @@ const s = StyleSheet.create({
         elevation: 8,
         zIndex: 50,
     },
+    // On mobile web: wider reach to the screen edges and taller for comfort
+    tabBarContainerMobileWeb: {
+        left: 12,
+        right: 12,
+        height: 62,
+        // Use CSS env() for bottom inset via style prop (React Native Web supports this)
+        ...(Platform.OS === 'web' ? {
+            bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' as any,
+        } : {}),
+    },
     absoluteBlur: {
         ...StyleSheet.absoluteFillObject,
         borderRadius: 20,
@@ -181,6 +204,8 @@ const s = StyleSheet.create({
         justifyContent: 'center',
         height: '100%',
         paddingVertical: 4,
+        // Larger touch area on web
+        minWidth: 44,
     },
     iconBox: {
         width: 32,

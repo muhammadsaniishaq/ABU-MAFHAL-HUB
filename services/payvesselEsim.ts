@@ -47,8 +47,35 @@ export interface UserEsim {
 
 // ─── Helper: invoke edge function ─────────────────────────────────────────────
 async function invokeEsim(body: Record<string, unknown>) {
-    const { data, error } = await supabase.functions.invoke('payvessel-esim', { body });
-    if (error) throw new Error(error.message ?? 'Edge function error');
+    let token = '';
+    let userId = '';
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            token = session.access_token || '';
+            userId = session.user?.id || '';
+        }
+    } catch (_) {}
+
+    const headers: Record<string, string> = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const payload = {
+        ...body,
+        user_id: userId || body.user_id,
+    };
+
+    const { data, error } = await supabase.functions.invoke('payvessel-esim', {
+        body: payload,
+        headers,
+    });
+
+    if (error) {
+        console.error('[payvesselEsim] invoke error:', error);
+        throw new Error(error.message ?? 'Edge function error');
+    }
     return data;
 }
 

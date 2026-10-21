@@ -176,18 +176,26 @@ serve(async (req) => {
             auth: { persistSession: false }
         });
 
+        // ── Parse request body ──────────────────────────────────────────────
+        const body = await req.json().catch(() => ({})) as Record<string, any>;
+        const { action } = body;
+
         // ── Authenticate caller ─────────────────────────────────────────────
-        const authHeader = req.headers.get('Authorization') ?? '';
+        const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? '';
         let user: any = null;
         if (authHeader.startsWith('Bearer ')) {
-            const token = authHeader.slice(7).trim();
+            const token = authHeader.replace(/^Bearer\s+/i, '').trim();
             const { data, error } = await sb.auth.getUser(token);
             if (!error && data?.user) user = data.user;
         }
 
-        // ── Parse request body ──────────────────────────────────────────────
-        const body = await req.json().catch(() => ({})) as Record<string, any>;
-        const { action } = body;
+        // Robust fallback: if token didn't resolve user, but user_id was provided in body
+        if (!user && body.user_id) {
+            try {
+                const { data: uData } = await sb.auth.admin.getUserById(String(body.user_id));
+                if (uData?.user) user = uData.user;
+            } catch (_) {}
+        }
 
         // ── Load credentials from DB (system_secrets → app_settings → Deno.env)
         const [{ data: secrets }, { data: settings }] = await Promise.all([

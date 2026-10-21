@@ -1,7 +1,7 @@
 {
   "short_name": "ABU MAFHAL",
   "name": "ABU MAFHAL HUB - VTU & Payments",
-  "description": "Instant VTU, Data Bundles, Recharge Pins, Utility Bills & Crypto Payments",
+  "description": "Instant VTU, Data Bundles, Airtime, eSIM, Recharge Pins, Utility Bills & Crypto Payments",
   "icons": [
     {
       "src": "/assets/images/logo-icon.png",
@@ -16,11 +16,16 @@
       "purpose": "any maskable"
     }
   ],
-  "id": "/",
-  "start_url": "/",
+  "id": "/index",
+  "start_url": "/index",
   "scope": "/",
-  "background_color": "#0F172A",
-  "theme_color": "#0F172A",
+  "background_color": "#f0f2f8",
+  "theme_color": "#0d1b3e",
   "display": "standalone",
-  "orientation": "portrait"
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "lang": "en",
+  "categories": ["finance", "productivity"],
+  "prefer_related_applications": false,
+  "screenshots": []
 }
