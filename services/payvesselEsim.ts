@@ -21,6 +21,7 @@ export interface EsimPackage {
     wholesale_usd?: number;
     location_code: string;
     is_daily?: boolean;
+    networks?: any[];
 }
 
 export interface UserEsim {

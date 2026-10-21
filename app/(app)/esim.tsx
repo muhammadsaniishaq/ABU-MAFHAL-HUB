@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,9 @@ import {
   StatusBar,
   Alert,
   FlatList,
+  RefreshControl,
+  KeyboardAvoidingView,
+  Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,7 +40,35 @@ const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }
   FAILED:   { bg: '#FEE2E2', border: '#FECACA', text: '#B91C1C' },
 };
 
-const { width: W } = Dimensions.get('window');
+// Aliases for intuitive, fast search across top travel destinations
+const COUNTRY_ALIASES: Record<string, string[]> = {
+  SA: ['saudi', 'arabia', 'makkah', 'mecca', 'medina', 'madinah', 'hajj', 'umrah', 'ksa', 'riyadh', 'jeddah'],
+  AE: ['uae', 'dubai', 'emirates', 'abu dhabi', 'sharjah'],
+  GB: ['uk', 'united kingdom', 'england', 'britain', 'london', 'great britain'],
+  US: ['usa', 'united states', 'america', 'new york', 'california'],
+  TR: ['turkey', 'turkiye', 'istanbul', 'ankara'],
+  EG: ['egypt', 'cairo', 'alexandria', 'misr'],
+  GH: ['ghana', 'accra', 'kumasi'],
+  NG: ['nigeria', 'lagos', 'abuja'],
+  ZA: ['south africa', 'johannesburg', 'cape town'],
+  CA: ['canada', 'toronto', 'vancouver', 'montreal'],
+  DE: ['germany', 'berlin', 'frankfurt', 'munich', 'europe'],
+  FR: ['france', 'paris', 'europe'],
+  QA: ['qatar', 'doha'],
+  KW: ['kuwait', 'kuwait city'],
+  CN: ['china', 'beijing', 'shanghai', 'guangzhou', 'hong kong'],
+  MY: ['malaysia', 'kuala lumpur'],
+  IN: ['india', 'delhi', 'mumbai'],
+};
+
+// Continent categorization mapping for fast filtering
+const REGION_CATEGORIES: Record<string, string[]> = {
+  'MIDDLE EAST': ['SA', 'AE', 'QA', 'KW', 'OM', 'BH', 'JO', 'IL', 'IQ', 'LB'],
+  'EUROPE':      ['GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'CH', 'PT', 'BE', 'AT', 'SE', 'NO', 'DK', 'FI', 'IE', 'PL', 'GR', 'CZ', 'RO', 'HU'],
+  'AFRICA':      ['NG', 'GH', 'EG', 'ZA', 'KE', 'MA', 'RW', 'UG', 'TZ', 'SN', 'CI', 'ET', 'CM', 'DZ', 'TN'],
+  'AMERICAS':    ['US', 'CA', 'BR', 'MX', 'AR', 'CO', 'CL', 'PE'],
+  'ASIA':        ['CN', 'JP', 'KR', 'SG', 'MY', 'TH', 'ID', 'IN', 'VN', 'PH', 'HK', 'TW'],
+};
 
 export default function EsimScreen() {
   const router = useRouter();
@@ -47,6 +78,7 @@ export default function EsimScreen() {
 
   // Loading States
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [packagesLoading, setPackagesLoading] = useState(false);
 
@@ -61,6 +93,7 @@ export default function EsimScreen() {
   // Country Dropdown Picker States
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const [regionFilter, setRegionFilter] = useState<'ALL' | 'POPULAR' | 'MIDDLE EAST' | 'EUROPE' | 'AFRICA' | 'AMERICAS' | 'ASIA'>('ALL');
 
   // Modals & Popups
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -87,10 +120,8 @@ export default function EsimScreen() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const loadInitialData = async () => {
+  const refreshBalance = async () => {
     try {
-      setLoading(true);
-      // 1. Fetch user wallet balance
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -100,6 +131,13 @@ export default function EsimScreen() {
           .single();
         if (profile) setWalletBalance(Number(profile.balance) || 0);
       }
+    } catch (_) {}
+  };
+
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+      await refreshBalance();
 
       // 2. Fetch Regions from PayVessel
       const { regions: fetchedRegions } = await payvesselEsimService.getRegions();
@@ -121,6 +159,28 @@ export default function EsimScreen() {
       setLoading(false);
     }
   };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshBalance();
+      if (activeTab === 'buy') {
+        const { regions: fetchedRegions } = await payvesselEsimService.getRegions();
+        setRegions(fetchedRegions);
+        if (selectedRegion) {
+          await loadPackagesForRegion(selectedRegion.code);
+        }
+      } else {
+        const esims = await payvesselEsimService.getMyEsims();
+        setMyEsims(esims);
+      }
+      showToast('Updated successfully! 🔄');
+    } catch (e) {
+      console.error('Refresh error:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [activeTab, selectedRegion]);
 
   const loadPackagesForRegion = async (code: string) => {
     try {
@@ -176,8 +236,8 @@ export default function EsimScreen() {
         price_usd: selectedPackage.price_usd
       });
 
-      // Update local wallet balance
-      setWalletBalance(prev => Math.max(0, prev - selectedPackage.price_ngn));
+      // Synchronize fresh wallet balance
+      await refreshBalance();
 
       // Refresh list & select newly created eSIM
       setMyEsims(prev => [createdEsim, ...prev]);
@@ -194,6 +254,25 @@ export default function EsimScreen() {
   const copyToClipboard = async (text: string, label: string) => {
     await Clipboard.setStringAsync(text);
     showToast(`${label} copied to clipboard! 📋`);
+  };
+
+  const shareActivationDetails = async (esim: UserEsim) => {
+    try {
+      const shareText =
+        `🌐 ABU-MAFHAL Global eSIM Setup\n` +
+        `Destination: ${esim.country_name}\n` +
+        `Data Plan: ${esim.data_amount} (${esim.validity_days} Days)\n` +
+        `ICCID: ${esim.iccid || 'Provisioned'}\n` +
+        `SM-DP+ Address: ${esim.smdp_address || 'rsp.truphone.com'}\n` +
+        `Activation Code: ${esim.activation_code || esim.order_reference}\n` +
+        `LPA String: ${esim.lpa_activation_code || 'LPA:1$rsp.truphone.com$' + (esim.activation_code || '')}\n` +
+        `Status: ${esim.status}\n` +
+        `Reference: ${esim.order_reference}\n\n` +
+        `Instructions: Go to Settings > Cellular / Mobile Data > Add eSIM, then scan the QR code or enter the SM-DP+ Address and Activation Code manually.`;
+      await Share.share({ message: shareText, title: `${esim.country_name} eSIM Activation Details` });
+    } catch (e) {
+      console.warn('Share error:', e);
+    }
   };
 
   const handleCheckStatus = async (esim: UserEsim) => {
@@ -269,7 +348,7 @@ export default function EsimScreen() {
         price_usd: selectedTopupPackage.price_usd,
       });
 
-      setWalletBalance(prev => Math.max(0, prev - selectedTopupPackage.price_ngn));
+      await refreshBalance();
       setTopupModalEsim(null);
       showToast('eSIM Top-Up Successful! 📶⚡');
       handleCheckStatus(topupModalEsim);
@@ -280,11 +359,43 @@ export default function EsimScreen() {
     }
   };
 
-  // Filter regions for country picker dropdown
-  const filteredRegions = regions.filter(r =>
-    r.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-    r.code.toLowerCase().includes(countrySearch.toLowerCase())
-  );
+  // Helper to extract clean supported operator names
+  const getOperatorsText = (pkg: EsimPackage) => {
+    if (!pkg.networks || !Array.isArray(pkg.networks)) return null;
+    const names: string[] = [];
+    for (const net of pkg.networks) {
+      const ops = net.operators || [];
+      for (const op of ops) {
+        if (op.operator_name) {
+          const type = op.network_type ? ` (${op.network_type})` : '';
+          names.push(`${op.operator_name}${type}`);
+        }
+      }
+    }
+    return names.length > 0 ? names.slice(0, 3).join(' • ') : null;
+  };
+
+  // Filter regions with smart aliases + continent tabs
+  const filteredRegions = useMemo(() => {
+    const q = countrySearch.trim().toLowerCase();
+
+    return regions.filter(r => {
+      // 1. Region category filter
+      if (regionFilter === 'POPULAR' && !r.popular) return false;
+      if (regionFilter !== 'ALL' && regionFilter !== 'POPULAR') {
+        const allowedCodes = REGION_CATEGORIES[regionFilter] || [];
+        if (!allowedCodes.includes(r.code.toUpperCase())) return false;
+      }
+
+      // 2. Search query filter
+      if (!q) return true;
+      if (r.name.toLowerCase().includes(q)) return true;
+      if (r.code.toLowerCase().includes(q)) return true;
+
+      const aliases = COUNTRY_ALIASES[r.code.toUpperCase()] || [];
+      return aliases.some(a => a.includes(q) || q.includes(a));
+    });
+  }, [regions, countrySearch, regionFilter]);
 
   return (
     <View style={styles.container}>
@@ -348,9 +459,15 @@ export default function EsimScreen() {
           <Text style={styles.loaderText}>Connecting to Global eSIM Gateway...</Text>
         </View>
       ) : activeTab === 'buy' ? (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0056D2']} />
+          }
+        >
 
-          {/* DESTINATION DROPDOWN SELECTOR (Replaces top bar pills per user requirement) */}
+          {/* DESTINATION DROPDOWN SELECTOR */}
           <Text style={styles.sectionLabel}>SELECT DESTINATION COUNTRY</Text>
           
           <TouchableOpacity
@@ -369,7 +486,7 @@ export default function EsimScreen() {
                 <Text style={styles.dropdownSubtitle}>
                   {selectedRegion
                     ? `${selectedRegion.code} • Tap to change country (${regions.length} available)`
-                    : 'Tap to browse 240+ global destinations'}
+                    : 'Tap to choose from 240+ global destinations'}
                 </Text>
               </View>
             </View>
@@ -426,6 +543,7 @@ export default function EsimScreen() {
             <View style={{ gap: 10 }}>
               {packages.map((pkg) => {
                 const isSelected = selectedPackage?.package_code === pkg.package_code;
+                const operators = getOperatorsText(pkg);
                 return (
                   <TouchableOpacity
                     key={pkg.package_code}
@@ -442,9 +560,20 @@ export default function EsimScreen() {
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.packageDataAmount}>{pkg.data_amount}</Text>
-                        <Text style={styles.packageValidity}>Valid for {pkg.validity_days} Days</Text>
-                        {pkg.name ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.packageDataAmount}>{pkg.data_amount}</Text>
+                          <View style={styles.dayBadge}>
+                            <Text style={styles.dayBadgeText}>{pkg.validity_days} Days</Text>
+                          </View>
+                        </View>
+                        {operators ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                            <Ionicons name="radio" size={11} color="#059669" />
+                            <Text style={styles.operatorBadgeText} numberOfLines={1}>
+                              {operators}
+                            </Text>
+                          </View>
+                        ) : pkg.name ? (
                           <Text style={styles.packageNetworkName} numberOfLines={1}>{pkg.name}</Text>
                         ) : null}
                       </View>
@@ -503,7 +632,13 @@ export default function EsimScreen() {
         </ScrollView>
       ) : (
         /* MY ESIMS TAB */
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0056D2']} />
+          }
+        >
           {myEsims.length === 0 ? (
             <View style={styles.emptyEsims}>
               <View style={styles.emptyIconCircle}>
@@ -607,10 +742,13 @@ export default function EsimScreen() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════════ */}
-      {/* COUNTRY DROPDOWN MODAL PICKER                                        */}
+      {/* COUNTRY DROPDOWN MODAL PICKER WITH CONTINENT TABS & SMART SEARCH     */}
       {/* ════════════════════════════════════════════════════════════════════ */}
       <Modal visible={showCountryPicker} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
           <View style={[styles.modalCard, { maxHeight: '90%', paddingBottom: 16 }]}>
             {/* Modal Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -628,11 +766,11 @@ export default function EsimScreen() {
               <Ionicons name="search-outline" size={18} color="#64748B" />
               <TextInput
                 style={styles.dropdownSearchInput}
-                placeholder="Search country or code (e.g. Saudi, UK, US, Dubai)..."
+                placeholder="Search country (e.g. Saudi, UK, Dubai, USA)..."
                 placeholderTextColor="#94A3B8"
                 value={countrySearch}
                 onChangeText={setCountrySearch}
-                autoFocus={true}
+                autoFocus={false}
               />
               {countrySearch.length > 0 && (
                 <TouchableOpacity onPress={() => setCountrySearch('')}>
@@ -641,13 +779,33 @@ export default function EsimScreen() {
               )}
             </View>
 
+            {/* Quick Category / Continent Tabs */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {(['ALL', 'POPULAR', 'MIDDLE EAST', 'EUROPE', 'AFRICA', 'AMERICAS', 'ASIA'] as const).map((cat) => {
+                  const isActive = regionFilter === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setRegionFilter(cat)}
+                      style={[styles.filterPill, isActive && styles.filterPillActive]}
+                    >
+                      <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
             {/* List of Countries */}
             <FlatList
               data={filteredRegions}
               keyExtractor={(item) => item.code}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={true}
-              style={{ maxHeight: 420 }}
+              style={{ maxHeight: 380 }}
               renderItem={({ item }) => {
                 const isCurrent = selectedRegion?.code === item.code;
                 return (
@@ -685,7 +843,7 @@ export default function EsimScreen() {
               <Text style={styles.cancelBtnText}>Close</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ════════════════════════════════════════════════════════════════════ */}
@@ -783,6 +941,15 @@ export default function EsimScreen() {
                     Scan with your iPhone or Android Camera
                   </Text>
                 </View>
+
+                {/* Quick Share / Export Button */}
+                <TouchableOpacity
+                  onPress={() => shareActivationDetails(activeEsimModal)}
+                  style={styles.shareSetupBtn}
+                >
+                  <Ionicons name="share-social-outline" size={16} color="#0056D2" />
+                  <Text style={styles.shareSetupBtnText}>Share Setup Details to WhatsApp / Notes</Text>
+                </TouchableOpacity>
 
                 {/* Manual Setup Details */}
                 <Text style={[styles.sectionLabel, { marginTop: 16 }]}>MANUAL ACTIVATION DETAILS</Text>
@@ -983,7 +1150,7 @@ export default function EsimScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC', // Crisp clean light background
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
@@ -1229,12 +1396,17 @@ const styles = StyleSheet.create({
   packageValidity: {
     color: '#64748B',
     fontSize: 12,
-    marginTop: 2,
+    marginTop: 1,
   },
   packageNetworkName: {
     color: '#94A3B8',
     fontSize: 10,
     marginTop: 2,
+  },
+  operatorBadgeText: {
+    color: '#059669',
+    fontSize: 10,
+    fontWeight: '700',
   },
   packagePriceNgn: {
     color: '#0F172A',
@@ -1268,6 +1440,8 @@ const styles = StyleSheet.create({
   },
   dayBadge: {
     backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#BFDBFE',
@@ -1506,13 +1680,33 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 44,
-    marginVertical: 10,
+    marginVertical: 8,
     gap: 8,
   },
   dropdownSearchInput: {
     flex: 1,
     color: '#0F172A',
     fontSize: 13,
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterPillActive: {
+    backgroundColor: '#0056D2',
+    borderColor: '#0056D2',
+  },
+  filterPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
   },
   countryListItem: {
     flexDirection: 'row',
@@ -1607,6 +1801,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  shareSetupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+    marginBottom: 8,
+  },
+  shareSetupBtnText: {
+    color: '#0056D2',
+    fontWeight: '800',
+    fontSize: 12,
   },
   codeItem: {
     flexDirection: 'row',
