@@ -21,6 +21,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../../services/supabase';
@@ -30,6 +31,22 @@ import {
   EsimPackage,
   UserEsim,
 } from '../../services/payvesselEsim';
+
+// Brand Design Tokens
+const BRAND = {
+  navy: '#0D1B3E',
+  navyDark: '#070D1E',
+  navyLight: '#162A5A',
+  gold: '#F5A623',
+  goldDark: '#D97706',
+  goldLight: '#FEF3C7',
+  bg: '#F8FAFC',
+  cardBg: '#FFFFFF',
+  border: '#E2E8F0',
+  textMain: '#0F172A',
+  textSub: '#64748B',
+  green: '#15803D',
+};
 
 // Light theme status badge colors
 const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -72,6 +89,7 @@ const REGION_CATEGORIES: Record<string, string[]> = {
 
 export default function EsimScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Navigation / Tabs
   const [activeTab, setActiveTab] = useState<'buy' | 'my_esims'>('buy');
@@ -397,246 +415,321 @@ export default function EsimScreen() {
     });
   }, [regions, countrySearch, regionFilter]);
 
+  const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 36 : 22) + 8;
+  const bottomBarPadding = Math.max(insets?.bottom || 0, 16);
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="light-content" backgroundColor={BRAND.navyDark} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="#0F172A" />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.headerTitle}>Global eSIM Roaming</Text>
-          <Text style={styles.headerSubtitle}>PayVessel High-Speed Travel Data 🌐</Text>
+      {/* Modern Brand Navy Header */}
+      <LinearGradient
+        colors={[BRAND.navyDark, BRAND.navy, BRAND.navyLight]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.headerContainer, { paddingTop: headerTopPadding }]}
+      >
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={styles.headerTitle}>Global eSIM Roaming</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
+              <Ionicons name="flash" size={11} color={BRAND.gold} />
+              <Text style={styles.headerSubtitle}>PayVessel High-Speed Data 🌐</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push('/wallet')}
+            style={styles.balancePill}
+            activeOpacity={0.8}
+          >
+            <View style={styles.balanceIconWrap}>
+              <Ionicons name="wallet-outline" size={13} color={BRAND.gold} />
+            </View>
+            <View>
+              <Text style={styles.balancePillLabel}>Balance</Text>
+              <Text style={styles.balancePillText}>₦{walletBalance.toLocaleString()}</Text>
+            </View>
+            <View style={styles.balancePlusWrap}>
+              <Ionicons name="add" size={12} color={BRAND.navy} />
+            </View>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={() => router.push('/wallet')}
-          style={styles.walletBadge}
-        >
-          <Ionicons name="wallet-outline" size={15} color="#0056D2" />
-          <Text style={styles.walletBadgeText}>₦{walletBalance.toLocaleString()}</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          onPress={() => setActiveTab('buy')}
-          style={[styles.tabButton, activeTab === 'buy' && styles.activeTabButton]}
-        >
-          <Ionicons
-            name="globe-outline"
-            size={16}
-            color={activeTab === 'buy' ? '#FFFFFF' : '#64748B'}
-          />
-          <Text style={[styles.tabText, activeTab === 'buy' && styles.activeTabText]}>
-            Buy eSIM Data
-          </Text>
-        </TouchableOpacity>
+        {/* Tabs Bar in Header */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('buy')}
+            style={[styles.tabButton, activeTab === 'buy' && styles.activeTabButton]}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="globe-outline"
+              size={15}
+              color={activeTab === 'buy' ? '#FFFFFF' : 'rgba(255,255,255,0.65)'}
+            />
+            <Text style={[styles.tabText, activeTab === 'buy' && styles.activeTabText]}>
+              Buy eSIM Data
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => {
-            setActiveTab('my_esims');
-            payvesselEsimService.getMyEsims().then(setMyEsims);
-          }}
-          style={[styles.tabButton, activeTab === 'my_esims' && styles.activeTabButton]}
-        >
-          <Ionicons
-            name="cellular-outline"
-            size={16}
-            color={activeTab === 'my_esims' ? '#FFFFFF' : '#64748B'}
-          />
-          <Text style={[styles.tabText, activeTab === 'my_esims' && styles.activeTabText]}>
-            My eSIMs ({myEsims.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            onPress={() => {
+              setActiveTab('my_esims');
+              payvesselEsimService.getMyEsims().then(setMyEsims);
+            }}
+            style={[styles.tabButton, activeTab === 'my_esims' && styles.activeTabButton]}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="cellular-outline"
+              size={15}
+              color={activeTab === 'my_esims' ? '#FFFFFF' : 'rgba(255,255,255,0.65)'}
+            />
+            <Text style={[styles.tabText, activeTab === 'my_esims' && styles.activeTabText]}>
+              My eSIMs ({myEsims.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={styles.loaderCenter}>
-          <ActivityIndicator size="large" color="#0056D2" />
+          <ActivityIndicator size="large" color={BRAND.navy} />
           <Text style={styles.loaderText}>Connecting to Global eSIM Gateway...</Text>
         </View>
       ) : activeTab === 'buy' ? (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0056D2']} />
-          }
-        >
-
-          {/* DESTINATION DROPDOWN SELECTOR */}
-          <Text style={styles.sectionLabel}>SELECT DESTINATION COUNTRY</Text>
-          
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowCountryPicker(true)}
-            style={styles.dropdownButton}
+        <View style={{ flex: 1, position: 'relative' }}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: selectedPackage ? 140 : 60 }
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BRAND.navy, BRAND.gold]} />
+            }
           >
-            <View style={styles.dropdownLeft}>
-              <View style={styles.flagCircle}>
-                <Text style={{ fontSize: 24 }}>{selectedRegion?.flag || '🌐'}</Text>
+            {/* Zero Roaming Charge Guarantee Banner */}
+            <LinearGradient
+              colors={['#ECFDF5', '#F0FDF4']}
+              style={styles.guaranteeCard}
+            >
+              <View style={styles.guaranteeIconWrap}>
+                <Ionicons name="shield-checkmark" size={17} color="#059669" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.dropdownTitle} numberOfLines={1}>
-                  {selectedRegion ? selectedRegion.name : 'Choose a Country / Region'}
-                </Text>
-                <Text style={styles.dropdownSubtitle}>
-                  {selectedRegion
-                    ? `${selectedRegion.code} • Tap to change country (${regions.length} available)`
-                    : 'Tap to choose from 240+ global destinations'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.dropdownChevronBox}>
-              <Ionicons name="chevron-down" size={18} color="#0056D2" />
-            </View>
-          </TouchableOpacity>
-
-          {/* Selected Destination Banner Card */}
-          {selectedRegion && (
-            <View style={styles.destinationCard}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                  <Text style={{ fontSize: 32 }}>{selectedRegion.flag}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.destCardName}>
-                      {selectedRegion.name}
-                    </Text>
-                    <Text style={styles.destCardSub}>
-                      4G & 5G High-Speed Roaming
-                    </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.guaranteeTitle}>Instant Global eSIM Roaming</Text>
+                  <View style={styles.guaranteePill}>
+                    <Text style={styles.guaranteePillText}>ZERO SURCHARGE</Text>
                   </View>
                 </View>
-                <View style={styles.badgeInstant}>
-                  <Ionicons name="flash" size={11} color="#15803D" />
-                  <Text style={styles.badgeInstantText}>INSTANT</Text>
+                <Text style={styles.guaranteeSubtitle}>
+                  Instant QR code & activation credentials generated straight from PayVessel roaming server.
+                </Text>
+              </View>
+            </LinearGradient>
+
+            {/* DESTINATION DROPDOWN SELECTOR */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 8 }}>
+              <Text style={styles.sectionLabel}>SELECT DESTINATION COUNTRY</Text>
+              <Text style={{ fontSize: 11, color: BRAND.textSub, fontWeight: '700' }}>
+                {regions.length}+ countries
+              </Text>
+            </View>
+            
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setShowCountryPicker(true)}
+              style={styles.dropdownButton}
+            >
+              <View style={styles.dropdownLeft}>
+                <View style={styles.flagCircle}>
+                  <Text style={{ fontSize: 24 }}>{selectedRegion?.flag || '🌐'}</Text>
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dropdownTitle} numberOfLines={1}>
+                    {selectedRegion ? selectedRegion.name : 'Choose a Country / Region'}
+                  </Text>
+                  <Text style={styles.dropdownSubtitle}>
+                    {selectedRegion
+                      ? `${selectedRegion.code} • Tap to switch destination country`
+                      : 'Tap to choose from 240+ global destinations'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.dropdownChevronBox}>
+                <Ionicons name="chevron-down" size={18} color={BRAND.navy} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Selected Destination Highlights */}
+            {selectedRegion && (
+              <LinearGradient
+                colors={['#FFFFFF', '#F8FAFC']}
+                style={styles.destinationCard}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <Text style={{ fontSize: 32 }}>{selectedRegion.flag}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.destCardName}>
+                        {selectedRegion.name}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        <Ionicons name="wifi" size={12} color={BRAND.green} />
+                        <Text style={styles.destCardSub}>
+                          4G LTE & 5G High-Speed Roaming
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.badgeInstant}>
+                    <Ionicons name="flash" size={11} color="#15803D" />
+                    <Text style={styles.badgeInstantText}>INSTANT</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            )}
+
+            {/* Packages List */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
+              <Text style={styles.sectionLabel}>AVAILABLE DATA PLANS</Text>
+              {packages.length > 0 && (
+                <Text style={{ fontSize: 12, color: BRAND.navy, fontWeight: '800' }}>
+                  {packages.length} bundles available
+                </Text>
+              )}
+            </View>
+
+            {packagesLoading ? (
+              <View style={styles.packagesLoader}>
+                <ActivityIndicator color={BRAND.navy} size="small" />
+                <Text style={styles.packagesLoaderText}>Loading bundles for {selectedRegion?.name}...</Text>
+              </View>
+            ) : packages.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="alert-circle-outline" size={40} color="#94A3B8" />
+                <Text style={styles.emptyStateTitle}>No Packages Found</Text>
+                <Text style={styles.emptyStateSub}>No active plans for this country right now. Please select another destination.</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {packages.map((pkg) => {
+                  const isSelected = selectedPackage?.package_code === pkg.package_code;
+                  const operators = getOperatorsText(pkg);
+                  return (
+                    <TouchableOpacity
+                      key={pkg.package_code}
+                      activeOpacity={0.85}
+                      onPress={() => setSelectedPackage(pkg)}
+                      style={[styles.packageCard, isSelected && styles.packageCardSelected]}
+                    >
+                      {/* Active Left Indicator Bar */}
+                      <View style={[styles.packageCardIndicator, isSelected && styles.packageCardIndicatorActive]} />
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingLeft: 6 }}>
+                        <View style={[styles.dataIconBox, isSelected && styles.dataIconBoxSelected]}>
+                          <Ionicons
+                            name="cellular"
+                            size={18}
+                            color={isSelected ? '#FFFFFF' : BRAND.navy}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.packageDataAmount}>{pkg.data_amount}</Text>
+                            <View style={[styles.dayBadge, isSelected && styles.dayBadgeSelected]}>
+                              <Text style={[styles.dayBadgeText, isSelected && { color: BRAND.navy }]}>{pkg.validity_days} Days</Text>
+                            </View>
+                          </View>
+                          {operators ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                              <Ionicons name="radio" size={11} color="#059669" />
+                              <Text style={styles.operatorBadgeText} numberOfLines={1}>
+                                {operators}
+                              </Text>
+                            </View>
+                          ) : pkg.name ? (
+                            <Text style={styles.packageNetworkName} numberOfLines={1}>{pkg.name}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                        <Text style={[styles.packagePriceNgn, isSelected && { color: BRAND.navy }]}>
+                          ₦{pkg.price_ngn.toLocaleString()}
+                        </Text>
+                        <Text style={styles.packagePriceUsd}>${pkg.price_usd.toFixed(2)} USD</Text>
+                        <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+                          {isSelected && <View style={styles.radioInner} />}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Info Notice */}
+            <View style={styles.infoBanner}>
+              <Ionicons name="information-circle" size={20} color={BRAND.navy} />
+              <Text style={styles.infoBannerText}>
+                Compatible with all unlocked eSIM smartphones (iPhone XS & above, Samsung Galaxy S20+, Google Pixel 3+). QR code & manual codes are generated instantly upon order.
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* STICKY BOTTOM CHECKOUT ACTION BAR */}
+          {selectedPackage && (
+            <View style={[styles.stickyBottomBar, { paddingBottom: bottomBarPadding }]}>
+              <View style={styles.stickyBottomInner}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.stickySelectedLabel}>Selected Plan:</Text>
+                  <Text style={styles.stickySelectedVal} numberOfLines={1}>
+                    {selectedPackage.data_amount} • {selectedPackage.validity_days} Days
+                  </Text>
+                  <Text style={styles.stickyPriceVal}>
+                    ₦{selectedPackage.price_ngn.toLocaleString()}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={handlePurchasePress}
+                  disabled={actionLoading}
+                  activeOpacity={0.85}
+                  style={styles.activateCtaButton}
+                >
+                  <LinearGradient
+                    colors={[BRAND.navyDark, BRAND.navy, BRAND.goldDark]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.activateCtaGradient}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="flash" size={17} color={BRAND.gold} />
+                        <Text style={styles.activateCtaText}>Activate Now</Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             </View>
           )}
-
-          {/* Packages List */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 10 }}>
-            <Text style={styles.sectionLabel}>AVAILABLE DATA PLANS</Text>
-            {packages.length > 0 && (
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
-                {packages.length} bundles available
-              </Text>
-            )}
-          </View>
-
-          {packagesLoading ? (
-            <View style={styles.packagesLoader}>
-              <ActivityIndicator color="#0056D2" size="small" />
-              <Text style={styles.packagesLoaderText}>Loading packages for {selectedRegion?.name}...</Text>
-            </View>
-          ) : packages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="alert-circle-outline" size={40} color="#94A3B8" />
-              <Text style={styles.emptyStateTitle}>No Packages Found</Text>
-              <Text style={styles.emptyStateSub}>No active plans for this country right now. Please select another destination.</Text>
-            </View>
-          ) : (
-            <View style={{ gap: 10 }}>
-              {packages.map((pkg) => {
-                const isSelected = selectedPackage?.package_code === pkg.package_code;
-                const operators = getOperatorsText(pkg);
-                return (
-                  <TouchableOpacity
-                    key={pkg.package_code}
-                    activeOpacity={0.8}
-                    onPress={() => setSelectedPackage(pkg)}
-                    style={[styles.packageCard, isSelected && styles.packageCardSelected]}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                      <View style={[styles.dataIconBox, isSelected && styles.dataIconBoxSelected]}>
-                        <Ionicons
-                          name="cellular"
-                          size={18}
-                          color={isSelected ? '#FFFFFF' : '#0056D2'}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.packageDataAmount}>{pkg.data_amount}</Text>
-                          <View style={styles.dayBadge}>
-                            <Text style={styles.dayBadgeText}>{pkg.validity_days} Days</Text>
-                          </View>
-                        </View>
-                        {operators ? (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                            <Ionicons name="radio" size={11} color="#059669" />
-                            <Text style={styles.operatorBadgeText} numberOfLines={1}>
-                              {operators}
-                            </Text>
-                          </View>
-                        ) : pkg.name ? (
-                          <Text style={styles.packageNetworkName} numberOfLines={1}>{pkg.name}</Text>
-                        ) : null}
-                      </View>
-                    </View>
-
-                    <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                      <Text style={[styles.packagePriceNgn, isSelected && { color: '#0056D2' }]}>
-                        ₦{pkg.price_ngn.toLocaleString()}
-                      </Text>
-                      <Text style={styles.packagePriceUsd}>${pkg.price_usd.toFixed(2)} USD</Text>
-                      <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                        {isSelected && <View style={styles.radioInner} />}
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Info Notice */}
-          <View style={styles.infoBanner}>
-            <Ionicons name="information-circle" size={20} color="#0056D2" />
-            <Text style={styles.infoBannerText}>
-              Compatible with all unlocked eSIM smartphones (iPhone XS & above, Samsung Galaxy S20+, Google Pixel 3+). QR code & manual codes are generated instantly upon order.
-            </Text>
-          </View>
-
-          {/* Checkout Button */}
-          {selectedPackage && (
-            <TouchableOpacity
-              onPress={handlePurchasePress}
-              disabled={actionLoading}
-              activeOpacity={0.85}
-              style={styles.checkoutButton}
-            >
-              <LinearGradient
-                colors={['#0056D2', '#0040A8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.checkoutGradient}
-              >
-                {actionLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="flash" size={18} color="#FFFFFF" />
-                    <Text style={styles.checkoutText}>
-                      Activate {selectedPackage.data_amount} — ₦{selectedPackage.price_ngn.toLocaleString()}
-                    </Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
+        </View>
       ) : (
         /* MY ESIMS TAB */
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 60 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0056D2']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BRAND.navy, BRAND.gold]} />
           }
         >
           {myEsims.length === 0 ? (
@@ -1013,10 +1106,10 @@ export default function EsimScreen() {
 
                 <TouchableOpacity
                   onPress={() => setActiveEsimModal(null)}
-                  style={[styles.checkoutButton, { marginTop: 16 }]}
+                  style={[styles.activateCtaButton, { marginTop: 16 }]}
                 >
-                  <View style={[styles.checkoutGradient, { backgroundColor: '#0056D2' }]}>
-                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Done</Text>
+                  <View style={[styles.activateCtaGradient, { backgroundColor: '#0D1B3E', paddingVertical: 14 }]}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 14 }}>Done</Text>
                   </View>
                 </TouchableOpacity>
               </ScrollView>
@@ -1152,87 +1245,118 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
+  headerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#070D1E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 54 : 44,
-    paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    marginBottom: 14,
   },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
     fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontWeight: '600',
   },
-  walletBadge: {
+  balancePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
-    gap: 5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    gap: 6,
   },
-  walletBadgeText: {
-    color: '#0056D2',
-    fontWeight: '900',
+  balanceIconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(245, 166, 35, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  balancePillLabel: {
+    fontSize: 8.5,
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  balancePillText: {
     fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  balancePlusWrap: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#F5A623',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    marginHorizontal: 16,
-    marginTop: 14,
-    padding: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: 3,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: 9,
     gap: 6,
   },
   activeTabButton: {
-    backgroundColor: '#0056D2',
-    shadowColor: '#0056D2',
-    shadowOpacity: 0.2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.65)',
   },
   activeTabText: {
     color: '#FFFFFF',
+    fontWeight: '900',
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 60,
   },
   loaderCenter: {
     flex: 1,
@@ -1245,12 +1369,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  guaranteeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    marginBottom: 14,
+    gap: 10,
+  },
+  guaranteeIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#D1FAE5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guaranteeTitle: {
+    color: '#065F46',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  guaranteePill: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  guaranteePillText: {
+    color: '#047857',
+    fontSize: 8.5,
+    fontWeight: '900',
+  },
+  guaranteeSubtitle: {
+    color: '#047857',
+    fontSize: 10.5,
+    marginTop: 2,
+    lineHeight: 14,
+  },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '900',
     color: '#64748B',
     letterSpacing: 0.8,
-    marginBottom: 8,
   },
 
   // ── Country Dropdown Button Styles ──
@@ -1260,12 +1423,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: '#E2E8F0',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 12,
-    shadowColor: '#000000',
+    shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -1281,7 +1444,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     justifyContent: 'center',
@@ -1289,8 +1452,8 @@ const styles = StyleSheet.create({
   },
   dropdownTitle: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontWeight: '900',
+    color: '#0D1B3E',
   },
   dropdownSubtitle: {
     fontSize: 11,
@@ -1309,23 +1472,27 @@ const styles = StyleSheet.create({
 
   // ── Destination Banner Card ──
   destinationCard: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2E8F0',
     marginBottom: 4,
+    shadowColor: '#0D1B3E',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   destCardName: {
-    color: '#0F172A',
+    color: '#0D1B3E',
     fontSize: 15,
     fontWeight: '900',
   },
   destCardSub: {
-    color: '#0056D2',
+    color: '#15803D',
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 2,
   },
   badgeInstant: {
     flexDirection: 'row',
@@ -1357,39 +1524,57 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 8,
     fontSize: 12,
+    fontWeight: '600',
   },
   packageCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 16,
+    padding: 14,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowColor: '#0D1B3E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  packageCardIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: 'transparent',
+  },
+  packageCardIndicatorActive: {
+    backgroundColor: '#0D1B3E',
   },
   packageCardSelected: {
-    borderColor: '#0056D2',
-    backgroundColor: '#EFF6FF',
+    borderColor: '#0D1B3E',
+    backgroundColor: '#F8FAFC',
+    shadowColor: '#0D1B3E',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   dataIconBox: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   dataIconBoxSelected: {
-    backgroundColor: '#0056D2',
+    backgroundColor: '#0D1B3E',
   },
   packageDataAmount: {
-    color: '#0F172A',
+    color: '#0D1B3E',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1409,7 +1594,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   packagePriceNgn: {
-    color: '#0F172A',
+    color: '#0D1B3E',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1430,24 +1615,28 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   radioCircleSelected: {
-    borderColor: '#0056D2',
+    borderColor: '#0D1B3E',
   },
   radioInner: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#0056D2',
+    backgroundColor: '#0D1B3E',
   },
   dayBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  dayBadgeSelected: {
+    backgroundColor: '#EFF6FF',
     borderColor: '#BFDBFE',
   },
   dayBadgeText: {
-    color: '#0056D2',
+    color: '#64748B',
     fontSize: 10,
     fontWeight: '800',
   },
@@ -1456,9 +1645,9 @@ const styles = StyleSheet.create({
   infoBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2E8F0',
     borderRadius: 14,
     padding: 12,
     marginTop: 18,
@@ -1466,34 +1655,73 @@ const styles = StyleSheet.create({
   },
   infoBannerText: {
     flex: 1,
-    color: '#1E40AF',
-    fontSize: 12,
-    lineHeight: 18,
+    color: '#475569',
+    fontSize: 11.5,
+    lineHeight: 17,
   },
 
-  // ── Checkout Button ──
-  checkoutButton: {
-    marginTop: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#0056D2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+  // ── STICKY BOTTOM CHECKOUT ACTION BAR ──
+  stickyBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1.5,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#0D1B3E',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 20,
+    zIndex: 100,
   },
-  checkoutGradient: {
+  stickyBottomInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 16,
-    gap: 8,
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  checkoutText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+  stickySelectedLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  stickySelectedVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 1,
+  },
+  stickyPriceVal: {
+    fontSize: 18,
     fontWeight: '900',
+    color: '#0D1B3E',
+    letterSpacing: -0.3,
+  },
+  activateCtaButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#0D1B3E',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  activateCtaGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activateCtaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
 
   // ── Empty State ──
@@ -1545,7 +1773,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   emptyActionBtn: {
-    backgroundColor: '#0056D2',
+    backgroundColor: '#0D1B3E',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
@@ -1564,7 +1792,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000000',
+    shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -1574,12 +1802,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   myEsimCountryName: {
-    color: '#0F172A',
+    color: '#0D1B3E',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1620,22 +1848,22 @@ const styles = StyleSheet.create({
   metaVal: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#0F172A',
+    color: '#0D1B3E',
     marginTop: 2,
   },
   viewQrBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2E8F0',
     paddingVertical: 10,
     borderRadius: 10,
     gap: 6,
   },
   viewQrBtnText: {
-    color: '#0056D2',
+    color: '#0D1B3E',
     fontWeight: '800',
     fontSize: 12,
   },
@@ -1643,7 +1871,7 @@ const styles = StyleSheet.create({
   // ── Modals Common ──
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(13, 27, 62, 0.7)',
     justifyContent: 'center',
     padding: 20,
   },
@@ -1653,14 +1881,14 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000000',
+    shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 8,
   },
   modalTitle: {
-    color: '#0F172A',
+    color: '#0D1B3E',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1697,8 +1925,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterPillActive: {
-    backgroundColor: '#0056D2',
-    borderColor: '#0056D2',
+    backgroundColor: '#0D1B3E',
+    borderColor: '#0D1B3E',
   },
   filterPillText: {
     fontSize: 11,
@@ -1717,13 +1945,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   countryListItemActive: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     borderRadius: 10,
   },
   countryItemName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#0D1B3E',
   },
   countryItemCode: {
     fontSize: 11,
@@ -1736,7 +1964,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -1761,7 +1991,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   confirmRowVal: {
-    color: '#0F172A',
+    color: '#0D1B3E',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1779,7 +2009,7 @@ const styles = StyleSheet.create({
   },
   confirmPayBtn: {
     flex: 2,
-    backgroundColor: '#0056D2',
+    backgroundColor: '#0D1B3E',
     paddingVertical: 13,
     borderRadius: 12,
     alignItems: 'center',
@@ -1806,16 +2036,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2E8F0',
     paddingVertical: 10,
     borderRadius: 10,
     gap: 8,
     marginBottom: 8,
   },
   shareSetupBtnText: {
-    color: '#0056D2',
+    color: '#0D1B3E',
     fontWeight: '800',
     fontSize: 12,
   },
@@ -1837,7 +2067,7 @@ const styles = StyleSheet.create({
   },
   codeVal: {
     fontSize: 12,
-    color: '#0F172A',
+    color: '#0D1B3E',
     fontWeight: 'bold',
     marginTop: 2,
   },
@@ -1845,7 +2075,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
@@ -1868,16 +2098,17 @@ const styles = StyleSheet.create({
   // ── In-App Toast ──
   toastContainer: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 90,
     alignSelf: 'center',
-    backgroundColor: '#0056D2',
+    backgroundColor: '#0D1B3E',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 25,
-    shadowColor: '#0056D2',
+    shadowColor: '#0D1B3E',
     shadowOpacity: 0.3,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 25,
+    zIndex: 999,
   },
   toastText: {
     color: '#FFFFFF',

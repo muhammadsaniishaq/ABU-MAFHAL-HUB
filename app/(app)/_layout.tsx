@@ -34,7 +34,7 @@ export default function AppLayout() {
     const fabBottom = tabBarBottom + 60 + 12;
 
     const isDesktopWeb = Platform.OS === 'web' && width >= 768;
-    const hideFab = isDesktopWeb || pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/');
+    const hideFab = isDesktopWeb || pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/') || pathname?.includes('esim');
 
     useEffect(() => {
         // AI Button Pulse Animation
