@@ -133,6 +133,11 @@ serve(async (req: Request) => {
     const bigiUsername = secrets['BIGISUB_USERNAME'] || secrets['BIGI_USERNAME'] || secrets['BIGI_USER'] || Deno.env.get('BIGISUB_USERNAME') || ''
     const bigiPassword = secrets['BIGISUB_PASSWORD'] || secrets['BIGI_PASSWORD'] || secrets['BIGI_PASS'] || Deno.env.get('BIGISUB_PASSWORD') || ''
     const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
+    const flutterwaveSecret = secrets['FLUTTERWAVE_SECRET_KEY'] || secrets['FLUTTERWAVE_KEY'] || secrets['FLUTTERWAVE_SECRET'] || secrets['FLW_SECRET_KEY'] || Deno.env.get('FLUTTERWAVE_SECRET_KEY') || ''
+    const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || Deno.env.get('MONNIFY_API_KEY') || ''
+    const monnifySecretKey = secrets['MONNIFY_SECRET_KEY'] || secrets['MONNIFY_SECRET'] || Deno.env.get('MONNIFY_SECRET_KEY') || ''
+    const monnifyContractCode = secrets['MONNIFY_CONTRACT_CODE'] || secrets['MONNIFY_CODE'] || Deno.env.get('MONNIFY_CONTRACT_CODE') || ''
+    const aijalonKey = secrets['AIJALON_API_KEY'] || secrets['AIJALON_KEY'] || Deno.env.get('AIJALON_API_KEY') || ''
 
     const providerBalances: any[] = []
 
@@ -912,6 +917,150 @@ serve(async (req: Request) => {
         currency: 'NGN',
         status: 'unconfigured',
         error: 'API Key not configured in Vault',
+        allowDeposit: true,
+        allowWithdrawal: false
+      })
+    }
+
+    // 12. Flutterwave (Instant Payouts & Collections)
+    if (flutterwaveSecret && flutterwaveSecret.trim() !== '') {
+      let balance = 0
+      let latencyMs = 160
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.flutterwave.com/v3/balances/NGN', {
+          headers: { 'Authorization': `Bearer ${flutterwaveSecret.trim()}`, 'Accept': 'application/json' }
+        })
+        const data = await response.json()
+        const rawBal = data?.data?.available_balance ?? data?.data?.balance ?? data?.available_balance
+        if (rawBal !== undefined && rawBal !== null) {
+          balance = Number(rawBal)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
+      providerBalances.push({
+        id: 'flutterwave',
+        name: 'Flutterwave (Payouts & Gateway Collections)',
+        category: 'Payment Gateway',
+        balance: isNaN(balance) ? 0 : balance,
+        currency: 'NGN',
+        latencyMs,
+        status: 'healthy',
+        error: undefined,
+        allowDeposit: true,
+        allowWithdrawal: true,
+        depositAccount: resolveDepositAccount(secrets, 'flutterwave', 'Access Bank / Flutterwave', '', 'ABUMAFHAL Sub / Flutterwave', 'Direct bank top-up for Flutterwave merchant balance.')
+      })
+    } else {
+      providerBalances.push({
+        id: 'flutterwave',
+        name: 'Flutterwave (Payouts & Gateway Collections)',
+        category: 'Payment Gateway',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'FLUTTERWAVE_SECRET_KEY not configured in Vault',
+        allowDeposit: true,
+        allowWithdrawal: true
+      })
+    }
+
+    // 13. Monnify (Virtual Accounts, Settlements & Gateway)
+    if (monnifyApiKey && monnifyApiKey.trim() !== '' && monnifySecretKey && monnifySecretKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 210
+      try {
+        // Authenticate with Monnify Basic Auth to get bearer token
+        const basicAuth = btoa(`${monnifyApiKey.trim()}:${monnifySecretKey.trim()}`)
+        const loginRes = await fetch('https://api.monnify.com/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' }
+        })
+        const loginData = await loginRes.json().catch(() => ({}))
+        const accessToken = loginData?.responseBody?.accessToken
+
+        if (accessToken) {
+          const balUrl = monnifyContractCode 
+            ? `https://api.monnify.com/api/v2/disbursements/wallet-balance?accountNumber=${monnifyContractCode.trim()}`
+            : 'https://api.monnify.com/api/v2/disbursements/wallet-balance'
+          
+          const { response: balResp, latency } = await fetchWithTimeout(balUrl, {
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+          })
+          const balData = await balResp.json().catch(() => ({}))
+          const rawBal = balData?.responseBody?.availableBalance ?? balData?.responseBody?.balance ?? balData?.availableBalance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+          }
+        }
+      } catch (e) {}
+
+      providerBalances.push({
+        id: 'monnify',
+        name: 'Monnify / Moniepoint Gateway',
+        category: 'Payment Gateway',
+        balance: isNaN(balance) ? 0 : balance,
+        currency: 'NGN',
+        latencyMs,
+        status: 'healthy',
+        error: undefined,
+        allowDeposit: true,
+        allowWithdrawal: true,
+        depositAccount: resolveDepositAccount(secrets, 'monnify', 'Wema Bank / Monnify', '', 'ABUMAFHAL Sub Corporate', 'Dedicated Monnify parent funding account.')
+      })
+    } else {
+      providerBalances.push({
+        id: 'monnify',
+        name: 'Monnify / Moniepoint Gateway',
+        category: 'Payment Gateway',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'MONNIFY_API_KEY & MONNIFY_SECRET_KEY not configured in Vault',
+        allowDeposit: true,
+        allowWithdrawal: true
+      })
+    }
+
+    // 14. Aijalon Telecommunications (Data & VTU Secondary Route)
+    if (aijalonKey && aijalonKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 200
+      try {
+        const { response, latency } = await fetchWithTimeout('https://aijalon.com/api/user/balance', {
+          headers: { 'Authorization': `Bearer ${aijalonKey.trim()}`, 'Accept': 'application/json' }
+        })
+        const data = await response.json().catch(() => ({}))
+        const rawBal = data?.balance ?? data?.data?.balance ?? data?.wallet_balance
+        if (rawBal !== undefined && rawBal !== null) {
+          balance = Number(rawBal)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
+      providerBalances.push({
+        id: 'aijalon',
+        name: 'Aijalon Telecommunications (VTU / Data)',
+        category: 'VTU Telecom',
+        balance: isNaN(balance) ? 0 : balance,
+        currency: 'NGN',
+        latencyMs,
+        status: 'healthy',
+        error: undefined,
+        allowDeposit: true,
+        allowWithdrawal: false,
+        depositAccount: resolveDepositAccount(secrets, 'aijalon', 'Wema Bank / Aijalon', '', 'Aijalon ABUMAFHAL Telecom', 'Top-up virtual account for Aijalon VTU routing.')
+      })
+    } else {
+      providerBalances.push({
+        id: 'aijalon',
+        name: 'Aijalon Telecommunications (VTU / Data)',
+        category: 'VTU Telecom',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'AIJALON_API_KEY not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })

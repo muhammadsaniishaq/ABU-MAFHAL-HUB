@@ -95,6 +95,9 @@ export default function LiquidityVaultScreen() {
     // BigiSub-specific: username + password
     const [bigiUsername, setBigiUsername] = useState('');
     const [bigiPassword, setBigiPassword] = useState('');
+    // Monnify-specific: Secret Key & Contract Code
+    const [monnifySecret, setMonnifySecret] = useState('');
+    const [monnifyContractCode, setMonnifyContractCode] = useState('');
 
     // Low Float Email & SMS Alert States
     const [alertEmail, setAlertEmail] = useState('');
@@ -500,6 +503,39 @@ export default function LiquidityVaultScreen() {
                     error: termiiKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
+                },
+                {
+                    id: 'flutterwave',
+                    name: 'Flutterwave (Payouts & Gateway Collections)',
+                    category: 'Payment Gateway',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: (secretsMap['FLUTTERWAVE_SECRET_KEY'] || secretsMap['FLUTTERWAVE_KEY']) ? 'healthy' : 'unconfigured',
+                    error: (secretsMap['FLUTTERWAVE_SECRET_KEY'] || secretsMap['FLUTTERWAVE_KEY']) ? undefined : 'Secret Key not configured in Vault',
+                    allowDeposit: true,
+                    allowWithdrawal: true
+                },
+                {
+                    id: 'monnify',
+                    name: 'Monnify / Moniepoint Gateway',
+                    category: 'Payment Gateway',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: (secretsMap['MONNIFY_API_KEY'] || secretsMap['MONNIFY_KEY']) ? 'healthy' : 'unconfigured',
+                    error: (secretsMap['MONNIFY_API_KEY'] || secretsMap['MONNIFY_KEY']) ? undefined : 'API Key not configured in Vault',
+                    allowDeposit: true,
+                    allowWithdrawal: true
+                },
+                {
+                    id: 'aijalon',
+                    name: 'Aijalon Telecommunications (VTU / Data)',
+                    category: 'VTU Telecom',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: (secretsMap['AIJALON_API_KEY'] || secretsMap['AIJALON_KEY']) ? 'healthy' : 'unconfigured',
+                    error: (secretsMap['AIJALON_API_KEY'] || secretsMap['AIJALON_KEY']) ? undefined : 'API Key not configured in Vault',
+                    allowDeposit: true,
+                    allowWithdrawal: false
                 }
             ];
 
@@ -532,7 +568,10 @@ export default function LiquidityVaultScreen() {
             nineboost: 'NINEBOOST_API_KEY',
             nowpayments: 'NOWPAYMENTS_API_KEY',
             bigi: 'BIGI_API_TOKEN',
-            termii: 'TERMII_API_KEY'
+            termii: 'TERMII_API_KEY',
+            flutterwave: 'FLUTTERWAVE_SECRET_KEY',
+            monnify: 'MONNIFY_API_KEY',
+            aijalon: 'AIJALON_API_KEY'
         };
         const keyName = secretMap[p.id] || 'GENERIC_API_KEY';
         setTokenKeyName(keyName);
@@ -567,6 +606,19 @@ export default function LiquidityVaultScreen() {
         } else {
             setBigiUsername('');
             setBigiPassword('');
+        }
+
+        // Pre-fill Monnify Secret & Contract Code
+        if (p.id === 'monnify') {
+            setMonnifySecret(
+                vaultSecrets['MONNIFY_SECRET_KEY'] || vaultSecrets['MONNIFY_SECRET'] || ''
+            );
+            setMonnifyContractCode(
+                vaultSecrets['MONNIFY_CONTRACT_CODE'] || vaultSecrets['MONNIFY_CODE'] || ''
+            );
+        } else {
+            setMonnifySecret('');
+            setMonnifyContractCode('');
         }
     };
 
@@ -604,7 +656,10 @@ export default function LiquidityVaultScreen() {
                 nineboost: 'NINEBOOST_API_KEY',
                 nowpayments: 'NOWPAYMENTS_API_KEY',
                 bigi: 'BIGI_API_TOKEN',
-                termii: 'TERMII_API_KEY'
+                termii: 'TERMII_API_KEY',
+                flutterwave: 'FLUTTERWAVE_SECRET_KEY',
+                monnify: 'MONNIFY_API_KEY',
+                aijalon: 'AIJALON_API_KEY'
             };
 
             const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';
@@ -651,6 +706,29 @@ export default function LiquidityVaultScreen() {
                     }, { onConflict: 'key' });
                     setVaultSecrets(prev => ({ ...prev, [cred.key]: cred.value }));
                 }
+            } else if (selectedTokenProvider?.id === 'monnify') {
+                // Save Monnify API Key, Secret Key, and Contract Code
+                const credsToSave = [
+                    { key: 'MONNIFY_API_KEY', value: tokenValue.trim() },
+                ];
+                if (monnifySecret.trim()) {
+                    credsToSave.push({ key: 'MONNIFY_SECRET_KEY', value: monnifySecret.trim() });
+                }
+                if (monnifyContractCode.trim()) {
+                    credsToSave.push({ key: 'MONNIFY_CONTRACT_CODE', value: monnifyContractCode.trim() });
+                }
+                for (const cred of credsToSave) {
+                    await supabase.from('system_secrets').upsert({
+                        key: cred.key, value: cred.value,
+                        description: `Monnify credential - ${cred.key}`,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                    await supabase.from('app_settings').upsert({
+                        key: cred.key, value: cred.value,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                    setVaultSecrets(prev => ({ ...prev, [cred.key]: cred.value }));
+                }
             } else {
                 // Normal save for other providers
                 await supabase.from('system_secrets').upsert({
@@ -669,7 +747,7 @@ export default function LiquidityVaultScreen() {
 
             await supabase.functions.invoke('check-provider-balances', { body: {} });
 
-            Alert.alert("Success 🎉", (isBilal || isBigi)
+            Alert.alert("Success 🎉", (isBilal || isBigi || selectedTokenProvider?.id === 'monnify')
                 ? `${selectedTokenProvider?.name} credentials saved to Vault! Balance will update now.`
                 : `Saved ${secretKey} to Vault successfully!`
             );
@@ -679,6 +757,8 @@ export default function LiquidityVaultScreen() {
             setBilalPassword('');
             setBigiUsername('');
             setBigiPassword('');
+            setMonnifySecret('');
+            setMonnifyContractCode('');
             fetchProviderBalances();
         } catch (e: any) {
             Alert.alert("Error", e.message || "Failed to save secret key to Vault.");
@@ -1342,6 +1422,48 @@ export default function LiquidityVaultScreen() {
                                         autoCapitalize="none"
                                         value={tokenValue}
                                         onChangeText={setTokenValue}
+                                    />
+                                </>
+                            ) : selectedTokenProvider?.id === 'monnify' ? (
+                                <>
+                                    <View style={{
+                                        backgroundColor: '#eff6ff', borderRadius: 8, padding: 8,
+                                        borderLeftWidth: 3, borderLeftColor: '#3b82f6', marginBottom: 12
+                                    }}>
+                                        <Text style={{ color: '#1e40af', fontSize: 12, fontWeight: '700' }}>
+                                            🔐 Monnify requires API Key, Secret Key, and optionally Contract Code.
+                                        </Text>
+                                    </View>
+
+                                    <Text style={styles.inputLabel}>Monnify API Key (Public/API Key)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="MK_PROD_..."
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={tokenValue}
+                                        onChangeText={setTokenValue}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Monnify Secret Key</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Enter Monnify Secret Key"
+                                        placeholderTextColor="#94a3b8"
+                                        secureTextEntry={true}
+                                        autoCapitalize="none"
+                                        value={monnifySecret}
+                                        onChangeText={setMonnifySecret}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Contract Code (Account Number / Wallet)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. 1029384756"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={monnifyContractCode}
+                                        onChangeText={setMonnifyContractCode}
                                     />
                                 </>
                             ) : (
