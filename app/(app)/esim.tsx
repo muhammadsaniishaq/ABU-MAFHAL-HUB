@@ -416,7 +416,7 @@ export default function EsimScreen() {
   }, [regions, countrySearch, regionFilter]);
 
   const headerTopPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? 36 : 22) + 8;
-  const bottomBarPadding = Math.max(insets?.bottom || 0, 16);
+  const bottomBarPadding = Math.max(insets?.bottom || 0, Platform.OS === 'ios' ? 24 : 16);
 
   return (
     <View style={styles.container}>
@@ -566,42 +566,15 @@ export default function EsimScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Selected Destination Highlights */}
-            {selectedRegion && (
-              <LinearGradient
-                colors={['#FFFFFF', '#F8FAFC']}
-                style={styles.destinationCard}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                    <Text style={{ fontSize: 32 }}>{selectedRegion.flag}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.destCardName}>
-                        {selectedRegion.name}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                        <Ionicons name="wifi" size={12} color={BRAND.green} />
-                        <Text style={styles.destCardSub}>
-                          4G LTE & 5G High-Speed Roaming
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View style={styles.badgeInstant}>
-                    <Ionicons name="flash" size={11} color="#15803D" />
-                    <Text style={styles.badgeInstantText}>INSTANT</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-            )}
-
-            {/* Packages List */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
+            {/* Section Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
               <Text style={styles.sectionLabel}>AVAILABLE DATA PLANS</Text>
               {packages.length > 0 && (
-                <Text style={{ fontSize: 12, color: BRAND.navy, fontWeight: '800' }}>
-                  {packages.length} bundles available
-                </Text>
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>
+                    {packages.length} plans • {selectedRegion?.name}
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -624,49 +597,60 @@ export default function EsimScreen() {
                   return (
                     <TouchableOpacity
                       key={pkg.package_code}
-                      activeOpacity={0.85}
-                      onPress={() => setSelectedPackage(pkg)}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setSelectedPackage(pkg);
+                        try {
+                          Haptics.selectionAsync();
+                        } catch (_) {}
+                      }}
                       style={[styles.packageCard, isSelected && styles.packageCardSelected]}
                     >
-                      {/* Active Left Indicator Bar */}
+                      {/* Active indicator bar */}
                       <View style={[styles.packageCardIndicator, isSelected && styles.packageCardIndicatorActive]} />
 
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingLeft: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingLeft: 4 }}>
                         <View style={[styles.dataIconBox, isSelected && styles.dataIconBoxSelected]}>
                           <Ionicons
-                            name="cellular"
-                            size={18}
+                            name="wifi"
+                            size={16}
                             color={isSelected ? '#FFFFFF' : BRAND.navy}
                           />
                         </View>
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={styles.packageDataAmount}>{pkg.data_amount}</Text>
+                            <Text style={[styles.packageDataAmount, isSelected && { color: BRAND.navy }]}>
+                              {pkg.data_amount}
+                            </Text>
                             <View style={[styles.dayBadge, isSelected && styles.dayBadgeSelected]}>
-                              <Text style={[styles.dayBadgeText, isSelected && { color: BRAND.navy }]}>{pkg.validity_days} Days</Text>
+                              <Ionicons name="time-outline" size={10} color={isSelected ? BRAND.navy : '#64748B'} />
+                              <Text style={[styles.dayBadgeText, isSelected && { color: BRAND.navy }]}>
+                                {pkg.validity_days} {pkg.validity_days === 1 ? 'Day' : 'Days'}
+                              </Text>
                             </View>
                           </View>
                           {operators ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                              <Ionicons name="radio" size={11} color="#059669" />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                              <Ionicons name="checkmark-circle" size={10} color="#059669" />
                               <Text style={styles.operatorBadgeText} numberOfLines={1}>
                                 {operators}
                               </Text>
                             </View>
-                          ) : pkg.name ? (
-                            <Text style={styles.packageNetworkName} numberOfLines={1}>{pkg.name}</Text>
-                          ) : null}
+                          ) : (
+                            <Text style={styles.packageNetworkName} numberOfLines={1}>Instant Roaming Data</Text>
+                          )}
                         </View>
                       </View>
 
-                      <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                      <View style={{ alignItems: 'flex-end', marginLeft: 6 }}>
                         <Text style={[styles.packagePriceNgn, isSelected && { color: BRAND.navy }]}>
                           ₦{pkg.price_ngn.toLocaleString()}
                         </Text>
-                        <Text style={styles.packagePriceUsd}>${pkg.price_usd.toFixed(2)} USD</Text>
-                        <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                          {isSelected && <View style={styles.radioInner} />}
-                        </View>
+                        <Text style={styles.packagePriceUsd}>${pkg.price_usd.toFixed(2)}</Text>
+                      </View>
+
+                      <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+                        {isSelected && <View style={styles.radioInner} />}
                       </View>
                     </TouchableOpacity>
                   );
@@ -908,7 +892,7 @@ export default function EsimScreen() {
                   >
                     <Text style={{ fontSize: 26, marginRight: 12 }}>{item.flag}</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.countryItemName, isCurrent && { color: '#0056D2', fontWeight: '900' }]}>
+                      <Text style={[styles.countryItemName, isCurrent && { color: BRAND.navy, fontWeight: '900' }]}>
                         {item.name}
                       </Text>
                       <Text style={styles.countryItemCode}>
@@ -916,7 +900,7 @@ export default function EsimScreen() {
                       </Text>
                     </View>
                     {isCurrent && (
-                      <Ionicons name="checkmark-circle" size={22} color="#0056D2" />
+                      <Ionicons name="checkmark-circle" size={22} color={BRAND.navy} />
                     )}
                   </TouchableOpacity>
                 );
@@ -946,21 +930,21 @@ export default function EsimScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <View style={styles.confirmIconRing}>
-                <Ionicons name="cellular" size={28} color="#0056D2" />
+              <View style={[styles.confirmIconRing, { backgroundColor: BRAND.goldLight, borderColor: '#FDE68A' }]}>
+                <Ionicons name="cellular" size={26} color={BRAND.navy} />
               </View>
-              <Text style={styles.modalTitle}>Confirm eSIM Purchase</Text>
-              <Text style={styles.modalSubtitle}>Instant Roaming Data Activation</Text>
+              <Text style={styles.modalTitle}>Confirm eSIM Activation</Text>
+              <Text style={styles.modalSubtitle}>Direct PayVessel Roaming Gateway 🌐</Text>
             </View>
 
             <View style={styles.confirmBreakdown}>
               <View style={styles.confirmRow}>
                 <Text style={styles.confirmRowLabel}>Destination</Text>
-                <Text style={styles.confirmRowVal}>{selectedRegion?.name}</Text>
+                <Text style={styles.confirmRowVal}>{selectedRegion?.flag} {selectedRegion?.name}</Text>
               </View>
               <View style={styles.confirmRow}>
                 <Text style={styles.confirmRowLabel}>Data Volume</Text>
-                <Text style={styles.confirmRowVal}>{selectedPackage?.data_amount}</Text>
+                <Text style={[styles.confirmRowVal, { color: BRAND.navy }]}>{selectedPackage?.data_amount}</Text>
               </View>
               <View style={styles.confirmRow}>
                 <Text style={styles.confirmRowLabel}>Validity Period</Text>
@@ -968,7 +952,7 @@ export default function EsimScreen() {
               </View>
               <View style={[styles.confirmRow, { borderBottomWidth: 0, paddingTop: 10 }]}>
                 <Text style={[styles.confirmRowLabel, { color: '#0F172A', fontWeight: 'bold' }]}>Wallet Deduction</Text>
-                <Text style={[styles.confirmRowVal, { color: '#0056D2', fontSize: 18, fontWeight: '900' }]}>
+                <Text style={[styles.confirmRowVal, { color: BRAND.navy, fontSize: 18, fontWeight: '900' }]}>
                   ₦{selectedPackage?.price_ngn.toLocaleString()}
                 </Text>
               </View>
@@ -978,6 +962,7 @@ export default function EsimScreen() {
               <TouchableOpacity
                 onPress={() => setShowConfirmModal(false)}
                 style={styles.cancelBtn}
+                activeOpacity={0.7}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -985,12 +970,16 @@ export default function EsimScreen() {
               <TouchableOpacity
                 onPress={handleConfirmOrder}
                 disabled={actionLoading}
-                style={styles.confirmPayBtn}
+                style={[styles.confirmPayBtn, { backgroundColor: BRAND.navy }]}
+                activeOpacity={0.85}
               >
                 {actionLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.confirmPayBtnText}>Pay & Activate ⚡</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="flash" size={15} color={BRAND.gold} />
+                    <Text style={styles.confirmPayBtnText}>Pay & Activate</Text>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
@@ -1026,7 +1015,7 @@ export default function EsimScreen() {
                     />
                   ) : (
                     <View style={{ width: 200, height: 200, justifyContent: 'center', alignItems: 'center' }}>
-                      <Ionicons name="qr-code" size={90} color="#0056D2" />
+                      <Ionicons name="qr-code" size={90} color={BRAND.navy} />
                       <Text style={{ color: '#0F172A', fontWeight: 'bold', marginTop: 10 }}>Scan to Activate</Text>
                     </View>
                   )}
@@ -1039,8 +1028,9 @@ export default function EsimScreen() {
                 <TouchableOpacity
                   onPress={() => shareActivationDetails(activeEsimModal)}
                   style={styles.shareSetupBtn}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="share-social-outline" size={16} color="#0056D2" />
+                  <Ionicons name="share-social-outline" size={16} color={BRAND.navy} />
                   <Text style={styles.shareSetupBtnText}>Share Setup Details to WhatsApp / Notes</Text>
                 </TouchableOpacity>
 
@@ -1056,7 +1046,7 @@ export default function EsimScreen() {
                     onPress={() => copyToClipboard(activeEsimModal.smdp_address || 'rsp.truphone.com', 'SM-DP+ Address')}
                     style={styles.copyBtn}
                   >
-                    <Ionicons name="copy-outline" size={16} color="#0056D2" />
+                    <Ionicons name="copy-outline" size={16} color={BRAND.navy} />
                   </TouchableOpacity>
                 </View>
 
@@ -1069,7 +1059,7 @@ export default function EsimScreen() {
                     onPress={() => copyToClipboard(activeEsimModal.activation_code || activeEsimModal.order_reference, 'Activation Code')}
                     style={styles.copyBtn}
                   >
-                    <Ionicons name="copy-outline" size={16} color="#0056D2" />
+                    <Ionicons name="copy-outline" size={16} color={BRAND.navy} />
                   </TouchableOpacity>
                 </View>
 
@@ -1083,7 +1073,7 @@ export default function EsimScreen() {
                       onPress={() => copyToClipboard(activeEsimModal.iccid!, 'ICCID')}
                       style={styles.copyBtn}
                     >
-                      <Ionicons name="copy-outline" size={16} color="#0056D2" />
+                      <Ionicons name="copy-outline" size={16} color={BRAND.navy} />
                     </TouchableOpacity>
                   </View>
                 ) : null}
@@ -1531,14 +1521,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 14,
-    borderRadius: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     shadowColor: '#0D1B3E',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1.5 },
     shadowOpacity: 0.04,
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 2,
     position: 'relative',
     overflow: 'hidden',
@@ -1548,24 +1539,24 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 4,
+    width: 3.5,
     backgroundColor: 'transparent',
   },
   packageCardIndicatorActive: {
-    backgroundColor: '#0D1B3E',
+    backgroundColor: '#F5A623',
   },
   packageCardSelected: {
     borderColor: '#0D1B3E',
     backgroundColor: '#F8FAFC',
     shadowColor: '#0D1B3E',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.09,
     shadowRadius: 6,
     elevation: 3,
   },
   dataIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1575,17 +1566,18 @@ const styles = StyleSheet.create({
   },
   packageDataAmount: {
     color: '#0D1B3E',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
+    letterSpacing: -0.2,
   },
   packageValidity: {
     color: '#64748B',
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 1,
   },
   packageNetworkName: {
     color: '#94A3B8',
-    fontSize: 10,
+    fontSize: 9.5,
     marginTop: 2,
   },
   operatorBadgeText: {
@@ -1595,38 +1587,42 @@ const styles = StyleSheet.create({
   },
   packagePriceNgn: {
     color: '#0D1B3E',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
+    letterSpacing: -0.2,
   },
   packagePriceUsd: {
     color: '#64748B',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     marginTop: 1,
   },
   radioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
     borderWidth: 2,
     borderColor: '#CBD5E1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
+    marginLeft: 6,
   },
   radioCircleSelected: {
     borderColor: '#0D1B3E',
   },
   radioInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7.5,
+    height: 7.5,
+    borderRadius: 3.75,
     backgroundColor: '#0D1B3E',
   },
   dayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 1.5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -1637,7 +1633,20 @@ const styles = StyleSheet.create({
   },
   dayBadgeText: {
     color: '#64748B',
-    fontSize: 10,
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  countBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  countBadgeText: {
+    fontSize: 11,
+    color: '#0D1B3E',
     fontWeight: '800',
   },
 
@@ -1650,7 +1659,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 14,
     padding: 12,
-    marginTop: 18,
+    marginTop: 16,
     gap: 10,
   },
   infoBannerText: {
@@ -1669,14 +1678,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1.5,
     borderTopColor: '#E2E8F0',
-    paddingTop: 12,
+    paddingTop: 10,
     paddingHorizontal: 16,
     shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
-    elevation: 20,
-    zIndex: 100,
+    elevation: 25,
+    zIndex: 999,
   },
   stickyBottomInner: {
     flexDirection: 'row',
@@ -1685,7 +1694,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   stickySelectedLabel: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
     color: '#64748B',
     textTransform: 'uppercase',
@@ -1703,13 +1712,13 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   activateCtaButton: {
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#0D1B3E',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 6,
-    elevation: 4,
+    elevation: 5,
   },
   activateCtaGradient: {
     paddingVertical: 12,
