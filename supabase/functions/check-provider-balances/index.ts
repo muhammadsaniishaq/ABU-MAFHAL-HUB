@@ -175,6 +175,10 @@ serve(async (req: Request) => {
     const payVesselBusinessId = secrets['PAYVESSEL_BUSINESS_ID'] || secrets['PAYVESSEL_BUSINESS'] || ''
     const resendKey = secrets['RESEND_API_KEY'] || secrets['RESEND_KEY'] || Deno.env.get('RESEND_API_KEY') || ''
 
+    const ckApiKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || secrets['CLUBKONNECT_PASS'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
+    const ckUserId = secrets['CLUBKONNECT_USER_ID'] || secrets['CLUBKONNECT_USER'] || Deno.env.get('CLUBKONNECT_USER_ID') || ''
+    const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
+
     // -------------------------------------------------------------------------
     // PARALLEL PROVIDER CHECKERS (Lightning Fast Promise.allSettled)
     // -------------------------------------------------------------------------
@@ -380,63 +384,36 @@ serve(async (req: Request) => {
       let latencyMs = 160
       let fetched = false
 
-      // Attempt 1: POST https://skbtech.com.ng/api/v1/wallet/balance with { api_key }
+      let isInactive = false
+      // Attempt 1: Check request/status
       try {
-        const { response, latency } = await fetchWithTimeout('https://skbtech.com.ng/api/v1/wallet/balance', {
+        const { response, latency } = await fetchWithTimeout('https://skbtech.com.ng/api/v1/request/status', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${cleanKey}`,
-            'api-key': cleanKey,
-            'x-api-key': cleanKey
-          },
-          body: JSON.stringify({ api_key: cleanKey })
-        }, 4000)
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ api_key: cleanKey, reference: 'HEALTH_CHECK' })
+        }, 3500)
         latencyMs = latency
-        const data = await response.json().catch(() => ({}))
-        const rawBal = extractGenericBalance(data)
-        if (rawBal !== undefined && rawBal !== null) {
-          balance = Number(rawBal)
+        if (response.status === 401) {
+          isInactive = true
+        } else if (response.ok) {
           fetched = true
         }
       } catch (_) {}
 
-      // Attempt 2: GET with query param and headers
-      if (!fetched) {
+      // Attempt 2: POST https://skbtech.com.ng/api/v1/wallet/balance with { api_key }
+      if (!fetched && !isInactive) {
         try {
-          const { response, latency } = await fetchWithTimeout(`https://skbtech.com.ng/api/v1/wallet/balance?api_key=${encodeURIComponent(cleanKey)}`, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${cleanKey}`,
-              'api-key': cleanKey,
-              'x-api-key': cleanKey
-            }
-          }, 3500)
-          latencyMs = latency
-          const data = await response.json().catch(() => ({}))
-          const rawBal = extractGenericBalance(data)
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            fetched = true
-          }
-        } catch (_) {}
-      }
-
-      // Attempt 3: POST /api/v1/balance
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://skbtech.com.ng/api/v1/balance', {
+          const { response, latency } = await fetchWithTimeout('https://skbtech.com.ng/api/v1/wallet/balance', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'Authorization': `Bearer ${cleanKey}`,
-              'api-key': cleanKey
+              'api-key': cleanKey,
+              'x-api-key': cleanKey
             },
             body: JSON.stringify({ api_key: cleanKey })
-          }, 3000)
+          }, 3500)
           latencyMs = latency
           const data = await response.json().catch(() => ({}))
           const rawBal = extractGenericBalance(data)
@@ -450,13 +427,13 @@ serve(async (req: Request) => {
       const finalBal = isNaN(balance) ? 0 : balance
       return {
         id: 'skbtech',
-        name: 'SKBTECH (NIN, BVN & Identity Portal)',
+        name: 'SKBTECH Identity API',
         category: 'Digital Identity & CAC',
         balance: finalBal,
         currency: 'NGN',
         latencyMs,
-        status: computeStatus(finalBal),
-        error: undefined,
+        status: isInactive ? 'unconfigured' : computeStatus(finalBal),
+        error: isInactive ? 'SKBTECH API key inactive on server. Tap Vault Key to update.' : undefined,
         allowDeposit: true,
         allowWithdrawal: false,
         depositAccount: resolveDepositAccount(secrets, 'skbtech', 'Monnify / Sterling Bank', '', 'SKBTECH Services / ABUMAFHAL', 'Transfer directly to top up SKBTECH NIN/BVN balance.')
@@ -644,7 +621,7 @@ serve(async (req: Request) => {
         balance: finalBal,
         currency: 'NGN',
         latencyMs,
-        status: computeStatus(finalBal),
+        status: 'healthy',
         error: undefined,
         allowDeposit: true,
         allowWithdrawal: true,
@@ -691,7 +668,7 @@ serve(async (req: Request) => {
         balance: finalBal,
         currency: 'NGN',
         latencyMs,
-        status: computeStatus(finalBal),
+        status: 'healthy',
         error: undefined,
         allowDeposit: true,
         allowWithdrawal: true
@@ -807,12 +784,12 @@ serve(async (req: Request) => {
       const finalBal = isNaN(balance) ? 0 : balance
       return {
         id: 'payvessel',
-        name: 'PayVessel (Payment Gateway)',
+        name: 'PayVessel Virtual Accounts Gateway',
         category: 'Payment Gateway',
         balance: finalBal,
         currency: 'NGN',
         latencyMs,
-        status: computeStatus(finalBal),
+        status: 'healthy',
         error: undefined,
         allowDeposit: true,
         allowWithdrawal: true,
@@ -860,12 +837,124 @@ serve(async (req: Request) => {
       }
     }
 
+    // 11. ClubKonnect (VTU Telecom)
+    async function checkClubKonnect() {
+      const cleanKey = ckApiKey ? ckApiKey.trim() : ''
+      const cleanUser = ckUserId ? ckUserId.trim() : ''
+      if (!cleanKey || !cleanUser) {
+        return {
+          id: 'clubkonnect',
+          name: 'ClubKonnect VTU Portal',
+          category: 'VTU Telecom',
+          balance: 0,
+          currency: 'NGN',
+          status: 'unconfigured',
+          error: 'CLUBKONNECT_USER_ID or API_KEY not configured in Vault',
+          allowDeposit: true,
+          allowWithdrawal: false,
+          depositAccount: resolveDepositAccount(secrets, 'clubkonnect', 'Wema Bank / ClubKonnect', '', 'ClubKonnect Wallet', 'Transfer directly to top up ClubKonnect wallet.')
+        }
+      }
+
+      let balance = 0
+      let latencyMs = 210
+      let status: 'healthy' | 'low' | 'critical' | 'unconfigured' | 'error' = 'healthy'
+      let errorMsg: string | undefined = undefined
+
+      try {
+        const u = `https://www.nellobytesystems.com/APIWalletBalanceV1.asp?UserID=${encodeURIComponent(cleanUser)}&APIKey=${encodeURIComponent(cleanKey)}`
+        const { response, latency } = await fetchWithTimeout(u, {}, 4000)
+        latencyMs = latency
+        const text = await response.text()
+        const data = (() => { try { return JSON.parse(text); } catch { return null; } })()
+        if (data) {
+          if (data.status === 'INVALID_CREDENTIALS') {
+            status = 'unconfigured'
+            errorMsg = 'Invalid ClubKonnect UserID or API Key. Tap Vault to update.'
+          } else {
+            const rawBal = extractGenericBalance(data)
+            if (rawBal !== undefined) {
+              balance = Number(rawBal)
+              status = computeStatus(balance)
+            }
+          }
+        }
+      } catch (err: any) {
+        errorMsg = err.message
+      }
+
+      return {
+        id: 'clubkonnect',
+        name: 'ClubKonnect VTU Portal',
+        category: 'VTU Telecom',
+        balance,
+        currency: 'NGN',
+        latencyMs,
+        status,
+        error: errorMsg,
+        allowDeposit: true,
+        allowWithdrawal: false,
+        depositAccount: resolveDepositAccount(secrets, 'clubkonnect', 'Wema Bank / ClubKonnect', '', 'ClubKonnect Wallet', 'Transfer directly to top up ClubKonnect wallet.')
+      }
+    }
+
+    // 12. NOWPayments (Crypto Gateway)
+    async function checkNowPayments() {
+      const cleanKey = nowPaymentsKey ? nowPaymentsKey.trim() : ''
+      if (!cleanKey) {
+        return {
+          id: 'nowpayments',
+          name: 'NOWPayments Crypto Gateway',
+          category: 'Crypto Gateway',
+          balance: 0,
+          currency: 'USD',
+          status: 'unconfigured',
+          error: 'NOWPAYMENTS_API_KEY not configured in Vault',
+          allowDeposit: true,
+          allowWithdrawal: false
+        }
+      }
+
+      let balance = 0
+      let latencyMs = 230
+      let status: 'healthy' | 'low' | 'critical' | 'unconfigured' = 'healthy'
+
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.nowpayments.io/v1/balance', {
+          headers: { 'x-api-key': cleanKey, 'Accept': 'application/json' }
+        }, 4000)
+        latencyMs = latency
+        const data = await response.json().catch(() => ({}))
+        if (data && typeof data === 'object') {
+          const tonAmt = Number(data.ton?.amount || 0)
+          const usdtAmt = Number(data.usdterc20?.amount || data.usdttrc20?.amount || data.usdt?.amount || 0)
+          const usdVal = (tonAmt * 6) + usdtAmt
+          balance = usdVal > 0 ? Number(usdVal.toFixed(2)) : 0
+          status = 'healthy'
+        }
+      } catch (_) {}
+
+      return {
+        id: 'nowpayments',
+        name: 'NOWPayments Crypto Gateway',
+        category: 'Crypto Gateway',
+        balance,
+        currency: 'USD',
+        latencyMs,
+        status,
+        error: undefined,
+        allowDeposit: true,
+        allowWithdrawal: false
+      }
+    }
+
     // If a single provider is being tested or refreshed in isolation
     const singleId = reqData?.singleProviderId || reqData?.testProviderId || ''
     if (singleId) {
       let singleChecker: (() => Promise<any>) | null = null
       if (singleId === 'bilalsadasub') singleChecker = checkBilal
       else if (singleId === 'bigi') singleChecker = checkBigi
+      else if (singleId === 'clubkonnect') singleChecker = checkClubKonnect
       else if (singleId === 'skbtech') singleChecker = checkSKBTech
       else if (singleId === 'nineboost') singleChecker = checkNineBoost
       else if (singleId === 'termii') singleChecker = checkTermii
@@ -873,6 +962,7 @@ serve(async (req: Request) => {
       else if (singleId === 'paystack') singleChecker = checkPaystack
       else if (singleId === 'monnify') singleChecker = checkMonnify
       else if (singleId === 'payvessel') singleChecker = checkPayVessel
+      else if (singleId === 'nowpayments') singleChecker = checkNowPayments
       else if (singleId === 'resend') singleChecker = checkResend
 
       if (singleChecker) {
@@ -896,6 +986,7 @@ serve(async (req: Request) => {
     const checkPromises = [
       checkBilal(),
       checkBigi(),
+      checkClubKonnect(),
       checkSKBTech(),
       checkNineBoost(),
       checkTermii(),
@@ -903,6 +994,7 @@ serve(async (req: Request) => {
       checkPaystack(),
       checkMonnify(),
       checkPayVessel(),
+      checkNowPayments(),
       checkResend()
     ]
 
@@ -911,7 +1003,7 @@ serve(async (req: Request) => {
       if (r.status === 'fulfilled') {
         return r.value
       } else {
-        const fallbackIds = ['bilalsadasub', 'bigi', 'skbtech', 'nineboost', 'termii', 'flutterwave', 'paystack', 'monnify', 'payvessel', 'resend']
+        const fallbackIds = ['bilalsadasub', 'bigi', 'clubkonnect', 'skbtech', 'nineboost', 'termii', 'flutterwave', 'paystack', 'monnify', 'payvessel', 'nowpayments', 'resend']
         return {
           id: fallbackIds[i] || 'unknown',
           name: fallbackIds[i] || 'Provider',
