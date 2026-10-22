@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
     View, Text, TouchableOpacity, ScrollView, ActivityIndicator, 
-    Alert, Modal, TextInput, StyleSheet, useWindowDimensions, Platform, Switch 
+    Alert, Modal, TextInput, StyleSheet, useWindowDimensions, Platform, Switch, Linking 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../services/supabase';
 
-// Official Brand Colors (Navy & Gold)
+// Official Brand Design Tokens (Navy & Gold - Crisp & Ultra Clean)
 const T = {
     navy: '#0d1b3e',
     navyMid: '#142258',
@@ -22,6 +22,7 @@ const T = {
     text: '#0d1b3e',
     textSub: '#5a6890',
     border: '#cbd5e1',
+    borderLight: '#e2e8f0',
     bg: '#f4f6fb',
     cardBg: '#ffffff',
     success: '#10b981',
@@ -30,7 +31,7 @@ const T = {
     info: '#0284c7'
 };
 
-interface ProviderWallet {
+export interface ProviderWallet {
     id: string;
     name: string;
     category?: string;
@@ -70,40 +71,63 @@ export default function LiquidityVaultScreen() {
     const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
     const isDesktop = Platform.OS === 'web' && width >= 768;
 
-    const providerCardWidth = isDesktopWeb ? '32.3%' : isTabletWeb ? '48.8%' : '100%';
+    const providerCardWidth: any = isDesktopWeb ? '32.3%' : isTabletWeb ? '48.8%' : '100%';
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [totalBalance, setTotalBalance] = useState(0);
+    const [usdBalance, setUsdBalance] = useState(0);
     const [providers, setProviders] = useState<ProviderWallet[]>([]);
     const [vaultSecrets, setVaultSecrets] = useState<Record<string, string>>({});
-    const [activeFilter, setActiveFilter] = useState<string>('All');
+    const [activeFilter, setActiveFilter] = useState<string>('Active');
     const [searchQuery, setSearchQuery] = useState<string>('');
+    const [syncingProviderId, setSyncingProviderId] = useState<string | null>(null);
 
     // Modal States
     const [selectedDepositProvider, setSelectedDepositProvider] = useState<ProviderWallet | null>(null);
     const [selectedWithdrawProvider, setSelectedWithdrawProvider] = useState<ProviderWallet | null>(null);
     const [selectedTokenProvider, setSelectedTokenProvider] = useState<ProviderWallet | null>(null);
 
-    // Vault Token Edit Form
+    // Vault Token Edit Form States
     const [tokenKeyName, setTokenKeyName] = useState('');
     const [tokenValue, setTokenValue] = useState('');
     const [tokenSaving, setTokenSaving] = useState(false);
-    // BilalSadaSub-specific: username + password
+
+    // BilalSadaSub credentials
     const [bilalUsername, setBilalUsername] = useState('');
     const [bilalPassword, setBilalPassword] = useState('');
-    // BigiSub-specific: username + password
+
+    // BigiSub credentials
     const [bigiUsername, setBigiUsername] = useState('');
     const [bigiPassword, setBigiPassword] = useState('');
-    // Monnify-specific: Secret Key & Contract Code
+
+    // SKBTECH credentials
+    const [skbTechKey, setSkbTechKey] = useState('');
+
+    // NineBoost credentials
+    const [nineBoostKey, setNineBoostKey] = useState('');
+
+    // Flutterwave credentials
+    const [flwSecretKey, setFlwSecretKey] = useState('');
+    const [flwPublicKey, setFlwPublicKey] = useState('');
+    const [flwSecretHash, setFlwSecretHash] = useState('');
+
+    // Termii credentials
+    const [termiiApiKey, setTermiiApiKey] = useState('');
+    const [termiiSenderId, setTermiiSenderId] = useState('AbuMafhal');
+
+    // Monnify credentials
+    const [monnifyApiKey, setMonnifyApiKey] = useState('');
     const [monnifySecret, setMonnifySecret] = useState('');
     const [monnifyContractCode, setMonnifyContractCode] = useState('');
+
+    // Paystack credentials
+    const [paystackSecret, setPaystackSecret] = useState('');
+    const [paystackPublic, setPaystackPublic] = useState('');
 
     // Low Float Email & SMS Alert States
     const [alertEmail, setAlertEmail] = useState('');
     const [alertPhone, setAlertPhone] = useState('');
-    const [termiiApiKey, setTermiiApiKey] = useState('');
-    const [termiiSenderId, setTermiiSenderId] = useState('AbuMafhal');
     const [alertThreshold, setAlertThreshold] = useState('5000');
     const [alertIntervalMins, setAlertIntervalMins] = useState('30');
     const [alertEnabled, setAlertEnabled] = useState(false);
@@ -159,6 +183,24 @@ export default function LiquidityVaultScreen() {
             }
         }
     }, [vaultSecrets]);
+
+    useEffect(() => {
+        fetchProviderBalances(false);
+        const autoPoll = setInterval(() => {
+            fetchProviderBalances(true); // background silent sync (non-blocking)
+        }, 120000); // 2 minutes interval
+        return () => clearInterval(autoPoll);
+    }, []);
+
+    useEffect(() => {
+        if (selectedDepositProvider) {
+            const pId = selectedDepositProvider.id.toUpperCase();
+            setFundBankName(vaultSecrets[`${pId}_BANK_NAME`] || vaultSecrets[`${pId}_BANK`] || selectedDepositProvider.depositAccount?.bankName || '');
+            setFundAccountNumber(vaultSecrets[`${pId}_ACCOUNT_NUMBER`] || vaultSecrets[`${pId}_ACCOUNT`] || selectedDepositProvider.depositAccount?.accountNumber || '');
+            setFundAccountName(vaultSecrets[`${pId}_ACCOUNT_NAME`] || selectedDepositProvider.depositAccount?.accountName || '');
+            setEditingDepositBank(false);
+        }
+    }, [selectedDepositProvider?.id]);
 
     const handleToggleAlertSwitch = async (newValue: boolean) => {
         setAlertEnabled(newValue);
@@ -253,18 +295,17 @@ export default function LiquidityVaultScreen() {
             }));
 
             if (alertEnabled) {
-                // Force check and send test alert immediately when enabled
                 await supabase.functions.invoke('check-provider-balances', {
                     body: { triggerAlertCheck: true, force: true }
                 });
                 Alert.alert(
                     "Alert Settings Saved! ⚡",
-                    `Low Float Email & SMS Alerts are active for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, automated alerts will be sent every ${alertIntervalMins.trim() || 30} minutes.`
+                    `Low Float Email & SMS Alerts are active for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, automated alerts will be dispatched.`
                 );
             } else {
                 Alert.alert(
                     "Alerts Disabled 🔕",
-                    "Automated low balance email & SMS notifications have been turned OFF successfully."
+                    "Automated low balance email & SMS notifications have been saved as disabled."
                 );
             }
             setShowAlertCard(false);
@@ -275,24 +316,6 @@ export default function LiquidityVaultScreen() {
             setSavingAlerts(false);
         }
     };
-
-    useEffect(() => {
-        fetchProviderBalances(false);
-        const autoPoll = setInterval(() => {
-            fetchProviderBalances(true); // background silent sync (no UI freeze/spinners)
-        }, 120000); // 2 minutes interval
-        return () => clearInterval(autoPoll);
-    }, []);
-
-    useEffect(() => {
-        if (selectedDepositProvider) {
-            const pId = selectedDepositProvider.id.toUpperCase();
-            setFundBankName(vaultSecrets[`${pId}_BANK_NAME`] || vaultSecrets[`${pId}_BANK`] || selectedDepositProvider.depositAccount?.bankName || '');
-            setFundAccountNumber(vaultSecrets[`${pId}_ACCOUNT_NUMBER`] || vaultSecrets[`${pId}_ACCOUNT`] || selectedDepositProvider.depositAccount?.accountNumber || '');
-            setFundAccountName(vaultSecrets[`${pId}_ACCOUNT_NAME`] || selectedDepositProvider.depositAccount?.accountName || '');
-            setEditingDepositBank(false);
-        }
-    }, [selectedDepositProvider?.id]);
 
     const handleSaveDepositAccount = async () => {
         if (!selectedDepositProvider) return;
@@ -325,7 +348,7 @@ export default function LiquidityVaultScreen() {
     const fetchProviderBalances = async (isSilent = false) => {
         if (!isSilent) setRefreshing(true);
         try {
-            // 1. Invoke Edge Function first (uses SERVICE_ROLE_KEY to bypass RLS)
+            // 1. Invoke Edge Function (uses SERVICE_ROLE_KEY to bypass RLS & parallel fetches)
             const { data: edgeData, error: edgeError } = await supabase.functions.invoke('check-provider-balances', {
                 body: {}
             });
@@ -333,6 +356,13 @@ export default function LiquidityVaultScreen() {
             if (!edgeError && edgeData?.success && edgeData?.providers && edgeData.providers.length > 0) {
                 setTotalBalance(edgeData.totalBalance || 0);
                 setProviders(edgeData.providers);
+                
+                // Calculate USD balance for NineBoost
+                const usd = edgeData.providers
+                    .filter((p: any) => p.currency === 'USD')
+                    .reduce((acc: number, curr: any) => acc + (Number(curr.balance) || 0), 0);
+                setUsdBalance(usd);
+
                 if (edgeData.secrets) {
                     setVaultSecrets(edgeData.secrets);
                 }
@@ -369,51 +399,119 @@ export default function LiquidityVaultScreen() {
 
             setVaultSecrets(secretsMap);
 
-            const agentHubKey = secretsMap['AGENTHUB_API_KEY'] || secretsMap['AGENTHUB_KEY'] || '';
             const bilalToken = secretsMap['BILALSADASUB_TOKEN'] || secretsMap['BILAL_TOKEN'] || secretsMap['BILALSADASUB_API_KEY'] || '';
-            const paystackSecret = secretsMap['PAYSTACK_SECRET_KEY'] || secretsMap['PAYSTACK_KEY'] || '';
-            const clubkonnectKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || secretsMap['CLUBKONNECT_PASS'] || secretsMap['CLUBKONNECT_USER_ID'] || secretsMap['CLUBKONNECT_USER'] || '';
-            const idProKey = secretsMap['IDPRO_API_KEY'] || secretsMap['IDPRO_KEY'] || '';
-            const payVesselKey = secretsMap['PAYVESSEL_API_KEY'] || secretsMap['PAYVESSEL_KEY'] || secretsMap['PAYVESSEL_SECRET_KEY'] || secretsMap['PAYBESSEL_API_KEY'] || secretsMap['PAYBESSEL_KEY'] || '';
-            const nineBoostKey = secretsMap['NINEBOOST_API_KEY'] || secretsMap['NINEBOOST_KEY'] || secretsMap['NINEBOOST_TOKEN'] || '';
-            const nowPaymentsKey = secretsMap['NOWPAYMENTS_API_KEY'] || secretsMap['NOWPAYMENTS_KEY'] || '';
+            const bilalUser = secretsMap['BILALSADASUB_USERNAME'] || secretsMap['BILAL_USERNAME'] || '';
             const bigiToken = secretsMap['BIGI_API_TOKEN'] || secretsMap['BIGI_TOKEN'] || '';
+            const bigiUser = secretsMap['BIGISUB_USERNAME'] || secretsMap['BIGI_USERNAME'] || '';
+            const skbKey = secretsMap['SKBTECH_API_KEY'] || secretsMap['SKB_API_KEY'] || secretsMap['SKBTECH_KEY'] || '';
+            const nineBoostKey = secretsMap['NINEBOOST_API_KEY'] || secretsMap['NINEBOOST_KEY'] || secretsMap['NINEBOOST_TOKEN'] || '';
             const termiiKey = secretsMap['TERMII_API_KEY'] || secretsMap['TERMII_KEY'] || '';
-            const monnifyApiKey = secretsMap['MONNIFY_API_KEY'] || secretsMap['MONNIFY_KEY'] || '';
+            const flwKey = secretsMap['FLUTTERWAVE_SECRET_KEY'] || secretsMap['FLUTTERWAVE_KEY'] || secretsMap['FLUTTERWAVE_SECRET'] || '';
+            const paystackSecret = secretsMap['PAYSTACK_SECRET_KEY'] || secretsMap['PAYSTACK_KEY'] || '';
+            const monnifyKey = secretsMap['MONNIFY_API_KEY'] || secretsMap['MONNIFY_KEY'] || '';
+            const payVesselKey = secretsMap['PAYVESSEL_API_KEY'] || secretsMap['PAYVESSEL_KEY'] || '';
 
-            const list: ProviderWallet[] = [
-                {
-                    id: 'agenthub',
-                    name: 'AgentHub (Identity, NIN, BVN)',
-                    category: 'Digital Identity',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: agentHubKey ? 'healthy' : 'unconfigured',
-                    error: agentHubKey ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'Sterling Bank / Payvessel (AgentHub)',
-                        accountNumber: '9081234567',
-                        accountName: 'AgentHub Corporate / ABUMAFHAL',
-                        instructions: 'Transfer to this virtual account to top up AgentHub balance.'
-                    }
-                },
+            const fallbackList: ProviderWallet[] = [
                 {
                     id: 'bilalsadasub',
-                    name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
+                    name: 'BilalSadaSub Telecom (Data, Airtime, Bills)',
                     category: 'VTU Telecom',
                     balance: 0,
                     currency: 'NGN',
-                    status: bilalToken ? 'healthy' : 'unconfigured',
-                    error: bilalToken ? undefined : 'Token not configured in Vault',
+                    status: (bilalUser || bilalToken) ? 'healthy' : 'unconfigured',
+                    error: (bilalUser || bilalToken) ? undefined : 'Username/Password not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false,
                     depositAccount: {
-                        bankName: 'Sterling / Payvessel (BilalSadaSub)',
-                        accountNumber: '8910293841',
-                        accountName: 'BilalSadaSub Telecom',
-                        instructions: 'Auto-funding bank account for BilalSadaSub VTU portal.'
+                        bankName: secretsMap['BILALSADASUB_BANK_NAME'] || 'Sterling Bank / Payvessel',
+                        accountNumber: secretsMap['BILALSADASUB_ACCOUNT_NUMBER'] || '8910293841',
+                        accountName: secretsMap['BILALSADASUB_ACCOUNT_NAME'] || 'BilalSadaSub Telecom',
+                        instructions: 'Dedicated auto-funding bank account for BilalSadaSub VTU balance.'
+                    }
+                },
+                {
+                    id: 'bigi',
+                    name: 'Bigi VTU Portal (SME Data & Airtime)',
+                    category: 'VTU Telecom',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: (bigiUser || bigiToken) ? 'healthy' : 'unconfigured',
+                    error: (bigiUser || bigiToken) ? undefined : 'Username/Password not configured in Vault',
+                    allowDeposit: true,
+                    allowWithdrawal: false,
+                    depositAccount: {
+                        bankName: secretsMap['BIGI_BANK_NAME'] || 'Wema Bank / BigiSub',
+                        accountNumber: secretsMap['BIGI_ACCOUNT_NUMBER'] || '1029384756',
+                        accountName: secretsMap['BIGI_ACCOUNT_NAME'] || 'BigiSub Telecom Funding',
+                        instructions: 'Direct bank transfer to top up Bigi SME Data float.'
+                    }
+                },
+                {
+                    id: 'skbtech',
+                    name: 'SKBTECH (NIN, BVN & Identity Portal)',
+                    category: 'Digital Identity & CAC',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: skbKey ? 'healthy' : 'unconfigured',
+                    error: skbKey ? undefined : 'SKBTECH_API_KEY not configured in Vault (skbtech.com.ng)',
+                    allowDeposit: true,
+                    allowWithdrawal: false,
+                    depositAccount: {
+                        bankName: secretsMap['SKBTECH_BANK_NAME'] || 'Monnify / Sterling Bank',
+                        accountNumber: secretsMap['SKBTECH_ACCOUNT_NUMBER'] || '9081234567',
+                        accountName: secretsMap['SKBTECH_ACCOUNT_NAME'] || 'SKBTECH Services / ABUMAFHAL',
+                        instructions: 'Transfer to this virtual account to top up SKBTECH NIN/BVN balance.'
+                    }
+                },
+                {
+                    id: 'nineboost',
+                    name: 'NineBoost (Social Media Marketing SMM Panel)',
+                    category: 'Marketing Services',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: nineBoostKey ? 'healthy' : 'unconfigured',
+                    error: nineBoostKey ? undefined : 'NINEBOOST_API_KEY not configured in Vault',
+                    allowDeposit: true,
+                    allowWithdrawal: false,
+                    depositAccount: {
+                        bankName: secretsMap['NINEBOOST_BANK_NAME'] || 'Moniepoint / Sterling',
+                        accountNumber: secretsMap['NINEBOOST_ACCOUNT_NUMBER'] || '5051523456',
+                        accountName: secretsMap['NINEBOOST_ACCOUNT_NAME'] || 'NineBoost SMM Portal',
+                        instructions: 'Transfer to top up SMM panel wallet balance.'
+                    }
+                },
+                {
+                    id: 'termii',
+                    name: 'Termii (SMS & OTP Messaging Gateway)',
+                    category: 'SMS & Communications',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: termiiKey ? 'healthy' : 'unconfigured',
+                    error: termiiKey ? undefined : 'TERMII_API_KEY not configured in Vault',
+                    allowDeposit: true,
+                    allowWithdrawal: false,
+                    depositAccount: {
+                        bankName: secretsMap['TERMII_BANK_NAME'] || 'Providus Bank / Termii',
+                        accountNumber: secretsMap['TERMII_ACCOUNT_NUMBER'] || '1122334455',
+                        accountName: secretsMap['TERMII_ACCOUNT_NAME'] || 'Termii Messaging Corporate',
+                        instructions: 'Direct bank transfer to top up Termii SMS/OTP balance.'
+                    }
+                },
+                {
+                    id: 'flutterwave',
+                    name: 'Flutterwave (Payouts & Gateway Collections)',
+                    category: 'Payment Gateway',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: flwKey ? 'healthy' : 'unconfigured',
+                    error: flwKey ? undefined : 'FLUTTERWAVE_SECRET_KEY not configured in Vault',
+                    allowDeposit: true,
+                    allowWithdrawal: true,
+                    depositAccount: {
+                        bankName: secretsMap['FLUTTERWAVE_BANK_NAME'] || 'Access Bank / Flutterwave',
+                        accountNumber: secretsMap['FLUTTERWAVE_ACCOUNT_NUMBER'] || '0123456789',
+                        accountName: secretsMap['FLUTTERWAVE_ACCOUNT_NAME'] || 'ABUMAFHAL Sub / Flutterwave',
+                        instructions: 'Direct bank top-up for Flutterwave merchant balance.'
                     }
                 },
                 {
@@ -428,30 +526,19 @@ export default function LiquidityVaultScreen() {
                     allowWithdrawal: true
                 },
                 {
-                    id: 'clubkonnect',
-                    name: 'Clubkonnect / NelloByte API (VTU Telecom)',
-                    category: 'VTU Telecom',
+                    id: 'monnify',
+                    name: 'Monnify / Moniepoint Gateway',
+                    category: 'Payment Gateway',
                     balance: 0,
                     currency: 'NGN',
-                    status: clubkonnectKey ? 'healthy' : 'unconfigured',
-                    error: clubkonnectKey ? undefined : 'API Key not configured in Vault',
+                    status: monnifyKey ? 'healthy' : 'unconfigured',
+                    error: monnifyKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
-                    allowWithdrawal: false
-                },
-                {
-                    id: 'idpro',
-                    name: 'IDPro (Identity & KYC Verification API)',
-                    category: 'Digital Identity & CAC',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: idProKey ? 'healthy' : 'unconfigured',
-                    error: idProKey ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
+                    allowWithdrawal: true
                 },
                 {
                     id: 'payvessel',
-                    name: 'PayVessel (Payment & Payout Gateway)',
+                    name: 'PayVessel (Payment Gateway)',
                     category: 'Payment Gateway',
                     balance: 0,
                     currency: 'NGN',
@@ -459,115 +546,10 @@ export default function LiquidityVaultScreen() {
                     error: payVesselKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: true
-                },
-                {
-                    id: 'nineboost',
-                    name: 'NineBoost (Social Media Marketing SMM Panel)',
-                    category: 'Marketing Services',
-                    balance: 0,
-                    currency: 'USD',
-                    status: nineBoostKey ? 'healthy' : 'unconfigured',
-                    error: nineBoostKey ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                },
-                {
-                    id: 'nowpayments',
-                    name: 'NowPayments (Crypto Payment Gateway)',
-                    category: 'Payment Gateway',
-                    balance: 0,
-                    currency: 'USD',
-                    status: nowPaymentsKey ? 'healthy' : 'unconfigured',
-                    error: nowPaymentsKey ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: true
-                },
-                {
-                    id: 'bigi',
-                    name: 'Bigi VTU Portal (SME Data & Airtime)',
-                    category: 'VTU Telecom',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: bigiToken ? 'healthy' : 'unconfigured',
-                    error: bigiToken ? undefined : 'Token not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                },
-                {
-                    id: 'termii',
-                    name: 'Termii (SMS & OTP Messaging Gateway)',
-                    category: 'SMS & Communications',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: termiiKey ? 'healthy' : 'unconfigured',
-                    error: termiiKey ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                },
-                {
-                    id: 'flutterwave',
-                    name: 'Flutterwave (Payouts & Gateway Collections)',
-                    category: 'Payment Gateway',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: (secretsMap['FLUTTERWAVE_SECRET_KEY'] || secretsMap['FLUTTERWAVE_KEY']) ? 'healthy' : 'unconfigured',
-                    error: (secretsMap['FLUTTERWAVE_SECRET_KEY'] || secretsMap['FLUTTERWAVE_KEY']) ? undefined : 'Secret Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: true
-                },
-                {
-                    id: 'monnify',
-                    name: 'Monnify / Moniepoint Gateway',
-                    category: 'Payment Gateway',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: (secretsMap['MONNIFY_API_KEY'] || secretsMap['MONNIFY_KEY']) ? 'healthy' : 'unconfigured',
-                    error: (secretsMap['MONNIFY_API_KEY'] || secretsMap['MONNIFY_KEY']) ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: true
-                },
-                {
-                    id: 'aijalon',
-                    name: 'Aijalon Telecommunications (VTU / Data)',
-                    category: 'VTU Telecom',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: (secretsMap['AIJALON_API_KEY'] || secretsMap['AIJALON_KEY']) ? 'healthy' : 'unconfigured',
-                    error: (secretsMap['AIJALON_API_KEY'] || secretsMap['AIJALON_KEY']) ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                },
-                {
-                    id: 'skbtech',
-                    name: 'SKBTECH (NIN, BVN & Identity Portal)',
-                    category: 'Digital Identity & CAC',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: (secretsMap['SKBTECH_API_KEY'] || secretsMap['SKB_API_KEY'] || secretsMap['SKBTECH_KEY']) ? 'healthy' : 'unconfigured',
-                    error: (secretsMap['SKBTECH_API_KEY'] || secretsMap['SKB_API_KEY'] || secretsMap['SKBTECH_KEY']) ? undefined : 'API Key not configured in Vault (skbtech.com.ng)',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'Monnify / Sterling Bank',
-                        accountNumber: '9081234567',
-                        accountName: 'SKBTECH Services / ABUMAFHAL',
-                        instructions: 'Transfer to this virtual account to top up SKBTECH balance.'
-                    }
-                },
-                {
-                    id: 'resend',
-                    name: 'Resend (Email Gateway & Transactional Mail)',
-                    category: 'SMS & Communications',
-                    balance: 0,
-                    currency: 'USD',
-                    status: (secretsMap['RESEND_API_KEY'] || secretsMap['RESEND_KEY']) ? 'healthy' : 'unconfigured',
-                    error: (secretsMap['RESEND_API_KEY'] || secretsMap['RESEND_KEY']) ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: false,
-                    allowWithdrawal: false
                 }
             ];
 
-            setProviders(list);
+            setProviders(fallbackList);
         } catch (e: any) {
             console.error("Provider Balance Fetch Error", e);
         } finally {
@@ -587,213 +569,202 @@ export default function LiquidityVaultScreen() {
     const handleOpenTokenModal = (p: ProviderWallet) => {
         setSelectedTokenProvider(p);
         const secretMap: Record<string, string> = {
-            agenthub: 'AGENTHUB_API_KEY',
             bilalsadasub: 'BILALSADASUB_TOKEN',
-            paystack: 'PAYSTACK_SECRET_KEY',
-            clubkonnect: 'CLUBKONNECT_API_KEY',
-            idpro: 'IDPRO_API_KEY',
-            payvessel: 'PAYVESSEL_API_KEY',
-            nineboost: 'NINEBOOST_API_KEY',
-            nowpayments: 'NOWPAYMENTS_API_KEY',
             bigi: 'BIGI_API_TOKEN',
+            skbtech: 'SKBTECH_API_KEY',
+            nineboost: 'NINEBOOST_API_KEY',
             termii: 'TERMII_API_KEY',
             flutterwave: 'FLUTTERWAVE_SECRET_KEY',
+            paystack: 'PAYSTACK_SECRET_KEY',
             monnify: 'MONNIFY_API_KEY',
-            aijalon: 'AIJALON_API_KEY',
-            skbtech: 'SKBTECH_API_KEY',
-            resend: 'RESEND_API_KEY'
+            payvessel: 'PAYVESSEL_API_KEY'
         };
         const keyName = secretMap[p.id] || 'GENERIC_API_KEY';
         setTokenKeyName(keyName);
 
         let existingVal = vaultSecrets[keyName] || vaultSecrets[keyName.replace('_API_KEY', '_KEY').replace('_TOKEN', '_KEY')] || '';
-        if (p.id === 'payvessel' && !existingVal) {
-            existingVal = vaultSecrets['PAYBESSEL_API_KEY'] || vaultSecrets['PAYBESSEL_KEY'] || '';
-        }
         setTokenValue(existingVal);
 
-        // Pre-fill BilalSadaSub username & password from vault
+        // Pre-fill BilalSadaSub
         if (p.id === 'bilalsadasub') {
-            setBilalUsername(
-                vaultSecrets['BILALSADASUB_USERNAME'] || vaultSecrets['BILAL_USERNAME'] || vaultSecrets['BILALSADASUB_USER'] || ''
-            );
-            setBilalPassword(
-                vaultSecrets['BILALSADASUB_PASSWORD'] || vaultSecrets['BILAL_PASSWORD'] || vaultSecrets['BILALSADASUB_PASS'] || ''
-            );
-        } else {
-            setBilalUsername('');
-            setBilalPassword('');
+            setBilalUsername(vaultSecrets['BILALSADASUB_USERNAME'] || vaultSecrets['BILAL_USERNAME'] || vaultSecrets['BILALSADASUB_USER'] || '');
+            setBilalPassword(vaultSecrets['BILALSADASUB_PASSWORD'] || vaultSecrets['BILAL_PASSWORD'] || vaultSecrets['BILALSADASUB_PASS'] || '');
         }
 
-        // Pre-fill BigiSub username & password from vault
+        // Pre-fill BigiSub
         if (p.id === 'bigi') {
-            setBigiUsername(
-                vaultSecrets['BIGISUB_USERNAME'] || vaultSecrets['BIGI_USERNAME'] || vaultSecrets['BIGI_USER'] || ''
-            );
-            setBigiPassword(
-                vaultSecrets['BIGISUB_PASSWORD'] || vaultSecrets['BIGI_PASSWORD'] || vaultSecrets['BIGI_PASS'] || ''
-            );
-        } else {
-            setBigiUsername('');
-            setBigiPassword('');
+            setBigiUsername(vaultSecrets['BIGISUB_USERNAME'] || vaultSecrets['BIGI_USERNAME'] || vaultSecrets['BIGI_USER'] || '');
+            setBigiPassword(vaultSecrets['BIGISUB_PASSWORD'] || vaultSecrets['BIGI_PASSWORD'] || vaultSecrets['BIGI_PASS'] || '');
         }
 
-        // Pre-fill Monnify Secret & Contract Code
+        // Pre-fill SKBTECH
+        if (p.id === 'skbtech') {
+            setSkbTechKey(vaultSecrets['SKBTECH_API_KEY'] || vaultSecrets['SKB_API_KEY'] || vaultSecrets['SKBTECH_KEY'] || '');
+        }
+
+        // Pre-fill NineBoost
+        if (p.id === 'nineboost') {
+            setNineBoostKey(vaultSecrets['NINEBOOST_API_KEY'] || vaultSecrets['NINEBOOST_KEY'] || vaultSecrets['NINEBOOST_TOKEN'] || '');
+        }
+
+        // Pre-fill Flutterwave
+        if (p.id === 'flutterwave') {
+            setFlwSecretKey(vaultSecrets['FLUTTERWAVE_SECRET_KEY'] || vaultSecrets['FLUTTERWAVE_KEY'] || vaultSecrets['FLUTTERWAVE_SECRET'] || '');
+            setFlwPublicKey(vaultSecrets['FLUTTERWAVE_PUBLIC_KEY'] || vaultSecrets['FLUTTERWAVE_PUB'] || '');
+            setFlwSecretHash(vaultSecrets['FLUTTERWAVE_SECRET_HASH'] || vaultSecrets['FLUTTERWAVE_HASH'] || '');
+        }
+
+        // Pre-fill Termii
+        if (p.id === 'termii') {
+            setTermiiApiKey(vaultSecrets['TERMII_API_KEY'] || vaultSecrets['TERMII_KEY'] || '');
+            setTermiiSenderId(vaultSecrets['TERMII_SENDER_ID'] || vaultSecrets['TERMII_SENDER'] || 'AbuMafhal');
+        }
+
+        // Pre-fill Monnify
         if (p.id === 'monnify') {
-            setMonnifySecret(
-                vaultSecrets['MONNIFY_SECRET_KEY'] || vaultSecrets['MONNIFY_SECRET'] || ''
-            );
-            setMonnifyContractCode(
-                vaultSecrets['MONNIFY_CONTRACT_CODE'] || vaultSecrets['MONNIFY_CODE'] || ''
-            );
-        } else {
-            setMonnifySecret('');
-            setMonnifyContractCode('');
+            setMonnifyApiKey(vaultSecrets['MONNIFY_API_KEY'] || vaultSecrets['MONNIFY_KEY'] || '');
+            setMonnifySecret(vaultSecrets['MONNIFY_SECRET_KEY'] || vaultSecrets['MONNIFY_SECRET'] || '');
+            setMonnifyContractCode(vaultSecrets['MONNIFY_CONTRACT_CODE'] || vaultSecrets['MONNIFY_CODE'] || '');
+        }
+
+        // Pre-fill Paystack
+        if (p.id === 'paystack') {
+            setPaystackSecret(vaultSecrets['PAYSTACK_SECRET_KEY'] || vaultSecrets['PAYSTACK_KEY'] || '');
+            setPaystackPublic(vaultSecrets['PAYSTACK_PUBLIC_KEY'] || vaultSecrets['PAYSTACK_PUB'] || '');
         }
     };
 
     const handleSaveVaultToken = async () => {
-        const isBilal = selectedTokenProvider?.id === 'bilalsadasub';
-        const isBigi = selectedTokenProvider?.id === 'bigi';
-
-        // For BilalSadaSub / BigiSub: require username + password (token is optional bonus)
-        if (isBilal) {
-            if (!bilalUsername.trim() || !bilalPassword.trim()) {
-                Alert.alert("Invalid Input", "Please enter both Username and Password for BilalSadaSub.");
-                return;
-            }
-        } else if (isBigi) {
-            if (!bigiUsername.trim() || !bigiPassword.trim()) {
-                Alert.alert("Invalid Input", "Please enter both Username and Password for BigiSub.");
-                return;
-            }
-        } else {
-            if (!tokenValue || tokenValue.trim() === '') {
-                Alert.alert("Invalid Input", "Please enter a valid secret key value.");
-                return;
-            }
-        }
-
+        if (!selectedTokenProvider) return;
         setTokenSaving(true);
         try {
-            const secretKeyMap: Record<string, string> = {
-                agenthub: 'AGENTHUB_API_KEY',
-                bilalsadasub: 'BILALSADASUB_TOKEN',
-                paystack: 'PAYSTACK_SECRET_KEY',
-                clubkonnect: 'CLUBKONNECT_API_KEY',
-                idpro: 'IDPRO_API_KEY',
-                payvessel: 'PAYVESSEL_API_KEY',
-                nineboost: 'NINEBOOST_API_KEY',
-                nowpayments: 'NOWPAYMENTS_API_KEY',
-                bigi: 'BIGI_API_TOKEN',
-                termii: 'TERMII_API_KEY',
-                flutterwave: 'FLUTTERWAVE_SECRET_KEY',
-                monnify: 'MONNIFY_API_KEY',
-                aijalon: 'AIJALON_API_KEY',
-                skbtech: 'SKBTECH_API_KEY',
-                resend: 'RESEND_API_KEY'
-            };
+            const pId = selectedTokenProvider.id;
+            const updates: Array<{ key: string; value: string; desc: string }> = [];
 
-            const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';
-
-            if (isBilal) {
-                // Save username & password to vault
-                const credsToSave = [
-                    { key: 'BILALSADASUB_USERNAME', value: bilalUsername.trim() },
-                    { key: 'BILALSADASUB_PASSWORD', value: bilalPassword.trim() },
-                ];
+            if (pId === 'bilalsadasub') {
+                if (!bilalUsername.trim() || !bilalPassword.trim()) {
+                    Alert.alert("Input Required", "Please enter both Username and Password for BilalSadaSub.");
+                    setTokenSaving(false);
+                    return;
+                }
+                updates.push({ key: 'BILALSADASUB_USERNAME', value: bilalUsername.trim(), desc: 'BilalSadaSub Username' });
+                updates.push({ key: 'BILALSADASUB_PASSWORD', value: bilalPassword.trim(), desc: 'BilalSadaSub Password' });
                 if (tokenValue.trim()) {
-                    credsToSave.push({ key: 'BILALSADASUB_TOKEN', value: tokenValue.trim() });
+                    updates.push({ key: 'BILALSADASUB_TOKEN', value: tokenValue.trim(), desc: 'BilalSadaSub Token' });
                 }
-                for (const cred of credsToSave) {
-                    await supabase.from('system_secrets').upsert({
-                        key: cred.key, value: cred.value,
-                        description: `BilalSadaSub credential - ${cred.key}`,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'key' });
-                    await supabase.from('app_settings').upsert({
-                        key: cred.key, value: cred.value,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'key' });
-                    setVaultSecrets(prev => ({ ...prev, [cred.key]: cred.value }));
+            } else if (pId === 'bigi') {
+                if (!bigiUsername.trim() || !bigiPassword.trim()) {
+                    Alert.alert("Input Required", "Please enter both Username and Password for Bigi VTU.");
+                    setTokenSaving(false);
+                    return;
                 }
-            } else if (isBigi) {
-                // Save username & password to vault
-                const credsToSave = [
-                    { key: 'BIGISUB_USERNAME', value: bigiUsername.trim() },
-                    { key: 'BIGISUB_PASSWORD', value: bigiPassword.trim() },
-                ];
+                updates.push({ key: 'BIGISUB_USERNAME', value: bigiUsername.trim(), desc: 'BigiSub Username' });
+                updates.push({ key: 'BIGISUB_PASSWORD', value: bigiPassword.trim(), desc: 'BigiSub Password' });
                 if (tokenValue.trim()) {
-                    credsToSave.push({ key: 'BIGI_API_TOKEN', value: tokenValue.trim() });
+                    updates.push({ key: 'BIGI_API_TOKEN', value: tokenValue.trim(), desc: 'Bigi Token' });
                 }
-                for (const cred of credsToSave) {
-                    await supabase.from('system_secrets').upsert({
-                        key: cred.key, value: cred.value,
-                        description: `BigiSub credential - ${cred.key}`,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'key' });
-                    await supabase.from('app_settings').upsert({
-                        key: cred.key, value: cred.value,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'key' });
-                    setVaultSecrets(prev => ({ ...prev, [cred.key]: cred.value }));
+            } else if (pId === 'skbtech') {
+                const keyVal = skbTechKey.trim() || tokenValue.trim();
+                if (!keyVal) {
+                    Alert.alert("Input Required", "Please enter your official SKBTECH API Key.");
+                    setTokenSaving(false);
+                    return;
                 }
-            } else if (selectedTokenProvider?.id === 'monnify') {
-                // Save Monnify API Key, Secret Key, and Contract Code
-                const credsToSave = [
-                    { key: 'MONNIFY_API_KEY', value: tokenValue.trim() },
-                ];
+                updates.push({ key: 'SKBTECH_API_KEY', value: keyVal, desc: 'SKBTECH Official API Key (skbtech.com.ng)' });
+                updates.push({ key: 'SKB_API_KEY', value: keyVal, desc: 'SKBTECH API Key Alias' });
+            } else if (pId === 'nineboost') {
+                const keyVal = nineBoostKey.trim() || tokenValue.trim();
+                if (!keyVal) {
+                    Alert.alert("Input Required", "Please enter your NineBoost API Key.");
+                    setTokenSaving(false);
+                    return;
+                }
+                updates.push({ key: 'NINEBOOST_API_KEY', value: keyVal, desc: 'NineBoost SMM Panel API Key' });
+                updates.push({ key: 'NINEBOOST_KEY', value: keyVal, desc: 'NineBoost API Key Alias' });
+            } else if (pId === 'flutterwave') {
+                const secVal = flwSecretKey.trim() || tokenValue.trim();
+                if (!secVal) {
+                    Alert.alert("Input Required", "Please enter your Flutterwave Secret Key.");
+                    setTokenSaving(false);
+                    return;
+                }
+                updates.push({ key: 'FLUTTERWAVE_SECRET_KEY', value: secVal, desc: 'Flutterwave Secret Key' });
+                if (flwPublicKey.trim()) {
+                    updates.push({ key: 'FLUTTERWAVE_PUBLIC_KEY', value: flwPublicKey.trim(), desc: 'Flutterwave Public Key' });
+                }
+                if (flwSecretHash.trim()) {
+                    updates.push({ key: 'FLUTTERWAVE_SECRET_HASH', value: flwSecretHash.trim(), desc: 'Flutterwave Secret Hash' });
+                }
+            } else if (pId === 'termii') {
+                const keyVal = termiiApiKey.trim() || tokenValue.trim();
+                if (!keyVal) {
+                    Alert.alert("Input Required", "Please enter your Termii API Key.");
+                    setTokenSaving(false);
+                    return;
+                }
+                updates.push({ key: 'TERMII_API_KEY', value: keyVal, desc: 'Termii API Key' });
+                if (termiiSenderId.trim()) {
+                    updates.push({ key: 'TERMII_SENDER_ID', value: termiiSenderId.trim(), desc: 'Termii Sender ID' });
+                }
+            } else if (pId === 'monnify') {
+                const apiVal = monnifyApiKey.trim() || tokenValue.trim();
+                if (!apiVal) {
+                    Alert.alert("Input Required", "Please enter your Monnify API Key.");
+                    setTokenSaving(false);
+                    return;
+                }
+                updates.push({ key: 'MONNIFY_API_KEY', value: apiVal, desc: 'Monnify API Key' });
                 if (monnifySecret.trim()) {
-                    credsToSave.push({ key: 'MONNIFY_SECRET_KEY', value: monnifySecret.trim() });
+                    updates.push({ key: 'MONNIFY_SECRET_KEY', value: monnifySecret.trim(), desc: 'Monnify Secret Key' });
                 }
                 if (monnifyContractCode.trim()) {
-                    credsToSave.push({ key: 'MONNIFY_CONTRACT_CODE', value: monnifyContractCode.trim() });
+                    updates.push({ key: 'MONNIFY_CONTRACT_CODE', value: monnifyContractCode.trim(), desc: 'Monnify Contract Code' });
                 }
-                for (const cred of credsToSave) {
-                    await supabase.from('system_secrets').upsert({
-                        key: cred.key, value: cred.value,
-                        description: `Monnify credential - ${cred.key}`,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'key' });
-                    await supabase.from('app_settings').upsert({
-                        key: cred.key, value: cred.value,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'key' });
-                    setVaultSecrets(prev => ({ ...prev, [cred.key]: cred.value }));
+            } else if (pId === 'paystack') {
+                const secVal = paystackSecret.trim() || tokenValue.trim();
+                if (!secVal) {
+                    Alert.alert("Input Required", "Please enter your Paystack Secret Key.");
+                    setTokenSaving(false);
+                    return;
+                }
+                updates.push({ key: 'PAYSTACK_SECRET_KEY', value: secVal, desc: 'Paystack Secret Key' });
+                if (paystackPublic.trim()) {
+                    updates.push({ key: 'PAYSTACK_PUBLIC_KEY', value: paystackPublic.trim(), desc: 'Paystack Public Key' });
                 }
             } else {
-                // Normal save for other providers
-                await supabase.from('system_secrets').upsert({
-                    key: secretKey,
-                    value: tokenValue.trim(),
-                    description: `Updated secret for ${selectedTokenProvider?.name}`,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'key' });
-                await supabase.from('app_settings').upsert({
-                    key: secretKey,
-                    value: tokenValue.trim(),
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'key' });
-                setVaultSecrets(prev => ({ ...prev, [secretKey]: tokenValue.trim() }));
+                if (!tokenValue.trim()) {
+                    Alert.alert("Input Required", "Please enter a valid secret key value.");
+                    setTokenSaving(false);
+                    return;
+                }
+                updates.push({ key: tokenKeyName, value: tokenValue.trim(), desc: `Secret for ${selectedTokenProvider.name}` });
             }
 
-            await supabase.functions.invoke('check-provider-balances', { body: {} });
+            for (const item of updates) {
+                await supabase.from('system_secrets').upsert({
+                    key: item.key,
+                    value: item.value,
+                    description: item.desc,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'key' });
 
-            Alert.alert("Success 🎉", (isBilal || isBigi || selectedTokenProvider?.id === 'monnify')
-                ? `${selectedTokenProvider?.name} credentials saved to Vault! Balance will update now.`
-                : `Saved ${secretKey} to Vault successfully!`
-            );
+                await supabase.from('app_settings').upsert({
+                    key: item.key,
+                    value: item.value,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'key' });
+
+                setVaultSecrets(prev => ({ ...prev, [item.key]: item.value }));
+            }
+
+            // Immediately invoke fast background sync
+            supabase.functions.invoke('check-provider-balances', { body: {} });
+
+            Alert.alert("Saved Successfully 🎉", `${selectedTokenProvider.name} credentials saved to Vault! Balance will update now.`);
             setSelectedTokenProvider(null);
-            setTokenValue('');
-            setBilalUsername('');
-            setBilalPassword('');
-            setBigiUsername('');
-            setBigiPassword('');
-            setMonnifySecret('');
-            setMonnifyContractCode('');
-            fetchProviderBalances();
+            fetchProviderBalances(true);
         } catch (e: any) {
-            Alert.alert("Error", e.message || "Failed to save secret key to Vault.");
+            Alert.alert("Save Error", e.message || "Failed to save secret key to Vault.");
         } finally {
             setTokenSaving(false);
         }
@@ -830,7 +801,7 @@ export default function LiquidityVaultScreen() {
                 setSelectedWithdrawProvider(null);
                 setWithdrawAmount('');
                 setWithdrawAccount('');
-                fetchProviderBalances();
+                fetchProviderBalances(true);
             } else {
                 Alert.alert("Withdrawal Error", data?.error || "Failed to process withdrawal.");
             }
@@ -841,26 +812,60 @@ export default function LiquidityVaultScreen() {
         }
     };
 
-    // Filter providers
-    const filteredProviders = providers.filter(p => {
-        const matchesCategory = activeFilter === 'All'
-            || (activeFilter === 'VTU' && p.category === 'VTU Telecom')
-            || (activeFilter === 'Identity' && (p.category === 'Digital Identity & CAC' || p.category === 'Digital Identity'))
-            || (activeFilter === 'Gateways' && p.category === 'Payment Gateway')
-            || (activeFilter === 'Comms' && (p.category === 'SMS & Communications' || p.category === 'Marketing Services'));
-        
-        const matchesSearch = !searchQuery.trim() || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.category && p.category.toLowerCase().includes(searchQuery.toLowerCase()));
+    // Individual provider sync
+    const handleSyncProvider = async (p: ProviderWallet) => {
+        setSyncingProviderId(p.id);
+        try {
+            const { data, error } = await supabase.functions.invoke('check-provider-balances', {
+                body: { singleProviderId: p.id }
+            });
+            if (!error && data?.provider) {
+                setProviders(prev => prev.map(pv => pv.id === p.id ? { ...pv, ...data.provider } : pv));
+                // Recalc total
+                setProviders(prev => {
+                    const total = prev.filter(x => x.currency === 'NGN').reduce((acc, cur) => acc + (Number(cur.balance) || 0), 0);
+                    setTotalBalance(total);
+                    return prev;
+                });
+            }
+        } catch (_) {}
+        finally { setSyncingProviderId(null); }
+    };
 
-        return matchesCategory && matchesSearch;
+    // Primary core operational providers
+    const CORE_IDS = ['bilalsadasub', 'bigi', 'skbtech', 'nineboost', 'termii', 'flutterwave'];
+
+    // Filter providers based on search and category
+    const filteredProviders = providers.filter(p => {
+        // Core active filter
+        if (activeFilter === 'Active') {
+            if (!CORE_IDS.includes(p.id)) return false;
+        } else if (activeFilter === 'VTU') {
+            if (p.category !== 'VTU Telecom') return false;
+        } else if (activeFilter === 'Identity') {
+            if (!p.category?.includes('Identity')) return false;
+        } else if (activeFilter === 'Gateways') {
+            if (p.category !== 'Payment Gateway') return false;
+        } else if (activeFilter === 'Comms') {
+            if (!p.category?.includes('SMS') && !p.category?.includes('Marketing')) return false;
+        }
+
+        // Search query
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            return p.name.toLowerCase().includes(q) || (p.category && p.category.toLowerCase().includes(q));
+        }
+
+        return true;
     });
 
-    const healthyCount = providers.filter(p => p.status === 'healthy').length;
-    const unconfiguredCount = providers.filter(p => p.status === 'unconfigured').length;
+    const activeCount = providers.filter(p => CORE_IDS.includes(p.id) && p.status === 'healthy').length;
+    const totalCoreCount = CORE_IDS.length;
 
     return (
         <View style={styles.container}>
             <Stack.Screen options={{
-                title: 'API Wallet & Finance Hub',
+                title: 'Liquidity & API Float Vault',
                 headerStyle: { backgroundColor: T.navyDark },
                 headerTintColor: T.white,
                 headerTitleStyle: { fontWeight: '900', fontSize: 16 },
@@ -875,25 +880,29 @@ export default function LiquidityVaultScreen() {
                 contentContainerStyle={[styles.scrollContent, isDesktop && styles.desktopScrollContent]}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Aggregate Total Float Hero Banner */}
+                {/* Aggregate Real-Time Float Hero Banner */}
                 <LinearGradient
                     colors={[T.navyDark, T.navy, T.navyMid]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.heroCard}
                 >
-                    {/* Gold Decorative Accent Stripe */}
                     <View style={styles.heroAccentStripe} />
 
                     <View style={styles.heroTopRow}>
                         <View style={{ flex: 1 }}>
                             <View style={styles.heroBadgeRow}>
-                                <Ionicons name="wallet-outline" size={12} color={T.gold} />
-                                <Text style={styles.heroSubTitle}>REAL-TIME AGGREGATE API FLOAT</Text>
+                                <Ionicons name="shield-checkmark" size={13} color={T.gold} />
+                                <Text style={styles.heroSubTitle}>REAL-TIME AGGREGATE API LIQUIDITY</Text>
                             </View>
                             <Text style={styles.heroBalanceText} numberOfLines={1} adjustsFontSizeToFit>
                                 ₦ {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
+                            {usdBalance > 0 && (
+                                <Text style={styles.heroUsdText}>
+                                    USD Float (SMM): ${usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </Text>
+                            )}
                         </View>
 
                         <TouchableOpacity 
@@ -906,54 +915,58 @@ export default function LiquidityVaultScreen() {
                                 <ActivityIndicator size="small" color={T.gold} />
                             ) : (
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="sync" size={12} color={T.gold} style={{ marginRight: 4 }} />
-                                    <Text style={styles.refreshBtnText}>Sync</Text>
+                                    <Ionicons name="sync" size={13} color={T.gold} style={{ marginRight: 4 }} />
+                                    <Text style={styles.refreshBtnText}>Sync Float</Text>
                                 </View>
                             )}
                         </TouchableOpacity>
                     </View>
 
-                    {/* Stat Badges Grid */}
+                    {/* Operational Badges Grid */}
                     <View style={styles.badgeGridRow}>
                         <View style={styles.statBadge}>
-                            <Ionicons name="checkmark-circle" size={12} color={T.success} />
+                            <Ionicons name="checkmark-circle" size={13} color={T.success} />
                             <Text style={styles.statBadgeText}>
-                                {healthyCount} Active Vendors
+                                {activeCount} / {totalCoreCount} Core Pillars Active
                             </Text>
                         </View>
 
                         <View style={styles.statBadge}>
-                            <Ionicons name="alert-circle-outline" size={12} color={unconfiguredCount > 0 ? T.warning : T.gold} />
+                            <Ionicons name="flash-outline" size={13} color={T.gold} />
                             <Text style={styles.statBadgeText}>
-                                {unconfiguredCount} Unconfigured
+                                Fast Parallel Polling
                             </Text>
                         </View>
 
-                        <View style={styles.statBadge}>
-                            <Ionicons name="key-outline" size={12} color={T.gold} />
+                        <TouchableOpacity 
+                            onPress={() => setShowAlertCard(!showAlertCard)}
+                            style={[styles.statBadge, alertEnabled && { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}
+                        >
+                            <Ionicons name={alertEnabled ? "notifications" : "notifications-outline"} size={13} color={alertEnabled ? T.success : T.gold} />
                             <Text style={styles.statBadgeText}>
-                                {providers.length} Integrations
+                                {alertEnabled ? 'Auto Alerts ON' : 'Alerts Config'}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                     </View>
                 </LinearGradient>
 
-                {/* Automated Low Float Email Alert Settings Banner/Card */}
-                <View style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: T.border }}>
+                {/* Automated Low Float Email & SMS Alert Settings Banner/Card */}
+                <View style={styles.alertCardContainer}>
                     <TouchableOpacity 
                         onPress={() => setShowAlertCard(!showAlertCard)}
-                        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                        style={styles.alertHeaderRow}
+                        activeOpacity={0.85}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                            <View style={{ backgroundColor: '#fff7ed', padding: 6, borderRadius: 8, marginRight: 8 }}>
+                            <View style={styles.alertIconBadge}>
                                 <Ionicons name="mail-unread-outline" size={16} color="#d97706" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: T.navy, fontWeight: '700', fontSize: 12.5 }}>
-                                    ⚡ Low Float Auto Email Alerts
+                                <Text style={styles.alertTitle}>
+                                    ⚡ Automated Low Float Threshold Alerts
                                 </Text>
-                                <Text style={{ color: T.textSub, fontSize: 12.5 }} numberOfLines={1}>
-                                    {alertEnabled && alertEmail ? `Alerts active → ${alertEmail} (Min: ₦${Number(alertThreshold || 5000).toLocaleString()} | Every ${alertIntervalMins || 30} mins)` : 'Configure email, minimum threshold & time interval'}
+                                <Text style={styles.alertSub} numberOfLines={1}>
+                                    {alertEnabled && alertEmail ? `Active → ${alertEmail} (Min: ₦${Number(alertThreshold || 5000).toLocaleString()} | Every ${alertIntervalMins || 30}m)` : 'Click to set alert email, SMS phone & threshold'}
                                 </Text>
                             </View>
                         </View>
@@ -961,17 +974,17 @@ export default function LiquidityVaultScreen() {
                     </TouchableOpacity>
 
                     {showAlertCard && (
-                        <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
-                            <Text style={{ color: T.textSub, fontSize: 12, marginBottom: 10, lineHeight: 14 }}>
-                                Receive automated email notifications whenever any API vendor wallet balance drops below your specified minimum threshold. Set your preferred check frequency in minutes!
+                        <View style={styles.alertExpandedBox}>
+                            <Text style={styles.alertExplainer}>
+                                Receive instant email & SMS notifications whenever any provider wallet drops below your minimum safety float.
                             </Text>
 
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <View style={styles.formRow}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>Notification Email</Text>
+                                    <Text style={styles.inputLabel}>Admin Notification Email</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="e.g. admin@abumafhal.com"
+                                        placeholder="admin@abumafhal.com.ng"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="email-address"
                                         autoCapitalize="none"
@@ -983,7 +996,7 @@ export default function LiquidityVaultScreen() {
                                     <Text style={styles.inputLabel}>SMS Phone (Optional)</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="e.g. 08145853539"
+                                        placeholder="08145853539"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="phone-pad"
                                         value={alertPhone}
@@ -992,37 +1005,12 @@ export default function LiquidityVaultScreen() {
                                 </View>
                             </View>
 
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                <View style={{ flex: 1.5 }}>
-                                    <Text style={styles.inputLabel}>Termii SMS API Key</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        placeholder="Termii API Key"
-                                        placeholderTextColor="#94a3b8"
-                                        autoCapitalize="none"
-                                        value={termiiApiKey}
-                                        onChangeText={setTermiiApiKey}
-                                    />
-                                </View>
+                            <View style={styles.formRow}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>Sender ID</Text>
+                                    <Text style={styles.inputLabel}>Minimum Float Threshold (₦)</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="e.g. AbuMafhal"
-                                        placeholderTextColor="#94a3b8"
-                                        autoCapitalize="none"
-                                        value={termiiSenderId}
-                                        onChangeText={setTermiiSenderId}
-                                    />
-                                </View>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>Minimum Threshold (₦)</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        placeholder="e.g. 5000"
+                                        placeholder="5000"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="numeric"
                                         value={alertThreshold}
@@ -1030,10 +1018,10 @@ export default function LiquidityVaultScreen() {
                                     />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>Interval (Minutes)</Text>
+                                    <Text style={styles.inputLabel}>Cooldown Interval (Minutes)</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="e.g. 30"
+                                        placeholder="30"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="numeric"
                                         value={alertIntervalMins}
@@ -1042,31 +1030,23 @@ export default function LiquidityVaultScreen() {
                                 </View>
                             </View>
 
-                            {/* SMTP Sender Setup for Direct Inbox Delivery */}
+                            {/* Custom SMTP / Zoho Config Accordion */}
                             <TouchableOpacity 
                                 onPress={() => setShowSmtpConfig(!showSmtpConfig)}
-                                style={{
-                                    backgroundColor: '#fffbeb', borderRadius: 8, padding: 8,
-                                    borderWidth: 1, borderColor: '#fef08a', marginVertical: 8,
-                                    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
-                                }}
+                                style={styles.smtpToggleBtn}
                             >
-                                <Text style={{ color: '#92400e', fontSize: 12, fontWeight: '700' }}>
-                                    🔐 Configure Custom SMTP / Zoho Email (100% Direct Inbox)
+                                <Text style={styles.smtpToggleText}>
+                                    🔐 Custom SMTP / Zoho Email Setup (Direct Inbox)
                                 </Text>
                                 <Ionicons name={showSmtpConfig ? "chevron-up" : "chevron-down"} size={14} color="#92400e" />
                             </TouchableOpacity>
 
                             {showSmtpConfig && (
-                                <View style={{ backgroundColor: '#f8fafc', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: T.border, marginBottom: 8 }}>
-                                    <Text style={{ color: T.textSub, fontSize: 12.5, marginBottom: 8 }}>
-                                        Enter your official Zoho or domain email credentials below to send alerts directly from your own domain and guarantee Inbox delivery without hitting Spam.
-                                    </Text>
-
-                                    <Text style={styles.inputLabel}>Sender Email (Zoho / Domain)</Text>
+                                <View style={styles.smtpBox}>
+                                    <Text style={styles.inputLabel}>Zoho Sender Email</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="e.g. admin@abumafhal.com.ng"
+                                        placeholder="admin@abumafhal.com.ng"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="email-address"
                                         autoCapitalize="none"
@@ -1074,10 +1054,10 @@ export default function LiquidityVaultScreen() {
                                         onChangeText={setSmtpEmail}
                                     />
 
-                                    <Text style={styles.inputLabel}>SMTP / App Password</Text>
+                                    <Text style={styles.inputLabel}>Zoho App Password</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="Enter Zoho / SMTP App Password"
+                                        placeholder="Enter Zoho App Password"
                                         placeholderTextColor="#94a3b8"
                                         secureTextEntry={true}
                                         autoCapitalize="none"
@@ -1087,8 +1067,8 @@ export default function LiquidityVaultScreen() {
                                 </View>
                             )}
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 }}>
-                                <Text style={{ color: T.navy, fontWeight: '600', fontSize: 12 }}>Enable Auto Email & SMS Alerts</Text>
+                            <View style={styles.switchRow}>
+                                <Text style={styles.switchLabel}>Enable Automated Low Float Alerts</Text>
                                 <Switch
                                     value={alertEnabled}
                                     onValueChange={handleToggleAlertSwitch}
@@ -1100,25 +1080,25 @@ export default function LiquidityVaultScreen() {
                             <TouchableOpacity
                                 onPress={handleSaveAlertSettings}
                                 disabled={savingAlerts}
-                                style={[styles.executeWithdrawBtn, { marginTop: 6 }]}
+                                style={styles.saveAlertBtn}
                                 activeOpacity={0.85}
                             >
                                 {savingAlerts ? (
                                     <ActivityIndicator color={T.navy} size="small" />
                                 ) : (
-                                    <Text style={styles.executeWithdrawBtnText}>Save & Enable Low Float Alerts</Text>
+                                    <Text style={styles.saveAlertBtnText}>Save & Apply Alert Preferences</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
                     )}
                 </View>
 
-                {/* Search Bar Input */}
+                {/* Quick Search Bar */}
                 <View style={styles.searchBarBox}>
                     <Ionicons name="search-outline" size={15} color={T.textSub} style={{ marginRight: 6 }} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search vendors by name or category..."
+                        placeholder="Search vendors by name or service (Bilal, SKB Tech, Bigi, Flutterwave)..."
                         placeholderTextColor="#94a3b8"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -1130,22 +1110,29 @@ export default function LiquidityVaultScreen() {
                     )}
                 </View>
 
-                {/* Category Filter Chips */}
+                {/* Clean Category Navigation Chips */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar}>
-                    {['All', 'VTU', 'Identity', 'Gateways', 'Comms'].map(f => (
+                    {[
+                        { label: 'Core Active', key: 'Active' },
+                        { label: 'VTU Telecom', key: 'VTU' },
+                        { label: 'Identity & KYC', key: 'Identity' },
+                        { label: 'Payment Gateways', key: 'Gateways' },
+                        { label: 'Comms & SMM', key: 'Comms' },
+                        { label: `All (${providers.length})`, key: 'All' },
+                    ].map(f => (
                         <TouchableOpacity 
-                            key={f}
-                            onPress={() => setActiveFilter(f)}
+                            key={f.key}
+                            onPress={() => setActiveFilter(f.key)}
                             style={[
                                 styles.filterChip,
-                                activeFilter === f && styles.filterChipActive
+                                activeFilter === f.key && styles.filterChipActive
                             ]}
                         >
                             <Text style={[
                                 styles.filterChipText,
-                                activeFilter === f && styles.filterChipTextActive
+                                activeFilter === f.key && styles.filterChipTextActive
                             ]}>
-                                {f === 'All' ? `All (${providers.length})` : f}
+                                {f.label}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -1153,22 +1140,24 @@ export default function LiquidityVaultScreen() {
 
                 {/* Section Header */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>API Vendor Float & Vault</Text>
-                    <TouchableOpacity onPress={() => router.push('/manage/api')}>
-                        <Text style={styles.manageVaultLink}>Manage Credentials →</Text>
+                    <Text style={styles.sectionTitle}>
+                        {activeFilter === 'Active' ? '⭐ Core Active Operational Float' : `${activeFilter} Providers`}
+                    </Text>
+                    <TouchableOpacity onPress={() => router.push('/manage/secrets')}>
+                        <Text style={styles.manageVaultLink}>Manage All Vault Keys →</Text>
                     </TouchableOpacity>
                 </View>
 
                 {loading ? (
                     <View style={styles.loadingBox}>
                         <ActivityIndicator size="large" color={T.navy} />
-                        <Text style={styles.loadingText}>Fetching live balances from API Vault providers...</Text>
+                        <Text style={styles.loadingText}>Fetching real-time balances from active API gateways...</Text>
                     </View>
                 ) : filteredProviders.length === 0 ? (
                     <View style={styles.emptyBox}>
                         <Ionicons name="search-outline" size={28} color={T.textSub} />
-                        <Text style={styles.emptyTitle}>No API Providers Found</Text>
-                        <Text style={styles.emptySub}>No vendor matched your search criteria.</Text>
+                        <Text style={styles.emptyTitle}>No Providers Found</Text>
+                        <Text style={styles.emptySub}>No vendor matched your filter or search criteria.</Text>
                     </View>
                 ) : (
                     <View style={[styles.providersGrid, isDesktop && { flexDirection: 'row', flexWrap: 'wrap' }]}>
@@ -1179,11 +1168,21 @@ export default function LiquidityVaultScreen() {
                             const isUnconfigured = p.status === 'unconfigured';
 
                             return (
-                                <View key={p.id} style={[styles.providerCard, { width: providerCardWidth }]}>
-                                    {/* Left Accent Bar */}
+                                <View key={p.id} style={[
+                                    styles.providerCard,
+                                    { width: providerCardWidth },
+                                    p.status === 'low' && { borderColor: '#f59e0b' },
+                                    p.status === 'critical' && { borderColor: '#ef4444' },
+                                ]}>
+                                    {/* Left Status Accent Bar */}
                                     <View style={[
                                         styles.providerCardLeftBar,
-                                        { backgroundColor: isHealthy ? T.success : isUnconfigured ? T.warning : T.danger }
+                                        { backgroundColor: 
+                                            p.status === 'healthy' ? T.success :
+                                            p.status === 'low' ? T.warning :
+                                            p.status === 'critical' ? T.danger :
+                                            p.status === 'unconfigured' ? '#f97316' : T.danger
+                                        }
                                     ]} />
 
                                     <View style={styles.providerCardHeader}>
@@ -1209,22 +1208,27 @@ export default function LiquidityVaultScreen() {
                                             <Text style={styles.providerName} numberOfLines={1}>{p.name}</Text>
                                         </View>
 
-                                        {/* Status Badge */}
+                                        {/* Status Pill */}
                                         <View style={[
                                             styles.statusPill,
-                                            isHealthy && { backgroundColor: '#dcfce7', borderColor: '#22c55e' },
-                                            isLow && { backgroundColor: '#fef3c7', borderColor: '#f59e0b' },
-                                            isCritical && { backgroundColor: '#fee2e2', borderColor: '#ef4444' },
-                                            isUnconfigured && { backgroundColor: '#fff7ed', borderColor: '#f97316' }
+                                            p.status === 'healthy' && { backgroundColor: '#dcfce7', borderColor: '#22c55e' },
+                                            p.status === 'low' && { backgroundColor: '#fef3c7', borderColor: '#f59e0b' },
+                                            p.status === 'critical' && { backgroundColor: '#fee2e2', borderColor: '#ef4444' },
+                                            p.status === 'unconfigured' && { backgroundColor: '#fff7ed', borderColor: '#f97316' },
+                                            p.status === 'error' && { backgroundColor: '#fef2f2', borderColor: '#dc2626' },
                                         ]}>
                                             <Text style={[
                                                 styles.statusPillText,
-                                                isHealthy && { color: '#15803d' },
-                                                isLow && { color: '#b45309' },
-                                                isCritical && { color: '#b91c1c' },
-                                                isUnconfigured && { color: '#c2410c' }
+                                                p.status === 'healthy' && { color: '#15803d' },
+                                                p.status === 'low' && { color: '#b45309' },
+                                                p.status === 'critical' && { color: '#b91c1c' },
+                                                p.status === 'unconfigured' && { color: '#c2410c' },
+                                                p.status === 'error' && { color: '#991b1b' },
                                             ]}>
-                                                {isUnconfigured ? 'UNCONFIGURED' : 'HEALTHY'}
+                                                {p.status === 'healthy' ? '✓ HEALTHY' :
+                                                 p.status === 'low' ? '⚠ LOW FLOAT' :
+                                                 p.status === 'critical' ? '🔴 CRITICAL' :
+                                                 p.status === 'error' ? '✗ ERROR' : 'SETUP NEEDED'}
                                             </Text>
                                         </View>
                                     </View>
@@ -1262,20 +1266,34 @@ export default function LiquidityVaultScreen() {
                                                 style={[styles.actionBtn, styles.withdrawBtn]}
                                                 activeOpacity={0.85}
                                             >
-                                                <Ionicons name="arrow-up-circle-outline" size={12} color={T.goldDk} style={{ marginRight: 3 }} />
-                                                <Text style={[styles.actionBtnText, { color: T.goldDk }]} numberOfLines={1}>Withdraw</Text>
+                                                <Ionicons name="arrow-up-circle-outline" size={12} color={T.white} style={{ marginRight: 3 }} />
+                                                <Text style={[styles.actionBtnText, { color: T.white }]} numberOfLines={1}>Withdraw</Text>
                                             </TouchableOpacity>
                                         )}
 
                                         <TouchableOpacity 
                                             onPress={() => handleOpenTokenModal(p)}
-                                            style={[styles.actionBtn, styles.tokenBtn, isUnconfigured && styles.tokenBtnHighlight]}
+                                            style={[styles.actionBtn, styles.tokenBtn, p.status === 'unconfigured' && styles.tokenBtnHighlight]}
                                             activeOpacity={0.85}
                                         >
-                                            <Ionicons name="key-outline" size={12} color={isUnconfigured ? T.white : T.navy} style={{ marginRight: 3 }} />
-                                            <Text style={[styles.actionBtnText, { color: isUnconfigured ? T.white : T.navy }]} numberOfLines={1}>
-                                                {isUnconfigured ? 'Set Token' : 'Vault Key'}
+                                            <Ionicons name="key-outline" size={12} color={p.status === 'unconfigured' ? T.white : T.navy} style={{ marginRight: 3 }} />
+                                            <Text style={[styles.actionBtnText, { color: p.status === 'unconfigured' ? T.white : T.navy }]} numberOfLines={1}>
+                                                {p.status === 'unconfigured' ? 'Set Token' : 'Vault Key'}
                                             </Text>
+                                        </TouchableOpacity>
+
+                                        {/* Individual Sync Button */}
+                                        <TouchableOpacity
+                                            onPress={() => handleSyncProvider(p)}
+                                            disabled={syncingProviderId === p.id}
+                                            style={[styles.actionBtn, styles.syncBtn]}
+                                            activeOpacity={0.85}
+                                        >
+                                            {syncingProviderId === p.id ? (
+                                                <ActivityIndicator size={12} color={T.navy} />
+                                            ) : (
+                                                <Ionicons name="sync-outline" size={13} color={T.navy} />
+                                            )}
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1300,7 +1318,7 @@ export default function LiquidityVaultScreen() {
                             </View>
 
                             <Text style={styles.modalSubText}>
-                                Transfer funds directly to the dedicated bank account details below to top up your {selectedDepositProvider?.name} merchant balance.
+                                Transfer funds directly to the dedicated top-up bank account below to credit your {selectedDepositProvider?.name} balance.
                             </Text>
 
                             <View style={styles.bankDetailCard}>
@@ -1318,7 +1336,7 @@ export default function LiquidityVaultScreen() {
                                         <Text style={[styles.bankValue, { color: T.navy, marginRight: 5 }]}>
                                             {fundAccountNumber || selectedDepositProvider?.depositAccount?.accountNumber || 'Not Set'}
                                         </Text>
-                                        <Ionicons name="copy-outline" size={13} color={T.goldDk} />
+                                        <Ionicons name="copy-outline" size={14} color={T.goldDk} />
                                     </TouchableOpacity>
                                 </View>
 
@@ -1334,7 +1352,7 @@ export default function LiquidityVaultScreen() {
                                 )}
 
                                 <Text style={styles.bankInstructions}>
-                                    💡 Transfer funds directly to this bank account number to top up your API balance.
+                                    💡 {selectedDepositProvider?.depositAccount?.instructions || 'Transfer funds to this bank account to automatically top up provider float.'}
                                 </Text>
                             </View>
 
@@ -1348,7 +1366,7 @@ export default function LiquidityVaultScreen() {
                                     <Text style={styles.inputLabel}>Bank Name</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="e.g. Sterling Bank, Wema, Monnify, etc."
+                                        placeholder="e.g. Sterling Bank, Wema, Monnify, Access Bank"
                                         placeholderTextColor="#94a3b8"
                                         value={fundBankName}
                                         onChangeText={setFundBankName}
@@ -1396,7 +1414,7 @@ export default function LiquidityVaultScreen() {
                                     }}
                                 >
                                     <Text style={{ color: T.navy, fontSize: 12.5, fontWeight: '700' }}>
-                                        ✏️ Edit / Update Top-Up Bank Account Details
+                                        ✏️ Edit Top-Up Bank Account Details
                                     </Text>
                                 </TouchableOpacity>
                             )}
@@ -1409,33 +1427,29 @@ export default function LiquidityVaultScreen() {
                 </View>
             </Modal>
 
-            {/* Vault Token Edit Modal */}
+            {/* Dedicated Tailored Vault Key Edit Modal */}
             <Modal transparent visible={!!selectedTokenProvider} animationType="fade" onRequestClose={() => setSelectedTokenProvider(null)}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalDecorStripe} />
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                <Text style={styles.modalTitle}>Vault Key — {selectedTokenProvider?.name}</Text>
+                                <Text style={styles.modalTitle}>Vault Configuration — {selectedTokenProvider?.name}</Text>
                                 <TouchableOpacity onPress={() => setSelectedTokenProvider(null)}>
                                     <Ionicons name="close-circle" size={22} color={T.textSub} />
                                 </TouchableOpacity>
                             </View>
 
-                            {selectedTokenProvider?.id === 'bilalsadasub' || selectedTokenProvider?.id === 'bigi' ? (
-                                // BilalSadaSub & BigiSub: need Username + Password (Basic Auth / JWT)
+                            {/* 1. BilalSadaSub / BigiSub Form */}
+                            {(selectedTokenProvider?.id === 'bilalsadasub' || selectedTokenProvider?.id === 'bigi') ? (
                                 <>
-                                    <View style={{
-                                        backgroundColor: '#fffbeb', borderRadius: 8, padding: 8,
-                                        borderLeftWidth: 3, borderLeftColor: T.gold, marginBottom: 12
-                                    }}>
-                                        <Text style={{ color: '#92400e', fontSize: 12, fontWeight: '700' }}>
-                                            🔐 {selectedTokenProvider?.name} uses Username + Password authentication.
-                                            Enter your login credentials below — they are saved securely in Vault.
+                                    <View style={styles.infoBanner}>
+                                        <Text style={styles.infoBannerText}>
+                                            🔐 {selectedTokenProvider?.name} uses Username + Password authentication. Enter your login credentials below:
                                         </Text>
                                     </View>
 
-                                    <Text style={styles.inputLabel}>Username (Login)</Text>
+                                    <Text style={styles.inputLabel}>Portal Username</Text>
                                     <TextInput
                                         style={styles.modalInput}
                                         placeholder={`Enter your ${selectedTokenProvider?.name} username`}
@@ -1446,7 +1460,7 @@ export default function LiquidityVaultScreen() {
                                         onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiUsername : setBilalUsername}
                                     />
 
-                                    <Text style={styles.inputLabel}>Password</Text>
+                                    <Text style={styles.inputLabel}>Portal Password</Text>
                                     <TextInput
                                         style={styles.modalInput}
                                         placeholder={`Enter your ${selectedTokenProvider?.name} password`}
@@ -1458,35 +1472,159 @@ export default function LiquidityVaultScreen() {
                                         onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiPassword : setBilalPassword}
                                     />
 
-                                    <Text style={[styles.inputLabel, { marginTop: 6 }]}>Access Token (Optional)</Text>
+                                    <Text style={[styles.inputLabel, { marginTop: 4 }]}>Access Token (Optional)</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="Paste token if you have one (optional)"
+                                        placeholder="Optional token override if available"
                                         placeholderTextColor="#94a3b8"
                                         autoCapitalize="none"
                                         value={tokenValue}
                                         onChangeText={setTokenValue}
                                     />
                                 </>
-                            ) : selectedTokenProvider?.id === 'monnify' ? (
+                            ) : selectedTokenProvider?.id === 'nineboost' ? (
+                                /* NineBoost Form */
                                 <>
-                                    <View style={{
-                                        backgroundColor: '#eff6ff', borderRadius: 8, padding: 8,
-                                        borderLeftWidth: 3, borderLeftColor: '#3b82f6', marginBottom: 12
-                                    }}>
-                                        <Text style={{ color: '#1e40af', fontSize: 12, fontWeight: '700' }}>
-                                            🔐 Monnify requires API Key, Secret Key, and optionally Contract Code.
+                                    <View style={[styles.infoBanner, { borderLeftColor: '#8b5cf6' }]}>
+                                        <Text style={styles.infoBannerText}>
+                                            📱 NineBoost SMM Panel API Key for Social Media Marketing services.
                                         </Text>
                                     </View>
 
-                                    <Text style={styles.inputLabel}>Monnify API Key (Public/API Key)</Text>
+                                    <Text style={styles.inputLabel}>NineBoost API Key</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Paste your NineBoost API Key here"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        value={nineBoostKey || tokenValue}
+                                        onChangeText={(val) => { setNineBoostKey(val); setTokenValue(val); }}
+                                    />
+
+                                    <TouchableOpacity 
+                                        onPress={() => Linking.openURL('https://9boost.me/api')}
+                                        style={{ marginVertical: 6, flexDirection: 'row', alignItems: 'center' }}
+                                    >
+                                        <Ionicons name="open-outline" size={14} color={T.info} style={{ marginRight: 4 }} />
+                                        <Text style={{ color: T.info, fontSize: 12, fontWeight: '700' }}>
+                                            Open NineBoost API Dashboard (9boost.me)
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : selectedTokenProvider?.id === 'skbtech' ? (
+                                /* 2. SKBTECH Official Form */
+                                <>
+                                    <View style={[styles.infoBanner, { borderLeftColor: T.success }]}>
+                                        <Text style={styles.infoBannerText}>
+                                            🛡️ Official SKBTECH API Key for NIN, BVN, Slip Printing and Identity Services.
+                                        </Text>
+                                    </View>
+
+                                    <Text style={styles.inputLabel}>SKBTECH API Key (SKBTECH_API_KEY)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="skb_live_..."
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={skbTechKey || tokenValue}
+                                        onChangeText={(val) => { setSkbTechKey(val); setTokenValue(val); }}
+                                    />
+
+                                    <TouchableOpacity 
+                                        onPress={() => Linking.openURL('https://skbtech.com.ng/developer')}
+                                        style={{ marginVertical: 6, flexDirection: 'row', alignItems: 'center' }}
+                                    >
+                                        <Ionicons name="open-outline" size={14} color={T.info} style={{ marginRight: 4 }} />
+                                        <Text style={{ color: T.info, fontSize: 12, fontWeight: '700' }}>
+                                            Open SKBTECH Developer Portal (skbtech.com.ng)
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : selectedTokenProvider?.id === 'flutterwave' ? (
+                                /* 3. Flutterwave Form */
+                                <>
+                                    <View style={[styles.infoBanner, { borderLeftColor: '#f59e0b' }]}>
+                                        <Text style={styles.infoBannerText}>
+                                            💳 Flutterwave Secret Key is required for live automated merchant payouts and collections.
+                                        </Text>
+                                    </View>
+
+                                    <Text style={styles.inputLabel}>Flutterwave Secret Key (FLWSECK-...)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="FLWSECK_TEST-... or FLWSECK-..."
+                                        placeholderTextColor="#94a3b8"
+                                        secureTextEntry={false}
+                                        autoCapitalize="none"
+                                        value={flwSecretKey || tokenValue}
+                                        onChangeText={(val) => { setFlwSecretKey(val); setTokenValue(val); }}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Flutterwave Public Key (Optional)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="FLWPUBK-..."
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={flwPublicKey}
+                                        onChangeText={setFlwPublicKey}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Webhook Secret Hash (Optional)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Enter secret hash for webhook verification"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={flwSecretHash}
+                                        onChangeText={setFlwSecretHash}
+                                    />
+
+                                    <TouchableOpacity 
+                                        onPress={() => Linking.openURL('https://dashboard.flutterwave.com/dashboard/settings/apis')}
+                                        style={{ marginVertical: 6, flexDirection: 'row', alignItems: 'center' }}
+                                    >
+                                        <Ionicons name="open-outline" size={14} color={T.info} style={{ marginRight: 4 }} />
+                                        <Text style={{ color: T.info, fontSize: 12, fontWeight: '700' }}>
+                                            Open Flutterwave API Dashboard
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : selectedTokenProvider?.id === 'termii' ? (
+                                /* 4. Termii Form */
+                                <>
+                                    <Text style={styles.inputLabel}>Termii API Key</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Enter Termii API Key"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={termiiApiKey || tokenValue}
+                                        onChangeText={(val) => { setTermiiApiKey(val); setTokenValue(val); }}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Termii Sender ID</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. AbuMafhal"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={termiiSenderId}
+                                        onChangeText={setTermiiSenderId}
+                                    />
+                                </>
+                            ) : selectedTokenProvider?.id === 'monnify' ? (
+                                /* 5. Monnify Form */
+                                <>
+                                    <Text style={styles.inputLabel}>Monnify API Key (MK_PROD_...)</Text>
                                     <TextInput
                                         style={styles.modalInput}
                                         placeholder="MK_PROD_..."
                                         placeholderTextColor="#94a3b8"
                                         autoCapitalize="none"
-                                        value={tokenValue}
-                                        onChangeText={setTokenValue}
+                                        value={monnifyApiKey || tokenValue}
+                                        onChangeText={(val) => { setMonnifyApiKey(val); setTokenValue(val); }}
                                     />
 
                                     <Text style={styles.inputLabel}>Monnify Secret Key</Text>
@@ -1500,10 +1638,10 @@ export default function LiquidityVaultScreen() {
                                         onChangeText={setMonnifySecret}
                                     />
 
-                                    <Text style={styles.inputLabel}>Contract Code (Account Number / Wallet)</Text>
+                                    <Text style={styles.inputLabel}>Monnify Contract Code (Optional)</Text>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="e.g. 1029384756"
+                                        placeholder="1029384756"
                                         placeholderTextColor="#94a3b8"
                                         autoCapitalize="none"
                                         value={monnifyContractCode}
@@ -1511,12 +1649,8 @@ export default function LiquidityVaultScreen() {
                                     />
                                 </>
                             ) : (
-                                // All other providers: just show Secret Key Name + Token Value
+                                /* Generic Provider */
                                 <>
-                                    <Text style={styles.modalSubText}>
-                                        View or update the secret API key for this vendor stored in Vault.
-                                    </Text>
-
                                     <Text style={styles.inputLabel}>Secret Key Name</Text>
                                     <TextInput
                                         style={[styles.modalInput, { backgroundColor: '#e2e8f0', color: T.textSub }]}
@@ -1524,12 +1658,11 @@ export default function LiquidityVaultScreen() {
                                         editable={false}
                                     />
 
-                                    <Text style={styles.inputLabel}>Secret Token Value</Text>
+                                    <Text style={styles.inputLabel}>Secret Key Value</Text>
                                     <TextInput
                                         style={styles.modalInput}
                                         placeholder="Paste API Key or Token here..."
                                         placeholderTextColor="#94a3b8"
-                                        secureTextEntry={false}
                                         value={tokenValue}
                                         onChangeText={setTokenValue}
                                     />
@@ -1546,7 +1679,7 @@ export default function LiquidityVaultScreen() {
                                     <ActivityIndicator color={T.navy} size="small" />
                                 ) : (
                                     <Text style={styles.executeWithdrawBtnText}>
-                                        {(selectedTokenProvider?.id === 'bilalsadasub' || selectedTokenProvider?.id === 'bigi') ? 'Save Credentials to Vault' : 'Save Secret Key to Vault'}
+                                        Save Credentials to Vault
                                     </Text>
                                 )}
                             </TouchableOpacity>
@@ -1573,13 +1706,13 @@ export default function LiquidityVaultScreen() {
                             </View>
 
                             <Text style={styles.modalSubText}>
-                                Transfer funds out of provider balance directly to your destination Nigerian bank account.
+                                Transfer funds directly out of your {selectedWithdrawProvider?.name} merchant balance to your designated bank account.
                             </Text>
 
-                            <Text style={styles.inputLabel}>Amount (₦)</Text>
+                            <Text style={styles.inputLabel}>Withdrawal Amount (₦)</Text>
                             <TextInput 
                                 style={styles.modalInput}
-                                placeholder="50000"
+                                placeholder="e.g. 50000"
                                 placeholderTextColor="#94a3b8"
                                 keyboardType="numeric"
                                 value={withdrawAmount}
@@ -1605,7 +1738,7 @@ export default function LiquidityVaultScreen() {
                                 ))}
                             </ScrollView>
 
-                            <Text style={styles.inputLabel}>10-Digit Account Number</Text>
+                            <Text style={styles.inputLabel}>10-Digit Destination Account Number</Text>
                             <TextInput 
                                 style={styles.modalInput}
                                 placeholder="0123456789"
@@ -1625,7 +1758,7 @@ export default function LiquidityVaultScreen() {
                                 {withdrawLoading ? (
                                     <ActivityIndicator color={T.navy} size="small" />
                                 ) : (
-                                    <Text style={styles.executeWithdrawBtnText}>Execute Live Withdrawal Transfer</Text>
+                                    <Text style={styles.executeWithdrawBtnText}>Execute Live Transfer</Text>
                                 )}
                             </TouchableOpacity>
 
@@ -1683,52 +1816,150 @@ const styles = StyleSheet.create({
     heroBadgeRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 3,
+        gap: 4,
         marginBottom: 2,
     },
     heroSubTitle: {
         color: T.gold,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
     heroBalanceText: {
         color: T.white,
-        fontWeight: '700',
-        fontSize: 18,
+        fontWeight: '800',
+        fontSize: 22,
         letterSpacing: 0.2,
     },
+    heroUsdText: {
+        color: '#94a3b8',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 1,
+    },
     refreshBtn: {
-        backgroundColor: 'rgba(245, 166, 35, 0.15)',
-        paddingHorizontal: 9,
-        paddingVertical: 4,
+        backgroundColor: 'rgba(245, 166, 35, 0.18)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
         borderRadius: 99,
         borderWidth: 1,
         borderColor: T.gold,
     },
     refreshBtnText: {
         color: T.gold,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '700',
     },
     badgeGridRow: {
         flexDirection: 'row',
-        gap: 4,
+        gap: 6,
         flexWrap: 'wrap',
     },
     statBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        paddingHorizontal: 6,
-        paddingVertical: 3,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         borderRadius: 6,
     },
     statBadgeText: {
-        color: '#e2e8f0',
+        color: '#f1f5f9',
         fontSize: 12,
         fontWeight: '600',
-        marginLeft: 3,
+        marginLeft: 4,
+    },
+    alertCardContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    alertHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    alertIconBadge: {
+        backgroundColor: '#fff7ed',
+        padding: 6,
+        borderRadius: 8,
+        marginRight: 8,
+    },
+    alertTitle: {
+        color: T.navy,
+        fontWeight: '700',
+        fontSize: 12.5,
+    },
+    alertSub: {
+        color: T.textSub,
+        fontSize: 12,
+    },
+    alertExpandedBox: {
+        marginTop: 12,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f1f5f9',
+    },
+    alertExplainer: {
+        color: T.textSub,
+        fontSize: 12,
+        marginBottom: 10,
+        lineHeight: 16,
+    },
+    formRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    smtpToggleBtn: {
+        backgroundColor: '#fffbeb',
+        borderRadius: 8,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#fef08a',
+        marginVertical: 8,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    smtpToggleText: {
+        color: '#92400e',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    smtpBox: {
+        backgroundColor: '#f8fafc',
+        padding: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.border,
+        marginBottom: 8,
+    },
+    switchRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginVertical: 8,
+    },
+    switchLabel: {
+        color: T.navy,
+        fontWeight: '600',
+        fontSize: 12,
+    },
+    saveAlertBtn: {
+        height: 38,
+        borderRadius: 8,
+        backgroundColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 6,
+    },
+    saveAlertBtnText: {
+        color: T.navy,
+        fontWeight: '700',
+        fontSize: 12.5,
     },
     searchBarBox: {
         flexDirection: 'row',
@@ -1736,7 +1967,7 @@ const styles = StyleSheet.create({
         backgroundColor: T.cardBg,
         borderRadius: 8,
         paddingHorizontal: 9,
-        height: 34,
+        height: 36,
         borderWidth: 1,
         borderColor: T.border,
         marginBottom: 8,
@@ -1751,13 +1982,13 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     filterChip: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
         borderRadius: 99,
         backgroundColor: T.cardBg,
         borderWidth: 1,
         borderColor: T.border,
-        marginRight: 5,
+        marginRight: 6,
     },
     filterChipActive: {
         backgroundColor: T.navy,
@@ -1776,30 +2007,30 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 6,
+        marginBottom: 8,
     },
     sectionTitle: {
         color: T.navy,
         fontWeight: '700',
-        fontSize: 12,
+        fontSize: 13,
     },
     manageVaultLink: {
         color: T.goldDk,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '700',
     },
     loadingBox: {
-        padding: 20,
+        padding: 24,
         alignItems: 'center',
     },
     loadingText: {
         color: T.textSub,
-        marginTop: 5,
+        marginTop: 6,
         fontWeight: '500',
         fontSize: 12.5,
     },
     emptyBox: {
-        padding: 20,
+        padding: 24,
         alignItems: 'center',
         backgroundColor: T.cardBg,
         borderRadius: 10,
@@ -1807,7 +2038,7 @@ const styles = StyleSheet.create({
         borderColor: T.border,
     },
     emptyTitle: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
         color: T.navy,
         marginTop: 4,
@@ -1818,12 +2049,12 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     providersGrid: {
-        gap: 7,
+        gap: 8,
     },
     providerCard: {
         backgroundColor: T.cardBg,
         borderRadius: 10,
-        padding: 10,
+        padding: 12,
         paddingLeft: 14,
         borderWidth: 1,
         borderColor: T.border,
@@ -1840,13 +2071,13 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         bottom: 0,
-        width: 3,
+        width: 3.5,
     },
     providerCardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 2,
+        marginBottom: 4,
     },
     providerIconMini: {
         width: 20,
@@ -1872,58 +2103,58 @@ const styles = StyleSheet.create({
     providerName: {
         color: T.navy,
         fontWeight: '700',
-        fontSize: 12.5,
+        fontSize: 13,
         marginTop: 1,
     },
     statusPill: {
-        paddingHorizontal: 5,
-        paddingVertical: 1.5,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
         borderRadius: 99,
         borderWidth: 1,
     },
     statusPillText: {
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '700',
         letterSpacing: 0.3,
     },
     balanceContainer: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        marginVertical: 2,
+        marginVertical: 4,
     },
     currencySymbol: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
         color: T.goldDk,
         marginRight: 2,
     },
     providerBalance: {
         color: T.navy,
-        fontWeight: '700',
-        fontSize: 15,
+        fontWeight: '800',
+        fontSize: 17,
     },
     providerErrorText: {
         color: T.warning,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '600',
-        marginBottom: 3,
+        marginBottom: 4,
     },
     actionButtonsRow: {
         flexDirection: 'row',
-        gap: 4,
-        marginTop: 4,
+        gap: 6,
+        marginTop: 6,
         flexWrap: 'wrap',
     },
     actionBtn: {
         flex: 1,
-        minWidth: 75,
-        height: 30,
+        minWidth: 68,
+        height: 32,
         borderRadius: 6,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 4,
+        paddingHorizontal: 6,
     },
     depositBtn: {
         backgroundColor: T.gold,
@@ -1936,12 +2167,24 @@ const styles = StyleSheet.create({
     tokenBtn: {
         backgroundColor: T.goldBg,
         borderColor: T.gold,
-        maxWidth: 90,
+        maxWidth: 88,
+        flex: 0,
+        minWidth: 68,
     },
     tokenBtnHighlight: {
         backgroundColor: T.warning,
         borderColor: T.warning,
-        maxWidth: 90,
+        maxWidth: 88,
+        flex: 0,
+        minWidth: 68,
+    },
+    syncBtn: {
+        backgroundColor: '#f1f5f9',
+        borderColor: T.border,
+        flex: 0,
+        width: 32,
+        minWidth: 32,
+        paddingHorizontal: 0,
     },
     actionBtnText: {
         fontSize: 12,
@@ -1956,8 +2199,8 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         width: '100%',
-        maxWidth: 420,
-        maxHeight: '88%',
+        maxWidth: 440,
+        maxHeight: '90%',
         backgroundColor: T.white,
         borderRadius: 14,
         padding: 16,
@@ -1986,9 +2229,23 @@ const styles = StyleSheet.create({
     },
     modalSubText: {
         color: T.textSub,
-        fontSize: 12.5,
+        fontSize: 12,
         lineHeight: 16,
         marginBottom: 10,
+    },
+    infoBanner: {
+        backgroundColor: '#fffbeb',
+        borderRadius: 8,
+        padding: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: T.gold,
+        marginBottom: 10,
+    },
+    infoBannerText: {
+        color: '#92400e',
+        fontSize: 12,
+        fontWeight: '600',
+        lineHeight: 15,
     },
     bankDetailCard: {
         backgroundColor: T.goldBg,
@@ -2002,18 +2259,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     bankLabel: {
         color: T.textSub,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '500',
     },
     bankValue: {
         color: T.navy,
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '700',
     },
     copySuccessToast: {
@@ -2036,7 +2293,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#e2e8f0',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 6,
+        marginTop: 8,
     },
     modalCloseBtnText: {
         color: T.navy,
@@ -2045,7 +2302,7 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         color: T.navy,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '600',
         marginBottom: 3,
     },
@@ -2057,7 +2314,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8fafc',
         color: T.navy,
         paddingHorizontal: 10,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '500',
         marginBottom: 8,
     },

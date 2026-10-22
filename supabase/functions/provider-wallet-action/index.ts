@@ -58,6 +58,60 @@ serve(async (req: Request) => {
         return jsonOk({ error: 'Please provide destination bank account number and bank code' })
       }
 
+      // ── FLUTTERWAVE WITHDRAWAL / TRANSFER ──────────────────────
+      if (providerId === 'flutterwave') {
+        const { data: flwSecretRow } = await supabaseAdmin
+          .from('system_secrets')
+          .select('value')
+          .in('key', ['FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET'])
+          .maybeSingle()
+
+        const flwSecret = flwSecretRow?.value || Deno.env.get('FLUTTERWAVE_SECRET_KEY') || ''
+        if (!flwSecret) {
+          return jsonOk({ error: 'Flutterwave Secret Key is not configured for automated transfers' })
+        }
+
+        const transferRes = await fetch('https://api.flutterwave.com/v3/transfers', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${flwSecret.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            account_bank: bankCode,
+            account_number: accountNumber,
+            amount: Number(amount),
+            narration: reason || 'ABUMAFHAL Admin Withdrawal',
+            currency: 'NGN',
+            reference: `FLW-WDR-${Date.now()}`
+          })
+        })
+
+        const transferData = await transferRes.json()
+        if (transferData.status !== 'success') {
+          return jsonOk({ error: transferData.message || 'Flutterwave transfer failed' })
+        }
+
+        await supabaseAdmin.from('audit_logs').insert({
+          admin_id: user.id,
+          action: 'PROVIDER_WALLET_WITHDRAWAL',
+          details: {
+            providerId: 'flutterwave',
+            amount,
+            accountNumber,
+            bankCode,
+            reference: transferData.data?.reference || transferData.data?.id
+          }
+        })
+
+        return jsonOk({
+          success: true,
+          message: `Successfully transferred ₦${amount.toLocaleString()} to ${accountNumber} via Flutterwave`,
+          transferData: transferData.data
+        })
+      }
+
+      // ── PAYSTACK WITHDRAWAL / TRANSFER ──────────────────────────
       // Fetch Paystack secret key
       const { data: secretRow } = await supabaseAdmin
         .from('system_secrets')
