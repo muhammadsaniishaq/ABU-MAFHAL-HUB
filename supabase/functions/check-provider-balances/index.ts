@@ -173,6 +173,7 @@ serve(async (req: Request) => {
     const payVesselKey = secrets['PAYVESSEL_API_KEY'] || secrets['PAYVESSEL_KEY'] || secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYBESSEL_API_KEY'] || Deno.env.get('PAYVESSEL_API_KEY') || ''
     const payVesselSecret = secrets['PAYVESSEL_API_SECRET'] || secrets['PAYVESSEL_SECRET_KEY'] || ''
     const payVesselBusinessId = secrets['PAYVESSEL_BUSINESS_ID'] || secrets['PAYVESSEL_BUSINESS'] || ''
+    const resendKey = secrets['RESEND_API_KEY'] || secrets['RESEND_KEY'] || Deno.env.get('RESEND_API_KEY') || ''
 
     // -------------------------------------------------------------------------
     // PARALLEL PROVIDER CHECKERS (Lightning Fast Promise.allSettled)
@@ -819,6 +820,46 @@ serve(async (req: Request) => {
       }
     }
 
+    // 10. Resend (Email Gateway Delivery)
+    async function checkResend() {
+      if (!resendKey || resendKey.trim() === '') {
+        return {
+          id: 'resend',
+          name: 'Resend (Email Gateway & Transactional Mail)',
+          category: 'SMS & Communications',
+          balance: 0,
+          currency: 'USD',
+          status: 'unconfigured',
+          error: 'RESEND_API_KEY not configured in Vault',
+          allowDeposit: false,
+          allowWithdrawal: false
+        }
+      }
+      let balance = 0
+      let latencyMs = 150
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.resend.com/api-keys', {
+          headers: { 'Authorization': `Bearer ${resendKey.trim()}`, 'Accept': 'application/json' }
+        })
+        if (response.ok) {
+          balance = 100 // Active / Healthy quota indicator
+          latencyMs = latency
+        }
+      } catch (_) {}
+      return {
+        id: 'resend',
+        name: 'Resend (Email Gateway & Transactional Mail)',
+        category: 'SMS & Communications',
+        balance,
+        currency: 'USD',
+        latencyMs,
+        status: balance > 0 ? 'healthy' : 'critical',
+        error: undefined,
+        allowDeposit: false,
+        allowWithdrawal: false
+      }
+    }
+
     // If a single provider is being tested or refreshed in isolation
     const singleId = reqData?.singleProviderId || reqData?.testProviderId || ''
     if (singleId) {
@@ -832,6 +873,7 @@ serve(async (req: Request) => {
       else if (singleId === 'paystack') singleChecker = checkPaystack
       else if (singleId === 'monnify') singleChecker = checkMonnify
       else if (singleId === 'payvessel') singleChecker = checkPayVessel
+      else if (singleId === 'resend') singleChecker = checkResend
 
       if (singleChecker) {
         try {
@@ -860,7 +902,8 @@ serve(async (req: Request) => {
       checkFlutterwave(),
       checkPaystack(),
       checkMonnify(),
-      checkPayVessel()
+      checkPayVessel(),
+      checkResend()
     ]
 
     const results = await Promise.allSettled(checkPromises)
@@ -868,7 +911,7 @@ serve(async (req: Request) => {
       if (r.status === 'fulfilled') {
         return r.value
       } else {
-        const fallbackIds = ['bilalsadasub', 'bigi', 'skbtech', 'nineboost', 'termii', 'flutterwave', 'paystack', 'monnify', 'payvessel']
+        const fallbackIds = ['bilalsadasub', 'bigi', 'skbtech', 'nineboost', 'termii', 'flutterwave', 'paystack', 'monnify', 'payvessel', 'resend']
         return {
           id: fallbackIds[i] || 'unknown',
           name: fallbackIds[i] || 'Provider',
