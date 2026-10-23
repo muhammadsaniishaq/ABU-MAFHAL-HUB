@@ -10,6 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { createAppNotification } from '../../services/notificationsHelper';
+import { KetawancyService, getKetawancyApiKey } from '../../services/ketawancy';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
@@ -97,6 +98,14 @@ const NETWORKS_DATA: NetworkItem[] = [
 ];
 
 const PRESETS = [100, 200, 500, 1000, 2000, 5000];
+
+// Ketawancy network ID map (MTN=1, Airtel=2, Glo=3, 9Mobile=4)
+const KETAWANCY_NETWORK_IDS: Record<string, number> = {
+    mtn: 1,
+    airtel: 2,
+    glo: 3,
+    '9mobile': 4,
+};
 
 const formatCurrency = (val: number | string | null | undefined): string => {
     const num = Number(val || 0);
@@ -481,11 +490,42 @@ function AirtimeScreenContent() {
                 }
             }
 
-            const result = await api.airtime.purchase(user.id, {
-                network: activeNetwork,
-                phone: phoneNumber,
-                amount: numAmount
-            });
+            // ── Provider routing ──────────────────────────────────────────────────
+            // Try Ketawancy first if configured (supports MTN, Airtel, Glo, 9Mobile)
+            let result: { success: boolean; reference?: string; refNo?: string } | null = null;
+            const ketawancyNetId = KETAWANCY_NETWORK_IDS[activeNetwork];
+
+            if (ketawancyNetId) {
+                try {
+                    const apiKey = await getKetawancyApiKey();
+                    if (apiKey && apiKey.trim() !== '') {
+                        const ketRes = await KetawancyService.buyAirtime({
+                            userId: user.id,
+                            networkId: ketawancyNetId,
+                            phone: phoneNumber,
+                            amount: numAmount,
+                            networkName: activeNetwork.toUpperCase(),
+                        });
+                        if (ketRes?.success) {
+                            result = { success: true, reference: ketRes.refNo };
+                        }
+                    }
+                } catch (ketErr: any) {
+                    console.warn('[Airtime] Ketawancy attempt note:', ketErr?.message);
+                    // Fallback to default provider below
+                }
+            }
+
+            // Fallback: existing edge-function based provider
+            if (!result?.success) {
+                const apiResult = await api.airtime.purchase(user.id, {
+                    network: activeNetwork,
+                    phone: phoneNumber,
+                    amount: numAmount
+                });
+                result = apiResult;
+            }
+            // ─────────────────────────────────────────────────────────────────────
 
             if (result?.success) {
                 try {
@@ -509,7 +549,7 @@ function AirtimeScreenContent() {
                     params: {
                         amount: `₦${formatCurrency(netPayable)}`,
                         type: 'Airtime Recharge',
-                        reference: result.reference
+                        reference: (result as any).reference || (result as any).refNo || ''
                     }
                 });
             } else {
