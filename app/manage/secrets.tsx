@@ -58,6 +58,7 @@ const REQUIRED_SECRETS = [
     { key: 'MONNIFY_CONTRACT_CODE', aliases: ['MONNIFY_CODE'], desc: 'Monnify 10-digit Contract Code / Wallet Number', provider: 'Monnify' },
     { key: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], desc: 'Legacy AgentHub Key (agenthub.ng fallback)', provider: 'Identity' },
     { key: 'BILALSADASUB_TOKEN', aliases: ['BILAL_TOKEN', 'BILALSADASUB_API_KEY'], desc: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)', provider: 'Bilalsadasub' },
+    { key: 'KETAWANCY_API_KEY', aliases: ['KETAWANCY_KEY', 'KETAWANSY_API_KEY', 'KETAWANSY_KEY'], desc: 'Ketawancy API Key (myapi.ketawancy.com for SIM, Ratel, Smile, Alpha, Kirani & Airtime)', provider: 'Ketawancy' },
     { key: 'PAYSTACK_SECRET_KEY', aliases: ['PAYSTACK_KEY', 'PAYSTACK_SECRET'], desc: 'Paystack Secret Key', provider: 'Paystack' },
     { key: 'PAYSTACK_PUBLIC_KEY', aliases: ['PAYSTACK_PUB'], desc: 'Paystack Public Key', provider: 'Paystack' },
     { key: 'FLUTTERWAVE_SECRET_KEY', aliases: ['FLUTTERWAVE_KEY', 'FLUTTERWAVE_SECRET'], desc: 'Flutterwave Secret Key for Instant Bank Payouts', provider: 'Flutterwave' },

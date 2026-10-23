@@ -408,7 +408,7 @@ export default function Dashboard() {
     } catch (e) { return ''; }
   };
 
-  const DEFAULT_PINNED_IDS = ['airtime', 'data', 'transfer', 'recharge_pin', 'airtime_cash', 'bills', 'cable', 'electricity', 'nin', 'tickets'];
+  const DEFAULT_PINNED_IDS = ['airtime', 'data', 'sim', 'transfer', 'recharge_pin', 'airtime_cash', 'bills', 'cable', 'electricity', 'nin', 'tickets'];
   const [pinnedActionIds, setPinnedActionIds] = useState<string[]>(DEFAULT_PINNED_IDS);
   const [showEditQuickActionsModal, setShowEditQuickActionsModal] = useState(false);
 
@@ -438,6 +438,7 @@ export default function Dashboard() {
     '/recharge-pin': 'feature_airtime',
     '/airtime-to-cash': 'feature_airtime',
     '/data': 'feature_data',
+    '/sim': 'feature_sim',
     '/education': 'feature_education',
     '/bills': 'feature_bills',
     '/virtual-cards': 'feature_cards',
@@ -505,6 +506,7 @@ export default function Dashboard() {
   const BASE_CATALOG = [
     { id: 'airtime',      icon: 'phone-portrait-outline', label: 'Airtime',         color: '#f97316', route: '/airtime',        badge: null },
     { id: 'data',         icon: 'wifi-outline',           label: 'Data',            color: '#22c55e', route: '/data',           badge: null },
+    { id: 'sim',          icon: 'hardware-chip-outline',  image: require('../../assets/images/telecom_hub.jpg'), label: 'Buy SIM',         color: '#dc2626', route: '/sim',            badge: 'HOT' },
     { id: 'transfer',     icon: 'swap-horizontal-outline',label: 'Transfer',        color: '#2563eb', route: '/transfer',       badge: null },
     { id: 'recharge_pin', icon: 'key-outline',            label: 'Recharge PIN',   color: '#10b981', route: '/recharge-pin',   badge: 'HOT' },
     { id: 'airtime_cash', icon: 'cash-outline',           label: 'Airtime ➤ Cash',color: '#16a34a', route: '/airtime-to-cash',badge: 'NEW' },
@@ -776,7 +778,11 @@ export default function Dashboard() {
                           isBadged && { transform: [{ scale: pulseAnim }] },
                         ]}
                       >
-                        <Ionicons name={act.icon as any} size={24} color={act.color} />
+                        {(act as any).image ? (
+                          <Image source={(act as any).image} style={{ width: 26, height: 26, borderRadius: 6 }} resizeMode="cover" />
+                        ) : (
+                          <Ionicons name={act.icon as any} size={24} color={act.color} />
+                        )}
                         {act.badge ? (
                           <View style={[s.badgeOverlay, { backgroundColor: act.color }]}>
                             <Text style={s.badgeText}>{act.badge}</Text>
@@ -787,6 +793,70 @@ export default function Dashboard() {
                     </TouchableOpacity>
                   );
                 })}
+              </View>
+            </View>
+          );
+
+          const telecomHubEl = (
+            <View style={[s.section, isDesktop && { marginHorizontal: 0 }]}>
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 20,
+                  padding: 14,
+                  borderWidth: 1.5,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 10,
+                  elevation: 2,
+                }}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => router.push('/sim')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                >
+                  <Image
+                    source={require('../../assets/images/telecom_hub.jpg')}
+                    style={{ width: 60, height: 60, borderRadius: 14 }}
+                    resizeMode="cover"
+                  />
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '900', color: T.navy }}>Telecom & SIM Hub</Text>
+                      <View style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '900', color: '#FFFFFF' }}>NEW</Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 11, color: T.textSub, lineHeight: 15, fontWeight: '500' }}>
+                      Buy Kirani SIM Cards, 4G Data (Smile, Alpha, Kirani, Ratel) & instant Airtime recharge.
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Sub buttons for separate pages */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                  <TouchableOpacity
+                    onPress={() => router.push('/sim')}
+                    style={{ flex: 1, backgroundColor: '#FEF2F2', paddingVertical: 8, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FEE2E2' }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#DC2626' }}>💳 Buy SIM</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push('/data')}
+                    style={{ flex: 1, backgroundColor: '#F0FDF4', paddingVertical: 8, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#DCFCE7' }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#16A34A' }}>🌐 Data Hub</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push('/airtime')}
+                    style={{ flex: 1, backgroundColor: '#FFF7ED', paddingVertical: 8, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FFEDD5' }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#EA580C' }}>📞 Airtime</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           );
@@ -982,6 +1052,7 @@ export default function Dashboard() {
                   {bannersEl}
                   {dbErrorEl}
                   {quickActionsEl}
+                  {telecomHubEl}
                   {payBillsEl}
                   <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
                     <View style={{ flex: 1 }}>{referEarnEl}</View>
@@ -1005,6 +1076,7 @@ export default function Dashboard() {
               {bannersEl}
               {dbErrorEl}
               {quickActionsEl}
+              {telecomHubEl}
               {referEarnEl}
               {reviewsEl}
               {transactionsEl}
@@ -1069,7 +1141,11 @@ export default function Dashboard() {
                         <View key={id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: T.bg, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                             <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: item.color + '18', alignItems: 'center', justifyContent: 'center' }}>
-                              <Ionicons name={item.icon as any} size={16} color={item.color} />
+                              {(item as any).image ? (
+                                <Image source={(item as any).image} style={{ width: 22, height: 22, borderRadius: 6 }} resizeMode="cover" />
+                              ) : (
+                                <Ionicons name={item.icon as any} size={16} color={item.color} />
+                              )}
                             </View>
                             <Text style={{ fontSize: 12, fontWeight: '800', color: T.navy }}>{item.label}</Text>
                           </View>
@@ -1154,7 +1230,11 @@ export default function Dashboard() {
                         }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.bg, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}
                       >
-                        <Ionicons name={item.icon as any} size={14} color={item.color} />
+                        {(item as any).image ? (
+                          <Image source={(item as any).image} style={{ width: 16, height: 16, borderRadius: 4 }} resizeMode="cover" />
+                        ) : (
+                          <Ionicons name={item.icon as any} size={14} color={item.color} />
+                        )}
                         <Text style={{ fontSize: 10.5, fontWeight: '700', color: T.navy }}>{item.label}</Text>
                         <Ionicons name="add-circle" size={14} color={T.indigo} />
                       </TouchableOpacity>

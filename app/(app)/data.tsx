@@ -18,6 +18,7 @@ import DynamicBanners from '../../components/DynamicBanners';
 import BrandAlertModal, { AlertType, BrandAlertState } from '../../components/BrandAlertModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { validateNigerianPhone } from '../../utils/securityUtils';
+import { KetawancyService } from '../../services/ketawancy';
 
 export interface ExtractedPlanInfo {
     volumeVal: string;
@@ -160,14 +161,22 @@ const NETWORK_LOGOS: Record<string, any> = {
     glo: require('../../assets/images/glo.png'),
     airtel: require('../../assets/images/airtel.png'),
     '9mobile': require('../../assets/images/9mobile.png'),
+    smile: require('../../assets/images/smile_logo.png'),
+    alpha: require('../../assets/images/alpha_logo.png'),
+    kirani: require('../../assets/images/kirani.png'),
+    ratel: require('../../assets/images/ratel_alat.jpg'),
     vitel: require('../../assets/images/vitel.png'),
 };
 
 const NETWORKS_DATA = [
     { id: 'mtn', name: 'MTN', color: '#FFCC00', status: '5G Ready', prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
-    { id: 'glo', name: 'Glo', color: '#0F6A37', status: '4G LTE', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
     { id: 'airtel', name: 'Airtel', color: '#FF0000', status: '5G Ready', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
+    { id: 'glo', name: 'Glo', color: '#0F6A37', status: '4G LTE', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
     { id: '9mobile', name: '9mobile', color: '#006B3E', status: '4G Active', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
+    { id: 'smile', name: 'Smile 4G', color: '#ec4899', status: '4G LTE', prefixes: ['0702'] },
+    { id: 'alpha', name: 'Alpha', color: '#DC2626', status: 'Fast Data', prefixes: ['080', '090'] },
+    { id: 'kirani', name: 'Kirani', color: '#2563EB', status: '4G Fast', prefixes: ['080', '070', '090'] },
+    { id: 'ratel', name: 'Ratel', color: '#B45309', status: '4G Active', prefixes: ['080', '070', '091'] },
     { id: 'vitel', name: 'VITAL', color: '#6366F1', status: '4G Active', prefixes: ['070', '091'] },
 ];
 
@@ -184,6 +193,14 @@ const getNetworkStyles = (netId: string, isSelected: boolean) => {
             return { bg: '#f0fdf4', border: '#16a34a', text: '#166534' };
         case '9mobile':
             return { bg: '#ecfdf5', border: '#059669', text: '#065f46' };
+        case 'smile':
+            return { bg: '#fdf2f8', border: '#ec4899', text: '#be185d' };
+        case 'alpha':
+            return { bg: '#fef2f2', border: '#dc2626', text: '#991b1b' };
+        case 'kirani':
+            return { bg: '#eff6ff', border: '#2563eb', text: '#1d4ed8' };
+        case 'ratel':
+            return { bg: '#fffbeb', border: '#b45309', text: '#78350f' };
         case 'vitel':
             return { bg: '#eef2ff', border: '#6366f1', text: '#3730a3' };
         default:
@@ -861,6 +878,63 @@ export default function DataScreen() {
         setLoadingPlans(true);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         try {
+            if (netId === 'smile') {
+                const rawPlans = await KetawancyService.getSmilePlans();
+                const mapped = rawPlans.map(p => ({
+                    id: String(p.planId),
+                    name: p.planName,
+                    price: p.price || 0,
+                    volume: p.planName,
+                    validity: p.validity || '30 Days',
+                    network: 'Smile',
+                    apiVendor: 'ketawancy'
+                }));
+                setPlans(mapped as any);
+                return;
+            }
+            if (netId === 'alpha') {
+                const rawPlans = await KetawancyService.getAlphaPlans();
+                const mapped = rawPlans.map(p => ({
+                    id: String(p.planId),
+                    name: p.planName,
+                    price: p.price || 0,
+                    volume: p.planName,
+                    validity: p.validity || '30 Days',
+                    network: 'Alpha',
+                    apiVendor: 'ketawancy'
+                }));
+                setPlans(mapped as any);
+                return;
+            }
+            if (netId === 'kirani') {
+                const rawPlans = await KetawancyService.getKiraniPlans();
+                const mapped = rawPlans.map(p => ({
+                    id: String(p.planId),
+                    name: p.planName,
+                    price: p.price || 0,
+                    volume: p.planName,
+                    validity: p.validity || '30 Days',
+                    network: 'Kirani',
+                    apiVendor: 'ketawancy'
+                }));
+                setPlans(mapped as any);
+                return;
+            }
+            if (netId === 'ratel') {
+                const rawPlans = await KetawancyService.getRatelPlans();
+                const mapped = rawPlans.map(p => ({
+                    id: String(p.planId),
+                    name: p.planName,
+                    price: p.price || 0,
+                    volume: p.planName,
+                    validity: p.validity || '30 Days',
+                    network: 'Ratel',
+                    apiVendor: 'ketawancy'
+                }));
+                setPlans(mapped as any);
+                return;
+            }
+
             const mappedPlans = await api.data.getPlans(netId);
             // Sort data plans neatly in ascending order by volume (e.g. 500MB, 1GB, 2GB, 5GB...) and price
             const sorted = [...mappedPlans].map(plan => {
@@ -919,14 +993,54 @@ export default function DataScreen() {
                 (autoRenew ? ' [Auto-Renew]' : '') + 
                 (isGift ? ` (Gift to ${recipientName || 'Someone'})` : '');
 
-            const result = await api.data.purchase(user.id, {
-                network,
-                phone: phoneNumber,
-                planId: selectedPlan.id,
-                amount: selectedPlan.price,
-                planName: planNameString,
-                vendor: (selectedPlan as any).apiVendor || 'bilalsadasub'
-            });
+            let result: { success: boolean; reference?: string };
+
+            if (network === 'smile') {
+                const res = await KetawancyService.buySmile({
+                    userId: user.id,
+                    phoneNumber,
+                    planId: selectedPlan.id,
+                    price: selectedPlan.price,
+                    planName: planNameString
+                });
+                result = { success: true, reference: res.refNo };
+            } else if (network === 'alpha') {
+                const res = await KetawancyService.buyAlpha({
+                    userId: user.id,
+                    phone: phoneNumber,
+                    planId: selectedPlan.id,
+                    price: selectedPlan.price,
+                    planName: planNameString
+                });
+                result = { success: true, reference: res.refNo };
+            } else if (network === 'kirani') {
+                const res = await KetawancyService.buyKirani({
+                    userId: user.id,
+                    phone: phoneNumber,
+                    planId: selectedPlan.id,
+                    price: selectedPlan.price,
+                    planName: planNameString
+                });
+                result = { success: true, reference: res.refNo };
+            } else if (network === 'ratel') {
+                const res = await KetawancyService.buyRatel({
+                    userId: user.id,
+                    phone: phoneNumber,
+                    planId: selectedPlan.id,
+                    price: selectedPlan.price,
+                    planName: planNameString
+                });
+                result = { success: true, reference: res.refNo };
+            } else {
+                result = await api.data.purchase(user.id, {
+                    network,
+                    phone: phoneNumber,
+                    planId: selectedPlan.id,
+                    amount: selectedPlan.price,
+                    planName: planNameString,
+                    vendor: (selectedPlan as any).apiVendor || 'bilalsadasub'
+                });
+            }
 
             if (result.success) {
                 // Save Beneficiary if requested
