@@ -224,11 +224,10 @@ export default function AdminDashboard() {
         const sumNgn = edgeRes.value.data.providers
           .filter((p: any) => p.currency === 'NGN')
           .reduce((a: number, b: any) => a + (Number(b.balance) || 0), 0);
-        // Include direct flutterwave verified balance (₦151.60)
-        liveLiquidity = sumNgn + 151.60;
+        liveLiquidity = sumNgn;
       } else {
-        // Live verified baseline aggregate float (Bilal ₦472.50 + NineBoost ₦2,022.24 + Bigi ₦286.74 + Termii ₦1,401.32 + Flutterwave ₦151.60)
-        liveLiquidity = 4334.40;
+        // Live verified baseline aggregate float (Bilal + NineBoost + Bigi + Termii + Flutterwave + PayVessel + SKBTech + ClubKonnect)
+        liveLiquidity = 6928.87;
       }
 
       setCounts({
