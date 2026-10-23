@@ -180,6 +180,64 @@ serve(async (req: Request) => {
     const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
 
     // -------------------------------------------------------------------------
+    // FAST-PATH: INSTANT TEST EMAIL DISPATCH (< 1 second)
+    // -------------------------------------------------------------------------
+    if (reqData?.action === 'test-email' || (reqData?.testEmail && (reqData?.isTest || reqData?.force))) {
+      const destEmail = (reqData.testEmail || secrets['LOW_BALANCE_ALERT_EMAIL'] || 'admin@abumafhal.com.ng').trim()
+      let emailSuccess = false
+      let emailMethod = 'none'
+      let emailError = ''
+
+      const subject = `Abu Mafhal Sub: Liquidity Alert Test Notification 📨`
+      const text = `Abu Mafhal Sub Liquidity Alert Test\n\nYour multi-channel float alerts are operational and functioning 100%! All provider wallets are monitored 24/7.`
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 24px; color: #0f172a;">
+          <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            <div style="background: #0d1b3e; padding: 24px; text-align: center;">
+              <h2 style="color: #f5a623; margin: 0; font-size: 20px; font-weight: 700;">Abu Mafhal Sub — Liquidity Vault</h2>
+              <p style="color: #94a3b8; font-size: 13px; margin: 6px 0 0 0;">Multi-Channel Email Test Notice</p>
+            </div>
+            <div style="padding: 24px;">
+              <p style="font-size: 15px; color: #1e293b; line-height: 1.6;">
+                Hello Admin,<br><br>
+                ✅ Your automated <strong>Multi-Channel Float Alert</strong> system is active and operating at <strong>100% efficiency</strong>! Real-time provider wallet monitoring is active.
+              </p>
+              <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 18px 0; border-left: 4px solid #f5a623;">
+                <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Monitored Channel:</div>
+                <div style="font-size: 16px; font-weight: bold; color: #0d1b3e; margin-top: 4px;">Email (Zoho SMTP & Resend Gateway)</div>
+              </div>
+              <p style="font-size: 13px; color: #64748b; margin-top: 20px;">
+                Timestamp: ${new Date().toUTCString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+
+      try {
+        const sendRes = await sendEmail(destEmail, subject, text, html, supabaseAdmin)
+        if (sendRes?.success) {
+          emailSuccess = true
+          emailMethod = sendRes.method || 'SMTP'
+        } else {
+          emailError = (sendRes as any)?.error || 'Could not send test email'
+        }
+      } catch (err: any) {
+        emailError = err.message
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        action: 'test-email',
+        recipient: destEmail,
+        emailReport: { success: emailSuccess, method: emailMethod, error: emailError }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      })
+    }
+
+    // -------------------------------------------------------------------------
     // PARALLEL PROVIDER CHECKERS (Lightning Fast Promise.allSettled)
     // -------------------------------------------------------------------------
 
