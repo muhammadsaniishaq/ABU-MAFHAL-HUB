@@ -171,6 +171,8 @@ export default function UserManagement() {
     const [kycFilter, setKycFilter] = useState<'all' | 'verified' | 'unverified'>('all');
     const [balanceRangeFilter, setBalanceRangeFilter] = useState<'all' | 'zero' | 'positive' | 'whale'>('all');
     const [activeFilterDropdown, setActiveFilterDropdown] = useState<'date' | 'role' | 'kyc' | 'balance' | 'sort' | null>(null);
+    const [isHeaderStatsOpen, setIsHeaderStatsOpen] = useState(false);
+    const [generatingAccUserId, setGeneratingAccUserId] = useState<string | null>(null);
     
     // Selection & Modal States
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -922,6 +924,7 @@ export default function UserManagement() {
     const handleGenerateSingleUserAccount = async (targetUser: UserProfile | null) => {
         if (!targetUser) return;
         setGeneratingSingleAcc(true);
+        setGeneratingAccUserId(targetUser.id);
         try {
             const { data, error } = await supabase.functions.invoke('create-virtual-account', {
                 body: { 
@@ -956,6 +959,7 @@ export default function UserManagement() {
             Alert.alert("Generation Failed", e.message || "Failed to generate virtual account.");
         } finally {
             setGeneratingSingleAcc(false);
+            setGeneratingAccUserId(null);
         }
     };
 
@@ -4762,6 +4766,21 @@ Metadata:
                         {!isSelectionMode && (
                             <>
                                 <TouchableOpacity 
+                                    onPress={() => setShowBatchModal(true)} 
+                                    style={[
+                                        s.headerGhostBtn, 
+                                        stats.missingAccounts > 0 && s.headerGhostBtnAlert, 
+                                        { paddingHorizontal: 9, width: 'auto', flexDirection: 'row', gap: 5 }
+                                    ]}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="flash" size={13} color={stats.missingAccounts > 0 ? "#F59E0B" : "#D4AF37"} />
+                                    <Text style={{ color: stats.missingAccounts > 0 ? "#FCD34D" : "#D4AF37", fontSize: 11, fontWeight: '800' }}>
+                                        Auto Gen VA{stats.missingAccounts > 0 ? ` (${stats.missingAccounts})` : ''}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
                                     onPress={onRefresh} 
                                     style={s.headerGhostBtn}
                                     activeOpacity={0.7}
@@ -4797,9 +4816,41 @@ Metadata:
                     </View>
                 </View>
 
-                {/* Mobile-First Ultra-Luxury KPI Carousel Ribbon (Horizontal Scroll) */}
+                {/* Mobile-First Header Dropdown Bar: Shows live balances and toggle button */}
                 {!isSelectionMode && (
-                    <>
+                    <View style={s.dropdownToggleBar}>
+                        <View style={s.dropdownTelemetryPill}>
+                            <Ionicons name="wallet-outline" size={12} color="#D4AF37" />
+                            <Text style={s.dropdownTelemetryText}>
+                                ₦{stats.totalBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </Text>
+                            <View style={s.dropdownTelemetryDivider} />
+                            <MaterialCommunityIcons name="ethereum" size={12} color="#60A5FA" />
+                            <Text style={[s.dropdownTelemetryText, { color: '#FCD34D' }]}>
+                                ${stats.totalCryptoUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={() => setIsHeaderStatsOpen(!isHeaderStatsOpen)}
+                            style={[s.dropdownHeaderBtn, isHeaderStatsOpen && s.dropdownHeaderBtnActive]}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons 
+                                name={isHeaderStatsOpen ? "chevron-up" : "chevron-down"} 
+                                size={12} 
+                                color={isHeaderStatsOpen ? "#0A1128" : "#D4AF37"} 
+                            />
+                            <Text style={[s.dropdownHeaderBtnText, isHeaderStatsOpen && { color: '#0A1128' }]}>
+                                {isHeaderStatsOpen ? "Close Overview ▲" : "Vault & Stats ▾"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* Collapsible Dropdown Content: Hero Banner + 2x3 Grid */}
+                {!isSelectionMode && isHeaderStatsOpen && (
+                    <View style={s.dropdownCollapsibleContent}>
                         {/* 1. Executive Balance Hero Banner Card (Fiat & Crypto Split with Token Chips) */}
                         <TouchableOpacity 
                             activeOpacity={0.9}
@@ -4975,38 +5026,41 @@ Metadata:
                                 <Text style={s.statBoxLabel}>Blocked</Text>
                             </TouchableOpacity>
                         </View>
-                    </>
+
+                        {/* Close Dropdown Bar Button */}
+                        <TouchableOpacity 
+                            onPress={() => setIsHeaderStatsOpen(false)}
+                            style={s.closeDropdownBar}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="chevron-up" size={13} color="#D4AF37" />
+                            <Text style={s.closeDropdownBarText}>Collapse Overview</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
 
-                {/* Virtual Account Missing Attention Banner */}
+                {/* Virtual Account Missing Attention Banner (Compact & High-Impact) */}
                 {!isSelectionMode && stats.missingAccounts > 0 && (
                     <TouchableOpacity 
                         onPress={() => setShowBatchModal(true)}
                         activeOpacity={0.85}
-                        style={s.missingAlertCard}
+                        style={s.missingAlertCardCompact}
                     >
                         <LinearGradient
-                            colors={['rgba(245, 158, 11, 0.18)', 'rgba(212, 175, 55, 0.12)']}
+                            colors={['rgba(245, 158, 11, 0.22)', 'rgba(212, 175, 55, 0.15)']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
-                            style={s.missingAlertGradient}
+                            style={s.missingAlertGradientCompact}
                         >
-                            <View style={s.missingAlertLeft}>
-                                <View style={s.missingAlertIcon}>
-                                    <Ionicons name="sparkles" size={14} color="#F59E0B" />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.missingAlertTitle}>
-                                        {stats.missingAccounts} User(s) Need Virtual Accounts
-                                    </Text>
-                                    <Text style={s.missingAlertSub} numberOfLines={1}>
-                                        Tap to launch automatic multi-bank account batch engine
-                                    </Text>
-                                </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                <Ionicons name="sparkles" size={13} color="#F59E0B" />
+                                <Text style={s.missingAlertTitleCompact} numberOfLines={1}>
+                                    {stats.missingAccounts} User(s) Need Virtual Accounts
+                                </Text>
                             </View>
-                            <View style={s.missingAlertBtnPill}>
-                                <Text style={s.missingAlertBtnText}>Generate</Text>
-                                <Ionicons name="arrow-forward" size={12} color="#0A1128" />
+                            <View style={s.missingAlertBtnPillCompact}>
+                                <Ionicons name="flash" size={11} color="#0A1128" />
+                                <Text style={s.missingAlertBtnTextCompact}>Auto Generate</Text>
                             </View>
                         </LinearGradient>
                     </TouchableOpacity>
@@ -5041,6 +5095,7 @@ Metadata:
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterContentLuxury}>
                         {[
                             { key: 'all', label: `All Users (${stats.totalUsers})` },
+                            { key: 'missing_va', label: `⚠️ Missing VA (${stats.missingAccounts})` },
                             { key: 'active', label: `Active (${stats.activeUsers})` },
                             { key: 'verified', label: `Verified (${stats.verifiedUsers})` },
                             { key: 'unverified', label: `Pending KYC (${stats.pendingKycUsers})` },
@@ -5429,6 +5484,54 @@ Metadata:
                                 </View>
                             </View>
 
+                            {/* Virtual Account Status Row (Direct Info & 1-Tap Auto Gen) */}
+                            <View style={[
+                                s.userCardVaRow,
+                                {
+                                    backgroundColor: item.account_number ? '#F8FAFC' : '#FFFBEB',
+                                    borderColor: item.account_number ? '#E2E8F0' : '#FDE68A',
+                                }
+                            ]}>
+                                {item.account_number ? (
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            Clipboard.setStringAsync(item.account_number || '');
+                                            Alert.alert("Copied 📋", `Account number ${item.account_number} copied to clipboard!`);
+                                        }}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="card-outline" size={12} color="#0A1128" />
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#0A1128' }} numberOfLines={1}>
+                                            {item.bank_name || 'PalmPay'}: <Text style={{ fontWeight: '900', color: '#B45309' }}>{item.account_number}</Text>
+                                        </Text>
+                                        <Ionicons name="copy-outline" size={10} color="#64748B" />
+                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <Ionicons name="alert-circle" size={13} color="#D97706" />
+                                            <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#B45309' }}>No Virtual Account</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => handleGenerateSingleUserAccount(item)}
+                                            disabled={generatingAccUserId === item.id}
+                                            style={s.cardGenVaBtn}
+                                            activeOpacity={0.8}
+                                        >
+                                            {generatingAccUserId === item.id ? (
+                                                <ActivityIndicator size="small" color="#0A1128" style={{ transform: [{ scale: 0.7 }] }} />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="flash" size={10} color="#0A1128" />
+                                                    <Text style={s.cardGenVaBtnText}>Auto Gen VA</Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+
                             {/* Row 3: Action Buttons Row [Fund ⚡] [Freeze 🔒 / Activate ▶] [WhatsApp 💬] [Reset Password 🔑] [More ▾] */}
                             <View style={s.actionButtonsBar}>
                                 {/* Fund Button */}
@@ -5701,6 +5804,129 @@ const s = StyleSheet.create({
         fontSize: 12,
         fontWeight: '900',
         letterSpacing: 0.3,
+    },
+    dropdownToggleBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.25)',
+    },
+    dropdownTelemetryPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    dropdownTelemetryText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    dropdownTelemetryDivider: {
+        width: 1,
+        height: 12,
+        backgroundColor: 'rgba(212, 175, 55, 0.4)',
+    },
+    dropdownHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(212, 175, 55, 0.15)',
+        borderWidth: 1,
+        borderColor: '#D4AF37',
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    dropdownHeaderBtnActive: {
+        backgroundColor: '#D4AF37',
+    },
+    dropdownHeaderBtnText: {
+        color: '#D4AF37',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    dropdownCollapsibleContent: {
+        marginBottom: 8,
+    },
+    closeDropdownBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: 6,
+        backgroundColor: 'rgba(10, 18, 38, 0.6)',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+        marginTop: 6,
+    },
+    closeDropdownBarText: {
+        color: '#D4AF37',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    missingAlertCardCompact: {
+        borderRadius: 8,
+        overflow: 'hidden',
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+    },
+    missingAlertGradientCompact: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
+    missingAlertTitleCompact: {
+        color: '#FCD34D',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    missingAlertBtnPillCompact: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#D4AF37',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    missingAlertBtnTextCompact: {
+        color: '#0A1128',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    userCardVaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        marginVertical: 6,
+        borderWidth: 1,
+    },
+    cardGenVaBtn: {
+        backgroundColor: '#D4AF37',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    cardGenVaBtnText: {
+        color: '#0A1128',
+        fontSize: 10,
+        fontWeight: '900',
     },
     ribbonWrapper: {
         marginBottom: 10,
