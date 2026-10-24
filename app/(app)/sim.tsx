@@ -52,12 +52,12 @@ const SIM_NETWORKS_META: Record<string, {
         features: ['Broadband & Router Ready', 'SmileVoice Compatible', 'National Roaming']
     },
     sahal: {
-        logo: require('../../assets/images/pin_service.png'),
-        color: '#0D9488',
-        lightBg: '#F0FDFA',
-        tag: 'Dedicated Cellular',
-        speed: '4G Network',
-        features: ['Physical SIM Package', 'Instant Provisioning', 'Secure PIN Enabled']
+        logo: require('../../assets/images/sahal.png'),
+        color: '#E11D48',
+        lightBg: '#FFF1F2',
+        tag: 'Sahal Telecom 4G',
+        speed: '4G LTE Cellular',
+        features: ['Sahal Dedicated SIM', 'Instant Provisioning', 'Nationwide Signal']
     },
     vitel: {
         logo: require('../../assets/images/vitel.png'),

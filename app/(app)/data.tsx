@@ -165,6 +165,7 @@ const NETWORK_LOGOS: Record<string, any> = {
     alpha: require('../../assets/images/alpha_logo.png'),
     kirani: require('../../assets/images/kirani.png'),
     ratel: require('../../assets/images/ratel_alat.png'),
+    sahal: require('../../assets/images/sahal.png'),
     vitel: require('../../assets/images/vitel.png'),
 };
 
@@ -177,6 +178,7 @@ const NETWORKS_DATA = [
     { id: 'alpha', name: 'Alpha', color: '#DC2626', status: 'Fast Data', prefixes: ['080', '090'] },
     { id: 'kirani', name: 'Kirani', color: '#2563EB', status: '4G Fast', prefixes: ['080', '070', '090'] },
     { id: 'ratel', name: 'Ratel', color: '#B45309', status: '4G Active', prefixes: ['080', '070', '091'] },
+    { id: 'sahal', name: 'Sahal', color: '#E11D48', status: '4G LTE', prefixes: ['080', '070', '091'] },
     { id: 'vitel', name: 'VITAL', color: '#6366F1', status: '4G Active', prefixes: ['070', '091'] },
 ];
 
@@ -201,6 +203,8 @@ const getNetworkStyles = (netId: string, isSelected: boolean) => {
             return { bg: '#eff6ff', border: '#2563eb', text: '#1d4ed8' };
         case 'ratel':
             return { bg: '#fffbeb', border: '#b45309', text: '#78350f' };
+        case 'sahal':
+            return { bg: '#fff1f2', border: '#e11d48', text: '#be123c' };
         case 'vitel':
             return { bg: '#eef2ff', border: '#6366f1', text: '#3730a3' };
         default:
