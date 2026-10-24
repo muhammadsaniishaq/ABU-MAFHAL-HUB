@@ -111,20 +111,24 @@ export const KetawancyService = {
             if (res?.status === 'success' && Array.isArray(res.data)) {
                 return res.data;
             }
-            // Fallback plans if API hasn't populated yet
+            // Fallback / Live mapped plans from Ketawancy Documentation
             return [
-                { _id: 'kirani-sim-1', name: 'Kirani SIM Card', price: 1500, status: 'on', description: 'Kirani 4G/LTE Physical SIM card with instant activation' },
-                { _id: 'smile-sim-1', name: 'Smile 4G SIM Card', price: 1000, status: 'on', description: 'Smile 4G LTE SIM with high speed broadband access' },
-                { _id: 'alpha-sim-1', name: 'Alpha SIM Card', price: 1200, status: 'on', description: 'Alpha Network SIM Card for voice and data' },
-                { _id: 'ratel-sim-1', name: 'Ratel SIM Card', price: 1500, status: 'on', description: 'Ratel Telecom SIM Card' },
+                { _id: '67c31cc8f3f0f520426fe893', name: 'Ratel SIM Card', price: 3000, status: 'on', network: 'ratel', description: 'Ratel Telecom Physical SIM Card with instant activation' },
+                { _id: '67c32387927afc9fa58e0595', name: 'Kirani SIM Card', price: 5900, status: 'on', network: 'kirani', description: 'Kirani 4G/LTE Physical SIM card with fast broadband' },
+                { _id: '67c32391927afc9fa58e0599', name: 'Alpha SIM Card', price: 2750, status: 'on', network: 'alpha', description: 'Alpha Network SIM Card for voice & high-speed data' },
+                { _id: '67d204183bd4d1bd7d1a8fd', name: 'Smile 4G SIM Card', price: 5000, status: 'on', network: 'smile', description: 'Smile 4G LTE High-speed broadband SIM Card' },
+                { _id: '6a9e0d7ec7aba8077b3266e2', name: 'Sahal SIM Card', price: 4500, status: 'on', network: 'sahal', description: 'Sahal Telecom Physical SIM Card' },
+                { _id: '6a9e0da1c7aba8077b3266ec', name: 'Vitel SIM Card', price: 3500, status: 'on', network: 'vitel', description: 'Vitel Telecom SIM Card' },
             ];
         } catch (e) {
             console.error('[Ketawancy] getSimPlans error:', e);
             return [
-                { _id: 'kirani-sim-1', name: 'Kirani SIM Card', price: 1500, status: 'on', description: 'Kirani 4G/LTE Physical SIM card' },
-                { _id: 'smile-sim-1', name: 'Smile 4G SIM Card', price: 1000, status: 'on', description: 'Smile 4G LTE SIM' },
-                { _id: 'alpha-sim-1', name: 'Alpha SIM Card', price: 1200, status: 'on', description: 'Alpha Network SIM Card' },
-                { _id: 'ratel-sim-1', name: 'Ratel SIM Card', price: 1500, status: 'on', description: 'Ratel Telecom SIM Card' },
+                { _id: '67c31cc8f3f0f520426fe893', name: 'Ratel SIM Card', price: 3000, status: 'on', network: 'ratel', description: 'Ratel Telecom Physical SIM Card' },
+                { _id: '67c32387927afc9fa58e0595', name: 'Kirani SIM Card', price: 5900, status: 'on', network: 'kirani', description: 'Kirani 4G/LTE Physical SIM card' },
+                { _id: '67c32391927afc9fa58e0599', name: 'Alpha SIM Card', price: 2750, status: 'on', network: 'alpha', description: 'Alpha Network SIM Card' },
+                { _id: '67d204183bd4d1bd7d1a8fd', name: 'Smile 4G SIM Card', price: 5000, status: 'on', network: 'smile', description: 'Smile 4G LTE SIM' },
+                { _id: '6a9e0d7ec7aba8077b3266e2', name: 'Sahal SIM Card', price: 4500, status: 'on', network: 'sahal', description: 'Sahal Telecom Physical SIM Card' },
+                { _id: '6a9e0da1c7aba8077b3266ec', name: 'Vitel SIM Card', price: 3500, status: 'on', network: 'vitel', description: 'Vitel Telecom SIM Card' },
             ];
         }
     },

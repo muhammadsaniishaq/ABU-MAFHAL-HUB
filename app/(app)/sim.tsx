@@ -164,7 +164,11 @@ export default function SimCardScreen() {
         } else if (lower.includes('alpha')) {
             return require('../../assets/images/alpha_logo.png');
         } else if (lower.includes('ratel')) {
-            return require('../../assets/images/ratel_alat.jpg');
+            return require('../../assets/images/ratel_alat.png');
+        } else if (lower.includes('sahal')) {
+            return require('../../assets/images/pin_service.png');
+        } else if (lower.includes('vitel')) {
+            return require('../../assets/images/pin_service.png');
         }
         return require('../../assets/images/pin_service.png');
     };
