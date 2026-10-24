@@ -164,7 +164,7 @@ const NETWORK_LOGOS: Record<string, any> = {
     smile: require('../../assets/images/smile_logo.png'),
     alpha: require('../../assets/images/alpha_logo.png'),
     kirani: require('../../assets/images/kirani.png'),
-    ratel: require('../../assets/images/ratel_alat.jpg'),
+    ratel: require('../../assets/images/ratel_alat.png'),
     vitel: require('../../assets/images/vitel.png'),
 };
 
@@ -239,6 +239,7 @@ export default function DataScreen() {
     const insets = useSafeAreaInsets();
     const [network, setNetwork] = useState('');
     const [networksData, setNetworksData] = useState(NETWORKS_DATA);
+    const [showNetworkDropdown, setShowNetworkDropdown] = useState(false);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
     const [plans, setPlans] = useState<DataPlan[]>([]);
@@ -1167,62 +1168,280 @@ export default function DataScreen() {
                         </TouchableOpacity>
                     )}
 
-                    {/* Network Selection */}
+                    {/* Network Selection - Premium Dropdown */}
                     <View style={s.sectionHeader}>
                         <Ionicons name="cellular-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
                         <Text style={s.sectionTitle}>Select Network</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', gap: 4, marginBottom: 16 }}>
-                        {networksData.map((net) => {
-                            const isSelected = network === net.id;
-                            const styles = getNetworkStyles(net.id, isSelected);
-                            return (
-                                <TouchableOpacity
-                                    key={net.id}
-                                    onPress={() => setNetwork(net.id)}
-                                    style={{
-                                        flex: 1,
-                                        paddingVertical: 10,
-                                        paddingHorizontal: 2,
-                                        borderRadius: 14,
-                                        backgroundColor: styles.bg,
-                                        borderWidth: 1.5,
-                                        borderColor: styles.border,
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        shadowColor: '#000',
-                                        shadowOffset: { width: 0, height: 2 },
-                                        shadowOpacity: isSelected ? 0.08 : 0.02,
-                                        shadowRadius: 4,
-                                        elevation: isSelected ? 3 : 1,
-                                        position: 'relative'
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={{ width: 28, height: 28, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', marginBottom: 4 }}>
-                                        <Image 
-                                            source={NETWORK_LOGOS[net.id]} 
-                                            style={{ width: '100%', height: '100%' }}
-                                            resizeMode="contain" 
-                                        />
-                                    </View>
-                                    <Text style={{ fontSize: 10, fontWeight: isSelected ? '800' : '600', color: isSelected ? styles.text : '#334155', textAlign: 'center' }} numberOfLines={1}>
-                                        {net.name}
-                                    </Text>
-                                    <View style={{ backgroundColor: isSelected ? styles.border : '#f1f5f9', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, marginTop: 3 }}>
-                                        <Text style={{ fontSize: 7.5, fontWeight: '800', color: isSelected ? '#ffffff' : '#64748b' }}>
-                                            {net.status}
+
+                    {/* Dropdown Trigger Card */}
+                    {(() => {
+                        const currentNet = networksData.find(n => n.id === network);
+                        const netStyles = currentNet ? getNetworkStyles(currentNet.id, true) : null;
+                        return (
+                            <TouchableOpacity
+                                onPress={() => setShowNetworkDropdown(true)}
+                                activeOpacity={0.85}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: 16,
+                                    paddingHorizontal: 14,
+                                    paddingVertical: 12,
+                                    borderWidth: 1.5,
+                                    borderColor: currentNet ? (netStyles?.border || '#E2E8F0') : '#E2E8F0',
+                                    marginBottom: 16,
+                                    shadowColor: '#0A1128',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 6,
+                                    elevation: 2,
+                                }}
+                            >
+                                {currentNet ? (
+                                    <>
+                                        <View style={{
+                                            width: 40,
+                                            height: 40,
+                                            borderRadius: 12,
+                                            backgroundColor: '#F8FAFC',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderWidth: 1,
+                                            borderColor: '#E2E8F0',
+                                            overflow: 'hidden',
+                                            marginRight: 12
+                                        }}>
+                                            <Image 
+                                                source={NETWORK_LOGOS[currentNet.id]} 
+                                                style={{ width: '85%', height: '85%' }} 
+                                                resizeMode="contain" 
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>
+                                                    {currentNet.name}
+                                                </Text>
+                                                <View style={{
+                                                    backgroundColor: netStyles?.border || '#0284C7',
+                                                    paddingHorizontal: 6,
+                                                    paddingVertical: 2,
+                                                    borderRadius: 6
+                                                }}>
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: '#FFFFFF' }}>
+                                                        {currentNet.status}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 1 }}>
+                                                Tap to change network provider
+                                            </Text>
+                                        </View>
+                                    </>
+                                ) : (
+                                    <>
+                                        <View style={{
+                                            width: 40,
+                                            height: 40,
+                                            borderRadius: 12,
+                                            backgroundColor: '#F1F5F9',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginRight: 12
+                                        }}>
+                                            <Ionicons name="cellular" size={20} color="#64748B" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 14, fontWeight: '700', color: '#334155' }}>
+                                                Choose Network Provider
+                                            </Text>
+                                            <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                                                MTN, Airtel, Glo, 9mobile, Smile, Alpha, Kirani, Ratel...
+                                            </Text>
+                                        </View>
+                                    </>
+                                )}
+                                <View style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 10,
+                                    backgroundColor: '#F8FAFC',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0'
+                                }}>
+                                    <Ionicons name="chevron-down" size={18} color="#64748B" />
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    })()}
+
+                    {/* Network Dropdown Selection Modal */}
+                    <Modal
+                        visible={showNetworkDropdown}
+                        transparent
+                        animationType="fade"
+                        onRequestClose={() => setShowNetworkDropdown(false)}
+                    >
+                        <Pressable 
+                            style={{ flex: 1, backgroundColor: 'rgba(10, 17, 40, 0.65)', justifyContent: 'flex-end' }}
+                            onPress={() => setShowNetworkDropdown(false)}
+                        >
+                            <Pressable 
+                                style={{
+                                    backgroundColor: '#FFFFFF',
+                                    borderTopLeftRadius: 28,
+                                    borderTopRightRadius: 28,
+                                    maxHeight: '80%',
+                                    paddingBottom: insets.bottom + 16,
+                                }}
+                                onPress={(e) => e.stopPropagation()}
+                            >
+                                {/* Modal Drag Handle & Header */}
+                                <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }}>
+                                    <View style={{ width: 44, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
+                                </View>
+
+                                <View style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    paddingHorizontal: 20,
+                                    paddingVertical: 12,
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: '#F1F5F9'
+                                }}>
+                                    <View>
+                                        <Text style={{ fontSize: 17, fontWeight: '900', color: '#0F172A' }}>
+                                            Select Network Provider
+                                        </Text>
+                                        <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 }}>
+                                            Choose telecom network for data recharge
                                         </Text>
                                     </View>
-                                    {isSelected && (
-                                        <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: styles.border, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
-                                            <Ionicons name="checkmark" size={8} color="white" />
-                                        </View>
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
+                                    <TouchableOpacity 
+                                        onPress={() => setShowNetworkDropdown(false)}
+                                        style={{
+                                            width: 34,
+                                            height: 34,
+                                            borderRadius: 17,
+                                            backgroundColor: '#F1F5F9',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                    >
+                                        <Ionicons name="close" size={18} color="#475569" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Network List */}
+                                <ScrollView 
+                                    style={{ paddingHorizontal: 16, paddingTop: 10 }}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    {networksData.map((net) => {
+                                        const isSelected = network === net.id;
+                                        const styles = getNetworkStyles(net.id, isSelected);
+                                        return (
+                                            <TouchableOpacity
+                                                key={net.id}
+                                                onPress={() => {
+                                                    setNetwork(net.id);
+                                                    setShowNetworkDropdown(false);
+                                                }}
+                                                activeOpacity={0.7}
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    padding: 12,
+                                                    borderRadius: 16,
+                                                    marginBottom: 8,
+                                                    backgroundColor: isSelected ? styles.bg : '#FFFFFF',
+                                                    borderWidth: 1.5,
+                                                    borderColor: isSelected ? styles.border : '#E2E8F0',
+                                                    shadowColor: '#000',
+                                                    shadowOffset: { width: 0, height: 1 },
+                                                    shadowOpacity: isSelected ? 0.05 : 0.02,
+                                                    shadowRadius: 3,
+                                                    elevation: isSelected ? 2 : 1,
+                                                }}
+                                            >
+                                                <View style={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    borderRadius: 14,
+                                                    backgroundColor: '#F8FAFC',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderWidth: 1,
+                                                    borderColor: '#E2E8F0',
+                                                    overflow: 'hidden',
+                                                    marginRight: 14
+                                                }}>
+                                                    <Image 
+                                                        source={NETWORK_LOGOS[net.id]} 
+                                                        style={{ width: '80%', height: '80%' }}
+                                                        resizeMode="contain" 
+                                                    />
+                                                </View>
+
+                                                <View style={{ flex: 1 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Text style={{
+                                                            fontSize: 15,
+                                                            fontWeight: isSelected ? '800' : '700',
+                                                            color: isSelected ? styles.text : '#0F172A'
+                                                        }}>
+                                                            {net.name}
+                                                        </Text>
+                                                        <View style={{
+                                                            backgroundColor: isSelected ? styles.border : '#F1F5F9',
+                                                            paddingHorizontal: 6,
+                                                            paddingVertical: 2,
+                                                            borderRadius: 6
+                                                        }}>
+                                                            <Text style={{
+                                                                fontSize: 8.5,
+                                                                fontWeight: '800',
+                                                                color: isSelected ? '#FFFFFF' : '#64748B'
+                                                            }}>
+                                                                {net.status}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                                        {net.id === 'smile' ? 'Smile 4G LTE broadband data' :
+                                                         net.id === 'alpha' ? 'Alpha unlimited voice & high-speed data' :
+                                                         net.id === 'kirani' ? 'Kirani 4G LTE voice & high-speed bundle' :
+                                                         net.id === 'ratel' ? 'Ratel unlimited high-speed bundle' :
+                                                         `${net.name} SME, Corporate Gifting & Direct Data`}
+                                                    </Text>
+                                                </View>
+
+                                                <View style={{
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: 12,
+                                                    borderWidth: 2,
+                                                    borderColor: isSelected ? styles.border : '#CBD5E1',
+                                                    backgroundColor: isSelected ? styles.border : 'transparent',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    marginLeft: 8
+                                                }}>
+                                                    {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                    <View style={{ height: 20 }} />
+                                </ScrollView>
+                            </Pressable>
+                        </Pressable>
+                    </Modal>
 
                     {/* Mode Segmented Control */}
                     <View style={s.segmentContainer}>
