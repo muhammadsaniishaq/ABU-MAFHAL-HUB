@@ -368,22 +368,6 @@ export const KetawancyService = {
     // ─── 4. SMILE DATA ───
     getSmilePlans: async (): Promise<KetawancyDataPlan[]> => {
         try {
-            const res = await requestKetawancy('/services/smile-plans');
-            if (res?.status === 'success' && Array.isArray(res.data)) {
-                return res.data;
-            }
-            return [
-                { planId: 624, planName: '1GB flexidaily', price: 330, validity: '1 day' },
-                { planId: 625, planName: '2.5GB flexidaily', price: 550, validity: '2 days' },
-                { planId: 626, planName: '5GB flexiweekly', price: 1600, validity: '7 days' },
-                { planId: 627, planName: '10GB Bigga', price: 3300, validity: '30 days' },
-                { planId: 628, planName: '15GB Bigga', price: 4400, validity: '30 days' },
-                { planId: 629, planName: '20GB Bigga', price: 5500, validity: '30 days' },
-                { planId: 630, planName: '40GB Bigga', price: 11000, validity: '30 days' },
-            ];
-    // ─── 4. SMILE DATA ───
-    getSmilePlans: async (): Promise<KetawancyDataPlan[]> => {
-        try {
             const res = await requestKetawancy('/services/smile/plans');
             if (res?.status === 'success' && Array.isArray(res.data) && res.data.length > 0) {
                 return res.data;
