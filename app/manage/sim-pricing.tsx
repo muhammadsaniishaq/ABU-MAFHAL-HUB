@@ -158,7 +158,7 @@ export default function SimPricingPage() {
             { val: plans.length, lbl: "Jimillar SIM", color: T.navy },
             { val: plans.filter(p => p.status === "on").length, lbl: "Active", color: T.green },
             { val: plans.filter(p => p.status === "off").length, lbl: "Hidden", color: T.red },
-            { val: plans.length > 0 ? "?" + Math.min(...plans.map(p => p.price)).toLocaleString() : "—", lbl: "Min Price", color: T.gold },
+            { val: plans.length > 0 ? "?" + Math.min(...plans.map(p => p.price)).toLocaleString() : "ï¿½", lbl: "Min Price", color: T.gold },
           ].map((st, i) => (
             <View key={i} style={[s.statItem, i > 0 && s.statDiv]}>
               <Text style={[s.statVal, { color: st.color }]}>{st.val}</Text>
@@ -190,7 +190,7 @@ export default function SimPricingPage() {
                     <View style={s.cardTop}>
                       <View style={[s.logoBox, { borderColor: color + "44" }]}>
                         {NETWORK_LOGOS[plan.network] ? (
-                          <Image source={NETWORK_LOGOS[plan.network]} style={s.logo} resizeMode="contain" />
+                          <Image source={NETWORK_LOGOS[plan.network]} style={s.logo as any} resizeMode="contain" />
                         ) : (
                           <Ionicons name="hardware-chip" size={24} color={color} />
                         )}
@@ -409,5 +409,4 @@ const s = StyleSheet.create({
   preview:     { marginTop: 20, padding: 14, backgroundColor: "#F8FAFC", borderRadius: 14, borderWidth: 1.5, borderColor: "#e2e8f0" },
   saveBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#0d1b3e", borderRadius: 16, paddingVertical: 15, marginTop: 20, marginBottom: 30 },
   saveTxt:     { color: "#fff", fontSize: 15, fontWeight: "900" },
-  blueL:       "#eff6ff",
 });
