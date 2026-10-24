@@ -46,6 +46,8 @@ const ALL_MODULES = [
   { t: 'NIN Tasks', i: 'card', r: '/manage/nin-tasks', c: '#0d1b3e', tag: 'Identity' },
   { t: 'BVN Tasks', i: 'finger-print', r: '/manage/bvn-tasks', c: '#f5a623', tag: 'Identity' },
   { t: 'Data Plans', i: 'wifi', r: '/manage/data-plans', c: '#2563eb', tag: 'Telecom' },
+  { t: 'SIM Pricing', i: 'hardware-chip', r: '/manage/sim-pricing', c: '#dc2626', tag: 'Telecom' },
+  { t: 'Features Control', i: 'apps', r: '/manage/features', c: '#8b5cf6', tag: 'Control' },
   { t: 'Airtime VTU', i: 'call', r: '/manage/airtime', c: '#0d1b3e', tag: 'VTU' },
   { t: 'Manage Rates', i: 'stats-chart', r: '/manage/rates', c: '#f5a623', tag: 'Live' },
   { t: 'CAC Management', i: 'briefcase', r: '/manage/cac', c: '#0d1b3e' },

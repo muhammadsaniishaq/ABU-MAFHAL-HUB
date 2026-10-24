@@ -160,6 +160,7 @@ export default function AdminWebSidebar({
       title: 'PRICING & ASSETS',
       items: [
         { label: 'Data Plans & APIs', route: '/manage/data-plans', icon: 'wifi', tag: 'Live' },
+        { label: 'SIM Card Pricing', route: '/manage/sim-pricing', icon: 'hardware-chip', tag: 'NEW' },
         { label: 'Airtime Portal', route: '/manage/airtime', icon: 'call' },
         { label: 'NIN Service Rates', route: '/manage/nin-pricing', icon: 'pricetag' },
         { label: 'BVN Service Rates', route: '/manage/bvn-pricing', icon: 'pricetags' },
@@ -180,6 +181,15 @@ export default function AdminWebSidebar({
         { label: 'Broadcasting & Mail', route: '/manage/communications', icon: 'megaphone' },
         { label: 'Cortex AI Engine', route: '/manage/ai', icon: 'sparkles', tag: 'AI' },
         { label: 'Crypto Liquidity', route: '/manage/crypto', icon: 'logo-bitcoin' },
+      ],
+    },
+    {
+      title: 'APP CONTROL',
+      items: [
+        { label: 'Features & Dashboard', route: '/manage/features', icon: 'apps', tag: 'Manage' },
+        { label: 'App Appearance', route: '/manage/appearance', icon: 'color-palette' },
+        { label: 'Staff & Team', route: '/manage/staff', icon: 'people-circle' },
+        { label: 'Referral Settings', route: '/manage/referral-settings', icon: 'gift' },
       ],
     },
     {
