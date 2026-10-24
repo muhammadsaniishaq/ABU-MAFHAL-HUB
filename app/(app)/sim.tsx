@@ -90,6 +90,8 @@ export default function SimCardScreen() {
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [purchasedSim, setPurchasedSim] = useState<any>(null);
+    const [isMaintenance, setIsMaintenance] = useState(false);
+    const [maintenanceMsg, setMaintenanceMsg] = useState('SIM Card activation service is temporarily undergoing scheduled maintenance.');
 
     useEffect(() => {
         loadData();
@@ -97,6 +99,18 @@ export default function SimCardScreen() {
 
     const loadData = async () => {
         try {
+            // Check feature maintenance status
+            const { data: flagData } = await supabase
+                .from('feature_flags')
+                .select('is_enabled, maintenance_message')
+                .eq('feature_key', 'feature_sim')
+                .maybeSingle();
+
+            if (flagData && flagData.is_enabled === false) {
+                setIsMaintenance(true);
+                if (flagData.maintenance_message) setMaintenanceMsg(flagData.maintenance_message);
+            }
+
             const { data: { user: authUser } } = await supabase.auth.getUser();
             if (authUser) {
                 setUser(authUser);
@@ -144,6 +158,11 @@ export default function SimCardScreen() {
     };
 
     const handleInitiatePurchase = () => {
+        if (isMaintenance) {
+            Alert.alert("Service Temporarily Unavailable", maintenanceMsg);
+            return;
+        }
+
         if (!selectedPlan) {
             Alert.alert("Plan Required", "Please select a SIM card type to continue.");
             return;
@@ -245,6 +264,47 @@ export default function SimCardScreen() {
                 showsVerticalScrollIndicator={false}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#D4AF37" />}
             >
+                {/* Maintenance Banner */}
+                {isMaintenance && (
+                    <View style={{
+                        backgroundColor: '#FFFBEB',
+                        borderRadius: 18,
+                        padding: 16,
+                        borderWidth: 1.5,
+                        borderColor: '#F59E0B',
+                        marginBottom: 16,
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        gap: 12,
+                    }}>
+                        <View style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 12,
+                            backgroundColor: '#FEF3C7',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: '#FDE68A'
+                        }}>
+                            <Ionicons name="construct" size={20} color="#D97706" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '900', color: '#B45309' }}>
+                                    SERVICE UNDER MAINTENANCE
+                                </Text>
+                                <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                    <Text style={{ fontSize: 8.5, fontWeight: '900', color: '#FFFFFF' }}>PAUSED</Text>
+                                </View>
+                            </View>
+                            <Text style={{ fontSize: 11.5, color: '#92400E', marginTop: 4, lineHeight: 16, fontWeight: '500' }}>
+                                {maintenanceMsg}
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
                 {/* Modern Interactive Visual SIM Showcase Card */}
                 {selectedPlan && (
                     <LinearGradient

@@ -461,6 +461,7 @@ export default function Dashboard() {
     'recharge_pin': 'feature_airtime',
     'airtime_cash': 'feature_airtime',
     'data': 'feature_data',
+    'sim': 'feature_sim',
     'transfer': 'feature_transfer',
     'bills': 'feature_bills',
     'cable': 'feature_bills',
