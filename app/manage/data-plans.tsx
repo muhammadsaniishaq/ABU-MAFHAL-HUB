@@ -335,6 +335,48 @@ export default function ManageDataPlans() {
                 });
             } catch (_) {}
 
+            // Ensure Ketawancy plans (Smile, Alpha, Kirani, Ratel) are seeded in DB if vendorId is 'all' or 'ketawancy'
+            if (vendorId === 'all' || vendorId === 'ketawancy') {
+                try {
+                    const ketNets = ['smile', 'alpha', 'kirani', 'ratel'];
+                    for (const net of ketNets) {
+                        let livePlans: any[] = [];
+                        if (net === 'smile') livePlans = await KetawancyService.getSmilePlans();
+                        else if (net === 'alpha') livePlans = await KetawancyService.getAlphaPlans();
+                        else if (net === 'kirani') livePlans = await KetawancyService.getKiraniPlans();
+                        else if (net === 'ratel') livePlans = await KetawancyService.getRatelPlans();
+
+                        if (livePlans && livePlans.length > 0) {
+                            const conf = configs.find(c => c.network === net);
+                            const markupVal = conf ? Number(conf.markup_value || 0) : 0;
+                            const markupType = conf ? conf.markup_type : 'fixed';
+
+                            const toUpsert = livePlans.map((kp, idx) => {
+                                const cost = Number(kp.price || 0);
+                                let sell = cost;
+                                if (markupType === 'percentage' && markupVal > 0) sell = Math.round(cost * (1 + markupVal / 100));
+                                else if (markupVal > 0) sell = cost + markupVal;
+                                return {
+                                    plan_id: `ket_${net}_${kp.planId || idx}`,
+                                    name: kp.planName,
+                                    original_name: kp.planName,
+                                    network: net,
+                                    cost_price: cost,
+                                    selling_price: sell,
+                                    validity: kp.validity || '30 Days',
+                                    plan_type: net.toUpperCase(),
+                                    api_vendor: 'ketawancy',
+                                    is_active: true
+                                };
+                            });
+                            await supabase.from('data_plans').upsert(toUpsert, { onConflict: 'plan_id' });
+                        }
+                    }
+                } catch (kSyncErr) {
+                    console.warn('[Sync] Ketawancy seeding notice:', kSyncErr);
+                }
+            }
+
             // Direct DB Matrix Query & Builder (100% Guaranteed Non-Zero Result)
             const { data: dbPlans } = await supabase.from('data_plans').select('*');
             const plans = dbPlans || [];
@@ -347,7 +389,8 @@ export default function ManageDataPlans() {
             }> = {
                 bilalsadasub: { name: 'BilalSadaSub API', total: 0, networks: { MTN: 0, GLO: 0, AIRTEL: 0, '9MOBILE': 0, VITAL: 0 }, plans: [] },
                 clubkonnect: { name: 'ClubKonnect API', total: 0, networks: { MTN: 0, GLO: 0, AIRTEL: 0, '9MOBILE': 0, VITAL: 0 }, plans: [] },
-                bigi: { name: 'Bigi VTU API', total: 0, networks: { MTN: 0, GLO: 0, AIRTEL: 0, '9MOBILE': 0, VITAL: 0 }, plans: [] }
+                bigi: { name: 'Bigi VTU API', total: 0, networks: { MTN: 0, GLO: 0, AIRTEL: 0, '9MOBILE': 0, VITAL: 0 }, plans: [] },
+                ketawancy: { name: 'Ketawancy Telecom API', total: 0, networks: { SMILE: 0, ALPHA: 0, KIRANI: 0, RATEL: 0 }, plans: [] }
             };
 
             plans.forEach((p: any) => {
@@ -477,35 +520,77 @@ export default function ManageDataPlans() {
 
             let planQuery = supabase.from('data_plans').select('*');
             if (selectedNetwork === 'vital' || selectedNetwork === 'vitel') {
-                planQuery = planQuery.or('network.eq.vital,network.eq.vitel');
+                planQuery = planQuery.or('network.eq.vital,network.eq.vitel,network.ilike.vital,network.ilike.vitel');
             } else {
-                planQuery = planQuery.eq('network', selectedNetwork);
+                planQuery = planQuery.ilike('network', selectedNetwork);
             }
 
-            const { data: activePlans, error: fetchErr } = await planQuery;
+            let { data: activePlans, error: fetchErr } = await planQuery;
 
             if (fetchErr) throw fetchErr;
+
+            // If plans are not yet in data_plans for this network, auto-fetch from Ketawancy or provider first
+            const ketawancyNets = ['smile', 'alpha', 'kirani', 'ratel'];
+            if ((!activePlans || activePlans.length === 0) && ketawancyNets.includes(selectedNetwork)) {
+                try {
+                    let liveKetPlans: any[] = [];
+                    if (selectedNetwork === 'smile') liveKetPlans = await KetawancyService.getSmilePlans();
+                    else if (selectedNetwork === 'alpha') liveKetPlans = await KetawancyService.getAlphaPlans();
+                    else if (selectedNetwork === 'kirani') liveKetPlans = await KetawancyService.getKiraniPlans();
+                    else if (selectedNetwork === 'ratel') liveKetPlans = await KetawancyService.getRatelPlans();
+
+                    if (liveKetPlans && liveKetPlans.length > 0) {
+                        const toInsert = liveKetPlans.map((kp, idx) => ({
+                            plan_id: `ket_${selectedNetwork}_${kp.planId || idx}`,
+                            name: kp.planName,
+                            original_name: kp.planName,
+                            network: selectedNetwork,
+                            cost_price: Number(kp.price || 0),
+                            selling_price: Number(kp.price || 0),
+                            validity: kp.validity || '30 Days',
+                            plan_type: selectedNetwork.toUpperCase(),
+                            api_vendor: 'ketawancy',
+                            is_active: true
+                        }));
+
+                        await supabase.from('data_plans').upsert(toInsert, { onConflict: 'plan_id' });
+
+                        const { data: reloaded } = await planQuery;
+                        activePlans = reloaded || toInsert;
+                    }
+                } catch (e) {
+                    console.warn('[ApplyMarkup] Auto-seed failed:', e);
+                }
+            }
+
             if (!activePlans || activePlans.length === 0) {
-                showAlert("Info", "No plans found for this network. Sync plans first.", 'error');
+                showAlert("Sync Required", `No plans found in database for ${selectedNetwork.toUpperCase()}. Click "Sync All" button at the top right to download plans.`, 'error');
                 return;
             }
 
             for (const plan of activePlans) {
-                const cost = parseFloat(plan.cost_price);
+                const cost = parseFloat(plan.cost_price || 0);
                 let selling = cost;
                 if (config.markup_type === 'percentage') {
-                    selling = cost * (1 + (parseFloat(config.markup_value) / 100));
+                    selling = cost * (1 + (parseFloat(config.markup_value || 0) / 100));
                 } else {
-                    selling = cost + parseFloat(config.markup_value);
+                    selling = cost + parseFloat(config.markup_value || 0);
                 }
                 selling = Math.round(selling);
 
-                const { error: updateErr } = await supabase
-                    .from('data_plans')
-                    .update({ selling_price: selling })
-                    .eq('id', plan.id);
-                
-                if (updateErr) throw updateErr;
+                if (plan.id) {
+                    const { error: updateErr } = await supabase
+                        .from('data_plans')
+                        .update({ selling_price: selling })
+                        .eq('id', plan.id);
+                    if (updateErr) throw updateErr;
+                } else if (plan.plan_id) {
+                    const { error: updateErr } = await supabase
+                        .from('data_plans')
+                        .update({ selling_price: selling })
+                        .eq('plan_id', plan.plan_id);
+                    if (updateErr) throw updateErr;
+                }
             }
 
             showAlert("Markup Applied 🎉", `Selling prices for ${selectedNetwork.toUpperCase()} plans updated using ${config.markup_type === 'percentage' ? `${config.markup_value}%` : `₦${config.markup_value}`} markup.`);
