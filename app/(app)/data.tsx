@@ -170,16 +170,16 @@ const NETWORK_LOGOS: Record<string, any> = {
 };
 
 const NETWORKS_DATA = [
-    { id: 'mtn', name: 'MTN', color: '#FFCC00', status: '5G Ready', prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
-    { id: 'airtel', name: 'Airtel', color: '#FF0000', status: '5G Ready', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
+    { id: 'mtn', name: 'MTN', color: '#FFCC00', status: '5G Ready', prefixes: ['0803', '0806', '0703', '0706', '0810', '0813', '0814', '0816', '0903', '0906', '0913', '0916', '0704'] },
+    { id: 'airtel', name: 'Airtel', color: '#FF0000', status: '5G Ready', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912', '0911'] },
     { id: 'glo', name: 'Glo', color: '#0F6A37', status: '4G LTE', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
     { id: '9mobile', name: '9mobile', color: '#006B3E', status: '4G Active', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
-    { id: 'smile', name: 'Smile 4G', color: '#ec4899', status: '4G LTE', prefixes: ['0702'] },
-    { id: 'alpha', name: 'Alpha', color: '#DC2626', status: 'Fast Data', prefixes: ['080', '090'] },
-    { id: 'kirani', name: 'Kirani', color: '#2563EB', status: '4G Fast', prefixes: ['080', '070', '090'] },
-    { id: 'ratel', name: 'Ratel', color: '#B45309', status: '4G Active', prefixes: ['080', '070', '091'] },
-    { id: 'sahal', name: 'Sahal', color: '#E11D48', status: '4G LTE', prefixes: ['080', '070', '091'] },
-    { id: 'vitel', name: 'VITAL', color: '#6366F1', status: '4G Active', prefixes: ['070', '091'] },
+    { id: 'smile', name: 'Smile 4G', color: '#ec4899', status: '4G LTE', prefixes: ['0702', '0709', '0707'] },
+    { id: 'alpha', name: 'Alpha', color: '#DC2626', status: 'Fast Data', prefixes: [] },
+    { id: 'kirani', name: 'Kirani', color: '#2563EB', status: '4G Fast', prefixes: [] },
+    { id: 'ratel', name: 'Ratel', color: '#B45309', status: '4G Active', prefixes: [] },
+    { id: 'sahal', name: 'Sahal', color: '#E11D48', status: '4G LTE', prefixes: [] },
+    { id: 'vitel', name: 'VITAL', color: '#6366F1', status: '4G Active', prefixes: ['0804'] },
 ];
 
 const getNetworkStyles = (netId: string, isSelected: boolean) => {
@@ -744,6 +744,7 @@ export default function DataScreen() {
 
     const isNetworkMismatch = Boolean(
         network &&
+        !['alpha', 'kirani', 'ratel', 'sahal', 'vitel'].includes(network) &&
         detectedCarrier &&
         detectedCarrier.id !== network &&
         dismissedMismatchPhone !== phoneNumber &&
@@ -775,18 +776,22 @@ export default function DataScreen() {
         return best;
     }, [plans]);
 
-    // Auto-detect Network
-    const detectNetwork = useCallback((phone: string) => {
+    // Auto-detect Network by prefix (respects user manual selection if non-empty or user picks a specialized vendor)
+    const detectNetwork = useCallback((phone: string, force = false) => {
         const cleanPhone = phone.replace(/\D/g, '');
         if (cleanPhone.length >= 4) {
             const prefix = cleanPhone.substring(0, 4);
-            setNetworksData(currentNetworks => {
-                const found = currentNetworks.find(n => n.prefixes.includes(prefix));
-                if (found) {
-                    setNetwork(prev => found.id !== prev ? found.id : prev);
-                }
-                return currentNetworks;
-            });
+            const found = NETWORKS_DATA.find(n => n.prefixes.includes(prefix));
+            if (found) {
+                setNetwork(prev => {
+                    // Don't override if the user already selected a specialized bundle provider unless forced
+                    const isSpecialized = ['alpha', 'kirani', 'ratel', 'sahal', 'vitel'].includes(prev);
+                    if (isSpecialized && !force) {
+                        return prev;
+                    }
+                    return found.id;
+                });
+            }
         }
     }, []);
 
@@ -1008,7 +1013,7 @@ export default function DataScreen() {
             return;
         }
 
-        const phoneValidation = validateNigerianPhone(phoneNumber);
+        const phoneValidation = validateNigerianPhone(phoneNumber, network);
         if (!phoneValidation.isValid) {
             showBrandAlert("Invalid Phone Number", phoneValidation.error || "Please enter a valid 11-digit Nigerian mobile phone number.", "warning");
             return;

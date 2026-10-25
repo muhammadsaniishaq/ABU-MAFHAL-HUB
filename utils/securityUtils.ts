@@ -11,8 +11,8 @@ export interface PhoneValidationResult {
     error?: string;
 }
 
-// Known Nigerian Mobile Network Prefixes
-export const NIGERIAN_NETWORK_PREFIXES: Record<string, 'MTN' | 'AIRTEL' | 'GLO' | '9MOBILE'> = {
+// Known Nigerian Mobile Network Prefixes (MTN, AIRTEL, GLO, 9MOBILE, SMILE, VITEL/NTEL)
+export const NIGERIAN_NETWORK_PREFIXES: Record<string, 'MTN' | 'AIRTEL' | 'GLO' | '9MOBILE' | 'SMILE' | 'VITEL'> = {
     // MTN
     '0803': 'MTN', '0806': 'MTN', '0703': 'MTN', '0706': 'MTN',
     '0813': 'MTN', '0816': 'MTN', '0810': 'MTN', '0814': 'MTN',
@@ -20,20 +20,24 @@ export const NIGERIAN_NETWORK_PREFIXES: Record<string, 'MTN' | 'AIRTEL' | 'GLO' 
     // AIRTEL
     '0802': 'AIRTEL', '0808': 'AIRTEL', '0708': 'AIRTEL', '0812': 'AIRTEL',
     '0701': 'AIRTEL', '0902': 'AIRTEL', '0901': 'AIRTEL', '0904': 'AIRTEL',
-    '0907': 'AIRTEL', '0912': 'AIRTEL',
+    '0907': 'AIRTEL', '0912': 'AIRTEL', '0911': 'AIRTEL',
     // GLO
     '0805': 'GLO', '0807': 'GLO', '0705': 'GLO', '0815': 'GLO',
     '0811': 'GLO', '0905': 'GLO', '0915': 'GLO',
     // 9MOBILE
     '0809': '9MOBILE', '0817': '9MOBILE', '0818': '9MOBILE',
-    '0909': '9MOBILE', '0908': '9MOBILE'
+    '0909': '9MOBILE', '0908': '9MOBILE',
+    // SMILE & 4G/LTE NETWORKS (0702, etc.)
+    '0702': 'SMILE', '0709': 'SMILE', '0707': 'SMILE',
+    // VITEL & NTEL (0804, etc.)
+    '0804': 'VITEL',
 };
 
 /**
- * Strictly validates a Nigerian mobile phone number.
- * Ensures the number is COMPLETE (exact 11 digits) and belongs to a valid Nigerian network.
+ * Validates a Nigerian mobile phone number.
+ * Ensures the number is COMPLETE (exact 11 digits) and belongs to a valid Nigerian network or provider.
  */
-export function validateNigerianPhone(rawInput: string | null | undefined): PhoneValidationResult {
+export function validateNigerianPhone(rawInput: string | null | undefined, targetNetwork?: string): PhoneValidationResult {
     if (!rawInput || typeof rawInput !== 'string') {
         return { isValid: false, clean11: '', cleanInternational: '', error: 'Phone number is required.' };
     }
@@ -68,14 +72,21 @@ export function validateNigerianPhone(rawInput: string | null | undefined): Phon
 
     // Check valid network prefix
     const prefix4 = digits.slice(0, 4);
+    const prefix3 = digits.slice(0, 3);
     const network = NIGERIAN_NETWORK_PREFIXES[prefix4];
 
-    if (!network) {
+    // Known general Nigerian mobile starts: 070, 080, 081, 090, 091
+    const isStandardNigerianMobile = ['070', '080', '081', '090', '091'].includes(prefix3);
+
+    // If telecom provider is specialized (alpha, kirani, ratel, sahal, vitel, smile), allow any standard Nigerian 11-digit mobile line
+    const isSpecializedNetwork = targetNetwork && ['alpha', 'kirani', 'ratel', 'sahal', 'vitel', 'smile'].includes(targetNetwork.toLowerCase());
+
+    if (!network && !isStandardNigerianMobile && !isSpecializedNetwork) {
         return {
             isValid: false,
             clean11: digits,
             cleanInternational: '',
-            error: `Invalid network prefix (${prefix4}). Please enter a valid MTN, Airtel, Glo, or 9mobile number.`
+            error: `Invalid network prefix (${prefix4}). Please enter a valid Nigerian mobile number.`
         };
     }
 
@@ -94,7 +105,7 @@ export function validateNigerianPhone(rawInput: string | null | undefined): Phon
         isValid: true,
         clean11: digits,
         cleanInternational: '234' + digits.slice(1),
-        network: network
+        network: (network as any) || 'UNKNOWN'
     };
 }
 

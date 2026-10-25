@@ -46,7 +46,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         code: '01', 
         color: '#FFCC00', 
         defaultDiscount: 0, // Face value by default (guarantees zero margin loss)
-        prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'],
+        prefixes: ['0803', '0806', '0703', '0706', '0810', '0813', '0814', '0816', '0903', '0906', '0913', '0916', '0704'],
         ussdBalance: '*310#',
         ussdData: '*323#',
         ussdBorrow: '*303#'
@@ -68,7 +68,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         code: '04', 
         color: '#FF0000', 
         defaultDiscount: 0, // Face value by default (guarantees zero margin loss)
-        prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'],
+        prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912', '0911'],
         ussdBalance: '*310#',
         ussdData: '*323#',
         ussdBorrow: '*303#'
@@ -90,7 +90,7 @@ const NETWORKS_DATA: NetworkItem[] = [
         code: '05', 
         color: '#6366F1', 
         defaultDiscount: 0,
-        prefixes: ['070', '091'],
+        prefixes: ['0804'],
         ussdBalance: '*310#',
         ussdData: '*323#',
         ussdBorrow: '*303#'
@@ -429,7 +429,7 @@ function AirtimeScreenContent() {
             return;
         }
 
-        const phoneValidation = validateNigerianPhone(phoneNumber);
+        const phoneValidation = validateNigerianPhone(phoneNumber, network);
         if (!phoneValidation.isValid) {
             Alert.alert("Invalid Phone Number", phoneValidation.error || "Please enter a valid 11-digit Nigerian mobile number.");
             return;
