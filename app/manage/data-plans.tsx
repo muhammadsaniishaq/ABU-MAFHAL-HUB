@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
+import { KetawancyService } from '../../services/ketawancy';
 
 // Executive Light Theme Palette (Clean White, Gold & Royal Navy)
 const L = {
@@ -45,6 +46,7 @@ const L = {
 
 const VENDORS = [
     { id: 'all', name: 'All Vendors', color: '#64748B', bg: '#F1F5F9' },
+    { id: 'ketawancy', name: 'Ketawancy API', color: '#D97706', bg: '#FEF3C7' },
     { id: 'clubkonnect', name: 'ClubKonnect', color: '#2563EB', bg: '#DBEAFE' },
     { id: 'bigi', name: 'Bigi VTU', color: '#4F46E5', bg: '#E0E7FF' },
     { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#059669', bg: '#D1FAE5' },
@@ -199,8 +201,68 @@ export default function ManageDataPlans() {
             const { data, error } = await query;
             let resultPlans = data || [];
 
+            // If selected network is a Ketawancy telecom network (smile, alpha, kirani, ratel) and not seeded in data_plans yet,
+            // seed or fetch them dynamically so Admin can immediately view and edit profit margins
+            const ketawancyNets = ['smile', 'alpha', 'kirani', 'ratel'];
+            if (resultPlans.length === 0 && ketawancyNets.includes(selectedNetwork)) {
+                try {
+                    let liveKetPlans: any[] = [];
+                    if (selectedNetwork === 'smile') liveKetPlans = await KetawancyService.getSmilePlans();
+                    else if (selectedNetwork === 'alpha') liveKetPlans = await KetawancyService.getAlphaPlans();
+                    else if (selectedNetwork === 'kirani') liveKetPlans = await KetawancyService.getKiraniPlans();
+                    else if (selectedNetwork === 'ratel') liveKetPlans = await KetawancyService.getRatelPlans();
+
+                    if (liveKetPlans && liveKetPlans.length > 0) {
+                        // Check if admin configured custom markup for this network
+                        const conf = configs.find(c => c.network === selectedNetwork);
+                        const markupVal = conf ? Number(conf.markup_value || 0) : 0;
+                        const markupType = conf ? conf.markup_type : 'fixed';
+
+                        const toInsert = liveKetPlans.map((kp, idx) => {
+                            const cost = Number(kp.price || 0);
+                            let sell = cost;
+                            if (markupType === 'percentage' && markupVal > 0) {
+                                sell = Math.round(cost * (1 + markupVal / 100));
+                            } else if (markupVal > 0) {
+                                sell = cost + markupVal;
+                            }
+
+                            return {
+                                plan_id: `ket_${selectedNetwork}_${kp.planId || idx}`,
+                                name: kp.planName,
+                                original_name: kp.planName,
+                                network: selectedNetwork,
+                                cost_price: cost,
+                                selling_price: sell,
+                                validity: kp.validity || '30 Days',
+                                plan_type: selectedNetwork.toUpperCase(),
+                                api_vendor: 'ketawancy',
+                                is_active: true
+                            };
+                        });
+
+                        // Insert into data_plans so they are permanent and manageable
+                        const { data: inserted } = await supabase
+                            .from('data_plans')
+                            .upsert(toInsert, { onConflict: 'plan_id' })
+                            .select('*');
+
+                        if (inserted && inserted.length > 0) {
+                            resultPlans = inserted;
+                        } else {
+                            resultPlans = toInsert;
+                        }
+                    }
+                } catch (ketErr) {
+                    console.warn('[ManageDataPlans] Ketawancy plans resolution note:', ketErr);
+                }
+            }
+
             // Vendor Filter (Soft filter - retain plans if no match)
-            if (selectedVendorFilter === 'bilalsadasub') {
+            if (selectedVendorFilter === 'ketawancy') {
+                const filtered = resultPlans.filter(p => p.api_vendor === 'ketawancy' || p.name?.toLowerCase().includes('ketawancy'));
+                if (filtered.length > 0) resultPlans = filtered;
+            } else if (selectedVendorFilter === 'bilalsadasub') {
                 const filtered = resultPlans.filter(p => p.api_vendor === 'bilalsadasub' || p.name?.toLowerCase().includes('bilal'));
                 if (filtered.length > 0) resultPlans = filtered;
             } else if (selectedVendorFilter === 'bigi') {

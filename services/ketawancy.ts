@@ -335,20 +335,41 @@ export const KetawancyService = {
             throw new Error(`Insufficient wallet balance. You have ₦${userBal.toLocaleString()}, but required amount is ₦${amount.toLocaleString()}.`);
         }
 
-        const { data: txn, error: txnErr } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                type: 'debit',
-                amount: amount,
-                status: 'pending',
-                title: `Airtime: ${networkName || 'Network'} ₦${amount}`,
-                description: `Airtime recharge of ₦${amount} to ${phone}`
-            })
-            .select('id')
-            .single();
+        const refNo = `airtime-${Date.now()}`;
+        let txnId: string | null = null;
+        try {
+            const { data: txn, error: txnErr } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: amount,
+                    status: 'pending',
+                    reference: refNo,
+                    description: `Airtime: ${networkName || 'Airtime'} ₦${amount} -> ${phone}`
+                })
+                .select('id')
+                .maybeSingle();
 
-        if (txnErr) throw new Error("Could not initialize transaction record");
+            if (txn?.id) {
+                txnId = txn.id;
+            } else if (txnErr) {
+                console.warn('[Ketawancy] Airtime txn insert fallback:', txnErr.message);
+                const { data: fallbackTxn } = await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: amount,
+                        status: 'pending'
+                    })
+                    .select('id')
+                    .maybeSingle();
+                if (fallbackTxn?.id) txnId = fallbackTxn.id;
+            }
+        } catch (e) {
+            console.warn('[Ketawancy] Airtime txn record exception:', e);
+        }
 
         try {
             const res = await requestKetawancy('/services/buy-airtime', {
@@ -365,29 +386,42 @@ export const KetawancyService = {
                 throw new Error(res?.message || 'Airtime purchase failed at Ketawancy provider');
             }
 
-            const refNo = res?.data?.refNo || `airtime-${Date.now()}`;
-            const newBal = userBal - amount;
+            const finalRef = res?.data?.refNo || refNo;
+            let newBal = Math.max(0, userBal - amount);
 
-            await supabase
-                .from('profiles')
-                .update({ balance: newBal })
-                .eq('id', userId);
+            try {
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: amount
+                });
+                if (!rpcErr && typeof rpcRes === 'number') {
+                    newBal = rpcRes;
+                } else {
+                    await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+                }
+            } catch {
+                await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+            }
 
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'success',
-                    reference: refNo,
-                    metadata: { vendor: 'ketawancy', type: 'airtime', networkId, phone }
-                })
-                .eq('id', txn.id);
+            if (txnId) {
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'success',
+                        reference: finalRef,
+                        metadata: { vendor: 'ketawancy', type: 'airtime', networkId, phone }
+                    })
+                    .eq('id', txnId);
+            }
 
-            return { success: true, refNo, newBalance: newBal };
+            return { success: true, refNo: finalRef, newBalance: newBal };
         } catch (err: any) {
-            await supabase
-                .from('transactions')
-                .update({ status: 'failed', description: `Airtime Failed: ${err.message || 'Provider error'}` })
-                .eq('id', txn.id);
+            if (txnId) {
+                await supabase
+                    .from('transactions')
+                    .update({ status: 'failed', description: `Airtime Failed: ${err.message || 'Provider error'}` })
+                    .eq('id', txnId);
+            }
             throw err;
         }
     },
@@ -415,20 +449,41 @@ export const KetawancyService = {
             throw new Error(`Insufficient balance. Wallet: ₦${userBal.toLocaleString()}, Plan Cost: ₦${price.toLocaleString()}.`);
         }
 
-        const { data: txn, error: txnErr } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                type: 'debit',
-                amount: price,
-                status: 'pending',
-                title: `Data: ${planName || 'Data Plan'}`,
-                description: `Data purchase for ${phone}`
-            })
-            .select('id')
-            .single();
+        const refNo = `data-${Date.now()}`;
+        let txnId: string | null = null;
+        try {
+            const { data: txn, error: txnErr } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: price,
+                    status: 'pending',
+                    reference: refNo,
+                    description: `Data: ${planName || 'Data Plan'} -> ${phone}`
+                })
+                .select('id')
+                .maybeSingle();
 
-        if (txnErr) throw new Error("Could not initialize transaction record");
+            if (txn?.id) {
+                txnId = txn.id;
+            } else if (txnErr) {
+                console.warn('[Ketawancy] Data txn insert fallback:', txnErr.message);
+                const { data: fallbackTxn } = await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: price,
+                        status: 'pending'
+                    })
+                    .select('id')
+                    .maybeSingle();
+                if (fallbackTxn?.id) txnId = fallbackTxn.id;
+            }
+        } catch (e) {
+            console.warn('[Ketawancy] Data txn record exception:', e);
+        }
 
         try {
             const res = await requestKetawancy('/services/buy-data', {
@@ -445,19 +500,36 @@ export const KetawancyService = {
                 throw new Error(res?.message || 'Data purchase failed at provider');
             }
 
-            const refNo = res?.data?.refNo || `data-${Date.now()}`;
-            const newBal = userBal - price;
+            const finalRef = res?.data?.refNo || refNo;
+            let newBal = Math.max(0, userBal - price);
 
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
-            await supabase.from('transactions').update({
-                status: 'success',
-                reference: refNo,
-                metadata: { vendor: 'ketawancy', type: 'data', planId: dataPlanId, phone }
-            }).eq('id', txn.id);
+            try {
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: price
+                });
+                if (!rpcErr && typeof rpcRes === 'number') {
+                    newBal = rpcRes;
+                } else {
+                    await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+                }
+            } catch {
+                await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+            }
 
-            return { success: true, refNo, newBalance: newBal };
+            if (txnId) {
+                await supabase.from('transactions').update({
+                    status: 'success',
+                    reference: finalRef,
+                    metadata: { vendor: 'ketawancy', type: 'data', planId: dataPlanId, phone }
+                }).eq('id', txnId);
+            }
+
+            return { success: true, refNo: finalRef, newBalance: newBal };
         } catch (err: any) {
-            await supabase.from('transactions').update({ status: 'failed', description: `Data Failed: ${err.message || 'Provider error'}` }).eq('id', txn.id);
+            if (txnId) {
+                await supabase.from('transactions').update({ status: 'failed', description: `Data Failed: ${err.message || 'Provider error'}` }).eq('id', txnId);
+            }
             throw err;
         }
     },
@@ -537,20 +609,41 @@ export const KetawancyService = {
         const userBal = Number(profile?.balance || 0);
         if (userBal < price) throw new Error(`Insufficient wallet balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
-        const { data: txn, error: txnErr } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                type: 'debit',
-                amount: price,
-                status: 'pending',
-                title: `Smile Data: ${planName || 'Smile Plan'}`,
-                description: `Smile 4G recharge for ${phoneNumber}`
-            })
-            .select('id')
-            .single();
+        const refNo = `smile-${Date.now()}`;
+        let txnId: string | null = null;
+        try {
+            const { data: txn, error: txnErr } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: price,
+                    status: 'pending',
+                    reference: refNo,
+                    description: `Smile Data: ${planName || 'Smile Plan'} -> ${phoneNumber}`
+                })
+                .select('id')
+                .maybeSingle();
 
-        if (txnErr) throw new Error("Could not initialize transaction record");
+            if (txn?.id) {
+                txnId = txn.id;
+            } else if (txnErr) {
+                console.warn('[Ketawancy] Smile txn insert fallback:', txnErr.message);
+                const { data: fallbackTxn } = await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: price,
+                        status: 'pending'
+                    })
+                    .select('id')
+                    .maybeSingle();
+                if (fallbackTxn?.id) txnId = fallbackTxn.id;
+            }
+        } catch (e) {
+            console.warn('[Ketawancy] Smile txn record exception:', e);
+        }
 
         try {
             const res = await requestKetawancy('/services/buy-smile', {
@@ -567,19 +660,36 @@ export const KetawancyService = {
                 throw new Error(res?.message || 'Smile data recharge failed at provider');
             }
 
-            const refNo = res?.data?.refNo || `smile-${Date.now()}`;
-            const newBal = userBal - price;
+            const finalRef = res?.data?.refNo || refNo;
+            let newBal = Math.max(0, userBal - price);
 
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
-            await supabase.from('transactions').update({
-                status: 'success',
-                reference: refNo,
-                metadata: { vendor: 'ketawancy', type: 'smile', planId, phoneNumber }
-            }).eq('id', txn.id);
+            try {
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: price
+                });
+                if (!rpcErr && typeof rpcRes === 'number') {
+                    newBal = rpcRes;
+                } else {
+                    await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+                }
+            } catch {
+                await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+            }
 
-            return { success: true, refNo, newBalance: newBal };
+            if (txnId) {
+                await supabase.from('transactions').update({
+                    status: 'success',
+                    reference: finalRef,
+                    metadata: { vendor: 'ketawancy', type: 'smile', planId, phoneNumber }
+                }).eq('id', txnId);
+            }
+
+            return { success: true, refNo: finalRef, newBalance: newBal };
         } catch (err: any) {
-            await supabase.from('transactions').update({ status: 'failed', description: `Smile Failed: ${err.message || 'Provider error'}` }).eq('id', txn.id);
+            if (txnId) {
+                await supabase.from('transactions').update({ status: 'failed', description: `Smile Failed: ${err.message || 'Provider error'}` }).eq('id', txnId);
+            }
             throw err;
         }
     },
@@ -626,20 +736,41 @@ export const KetawancyService = {
         const userBal = Number(profile?.balance || 0);
         if (userBal < price) throw new Error(`Insufficient wallet balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
-        const { data: txn, error: txnErr } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                type: 'debit',
-                amount: price,
-                status: 'pending',
-                title: `Alpha Plan: ${planName || 'Alpha'}`,
-                description: `Alpha recharge for ${phone}`
-            })
-            .select('id')
-            .single();
+        const refNo = `alpha-${Date.now()}`;
+        let txnId: string | null = null;
+        try {
+            const { data: txn, error: txnErr } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: price,
+                    status: 'pending',
+                    reference: refNo,
+                    description: `Alpha Plan: ${planName || 'Alpha'} -> ${phone}`
+                })
+                .select('id')
+                .maybeSingle();
 
-        if (txnErr) throw new Error("Could not initialize transaction record");
+            if (txn?.id) {
+                txnId = txn.id;
+            } else if (txnErr) {
+                console.warn('[Ketawancy] Alpha txn insert fallback:', txnErr.message);
+                const { data: fallbackTxn } = await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: price,
+                        status: 'pending'
+                    })
+                    .select('id')
+                    .maybeSingle();
+                if (fallbackTxn?.id) txnId = fallbackTxn.id;
+            }
+        } catch (e) {
+            console.warn('[Ketawancy] Alpha txn record exception:', e);
+        }
 
         try {
             const res = await requestKetawancy('/services/buy-alpha', {
@@ -655,19 +786,36 @@ export const KetawancyService = {
                 throw new Error(res?.message || 'Alpha purchase failed at provider');
             }
 
-            const refNo = res?.data?.refNo || `alpha-${Date.now()}`;
-            const newBal = userBal - price;
+            const finalRef = res?.data?.refNo || refNo;
+            let newBal = Math.max(0, userBal - price);
 
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
-            await supabase.from('transactions').update({
-                status: 'success',
-                reference: refNo,
-                metadata: { vendor: 'ketawancy', type: 'alpha', planId, phone }
-            }).eq('id', txn.id);
+            try {
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: price
+                });
+                if (!rpcErr && typeof rpcRes === 'number') {
+                    newBal = rpcRes;
+                } else {
+                    await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+                }
+            } catch {
+                await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+            }
 
-            return { success: true, refNo, newBalance: newBal };
+            if (txnId) {
+                await supabase.from('transactions').update({
+                    status: 'success',
+                    reference: finalRef,
+                    metadata: { vendor: 'ketawancy', type: 'alpha', planId, phone }
+                }).eq('id', txnId);
+            }
+
+            return { success: true, refNo: finalRef, newBalance: newBal };
         } catch (err: any) {
-            await supabase.from('transactions').update({ status: 'failed', description: `Alpha Failed: ${err.message || 'Provider error'}` }).eq('id', txn.id);
+            if (txnId) {
+                await supabase.from('transactions').update({ status: 'failed', description: `Alpha Failed: ${err.message || 'Provider error'}` }).eq('id', txnId);
+            }
             throw err;
         }
     },
@@ -721,20 +869,41 @@ export const KetawancyService = {
         const userBal = Number(profile?.balance || 0);
         if (userBal < price) throw new Error(`Insufficient balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
-        const { data: txn, error: txnErr } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                type: 'debit',
-                amount: price,
-                status: 'pending',
-                title: `Kirani: ${planName || 'Kirani Data'}`,
-                description: `Kirani data for ${phone}`
-            })
-            .select('id')
-            .single();
+        const refNo = `kirani-${Date.now()}`;
+        let txnId: string | null = null;
+        try {
+            const { data: txn, error: txnErr } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: price,
+                    status: 'pending',
+                    reference: refNo,
+                    description: `Kirani: ${planName || 'Kirani Data'} -> ${phone}`
+                })
+                .select('id')
+                .maybeSingle();
 
-        if (txnErr) throw new Error("Could not initialize transaction record");
+            if (txn?.id) {
+                txnId = txn.id;
+            } else if (txnErr) {
+                console.warn('[Ketawancy] Kirani txn insert fallback:', txnErr.message);
+                const { data: fallbackTxn } = await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: price,
+                        status: 'pending'
+                    })
+                    .select('id')
+                    .maybeSingle();
+                if (fallbackTxn?.id) txnId = fallbackTxn.id;
+            }
+        } catch (e) {
+            console.warn('[Ketawancy] Kirani txn record exception:', e);
+        }
 
         try {
             const res = await requestKetawancy('/services/buy/kirani', {
@@ -750,19 +919,36 @@ export const KetawancyService = {
                 throw new Error(res?.message || 'Kirani purchase failed at provider');
             }
 
-            const refNo = res?.data?.refNo || `kirani-${Date.now()}`;
-            const newBal = userBal - price;
+            const finalRef = res?.data?.refNo || refNo;
+            let newBal = Math.max(0, userBal - price);
 
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
-            await supabase.from('transactions').update({
-                status: 'success',
-                reference: refNo,
-                metadata: { vendor: 'ketawancy', type: 'kirani', planId, phone }
-            }).eq('id', txn.id);
+            try {
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: price
+                });
+                if (!rpcErr && typeof rpcRes === 'number') {
+                    newBal = rpcRes;
+                } else {
+                    await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+                }
+            } catch {
+                await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+            }
 
-            return { success: true, refNo, newBalance: newBal };
+            if (txnId) {
+                await supabase.from('transactions').update({
+                    status: 'success',
+                    reference: finalRef,
+                    metadata: { vendor: 'ketawancy', type: 'kirani', planId, phone }
+                }).eq('id', txnId);
+            }
+
+            return { success: true, refNo: finalRef, newBalance: newBal };
         } catch (err: any) {
-            await supabase.from('transactions').update({ status: 'failed', description: `Kirani Failed: ${err.message || 'Provider error'}` }).eq('id', txn.id);
+            if (txnId) {
+                await supabase.from('transactions').update({ status: 'failed', description: `Kirani Failed: ${err.message || 'Provider error'}` }).eq('id', txnId);
+            }
             throw err;
         }
     },
@@ -810,20 +996,41 @@ export const KetawancyService = {
         const userBal = Number(profile?.balance || 0);
         if (userBal < price) throw new Error(`Insufficient balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
-        const { data: txn, error: txnErr } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                type: 'debit',
-                amount: price,
-                status: 'pending',
-                title: `Ratel: ${planName || 'Ratel Data'}`,
-                description: `Ratel data for ${phone}`
-            })
-            .select('id')
-            .single();
+        const refNo = `ratel-${Date.now()}`;
+        let txnId: string | null = null;
+        try {
+            const { data: txn, error: txnErr } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: price,
+                    status: 'pending',
+                    reference: refNo,
+                    description: `Ratel: ${planName || 'Ratel Data'} -> ${phone}`
+                })
+                .select('id')
+                .maybeSingle();
 
-        if (txnErr) throw new Error("Could not initialize transaction record");
+            if (txn?.id) {
+                txnId = txn.id;
+            } else if (txnErr) {
+                console.warn('[Ketawancy] Ratel txn insert fallback:', txnErr.message);
+                const { data: fallbackTxn } = await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: price,
+                        status: 'pending'
+                    })
+                    .select('id')
+                    .maybeSingle();
+                if (fallbackTxn?.id) txnId = fallbackTxn.id;
+            }
+        } catch (e) {
+            console.warn('[Ketawancy] Ratel txn record exception:', e);
+        }
 
         try {
             const res = await requestKetawancy('/services/buy/ratel', {
@@ -839,19 +1046,36 @@ export const KetawancyService = {
                 throw new Error(res?.message || 'Ratel purchase failed at provider');
             }
 
-            const refNo = res?.data?.refNo || `ratel-${Date.now()}`;
-            const newBal = userBal - price;
+            const finalRef = res?.data?.refNo || refNo;
+            let newBal = Math.max(0, userBal - price);
 
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
-            await supabase.from('transactions').update({
-                status: 'success',
-                reference: refNo,
-                metadata: { vendor: 'ketawancy', type: 'ratel', planId, phone }
-            }).eq('id', txn.id);
+            try {
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: price
+                });
+                if (!rpcErr && typeof rpcRes === 'number') {
+                    newBal = rpcRes;
+                } else {
+                    await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+                }
+            } catch {
+                await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+            }
 
-            return { success: true, refNo, newBalance: newBal };
+            if (txnId) {
+                await supabase.from('transactions').update({
+                    status: 'success',
+                    reference: finalRef,
+                    metadata: { vendor: 'ketawancy', type: 'ratel', planId, phone }
+                }).eq('id', txnId);
+            }
+
+            return { success: true, refNo: finalRef, newBalance: newBal };
         } catch (err: any) {
-            await supabase.from('transactions').update({ status: 'failed', description: `Ratel Failed: ${err.message || 'Provider error'}` }).eq('id', txn.id);
+            if (txnId) {
+                await supabase.from('transactions').update({ status: 'failed', description: `Ratel Failed: ${err.message || 'Provider error'}` }).eq('id', txnId);
+            }
             throw err;
         }
     },

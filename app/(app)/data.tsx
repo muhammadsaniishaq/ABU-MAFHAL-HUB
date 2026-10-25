@@ -918,59 +918,55 @@ export default function DataScreen() {
         setLoadingPlans(true);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         try {
-            if (netId === 'smile') {
-                const rawPlans = await KetawancyService.getSmilePlans();
+            if (['smile', 'alpha', 'kirani', 'ratel'].includes(netId)) {
+                // First check if admin has configured plans in data_plans with custom selling_price / markup
+                try {
+                    const { data: dbPlans, error: dbErr } = await supabase
+                        .from('data_plans')
+                        .select('*')
+                        .eq('network', netId)
+                        .eq('is_active', true);
+
+                    if (!dbErr && dbPlans && dbPlans.length > 0) {
+                        const mapped = dbPlans.map(p => ({
+                            id: String(p.plan_id || p.id),
+                            name: p.name,
+                            price: Number(p.selling_price || p.price || 0),
+                            volume: p.volume || p.name,
+                            validity: p.validity || '30 Days',
+                            network: netId.toUpperCase(),
+                            apiVendor: 'ketawancy'
+                        })).sort((a, b) => a.price - b.price);
+                        setPlans(mapped as any);
+                        return;
+                    }
+                } catch (e) {
+                    console.log('Error fetching DB plans for Ketawancy:', e);
+                }
+
+                // Fallback: Fetch directly from KetawancyService if not yet seeded
+                let rawPlans: any[] = [];
+                if (netId === 'smile') rawPlans = await KetawancyService.getSmilePlans();
+                else if (netId === 'alpha') rawPlans = await KetawancyService.getAlphaPlans();
+                else if (netId === 'kirani') rawPlans = await KetawancyService.getKiraniPlans();
+                else if (netId === 'ratel') rawPlans = await KetawancyService.getRatelPlans();
+
+                // Check if admin has a markup in data_configs
+                let markup = 0;
+                try {
+                    const { data: cfg } = await supabase.from('data_configs').select('markup').eq('network', netId).maybeSingle();
+                    if (cfg && cfg.markup) markup = Number(cfg.markup) || 0;
+                } catch (_) {}
+
                 const mapped = rawPlans.map(p => ({
                     id: String(p.planId),
                     name: p.planName,
-                    price: p.price || 0,
+                    price: (Number(p.price) || 0) + markup,
                     volume: p.planName,
                     validity: p.validity || '30 Days',
-                    network: 'Smile',
+                    network: netId.toUpperCase(),
                     apiVendor: 'ketawancy'
-                }));
-                setPlans(mapped as any);
-                return;
-            }
-            if (netId === 'alpha') {
-                const rawPlans = await KetawancyService.getAlphaPlans();
-                const mapped = rawPlans.map(p => ({
-                    id: String(p.planId),
-                    name: p.planName,
-                    price: p.price || 0,
-                    volume: p.planName,
-                    validity: p.validity || '30 Days',
-                    network: 'Alpha',
-                    apiVendor: 'ketawancy'
-                }));
-                setPlans(mapped as any);
-                return;
-            }
-            if (netId === 'kirani') {
-                const rawPlans = await KetawancyService.getKiraniPlans();
-                const mapped = rawPlans.map(p => ({
-                    id: String(p.planId),
-                    name: p.planName,
-                    price: p.price || 0,
-                    volume: p.planName,
-                    validity: p.validity || '30 Days',
-                    network: 'Kirani',
-                    apiVendor: 'ketawancy'
-                }));
-                setPlans(mapped as any);
-                return;
-            }
-            if (netId === 'ratel') {
-                const rawPlans = await KetawancyService.getRatelPlans();
-                const mapped = rawPlans.map(p => ({
-                    id: String(p.planId),
-                    name: p.planName,
-                    price: p.price || 0,
-                    volume: p.planName,
-                    validity: p.validity || '30 Days',
-                    network: 'Ratel',
-                    apiVendor: 'ketawancy'
-                }));
+                })).sort((a, b) => a.price - b.price);
                 setPlans(mapped as any);
                 return;
             }
