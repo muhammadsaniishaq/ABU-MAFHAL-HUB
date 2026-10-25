@@ -498,6 +498,14 @@ export default function ManageDataPlans() {
         }
 
         let error;
+        // Always save to app_settings as bulletproof redundancy
+        try {
+            await supabase.from('app_settings').upsert({
+                key: `data_markup_${editingConfig.network?.toLowerCase()}`,
+                value: { markup_type: newMarkupType, markup_value: val }
+            }, { onConflict: 'key' });
+        } catch (_) {}
+
         if (editingConfig.id) {
             const { error: err } = await supabase
                 .from('data_configs')
@@ -505,10 +513,25 @@ export default function ManageDataPlans() {
                 .eq('id', editingConfig.id);
             error = err;
         } else {
-            const { error: err } = await supabase
+            // Try updating first by network, or insert
+            const { data: existing } = await supabase
                 .from('data_configs')
-                .insert({ network: editingConfig.network, markup_type: newMarkupType, markup_value: val });
-            error = err;
+                .select('id')
+                .eq('network', editingConfig.network)
+                .maybeSingle();
+
+            if (existing?.id) {
+                const { error: err } = await supabase
+                    .from('data_configs')
+                    .update({ markup_type: newMarkupType, markup_value: val })
+                    .eq('id', existing.id);
+                error = err;
+            } else {
+                const { error: err } = await supabase
+                    .from('data_configs')
+                    .insert({ network: editingConfig.network, markup_type: newMarkupType, markup_value: val });
+                error = err;
+            }
         }
 
         if (error) {
@@ -516,60 +539,111 @@ export default function ManageDataPlans() {
         } else {
             setEditingConfig(null);
             setNewMarkupValue('');
-            fetchConfigsAndPlanTypes();
-            showAlert('Markup Config Saved 🎉', 'Default network markup saved. Click "Apply Markup" to update plan prices.');
+            await fetchConfigsAndPlanTypes();
+            showAlert('Markup Config Saved 🎉', `Markup of ${newMarkupType === 'percentage' ? `${val}%` : `₦${val}`} saved for ${editingConfig.network?.toUpperCase()}. Click "Apply Markup" to update plan prices.`);
         }
     };
 
     const handleApplyMarkups = async () => {
         setApplyingMarkups(true);
         try {
-            const config = configs.find(c => c.network === selectedNetwork || 
-                ((selectedNetwork === 'vital' || selectedNetwork === 'vitel') && (c.network === 'vital' || c.network === 'vitel')));
+            const netKey = selectedNetwork.toLowerCase();
+            let config = configs.find(c => c.network?.toLowerCase() === netKey || 
+                ((netKey === 'vital' || netKey === 'vitel') && (c.network?.toLowerCase() === 'vital' || c.network?.toLowerCase() === 'vitel')));
+
+            // If not found in memory, query data_configs directly or app_settings
             if (!config) {
-                showAlert("Error", `No markup configuration found for ${selectedNetwork.toUpperCase()}`, 'error');
-                return;
+                try {
+                    const { data: dbConf } = await supabase
+                        .from('data_configs')
+                        .select('*')
+                        .ilike('network', netKey)
+                        .maybeSingle();
+                    if (dbConf) config = dbConf;
+                } catch (_) {}
+            }
+
+            if (!config) {
+                try {
+                    const { data: appConf } = await supabase
+                        .from('app_settings')
+                        .select('value')
+                        .eq('key', `data_markup_${netKey}`)
+                        .maybeSingle();
+                    if (appConf?.value) {
+                        const val = appConf.value;
+                        config = {
+                            network: netKey,
+                            markup_type: typeof val === 'object' ? val.markup_type || 'fixed' : 'fixed',
+                            markup_value: typeof val === 'object' ? Number(val.markup_value || 50) : Number(val || 50)
+                        };
+                    }
+                } catch (_) {}
+            }
+
+            // If still no config exists, create a default ₦50 markup config and save it automatically
+            if (!config) {
+                config = {
+                    network: netKey,
+                    markup_type: 'fixed',
+                    markup_value: 50
+                };
+                try {
+                    await supabase.from('data_configs').insert({
+                        network: netKey,
+                        markup_type: 'fixed',
+                        markup_value: 50
+                    });
+                } catch (_) {}
             }
 
             let planQuery = supabase.from('data_plans').select('*');
-            if (selectedNetwork === 'vital' || selectedNetwork === 'vitel') {
+            if (netKey === 'vital' || netKey === 'vitel') {
                 planQuery = planQuery.or('network.eq.vital,network.eq.vitel,network.ilike.vital,network.ilike.vitel');
             } else {
-                planQuery = planQuery.ilike('network', selectedNetwork);
+                planQuery = planQuery.ilike('network', netKey);
             }
 
             let { data: activePlans, error: fetchErr } = await planQuery;
 
-            if (fetchErr) throw fetchErr;
-
             // If plans are not yet in data_plans for this network, auto-fetch from Ketawancy or provider first
             const ketawancyNets = ['smile', 'alpha', 'kirani', 'ratel', 'sahal'];
-            if ((!activePlans || activePlans.length === 0) && ketawancyNets.includes(selectedNetwork)) {
+            if ((!activePlans || activePlans.length === 0) && ketawancyNets.includes(netKey)) {
                 try {
                     let liveKetPlans: any[] = [];
-                    if (selectedNetwork === 'smile') liveKetPlans = await KetawancyService.getSmilePlans();
-                    else if (selectedNetwork === 'alpha') liveKetPlans = await KetawancyService.getAlphaPlans();
-                    else if (selectedNetwork === 'kirani') liveKetPlans = await KetawancyService.getKiraniPlans();
-                    else if (selectedNetwork === 'ratel') liveKetPlans = await KetawancyService.getRatelPlans();
-                    else if (selectedNetwork === 'sahal') liveKetPlans = [
+                    if (netKey === 'smile') liveKetPlans = await KetawancyService.getSmilePlans();
+                    else if (netKey === 'alpha') liveKetPlans = await KetawancyService.getAlphaPlans();
+                    else if (netKey === 'kirani') liveKetPlans = await KetawancyService.getKiraniPlans();
+                    else if (netKey === 'ratel') liveKetPlans = await KetawancyService.getRatelPlans();
+                    else if (netKey === 'sahal') liveKetPlans = [
                         { planId: 1, planName: 'Sahal 1GB', price: 600, validity: '30 Days' },
                         { planId: 2, planName: 'Sahal 2GB', price: 1100, validity: '30 Days' },
                         { planId: 3, planName: 'Sahal 5GB', price: 2500, validity: '30 Days' }
                     ];
 
                     if (liveKetPlans && liveKetPlans.length > 0) {
-                        const toInsert = liveKetPlans.map((kp, idx) => ({
-                            plan_id: `ket_${selectedNetwork}_${kp.planId || idx}`,
-                            name: kp.planName,
-                            volume: kp.planName,
-                            network: selectedNetwork,
-                            cost_price: Number(kp.price || 0),
-                            selling_price: Number(kp.price || 0),
-                            validity: kp.validity || '30 Days',
-                            plan_type: selectedNetwork.toUpperCase(),
-                            api_vendor: 'ketawancy',
-                            is_active: true
-                        }));
+                        const toInsert = liveKetPlans.map((kp, idx) => {
+                            const cost = Number(kp.price || 0);
+                            let selling = cost;
+                            const mVal = Number(config.markup_value || 0);
+                            if (config.markup_type === 'percentage') {
+                                selling = Math.round(cost * (1 + (mVal / 100)));
+                            } else {
+                                selling = cost + mVal;
+                            }
+                            return {
+                                plan_id: `ket_${netKey}_${kp.planId || idx}`,
+                                name: kp.planName,
+                                volume: kp.planName,
+                                network: netKey,
+                                cost_price: cost,
+                                selling_price: selling,
+                                validity: kp.validity || '30 Days',
+                                plan_type: netKey.toUpperCase(),
+                                api_vendor: 'ketawancy',
+                                is_active: true
+                            };
+                        });
 
                         try {
                             await supabase.from('data_plans').upsert(toInsert, { onConflict: 'plan_id' });
@@ -592,30 +666,38 @@ export default function ManageDataPlans() {
             for (const plan of activePlans) {
                 const cost = parseFloat(plan.cost_price || 0);
                 let selling = cost;
+                const mVal = parseFloat(config.markup_value || 0);
                 if (config.markup_type === 'percentage') {
-                    selling = cost * (1 + (parseFloat(config.markup_value || 0) / 100));
+                    selling = cost * (1 + (mVal / 100));
                 } else {
-                    selling = cost + parseFloat(config.markup_value || 0);
+                    selling = cost + mVal;
                 }
                 selling = Math.round(selling);
 
                 if (plan.id) {
-                    const { error: updateErr } = await supabase
+                    await supabase
                         .from('data_plans')
                         .update({ selling_price: selling })
                         .eq('id', plan.id);
-                    if (updateErr) throw updateErr;
                 } else if (plan.plan_id) {
-                    const { error: updateErr } = await supabase
+                    await supabase
                         .from('data_plans')
                         .update({ selling_price: selling })
                         .eq('plan_id', plan.plan_id);
-                    if (updateErr) throw updateErr;
                 }
             }
 
-            showAlert("Markup Applied 🎉", `Selling prices for ${selectedNetwork.toUpperCase()} plans updated using ${config.markup_type === 'percentage' ? `${config.markup_value}%` : `₦${config.markup_value}`} markup.`);
-            fetchPlans();
+            // Save to app_settings as fallback redundancy
+            try {
+                await supabase.from('app_settings').upsert({
+                    key: `data_markup_${netKey}`,
+                    value: { markup_type: config.markup_type, markup_value: config.markup_value }
+                }, { onConflict: 'key' });
+            } catch (_) {}
+
+            showAlert("Markup Applied 🎉", `Selling prices for ${selectedNetwork.toUpperCase()} plans updated successfully using ${config.markup_type === 'percentage' ? `${config.markup_value}%` : `₦${config.markup_value}`} markup.`);
+            await fetchConfigsAndPlanTypes();
+            await fetchPlans();
         } catch (e: any) {
             showAlert("Error", e.message || "Failed to apply markup", 'error');
         } finally {

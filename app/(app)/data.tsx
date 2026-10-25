@@ -918,25 +918,75 @@ export default function DataScreen() {
         setLoadingPlans(true);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         try {
-            if (['smile', 'alpha', 'kirani', 'ratel'].includes(netId)) {
-                // First check if admin has configured plans in data_plans with custom selling_price / markup
+            const netLower = netId.toLowerCase();
+            if (['smile', 'alpha', 'kirani', 'ratel', 'sahal'].includes(netLower)) {
+                // Fetch markup config for this network first
+                let markupVal = 0;
+                let markupType = 'fixed';
+                try {
+                    const { data: cfg } = await supabase
+                        .from('data_configs')
+                        .select('markup_value, markup_type')
+                        .ilike('network', netLower)
+                        .maybeSingle();
+
+                    if (cfg && cfg.markup_value !== null && cfg.markup_value !== undefined) {
+                        markupVal = Number(cfg.markup_value) || 0;
+                        markupType = cfg.markup_type || 'fixed';
+                    } else {
+                        // Check app_settings fallback
+                        const { data: appCfg } = await supabase
+                            .from('app_settings')
+                            .select('value')
+                            .or(`key.eq.data_markup_${netLower},key.eq.markup_${netLower}`)
+                            .maybeSingle();
+                        if (appCfg?.value) {
+                            const val = appCfg.value;
+                            if (typeof val === 'object') {
+                                markupVal = Number(val.markup_value) || 0;
+                                markupType = val.markup_type || 'fixed';
+                            } else {
+                                markupVal = Number(val) || 0;
+                            }
+                        }
+                    }
+                } catch (_) {}
+
+                // Check if admin has configured plans in data_plans with custom selling_price / markup
                 try {
                     const { data: dbPlans, error: dbErr } = await supabase
                         .from('data_plans')
                         .select('*')
-                        .eq('network', netId)
+                        .ilike('network', netLower)
                         .eq('is_active', true);
 
                     if (!dbErr && dbPlans && dbPlans.length > 0) {
-                        const mapped = dbPlans.map(p => ({
-                            id: String(p.plan_id || p.id),
-                            name: p.name,
-                            price: Number(p.selling_price || p.price || 0),
-                            volume: p.volume || p.name,
-                            validity: p.validity || '30 Days',
-                            network: netId.toUpperCase(),
-                            apiVendor: 'ketawancy'
-                        })).sort((a, b) => a.price - b.price);
+                        const mapped = dbPlans.map(p => {
+                            let sellPrice = Number(p.selling_price || 0);
+                            const costPrice = Number(p.cost_price || p.price || 0);
+                            
+                            // If selling_price equals cost_price or is unset, apply markup
+                            if ((!sellPrice || sellPrice <= costPrice) && markupVal > 0) {
+                                if (markupType === 'percentage') {
+                                    sellPrice = Math.round(costPrice * (1 + markupVal / 100));
+                                } else {
+                                    sellPrice = costPrice + markupVal;
+                                }
+                            } else if (!sellPrice) {
+                                sellPrice = costPrice;
+                            }
+
+                            return {
+                                id: String(p.plan_id || p.id),
+                                name: p.name,
+                                price: sellPrice,
+                                volume: p.volume || p.name,
+                                validity: p.validity || '30 Days',
+                                network: netLower.toUpperCase(),
+                                apiVendor: 'ketawancy'
+                            };
+                        }).sort((a, b) => a.price - b.price);
+
                         setPlans(mapped as any);
                         return;
                     }
@@ -946,27 +996,34 @@ export default function DataScreen() {
 
                 // Fallback: Fetch directly from KetawancyService if not yet seeded
                 let rawPlans: any[] = [];
-                if (netId === 'smile') rawPlans = await KetawancyService.getSmilePlans();
-                else if (netId === 'alpha') rawPlans = await KetawancyService.getAlphaPlans();
-                else if (netId === 'kirani') rawPlans = await KetawancyService.getKiraniPlans();
-                else if (netId === 'ratel') rawPlans = await KetawancyService.getRatelPlans();
+                if (netLower === 'smile') rawPlans = await KetawancyService.getSmilePlans();
+                else if (netLower === 'alpha') rawPlans = await KetawancyService.getAlphaPlans();
+                else if (netLower === 'kirani') rawPlans = await KetawancyService.getKiraniPlans();
+                else if (netLower === 'ratel') rawPlans = await KetawancyService.getRatelPlans();
+                else if (netLower === 'sahal') rawPlans = [
+                    { planId: 1, planName: 'Sahal 1GB', price: 600, validity: '30 Days' },
+                    { planId: 2, planName: 'Sahal 2GB', price: 1100, validity: '30 Days' },
+                    { planId: 3, planName: 'Sahal 5GB', price: 2500, validity: '30 Days' }
+                ];
 
-                // Check if admin has a markup in data_configs
-                let markup = 0;
-                try {
-                    const { data: cfg } = await supabase.from('data_configs').select('markup').eq('network', netId).maybeSingle();
-                    if (cfg && cfg.markup) markup = Number(cfg.markup) || 0;
-                } catch (_) {}
-
-                const mapped = rawPlans.map(p => ({
-                    id: String(p.planId),
-                    name: p.planName,
-                    price: (Number(p.price) || 0) + markup,
-                    volume: p.planName,
-                    validity: p.validity || '30 Days',
-                    network: netId.toUpperCase(),
-                    apiVendor: 'ketawancy'
-                })).sort((a, b) => a.price - b.price);
+                const mapped = rawPlans.map(p => {
+                    const cost = Number(p.price) || 0;
+                    let selling = cost;
+                    if (markupType === 'percentage' && markupVal > 0) {
+                        selling = Math.round(cost * (1 + markupVal / 100));
+                    } else if (markupVal > 0) {
+                        selling = cost + markupVal;
+                    }
+                    return {
+                        id: String(p.planId),
+                        name: p.planName,
+                        price: selling,
+                        volume: p.planName,
+                        validity: p.validity || '30 Days',
+                        network: netLower.toUpperCase(),
+                        apiVendor: 'ketawancy'
+                    };
+                }).sort((a, b) => a.price - b.price);
                 setPlans(mapped as any);
                 return;
             }
