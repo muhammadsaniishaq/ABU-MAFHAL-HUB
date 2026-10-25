@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, StyleSheet, RefreshControl, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Platform, StyleSheet, RefreshControl, Modal } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -17,7 +17,7 @@ const T = {
     gold: '#f5a623',
     goldDk: '#d4890e',
     white: '#ffffff',
-    bg: '#f4f6fb',
+    bg: '#f8fafc',
     cardBg: '#ffffff',
     border: '#e2e8f0',
     sub: '#64748b',
@@ -41,7 +41,7 @@ const SIM_NETWORKS_META: Record<string, {
         lightBg: '#FEF3C7',
         tag: 'Instant 4G/LTE',
         speed: 'High Speed LTE',
-        features: ['Instant Activation', 'Voice & Unlimited Data']
+        features: ['Instant API Line Assignment', 'Voice & Unlimited Data']
     },
     kirani: {
         logo: require('../../assets/images/kirani.png'),
@@ -97,10 +97,6 @@ export default function SimCardScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [showNetworkModal, setShowNetworkModal] = useState(false);
 
-    // Form inputs (Online Activation only - no physical delivery)
-    const [phoneNumber, setPhoneNumber] = useState('');
-    const [emailAddress, setEmailAddress] = useState('');
-
     // Flow states
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [processing, setProcessing] = useState(false);
@@ -129,16 +125,14 @@ export default function SimCardScreen() {
             const { data: { user: authUser } } = await supabase.auth.getUser();
             if (authUser) {
                 setUser(authUser);
-                setEmailAddress(authUser.email || '');
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('balance, phone, full_name')
+                    .select('balance, phone, full_name, email')
                     .eq('id', authUser.id)
                     .maybeSingle();
 
                 if (profile) {
                     setBalance(Number(profile.balance || 0));
-                    if (profile.phone) setPhoneNumber(profile.phone);
                 }
             }
 
@@ -229,17 +223,12 @@ export default function SimCardScreen() {
         if (balance !== null && balance < selectedPlan.price) {
             Alert.alert(
                 "Insufficient Wallet Balance",
-                `Your wallet balance (₦${balance.toLocaleString()}) cannot cover this SIM purchase (₦${selectedPlan.price.toLocaleString()}).`,
+                `Your wallet balance (₦${balance.toLocaleString()}) cannot cover this SIM purchase (₦${selectedPlan.price.toLocaleString()}). Please fund your wallet.`,
                 [
                     { text: "Cancel", style: "cancel" },
                     { text: "Fund Wallet", onPress: () => router.push('/wallet') }
                 ]
             );
-            return;
-        }
-
-        if (!phoneNumber || phoneNumber.trim().length < 10) {
-            Alert.alert("Phone Required", "Please enter a valid contact phone number.");
             return;
         }
 
@@ -252,13 +241,12 @@ export default function SimCardScreen() {
 
         setProcessing(true);
         try {
+            // Purchase SIM: debits wallet balance only if API call succeeds
             const result = await KetawancyService.purchaseSim({
                 userId: user.id,
                 planId: selectedPlan._id,
                 planName: selectedPlan.name,
-                price: selectedPlan.price,
-                phone: phoneNumber.trim(),
-                email: emailAddress.trim()
+                price: selectedPlan.price
             });
 
             if (result.success) {
@@ -276,7 +264,7 @@ export default function SimCardScreen() {
                 });
             }
         } catch (err: any) {
-            Alert.alert("SIM Purchase Failed", err.message || "Failed to complete SIM purchase. Your wallet balance was not debited.");
+            Alert.alert("Purchase Failed", err.message || "Failed to purchase SIM. Your wallet balance was not debited.");
         } finally {
             setProcessing(false);
         }
@@ -289,298 +277,293 @@ export default function SimCardScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            <KeyboardAvoidingView 
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-                style={{ flex: 1 }}
+            {/* Header */}
+            <LinearGradient 
+                colors={['#060d21', '#0d1b3e']} 
+                style={[s.headerContainer, { paddingTop: insets.top + 10 }]}
             >
-                {/* Clean Modern Light Header */}
-                <LinearGradient 
-                    colors={['#060d21', '#0d1b3e']} 
-                    style={[s.headerContainer, { paddingTop: insets.top + 10 }]}
-                >
-                    <View style={s.headerTop}>
-                        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
-                            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                        <View style={{ alignItems: 'center' }}>
-                            <Text style={s.headerTitle}>SIM Cards & eSIM</Text>
-                            {balance !== null && (
-                                <TouchableOpacity 
-                                    onPress={() => router.push('/wallet')} 
-                                    style={s.balanceBadge} 
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
-                                    <Text style={s.headerBalance}>
-                                        ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
+                <View style={s.headerTop}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
+                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={s.headerTitle}>SIM Cards & eSIM</Text>
+                        {balance !== null && (
+                            <TouchableOpacity 
+                                onPress={() => router.push('/wallet')} 
+                                style={s.balanceBadge} 
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
+                                <Text style={s.headerBalance}>
+                                    ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <TouchableOpacity onPress={() => router.push('/wallet')} style={s.topWalletBtn}>
+                        <Ionicons name="add-circle" size={22} color="#f5a623" />
+                    </TouchableOpacity>
+                </View>
+            </LinearGradient>
+
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={s.scrollContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.navy} />}
+            >
+                {/* Maintenance Alert */}
+                {isMaintenance && (
+                    <View style={s.maintenanceBox}>
+                        <Ionicons name="warning" size={22} color="#D97706" />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={s.maintenanceTitle}>Service Under Maintenance</Text>
+                            <Text style={s.maintenanceDesc}>{maintenanceMsg}</Text>
                         </View>
-                        <TouchableOpacity onPress={() => router.push('/wallet')} style={s.topWalletBtn}>
-                            <Ionicons name="add-circle" size={22} color="#f5a623" />
+                    </View>
+                )}
+
+                {/* Modern Interactive Visual SIM Showcase Card */}
+                {selectedPlan && (
+                    <LinearGradient
+                        colors={[activeMeta.color, '#0d1b3e']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={s.simCardPreview}
+                    >
+                        <View style={s.previewTop}>
+                            <View style={s.chipGraphic}>
+                                <View style={s.chipLineHoriz} />
+                                <View style={s.chipLineVert} />
+                                <Ionicons name="hardware-chip" size={18} color="#D4AF37" />
+                            </View>
+                            <View style={s.networkLogoWrap}>
+                                <Image source={activeMeta.logo} style={s.previewLogo} resizeMode="contain" />
+                            </View>
+                        </View>
+
+                        <View style={s.previewMid}>
+                            <Text style={s.previewPlanName}>{selectedPlan.name.toUpperCase()}</Text>
+                            <Text style={s.previewPhoneNum}>
+                                {purchasedSim?.number ? purchasedSim.number : 'ONLINE INSTANT LINE'}
+                            </Text>
+                            <Text style={s.previewSubInfo}>
+                                Digital Activation • Assigned directly via API
+                            </Text>
+                        </View>
+
+                        <View style={s.previewBottom}>
+                            <View>
+                                <Text style={s.previewSubLabel}>NETWORK</Text>
+                                <Text style={s.previewSubVal}>{activeMeta.tag}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={s.previewSubLabel}>ACTIVATION FEE</Text>
+                                <Text style={s.previewPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
+                )}
+
+                {/* Success Order Box */}
+                {purchasedSim && (
+                    <View style={s.successBox}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="checkmark-circle" size={26} color="#16a34a" />
+                            <View style={{ marginLeft: 10 }}>
+                                <Text style={s.successTitle}>SIM Purchased Successfully!</Text>
+                                <Text style={s.successSubtitle}>Reference: {purchasedSim.refNo}</Text>
+                            </View>
+                        </View>
+
+                        <View style={s.assignedNumberBox}>
+                            <Text style={s.assignedLabel}>Assigned Line Number:</Text>
+                            <View style={s.assignedRow}>
+                                <Text style={s.assignedValue}>{purchasedSim.number || 'Provisioned'}</Text>
+                                {purchasedSim.number && (
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            Clipboard.setStringAsync(purchasedSim.number || '');
+                                            Alert.alert("Copied", "SIM line number copied to clipboard");
+                                        }}
+                                        style={s.copyBtn}
+                                    >
+                                        <Ionicons name="copy-outline" size={16} color="#2563eb" />
+                                        <Text style={s.copyBtnTxt}>Copy</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={() => setPurchasedSim(null)}
+                            style={s.dismissSuccessBtn}
+                        >
+                            <Text style={s.dismissSuccessText}>Close</Text>
                         </TouchableOpacity>
                     </View>
-                </LinearGradient>
+                )}
 
-                <ScrollView
-                    style={{ flex: 1 }}
-                    contentContainerStyle={s.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.navy} />}
-                >
-                    {/* Maintenance Alert */}
-                    {isMaintenance && (
-                        <View style={s.maintenanceBox}>
-                            <Ionicons name="warning" size={22} color="#D97706" />
-                            <View style={{ flex: 1, marginLeft: 10 }}>
-                                <Text style={s.maintenanceTitle}>Service Under Maintenance</Text>
-                                <Text style={s.maintenanceDesc}>{maintenanceMsg}</Text>
+                {/* 1. Select SIM Type / Network Provider */}
+                <View style={s.sectionHeader}>
+                    <Ionicons name="cellular-outline" size={15} color="#0d1b3e" style={{ marginRight: 6 }} />
+                    <Text style={s.sectionTitle}>Select SIM Provider</Text>
+                </View>
+
+                {loadingPlans ? (
+                    <View style={s.loadingWrap}>
+                        <ActivityIndicator size="small" color={T.navy} />
+                        <Text style={s.loadingTxt}>Loading available SIM plans...</Text>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        onPress={() => setShowNetworkModal(true)}
+                        activeOpacity={0.85}
+                        style={s.networkDropdownTrigger}
+                    >
+                        {selectedPlan ? (
+                            <>
+                                <View style={s.triggerLogoWrap}>
+                                    <Image source={activeMeta.logo} style={s.triggerLogo} resizeMode="contain" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={s.triggerName}>{selectedPlan.name}</Text>
+                                        <View style={[s.triggerTag, { backgroundColor: activeMeta.lightBg }]}>
+                                            <Text style={[s.triggerTagTxt, { color: activeMeta.color }]}>{activeMeta.tag}</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={s.triggerPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
+                                </View>
+                            </>
+                        ) : (
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.triggerPlaceholder}>Tap to choose a Network SIM</Text>
                             </View>
+                        )}
+                        <View style={s.dropdownIconBox}>
+                            <Ionicons name="chevron-down" size={18} color="#64748b" />
                         </View>
-                    )}
+                    </TouchableOpacity>
+                )}
 
-                    {/* Modern Interactive Visual SIM Showcase Card */}
-                    {selectedPlan && (
+                {/* 2. Order Summary Card */}
+                {selectedPlan && (
+                    <View style={s.summaryCard}>
+                        <View style={s.summaryRow}>
+                            <Text style={s.summaryLabel}>Plan Selected</Text>
+                            <Text style={s.summaryVal}>{selectedPlan.name}</Text>
+                        </View>
+                        <View style={s.divider} />
+                        <View style={s.summaryRow}>
+                            <Text style={s.summaryLabel}>Activation Type</Text>
+                            <Text style={s.summaryVal}>Online Instant API Activation</Text>
+                        </View>
+                        <View style={s.divider} />
+                        <View style={s.summaryRow}>
+                            <Text style={s.summaryLabel}>Payment Method</Text>
+                            <Text style={s.summaryVal}>Wallet Balance</Text>
+                        </View>
+                        <View style={s.divider} />
+                        <View style={s.summaryRow}>
+                            <Text style={[s.summaryLabel, { fontWeight: '800', color: '#0f172a' }]}>Total Cost</Text>
+                            <Text style={s.summaryTotal}>₦{selectedPlan.price.toLocaleString()}</Text>
+                        </View>
+                    </View>
+                )}
+
+                {/* Checkout Button */}
+                {selectedPlan && (
+                    <TouchableOpacity
+                        onPress={handleInitiatePurchase}
+                        disabled={processing}
+                        style={[s.checkoutBtn, processing && { opacity: 0.6 }]}
+                        activeOpacity={0.85}
+                    >
                         <LinearGradient
-                            colors={[activeMeta.color, '#0d1b3e']}
+                            colors={[T.gold, T.goldDk]}
                             start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={s.simCardPreview}
+                            end={{ x: 1, y: 0 }}
+                            style={s.checkoutGradient}
                         >
-                            <View style={s.previewTop}>
-                                <View style={s.chipGraphic}>
-                                    <View style={s.chipLineHoriz} />
-                                    <View style={s.chipLineVert} />
-                                    <Ionicons name="hardware-chip" size={18} color="#D4AF37" />
-                                </View>
-                                <View style={s.networkLogoWrap}>
-                                    <Image source={activeMeta.logo} style={s.previewLogo} resizeMode="contain" />
-                                </View>
-                            </View>
-
-                            <View style={s.previewMid}>
-                                <Text style={s.previewPlanName}>{selectedPlan.name.toUpperCase()}</Text>
-                                <Text style={s.previewPhoneNum}>
-                                    {phoneNumber ? phoneNumber.replace(/(\d{4})(\d{3})(\d{4})/, '$1  $2  $3') : '+234  ••••  ••••'}
-                                </Text>
-                            </View>
-
-                            <View style={s.previewBottom}>
-                                <View>
-                                    <Text style={s.previewSubLabel}>NETWORK</Text>
-                                    <Text style={s.previewSubVal}>{activeMeta.tag}</Text>
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={s.previewSubLabel}>ACTIVATION FEE</Text>
-                                    <Text style={s.previewPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
-                                </View>
-                            </View>
-                        </LinearGradient>
-                    )}
-
-                    {/* Success Order Banner if purchased */}
-                    {purchasedSim && (
-                        <View style={s.successBox}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
-                                <Text style={s.successTitle}>SIM Order Confirmed!</Text>
-                            </View>
-                            <Text style={s.successSubtitle}>Reference: {purchasedSim.refNo}</Text>
-                            {purchasedSim.number && (
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        Clipboard.setStringAsync(purchasedSim.number || '');
-                                        Alert.alert("Copied", "SIM line number copied to clipboard");
-                                    }}
-                                    style={s.copyNumberPill}
-                                >
-                                    <Text style={s.copyNumberText}>Line: {purchasedSim.number}</Text>
-                                    <Ionicons name="copy-outline" size={14} color="#2563eb" />
-                                </TouchableOpacity>
+                            {processing ? (
+                                <ActivityIndicator size="small" color="#0d1b3e" />
+                            ) : (
+                                <>
+                                    <Ionicons name="flash" size={18} color="#0d1b3e" />
+                                    <Text style={s.checkoutTxt}>
+                                        Pay & Activate • ₦{selectedPlan.price.toLocaleString()}
+                                    </Text>
+                                </>
                             )}
-                            <TouchableOpacity 
-                                onPress={() => setPurchasedSim(null)}
-                                style={s.dismissSuccessBtn}
-                            >
-                                <Text style={s.dismissSuccessText}>Done</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                )}
+            </ScrollView>
+
+            {/* Network Selection Bottom Sheet Modal */}
+            <Modal
+                visible={showNetworkModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowNetworkModal(false)}
+            >
+                <View style={s.modalOverlay}>
+                    <View style={s.modalContent}>
+                        <View style={s.modalHeader}>
+                            <Text style={s.modalTitle}>Select Network Provider</Text>
+                            <TouchableOpacity onPress={() => setShowNetworkModal(false)} style={s.modalCloseBtn}>
+                                <Ionicons name="close" size={20} color="#64748b" />
                             </TouchableOpacity>
                         </View>
-                    )}
 
-                    {/* 1. Network Selection Dropdown Trigger Card */}
-                    <View style={s.sectionHeader}>
-                        <Ionicons name="cellular-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                        <Text style={s.sectionTitle}>1. Select Network Provider</Text>
-                    </View>
-
-                    {loadingPlans ? (
-                        <View style={s.loadingWrap}>
-                            <ActivityIndicator size="small" color={T.navy} />
-                            <Text style={s.loadingTxt}>Loading available SIM plans...</Text>
-                        </View>
-                    ) : (
-                        <TouchableOpacity
-                            onPress={() => setShowNetworkModal(true)}
-                            activeOpacity={0.85}
-                            style={s.networkDropdownTrigger}
-                        >
-                            {selectedPlan ? (
-                                <>
-                                    <View style={s.triggerLogoWrap}>
-                                        <Image source={activeMeta.logo} style={s.triggerLogo} resizeMode="contain" />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                            <Text style={s.triggerName}>{selectedPlan.name}</Text>
-                                            <View style={[s.triggerTag, { backgroundColor: activeMeta.lightBg }]}>
-                                                <Text style={[s.triggerTagTxt, { color: activeMeta.color }]}>{activeMeta.tag}</Text>
-                                            </View>
+                        <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                            {simPlans.map(plan => {
+                                const meta = getPlanMeta(plan);
+                                const isSel = selectedPlan?._id === plan._id;
+                                return (
+                                    <TouchableOpacity
+                                        key={plan._id}
+                                        onPress={() => {
+                                            setSelectedPlan(plan);
+                                            setShowNetworkModal(false);
+                                            try { Haptics.selectionAsync(); } catch {}
+                                        }}
+                                        activeOpacity={0.75}
+                                        style={[
+                                            s.modalOptionCard,
+                                            isSel && { borderColor: meta.color, backgroundColor: meta.lightBg }
+                                        ]}
+                                    >
+                                        <View style={s.modalLogoWrap}>
+                                            <Image source={meta.logo} style={s.modalLogo} resizeMode="contain" />
                                         </View>
-                                        <Text style={s.triggerPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
-                                    </View>
-                                </>
-                            ) : (
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.triggerPlaceholder}>Tap to choose a Network SIM</Text>
-                                </View>
-                            )}
-                            <View style={s.dropdownIconBox}>
-                                <Ionicons name="chevron-down" size={18} color="#64748b" />
-                            </View>
-                        </TouchableOpacity>
-                    )}
-
-                    {/* 2. Customer Online Activation Details */}
-                    <View style={s.sectionHeader}>
-                        <Ionicons name="person-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                        <Text style={s.sectionTitle}>2. Activation Information</Text>
-                    </View>
-                    <View style={s.formCard}>
-                        <View style={s.field}>
-                            <Text style={s.fieldLabel}>Contact Phone Number *</Text>
-                            <View style={s.inputWrap}>
-                                <Ionicons name="call-outline" size={17} color="#64748b" />
-                                <TextInput
-                                    placeholder="e.g. 08012345678"
-                                    placeholderTextColor="#94a3b8"
-                                    keyboardType="phone-pad"
-                                    value={phoneNumber}
-                                    onChangeText={setPhoneNumber}
-                                    style={s.textInput}
-                                />
-                            </View>
-                        </View>
-
-                        <View style={s.field}>
-                            <Text style={s.fieldLabel}>Email Address (For Instant eSIM Profile & Receipt)</Text>
-                            <View style={s.inputWrap}>
-                                <Ionicons name="mail-outline" size={17} color="#64748b" />
-                                <TextInput
-                                    placeholder="customer@example.com"
-                                    placeholderTextColor="#94a3b8"
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    value={emailAddress}
-                                    onChangeText={setEmailAddress}
-                                    style={s.textInput}
-                                />
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Checkout Button */}
-                    {selectedPlan && (
-                        <TouchableOpacity
-                            onPress={handleInitiatePurchase}
-                            disabled={processing}
-                            style={[s.checkoutBtn, processing && { opacity: 0.6 }]}
-                            activeOpacity={0.85}
-                        >
-                            <LinearGradient
-                                colors={[T.gold, T.goldDk]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={s.checkoutGradient}
-                            >
-                                {processing ? (
-                                    <ActivityIndicator size="small" color="#0d1b3e" />
-                                ) : (
-                                    <>
-                                        <Ionicons name="flash" size={18} color="#0d1b3e" />
-                                        <Text style={s.checkoutTxt}>
-                                            Activate Now • ₦{selectedPlan.price.toLocaleString()}
-                                        </Text>
-                                    </>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    )}
-                </ScrollView>
-
-                {/* Network Selection Bottom Sheet Modal */}
-                <Modal
-                    visible={showNetworkModal}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setShowNetworkModal(false)}
-                >
-                    <View style={s.modalOverlay}>
-                        <View style={s.modalContent}>
-                            <View style={s.modalHeader}>
-                                <Text style={s.modalTitle}>Select Network Provider</Text>
-                                <TouchableOpacity onPress={() => setShowNetworkModal(false)} style={s.modalCloseBtn}>
-                                    <Ionicons name="close" size={20} color="#64748b" />
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-                                {simPlans.map(plan => {
-                                    const meta = getPlanMeta(plan);
-                                    const isSel = selectedPlan?._id === plan._id;
-                                    return (
-                                        <TouchableOpacity
-                                            key={plan._id}
-                                            onPress={() => {
-                                                setSelectedPlan(plan);
-                                                setShowNetworkModal(false);
-                                                try { Haptics.selectionAsync(); } catch {}
-                                            }}
-                                            activeOpacity={0.75}
-                                            style={[
-                                                s.modalOptionCard,
-                                                isSel && { borderColor: meta.color, backgroundColor: meta.lightBg }
-                                            ]}
-                                        >
-                                            <View style={s.modalLogoWrap}>
-                                                <Image source={meta.logo} style={s.modalLogo} resizeMode="contain" />
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Text style={s.modalOptionName}>{plan.name}</Text>
-                                                    <View style={[s.triggerTag, { backgroundColor: meta.lightBg }]}>
-                                                        <Text style={[s.triggerTagTxt, { color: meta.color }]}>{meta.tag}</Text>
-                                                    </View>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={s.modalOptionName}>{plan.name}</Text>
+                                                <View style={[s.triggerTag, { backgroundColor: meta.lightBg }]}>
+                                                    <Text style={[s.triggerTagTxt, { color: meta.color }]}>{meta.tag}</Text>
                                                 </View>
-                                                <Text style={s.modalOptionDesc} numberOfLines={1}>{meta.features.join(' • ')}</Text>
                                             </View>
-                                            <Text style={[s.modalOptionPrice, { color: meta.color }]}>₦{plan.price.toLocaleString()}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </ScrollView>
-                        </View>
+                                            <Text style={s.modalOptionDesc} numberOfLines={1}>{meta.features.join(' • ')}</Text>
+                                        </View>
+                                        <Text style={[s.modalOptionPrice, { color: meta.color }]}>₦{plan.price.toLocaleString()}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
                     </View>
-                </Modal>
+                </View>
+            </Modal>
 
-                {/* PIN Security Modal */}
-                <SecurityModal
-                    visible={showSecurityModal}
-                    onClose={() => setShowSecurityModal(false)}
-                    onSuccess={handleConfirmPurchase}
-                    title="Verify Security PIN"
-                />
-            </KeyboardAvoidingView>
+            {/* PIN Security Modal */}
+            <SecurityModal
+                visible={showSecurityModal}
+                onClose={() => setShowSecurityModal(false)}
+                onSuccess={handleConfirmPurchase}
+                title="Verify Security PIN"
+            />
         </View>
     );
 }
@@ -667,9 +650,9 @@ const s = StyleSheet.create({
         marginBottom: 20,
         shadowColor: '#0A1128',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.15,
         shadowRadius: 10,
-        elevation: 6,
+        elevation: 5,
     },
     previewTop: {
         flexDirection: 'row',
@@ -723,11 +706,17 @@ const s = StyleSheet.create({
         letterSpacing: 1,
     },
     previewPhoneNum: {
-        fontSize: 19,
+        fontSize: 18,
         fontWeight: '900',
         color: '#FFFFFF',
         letterSpacing: 1.5,
         marginTop: 4,
+    },
+    previewSubInfo: {
+        fontSize: 10,
+        color: 'rgba(255,255,255,0.7)',
+        marginTop: 3,
+        fontWeight: '500',
     },
     previewBottom: {
         flexDirection: 'row',
@@ -756,51 +745,72 @@ const s = StyleSheet.create({
     },
     successBox: {
         backgroundColor: '#F0FDF4',
-        borderRadius: 16,
+        borderRadius: 18,
         padding: 16,
         borderWidth: 1.5,
         borderColor: '#86EFAC',
         marginBottom: 20,
     },
     successTitle: {
-        fontSize: 14,
+        fontSize: 14.5,
         fontWeight: '900',
         color: '#16a34a',
-        marginLeft: 8,
     },
     successSubtitle: {
         fontSize: 11,
         color: '#64748b',
-        marginTop: 4,
+        marginTop: 2,
     },
-    copyNumberPill: {
+    assignedNumberBox: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    assignedLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#64748b',
+    },
+    assignedRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#BAE6FD',
-        marginTop: 10,
+        marginTop: 4,
     },
-    copyNumberText: {
-        fontSize: 13,
-        fontWeight: '800',
+    assignedValue: {
+        fontSize: 16,
+        fontWeight: '900',
         color: '#0284c7',
+        letterSpacing: 0.5,
+    },
+    copyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    copyBtnTxt: {
+        fontSize: 11.5,
+        fontWeight: '700',
+        color: '#2563eb',
     },
     dismissSuccessBtn: {
         backgroundColor: '#16a34a',
         borderRadius: 10,
-        paddingVertical: 9,
+        paddingVertical: 10,
         alignItems: 'center',
         marginTop: 12,
     },
     dismissSuccessText: {
         color: '#FFFFFF',
         fontWeight: '800',
-        fontSize: 12,
+        fontSize: 13,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -809,7 +819,7 @@ const s = StyleSheet.create({
         marginTop: 4,
     },
     sectionTitle: {
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '800',
         color: '#0d1b3e',
         textTransform: 'uppercase',
@@ -834,10 +844,10 @@ const s = StyleSheet.create({
         paddingVertical: 12,
         borderWidth: 1.5,
         borderColor: '#e2e8f0',
-        marginBottom: 18,
+        marginBottom: 16,
         shadowColor: '#0d1b3e',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
+        shadowOpacity: 0.03,
         shadowRadius: 5,
         elevation: 2,
     },
@@ -892,44 +902,44 @@ const s = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#e2e8f0',
     },
-    formCard: {
+    summaryCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 18,
+        borderRadius: 16,
         padding: 16,
         borderWidth: 1.5,
         borderColor: '#e2e8f0',
         marginBottom: 20,
         shadowColor: '#0d1b3e',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
+        shadowOpacity: 0.03,
         shadowRadius: 5,
         elevation: 2,
     },
-    field: {
-        marginBottom: 14,
-    },
-    fieldLabel: {
-        fontSize: 11.5,
-        fontWeight: '700',
-        color: '#334155',
-        marginBottom: 6,
-    },
-    inputWrap: {
+    summaryRow: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        paddingHorizontal: 12,
-        height: 46,
-        gap: 10,
+        paddingVertical: 6,
     },
-    textInput: {
-        flex: 1,
-        color: '#0f172a',
-        fontSize: 13.5,
+    summaryLabel: {
+        fontSize: 12.5,
+        color: '#64748b',
         fontWeight: '600',
+    },
+    summaryVal: {
+        fontSize: 12.5,
+        color: '#0f172a',
+        fontWeight: '700',
+    },
+    summaryTotal: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: '#f5a623',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#f1f5f9',
+        marginVertical: 4,
     },
     checkoutBtn: {
         borderRadius: 16,

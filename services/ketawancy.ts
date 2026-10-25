@@ -168,17 +168,15 @@ export const KetawancyService = {
         try {
             // 3. Call Ketawancy API
             const res = await requestKetawancy(`/sim/purchase/${planId}`, {
-                method: 'POST',
-                body: {
-                    phone: phone || profile.phone,
-                    email: email || profile.email,
-                    buyFrom: 'balance'
-                }
+                method: 'POST'
             });
 
-            const isSuccess = res?.status === 'success' || res?.data?.refNo;
+            if (res?.status !== 'success') {
+                throw new Error(res?.message || 'SIM purchase failed at provider');
+            }
+
             const refNo = res?.data?.refNo || `sim-${Date.now()}`;
-            const simDetails = res?.simCard || { number: phone || 'Generated', email: email || profile.email };
+            const simDetails = res?.simCard || { number: 'Assigned by Provider', email: profile.email || 'N/A' };
 
             // 4. Deduct User Wallet Balance safely
             const newBalance = userBal - price;
