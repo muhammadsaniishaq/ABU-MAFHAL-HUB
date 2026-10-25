@@ -554,19 +554,16 @@ export default function Dashboard() {
   ];
 
   const isActionHidden = useCallback((action: { id: string; route?: string }) => {
-    // 1. Service-specific visibility in dashboard_service_customizations
+    // 1. Service-specific visibility in dashboard_service_customizations (Hide / Show)
     const cust = serviceCustoms[action.id];
     if (cust && cust.is_visible === false) return true;
 
-    // 2. Global hidden features list
+    // 2. Global hidden features list (Admin Settings)
     const featKey = (action.route && featureMap[action.route]) || actionIdFeatureMap[action.id];
     if (featKey && hiddenFeatures.includes(featKey)) return true;
 
-    // 3. Feature flags under maintenance / disabled
-    if (featKey && featureFlags[featKey] && featureFlags[featKey].is_enabled === false) return true;
-
     return false;
-  }, [serviceCustoms, hiddenFeatures, featureFlags]);
+  }, [serviceCustoms, hiddenFeatures]);
 
   // Apply admin customizations on top of base catalog, filtering out any hidden services
   const ALL_ACTIONS_CATALOG = useMemo(() => {
@@ -574,17 +571,30 @@ export default function Dashboard() {
       .filter(item => !isActionHidden(item))
       .map(item => {
         const cust = serviceCustoms[item.id];
-        if (!cust) return item;
+        const featKey = (item.route && featureMap[item.route]) || actionIdFeatureMap[item.id];
+        const isMaintenance = featKey && featureFlags[featKey] && featureFlags[featKey].is_enabled === false;
+
+        const defaultBadge = isMaintenance ? 'MAINT' : item.badge;
+        const defaultColor = isMaintenance ? '#D97706' : item.color;
+
+        if (!cust) {
+          return {
+            ...item,
+            color: defaultColor,
+            badge: defaultBadge,
+          };
+        }
+
         return {
           ...item,
           icon: cust.custom_icon || item.icon,
           label: cust.custom_label || item.label,
-          color: cust.custom_color || item.color,
-          badge: cust.custom_badge !== undefined ? cust.custom_badge : item.badge,
+          color: isMaintenance ? '#D97706' : (cust.custom_color || item.color),
+          badge: isMaintenance ? 'MAINT' : (cust.custom_badge !== undefined ? cust.custom_badge : item.badge),
           bgStyle: cust.custom_bg_style || 'tint',
         };
       });
-  }, [isActionHidden, serviceCustoms]);
+  }, [isActionHidden, serviceCustoms, featureFlags]);
 
   const catalogMap = useMemo(() => new Map(ALL_ACTIONS_CATALOG.map(a => [a.id, a])), [ALL_ACTIONS_CATALOG]);
 

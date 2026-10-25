@@ -142,7 +142,7 @@ export default function AdminSettings() {
     const [activeTab, setActiveTab] = useState<'system' | 'features' | 'economics' | 'api'>('system');
 
     const allKnownFeatures = [
-      'feature_transfer', 'feature_airtime', 'feature_data', 'feature_education',
+      'feature_transfer', 'feature_airtime', 'feature_data', 'feature_sim', 'feature_telecom_sim', 'feature_education',
       'feature_bills', 'feature_cards',
       'feature_crypto', 'feature_analytics', 'feature_rewards', 'feature_qr',
       'feature_bvn', 'feature_nin', 'feature_cac',
@@ -1118,6 +1118,10 @@ export default function AdminSettings() {
                             <ToggleRow title="Airtime Top-up" subtitle="Toggle airtime recharge feature" icon="phone-portrait" color="#f97316" value={features['feature_airtime'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_airtime: val})} />
                             <View style={s.divider} />
                             <ToggleRow title="Data Bundles" subtitle="Toggle data subscription feature" icon="wifi" color="#22c55e" value={features['feature_data'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_data: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Buy SIM Cards" subtitle="Toggle SIM cards purchase feature" icon="hardware-chip" color="#dc2626" value={features['feature_sim'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_sim: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Telecom & SIM Hub" subtitle="Toggle Telecom & SIM Hub slider on dashboard" icon="cellular" color="#0F172A" value={features['feature_telecom_sim'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_telecom_sim: val})} />
                             <View style={s.divider} />
                             <ToggleRow title="Smile Data" subtitle="Toggle Smile internet data" icon="globe" color="#ec4899" value={features['feature_smile'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_smile: val})} />
                             <View style={s.divider} />

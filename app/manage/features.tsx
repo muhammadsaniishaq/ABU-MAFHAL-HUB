@@ -104,6 +104,8 @@ const ADMIN_LOCKABLE_MODULES = [
   { key: 'tickets',        label: 'Help Desk & Support',         icon: 'chatbubbles-outline',     cat: 'Operations' },
   { key: 'cms',            label: 'Content & CMS',               icon: 'images-outline',          cat: 'Operations' },
   { key: 'data_plans',     label: 'Data Bundles & Plans',        icon: 'wifi-outline',            cat: 'Operations' },
+  { key: 'sim_pricing',    label: 'SIM Pricing & Inventory',     icon: 'hardware-chip-outline',   cat: 'Operations' },
+  { key: 'telecom_hub',    label: 'Telecom Hub Controls',        icon: 'cellular-outline',        cat: 'Operations' },
   { key: 'airtime',        label: 'Airtime Top-up',              icon: 'call-outline',            cat: 'Operations' },
   { key: 'localization',   label: 'Localization & Languages',    icon: 'language-outline',        cat: 'Operations' },
   { key: 'bulk_sms',       label: 'Bulk SMS Messaging',          icon: 'chatbubbles-outline',     cat: 'Operations' },
@@ -394,25 +396,6 @@ export default function ManageFeaturesScreen() {
     const { error } = await supabase.from('feature_flags').update({ is_enabled: nv }).eq('feature_key', feature.feature_key);
     if (!error) {
       setFeatures(features.map(f => f.feature_key === feature.feature_key ? { ...f, is_enabled: nv } : f));
-
-      // Sync with global hidden_features setting
-      try {
-        const { data: curSetting } = await supabase.from('app_settings').select('value').eq('key', 'hidden_features').maybeSingle();
-        let list: string[] = [];
-        if (curSetting?.value) {
-          list = typeof curSetting.value === 'string' ? JSON.parse(curSetting.value) : curSetting.value;
-          if (!Array.isArray(list)) list = [];
-        }
-        if (nv) {
-          list = list.filter(k => k !== feature.feature_key);
-        } else {
-          if (!list.includes(feature.feature_key)) list.push(feature.feature_key);
-        }
-        await supabase.from('app_settings').upsert({ key: 'hidden_features', value: JSON.stringify(list) }, { onConflict: 'key' });
-        await AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(list));
-      } catch (e) {
-        console.warn('Sync error on toggle feature:', e);
-      }
     }
     setUpdating(null);
   };
@@ -658,7 +641,7 @@ export default function ManageFeaturesScreen() {
           <View style={s.tabsRow}>
             {([
               { id: 'services',    label: 'Dashboard Services', icon: 'grid-outline' },
-              { id: 'app_features',label: 'Feature Flags',      icon: 'toggle-outline' },
+              { id: 'app_features',label: 'Maintenance Mode',  icon: 'build-outline' },
               { id: 'admin_locks', label: 'Admin Security',     icon: 'shield-outline' },
             ] as const).map(tab => {
               const isSel = activeTab === tab.id;
@@ -784,13 +767,13 @@ export default function ManageFeaturesScreen() {
           ═══════════════════════════════════════════════════════════════════════ */}
           {activeTab === 'app_features' && (
             <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-              <View style={[s.infoBanner, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+              <View style={[s.infoBanner, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
                 <View style={s.infoBannerRow}>
-                  <Ionicons name="options-outline" size={16} color="#2563EB" />
-                  <Text style={[s.infoBannerTitle, { color: '#2563EB' }]}>System Feature Locks</Text>
+                  <Ionicons name="build-outline" size={16} color="#D97706" />
+                  <Text style={[s.infoBannerTitle, { color: '#B45309' }]}>Service Maintenance Mode</Text>
                 </View>
                 <Text style={s.infoBannerDesc}>
-                  Turn system services ON or OFF. When turned off, users attempting to access the service receive the custom maintenance notice.
+                  Put individual services into Maintenance Mode. When a service is in maintenance, its card remains visible with a maintenance status or custom notice when tapped, instead of being completely hidden.
                 </Text>
               </View>
 
