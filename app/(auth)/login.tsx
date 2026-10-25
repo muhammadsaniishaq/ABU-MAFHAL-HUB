@@ -155,15 +155,44 @@ export default function LoginScreen() {
             const isEmailInput = cleanIdent.includes('@');
 
             if (!isEmailInput) {
-                // Check if user entered phone number or username
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('email, phone_number, username')
-                    .or(`phone_number.eq.${cleanIdent},username.eq.${cleanIdent},id.eq.${cleanIdent}`)
-                    .maybeSingle();
+                // 1. Try secure Postgres RPC first (bypasses RLS restrictions for pre-auth)
+                try {
+                    const { data: resolvedRpcEmail } = await supabase.rpc('get_login_email_for_identifier', {
+                        user_identifier: cleanIdent
+                    });
+                    if (resolvedRpcEmail && typeof resolvedRpcEmail === 'string' && resolvedRpcEmail.includes('@')) {
+                        emailToUse = resolvedRpcEmail.trim();
+                    }
+                } catch (rpcErr) {
+                    console.log('RPC identifier lookup note:', rpcErr);
+                }
 
-                if (profile?.email) {
-                    emailToUse = profile.email;
+                // 2. Direct profiles query fallback if RPC returned null or was unavailable
+                if (!emailToUse.includes('@')) {
+                    const cleanDigits = cleanIdent.replace(/\D/g, '');
+                    const last10 = cleanDigits.slice(-10);
+
+                    // Check by username
+                    const { data: userProf } = await supabase
+                        .from('profiles')
+                        .select('email, phone, username')
+                        .ilike('username', cleanIdent)
+                        .maybeSingle();
+
+                    if (userProf?.email) {
+                        emailToUse = userProf.email;
+                    } else if (cleanDigits.length >= 7) {
+                        // Check by phone number variations (exact, 080..., 234..., or last 10 digits)
+                        const { data: phoneProf } = await supabase
+                            .from('profiles')
+                            .select('email, phone, username')
+                            .or(`phone.eq.${cleanIdent},phone.ilike.%${last10}%`)
+                            .maybeSingle();
+
+                        if (phoneProf?.email) {
+                            emailToUse = phoneProf.email;
+                        }
+                    }
                 }
             }
 
@@ -676,7 +705,7 @@ export default function LoginScreen() {
                                 
                                 {/* Login Identifier Input */}
                                 <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
-                                    Email or Phone Number
+                                    Email, Username, or Phone Number
                                 </Text>
                                 <View style={[
                                     styles.inputFieldBox, 
@@ -690,9 +719,9 @@ export default function LoginScreen() {
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="Email or phone number"
+                                        placeholder="Username, phone, or email"
                                         placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
-                                        keyboardType="email-address"
+                                        keyboardType="default"
                                         autoCapitalize="none"
                                         value={identifier}
                                         onChangeText={setIdentifier}
