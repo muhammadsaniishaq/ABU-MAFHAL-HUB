@@ -216,6 +216,8 @@ export default function EnterpriseCommunicationsHub() {
     const handleApplyTemplate = (tmpl: { title: string; subject?: string; body: string }) => {
         if (tmpl.subject && activeChannel === 'email') {
             setSubject(tmpl.subject);
+        } else if (tmpl.title && activeChannel === 'push') {
+            setSubject(tmpl.title);
         }
         setBody(tmpl.body);
     };
@@ -362,21 +364,79 @@ export default function EnterpriseCommunicationsHub() {
             if (activeChannel === 'push') {
                 const pushTitle = subject.trim() || 'Official Notice from ABU MAFHAL';
                 const pushBody = body.trim();
-                const pushData = { priority: isHighPriority ? 'high' : 'normal', route: actionRoute || undefined };
+                const pushData = { priority: isHighPriority ? 'high' : 'normal', route: actionRoute.trim() || undefined };
 
+                // 1. Insert In-App Notifications for every recipient with an ID
                 const pushRows = targetUsers.filter(u => u.id).map(u => ({
                     user_id: u.id!,
                     title: pushTitle,
                     body: pushBody,
                     type: 'broadcast',
                     data: pushData,
+                    created_at: new Date().toISOString()
                 }));
 
                 if (pushRows.length > 0) {
                     await supabase.from('notifications').insert(pushRows);
                 }
 
-                // Immediately trigger native notification on current device
+                // 2. Fetch Expo Push Tokens for target users
+                let expoTokens: string[] = [];
+                try {
+                    const userIds = targetUsers.map(u => u.id).filter(Boolean);
+                    if (userIds.length > 0) {
+                        const { data: profilesWithTokens } = await supabase
+                            .from('profiles')
+                            .select('expo_push_token')
+                            .in('id', userIds)
+                            .not('expo_push_token', 'is', null);
+
+                        if (profilesWithTokens && profilesWithTokens.length > 0) {
+                            expoTokens = profilesWithTokens
+                                .map((p: any) => p.expo_push_token)
+                                .filter((tok: string) => tok && (tok.startsWith('ExponentPushToken[') || tok.startsWith('ExpoPushToken[') || tok.length > 15));
+                        }
+                    }
+                } catch (tokErr) {
+                    console.warn('[Push] Error resolving expo tokens:', tokErr);
+                }
+
+                // 3. Dispatch directly via Expo Push API (batched in chunks of 100)
+                if (expoTokens.length > 0) {
+                    try {
+                        const chunkSize = 100;
+                        for (let i = 0; i < expoTokens.length; i += chunkSize) {
+                            const chunk = expoTokens.slice(i, i + chunkSize);
+                            const messages = chunk.map(token => ({
+                                to: token,
+                                sound: 'default',
+                                title: pushTitle,
+                                body: pushBody,
+                                channelId: isHighPriority ? 'security' : 'transactions',
+                                priority: isHighPriority ? 'high' : 'default',
+                                data: {
+                                    route: actionRoute.trim() || '/(app)/history',
+                                    priority: isHighPriority ? 'high' : 'normal'
+                                }
+                            }));
+
+                            await fetch('https://exp.host/--/api/v2/push/send', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Accept-encoding': 'gzip, deflate',
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(messages),
+                            });
+                        }
+                        console.log(`[Push] Successfully dispatched to ${expoTokens.length} registered device tokens.`);
+                    } catch (expoErr) {
+                        console.warn('[Push] Direct Expo Push dispatch warning:', expoErr);
+                    }
+                }
+
+                // 4. Immediately trigger native test alert on current admin phone
                 await sendInstantNotification(
                     pushTitle,
                     pushBody,
@@ -384,7 +444,7 @@ export default function EnterpriseCommunicationsHub() {
                     isHighPriority ? 'security' : 'transactions'
                 );
 
-                // Also invoke edge function to dispatch remote Expo Push to all recipient devices
+                // 5. Also invoke Edge Function for cloud backup
                 try {
                     await supabase.functions.invoke('send-communication', {
                         body: {
@@ -622,13 +682,13 @@ export default function EnterpriseCommunicationsHub() {
                 <View style={styles.card}>
                     <Text style={styles.cardHeading}>3. COMPOSE MESSAGE</Text>
 
-                    {activeChannel === 'email' && (
+                    {(activeChannel === 'email' || activeChannel === 'push') && (
                         <View>
-                            <Text style={styles.inputLabel}>Email Subject</Text>
+                            <Text style={styles.inputLabel}>{activeChannel === 'email' ? 'Email Subject' : 'Notification Title 🔔'}</Text>
                             <TextInput
                                 value={subject}
                                 onChangeText={setSubject}
-                                placeholder="e.g. Special Offer / Security Notification"
+                                placeholder={activeChannel === 'email' ? "e.g. Special Offer / Security Notification" : "e.g. 5% Weekend Cashback Promo 🎉"}
                                 placeholderTextColor={T.textMuted}
                                 style={styles.composerInput}
                             />

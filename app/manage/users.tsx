@@ -1703,14 +1703,48 @@ export default function UserManagement() {
                 await handleDeleteUser();
             }
             else if (pendingAction.type === 'notify') {
+                const pTitle = notifyTitle || 'System Notice';
+                const pBody = notifyMessage;
                 await supabase.from('notifications').insert({
                     user_id: selectedUser.id,
-                    title: notifyTitle || 'System Notice',
-                    body: notifyMessage,
+                    title: pTitle,
+                    body: pBody,
                     type: 'admin_push',
                     created_at: new Date().toISOString()
                 });
-                Alert.alert("Message Delivered", `Notification sent to ${selectedUser.full_name}`);
+
+                // Trigger Expo Remote Push directly if user has token
+                try {
+                    const { data: prof } = await supabase
+                        .from('profiles')
+                        .select('expo_push_token')
+                        .eq('id', selectedUser.id)
+                        .maybeSingle();
+
+                    if (prof?.expo_push_token) {
+                        await fetch('https://exp.host/--/api/v2/push/send', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Accept-encoding': 'gzip, deflate',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                to: prof.expo_push_token,
+                                sound: 'default',
+                                title: pTitle,
+                                body: pBody,
+                                channelId: 'transactions',
+                                priority: 'high',
+                                data: { route: '/(app)/history' }
+                            }),
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[UsersNotify] Push dispatch note:', e);
+                }
+
+                Alert.alert("Notification Sent 🚀", `Push notification dispatched directly to ${selectedUser.full_name}'s phone.`);
                 setNotifyMessage('');
                 setNotifyTitle('');
             }

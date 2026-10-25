@@ -54,9 +54,9 @@ const ALL_MODULES = [
   { t: 'CAC Pricing', i: 'pricetag', r: '/manage/cac-pricing', c: '#f5a623' },
   { t: 'NIN Pricing', i: 'pricetag', r: '/manage/nin-pricing', c: '#0d1b3e' },
   { t: 'BVN Pricing', i: 'pricetags', r: '/manage/bvn-pricing', c: '#f5a623' },
-  { t: 'SMM Services', i: 'logo-bitcoin', r: '/manage/smm-pricing', c: '#ea580c' },
-  { t: 'Broadcast & SMS', i: 'megaphone', r: '/manage/communications', c: '#7c3aed' },
-  { t: 'Mail Center', i: 'mail-unread', r: '/manage/mail-center', c: '#2563eb' },
+  { t: 'Push Notifications', i: 'notifications', r: '/manage/communications?tab=push', c: '#7c3aed', tag: 'Direct' },
+  { t: 'Broadcast & SMS', i: 'megaphone', r: '/manage/communications', c: '#2563eb' },
+  { t: 'Mail Center', i: 'mail-unread', r: '/manage/mail-center', c: '#f5a623' },
   { t: 'Audit Logs', i: 'document-text', r: '/manage/logs', c: '#0d1b3e', tag: 'Security' },
   { t: 'Infrastructure', i: 'server', r: '/manage/infrastructure', c: '#0d1b3e' },
   { t: 'Database Hub', i: 'server', r: '/manage/db', c: '#16a34a' },
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
     { label: 'Audit Logs', icon: 'list' as const, color: '#16a34a', action: () => router.push('/manage/logs') },
     { label: 'Manage Rates', icon: 'settings' as const, color: '#0d1b3e', action: () => router.push('/manage/rates') },
     { label: 'System Status', icon: 'desktop' as const, color: '#0d1b3e', action: () => router.push('/manage/infrastructure') },
-    { label: 'Broadcast', icon: 'megaphone' as const, color: '#0d1b3e', action: () => router.push('/manage/communications') },
+    { label: 'Push & Alerts', icon: 'notifications' as const, color: '#7c3aed', action: () => router.push('/manage/communications?tab=push' as any) },
   ];
 
   useEffect(() => {
