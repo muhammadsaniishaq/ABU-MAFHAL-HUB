@@ -648,7 +648,46 @@ export default function UserKYCScreen() {
         })
       });
 
-      // 3. Update Profiles with both NIN, BVN, Tier 2, & Address
+      // 3. Update Profiles with both NIN, BVN, Tier 2, & Address, and deduct KYC fee if not already deducted
+      let finalBal = userProfile?.balance;
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('balance, kyc_verified')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const currentBal = Number(currentProfile?.balance ?? 0);
+      let feeCharged = false;
+
+      if (kycFeeEnabled && kycFee > 0 && !currentProfile?.kyc_verified) {
+        // Check if KYC transaction already logged for this user
+        const { data: existingTx } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('user_id', user.id)
+          .ilike('title', '%KYC%')
+          .limit(1);
+
+        if (!existingTx || existingTx.length === 0) {
+          if (currentBal >= kycFee) {
+            finalBal = Math.max(0, currentBal - kycFee);
+            feeCharged = true;
+
+            // Record transaction
+            await supabase.from('transactions').insert({
+              user_id: user.id,
+              amount: kycFee,
+              type: 'debit',
+              title: 'KYC Verification Fee',
+              status: 'completed',
+              description: `KYC Tier-2 Verification Fee (NIN: ${ninInput.trim()})`,
+              reference: `kyc_fee_${Date.now()}`,
+              created_at: new Date().toISOString()
+            });
+          }
+        }
+      }
+
       const profileUpdate: any = {
         nin: ninInput.trim(),
         bvn: bvnInput.trim(),
@@ -659,6 +698,10 @@ export default function UserKYCScreen() {
         kyc_verified: true,
         updated_at: new Date().toISOString()
       };
+
+      if (feeCharged && finalBal !== undefined) {
+        profileUpdate.balance = finalBal;
+      }
 
       await supabase.from('profiles').update(profileUpdate).eq('id', user.id);
 

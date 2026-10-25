@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '../../services/supabase';
 import { KetawancyService, KetawancySimPlan } from '../../services/ketawancy';
 import SecurityModal from '../../components/SecurityModal';
+import BrandAlertModal, { AlertType, BrandAlertState } from '../../components/BrandAlertModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const T = {
@@ -103,6 +104,44 @@ export default function SimCardScreen() {
     const [purchasedSim, setPurchasedSim] = useState<any>(null);
     const [isMaintenance, setIsMaintenance] = useState(false);
     const [maintenanceMsg, setMaintenanceMsg] = useState('SIM Card activation service is temporarily undergoing scheduled maintenance.');
+
+    // Executive In-App Alert State
+    const [brandAlert, setBrandAlert] = useState<BrandAlertState>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+        buttonText: 'OK',
+    });
+
+    const showAlert = (
+        title: string,
+        message: string,
+        type: AlertType = 'info',
+        buttonText: string = 'OK',
+        onConfirm?: () => void,
+        showCancel: boolean = false,
+        cancelText: string = 'Cancel',
+        onCancel?: () => void
+    ) => {
+        try {
+            if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (_) {}
+
+        setBrandAlert({
+            visible: true,
+            title,
+            message,
+            type,
+            buttonText,
+            onConfirm,
+            showCancel,
+            cancelText,
+            onCancel
+        });
+    };
 
     useEffect(() => {
         loadData();
@@ -211,23 +250,24 @@ export default function SimCardScreen() {
 
     const handleInitiatePurchase = () => {
         if (isMaintenance) {
-            Alert.alert("Maintenance", maintenanceMsg);
+            showAlert("Maintenance Notice", maintenanceMsg, "warning");
             return;
         }
 
         if (!selectedPlan) {
-            Alert.alert("Selection Required", "Please select a SIM card type to continue.");
+            showAlert("Selection Required", "Please select a SIM card type to continue.", "info");
             return;
         }
 
         if (balance !== null && balance < selectedPlan.price) {
-            Alert.alert(
+            showAlert(
                 "Insufficient Wallet Balance",
                 `Your wallet balance (₦${balance.toLocaleString()}) cannot cover this SIM purchase (₦${selectedPlan.price.toLocaleString()}). Please fund your wallet.`,
-                [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Fund Wallet", onPress: () => router.push('/wallet') }
-                ]
+                "warning",
+                "Fund Wallet",
+                () => router.push('/wallet'),
+                true,
+                "Cancel"
             );
             return;
         }
@@ -255,16 +295,27 @@ export default function SimCardScreen() {
                 } catch {}
 
                 setBalance(result.newBalance);
-                setPurchasedSim({
+                const assignedSim = {
                     ...result.simCard,
                     refNo: result.refNo,
                     planName: selectedPlan.name,
                     price: selectedPlan.price,
                     date: new Date().toLocaleDateString()
-                });
+                };
+                setPurchasedSim(assignedSim);
+
+                const assignedPhone = result.simCard?.number || 'Assigned by Provider';
+                showAlert(
+                    "SIM Activated Successfully! 🎉",
+                    `Your ${selectedPlan.name} is now active!\n\nReference: ${result.refNo}\nLine/SIM Number: ${assignedPhone}\nAmount Paid: ₦${selectedPlan.price.toLocaleString()}`,
+                    "success",
+                    "View SIM Details",
+                    () => {}
+                );
             }
         } catch (err: any) {
-            Alert.alert("Purchase Failed", err.message || "Failed to purchase SIM. Your wallet balance was not debited.");
+            const errorMsg = err?.message || "Failed to purchase SIM. Your wallet balance was not debited.";
+            showAlert("Purchase Failed", errorMsg, "error");
         } finally {
             setProcessing(false);
         }
@@ -564,6 +615,85 @@ export default function SimCardScreen() {
                 onSuccess={handleConfirmPurchase}
                 title="Verify Security PIN"
             />
+
+            {/* In-App Executive Brand Alert Modal */}
+            <BrandAlertModal
+                visible={brandAlert.visible}
+                title={brandAlert.title}
+                message={brandAlert.message}
+                type={brandAlert.type}
+                buttonText={brandAlert.buttonText || 'OK'}
+                onClose={() => {
+                    const cb = brandAlert.onConfirm;
+                    setBrandAlert(prev => ({ ...prev, visible: false }));
+                    if (cb) cb();
+                }}
+                showCancel={brandAlert.showCancel}
+                cancelText={brandAlert.cancelText}
+                onCancel={() => {
+                    const cb = brandAlert.onCancel;
+                    setBrandAlert(prev => ({ ...prev, visible: false }));
+                    if (cb) cb();
+                }}
+            />
+
+            {/* Success SIM Assigned Modal */}
+            {purchasedSim && (
+                <Modal visible={Boolean(purchasedSim)} transparent animationType="fade">
+                    <View style={s.modalOverlay}>
+                        <View style={[s.modalContent, { maxWidth: 440, padding: 22 }]}>
+                            <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                    <Ionicons name="checkmark-done" size={32} color="#16A34A" />
+                                </View>
+                                <Text style={{ fontSize: 18, fontWeight: '900', color: T.navy }}>SIM Purchased Successfully</Text>
+                                <Text style={{ fontSize: 12, color: T.sub, textAlign: 'center', marginTop: 4 }}>
+                                    Your line is assigned and activated on the telecom provider gateway.
+                                </Text>
+                            </View>
+
+                            <View style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', gap: 10 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ fontSize: 12, color: T.sub }}>SIM Network</Text>
+                                    <Text style={{ fontSize: 12, fontWeight: '800', color: T.navy }}>{purchasedSim.planName}</Text>
+                                </View>
+                                <View style={{ height: 1, backgroundColor: '#E2E8F0' }} />
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 12, color: T.sub }}>Assigned Number</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: '#2563EB' }}>
+                                            {purchasedSim.number || 'Provisioned Online'}
+                                        </Text>
+                                        {purchasedSim.number && (
+                                            <TouchableOpacity onPress={() => Clipboard.setStringAsync(purchasedSim.number)}>
+                                                <Ionicons name="copy-outline" size={14} color="#2563EB" />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                </View>
+                                <View style={{ height: 1, backgroundColor: '#E2E8F0' }} />
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ fontSize: 12, color: T.sub }}>Reference ID</Text>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: T.navy }}>{purchasedSim.refNo}</Text>
+                                </View>
+                                <View style={{ height: 1, backgroundColor: '#E2E8F0' }} />
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ fontSize: 12, color: T.sub }}>Amount Debited</Text>
+                                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#16A34A' }}>₦{Number(purchasedSim.price || 0).toLocaleString()}</Text>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={() => setPurchasedSim(null)}
+                                style={{ backgroundColor: T.navy, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 18 }}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+            )}
         </View>
     );
 }
