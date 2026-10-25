@@ -18,12 +18,12 @@ const T = {
 };
 
 const DEFAULT_SIM_PLANS = [
-  { id: "67c31cc8f3f0f520426fe893", name: "Ratel SIM Card",  network: "ratel",  price: 3000, description: "Ratel Telecom Physical SIM card with instant activation", status: "on" },
-  { id: "67c32387927afc9fa58e0595", name: "Kirani SIM Card", network: "kirani", price: 5900, description: "Kirani 4G LTE Physical SIM card with instant activation", status: "on" },
-  { id: "67c32391927afc9fa58e0599", name: "Alpha SIM Card",  network: "alpha",  price: 2750, description: "Alpha Telecom Physical SIM card with instant activation",  status: "on" },
-  { id: "67d204183bd4d1bd7d1a8fd",  name: "Smile SIM Card",  network: "smile",  price: 5000, description: "Smile 4G LTE broadband SIM card with instant activation",  status: "on" },
-  { id: "6a9e0d7ec7aba8077b369f1",  name: "Sahal SIM Card",  network: "sahal",  price: 4500, description: "Sahal Telecom Physical SIM card with instant activation",  status: "on" },
-  { id: "7b2c1e3fa9d8c6b5e4f7a2d1", name: "Vitel SIM Card",  network: "vitel",  price: 3500, description: "Vitel Telecom Physical SIM card with instant activation",  status: "on" },
+  { id: "67c31cc8f3f0f520426fe893", name: "Ratel SIM Card",  network: "ratel",  price: 3000, description: "Ratel Telecom eSIM with instant online activation", status: "on" },
+  { id: "67c32387927afc9fa58e0595", name: "Kirani SIM Card", network: "kirani", price: 5900, description: "Kirani 4G LTE eSIM with instant online activation", status: "on" },
+  { id: "67c32391927afc9fa58e0599", name: "Alpha SIM Card",  network: "alpha",  price: 2750, description: "Alpha Telecom eSIM with instant online activation",  status: "on" },
+  { id: "67d204183bd4d1bd7d1a8fd",  name: "Smile SIM Card",  network: "smile",  price: 5000, description: "Smile 4G LTE eSIM with instant online activation",  status: "on" },
+  { id: "6a9e0d7ec7aba8077b369f1",  name: "Sahal SIM Card",  network: "sahal",  price: 4500, description: "Sahal Telecom eSIM with instant online activation",  status: "on" },
+  { id: "7b2c1e3fa9d8c6b5e4f7a2d1", name: "Vitel SIM Card",  network: "vitel",  price: 3500, description: "Vitel Telecom eSIM with instant online activation",  status: "on" },
 ];
 
 const NETWORK_LOGOS: Record<string, any> = {
@@ -66,7 +66,7 @@ export default function SimPricingPage() {
   const loadPlans = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("app_settings")
         .select("value")
         .eq("key", "sim_plans_custom")
@@ -94,7 +94,7 @@ export default function SimPricingPage() {
     await supabase.from("app_settings").upsert({
       key: "sim_plans_custom",
       value: JSON.stringify(newPlansList),
-      description: "Custom SIM pricing and hide status",
+      description: "Custom SIM pricing and status settings",
       updated_at: new Date().toISOString()
     }, { onConflict: "key" });
   };
@@ -113,20 +113,20 @@ export default function SimPricingPage() {
     if (!selectedPlan) return;
     const priceNum = Number(editPrice);
     if (isNaN(priceNum) || priceNum < 0) {
-      showToast("Farashin da kuka sanya ba daidai ba ne", "error");
+      showToast("Please enter a valid price", "error");
       return;
     }
     setSaving(true);
     try {
-      const updated = { ...selectedPlan, name: editName.trim(), price: priceNum, description: editDesc.trim(), status: editStatus };
-      const updatedList = plans.map(p => p.id === selectedPlan.id ? updated : p);
+      const updated: SimPlan = { ...selectedPlan, name: editName.trim(), price: priceNum, description: editDesc.trim(), status: editStatus };
+      const updatedList: SimPlan[] = plans.map(p => p.id === selectedPlan.id ? updated : p);
       await saveAllPlansToDb(updatedList);
       setPlans(updatedList);
       setEditModal(false);
-      showToast(`✓ ${updated.name} - ₦${priceNum.toLocaleString()} an sabunta`, "success");
+      showToast(`✓ ${updated.name} updated successfully`, "success");
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (err: any) {
-      showToast("Kuskure: " + (err?.message || "An samu matsala"), "error");
+      showToast("Error: " + (err?.message || "Failed to update"), "error");
     } finally {
       setSaving(false);
     }
@@ -138,10 +138,10 @@ export default function SimPricingPage() {
     setPlans(updatedList);
     try {
       await saveAllPlansToDb(updatedList);
-      showToast(newStatus === "on" ? `✓ ${plan.name} - An kunna` : `🚫 ${plan.name} - An ɓoye`, newStatus === "on" ? "success" : "error");
+      showToast(newStatus === "on" ? `✓ ${plan.name} enabled` : `🚫 ${plan.name} hidden`, newStatus === "on" ? "success" : "error");
       try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     } catch {
-      showToast("Matsalar sadarwa wajen canza status", "error");
+      showToast("Network error updating status", "error");
     }
   };
 
@@ -158,8 +158,8 @@ export default function SimPricingPage() {
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.headerTitle}>SIM Card Pricing</Text>
-            <Text style={s.headerSub}>Sabunta farashin SIM cards na kowane network</Text>
+            <Text style={s.headerTitle}>SIM Pricing Management</Text>
+            <Text style={s.headerSub}>Manage rates and visibility for online SIM cards</Text>
           </View>
           <TouchableOpacity onPress={loadPlans} style={[s.iconBtn, { backgroundColor: "rgba(245,166,35,0.2)" }]}>
             <Ionicons name="refresh" size={18} color={T.gold} />
@@ -177,7 +177,7 @@ export default function SimPricingPage() {
         {/* Stats */}
         <View style={s.statsBar}>
           {[
-            { val: plans.length, lbl: "Jimillar SIM", color: T.navy },
+            { val: plans.length, lbl: "Total SIMs", color: T.navy },
             { val: plans.filter(p => p.status === "on").length, lbl: "Active", color: T.green },
             { val: plans.filter(p => p.status === "off").length, lbl: "Hidden", color: T.red },
             { val: plans.length > 0 ? "₦" + Math.min(...plans.map(p => p.price)).toLocaleString() : "-", lbl: "Min Price", color: T.gold },
@@ -193,12 +193,12 @@ export default function SimPricingPage() {
         {loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator size="large" color={T.navy} />
-            <Text style={{ color: T.sub, marginTop: 10, fontSize: 13 }}>Ana loda...</Text>
+            <Text style={{ color: T.sub, marginTop: 10, fontSize: 13 }}>Loading SIM plans...</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
             <Text style={s.sectionLbl}>
-              SIM Cards ({plans.length})
+              SIM Inventory ({plans.length})
             </Text>
 
             {plans.map(plan => {
@@ -235,7 +235,7 @@ export default function SimPricingPage() {
                     {/* Price + Actions */}
                     <View style={s.priceRow}>
                       <View>
-                        <Text style={s.priceLbl}>Farashi</Text>
+                        <Text style={s.priceLbl}>Price</Text>
                         <Text style={[s.priceVal, { color }]}>₦{plan.price.toLocaleString()}</Text>
                       </View>
                       <View style={s.actBtns}>
@@ -272,7 +272,7 @@ export default function SimPricingPage() {
             <View style={s.infoBox}>
               <Ionicons name="information-circle-outline" size={16} color={T.blue} style={{ marginRight: 8 }} />
               <Text style={s.infoTxt}>
-                Danna Edit don canza farashi ko suna. Danna Hide/Show don ɓoye ko nuna SIM card a app. Canje-canje suna aiki nan take.
+                Tap Edit to change name and price. Tap Hide/Show to control SIM availability on customer app.
               </Text>
             </View>
           </ScrollView>
@@ -285,7 +285,7 @@ export default function SimPricingPage() {
               <View style={s.modalBox}>
                 <LinearGradient colors={[T.navy, "#142258"]} style={s.modalHead}>
                   <View>
-                    <Text style={s.modalTitle}>✏️ Sabunta SIM</Text>
+                    <Text style={s.modalTitle}>Edit SIM Card</Text>
                     <Text style={s.modalSub}>{selectedPlan?.name}</Text>
                   </View>
                   <TouchableOpacity onPress={() => setEditModal(false)}>
@@ -309,10 +309,10 @@ export default function SimPricingPage() {
                     </View>
                   )}
 
-                  <Text style={s.lbl}>Suna (Name)</Text>
+                  <Text style={s.lbl}>SIM Name</Text>
                   <TextInput style={s.input} value={editName} onChangeText={setEditName} placeholder="e.g. Ratel SIM Card" placeholderTextColor={T.sub} />
 
-                  <Text style={s.lbl}>Farashi (₦)</Text>
+                  <Text style={s.lbl}>Price (₦)</Text>
                   <View style={{ flexDirection: "row" }}>
                     <View style={s.prefix}>
                       <Text style={s.prefixTxt}>₦</Text>
@@ -324,14 +324,14 @@ export default function SimPricingPage() {
                     />
                   </View>
 
-                  <Text style={s.lbl}>Bayani (Description)</Text>
+                  <Text style={s.lbl}>Description</Text>
                   <TextInput
                     style={[s.input, { height: 70, textAlignVertical: "top", paddingTop: 10 }]}
                     value={editDesc} onChangeText={setEditDesc}
                     placeholder="Short description..." placeholderTextColor={T.sub} multiline
                   />
 
-                  <Text style={s.lbl}>Yanayi (Status)</Text>
+                  <Text style={s.lbl}>Status</Text>
                   <View style={{ flexDirection: "row", gap: 10 }}>
                     <TouchableOpacity
                       style={[s.stBtn, editStatus === "on" && s.stBtnOn]}
@@ -351,7 +351,7 @@ export default function SimPricingPage() {
 
                   {/* Preview */}
                   <View style={s.preview}>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: T.sub, marginBottom: 8 }}>👀 Preview</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: T.sub, marginBottom: 8 }}>Preview</Text>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff", padding: 14, borderRadius: 12, borderWidth: 1, borderColor: T.border }}>
                       <Text style={{ fontSize: 14, fontWeight: "800", color: T.text }}>{editName || "SIM Name"}</Text>
                       <Text style={{ fontSize: 17, fontWeight: "900", color: T.navy }}>₦{Number(editPrice || 0).toLocaleString()}</Text>
@@ -362,7 +362,7 @@ export default function SimPricingPage() {
                     {saving ? <ActivityIndicator size="small" color="#fff" /> : (
                       <>
                         <Ionicons name="save-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                        <Text style={s.saveTxt}>Ajiye Canje-canje</Text>
+                        <Text style={s.saveTxt}>Save Changes</Text>
                       </>
                     )}
                   </TouchableOpacity>

@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityInd
 import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const T = {
     navy: '#0d1b3e',
-    navyMid: '#142258',
+    navyMid: '#1e293b',
     gold: '#f5a623',
     goldDk: '#d4890e',
     white: '#ffffff',
@@ -49,7 +49,7 @@ const SIM_NETWORKS_META: Record<string, {
         lightBg: '#EFF6FF',
         tag: 'Fast 4G Broadband',
         speed: 'Multi-band 4G',
-        features: ['Nationwide Coverage', 'HD Voice & Minute Bundles']
+        features: ['Nationwide Coverage', 'HD Voice & Bundles']
     },
     alpha: {
         logo: require('../../assets/images/alpha_logo.png'),
@@ -73,7 +73,7 @@ const SIM_NETWORKS_META: Record<string, {
         lightBg: '#FFF1F2',
         tag: 'Sahal Telecom 4G',
         speed: '4G LTE Cellular',
-        features: ['Sahal Dedicated SIM', 'Instant Provisioning']
+        features: ['Dedicated SIM', 'Instant Provisioning']
     },
     vitel: {
         logo: require('../../assets/images/vitel.png'),
@@ -81,7 +81,7 @@ const SIM_NETWORKS_META: Record<string, {
         lightBg: '#EEF2FF',
         tag: 'Special Carrier',
         speed: '4G LTE Voice',
-        features: ['Express Delivery', 'Corporate Ready']
+        features: ['Corporate Ready', 'Multi-device Compatible']
     }
 };
 
@@ -97,18 +97,16 @@ export default function SimCardScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [showNetworkModal, setShowNetworkModal] = useState(false);
 
-    // Form inputs
+    // Form inputs (Online Activation only - no physical delivery)
     const [phoneNumber, setPhoneNumber] = useState('');
     const [emailAddress, setEmailAddress] = useState('');
-    const [deliveryAddress, setDeliveryAddress] = useState('');
-    const [simFormat, setSimFormat] = useState<'standard' | 'esim'>('standard');
 
     // Flow states
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [purchasedSim, setPurchasedSim] = useState<any>(null);
     const [isMaintenance, setIsMaintenance] = useState(false);
-    const [maintenanceMsg, setMaintenanceMsg] = useState('SIM Card service is temporarily undergoing scheduled maintenance.');
+    const [maintenanceMsg, setMaintenanceMsg] = useState('SIM Card activation service is temporarily undergoing scheduled maintenance.');
 
     useEffect(() => {
         loadData();
@@ -134,14 +132,13 @@ export default function SimCardScreen() {
                 setEmailAddress(authUser.email || '');
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('balance, phone, full_name, address')
+                    .select('balance, phone, full_name')
                     .eq('id', authUser.id)
                     .maybeSingle();
 
                 if (profile) {
                     setBalance(Number(profile.balance || 0));
                     if (profile.phone) setPhoneNumber(profile.phone);
-                    if (profile.address) setDeliveryAddress(profile.address);
                 }
             }
 
@@ -225,24 +222,24 @@ export default function SimCardScreen() {
         }
 
         if (!selectedPlan) {
-            Alert.alert("Zaɓi SIM", "Da fatan za a zaɓi katin SIM don ci gaba.");
+            Alert.alert("Selection Required", "Please select a SIM card type to continue.");
             return;
         }
 
         if (balance !== null && balance < selectedPlan.price) {
             Alert.alert(
-                "Kuɗin Ka Bai Isa Ba",
-                `Kuɗin wallet ɗinka (₦${balance.toLocaleString()}) bai isa siyan wannan SIM ɗin ba (₦${selectedPlan.price.toLocaleString()}).`,
+                "Insufficient Wallet Balance",
+                `Your wallet balance (₦${balance.toLocaleString()}) cannot cover this SIM purchase (₦${selectedPlan.price.toLocaleString()}).`,
                 [
-                    { text: "A'a", style: "cancel" },
-                    { text: "Sanya Kuɗi", onPress: () => router.push('/wallet') }
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Fund Wallet", onPress: () => router.push('/wallet') }
                 ]
             );
             return;
         }
 
         if (!phoneNumber || phoneNumber.trim().length < 10) {
-            Alert.alert("Lambar Waya", "Da fatan za a shigar da lambar waya mai aiki.");
+            Alert.alert("Phone Required", "Please enter a valid contact phone number.");
             return;
         }
 
@@ -279,7 +276,7 @@ export default function SimCardScreen() {
                 });
             }
         } catch (err: any) {
-            Alert.alert("SIM Purchase Failed", err.message || "An samu matsala wajen siyan SIM. Ba a cire kuɗi a wallet ɗinka ba.");
+            Alert.alert("SIM Purchase Failed", err.message || "Failed to complete SIM purchase. Your wallet balance was not debited.");
         } finally {
             setProcessing(false);
         }
@@ -296,7 +293,7 @@ export default function SimCardScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
                 style={{ flex: 1 }}
             >
-                {/* Premium Curved Header (Light/Navy Theme matching Data/Airtime) */}
+                {/* Clean Modern Light Header */}
                 <LinearGradient 
                     colors={['#060d21', '#0d1b3e']} 
                     style={[s.headerContainer, { paddingTop: insets.top + 10 }]}
@@ -306,7 +303,7 @@ export default function SimCardScreen() {
                             <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
                         </TouchableOpacity>
                         <View style={{ alignItems: 'center' }}>
-                            <Text style={s.headerTitle}>SIM Cards & Activation</Text>
+                            <Text style={s.headerTitle}>SIM Cards & eSIM</Text>
                             {balance !== null && (
                                 <TouchableOpacity 
                                     onPress={() => router.push('/wallet')} 
@@ -337,7 +334,7 @@ export default function SimCardScreen() {
                         <View style={s.maintenanceBox}>
                             <Ionicons name="warning" size={22} color="#D97706" />
                             <View style={{ flex: 1, marginLeft: 10 }}>
-                                <Text style={s.maintenanceTitle}>Sabis ɗin SIM na Gyara</Text>
+                                <Text style={s.maintenanceTitle}>Service Under Maintenance</Text>
                                 <Text style={s.maintenanceDesc}>{maintenanceMsg}</Text>
                             </View>
                         </View>
@@ -371,11 +368,11 @@ export default function SimCardScreen() {
 
                             <View style={s.previewBottom}>
                                 <View>
-                                    <Text style={s.previewSubLabel}>SPEED PROFILE</Text>
-                                    <Text style={s.previewSubVal}>{activeMeta.speed}</Text>
+                                    <Text style={s.previewSubLabel}>NETWORK</Text>
+                                    <Text style={s.previewSubVal}>{activeMeta.tag}</Text>
                                 </View>
                                 <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={s.previewSubLabel}>FARASHIN SIM</Text>
+                                    <Text style={s.previewSubLabel}>ACTIVATION FEE</Text>
                                     <Text style={s.previewPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
                                 </View>
                             </View>
@@ -387,18 +384,18 @@ export default function SimCardScreen() {
                         <View style={s.successBox}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
-                                <Text style={s.successTitle}>An Yi Nasarar Siyan SIM!</Text>
+                                <Text style={s.successTitle}>SIM Order Confirmed!</Text>
                             </View>
                             <Text style={s.successSubtitle}>Reference: {purchasedSim.refNo}</Text>
                             {purchasedSim.number && (
                                 <TouchableOpacity 
                                     onPress={() => {
                                         Clipboard.setStringAsync(purchasedSim.number || '');
-                                        Alert.alert("An Kwafa", "An kwafi lambar SIM");
+                                        Alert.alert("Copied", "SIM line number copied to clipboard");
                                     }}
                                     style={s.copyNumberPill}
                                 >
-                                    <Text style={s.copyNumberText}>Lamba: {purchasedSim.number}</Text>
+                                    <Text style={s.copyNumberText}>Line: {purchasedSim.number}</Text>
                                     <Ionicons name="copy-outline" size={14} color="#2563eb" />
                                 </TouchableOpacity>
                             )}
@@ -406,7 +403,7 @@ export default function SimCardScreen() {
                                 onPress={() => setPurchasedSim(null)}
                                 style={s.dismissSuccessBtn}
                             >
-                                <Text style={s.dismissSuccessText}>Yi Wata Odar</Text>
+                                <Text style={s.dismissSuccessText}>Done</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -414,13 +411,13 @@ export default function SimCardScreen() {
                     {/* 1. Network Selection Dropdown Trigger Card */}
                     <View style={s.sectionHeader}>
                         <Ionicons name="cellular-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                        <Text style={s.sectionTitle}>1. Zaɓi Network SIM</Text>
+                        <Text style={s.sectionTitle}>1. Select Network Provider</Text>
                     </View>
 
                     {loadingPlans ? (
                         <View style={s.loadingWrap}>
                             <ActivityIndicator size="small" color={T.navy} />
-                            <Text style={s.loadingTxt}>Ana loda jerin SIM da farashi...</Text>
+                            <Text style={s.loadingTxt}>Loading available SIM plans...</Text>
                         </View>
                     ) : (
                         <TouchableOpacity
@@ -445,7 +442,7 @@ export default function SimCardScreen() {
                                 </>
                             ) : (
                                 <View style={{ flex: 1 }}>
-                                    <Text style={s.triggerPlaceholder}>Danna nan don zaɓar Network SIM</Text>
+                                    <Text style={s.triggerPlaceholder}>Tap to choose a Network SIM</Text>
                                 </View>
                             )}
                             <View style={s.dropdownIconBox}>
@@ -454,63 +451,14 @@ export default function SimCardScreen() {
                         </TouchableOpacity>
                     )}
 
-                    {/* 2. Format Selector: Physical SIM or eSIM */}
-                    <View style={s.sectionHeader}>
-                        <Ionicons name="hardware-chip-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                        <Text style={s.sectionTitle}>2. Nau'in SIM (Format)</Text>
-                    </View>
-                    <View style={s.formatRow}>
-                        <TouchableOpacity
-                            onPress={() => {
-                                setSimFormat('standard');
-                                try { Haptics.selectionAsync(); } catch {}
-                            }}
-                            activeOpacity={0.8}
-                            style={[s.formatPill, simFormat === 'standard' && s.formatPillActive]}
-                        >
-                            <MaterialCommunityIcons 
-                                name="sim" 
-                                size={20} 
-                                color={simFormat === 'standard' ? '#0d1b3e' : '#64748b'} 
-                            />
-                            <View style={{ marginLeft: 8 }}>
-                                <Text style={[s.formatPillTitle, simFormat === 'standard' && { color: '#0d1b3e' }]}>
-                                    Physical SIM Card
-                                </Text>
-                                <Text style={s.formatPillSub}>Standard / Nano</Text>
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => {
-                                setSimFormat('esim');
-                                try { Haptics.selectionAsync(); } catch {}
-                            }}
-                            activeOpacity={0.8}
-                            style={[s.formatPill, simFormat === 'esim' && s.formatPillActive]}
-                        >
-                            <Ionicons 
-                                name="qr-code-outline" 
-                                size={19} 
-                                color={simFormat === 'esim' ? '#0d1b3e' : '#64748b'} 
-                            />
-                            <View style={{ marginLeft: 8 }}>
-                                <Text style={[s.formatPillTitle, simFormat === 'esim' && { color: '#0d1b3e' }]}>
-                                    eSIM Profile (QR)
-                                </Text>
-                                <Text style={s.formatPillSub}>Digital Activation</Text>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* 3. Delivery / Contact Form */}
+                    {/* 2. Customer Online Activation Details */}
                     <View style={s.sectionHeader}>
                         <Ionicons name="person-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                        <Text style={s.sectionTitle}>3. Bayanan Mai Karɓa</Text>
+                        <Text style={s.sectionTitle}>2. Activation Information</Text>
                     </View>
                     <View style={s.formCard}>
                         <View style={s.field}>
-                            <Text style={s.fieldLabel}>Lambar Waya (Contact Phone) *</Text>
+                            <Text style={s.fieldLabel}>Contact Phone Number *</Text>
                             <View style={s.inputWrap}>
                                 <Ionicons name="call-outline" size={17} color="#64748b" />
                                 <TextInput
@@ -525,11 +473,11 @@ export default function SimCardScreen() {
                         </View>
 
                         <View style={s.field}>
-                            <Text style={s.fieldLabel}>Email Address (Don rasit ko eSIM QR)</Text>
+                            <Text style={s.fieldLabel}>Email Address (For Instant eSIM Profile & Receipt)</Text>
                             <View style={s.inputWrap}>
                                 <Ionicons name="mail-outline" size={17} color="#64748b" />
                                 <TextInput
-                                    placeholder="name@example.com"
+                                    placeholder="customer@example.com"
                                     placeholderTextColor="#94a3b8"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
@@ -539,22 +487,6 @@ export default function SimCardScreen() {
                                 />
                             </View>
                         </View>
-
-                        {simFormat === 'standard' && (
-                            <View style={s.field}>
-                                <Text style={s.fieldLabel}>Adireshin Isarwa (Delivery Address)</Text>
-                                <View style={s.inputWrap}>
-                                    <Ionicons name="location-outline" size={17} color="#64748b" />
-                                    <TextInput
-                                        placeholder="Jiha, Gari, ko Unguwa"
-                                        placeholderTextColor="#94a3b8"
-                                        value={deliveryAddress}
-                                        onChangeText={setDeliveryAddress}
-                                        style={s.textInput}
-                                    />
-                                </View>
-                            </View>
-                        )}
                     </View>
 
                     {/* Checkout Button */}
@@ -575,9 +507,9 @@ export default function SimCardScreen() {
                                     <ActivityIndicator size="small" color="#0d1b3e" />
                                 ) : (
                                     <>
-                                        <Ionicons name="shield-checkmark" size={18} color="#0d1b3e" />
+                                        <Ionicons name="flash" size={18} color="#0d1b3e" />
                                         <Text style={s.checkoutTxt}>
-                                            Biya ₦{selectedPlan.price.toLocaleString()} & Tabbatar da SIM
+                                            Activate Now • ₦{selectedPlan.price.toLocaleString()}
                                         </Text>
                                     </>
                                 )}
@@ -596,7 +528,7 @@ export default function SimCardScreen() {
                     <View style={s.modalOverlay}>
                         <View style={s.modalContent}>
                             <View style={s.modalHeader}>
-                                <Text style={s.modalTitle}>Zaɓi Network SIM Card</Text>
+                                <Text style={s.modalTitle}>Select Network Provider</Text>
                                 <TouchableOpacity onPress={() => setShowNetworkModal(false)} style={s.modalCloseBtn}>
                                     <Ionicons name="close" size={20} color="#64748b" />
                                 </TouchableOpacity>
@@ -646,7 +578,7 @@ export default function SimCardScreen() {
                     visible={showSecurityModal}
                     onClose={() => setShowSecurityModal(false)}
                     onSuccess={handleConfirmPurchase}
-                    title="Tabbatar da PIN"
+                    title="Verify Security PIN"
                 />
             </KeyboardAvoidingView>
         </View>
@@ -959,41 +891,6 @@ const s = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: '#e2e8f0',
-    },
-    formatRow: {
-        flexDirection: 'row',
-        gap: 10,
-        marginBottom: 18,
-    },
-    formatPill: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 14,
-        padding: 12,
-        borderWidth: 1.5,
-        borderColor: '#e2e8f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 3,
-        elevation: 1,
-    },
-    formatPillActive: {
-        borderColor: '#f5a623',
-        backgroundColor: '#FFFBEB',
-    },
-    formatPillTitle: {
-        fontSize: 12.5,
-        fontWeight: '800',
-        color: '#334155',
-    },
-    formatPillSub: {
-        fontSize: 9.5,
-        color: '#64748b',
-        fontWeight: '600',
-        marginTop: 1,
     },
     formCard: {
         backgroundColor: '#FFFFFF',
