@@ -12,6 +12,7 @@
  * - User/Account: /users/me, /services/get-user-transactions
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
 const KETAWANCY_BASE_URL = 'https://myapi.ketawancy.com/api/v1';
@@ -27,7 +28,36 @@ export async function getKetawancyApiKey(): Promise<string> {
     }
 
     try {
-        // 1. Check system_secrets table
+        // 1. Check local AsyncStorage cache (from Admin API Vault)
+        const localVaultKeys = ['@vault_KETAWANCY_API_KEY', '@vault_KETAWANCY_KEY', '@vault_KETAWANCY_TOKEN', '@vault_KETAWANSY_API_KEY'];
+        for (const vk of localVaultKeys) {
+            try {
+                const stored = await AsyncStorage.getItem(vk);
+                if (stored && typeof stored === 'string' && stored.trim() !== '') {
+                    cachedApiKey = stored.trim();
+                    lastKeyFetchTime = now;
+                    return cachedApiKey;
+                }
+            } catch {}
+        }
+
+        // 2. Check app_settings table (accessible to all authenticated users)
+        const { data: setting } = await supabase
+            .from('app_settings')
+            .select('value')
+            .in('key', ['KETAWANCY_API_KEY', 'ketawancy_api_key', 'ketawancy_key', 'KETAWANCY_KEY'])
+            .maybeSingle();
+
+        if (setting?.value) {
+            const val = typeof setting.value === 'object' ? setting.value?.key || setting.value?.value : setting.value;
+            if (val && typeof val === 'string' && val.trim() !== '') {
+                cachedApiKey = val.trim();
+                lastKeyFetchTime = now;
+                return cachedApiKey;
+            }
+        }
+
+        // 3. Check system_secrets table (accessible to admins or via service role)
         const { data: secret } = await supabase
             .from('system_secrets')
             .select('value')
@@ -39,39 +69,25 @@ export async function getKetawancyApiKey(): Promise<string> {
             lastKeyFetchTime = now;
             return cachedApiKey;
         }
-
-        // 2. Check app_settings table
-        const { data: setting } = await supabase
-            .from('app_settings')
-            .select('value')
-            .in('key', ['KETAWANCY_API_KEY', 'ketawancy_api_key', 'ketawancy_key'])
-            .maybeSingle();
-
-        if (setting?.value) {
-            const val = typeof setting.value === 'object' ? setting.value?.key || setting.value?.value : setting.value;
-            if (val && typeof val === 'string' && val.trim() !== '') {
-                cachedApiKey = val.trim();
-                lastKeyFetchTime = now;
-                return cachedApiKey;
-            }
-        }
     } catch (e) {
         console.warn('[Ketawancy] Secret resolution note:', e);
     }
 
-    // Default fallback or prompt admin
     return cachedApiKey || '';
 }
 
 async function requestKetawancy<T = any>(endpoint: string, options: { method?: 'GET' | 'POST'; body?: any } = {}): Promise<T> {
     const apiKey = await getKetawancyApiKey();
+
     const headers: Record<string, string> = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
     };
 
     if (apiKey) {
+        // Pass both standard custom header and Bearer token for maximum provider compatibility
         headers['x-api-key'] = apiKey;
+        headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
     }
 
     const url = `${KETAWANCY_BASE_URL}${endpoint}`;
@@ -81,7 +97,25 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
         body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
+
+    // Detect authentication errors from the provider
+    if (!response.ok || data?.status === 'fail' || data?.status === 'error') {
+        const errorText = String(data?.message || data?.msg || '').toLowerCase();
+        if (
+            response.status === 401 ||
+            errorText.includes('logged in') ||
+            errorText.includes('get access') ||
+            errorText.includes('unauthorized') ||
+            errorText.includes('invalid token')
+        ) {
+            console.warn('[Ketawancy] API Authentication Error:', data?.message);
+            throw new Error(
+                "Telecom Provider Authentication Error: The Ketawancy API Key or Bearer Token is invalid or expired. Please update KETAWANCY_API_KEY in Admin Settings -> API Vault."
+            );
+        }
+    }
+
     return data;
 }
 

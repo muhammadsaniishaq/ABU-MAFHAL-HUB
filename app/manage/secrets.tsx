@@ -189,6 +189,16 @@ export default function SecretsManager() {
                     description: keyItem.desc,
                     updated_at: new Date().toISOString()
                 });
+
+                // Mirror Ketawancy keys into app_settings so all mobile users can query SIM/telecom APIs without admin RLS blockage
+                if (k.toUpperCase().includes('KETAWANC')) {
+                    await supabase.from('app_settings').upsert({
+                        key: k,
+                        value: cleanVal,
+                        description: keyItem.desc,
+                        updated_at: new Date().toISOString()
+                    });
+                }
             }
 
             setOriginalSecrets(prev => ({ ...prev, [primaryKey]: cleanVal }));
