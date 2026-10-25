@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, StyleSheet, RefreshControl, Modal } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +11,22 @@ import { KetawancyService, KetawancySimPlan } from '../../services/ketawancy';
 import SecurityModal from '../../components/SecurityModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const T = {
+    navy: '#0d1b3e',
+    navyMid: '#142258',
+    gold: '#f5a623',
+    goldDk: '#d4890e',
+    white: '#ffffff',
+    bg: '#f4f6fb',
+    cardBg: '#ffffff',
+    border: '#e2e8f0',
+    sub: '#64748b',
+    text: '#0f172a',
+    red: '#dc2626',
+    green: '#16a34a',
+    blue: '#2563eb',
+};
+
 const SIM_NETWORKS_META: Record<string, {
     logo: any;
     color: string;
@@ -21,7 +37,7 @@ const SIM_NETWORKS_META: Record<string, {
 }> = {
     ratel: {
         logo: require('../../assets/images/ratel_alat.png'),
-        color: '#D97706',
+        color: '#B45309',
         lightBg: '#FEF3C7',
         tag: 'Instant 4G/LTE',
         speed: 'High Speed LTE',
@@ -45,7 +61,7 @@ const SIM_NETWORKS_META: Record<string, {
     },
     smile: {
         logo: require('../../assets/images/smile_logo.png'),
-        color: '#DB2777',
+        color: '#EC4899',
         lightBg: '#FDF2F8',
         tag: 'SuperFast 4G LTE',
         speed: '4G LTE Broadband',
@@ -61,7 +77,7 @@ const SIM_NETWORKS_META: Record<string, {
     },
     vitel: {
         logo: require('../../assets/images/vitel.png'),
-        color: '#4F46E5',
+        color: '#6366F1',
         lightBg: '#EEF2FF',
         tag: 'Special Carrier',
         speed: '4G LTE Voice',
@@ -79,6 +95,7 @@ export default function SimCardScreen() {
     const [selectedPlan, setSelectedPlan] = useState<KetawancySimPlan | null>(null);
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [showNetworkModal, setShowNetworkModal] = useState(false);
 
     // Form inputs
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -91,7 +108,7 @@ export default function SimCardScreen() {
     const [processing, setProcessing] = useState(false);
     const [purchasedSim, setPurchasedSim] = useState<any>(null);
     const [isMaintenance, setIsMaintenance] = useState(false);
-    const [maintenanceMsg, setMaintenanceMsg] = useState('SIM Card service is undergoing scheduled maintenance.');
+    const [maintenanceMsg, setMaintenanceMsg] = useState('SIM Card service is temporarily undergoing scheduled maintenance.');
 
     useEffect(() => {
         loadData();
@@ -130,36 +147,44 @@ export default function SimCardScreen() {
 
             const plans = await KetawancyService.getSimPlans();
             
-            // Sync with custom pricing and status configured in Admin SIM Pricing
+            // Sync with custom pricing and status stored in app_settings (key: sim_plans_custom)
             try {
-                const { data: dbPlans } = await supabase.from('sim_plans').select('*');
-                if (dbPlans && dbPlans.length > 0) {
-                    const dbMap = new Map<string, any>();
-                    dbPlans.forEach(p => {
-                        if (p.id) dbMap.set(p.id, p);
-                        if (p.network) dbMap.set(p.network.toLowerCase(), p);
-                    });
+                const { data: settingData } = await supabase
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', 'sim_plans_custom')
+                    .maybeSingle();
 
-                    const merged = plans.map(p => {
-                        const netKey = (p.network || p.name || '').toLowerCase();
-                        const found = dbMap.get(p._id) || dbMap.get(netKey);
-                        if (found) {
-                            return {
-                                ...p,
-                                name: found.name || p.name,
-                                price: typeof found.price === 'number' ? found.price : p.price,
-                                description: found.description || p.description,
-                                status: found.status || p.status,
-                            };
+                if (settingData && settingData.value) {
+                    let dbPlans = typeof settingData.value === 'string' ? JSON.parse(settingData.value) : settingData.value;
+                    if (Array.isArray(dbPlans) && dbPlans.length > 0) {
+                        const dbMap = new Map<string, any>();
+                        dbPlans.forEach((p: any) => {
+                            if (p.id) dbMap.set(p.id, p);
+                            if (p.network) dbMap.set(p.network.toLowerCase(), p);
+                        });
+
+                        const merged = plans.map(p => {
+                            const netKey = (p.network || p.name || '').toLowerCase();
+                            const found = dbMap.get(p._id) || dbMap.get(netKey);
+                            if (found) {
+                                return {
+                                    ...p,
+                                    name: found.name || p.name,
+                                    price: typeof found.price === 'number' ? found.price : p.price,
+                                    description: found.description || p.description,
+                                    status: found.status || p.status,
+                                };
+                            }
+                            return p;
+                        }).filter(p => p.status !== 'off'); // Hide SIMs that are turned off in Admin
+
+                        setSimPlans(merged);
+                        if (merged.length > 0) {
+                            setSelectedPlan(merged[0]);
                         }
-                        return p;
-                    }).filter(p => p.status !== 'off'); // Hide SIMs that are turned off in Admin
-
-                    setSimPlans(merged);
-                    if (merged.length > 0) {
-                        setSelectedPlan(merged[0]);
+                        return;
                     }
-                    return;
                 }
             } catch (mergeErr) {
                 console.warn('[SIM Screen] Merge sim_plans warning:', mergeErr);
@@ -200,7 +225,7 @@ export default function SimCardScreen() {
         }
 
         if (!selectedPlan) {
-            Alert.alert("Plan Required", "Zaɓi katin SIM don ci gaba.");
+            Alert.alert("Zaɓi SIM", "Da fatan za a zaɓi katin SIM don ci gaba.");
             return;
         }
 
@@ -254,7 +279,7 @@ export default function SimCardScreen() {
                 });
             }
         } catch (err: any) {
-            Alert.alert("SIM Purchase Failed", err.message || "An samu matsala wajen siyan SIM. Ba a cire kudi a wallet dinka ba.");
+            Alert.alert("SIM Purchase Failed", err.message || "An samu matsala wajen siyan SIM. Ba a cire kuɗi a wallet ɗinka ba.");
         } finally {
             setProcessing(false);
         }
@@ -263,269 +288,277 @@ export default function SimCardScreen() {
     const activeMeta = selectedPlan ? getPlanMeta(selectedPlan) : SIM_NETWORKS_META.ratel;
 
     return (
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-            style={{ flex: 1, backgroundColor: '#070D1E' }}
-        >
-            <StatusBar style="light" />
+        <View style={s.pageWrapper}>
             <Stack.Screen options={{ headerShown: false }} />
+            <StatusBar style="light" />
 
-            {/* Ultra Modern Smooth Header */}
-            <View style={[s.header, { paddingTop: insets.top + 6 }]}>
-                <TouchableOpacity 
-                    onPress={() => router.back()} 
-                    style={s.backBtn} 
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
-                </TouchableOpacity>
-
-                <View style={{ flex: 1, marginHorizontal: 12 }}>
-                    <Text style={s.headerTitle}>SIM Cards</Text>
-                    <Text style={s.headerSubtitle}>Order & Instant Activation</Text>
-                </View>
-
-                <TouchableOpacity 
-                    onPress={() => router.push('/wallet')} 
-                    style={s.balancePill}
-                    activeOpacity={0.8}
-                >
-                    <Ionicons name="wallet" size={14} color="#F5A623" />
-                    <Text style={s.balanceText}>
-                        ₦{balance !== null ? balance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '••••'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView
-                style={s.scroll}
-                contentContainerStyle={[s.scrollContent, { paddingBottom: 120 }]}
-                showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F5A623" />}
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+                style={{ flex: 1 }}
             >
-                {/* Maintenance Alert */}
-                {isMaintenance && (
-                    <View style={s.maintenanceBox}>
-                        <Ionicons name="alert-circle" size={20} color="#D97706" />
-                        <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={s.maintenanceTitle}>Sabis ɗin SIM na Gyara</Text>
-                            <Text style={s.maintenanceDesc}>{maintenanceMsg}</Text>
+                {/* Premium Curved Header (Light/Navy Theme matching Data/Airtime) */}
+                <LinearGradient 
+                    colors={['#060d21', '#0d1b3e']} 
+                    style={[s.headerContainer, { paddingTop: insets.top + 10 }]}
+                >
+                    <View style={s.headerTop}>
+                        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
+                            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                        </TouchableOpacity>
+                        <View style={{ alignItems: 'center' }}>
+                            <Text style={s.headerTitle}>SIM Cards & Activation</Text>
+                            {balance !== null && (
+                                <TouchableOpacity 
+                                    onPress={() => router.push('/wallet')} 
+                                    style={s.balanceBadge} 
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
+                                    <Text style={s.headerBalance}>
+                                        ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
-                    </View>
-                )}
-
-                {/* Modern Glossy Virtual SIM Card Preview */}
-                {selectedPlan && (
-                    <LinearGradient
-                        colors={[activeMeta.color, '#0B132B']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={s.simCardPreview}
-                    >
-                        {/* Top Row: Chip + Brand */}
-                        <View style={s.previewTop}>
-                            <View style={s.chipGraphic}>
-                                <View style={s.chipLineHoriz} />
-                                <View style={s.chipLineVert} />
-                                <Ionicons name="hardware-chip" size={18} color="#EAB308" />
-                            </View>
-                            <View style={s.networkLogoWrap}>
-                                <Image source={activeMeta.logo} style={s.previewLogo} resizeMode="contain" />
-                            </View>
-                        </View>
-
-                        {/* Mid Row: SIM Name & Format */}
-                        <View style={s.previewMid}>
-                            <Text style={s.previewPlanName}>{selectedPlan.name.toUpperCase()}</Text>
-                            <Text style={s.previewPhoneNum}>
-                                {phoneNumber ? phoneNumber.replace(/(\d{4})(\d{3})(\d{4})/, '$1  $2  $3') : '+234  ••••  ••••'}
-                            </Text>
-                        </View>
-
-                        {/* Bottom Row: Speed & Price */}
-                        <View style={s.previewBottom}>
-                            <View>
-                                <Text style={s.previewSubLabel}>NETWORK</Text>
-                                <Text style={s.previewSubVal}>{activeMeta.tag}</Text>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={s.previewSubLabel}>PRICE</Text>
-                                <Text style={s.previewPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
-                            </View>
-                        </View>
-                    </LinearGradient>
-                )}
-
-                {/* Success Banner if purchased */}
-                {purchasedSim && (
-                    <View style={s.successBox}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                            <Text style={s.successTitle}>An Yi Nasarar Siyan SIM!</Text>
-                        </View>
-                        <Text style={s.successSubtitle}>Ref: {purchasedSim.refNo}</Text>
-                        {purchasedSim.number && (
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    Clipboard.setStringAsync(purchasedSim.number || '');
-                                    Alert.alert("An Kwafa", "An kwafi lambar SIM");
-                                }}
-                                style={s.copyNumberPill}
-                            >
-                                <Text style={s.copyNumberText}>Lamba: {purchasedSim.number}</Text>
-                                <Ionicons name="copy-outline" size={14} color="#0284C7" />
-                            </TouchableOpacity>
-                        )}
-                        <TouchableOpacity 
-                            onPress={() => setPurchasedSim(null)}
-                            style={s.dismissSuccessBtn}
-                        >
-                            <Text style={s.dismissSuccessText}>Yayi Kyau</Text>
+                        <TouchableOpacity onPress={() => router.push('/wallet')} style={s.topWalletBtn}>
+                            <Ionicons name="add-circle" size={22} color="#f5a623" />
                         </TouchableOpacity>
                     </View>
-                )}
+                </LinearGradient>
 
-                {/* 1. Horizontal SIM Selection Bubbles / Cards */}
-                <Text style={s.sectionTitle}>Zaɓi Network SIM</Text>
-                {loadingPlans ? (
-                    <View style={s.loadingWrap}>
-                        <ActivityIndicator size="small" color="#F5A623" />
-                        <Text style={s.loadingTxt}>Ana loda jerin SIM...</Text>
-                    </View>
-                ) : (
-                    <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false} 
-                        contentContainerStyle={s.hList}
-                    >
-                        {simPlans.map(plan => {
-                            const isSel = selectedPlan?._id === plan._id;
-                            const meta = getPlanMeta(plan);
-                            return (
-                                <TouchableOpacity
-                                    key={plan._id}
-                                    onPress={() => {
-                                        setSelectedPlan(plan);
-                                        try { Haptics.selectionAsync(); } catch {}
-                                    }}
-                                    activeOpacity={0.8}
-                                    style={[
-                                        s.hCard,
-                                        isSel && { borderColor: meta.color, backgroundColor: '#131F3F' }
-                                    ]}
-                                >
-                                    <View style={[s.hCardLogo, { borderColor: meta.color + '44' }]}>
-                                        <Image source={meta.logo} style={s.hLogoImg} resizeMode="contain" />
-                                    </View>
-                                    <Text style={[s.hCardName, isSel && { color: '#FFFFFF' }]} numberOfLines={1}>
-                                        {plan.name.replace(' SIM Card', '')}
-                                    </Text>
-                                    <Text style={[s.hCardPrice, { color: isSel ? '#F5A623' : '#94A3B8' }]}>
-                                        ₦{plan.price.toLocaleString()}
-                                    </Text>
-                                    {isSel && (
-                                        <View style={[s.hActiveDot, { backgroundColor: meta.color }]} />
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                )}
-
-                {/* 2. Format Selector: Physical SIM or eSIM */}
-                <Text style={s.sectionTitle}>Nau'in SIM (Format)</Text>
-                <View style={s.formatRow}>
-                    <TouchableOpacity
-                        onPress={() => {
-                            setSimFormat('standard');
-                            try { Haptics.selectionAsync(); } catch {}
-                        }}
-                        activeOpacity={0.8}
-                        style={[s.formatPill, simFormat === 'standard' && s.formatPillActive]}
-                    >
-                        <MaterialCommunityIcons 
-                            name="sim" 
-                            size={18} 
-                            color={simFormat === 'standard' ? '#070D1E' : '#94A3B8'} 
-                        />
-                        <Text style={[s.formatPillTxt, simFormat === 'standard' && s.formatPillTxtActive]}>
-                            Physical SIM Card
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={() => {
-                            setSimFormat('esim');
-                            try { Haptics.selectionAsync(); } catch {}
-                        }}
-                        activeOpacity={0.8}
-                        style={[s.formatPill, simFormat === 'esim' && s.formatPillActive]}
-                    >
-                        <Ionicons 
-                            name="qr-code" 
-                            size={16} 
-                            color={simFormat === 'esim' ? '#070D1E' : '#94A3B8'} 
-                        />
-                        <Text style={[s.formatPillTxt, simFormat === 'esim' && s.formatPillTxtActive]}>
-                            eSIM Profile (QR)
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* 3. Streamlined Clean Form */}
-                <Text style={s.sectionTitle}>Bayanai & Isarwa</Text>
-                <View style={s.formBox}>
-                    <View style={s.field}>
-                        <Text style={s.fieldLabel}>Lambar Waya (Contact Phone) *</Text>
-                        <View style={s.fieldInputWrap}>
-                            <Ionicons name="call-outline" size={17} color="#94A3B8" />
-                            <TextInput
-                                placeholder="e.g. 08012345678"
-                                placeholderTextColor="#64748B"
-                                keyboardType="phone-pad"
-                                value={phoneNumber}
-                                onChangeText={setPhoneNumber}
-                                style={s.inputTxt}
-                            />
-                        </View>
-                    </View>
-
-                    <View style={s.field}>
-                        <Text style={s.fieldLabel}>Email (Don samun eSIM / Rasit)</Text>
-                        <View style={s.fieldInputWrap}>
-                            <Ionicons name="mail-outline" size={17} color="#94A3B8" />
-                            <TextInput
-                                placeholder="name@example.com"
-                                placeholderTextColor="#64748B"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={emailAddress}
-                                onChangeText={setEmailAddress}
-                                style={s.inputTxt}
-                            />
-                        </View>
-                    </View>
-
-                    {simFormat === 'standard' && (
-                        <View style={s.field}>
-                            <Text style={s.fieldLabel}>Adireshin Karɓa (Address / Station)</Text>
-                            <View style={s.fieldInputWrap}>
-                                <Ionicons name="location-outline" size={17} color="#94A3B8" />
-                                <TextInput
-                                    placeholder="Jiha, Gari, ko Unguwa"
-                                    placeholderTextColor="#64748B"
-                                    value={deliveryAddress}
-                                    onChangeText={setDeliveryAddress}
-                                    style={s.inputTxt}
-                                />
+                <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={s.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.navy} />}
+                >
+                    {/* Maintenance Alert */}
+                    {isMaintenance && (
+                        <View style={s.maintenanceBox}>
+                            <Ionicons name="warning" size={22} color="#D97706" />
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={s.maintenanceTitle}>Sabis ɗin SIM na Gyara</Text>
+                                <Text style={s.maintenanceDesc}>{maintenanceMsg}</Text>
                             </View>
                         </View>
                     )}
-                </View>
 
-                {/* 4. Pay Button Bottom Action */}
-                {selectedPlan && (
-                    <View style={s.actionWrap}>
+                    {/* Modern Interactive Visual SIM Showcase Card */}
+                    {selectedPlan && (
+                        <LinearGradient
+                            colors={[activeMeta.color, '#0d1b3e']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={s.simCardPreview}
+                        >
+                            <View style={s.previewTop}>
+                                <View style={s.chipGraphic}>
+                                    <View style={s.chipLineHoriz} />
+                                    <View style={s.chipLineVert} />
+                                    <Ionicons name="hardware-chip" size={18} color="#D4AF37" />
+                                </View>
+                                <View style={s.networkLogoWrap}>
+                                    <Image source={activeMeta.logo} style={s.previewLogo} resizeMode="contain" />
+                                </View>
+                            </View>
+
+                            <View style={s.previewMid}>
+                                <Text style={s.previewPlanName}>{selectedPlan.name.toUpperCase()}</Text>
+                                <Text style={s.previewPhoneNum}>
+                                    {phoneNumber ? phoneNumber.replace(/(\d{4})(\d{3})(\d{4})/, '$1  $2  $3') : '+234  ••••  ••••'}
+                                </Text>
+                            </View>
+
+                            <View style={s.previewBottom}>
+                                <View>
+                                    <Text style={s.previewSubLabel}>SPEED PROFILE</Text>
+                                    <Text style={s.previewSubVal}>{activeMeta.speed}</Text>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={s.previewSubLabel}>FARASHIN SIM</Text>
+                                    <Text style={s.previewPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
+                                </View>
+                            </View>
+                        </LinearGradient>
+                    )}
+
+                    {/* Success Order Banner if purchased */}
+                    {purchasedSim && (
+                        <View style={s.successBox}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
+                                <Text style={s.successTitle}>An Yi Nasarar Siyan SIM!</Text>
+                            </View>
+                            <Text style={s.successSubtitle}>Reference: {purchasedSim.refNo}</Text>
+                            {purchasedSim.number && (
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        Clipboard.setStringAsync(purchasedSim.number || '');
+                                        Alert.alert("An Kwafa", "An kwafi lambar SIM");
+                                    }}
+                                    style={s.copyNumberPill}
+                                >
+                                    <Text style={s.copyNumberText}>Lamba: {purchasedSim.number}</Text>
+                                    <Ionicons name="copy-outline" size={14} color="#2563eb" />
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity 
+                                onPress={() => setPurchasedSim(null)}
+                                style={s.dismissSuccessBtn}
+                            >
+                                <Text style={s.dismissSuccessText}>Yi Wata Odar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* 1. Network Selection Dropdown Trigger Card */}
+                    <View style={s.sectionHeader}>
+                        <Ionicons name="cellular-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                        <Text style={s.sectionTitle}>1. Zaɓi Network SIM</Text>
+                    </View>
+
+                    {loadingPlans ? (
+                        <View style={s.loadingWrap}>
+                            <ActivityIndicator size="small" color={T.navy} />
+                            <Text style={s.loadingTxt}>Ana loda jerin SIM da farashi...</Text>
+                        </View>
+                    ) : (
+                        <TouchableOpacity
+                            onPress={() => setShowNetworkModal(true)}
+                            activeOpacity={0.85}
+                            style={s.networkDropdownTrigger}
+                        >
+                            {selectedPlan ? (
+                                <>
+                                    <View style={s.triggerLogoWrap}>
+                                        <Image source={activeMeta.logo} style={s.triggerLogo} resizeMode="contain" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={s.triggerName}>{selectedPlan.name}</Text>
+                                            <View style={[s.triggerTag, { backgroundColor: activeMeta.lightBg }]}>
+                                                <Text style={[s.triggerTagTxt, { color: activeMeta.color }]}>{activeMeta.tag}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={s.triggerPrice}>₦{selectedPlan.price.toLocaleString()}</Text>
+                                    </View>
+                                </>
+                            ) : (
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.triggerPlaceholder}>Danna nan don zaɓar Network SIM</Text>
+                                </View>
+                            )}
+                            <View style={s.dropdownIconBox}>
+                                <Ionicons name="chevron-down" size={18} color="#64748b" />
+                            </View>
+                        </TouchableOpacity>
+                    )}
+
+                    {/* 2. Format Selector: Physical SIM or eSIM */}
+                    <View style={s.sectionHeader}>
+                        <Ionicons name="hardware-chip-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                        <Text style={s.sectionTitle}>2. Nau'in SIM (Format)</Text>
+                    </View>
+                    <View style={s.formatRow}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setSimFormat('standard');
+                                try { Haptics.selectionAsync(); } catch {}
+                            }}
+                            activeOpacity={0.8}
+                            style={[s.formatPill, simFormat === 'standard' && s.formatPillActive]}
+                        >
+                            <MaterialCommunityIcons 
+                                name="sim" 
+                                size={20} 
+                                color={simFormat === 'standard' ? '#0d1b3e' : '#64748b'} 
+                            />
+                            <View style={{ marginLeft: 8 }}>
+                                <Text style={[s.formatPillTitle, simFormat === 'standard' && { color: '#0d1b3e' }]}>
+                                    Physical SIM Card
+                                </Text>
+                                <Text style={s.formatPillSub}>Standard / Nano</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                setSimFormat('esim');
+                                try { Haptics.selectionAsync(); } catch {}
+                            }}
+                            activeOpacity={0.8}
+                            style={[s.formatPill, simFormat === 'esim' && s.formatPillActive]}
+                        >
+                            <Ionicons 
+                                name="qr-code-outline" 
+                                size={19} 
+                                color={simFormat === 'esim' ? '#0d1b3e' : '#64748b'} 
+                            />
+                            <View style={{ marginLeft: 8 }}>
+                                <Text style={[s.formatPillTitle, simFormat === 'esim' && { color: '#0d1b3e' }]}>
+                                    eSIM Profile (QR)
+                                </Text>
+                                <Text style={s.formatPillSub}>Digital Activation</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* 3. Delivery / Contact Form */}
+                    <View style={s.sectionHeader}>
+                        <Ionicons name="person-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                        <Text style={s.sectionTitle}>3. Bayanan Mai Karɓa</Text>
+                    </View>
+                    <View style={s.formCard}>
+                        <View style={s.field}>
+                            <Text style={s.fieldLabel}>Lambar Waya (Contact Phone) *</Text>
+                            <View style={s.inputWrap}>
+                                <Ionicons name="call-outline" size={17} color="#64748b" />
+                                <TextInput
+                                    placeholder="e.g. 08012345678"
+                                    placeholderTextColor="#94a3b8"
+                                    keyboardType="phone-pad"
+                                    value={phoneNumber}
+                                    onChangeText={setPhoneNumber}
+                                    style={s.textInput}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={s.field}>
+                            <Text style={s.fieldLabel}>Email Address (Don rasit ko eSIM QR)</Text>
+                            <View style={s.inputWrap}>
+                                <Ionicons name="mail-outline" size={17} color="#64748b" />
+                                <TextInput
+                                    placeholder="name@example.com"
+                                    placeholderTextColor="#94a3b8"
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    value={emailAddress}
+                                    onChangeText={setEmailAddress}
+                                    style={s.textInput}
+                                />
+                            </View>
+                        </View>
+
+                        {simFormat === 'standard' && (
+                            <View style={s.field}>
+                                <Text style={s.fieldLabel}>Adireshin Isarwa (Delivery Address)</Text>
+                                <View style={s.inputWrap}>
+                                    <Ionicons name="location-outline" size={17} color="#64748b" />
+                                    <TextInput
+                                        placeholder="Jiha, Gari, ko Unguwa"
+                                        placeholderTextColor="#94a3b8"
+                                        value={deliveryAddress}
+                                        onChangeText={setDeliveryAddress}
+                                        style={s.textInput}
+                                    />
+                                </View>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Checkout Button */}
+                    {selectedPlan && (
                         <TouchableOpacity
                             onPress={handleInitiatePurchase}
                             disabled={processing}
@@ -533,97 +566,157 @@ export default function SimCardScreen() {
                             activeOpacity={0.85}
                         >
                             <LinearGradient
-                                colors={['#F5A623', '#D97706']}
+                                colors={[T.gold, T.goldDk]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={s.checkoutGradient}
                             >
                                 {processing ? (
-                                    <ActivityIndicator size="small" color="#070D1E" />
+                                    <ActivityIndicator size="small" color="#0d1b3e" />
                                 ) : (
                                     <>
-                                        <Ionicons name="shield-checkmark" size={18} color="#070D1E" />
+                                        <Ionicons name="shield-checkmark" size={18} color="#0d1b3e" />
                                         <Text style={s.checkoutTxt}>
-                                            Biya ₦{selectedPlan.price.toLocaleString()} & Yi Oda
+                                            Biya ₦{selectedPlan.price.toLocaleString()} & Tabbatar da SIM
                                         </Text>
                                     </>
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
-                    </View>
-                )}
-            </ScrollView>
+                    )}
+                </ScrollView>
 
-            {/* PIN Security Modal */}
-            <SecurityModal
-                visible={showSecurityModal}
-                onClose={() => setShowSecurityModal(false)}
-                onSuccess={handleConfirmPurchase}
-                title="Tabbatar da PIN"
-            />
-        </KeyboardAvoidingView>
+                {/* Network Selection Bottom Sheet Modal */}
+                <Modal
+                    visible={showNetworkModal}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setShowNetworkModal(false)}
+                >
+                    <View style={s.modalOverlay}>
+                        <View style={s.modalContent}>
+                            <View style={s.modalHeader}>
+                                <Text style={s.modalTitle}>Zaɓi Network SIM Card</Text>
+                                <TouchableOpacity onPress={() => setShowNetworkModal(false)} style={s.modalCloseBtn}>
+                                    <Ionicons name="close" size={20} color="#64748b" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                                {simPlans.map(plan => {
+                                    const meta = getPlanMeta(plan);
+                                    const isSel = selectedPlan?._id === plan._id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={plan._id}
+                                            onPress={() => {
+                                                setSelectedPlan(plan);
+                                                setShowNetworkModal(false);
+                                                try { Haptics.selectionAsync(); } catch {}
+                                            }}
+                                            activeOpacity={0.75}
+                                            style={[
+                                                s.modalOptionCard,
+                                                isSel && { borderColor: meta.color, backgroundColor: meta.lightBg }
+                                            ]}
+                                        >
+                                            <View style={s.modalLogoWrap}>
+                                                <Image source={meta.logo} style={s.modalLogo} resizeMode="contain" />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Text style={s.modalOptionName}>{plan.name}</Text>
+                                                    <View style={[s.triggerTag, { backgroundColor: meta.lightBg }]}>
+                                                        <Text style={[s.triggerTagTxt, { color: meta.color }]}>{meta.tag}</Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={s.modalOptionDesc} numberOfLines={1}>{meta.features.join(' • ')}</Text>
+                                            </View>
+                                            <Text style={[s.modalOptionPrice, { color: meta.color }]}>₦{plan.price.toLocaleString()}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* PIN Security Modal */}
+                <SecurityModal
+                    visible={showSecurityModal}
+                    onClose={() => setShowSecurityModal(false)}
+                    onSuccess={handleConfirmPurchase}
+                    title="Tabbatar da PIN"
+                />
+            </KeyboardAvoidingView>
+        </View>
     );
 }
 
 const s = StyleSheet.create({
-    header: {
+    pageWrapper: {
+        flex: 1,
+        backgroundColor: T.bg,
+    },
+    headerContainer: {
+        paddingBottom: 16,
+        paddingHorizontal: 16,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+    headerTop: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        backgroundColor: '#070D1E',
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
+        justifyContent: 'space-between',
     },
     backBtn: {
-        width: 38,
-        height: 38,
+        width: 36,
+        height: 36,
         borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    topWalletBtn: {
+        width: 36,
+        height: 36,
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
-        color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '900',
+        color: '#FFFFFF',
         letterSpacing: 0.3,
     },
-    headerSubtitle: {
-        color: '#94A3B8',
-        fontSize: 11,
-        fontWeight: '600',
-        marginTop: 1,
-    },
-    balancePill: {
+    balanceBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(245, 166, 35, 0.12)',
+        backgroundColor: 'rgba(245, 166, 35, 0.15)',
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 12,
+        marginTop: 4,
         borderWidth: 1,
         borderColor: 'rgba(245, 166, 35, 0.3)',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 12,
     },
-    balanceText: {
-        color: '#F5A623',
+    headerBalance: {
         fontSize: 12,
-        fontWeight: '900',
-    },
-    scroll: {
-        flex: 1,
-        backgroundColor: '#070D1E',
+        fontWeight: '800',
+        color: '#f5a623',
     },
     scrollContent: {
         padding: 16,
+        paddingBottom: 40,
     },
     maintenanceBox: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FEF3C7',
-        borderRadius: 14,
+        borderRadius: 16,
         padding: 14,
+        borderWidth: 1,
+        borderColor: '#F59E0B',
         marginBottom: 16,
     },
     maintenanceTitle: {
@@ -640,13 +733,11 @@ const s = StyleSheet.create({
         borderRadius: 22,
         padding: 18,
         marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.35,
-        shadowRadius: 14,
-        elevation: 8,
+        shadowColor: '#0A1128',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 6,
     },
     previewTop: {
         flexDirection: 'row',
@@ -657,9 +748,9 @@ const s = StyleSheet.create({
         width: 38,
         height: 30,
         borderRadius: 6,
-        backgroundColor: 'rgba(234, 179, 8, 0.2)',
+        backgroundColor: 'rgba(212, 175, 55, 0.2)',
         borderWidth: 1.5,
-        borderColor: '#EAB308',
+        borderColor: '#D4AF37',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
@@ -669,17 +760,17 @@ const s = StyleSheet.create({
         position: 'absolute',
         width: '100%',
         height: 1,
-        backgroundColor: 'rgba(234, 179, 8, 0.4)',
+        backgroundColor: 'rgba(212, 175, 55, 0.4)',
     },
     chipLineVert: {
         position: 'absolute',
         height: '100%',
         width: 1,
-        backgroundColor: 'rgba(234, 179, 8, 0.4)',
+        backgroundColor: 'rgba(212, 175, 55, 0.4)',
     },
     networkLogoWrap: {
-        width: 42,
-        height: 42,
+        width: 44,
+        height: 44,
         borderRadius: 12,
         backgroundColor: '#FFFFFF',
         alignItems: 'center',
@@ -696,7 +787,7 @@ const s = StyleSheet.create({
     previewPlanName: {
         fontSize: 11,
         fontWeight: '800',
-        color: 'rgba(255,255,255,0.7)',
+        color: 'rgba(255,255,255,0.75)',
         letterSpacing: 1,
     },
     previewPhoneNum: {
@@ -729,44 +820,46 @@ const s = StyleSheet.create({
     previewPrice: {
         fontSize: 18,
         fontWeight: '900',
-        color: '#F5A623',
+        color: '#f5a623',
     },
     successBox: {
-        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        backgroundColor: '#F0FDF4',
         borderRadius: 16,
         padding: 16,
-        borderWidth: 1,
-        borderColor: '#10B981',
+        borderWidth: 1.5,
+        borderColor: '#86EFAC',
         marginBottom: 20,
     },
     successTitle: {
         fontSize: 14,
         fontWeight: '900',
-        color: '#10B981',
+        color: '#16a34a',
         marginLeft: 8,
     },
     successSubtitle: {
         fontSize: 11,
-        color: '#94A3B8',
+        color: '#64748b',
         marginTop: 4,
     },
     copyNumberPill: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#070D1E',
+        backgroundColor: '#FFFFFF',
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
         marginTop: 10,
     },
     copyNumberText: {
         fontSize: 13,
         fontWeight: '800',
-        color: '#38BDF8',
+        color: '#0284c7',
     },
     dismissSuccessBtn: {
-        backgroundColor: '#10B981',
+        backgroundColor: '#16a34a',
         borderRadius: 10,
         paddingVertical: 9,
         alignItems: 'center',
@@ -777,109 +870,143 @@ const s = StyleSheet.create({
         fontWeight: '800',
         fontSize: 12,
     },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        marginTop: 4,
+    },
     sectionTitle: {
         fontSize: 12.5,
         fontWeight: '800',
-        color: '#94A3B8',
+        color: '#0d1b3e',
         textTransform: 'uppercase',
-        letterSpacing: 0.8,
-        marginBottom: 10,
+        letterSpacing: 0.5,
     },
     loadingWrap: {
-        paddingVertical: 20,
+        paddingVertical: 18,
         alignItems: 'center',
         justifyContent: 'center',
     },
     loadingTxt: {
         fontSize: 11,
-        color: '#94A3B8',
+        color: '#64748b',
         marginTop: 6,
     },
-    hList: {
-        gap: 10,
-        paddingRight: 10,
-        marginBottom: 22,
-    },
-    hCard: {
-        width: 105,
-        backgroundColor: '#0F1833',
-        borderRadius: 16,
-        padding: 12,
+    networkDropdownTrigger: {
+        flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.08)',
-        position: 'relative',
+        borderColor: '#e2e8f0',
+        marginBottom: 18,
+        shadowColor: '#0d1b3e',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
+        elevation: 2,
     },
-    hCardLogo: {
+    triggerLogoWrap: {
         width: 44,
         height: 44,
         borderRadius: 12,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#F8FAFC',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 4,
         borderWidth: 1,
-        marginBottom: 8,
+        borderColor: '#e2e8f0',
+        overflow: 'hidden',
+        marginRight: 12,
     },
-    hLogoImg: {
-        width: '100%',
-        height: '100%',
+    triggerLogo: {
+        width: '80%',
+        height: '80%',
     },
-    hCardName: {
-        fontSize: 11.5,
+    triggerName: {
+        fontSize: 15,
         fontWeight: '800',
-        color: '#CBD5E1',
-        textAlign: 'center',
+        color: '#0f172a',
     },
-    hCardPrice: {
-        fontSize: 12,
+    triggerTag: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    triggerTagTxt: {
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    triggerPrice: {
+        fontSize: 13.5,
         fontWeight: '900',
-        marginTop: 3,
+        color: '#f5a623',
+        marginTop: 2,
     },
-    hActiveDot: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
+    triggerPlaceholder: {
+        fontSize: 14,
+        color: '#64748b',
+        fontWeight: '600',
+    },
+    dropdownIconBox: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
     },
     formatRow: {
         flexDirection: 'row',
         gap: 10,
-        marginBottom: 22,
+        marginBottom: 18,
     },
     formatPill: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        backgroundColor: '#0F1833',
+        backgroundColor: '#FFFFFF',
         borderRadius: 14,
-        paddingVertical: 12,
+        padding: 12,
         borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderColor: '#e2e8f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 3,
+        elevation: 1,
     },
     formatPillActive: {
-        backgroundColor: '#F5A623',
-        borderColor: '#F5A623',
+        borderColor: '#f5a623',
+        backgroundColor: '#FFFBEB',
     },
-    formatPillTxt: {
-        fontSize: 12,
+    formatPillTitle: {
+        fontSize: 12.5,
         fontWeight: '800',
-        color: '#94A3B8',
+        color: '#334155',
     },
-    formatPillTxtActive: {
-        color: '#070D1E',
+    formatPillSub: {
+        fontSize: 9.5,
+        color: '#64748b',
+        fontWeight: '600',
+        marginTop: 1,
     },
-    formBox: {
-        backgroundColor: '#0F1833',
+    formCard: {
+        backgroundColor: '#FFFFFF',
         borderRadius: 18,
         padding: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
         marginBottom: 20,
+        shadowColor: '#0d1b3e',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
+        elevation: 2,
     },
     field: {
         marginBottom: 14,
@@ -887,37 +1014,35 @@ const s = StyleSheet.create({
     fieldLabel: {
         fontSize: 11.5,
         fontWeight: '700',
-        color: '#94A3B8',
+        color: '#334155',
         marginBottom: 6,
     },
-    fieldInputWrap: {
+    inputWrap: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#070D1E',
+        backgroundColor: '#F8FAFC',
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.12)',
+        borderColor: '#e2e8f0',
         paddingHorizontal: 12,
         height: 46,
         gap: 10,
     },
-    inputTxt: {
+    textInput: {
         flex: 1,
-        color: '#FFFFFF',
+        color: '#0f172a',
         fontSize: 13.5,
         fontWeight: '600',
-    },
-    actionWrap: {
-        marginTop: 4,
     },
     checkoutBtn: {
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#F5A623',
+        shadowColor: '#f5a623',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 6,
+        shadowRadius: 8,
+        elevation: 5,
+        marginBottom: 20,
     },
     checkoutGradient: {
         flexDirection: 'row',
@@ -929,6 +1054,80 @@ const s = StyleSheet.create({
     checkoutTxt: {
         fontSize: 15,
         fontWeight: '900',
-        color: '#070D1E',
+        color: '#0d1b3e',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(10, 17, 40, 0.65)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        padding: 20,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+        marginBottom: 10,
+    },
+    modalTitle: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: '#0d1b3e',
+    },
+    modalCloseBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#f1f5f9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalOptionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 16,
+        marginBottom: 8,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
+    },
+    modalLogoWrap: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        marginRight: 12,
+        overflow: 'hidden',
+    },
+    modalLogo: {
+        width: '80%',
+        height: '80%',
+    },
+    modalOptionName: {
+        fontSize: 14.5,
+        fontWeight: '800',
+        color: '#0f172a',
+    },
+    modalOptionDesc: {
+        fontSize: 10.5,
+        color: '#64748b',
+        marginTop: 2,
+    },
+    modalOptionPrice: {
+        fontSize: 14.5,
+        fontWeight: '900',
     },
 });

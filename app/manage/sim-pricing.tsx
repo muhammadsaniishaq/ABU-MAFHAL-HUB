@@ -66,12 +66,21 @@ export default function SimPricingPage() {
   const loadPlans = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("sim_plans").select("*").order("network", { ascending: true });
-      if (error || !data || data.length === 0) {
-        setPlans(DEFAULT_SIM_PLANS as SimPlan[]);
-      } else {
-        setPlans(data as SimPlan[]);
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "sim_plans_custom")
+        .maybeSingle();
+
+      if (data && data.value) {
+        let parsed = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPlans(parsed);
+          setLoading(false);
+          return;
+        }
       }
+      setPlans(DEFAULT_SIM_PLANS as SimPlan[]);
     } catch {
       setPlans(DEFAULT_SIM_PLANS as SimPlan[]);
     } finally {
@@ -80,6 +89,15 @@ export default function SimPricingPage() {
   }, []);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
+
+  const saveAllPlansToDb = async (newPlansList: SimPlan[]) => {
+    await supabase.from("app_settings").upsert({
+      key: "sim_plans_custom",
+      value: JSON.stringify(newPlansList),
+      description: "Custom SIM pricing and hide status",
+      updated_at: new Date().toISOString()
+    }, { onConflict: "key" });
+  };
 
   const openEdit = (plan: SimPlan) => {
     setSelectedPlan(plan);
@@ -101,10 +119,11 @@ export default function SimPricingPage() {
     setSaving(true);
     try {
       const updated = { ...selectedPlan, name: editName.trim(), price: priceNum, description: editDesc.trim(), status: editStatus };
-      await supabase.from("sim_plans").upsert(updated, { onConflict: "id" });
-      setPlans(prev => prev.map(p => p.id === selectedPlan.id ? updated : p));
+      const updatedList = plans.map(p => p.id === selectedPlan.id ? updated : p);
+      await saveAllPlansToDb(updatedList);
+      setPlans(updatedList);
       setEditModal(false);
-      showToast(`? ${updated.name} - ?${priceNum.toLocaleString()} an sabunta`, "success");
+      showToast(`✓ ${updated.name} - ₦${priceNum.toLocaleString()} an sabunta`, "success");
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (err: any) {
       showToast("Kuskure: " + (err?.message || "An samu matsala"), "error");
@@ -114,13 +133,16 @@ export default function SimPricingPage() {
   };
 
   const toggleStatus = async (plan: SimPlan) => {
-    const newStatus = plan.status === "on" ? "off" : "on";
+    const newStatus: "on" | "off" = plan.status === "on" ? "off" : "on";
+    const updatedList: SimPlan[] = plans.map(p => p.id === plan.id ? { ...p, status: newStatus } : p);
+    setPlans(updatedList);
     try {
-      await supabase.from("sim_plans").update({ status: newStatus }).eq("id", plan.id);
-    } catch {}
-    setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, status: newStatus } : p));
-    showToast(newStatus === "on" ? `? ${plan.name} - An kunna` : `?? ${plan.name} - An ?oye`, newStatus === "on" ? "success" : "error");
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+      await saveAllPlansToDb(updatedList);
+      showToast(newStatus === "on" ? `✓ ${plan.name} - An kunna` : `🚫 ${plan.name} - An ɓoye`, newStatus === "on" ? "success" : "error");
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+    } catch {
+      showToast("Matsalar sadarwa wajen canza status", "error");
+    }
   };
 
   const netColor = (netId: string) => NETWORK_COLORS[netId] || T.navy;
@@ -158,7 +180,7 @@ export default function SimPricingPage() {
             { val: plans.length, lbl: "Jimillar SIM", color: T.navy },
             { val: plans.filter(p => p.status === "on").length, lbl: "Active", color: T.green },
             { val: plans.filter(p => p.status === "off").length, lbl: "Hidden", color: T.red },
-            { val: plans.length > 0 ? "?" + Math.min(...plans.map(p => p.price)).toLocaleString() : "�", lbl: "Min Price", color: T.gold },
+            { val: plans.length > 0 ? "₦" + Math.min(...plans.map(p => p.price)).toLocaleString() : "-", lbl: "Min Price", color: T.gold },
           ].map((st, i) => (
             <View key={i} style={[s.statItem, i > 0 && s.statDiv]}>
               <Text style={[s.statVal, { color: st.color }]}>{st.val}</Text>
@@ -214,7 +236,7 @@ export default function SimPricingPage() {
                     <View style={s.priceRow}>
                       <View>
                         <Text style={s.priceLbl}>Farashi</Text>
-                        <Text style={[s.priceVal, { color }]}>?{plan.price.toLocaleString()}</Text>
+                        <Text style={[s.priceVal, { color }]}>₦{plan.price.toLocaleString()}</Text>
                       </View>
                       <View style={s.actBtns}>
                         <TouchableOpacity
@@ -250,7 +272,7 @@ export default function SimPricingPage() {
             <View style={s.infoBox}>
               <Ionicons name="information-circle-outline" size={16} color={T.blue} style={{ marginRight: 8 }} />
               <Text style={s.infoTxt}>
-                Danna Edit don canza farashi ko suna. Danna Hide/Show don ?oye ko nuna SIM card a app. Canje-canje suna aiki nan take.
+                Danna Edit don canza farashi ko suna. Danna Hide/Show don ɓoye ko nuna SIM card a app. Canje-canje suna aiki nan take.
               </Text>
             </View>
           </ScrollView>
@@ -263,7 +285,7 @@ export default function SimPricingPage() {
               <View style={s.modalBox}>
                 <LinearGradient colors={[T.navy, "#142258"]} style={s.modalHead}>
                   <View>
-                    <Text style={s.modalTitle}>?? Sabunta SIM</Text>
+                    <Text style={s.modalTitle}>✏️ Sabunta SIM</Text>
                     <Text style={s.modalSub}>{selectedPlan?.name}</Text>
                   </View>
                   <TouchableOpacity onPress={() => setEditModal(false)}>
@@ -290,10 +312,10 @@ export default function SimPricingPage() {
                   <Text style={s.lbl}>Suna (Name)</Text>
                   <TextInput style={s.input} value={editName} onChangeText={setEditName} placeholder="e.g. Ratel SIM Card" placeholderTextColor={T.sub} />
 
-                  <Text style={s.lbl}>Farashi (?)</Text>
+                  <Text style={s.lbl}>Farashi (₦)</Text>
                   <View style={{ flexDirection: "row" }}>
                     <View style={s.prefix}>
-                      <Text style={s.prefixTxt}>?</Text>
+                      <Text style={s.prefixTxt}>₦</Text>
                     </View>
                     <TextInput
                       style={[s.input, { flex: 1, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeftWidth: 0 }]}
@@ -329,10 +351,10 @@ export default function SimPricingPage() {
 
                   {/* Preview */}
                   <View style={s.preview}>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: T.sub, marginBottom: 8 }}>?? Preview</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: T.sub, marginBottom: 8 }}>👀 Preview</Text>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff", padding: 14, borderRadius: 12, borderWidth: 1, borderColor: T.border }}>
                       <Text style={{ fontSize: 14, fontWeight: "800", color: T.text }}>{editName || "SIM Name"}</Text>
-                      <Text style={{ fontSize: 17, fontWeight: "900", color: T.navy }}>?{Number(editPrice || 0).toLocaleString()}</Text>
+                      <Text style={{ fontSize: 17, fontWeight: "900", color: T.navy }}>₦{Number(editPrice || 0).toLocaleString()}</Text>
                     </View>
                   </View>
 
