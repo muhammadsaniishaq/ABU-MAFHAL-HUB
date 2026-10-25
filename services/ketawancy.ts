@@ -759,7 +759,22 @@ export const KetawancyService = {
         }
     },
 
-    // ─── 8. USER PROFILE & TELEMETRY ───
+    // ─── 8. WALLET & PROFIT SERVICES ───
+    transferWalletToWallet: async (amount: number, identifier: string) => {
+        return await requestKetawancy('/services/wallet-to-wallet', {
+            method: 'POST',
+            body: { amount, identifier }
+        });
+    },
+
+    withdrawProfit: async (amount: number) => {
+        return await requestKetawancy('/services/withdraw-profit', {
+            method: 'POST',
+            body: { amount }
+        });
+    },
+
+    // ─── 9. USER PROFILE & TELEMETRY ───
     getUserMe: async () => {
         try {
             return await requestKetawancy('/users/me');
