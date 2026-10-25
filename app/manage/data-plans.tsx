@@ -118,7 +118,11 @@ export default function ManageDataPlans() {
     const [newMarkupType, setNewMarkupType] = useState<'fixed' | 'percentage'>('fixed');
     const [applyingMarkups, setApplyingMarkups] = useState(false);
 
-    const networks = ['mtn', 'glo', 'airtel', '9mobile', 'vital'];
+    // Hidden Networks from User View
+    const [hiddenNetworks, setHiddenNetworks] = useState<string[]>([]);
+    const [togglingNetworkVisibility, setTogglingNetworkVisibility] = useState(false);
+
+    const networks = ['mtn', 'airtel', 'glo', '9mobile', 'smile', 'alpha', 'kirani', 'ratel', 'sahal', 'vital'];
 
     useEffect(() => {
         fetchConfigsAndPlanTypes();
@@ -130,6 +134,16 @@ export default function ManageDataPlans() {
 
     const fetchConfigsAndPlanTypes = async () => {
         try {
+            // 0. Fetch Hidden Networks
+            const { data: hiddenData } = await supabase.from('app_settings').select('value').eq('key', 'hidden_data_networks').maybeSingle();
+            if (hiddenData && hiddenData.value) {
+                if (Array.isArray(hiddenData.value)) {
+                    setHiddenNetworks(hiddenData.value);
+                } else if (typeof hiddenData.value === 'string') {
+                    try { setHiddenNetworks(JSON.parse(hiddenData.value)); } catch (_) {}
+                }
+            }
+
             // 1. Fetch Active VTU Vendor
             const { data: vendorData } = await supabase.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
             if (vendorData && vendorData.value) {
@@ -451,6 +465,34 @@ export default function ManageDataPlans() {
         else fetchPlans();
     };
 
+    const toggleNetworkVisibility = async (netId: string) => {
+        setTogglingNetworkVisibility(true);
+        try {
+            const isCurrentlyHidden = hiddenNetworks.includes(netId);
+            const updated = isCurrentlyHidden 
+                ? hiddenNetworks.filter(n => n !== netId)
+                : [...hiddenNetworks, netId];
+
+            setHiddenNetworks(updated);
+
+            const { error } = await supabase
+                .from('app_settings')
+                .upsert({ key: 'hidden_data_networks', value: updated }, { onConflict: 'key' });
+
+            if (error) throw error;
+
+            if (isCurrentlyHidden) {
+                showAlert('Network Visible 👁️', `${netId.toUpperCase()} is now visible to all app users.`);
+            } else {
+                showAlert('Network Hidden 🚫', `${netId.toUpperCase()} is now completely hidden from app users.`);
+            }
+        } catch (e: any) {
+            showAlert('Visibility Error', e.message || 'Failed to update network visibility', 'error');
+        } finally {
+            setTogglingNetworkVisibility(false);
+        }
+    };
+
     return (
         <View style={{ flex: 1, backgroundColor: L.bg }}>
             <Stack.Screen options={{ headerShown: false }} />
@@ -609,7 +651,7 @@ export default function ManageDataPlans() {
                         </TouchableOpacity>
                     </View>
 
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 2, gap: 6 }}>
                         {networks.map(net => {
                             const conf = configs.find(c => c.network === net) || { network: net, markup_type: 'fixed', markup_value: 0 };
                             return (
@@ -620,7 +662,7 @@ export default function ManageDataPlans() {
                                         setNewMarkupValue(conf.markup_value.toString());
                                         setNewMarkupType(conf.markup_type as any);
                                     }}
-                                    style={{ flex: 1, backgroundColor: L.bg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, padding: 8, alignItems: 'center' }}
+                                    style={{ width: 85, backgroundColor: L.bg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, padding: 8, alignItems: 'center' }}
                                 >
                                     <Text style={{ color: L.textMuted, fontSize: 9.5, fontWeight: '900', textTransform: 'uppercase' }}>{net}</Text>
                                     <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', marginTop: 2 }}>
@@ -630,34 +672,115 @@ export default function ManageDataPlans() {
                                 </TouchableOpacity>
                             );
                         })}
-                    </View>
+                    </ScrollView>
                 </View>
 
-                {/* Network Selector Tabs Bar */}
-                <View style={{ flexDirection: 'row', paddingHorizontal: 12, marginBottom: 12, gap: 6 }}>
-                    {networks.map(net => {
-                        const isSelected = selectedNetwork === net;
-                        return (
-                            <TouchableOpacity
-                                key={net}
-                                onPress={() => setSelectedNetwork(net)}
-                                style={{ 
-                                    flex: 1, 
-                                    backgroundColor: isSelected ? L.navyHeader : L.card, 
-                                    borderRadius: 10, 
-                                    paddingVertical: 8, 
-                                    alignItems: 'center',
-                                    borderWidth: 1,
-                                    borderColor: isSelected ? L.navyHeader : L.inputBorder,
-                                    elevation: isSelected ? 2 : 0
-                                }}
-                            >
-                                <Text style={{ color: isSelected ? '#FFFFFF' : L.textSecondary, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
-                                    {net}
+                {/* Network Selector Tabs Bar with Hidden Status Indicator */}
+                <View style={{ marginBottom: 10 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 6 }}>
+                        {networks.map(net => {
+                            const isSelected = selectedNetwork === net;
+                            const isHidden = hiddenNetworks.includes(net);
+                            return (
+                                <TouchableOpacity
+                                    key={net}
+                                    onPress={() => setSelectedNetwork(net)}
+                                    style={{ 
+                                        backgroundColor: isSelected ? L.navyHeader : L.card, 
+                                        borderRadius: 10, 
+                                        paddingHorizontal: 14,
+                                        paddingVertical: 8, 
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderWidth: 1,
+                                        borderColor: isSelected ? L.navyHeader : isHidden ? '#FECDD3' : L.inputBorder,
+                                        elevation: isSelected ? 2 : 0,
+                                        flexDirection: 'row',
+                                        gap: 5
+                                    }}
+                                >
+                                    <Text style={{ color: isSelected ? '#FFFFFF' : isHidden ? '#94A3B8' : L.textSecondary, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
+                                        {net}
+                                    </Text>
+                                    {isHidden && (
+                                        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ color: '#E11D48', fontSize: 8, fontWeight: '900' }}>HIDDEN</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+
+                {/* Network Visibility & User Availability Manager */}
+                <View style={{ 
+                    backgroundColor: hiddenNetworks.includes(selectedNetwork) ? '#FFF1F2' : '#F0FDF4', 
+                    borderRadius: 14, 
+                    borderWidth: 1.5, 
+                    borderColor: hiddenNetworks.includes(selectedNetwork) ? '#FDA4AF' : '#86EFAC', 
+                    padding: 12, 
+                    marginHorizontal: 12, 
+                    marginBottom: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                }}>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <Ionicons 
+                                name={hiddenNetworks.includes(selectedNetwork) ? "eye-off" : "eye"} 
+                                size={15} 
+                                color={hiddenNetworks.includes(selectedNetwork) ? '#E11D48' : '#16A34A'} 
+                            />
+                            <Text style={{ 
+                                fontSize: 12, 
+                                fontWeight: '900', 
+                                color: hiddenNetworks.includes(selectedNetwork) ? '#9F1239' : '#166534',
+                                textTransform: 'uppercase'
+                            }}>
+                                {selectedNetwork} Network Visibility: {hiddenNetworks.includes(selectedNetwork) ? 'Hidden from Users' : 'Visible in App'}
+                            </Text>
+                        </View>
+                        <Text style={{ 
+                            fontSize: 10, 
+                            color: hiddenNetworks.includes(selectedNetwork) ? '#BE123C' : '#15803D' 
+                        }}>
+                            {hiddenNetworks.includes(selectedNetwork) 
+                                ? `Users cannot see or buy ${selectedNetwork.toUpperCase()} data plans on their screen.` 
+                                : `${selectedNetwork.toUpperCase()} is active and purchaseable by users in the data menu.`}
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={() => toggleNetworkVisibility(selectedNetwork)}
+                        disabled={togglingNetworkVisibility}
+                        activeOpacity={0.8}
+                        style={{
+                            backgroundColor: hiddenNetworks.includes(selectedNetwork) ? '#E11D48' : '#16A34A',
+                            paddingHorizontal: 12,
+                            paddingVertical: 7,
+                            borderRadius: 10,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5
+                        }}
+                    >
+                        {togglingNetworkVisibility ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                            <>
+                                <Ionicons 
+                                    name={hiddenNetworks.includes(selectedNetwork) ? "eye-outline" : "eye-off-outline"} 
+                                    size={13} 
+                                    color="#FFFFFF" 
+                                />
+                                <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '900' }}>
+                                    {hiddenNetworks.includes(selectedNetwork) ? 'Make Visible' : 'Hide Network'}
                                 </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
+                            </>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
                 {/* Data Plans List */}

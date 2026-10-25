@@ -288,23 +288,53 @@ export default function DataScreen() {
         });
     }, []);
     
-    // Fetch dynamic networks (Merge with base NETWORKS_DATA to ensure VITEL is never removed)
+    // Fetch dynamic networks & filter out networks hidden by admin
     useEffect(() => {
         const fetchNetworks = async () => {
             try {
-                const response = await fetch('https://www.nellobytesystems.com/APIDatabundleNetworkV2.asp?UserID=CK101269551');
-                const data = await response.json();
-                if (data && data.MOBILE_NETWORK) {
-                    // Update discounts/API IDs for matched networks, keeping all 5 NETWORKS_DATA intact
-                    const dynamic = NETWORKS_DATA.map((baseNet) => {
-                        const match = data.MOBILE_NETWORK.find((net: any) => {
-                            const n = (net.NETWORK_NAME || '').toLowerCase();
-                            return n.includes(baseNet.id) || (baseNet.id === '9mobile' && (n.includes('mobile') || n.includes('t2')));
+                // 1. Fetch hidden networks configured by admin
+                let hidden: string[] = [];
+                try {
+                    const { data: hiddenData } = await supabase
+                        .from('app_settings')
+                        .select('value')
+                        .eq('key', 'hidden_data_networks')
+                        .maybeSingle();
+                    if (hiddenData && hiddenData.value) {
+                        if (Array.isArray(hiddenData.value)) hidden = hiddenData.value;
+                        else if (typeof hiddenData.value === 'string') {
+                            try { hidden = JSON.parse(hiddenData.value); } catch (_) {}
+                        }
+                    }
+                } catch (_) {}
+
+                // 2. Fetch network rates
+                let dynamic = NETWORKS_DATA;
+                try {
+                    const response = await fetch('https://www.nellobytesystems.com/APIDatabundleNetworkV2.asp?UserID=CK101269551');
+                    const data = await response.json();
+                    if (data && data.MOBILE_NETWORK) {
+                        dynamic = NETWORKS_DATA.map((baseNet) => {
+                            const match = data.MOBILE_NETWORK.find((net: any) => {
+                                const n = (net.NETWORK_NAME || '').toLowerCase();
+                                return n.includes(baseNet.id) || (baseNet.id === '9mobile' && (n.includes('mobile') || n.includes('t2')));
+                            });
+                            return match ? { ...baseNet, apiId: match.NETWORK_ID, discount: match.DISCOUNT } : baseNet;
                         });
-                        return match ? { ...baseNet, apiId: match.NETWORK_ID, discount: match.DISCOUNT } : baseNet;
-                    });
-                    setNetworksData(dynamic);
-                }
+                    }
+                } catch (_) {}
+
+                // 3. Exclude any network flagged as hidden by admin
+                const visibleNetworks = dynamic.filter(n => !hidden.includes(n.id));
+                setNetworksData(visibleNetworks);
+
+                // If currently selected network was hidden, reset or select first visible
+                setNetwork(curr => {
+                    if (curr && hidden.includes(curr)) {
+                        return visibleNetworks.length > 0 ? visibleNetworks[0].id : '';
+                    }
+                    return curr;
+                });
             } catch (err) {
                 console.warn('Failed to fetch dynamic networks', err);
             }
