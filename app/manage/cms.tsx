@@ -40,7 +40,7 @@ const L = {
 };
 
 const AVAILABLE_PLACEMENTS = [
-  'dashboard', 'web_desktop', 'mobile_only', 'airtime', 'data', 'bills', 'transfer',
+  'dashboard', 'telecom_sim', 'sim', 'web_desktop', 'mobile_only', 'airtime', 'data', 'bills', 'transfer',
   'education', 'smile', 'cac', 'nin_bvn', 'social_boost', 'crypto', 'qr_pay', 'wallet', 'services'
 ];
 
@@ -1062,7 +1062,11 @@ export default function ModernContentManager() {
               <View style={s.placementSelectorRow}>
                 {AVAILABLE_PLACEMENTS.map(p => {
                   const isChecked = newPlacements.includes(p);
-                  const displayLabel = p === 'web_desktop' ? '💻 Web / Desktop' : p === 'mobile_only' ? '📱 Mobile Only' : p;
+                  const displayLabel = 
+                    p === 'telecom_sim' ? '📱 Telecom & SIM Hub' :
+                    p === 'sim' ? '💳 SIM Page' :
+                    p === 'web_desktop' ? '💻 Web / Desktop' : 
+                    p === 'mobile_only' ? '📱 Mobile Only' : p;
                   return (
                     <TouchableOpacity
                       key={p}
@@ -1070,7 +1074,7 @@ export default function ModernContentManager() {
                       style={[
                         s.placementSelectChip, 
                         isChecked && s.placementSelectChipActive,
-                        (p === 'web_desktop' || p === 'mobile_only') && { borderWidth: 1.5, borderColor: isChecked ? '#0F172A' : L.goldDk }
+                        (p === 'telecom_sim' || p === 'sim' || p === 'web_desktop' || p === 'mobile_only') && { borderWidth: 1.5, borderColor: isChecked ? '#0F172A' : L.goldDk }
                       ]}
                       activeOpacity={0.7}
                     >

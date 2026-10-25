@@ -31,7 +31,17 @@ interface Banner {
   placement?: string;
 }
 
-export default function DynamicBanners({ placement = 'dashboard' }: { placement?: string }) {
+export default function DynamicBanners({ 
+  placement = 'dashboard',
+  height,
+  borderRadius = RADIUS,
+  onBannersLoaded,
+}: { 
+  placement?: string;
+  height?: number;
+  borderRadius?: number;
+  onBannersLoaded?: (count: number) => void;
+}) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && windowWidth >= 768;
 
@@ -42,7 +52,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
   const bannerW = isDesktop
     ? Math.min(windowWidth - 48, 860)
     : Math.max(windowWidth - 28, 280);
-  const bannerH = isDesktop ? 116 : 64;
+  const bannerH = height || (isDesktop ? 116 : 64);
   const stride = bannerW + GAP;
 
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -91,12 +101,16 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
           return false;
         }
 
-        // Rule 3: Screen placement match (or generic all/dashboard)
+        // Rule 3: Screen placement match
+        if (placement && placement !== 'dashboard') {
+          return pList.some((item) => item.includes(placement.toLowerCase()));
+        }
+
         if (!rawP || pList.includes('all') || pList.includes('dashboard')) {
           return true;
         }
 
-        return placement && pList.some((item) => item.includes(placement.toLowerCase()));
+        return false;
       });
 
       // If on desktop, check if there are desktop-exclusive banners
@@ -112,24 +126,20 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
 
         if (desktopSpecific.length > 0) {
           setBanners(desktopSpecific);
+          onBannersLoaded?.(desktopSpecific.length);
           return;
         }
       }
 
-      // Clean fallback excluding cross-device pollution
-      const cleanBanners = (filtered.length ? filtered : data).filter((b) => {
-        const rawP = String(b.placement || '').toLowerCase();
-        if (isDesktop) return !rawP.includes('mobile_only');
-        return !rawP.includes('web_desktop') && !rawP.includes('desktop');
-      });
-
-      setBanners(cleanBanners);
+      setBanners(filtered);
+      onBannersLoaded?.(filtered.length);
     } catch (e) {
       console.warn('DynamicBanners:', e);
+      onBannersLoaded?.(0);
     } finally {
       setLoading(false);
     }
-  }, [placement, isDesktop]);
+  }, [placement, isDesktop, onBannersLoaded]);
 
   useEffect(() => {
     fetchBanners();
@@ -245,7 +255,7 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
             <TouchableOpacity
               onPress={() => onPress(item)}
               activeOpacity={item.target_url ? 0.9 : 1}
-              style={[s.card, { width: bannerW, height: bannerH }]}
+              style={[s.card, { width: bannerW, height: bannerH, borderRadius }]}
               accessible
               accessibilityRole="button"
               accessibilityLabel={item.title || 'Banner'}

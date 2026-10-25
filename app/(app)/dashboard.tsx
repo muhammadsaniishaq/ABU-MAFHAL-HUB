@@ -798,8 +798,19 @@ export default function Dashboard() {
             </View>
           );
 
-          const telecomHubEl = (
+          const isTelecomHidden = hiddenFeatures.includes('feature_telecom_sim') || 
+            hiddenFeatures.includes('feature_sim') || 
+            serviceCustoms['telecom_hub']?.is_visible === false;
+
+          const telecomHubEl = !isTelecomHidden ? (
             <View style={[s.section, isDesktop && { marginHorizontal: 0 }]}>
+              {/* Dynamic Sliding Banners with placement="telecom_sim" */}
+              <DynamicBanners 
+                placement="telecom_sim" 
+                height={isDesktop ? 130 : 90} 
+                borderRadius={18} 
+              />
+
               <View
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -812,6 +823,7 @@ export default function Dashboard() {
                   shadowOpacity: 0.05,
                   shadowRadius: 10,
                   elevation: 2,
+                  marginTop: 6,
                 }}
               >
                 <TouchableOpacity
@@ -821,7 +833,7 @@ export default function Dashboard() {
                 >
                   <Image
                     source={require('../../assets/images/telecom_hub.jpg')}
-                    style={{ width: 60, height: 60, borderRadius: 14 }}
+                    style={{ width: 56, height: 56, borderRadius: 14 }}
                     resizeMode="cover"
                   />
                   <View style={{ flex: 1 }}>
@@ -835,6 +847,7 @@ export default function Dashboard() {
                       Buy Kirani SIM Cards, 4G Data (Smile, Alpha, Kirani, Ratel) & instant Airtime recharge.
                     </Text>
                   </View>
+                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                 </TouchableOpacity>
 
                 {/* Sub buttons for separate pages */}
@@ -860,7 +873,7 @@ export default function Dashboard() {
                 </View>
               </View>
             </View>
-          );
+          ) : null;
 
           const payBillsEl = !hiddenFeatures.includes('feature_bills') ? (
             <View style={[s.section, isDesktop && { marginHorizontal: 0 }]}>
