@@ -260,6 +260,9 @@ export default function SplashScreen() {
 
   const checkAuthSession = async () => {
     try {
+      // 1. Web Browser visitor handling:
+      // If accessed via a browser (web), visitors should be served the landing page,
+      // not the mobile onboarding carousel splash.
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const search = window.location.search || '', hash = window.location.hash || '';
         const hasAuth = (hash && hash.includes('access_token')) || (search && search.includes('code='));
@@ -272,22 +275,33 @@ export default function SplashScreen() {
           }
           await processOAuthReturn();
         }
-      }
 
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session && Platform.OS === 'web') {
+        // If on web root and not already logged in, redirect to landing showcase
         const hasActive = await AsyncStorage.getItem('has_active_session');
-        if (hasActive === 'true') {
-          await new Promise(resolve => setTimeout(resolve, 400));
-          const retryResult = await supabase.auth.getSession();
-          session = retryResult.data.session;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user || hasActive === 'true') {
+          router.replace('/dashboard' as any);
+          return;
+        } else {
+          // Serve web landing page
+          window.location.replace('/landing.html');
+          return;
         }
       }
 
-      if (session?.user) {
+      // 2. Mobile Native App handling (Play Store app):
+      let { data: { session } } = await supabase.auth.getSession();
+      const hasActive = await AsyncStorage.getItem('has_active_session');
+      const savedUser = await AsyncStorage.getItem('saved_user_identifier');
+
+      if (session?.user || hasActive === 'true' || savedUser) {
+        // User is already logged in! Immediately direct them to PIN screen without showing splash slides
         await AsyncStorage.setItem('has_active_session', 'true');
-        await AsyncStorage.setItem('app_unlocked', 'true');
+        // Keep locked state so PIN is required
+        await AsyncStorage.removeItem('app_unlocked');
         setHasValidSession(true);
+        router.replace('/(auth)/pin' as any);
+        return;
       } else {
         await AsyncStorage.removeItem('has_active_session');
         await AsyncStorage.removeItem('app_unlocked');

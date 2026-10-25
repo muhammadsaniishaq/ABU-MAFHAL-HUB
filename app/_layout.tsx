@@ -142,37 +142,55 @@ export default function RootLayout() {
     useEffect(() => {
         let isMounted = true;
 
-        supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-            if (!isMounted) return;
-            if (error) {
-                if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
-                    await forceSignOut();
-                    await AsyncStorage.removeItem('has_active_session');
-                    await AsyncStorage.removeItem('app_unlocked');
+        const initAuth = async () => {
+            try {
+                let { data: { session }, error } = await supabase.auth.getSession();
+                if (!isMounted) return;
+
+                if (!session) {
+                    const hasActive = await AsyncStorage.getItem('has_active_session');
+                    if (hasActive === 'true') {
+                        // Attempt a graceful refresh before assuming logged out
+                        const refreshed = await supabase.auth.refreshSession().catch(() => ({ data: { session: null }, error: null }));
+                        if (refreshed?.data?.session) {
+                            session = refreshed.data.session;
+                            error = null;
+                        }
+                    }
                 }
-                setSession(null);
-            } else {
-                setSession(session);
-                if (session?.user) {
+
+                if (error) {
+                    // Only force sign out if refresh token was explicitly revoked/invalid
+                    if (error.message?.includes('Refresh Token Not Found') || error.message?.includes('invalid_grant')) {
+                        await forceSignOut();
+                        await AsyncStorage.removeItem('has_active_session');
+                        await AsyncStorage.removeItem('app_unlocked');
+                    }
+                    setSession(null);
+                } else if (session?.user) {
+                    setSession(session);
                     await AsyncStorage.setItem('has_active_session', 'true');
-                    await AsyncStorage.setItem('app_unlocked', 'true');
                     const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                     if (cached) setUserRole(cached);
                     fetchUserRole(session.user.id, session.user.email);
                 } else {
                     const hasActive = await AsyncStorage.getItem('has_active_session');
-                    if (hasActive !== 'true') {
+                    const savedUser = await AsyncStorage.getItem('saved_user_identifier');
+                    if (hasActive !== 'true' && !savedUser) {
                         await AsyncStorage.removeItem('has_active_session');
                         await AsyncStorage.removeItem('app_unlocked');
                     }
+                    setSession(null);
                 }
+            } catch (err) {
+                console.warn('Init auth notice:', err);
+            } finally {
+                if (isMounted) setAuthChecked(true);
+                if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
             }
-            setAuthChecked(true);
-            if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
-        }).catch(async () => {
-            if (isMounted) setAuthChecked(true);
-            if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
-        });
+        };
+
+        initAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (!isMounted) return;
@@ -429,7 +447,15 @@ export default function RootLayout() {
             })().catch(() => {});
         } else {
             if (!isPublicScreen && !isAuthGroup) {
-                router.replace('/');
+                if (Platform.OS === 'web') {
+                    if (typeof window !== 'undefined') {
+                        window.location.replace('/landing.html');
+                    } else {
+                        router.replace('/');
+                    }
+                } else {
+                    router.replace('/');
+                }
             }
         }
     }, [session, userRole, authChecked, segments]);
