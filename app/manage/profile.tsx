@@ -362,10 +362,10 @@ export default function AdminProfileScreen() {
 
     if (loading && !profile) {
         return (
-            <View style={{ flex: 1, backgroundColor: T.navyDark, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ flex: 1, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
                 <Stack.Screen options={{ headerShown: false }} />
-                <ActivityIndicator size="large" color={T.goldBright} />
-                <Text style={{ color: '#FFFFFF', marginTop: 12, fontWeight: '700', fontSize: 13 }}>
+                <ActivityIndicator size="large" color={T.gold} />
+                <Text style={{ color: '#0F172A', marginTop: 12, fontWeight: '700', fontSize: 13 }}>
                     Loading Super Admin Profile...
                 </Text>
             </View>
@@ -376,20 +376,17 @@ export default function AdminProfileScreen() {
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Top Luxury Dark Header Bar */}
-            <LinearGradient
-                colors={['#070D1E', '#0A122A', '#0F172A']}
-                style={s.topBar}
-            >
+            {/* Clean Executive Light Header Bar */}
+            <View style={s.topBar}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.8}>
-                    <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                    <Ionicons name="arrow-back" size={20} color="#0F172A" />
                 </TouchableOpacity>
 
                 <View style={s.brandWrap}>
                     <View style={s.logoCircle}>
                         <Image
                             source={require('../../assets/images/logo-icon.png')}
-                            style={{ width: 24, height: 24, resizeMode: 'contain' }}
+                            style={{ width: 22, height: 22, resizeMode: 'contain' }}
                         />
                     </View>
                     <View>
@@ -407,7 +404,7 @@ export default function AdminProfileScreen() {
                         style={s.bellBtn}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="notifications" size={18} color="#FFFFFF" />
+                        <Ionicons name="notifications" size={18} color="#0F172A" />
                         {realStats.pendingNotifications > 0 && (
                             <View style={s.bellBadge}>
                                 <Text style={s.bellBadgeText}>{realStats.pendingNotifications}</Text>
@@ -420,27 +417,27 @@ export default function AdminProfileScreen() {
                         style={s.walletPill}
                         activeOpacity={0.85}
                     >
-                        <Ionicons name="wallet" size={13} color="#F59E0B" />
+                        <Ionicons name="wallet" size={13} color="#D97706" />
                         <Text style={s.walletPillText}>
                             ₦{realStats.adminBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
-                        <Ionicons name="chevron-down" size={12} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={12} color="#64748B" />
                     </TouchableOpacity>
                 </View>
-            </LinearGradient>
+            </View>
 
             {/* Main Scrollable Content */}
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={s.scrollContainer}
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.goldBright} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />}
             >
                 {/* 1. HERO PROFILE CARD WITH GOLDEN ACCENT */}
                 <View style={s.heroCard}>
-                    {/* Golden Wave Banner Header */}
+                    {/* Golden Banner Header */}
                     <LinearGradient
-                        colors={['#0F1E3A', '#1C2E52', '#F59E0B', '#FDE68A']}
+                        colors={['#FEF3C7', '#FDE68A', '#F59E0B']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={s.heroBannerGradient}
@@ -645,19 +642,27 @@ export default function AdminProfileScreen() {
                             </View>
                         </View>
 
-                        {/* Role */}
-                        <View style={s.infoRowItem}>
+                        {/* Role (Clickable to /manage/staff) */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/manage/staff')}
+                            style={[s.infoRowItem, { cursor: 'pointer' } as any]}
+                            activeOpacity={0.7}
+                        >
                             <View style={s.infoLabelCol}>
-                                <Ionicons name="shield-checkmark-outline" size={15} color="#64748B" />
-                                <Text style={s.infoLabelText}>Role</Text>
+                                <Ionicons name="shield-checkmark-outline" size={15} color="#D97706" />
+                                <Text style={s.infoLabelText}>Access & Role</Text>
                             </View>
-                            <View style={s.infoValueBox}>
+                            <View style={[s.infoValueBox, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                                 <View style={s.roleBadgePillMini}>
                                     <Ionicons name="shield-checkmark" size={11} color="#D97706" />
                                     <Text style={s.roleBadgePillMiniText}>Super Admin</Text>
                                 </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>Manage</Text>
+                                    <Ionicons name="chevron-forward" size={12} color="#2563EB" />
+                                </View>
                             </View>
-                        </View>
+                        </TouchableOpacity>
 
                         {/* Member Since */}
                         <View style={s.infoRowItem}>
@@ -679,25 +684,12 @@ export default function AdminProfileScreen() {
                             <Ionicons name="flash" size={17} color="#D97706" />
                         </View>
                         <View>
-                            <Text style={s.sectionHeadTitle}>Quick Actions</Text>
-                            <Text style={s.sectionHeadSubtitle}>Common admin actions and shortcuts</Text>
+                            <Text style={s.sectionHeadTitle}>Security & Quick Actions</Text>
+                            <Text style={s.sectionHeadSubtitle}>Manage 2FA, staff access roles, and passwords</Text>
                         </View>
                     </View>
 
                     <View style={s.quickGrid}>
-                        {/* Change Password */}
-                        <TouchableOpacity
-                            onPress={() => setShowPasswordModal(true)}
-                            style={s.quickTile}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[s.quickTileIcon, { backgroundColor: '#FEF3C7' }]}>
-                                <Ionicons name="key" size={16} color="#D97706" />
-                            </View>
-                            <Text style={s.quickTileText} numberOfLines={2}>Change Password</Text>
-                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
-                        </TouchableOpacity>
-
                         {/* Enable 2FA */}
                         <TouchableOpacity
                             onPress={() => router.push('/manage/security')}
@@ -707,11 +699,37 @@ export default function AdminProfileScreen() {
                             <View style={[s.quickTileIcon, { backgroundColor: '#EFF6FF' }]}>
                                 <Ionicons name="shield-checkmark" size={16} color="#2563EB" />
                             </View>
-                            <Text style={s.quickTileText} numberOfLines={2}>Enable 2FA</Text>
+                            <Text style={s.quickTileText} numberOfLines={2}>Enable 2FA & Security</Text>
                             <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
                         </TouchableOpacity>
 
-                        {/* Manage Users */}
+                        {/* Access & Roles */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/manage/staff')}
+                            style={s.quickTile}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[s.quickTileIcon, { backgroundColor: '#FEF3C7' }]}>
+                                <Ionicons name="key-outline" size={16} color="#D97706" />
+                            </View>
+                            <Text style={s.quickTileText} numberOfLines={2}>Access & Roles</Text>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </TouchableOpacity>
+
+                        {/* Change Password */}
+                        <TouchableOpacity
+                            onPress={() => setShowPasswordModal(true)}
+                            style={s.quickTile}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[s.quickTileIcon, { backgroundColor: '#F5F3FF' }]}>
+                                <Ionicons name="lock-closed" size={16} color="#7C3AED" />
+                            </View>
+                            <Text style={s.quickTileText} numberOfLines={2}>Change Password</Text>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </TouchableOpacity>
+
+                        {/* Manage Staff & Users */}
                         <TouchableOpacity
                             onPress={() => router.push('/manage/users')}
                             style={s.quickTile}
@@ -721,19 +739,6 @@ export default function AdminProfileScreen() {
                                 <Ionicons name="people" size={16} color="#10B981" />
                             </View>
                             <Text style={s.quickTileText} numberOfLines={2}>Manage Users</Text>
-                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
-                        </TouchableOpacity>
-
-                        {/* View Activity Logs */}
-                        <TouchableOpacity
-                            onPress={() => router.push('/manage/logs')}
-                            style={s.quickTile}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[s.quickTileIcon, { backgroundColor: '#F5F3FF' }]}>
-                                <Ionicons name="time" size={16} color="#7C3AED" />
-                            </View>
-                            <Text style={s.quickTileText} numberOfLines={2}>View Activity Logs</Text>
                             <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
                         </TouchableOpacity>
                     </View>
@@ -940,18 +945,19 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(217, 119, 6, 0.25)',
+        borderBottomColor: '#E2E8F0',
     },
     backBtn: {
         width: 36,
         height: 36,
         borderRadius: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderColor: '#E2E8F0',
     },
     brandWrap: {
         flexDirection: 'row',
@@ -962,25 +968,25 @@ const s = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 17,
-        backgroundColor: '#0F172A',
+        backgroundColor: '#FFFBEB',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
         borderColor: '#D97706',
     },
     brandTitle: {
-        color: '#FFFFFF',
+        color: '#0F172A',
         fontSize: 12.5,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
     brandGold: {
-        color: '#F59E0B',
+        color: '#D97706',
         fontSize: 12.5,
         fontWeight: '900',
     },
     brandSub: {
-        color: '#94A3B8',
+        color: '#64748B',
         fontSize: 8.5,
         fontWeight: '800',
         letterSpacing: 0.8,
@@ -994,12 +1000,12 @@ const s = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderColor: '#E2E8F0',
     },
     bellBadge: {
         position: 'absolute',
@@ -1013,7 +1019,7 @@ const s = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 3,
         borderWidth: 1.5,
-        borderColor: '#0A122A',
+        borderColor: '#FFFFFF',
     },
     bellBadgeText: {
         color: '#FFFFFF',
@@ -1021,7 +1027,7 @@ const s = StyleSheet.create({
         fontWeight: '900',
     },
     walletPill: {
-        backgroundColor: '#070D1E',
+        backgroundColor: '#F8FAFC',
         borderRadius: 18,
         paddingHorizontal: 10,
         paddingVertical: 6,
@@ -1029,10 +1035,10 @@ const s = StyleSheet.create({
         alignItems: 'center',
         gap: 5,
         borderWidth: 1,
-        borderColor: 'rgba(217, 119, 6, 0.4)',
+        borderColor: '#E2E8F0',
     },
     walletPillText: {
-        color: '#FFFFFF',
+        color: '#0F172A',
         fontSize: 11,
         fontWeight: '900',
     },

@@ -174,87 +174,93 @@ export default function SecuritySub() {
         : '';
 
     return (
-        <ScrollView className="flex-1 bg-slate-900">
+        <ScrollView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
             <Stack.Screen options={{
-                title: 'Security Command',
-                headerStyle: { backgroundColor: '#0F172A' },
-                headerTintColor: '#fff'
+                title: 'Security & 2FA Control',
+                headerStyle: { backgroundColor: '#FFFFFF' },
+                headerTintColor: '#0F172A',
+                headerShadowVisible: false,
             }} />
 
-            <View className="p-6">
-                <View className="flex-row items-center mb-6">
-                    <View className="w-16 h-16 bg-blue-500/10 rounded-full items-center justify-center mr-4 border border-blue-500/30">
-                        <Ionicons name="shield-checkmark" size={32} color="#3B82F6" />
+            <View style={{ padding: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                    <View style={{ width: 52, height: 52, backgroundColor: '#EFF6FF', borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginRight: 14, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                        <Ionicons name="shield-checkmark" size={28} color="#2563EB" />
                     </View>
-                    <View>
-                        <Text className="text-white text-2xl font-black">Security Sub</Text>
-                        <Text className="text-slate-400 font-medium">System Integrity & Access</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#0F172A', fontSize: 20, fontWeight: '900' }}>Security & 2FA Hub</Text>
+                        <Text style={{ color: '#64748B', fontSize: 13, fontWeight: '600', marginTop: 2 }}>System Integrity, 2FA & Access Controls</Text>
                     </View>
                 </View>
 
                 {/* Authentication Controls */}
-                <View className="bg-slate-800/50 rounded-2xl border border-slate-700 p-4 mb-8">
-                    <Text className="text-slate-400 font-bold uppercase text-xs mb-4 tracking-wider">Authentication Policy</Text>
+                <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }}>
+                    <Text style={{ color: '#64748B', fontWeight: '800', textTransform: 'uppercase', fontSize: 11, marginBottom: 14, letterSpacing: 0.5 }}>Authentication Policy</Text>
 
                     {/* Require 2FA (Google Authenticator) */}
-                    <View className="flex-row items-center justify-between mb-6">
-                        <View className="flex-row items-center gap-3" style={{ flex: 1 }}>
-                            <View className="bg-orange-500/20 p-2 rounded-lg">
-                                <Ionicons name="key" size={18} color="#F97316" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                            <View style={{ backgroundColor: '#FEF3C7', padding: 10, borderRadius: 10 }}>
+                                <Ionicons name="key" size={20} color="#D97706" />
                             </View>
                             <View style={{ flex: 1, paddingRight: 8 }}>
-                                <Text className="text-white font-bold">Google Authenticator (2FA)</Text>
-                                <Text className="text-slate-500 text-xs">Verify your identity using a 6-digit TOTP app code</Text>
+                                <Text style={{ color: '#0F172A', fontWeight: '800', fontSize: 14 }}>Google Authenticator (2FA)</Text>
+                                <Text style={{ color: '#64748B', fontSize: 11.5, marginTop: 2 }}>Verify your identity using a 6-digit TOTP app code</Text>
                             </View>
                         </View>
                         <Switch
                             value={isMfaActive}
                             onValueChange={handleToggleMfa}
-                            trackColor={{ false: '#334155', true: '#F97316' }}
+                            trackColor={{ false: '#CBD5E1', true: '#F59E0B' }}
                             thumbColor="white"
                         />
                     </View>
 
                     {/* Biometric Gating */}
-                    <View className="flex-row items-center justify-between">
-                        <View className="flex-row items-center gap-3">
-                            <View className="bg-purple-500/20 p-2 rounded-lg">
-                                <Ionicons name="finger-print" size={18} color="#A855F7" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                            <View style={{ backgroundColor: '#F5F3FF', padding: 10, borderRadius: 10 }}>
+                                <Ionicons name="finger-print" size={20} color="#7C3AED" />
                             </View>
-                            <View>
-                                <Text className="text-white font-bold">Biometric Gating</Text>
-                                <Text className="text-slate-500 text-xs">Require face / fingerprint check on admin load</Text>
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={{ color: '#0F172A', fontWeight: '800', fontSize: 14 }}>Biometric Gating</Text>
+                                <Text style={{ color: '#64748B', fontSize: 11.5, marginTop: 2 }}>Require face / fingerprint check on admin load</Text>
                             </View>
                         </View>
                         <Switch
                             value={biometric}
                             onValueChange={setBiometric}
-                            trackColor={{ false: '#334155', true: '#A855F7' }}
+                            trackColor={{ false: '#CBD5E1', true: '#7C3AED' }}
                             thumbColor="white"
                         />
                     </View>
                 </View>
 
                 {/* Active Sessions */}
-                <Text className="text-slate-400 font-bold uppercase text-xs mb-3 ml-1 tracking-wider">Active Sessions</Text>
-                <View className="bg-slate-800 rounded-xl p-4 mb-3 border border-slate-700 flex-row justify-between items-center">
-                    <View className="flex-row items-center gap-3">
-                        <Ionicons
-                            name="laptop"
-                            size={20}
-                            color="#64748B"
-                        />
+                <Text style={{ color: '#64748B', fontWeight: '800', textTransform: 'uppercase', fontSize: 11, marginBottom: 10, marginLeft: 2, letterSpacing: 0.5 }}>Active Sessions</Text>
+                <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons
+                                name="laptop"
+                                size={20}
+                                color="#475569"
+                            />
+                        </View>
                         <View>
-                            <View className="flex-row items-center gap-2">
-                                <Text className="text-slate-200 font-bold">Current Session</Text>
-                                <View className="bg-green-500/20 px-1.5 py-0.5 rounded">
-                                    <Text className="text-green-500 text-xs font-bold uppercase">Active</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{ color: '#0F172A', fontWeight: '800', fontSize: 13.5 }}>Current Session</Text>
+                                <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                    <Text style={{ color: '#16A34A', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>Active</Text>
                                 </View>
                             </View>
-                            <Text className="text-slate-500 text-xs">Console • Connected</Text>
+                            <Text style={{ color: '#64748B', fontSize: 11.5, marginTop: 2 }}>Admin Console • Connected</Text>
                         </View>
                     </View>
-                    <Text className="text-green-500 text-xs font-bold">Online</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                        <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '800' }}>Online</Text>
+                    </View>
                 </View>
             </View>
 
