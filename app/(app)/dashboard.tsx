@@ -75,6 +75,18 @@ export default function Dashboard() {
   const [serviceCustoms, setServiceCustoms] = useState<Record<string, any>>(inMemoryServiceCustoms);
   const [hiddenFeatures, setHiddenFeatures] = useState<string[]>(inMemoryHiddenFeatures);
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
+  const [telecomBannerConfig, setTelecomBannerConfig] = useState<{ is_visible?: boolean; banners?: any[] } | null>(null);
+  const [telecomSlideIdx, setTelecomSlideIdx] = useState(0);
+
+  // Auto-cycle telecom slides if multiple exist
+  useEffect(() => {
+    const customSlides = (telecomBannerConfig?.banners || []).filter((b: any) => b.is_active !== false);
+    if (customSlides.length <= 1) return;
+    const interval = setInterval(() => {
+      setTelecomSlideIdx((prev) => (prev + 1) % customSlides.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [telecomBannerConfig]);
 
   const partnerAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -224,6 +236,7 @@ export default function Dashboard() {
         if (cached.unreadCount !== undefined) setUnreadCount(cached.unreadCount);
         if (cached.activePartners) setActivePartners(cached.activePartners);
         if (cached.celebrationSettings) setCelebrationSettings(cached.celebrationSettings);
+        if (cached.telecomBannerConfig) setTelecomBannerConfig(cached.telecomBannerConfig);
       }
     } catch (e) {
       console.warn("Cache read error:", e);
@@ -292,7 +305,7 @@ export default function Dashboard() {
   const fetchAppSettings = async () => {
     try {
       const { data } = await supabase.from('app_settings').select('key, value').in('key', [
-        'app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations', 'celebration_event_settings'
+        'app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations', 'celebration_event_settings', 'telecom_hub_banner_config'
       ]);
       if (data) {
         data.forEach(setting => {
@@ -300,6 +313,15 @@ export default function Dashboard() {
             let url = setting.value;
             try { const parsed = JSON.parse(setting.value); if (parsed.url) url = parsed.url; } catch (e) {}
             setLogoUrl(url); saveCache({ logoUrl: url });
+          }
+          if (setting.key === 'telecom_hub_banner_config') {
+            try {
+              const parsed = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+              if (parsed && typeof parsed === 'object') {
+                setTelecomBannerConfig(parsed);
+                saveCache({ telecomBannerConfig: parsed });
+              }
+            } catch (e) {}
           }
           if (setting.key === 'hidden_features') {
             try { 
@@ -798,19 +820,31 @@ export default function Dashboard() {
             </View>
           );
 
+          // ── Telecom & SIM Hub Dynamic Banner Slider ──
+          const telecomConfig = telecomBannerConfig || { is_visible: true, banners: [] };
           const isTelecomHidden = hiddenFeatures.includes('feature_telecom_sim') || 
             hiddenFeatures.includes('feature_sim') || 
-            serviceCustoms['telecom_hub']?.is_visible === false;
+            serviceCustoms['telecom_hub']?.is_visible === false ||
+            telecomConfig.is_visible === false;
+
+          const customSlides = (telecomConfig.banners || []).filter((b: any) => b.is_active !== false);
+          const activeTelecomSlides = customSlides.length > 0 ? customSlides : [
+            {
+              id: 'default-telecom-slide',
+              title: 'Telecom & SIM Hub',
+              subtitle: 'Buy Kirani SIM Cards, 4G Data (Smile, Alpha, Kirani, Ratel) & instant Airtime recharge.',
+              badge: 'NEW',
+              image_url: '',
+              target_url: '/sim',
+              is_default: true,
+            }
+          ];
+
+          const currentSlide = activeTelecomSlides[telecomSlideIdx % activeTelecomSlides.length] || activeTelecomSlides[0];
 
           const telecomHubEl = !isTelecomHidden ? (
             <View style={[s.section, isDesktop && { marginHorizontal: 0 }]}>
-              {/* Dynamic Sliding Banners with placement="telecom_sim" */}
-              <DynamicBanners 
-                placement="telecom_sim" 
-                height={isDesktop ? 130 : 90} 
-                borderRadius={18} 
-              />
-
+              {/* Sliding Telecom Hub Card */}
               <View
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -824,34 +858,68 @@ export default function Dashboard() {
                   shadowRadius: 10,
                   elevation: 2,
                   marginTop: 6,
+                  overflow: 'hidden',
                 }}
               >
                 <TouchableOpacity
                   activeOpacity={0.9}
-                  onPress={() => router.push('/sim')}
+                  onPress={() => router.push((currentSlide.target_url as any) || '/sim')}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
                 >
-                  <Image
-                    source={require('../../assets/images/telecom_hub.jpg')}
-                    style={{ width: 56, height: 56, borderRadius: 14 }}
-                    resizeMode="cover"
-                  />
+                  {currentSlide.image_url ? (
+                    <Image
+                      source={{ uri: currentSlide.image_url }}
+                      style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: '#F1F5F9' }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Image
+                      source={require('../../assets/images/telecom_hub.jpg')}
+                      style={{ width: 56, height: 56, borderRadius: 14 }}
+                      resizeMode="cover"
+                    />
+                  )}
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '900', color: T.navy }}>Telecom & SIM Hub</Text>
-                      <View style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                        <Text style={{ fontSize: 9, fontWeight: '900', color: '#FFFFFF' }}>NEW</Text>
-                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '900', color: T.navy }} numberOfLines={1}>
+                        {currentSlide.title || 'Telecom & SIM Hub'}
+                      </Text>
+                      {currentSlide.badge ? (
+                        <View style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '900', color: '#FFFFFF' }}>{currentSlide.badge}</Text>
+                        </View>
+                      ) : null}
                     </View>
-                    <Text style={{ fontSize: 11, color: T.textSub, lineHeight: 15, fontWeight: '500' }}>
-                      Buy Kirani SIM Cards, 4G Data (Smile, Alpha, Kirani, Ratel) & instant Airtime recharge.
+                    <Text style={{ fontSize: 11, color: T.textSub, lineHeight: 15, fontWeight: '500' }} numberOfLines={2}>
+                      {currentSlide.subtitle || 'Buy Kirani SIM Cards, 4G Data & instant Airtime recharge.'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                 </TouchableOpacity>
 
+                {/* Carousel Pagination Dots if multiple slides */}
+                {activeTelecomSlides.length > 1 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, marginTop: 8 }}>
+                    {activeTelecomSlides.map((_: any, idx: number) => {
+                      const isActive = idx === (telecomSlideIdx % activeTelecomSlides.length);
+                      return (
+                        <TouchableOpacity
+                          key={idx}
+                          onPress={() => setTelecomSlideIdx(idx)}
+                          style={{
+                            width: isActive ? 16 : 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: isActive ? T.navy : '#CBD5E1',
+                          }}
+                        />
+                      );
+                    })}
+                  </View>
+                )}
+
                 {/* Sub buttons for separate pages */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
                   <TouchableOpacity
                     onPress={() => router.push('/sim')}
                     style={{ flex: 1, backgroundColor: '#FEF2F2', paddingVertical: 8, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FEE2E2' }}
