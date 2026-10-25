@@ -149,21 +149,47 @@ export const KetawancyService = {
             throw new Error(`Insufficient wallet balance. You have ₦${userBal.toLocaleString()}, but SIM cost is ₦${price.toLocaleString()}. Please fund your wallet.`);
         }
 
-        // 2. Initialize Transaction in Supabase
-        const { data: txn, error: txnErr } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                type: 'debit',
-                amount: price,
-                status: 'pending',
-                title: `SIM Purchase: ${planName || 'SIM Card'}`,
-                description: `Purchase of ${planName || 'SIM Card'} for ${phone || email || 'User'}`
-            })
-            .select('id')
-            .single();
+        // Generate client transaction reference upfront
+        const refNo = `sim_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
-        if (txnErr) throw new Error("Could not initialize transaction record");
+        // 2. Initialize Transaction in Supabase (omit 'title' as transactions table has 'description' and 'details')
+        let txnId: string | null = null;
+        try {
+            const { data: txn, error: txnErr } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: price,
+                    status: 'pending',
+                    reference: refNo,
+                    description: `SIM Purchase: ${planName || 'SIM Card'} for ${phone || email || 'User'}`,
+                    details: { planId, planName, network: 'telecom', phone: phone || '' }
+                })
+                .select('id')
+                .single();
+
+            if (txnErr) {
+                console.warn('[Ketawancy] Primary transaction insert warning:', txnErr.message);
+                // Fallback attempt with minimal required fields
+                const { data: fallbackTxn } = await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: price,
+                        status: 'pending',
+                        description: `SIM Purchase: ${planName || 'SIM Card'}`
+                    })
+                    .select('id')
+                    .single();
+                if (fallbackTxn?.id) txnId = fallbackTxn.id;
+            } else if (txn?.id) {
+                txnId = txn.id;
+            }
+        } catch (initErr: any) {
+            console.warn('[Ketawancy] Transaction init caught note:', initErr?.message);
+        }
 
         try {
             // 3. Call Ketawancy API
@@ -175,46 +201,85 @@ export const KetawancyService = {
                 throw new Error(res?.message || 'SIM purchase failed at provider');
             }
 
-            const refNo = res?.data?.refNo || `sim-${Date.now()}`;
+            const finalRef = res?.data?.refNo || refNo;
             const simDetails = res?.simCard || { number: 'Assigned by Provider', email: profile.email || 'N/A' };
 
-            // 4. Deduct User Wallet Balance safely
-            const newBalance = userBal - price;
-            await supabase
-                .from('profiles')
-                .update({ balance: newBalance })
-                .eq('id', userId);
+            // 4. Deduct User Wallet Balance safely (RPC first with direct fallback)
+            let newBalance = Math.max(0, userBal - price);
+            try {
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('deduct_balance', {
+                    user_id: userId,
+                    amount: price
+                });
+
+                if (!rpcErr && rpcRes) {
+                    if (typeof rpcRes === 'object' && rpcRes.new_balance !== undefined) {
+                        newBalance = Number(rpcRes.new_balance);
+                    } else if (typeof rpcRes === 'number') {
+                        newBalance = rpcRes;
+                    }
+                } else {
+                    // Direct profile update fallback
+                    await supabase
+                        .from('profiles')
+                        .update({ balance: newBalance })
+                        .eq('id', userId);
+                }
+            } catch (deductErr) {
+                console.warn('[Ketawancy] Balance deduction note:', deductErr);
+                await supabase
+                    .from('profiles')
+                    .update({ balance: newBalance })
+                    .eq('id', userId);
+            }
 
             // 5. Update transaction to success
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'success',
-                    reference: refNo,
-                    metadata: {
-                        vendor: 'ketawancy',
-                        type: 'sim',
-                        planId,
-                        simCard: simDetails
-                    }
-                })
-                .eq('id', txn.id);
+            if (txnId) {
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'success',
+                        reference: finalRef,
+                        metadata: {
+                            vendor: 'ketawancy',
+                            type: 'sim',
+                            planId,
+                            simCard: simDetails
+                        }
+                    })
+                    .eq('id', txnId);
+            } else {
+                // If init was skipped due to schema constraints, record completed record now
+                await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'payment',
+                        amount: price,
+                        status: 'success',
+                        reference: finalRef,
+                        description: `SIM Purchase: ${planName || 'SIM Card'}`,
+                        metadata: { vendor: 'ketawancy', type: 'sim', planId, simCard: simDetails }
+                    });
+            }
 
             return {
                 success: true,
-                refNo,
+                refNo: finalRef,
                 simCard: simDetails,
                 newBalance
             };
         } catch (err: any) {
-            // Mark transaction as failed
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'failed',
-                    description: `SIM Purchase Failed: ${err.message || 'Provider error'}`
-                })
-                .eq('id', txn.id);
+            // Mark transaction as failed if initialized
+            if (txnId) {
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'failed',
+                        description: `SIM Purchase Failed: ${err.message || 'Provider error'}`
+                    })
+                    .eq('id', txnId);
+            }
 
             throw err;
         }

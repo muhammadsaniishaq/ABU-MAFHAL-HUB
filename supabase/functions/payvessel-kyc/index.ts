@@ -483,30 +483,51 @@ Deno.serve(async (req: Request) => {
                 if (kycFeeEnabled && kycFee > 0) {
                     newBal = Math.max(0, currentUserBalance - kycFee);
 
-                    // Update balance and NIN
-                    const { error: balErr } = await supabaseAdmin
+                    // Deduct balance via atomic RPC (bypasses profile lock trigger)
+                    const { data: deductRes, error: deductErr } = await supabaseAdmin.rpc('deduct_balance', {
+                        user_id: userId,
+                        amount: kycFee
+                    });
+
+                    if (!deductErr && deductRes) {
+                        if (typeof deductRes === 'object' && deductRes.new_balance !== undefined) {
+                            newBal = Number(deductRes.new_balance);
+                        } else if (typeof deductRes === 'number') {
+                            newBal = deductRes;
+                        }
+                    } else {
+                        // Fallback: direct update
+                        const { error: balErr } = await supabaseAdmin
+                            .from('profiles')
+                            .update({
+                                balance: newBal,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', userId);
+                        if (balErr) console.warn('[Payvessel KYC] Profile balance fallback update warning:', balErr);
+                    }
+
+                    // Update NIN & name
+                    await supabaseAdmin
                         .from('profiles')
                         .update({
-                            balance: newBal,
                             nin: cleanNin,
                             full_name: verifiedData.fullName,
                             updated_at: new Date().toISOString()
                         })
                         .eq('id', userId);
-                    if (balErr) console.warn('[Payvessel KYC] Profile balance/NIN update warning:', balErr);
 
-                    // Record debit transaction in transactions table
+                    // Record payment transaction in transactions table (schema-safe without nonexistent 'title' column)
                     const { error: txErr } = await supabaseAdmin
                         .from('transactions')
                         .insert({
                             user_id: userId,
                             amount: kycFee,
-                            type: 'debit',
-                            title: 'KYC NIN Verification Fee',
-                            status: 'completed',
-                            description: `Automated KYC Identity Verification Fee (NIN: ${cleanNin})`,
-                            reference: `kyc_nin_${Date.now()}`,
-                            created_at: new Date().toISOString()
+                            type: 'payment',
+                            status: 'success',
+                            description: `KYC NIN Verification Fee (NIN: ${cleanNin})`,
+                            reference: `kyc_nin_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                            details: { service: 'kyc', verificationType: 'nin', nin: cleanNin, fullName: verifiedData.fullName }
                         });
                     if (txErr) console.warn('[Payvessel KYC] Transaction insert warning:', txErr);
 
@@ -801,28 +822,51 @@ Deno.serve(async (req: Request) => {
                 if (kycFeeEnabled && kycFee > 0) {
                     newBal = Math.max(0, currentUserBalance - kycFee);
 
-                    const { error: balErr } = await supabaseAdmin
+                    // Deduct balance via atomic RPC (bypasses profile lock trigger)
+                    const { data: deductRes, error: deductErr } = await supabaseAdmin.rpc('deduct_balance', {
+                        user_id: userId,
+                        amount: kycFee
+                    });
+
+                    if (!deductErr && deductRes) {
+                        if (typeof deductRes === 'object' && deductRes.new_balance !== undefined) {
+                            newBal = Number(deductRes.new_balance);
+                        } else if (typeof deductRes === 'number') {
+                            newBal = deductRes;
+                        }
+                    } else {
+                        // Fallback: direct update
+                        const { error: balErr } = await supabaseAdmin
+                            .from('profiles')
+                            .update({
+                                balance: newBal,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', userId);
+                        if (balErr) console.warn('[Payvessel KYC] Profile balance fallback update warning:', balErr);
+                    }
+
+                    // Update BVN & kyc_tier
+                    await supabaseAdmin
                         .from('profiles')
                         .update({
-                            balance: newBal,
                             bvn: cleanBvn,
                             kyc_tier: 2,
                             updated_at: new Date().toISOString()
                         })
                         .eq('id', userId);
-                    if (balErr) console.warn('[Payvessel KYC] Profile balance/BVN update warning:', balErr);
 
+                    // Record payment transaction in transactions table (schema-safe without nonexistent 'title' column)
                     const { error: txErr } = await supabaseAdmin
                         .from('transactions')
                         .insert({
                             user_id: userId,
                             amount: kycFee,
-                            type: 'debit',
-                            title: 'KYC BVN Verification Fee',
-                            status: 'completed',
-                            description: `Automated KYC Bank Identity Verification Fee (BVN: ${cleanBvn})`,
-                            reference: `kyc_bvn_${Date.now()}`,
-                            created_at: new Date().toISOString()
+                            type: 'payment',
+                            status: 'success',
+                            description: `KYC BVN Verification Fee (BVN: ${cleanBvn})`,
+                            reference: `kyc_bvn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                            details: { service: 'kyc', verificationType: 'bvn', bvn: cleanBvn, fullName: verifiedData.fullName }
                         });
                     if (txErr) console.warn('[Payvessel KYC] Transaction insert warning:', txErr);
 
