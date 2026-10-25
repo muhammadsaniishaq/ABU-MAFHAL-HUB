@@ -13,7 +13,6 @@ import {
     Modal,
     StyleSheet,
     Dimensions,
-    useWindowDimensions,
     RefreshControl
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
@@ -22,10 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadMediaFile } from '../../services/mediaUpload';
 
-// Premium Executive Color Tokens Matching Design
+// Executive Luxury Theme Colors
 const T = {
     navyDark: '#070D1E',
     navyDeep: '#0A122A',
@@ -56,8 +53,6 @@ const T = {
 
 export default function AdminProfileScreen() {
     const router = useRouter();
-    const { width } = useWindowDimensions();
-    const isDesktop = width >= 900;
 
     // Profile & Auth State
     const [profile, setProfile] = useState<any>(null);
@@ -65,7 +60,7 @@ export default function AdminProfileScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-    // Sidebar active category
+    // Active Sidebar category
     const [activeSidebarTab, setActiveSidebarTab] = useState('profile');
 
     // Edit Modal State
@@ -83,7 +78,7 @@ export default function AdminProfileScreen() {
     const [newPassword, setNewPassword] = useState('');
     const [changingPassword, setChangingPassword] = useState(false);
 
-    // Live Real Database Metrics (NO HARDCODED MOCKUP)
+    // Real Live Database Metrics (NO HARDCODED MOCKUP)
     const [realStats, setRealStats] = useState({
         totalUsers: 0,
         totalUsersBalance: 0,
@@ -151,7 +146,6 @@ export default function AdminProfileScreen() {
 
     const fetchLivePlatformMetrics = async () => {
         try {
-            // Real Users count, users wallet total, and notifications count
             const [
                 usersRes,
                 balancesRes,
@@ -183,7 +177,6 @@ export default function AdminProfileScreen() {
             // 3. Total Crypto Balance in USD
             let cryptoSumUSD = 0;
             if (cryptoRes.status === 'fulfilled' && cryptoRes.value.data) {
-                // Asset rates estimate: BTC ~$65,000, ETH ~$3,400, USDT = 1
                 cryptoSumUSD = cryptoRes.value.data.reduce((sum: number, w: any) => {
                     const b = Number(w.balance || 0);
                     const asset = (w.asset || 'USDT').toUpperCase();
@@ -194,7 +187,7 @@ export default function AdminProfileScreen() {
             }
 
             // 4. Admin Primary Float / Account Balance
-            let adminFloat = 10000000; // Baseline reserve float
+            let adminFloat = 10000000;
             if (adminProfRes.status === 'fulfilled' && adminProfRes.value.data) {
                 const b = Number(adminProfRes.value.data.balance ?? adminProfRes.value.data.credit_balance ?? 0);
                 if (b > 0) adminFloat = b;
@@ -354,7 +347,6 @@ export default function AdminProfileScreen() {
         }
     };
 
-    // Sidebar Items Matching Design
     const sidebarItems = [
         { id: 'profile', label: 'Profile', icon: 'person', route: null },
         { id: 'security', label: 'Security', icon: 'shield-checkmark-outline', route: '/manage/security' },
@@ -389,17 +381,15 @@ export default function AdminProfileScreen() {
                 colors={['#070D1E', '#0A122A', '#0F172A']}
                 style={s.topBar}
             >
-                {/* Back button */}
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.8}>
                     <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
 
-                {/* Brand Logo & Name */}
                 <View style={s.brandWrap}>
                     <View style={s.logoCircle}>
                         <Image
                             source={require('../../assets/images/logo-icon.png')}
-                            style={{ width: 26, height: 26, resizeMode: 'contain' }}
+                            style={{ width: 24, height: 24, resizeMode: 'contain' }}
                         />
                     </View>
                     <View>
@@ -411,14 +401,13 @@ export default function AdminProfileScreen() {
                     </View>
                 </View>
 
-                {/* Right: Notification Bell & Admin Float Wallet */}
                 <View style={s.topBarRight}>
                     <TouchableOpacity
                         onPress={() => router.push('/manage/communications?tab=push' as any)}
                         style={s.bellBtn}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="notifications" size={20} color="#FFFFFF" />
+                        <Ionicons name="notifications" size={18} color="#FFFFFF" />
                         {realStats.pendingNotifications > 0 && (
                             <View style={s.bellBadge}>
                                 <Text style={s.bellBadgeText}>{realStats.pendingNotifications}</Text>
@@ -426,13 +415,12 @@ export default function AdminProfileScreen() {
                         )}
                     </TouchableOpacity>
 
-                    {/* Admin Balance Badge Pill */}
                     <TouchableOpacity
                         onPress={() => router.push('/manage/liquidity')}
                         style={s.walletPill}
                         activeOpacity={0.85}
                     >
-                        <Ionicons name="wallet" size={14} color="#F59E0B" />
+                        <Ionicons name="wallet" size={13} color="#F59E0B" />
                         <Text style={s.walletPillText}>
                             ₦{realStats.adminBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
@@ -441,75 +429,30 @@ export default function AdminProfileScreen() {
                 </View>
             </LinearGradient>
 
-            {/* Split Screen Layout (Desktop Left Sidebar + Right Content, or Mobile Stack) */}
-            <View style={s.bodyLayout}>
-                {/* ─── LEFT SIDEBAR (Desktop / Tablet or Tablet Mode) ─── */}
-                <View style={[s.sidebar, !isDesktop && s.sidebarCompact]}>
-                    {/* User Mini Avatar & Status */}
-                    <View style={s.sidebarUserCard}>
-                        <View style={s.sidebarAvatarWrap}>
-                            {profile?.avatar_url ? (
-                                <Image source={{ uri: profile.avatar_url }} style={s.sidebarAvatarImg} />
-                            ) : (
-                                <Image source={require('../../assets/images/ceo.jpg')} style={s.sidebarAvatarImg} />
-                            )}
-                            <View style={s.onlineBadgeDot} />
-                        </View>
-                        <Text style={s.sidebarUserName} numberOfLines={1}>
-                            {profile?.full_name || 'Muhammad Sani'}
-                        </Text>
-                        <Text style={s.sidebarUserRole}>Super Admin</Text>
-                    </View>
+            {/* Main Scrollable Content */}
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={s.scrollContainer}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.goldBright} />}
+            >
+                {/* 1. HERO PROFILE CARD WITH GOLDEN ACCENT */}
+                <View style={s.heroCard}>
+                    {/* Golden Wave Banner Header */}
+                    <LinearGradient
+                        colors={['#0F1E3A', '#1C2E52', '#F59E0B', '#FDE68A']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={s.heroBannerGradient}
+                    />
 
-                    {/* Sidebar Navigation Items */}
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                        {sidebarItems.map(item => {
-                            const isSelected = activeSidebarTab === item.id;
-                            return (
-                                <TouchableOpacity
-                                    key={item.id}
-                                    onPress={() => {
-                                        setActiveSidebarTab(item.id);
-                                        if (item.route) router.push(item.route as any);
-                                    }}
-                                    style={[s.sidebarNavItem, isSelected && s.sidebarNavItemActive]}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons
-                                        name={item.icon as any}
-                                        size={18}
-                                        color={isSelected ? T.goldBright : '#94A3B8'}
-                                    />
-                                    <Text style={[s.sidebarNavLabel, isSelected && s.sidebarNavLabelActive]}>
-                                        {item.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-
-                {/* ─── MAIN RIGHT CONTENT AREA ─── */}
-                <ScrollView
-                    style={s.mainContent}
-                    contentContainerStyle={s.mainScroll}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.goldBright} />}
-                >
-                    {/* 1. TOP HERO PROFILE CARD (With Luxury Golden Wave Banner) */}
-                    <View style={s.heroCard}>
-                        <LinearGradient
-                            colors={['#0F1E3A', '#1C2E52', '#FDE68A']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={s.heroBanner}
-                        />
-
-                        <View style={s.heroProfileRow}>
-                            {/* Avatar with Crown Badge & Camera Trigger */}
-                            <View style={s.heroAvatarContainer}>
+                    {/* Profile Information Block */}
+                    <View style={s.heroContentWrap}>
+                        {/* Top: Avatar & Action Buttons */}
+                        <View style={s.heroTopRow}>
+                            <View style={s.heroAvatarFrame}>
                                 <View style={s.crownBadge}>
-                                    <Ionicons name="ribbon" size={12} color="#D97706" />
+                                    <Ionicons name="ribbon" size={11} color="#D97706" />
                                 </View>
                                 {profile?.avatar_url ? (
                                     <Image source={{ uri: profile.avatar_url }} style={s.heroAvatarImg} />
@@ -525,321 +468,328 @@ export default function AdminProfileScreen() {
                                     {uploadingAvatar ? (
                                         <ActivityIndicator size="small" color="#FFFFFF" />
                                     ) : (
-                                        <Ionicons name="camera" size={13} color="#FFFFFF" />
+                                        <Ionicons name="camera" size={12} color="#FFFFFF" />
                                     )}
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Admin Main Details */}
-                            <View style={s.heroTextContainer}>
-                                <View style={s.heroNameRow}>
-                                    <Text style={s.heroName}>{profile?.full_name || 'Muhammad Sani'}</Text>
-                                    <TouchableOpacity
-                                        onPress={() => setShowEditModal(true)}
-                                        style={s.heroEditBtn}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Ionicons name="create-outline" size={14} color="#0F172A" />
-                                        <Text style={s.heroEditBtnText}>Edit Profile</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Super Admin Badge Pill */}
-                                <View style={s.rolePill}>
-                                    <Ionicons name="shield-checkmark" size={12} color="#D97706" />
-                                    <Text style={s.rolePillText}>Super Admin</Text>
-                                </View>
-
-                                {/* Contact Information List */}
-                                <View style={s.heroContactList}>
-                                    <View style={s.heroContactItem}>
-                                        <Ionicons name="mail-outline" size={14} color="#64748B" />
-                                        <Text style={s.heroContactText}>{profile?.email || 'admin@abumafhal.com'}</Text>
-                                    </View>
-                                    <View style={s.heroContactItem}>
-                                        <Ionicons name="call-outline" size={14} color="#64748B" />
-                                        <Text style={s.heroContactText}>{profile?.phone || '+234 701 588 1213'}</Text>
-                                    </View>
-                                    <View style={s.heroContactItem}>
-                                        <Ionicons name="location-outline" size={14} color="#64748B" />
-                                        <Text style={s.heroContactText}>{profile?.country || 'Nigeria'}</Text>
-                                    </View>
-                                </View>
-
-                                <Text style={s.memberSinceText}>
-                                    Member since {formatJoinedDate(profile?.created_at)}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* 2. THREE REAL STATS KPI CARDS (Matching Screenshot) */}
-                    <View style={s.kpiGrid}>
-                        {/* KPI 1: Total Users */}
-                        <TouchableOpacity
-                            onPress={() => router.push('/manage/users')}
-                            style={s.kpiCard}
-                            activeOpacity={0.85}
-                        >
-                            <View style={s.kpiTopRow}>
-                                <View style={[s.kpiIconBox, { backgroundColor: '#FEF3C7' }]}>
-                                    <Ionicons name="people" size={18} color="#D97706" />
-                                </View>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </View>
-                            <Text style={s.kpiValue}>{realStats.totalUsers.toLocaleString()}</Text>
-                            <Text style={s.kpiLabel}>Total Users</Text>
-                        </TouchableOpacity>
-
-                        {/* KPI 2: Total Users Balance */}
-                        <TouchableOpacity
-                            onPress={() => router.push('/manage/accounting')}
-                            style={s.kpiCard}
-                            activeOpacity={0.85}
-                        >
-                            <View style={s.kpiTopRow}>
-                                <View style={[s.kpiIconBox, { backgroundColor: '#EFF6FF' }]}>
-                                    <Ionicons name="wallet" size={18} color="#2563EB" />
-                                </View>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </View>
-                            <Text style={s.kpiValue} numberOfLines={1} adjustsFontSizeToFit>
-                                ₦{realStats.totalUsersBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Text>
-                            <Text style={s.kpiLabel}>Total Users Balance</Text>
-                        </TouchableOpacity>
-
-                        {/* KPI 3: Total Crypto Balance */}
-                        <TouchableOpacity
-                            onPress={() => router.push('/manage/crypto')}
-                            style={s.kpiCard}
-                            activeOpacity={0.85}
-                        >
-                            <View style={s.kpiTopRow}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                    <View style={[s.cryptoPillMini, { backgroundColor: '#10B981' }]}>
-                                        <Text style={s.cryptoPillText}>₮</Text>
-                                    </View>
-                                    <View style={[s.cryptoPillMini, { backgroundColor: '#6366F1' }]}>
-                                        <Text style={s.cryptoPillText}>Ξ</Text>
-                                    </View>
-                                    <View style={[s.cryptoPillMini, { backgroundColor: '#F59E0B' }]}>
-                                        <Text style={s.cryptoPillText}>₿</Text>
-                                    </View>
-                                </View>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </View>
-                            <Text style={s.kpiValue} numberOfLines={1} adjustsFontSizeToFit>
-                                ${realStats.totalCryptoBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Text>
-                            <Text style={s.kpiLabel}>Total Crypto Balance</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* 3. PERSONAL INFORMATION SECTION CARD */}
-                    <View style={s.sectionCard}>
-                        <View style={s.sectionHeaderRow}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                <View style={[s.kpiIconBox, { backgroundColor: '#FEF3C7', width: 34, height: 34 }]}>
-                                    <Ionicons name="person" size={18} color="#D97706" />
-                                </View>
-                                <View>
-                                    <Text style={s.sectionTitle}>Personal Information</Text>
-                                    <Text style={s.sectionSubtitle}>Manage your personal details and contact information</Text>
-                                </View>
-                            </View>
-
                             <TouchableOpacity
                                 onPress={() => setShowEditModal(true)}
-                                style={s.editDetailsBtn}
+                                style={s.editProfileBtn}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name="create-outline" size={13} color="#0F172A" />
-                                <Text style={s.editDetailsBtnText}>Edit</Text>
+                                <Ionicons name="create-outline" size={14} color="#0F172A" />
+                                <Text style={s.editProfileBtnText}>Edit Profile</Text>
                             </TouchableOpacity>
                         </View>
 
-                        {/* Information Rows */}
-                        <View style={{ marginTop: 14, gap: 10 }}>
-                            {/* Full Name */}
-                            <View style={s.detailRow}>
-                                <View style={s.detailLabelCol}>
-                                    <Ionicons name="person-outline" size={16} color="#64748B" />
-                                    <Text style={s.detailLabel}>Full Name</Text>
-                                </View>
-                                <View style={s.detailValueCol}>
-                                    <Text style={s.detailValueText}>{profile?.full_name || 'Muhammad Sani'}</Text>
-                                </View>
-                            </View>
+                        {/* Name and Super Admin Badge */}
+                        <Text style={s.heroAdminName}>{profile?.full_name || 'Muhammad Sani'}</Text>
+                        
+                        <View style={s.roleBadgePill}>
+                            <Ionicons name="shield-checkmark" size={12} color="#D97706" />
+                            <Text style={s.roleBadgePillText}>Super Admin</Text>
+                        </View>
 
-                            {/* Email Address */}
-                            <View style={s.detailRow}>
-                                <View style={s.detailLabelCol}>
-                                    <Ionicons name="mail-outline" size={16} color="#64748B" />
-                                    <Text style={s.detailLabel}>Email Address</Text>
-                                </View>
-                                <View style={s.detailValueCol}>
-                                    <Text style={s.detailValueText}>{profile?.email || 'admin@abumafhal.com'}</Text>
-                                </View>
+                        {/* Contact Details List */}
+                        <View style={s.heroMetaList}>
+                            <View style={s.heroMetaItem}>
+                                <Ionicons name="mail-outline" size={15} color="#64748B" />
+                                <Text style={s.heroMetaText}>{profile?.email || 'admin@abumafhal.com'}</Text>
                             </View>
-
-                            {/* Phone Number */}
-                            <View style={s.detailRow}>
-                                <View style={s.detailLabelCol}>
-                                    <Ionicons name="call-outline" size={16} color="#64748B" />
-                                    <Text style={s.detailLabel}>Phone Number</Text>
-                                </View>
-                                <View style={s.detailValueCol}>
-                                    <Text style={s.detailValueText}>{profile?.phone || '+234 701 588 1213'}</Text>
-                                </View>
+                            <View style={s.heroMetaItem}>
+                                <Ionicons name="call-outline" size={15} color="#64748B" />
+                                <Text style={s.heroMetaText}>{profile?.phone || '+234 701 588 1213'}</Text>
                             </View>
-
-                            {/* Country */}
-                            <View style={s.detailRow}>
-                                <View style={s.detailLabelCol}>
-                                    <Ionicons name="location-outline" size={16} color="#64748B" />
-                                    <Text style={s.detailLabel}>Country</Text>
-                                </View>
-                                <View style={s.detailValueCol}>
-                                    <Text style={s.detailValueText}>{profile?.country || 'Nigeria'}</Text>
-                                </View>
-                            </View>
-
-                            {/* Role */}
-                            <View style={s.detailRow}>
-                                <View style={s.detailLabelCol}>
-                                    <Ionicons name="shield-checkmark-outline" size={16} color="#64748B" />
-                                    <Text style={s.detailLabel}>Role</Text>
-                                </View>
-                                <View style={s.detailValueCol}>
-                                    <View style={s.roleBadgePill}>
-                                        <Ionicons name="shield-checkmark" size={12} color="#D97706" />
-                                        <Text style={s.roleBadgePillText}>Super Admin</Text>
-                                    </View>
-                                </View>
-                            </View>
-
-                            {/* Member Since */}
-                            <View style={s.detailRow}>
-                                <View style={s.detailLabelCol}>
-                                    <Ionicons name="calendar-outline" size={16} color="#64748B" />
-                                    <Text style={s.detailLabel}>Member Since</Text>
-                                </View>
-                                <View style={s.detailValueCol}>
-                                    <Text style={s.detailValueText}>{formatJoinedDate(profile?.created_at)}</Text>
-                                </View>
+                            <View style={s.heroMetaItem}>
+                                <Ionicons name="location-outline" size={15} color="#64748B" />
+                                <Text style={s.heroMetaText}>{profile?.country || 'Nigeria'}</Text>
                             </View>
                         </View>
+
+                        <Text style={s.memberSinceText}>
+                            Member since {formatJoinedDate(profile?.created_at)}
+                        </Text>
                     </View>
+                </View>
 
-                    {/* 4. QUICK ACTIONS SECTION */}
-                    <View style={s.sectionCard}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                            <View style={[s.kpiIconBox, { backgroundColor: '#FEF3C7', width: 34, height: 34 }]}>
-                                <Ionicons name="flash" size={18} color="#D97706" />
-                            </View>
-                            <View>
-                                <Text style={s.sectionTitle}>Quick Actions</Text>
-                                <Text style={s.sectionSubtitle}>Common admin actions and shortcuts</Text>
-                            </View>
-                        </View>
-
-                        <View style={s.quickActionsRow}>
-                            {/* Action 1: Change Password */}
-                            <TouchableOpacity
-                                onPress={() => setShowPasswordModal(true)}
-                                style={s.actionTile}
-                                activeOpacity={0.8}
-                            >
-                                <View style={[s.actionIconSquare, { backgroundColor: '#FEF3C7' }]}>
-                                    <Ionicons name="key" size={16} color="#D97706" />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.actionTileTitle}>Change Password</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </TouchableOpacity>
-
-                            {/* Action 2: Enable 2FA */}
-                            <TouchableOpacity
-                                onPress={() => router.push('/manage/security')}
-                                style={s.actionTile}
-                                activeOpacity={0.8}
-                            >
-                                <View style={[s.actionIconSquare, { backgroundColor: '#EFF6FF' }]}>
-                                    <Ionicons name="shield-checkmark" size={16} color="#2563EB" />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.actionTileTitle}>Enable 2FA</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </TouchableOpacity>
-
-                            {/* Action 3: Manage Users */}
-                            <TouchableOpacity
-                                onPress={() => router.push('/manage/users')}
-                                style={s.actionTile}
-                                activeOpacity={0.8}
-                            >
-                                <View style={[s.actionIconSquare, { backgroundColor: '#ECFDF5' }]}>
-                                    <Ionicons name="people" size={16} color="#10B981" />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.actionTileTitle}>Manage Users</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </TouchableOpacity>
-
-                            {/* Action 4: View Activity Logs */}
-                            <TouchableOpacity
-                                onPress={() => router.push('/manage/logs')}
-                                style={s.actionTile}
-                                activeOpacity={0.8}
-                            >
-                                <View style={[s.actionIconSquare, { backgroundColor: '#F5F3FF' }]}>
-                                    <Ionicons name="time" size={16} color="#7C3AED" />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.actionTileTitle}>View Activity Logs</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* 5. LOGOUT BUTTON CARD (Matching Screenshot) */}
+                {/* 2. THREE REAL STATS KPI CARDS */}
+                <View style={s.kpiGrid}>
+                    {/* KPI 1: Total Users */}
                     <TouchableOpacity
-                        onPress={handleSignOut}
-                        style={s.logoutBannerCard}
+                        onPress={() => router.push('/manage/users')}
+                        style={s.kpiCard}
                         activeOpacity={0.85}
                     >
-                        <View style={s.logoutLeftCol}>
-                            <View style={s.logoutIconBox}>
-                                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+                        <View style={s.kpiCardTop}>
+                            <View style={[s.kpiIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                                <Ionicons name="people" size={16} color="#D97706" />
                             </View>
-                            <View>
-                                <Text style={s.logoutTitle}>Logout</Text>
-                                <Text style={s.logoutSub}>Sign out from your admin account</Text>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </View>
+                        <Text style={s.kpiNumber}>{realStats.totalUsers.toLocaleString()}</Text>
+                        <Text style={s.kpiSubtitle}>Total Users</Text>
+                    </TouchableOpacity>
+
+                    {/* KPI 2: Total Users Balance */}
+                    <TouchableOpacity
+                        onPress={() => router.push('/manage/accounting')}
+                        style={s.kpiCard}
+                        activeOpacity={0.85}
+                    >
+                        <View style={s.kpiCardTop}>
+                            <View style={[s.kpiIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                                <Ionicons name="wallet" size={16} color="#2563EB" />
+                            </View>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </View>
+                        <Text style={s.kpiNumber} numberOfLines={1} adjustsFontSizeToFit>
+                            ₦{realStats.totalUsersBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                        <Text style={s.kpiSubtitle}>Total Users Balance</Text>
+                    </TouchableOpacity>
+
+                    {/* KPI 3: Total Crypto Balance */}
+                    <TouchableOpacity
+                        onPress={() => router.push('/manage/crypto')}
+                        style={s.kpiCard}
+                        activeOpacity={0.85}
+                    >
+                        <View style={s.kpiCardTop}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                <View style={[s.cryptoPillMini, { backgroundColor: '#10B981' }]}>
+                                    <Text style={s.cryptoPillMiniText}>₮</Text>
+                                </View>
+                                <View style={[s.cryptoPillMini, { backgroundColor: '#6366F1' }]}>
+                                    <Text style={s.cryptoPillMiniText}>Ξ</Text>
+                                </View>
+                                <View style={[s.cryptoPillMini, { backgroundColor: '#F59E0B' }]}>
+                                    <Text style={s.cryptoPillMiniText}>₿</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </View>
+                        <Text style={s.kpiNumber} numberOfLines={1} adjustsFontSizeToFit>
+                            ${realStats.totalCryptoBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                        <Text style={s.kpiSubtitle}>Total Crypto Balance</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* 3. PERSONAL INFORMATION SECTION */}
+                <View style={s.sectionBox}>
+                    <View style={s.sectionHeadRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <View style={[s.kpiIconCircle, { backgroundColor: '#FEF3C7', width: 34, height: 34 }]}>
+                                <Ionicons name="person" size={17} color="#D97706" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.sectionHeadTitle}>Personal Information</Text>
+                                <Text style={s.sectionHeadSubtitle}>Manage your personal details and contact information</Text>
                             </View>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color="#DC2626" />
-                    </TouchableOpacity>
-                </ScrollView>
-            </View>
+
+                        <TouchableOpacity
+                            onPress={() => setShowEditModal(true)}
+                            style={s.sectionEditPill}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="create-outline" size={13} color="#D97706" />
+                            <Text style={s.sectionEditPillText}>Edit</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Table-Like Info Rows */}
+                    <View style={s.infoRowsList}>
+                        {/* Full Name */}
+                        <View style={s.infoRowItem}>
+                            <View style={s.infoLabelCol}>
+                                <Ionicons name="person-outline" size={15} color="#64748B" />
+                                <Text style={s.infoLabelText}>Full Name</Text>
+                            </View>
+                            <View style={s.infoValueBox}>
+                                <Text style={s.infoValueText}>{profile?.full_name || 'Muhammad Sani'}</Text>
+                            </View>
+                        </View>
+
+                        {/* Email Address */}
+                        <View style={s.infoRowItem}>
+                            <View style={s.infoLabelCol}>
+                                <Ionicons name="mail-outline" size={15} color="#64748B" />
+                                <Text style={s.infoLabelText}>Email Address</Text>
+                            </View>
+                            <View style={s.infoValueBox}>
+                                <Text style={s.infoValueText}>{profile?.email || 'admin@abumafhal.com'}</Text>
+                            </View>
+                        </View>
+
+                        {/* Phone Number */}
+                        <View style={s.infoRowItem}>
+                            <View style={s.infoLabelCol}>
+                                <Ionicons name="call-outline" size={15} color="#64748B" />
+                                <Text style={s.infoLabelText}>Phone Number</Text>
+                            </View>
+                            <View style={s.infoValueBox}>
+                                <Text style={s.infoValueText}>{profile?.phone || '+234 701 588 1213'}</Text>
+                            </View>
+                        </View>
+
+                        {/* Country */}
+                        <View style={s.infoRowItem}>
+                            <View style={s.infoLabelCol}>
+                                <Ionicons name="location-outline" size={15} color="#64748B" />
+                                <Text style={s.infoLabelText}>Country</Text>
+                            </View>
+                            <View style={s.infoValueBox}>
+                                <Text style={s.infoValueText}>{profile?.country || 'Nigeria'}</Text>
+                            </View>
+                        </View>
+
+                        {/* Role */}
+                        <View style={s.infoRowItem}>
+                            <View style={s.infoLabelCol}>
+                                <Ionicons name="shield-checkmark-outline" size={15} color="#64748B" />
+                                <Text style={s.infoLabelText}>Role</Text>
+                            </View>
+                            <View style={s.infoValueBox}>
+                                <View style={s.roleBadgePillMini}>
+                                    <Ionicons name="shield-checkmark" size={11} color="#D97706" />
+                                    <Text style={s.roleBadgePillMiniText}>Super Admin</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Member Since */}
+                        <View style={s.infoRowItem}>
+                            <View style={s.infoLabelCol}>
+                                <Ionicons name="calendar-outline" size={15} color="#64748B" />
+                                <Text style={s.infoLabelText}>Member Since</Text>
+                            </View>
+                            <View style={s.infoValueBox}>
+                                <Text style={s.infoValueText}>{formatJoinedDate(profile?.created_at)}</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* 4. QUICK ACTIONS SECTION */}
+                <View style={s.sectionBox}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <View style={[s.kpiIconCircle, { backgroundColor: '#FEF3C7', width: 34, height: 34 }]}>
+                            <Ionicons name="flash" size={17} color="#D97706" />
+                        </View>
+                        <View>
+                            <Text style={s.sectionHeadTitle}>Quick Actions</Text>
+                            <Text style={s.sectionHeadSubtitle}>Common admin actions and shortcuts</Text>
+                        </View>
+                    </View>
+
+                    <View style={s.quickGrid}>
+                        {/* Change Password */}
+                        <TouchableOpacity
+                            onPress={() => setShowPasswordModal(true)}
+                            style={s.quickTile}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[s.quickTileIcon, { backgroundColor: '#FEF3C7' }]}>
+                                <Ionicons name="key" size={16} color="#D97706" />
+                            </View>
+                            <Text style={s.quickTileText} numberOfLines={2}>Change Password</Text>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </TouchableOpacity>
+
+                        {/* Enable 2FA */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/manage/security')}
+                            style={s.quickTile}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[s.quickTileIcon, { backgroundColor: '#EFF6FF' }]}>
+                                <Ionicons name="shield-checkmark" size={16} color="#2563EB" />
+                            </View>
+                            <Text style={s.quickTileText} numberOfLines={2}>Enable 2FA</Text>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </TouchableOpacity>
+
+                        {/* Manage Users */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/manage/users')}
+                            style={s.quickTile}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[s.quickTileIcon, { backgroundColor: '#ECFDF5' }]}>
+                                <Ionicons name="people" size={16} color="#10B981" />
+                            </View>
+                            <Text style={s.quickTileText} numberOfLines={2}>Manage Users</Text>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </TouchableOpacity>
+
+                        {/* View Activity Logs */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/manage/logs')}
+                            style={s.quickTile}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[s.quickTileIcon, { backgroundColor: '#F5F3FF' }]}>
+                                <Ionicons name="time" size={16} color="#7C3AED" />
+                            </View>
+                            <Text style={s.quickTileText} numberOfLines={2}>View Activity Logs</Text>
+                            <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* 5. SIDEBAR SHORTCUTS CAROUSEL */}
+                <View style={s.sectionBox}>
+                    <Text style={[s.sectionHeadTitle, { marginBottom: 10 }]}>Administration Modules</Text>
+                    <View style={s.moduleChipsWrap}>
+                        {sidebarItems.filter(i => i.route).map(item => (
+                            <TouchableOpacity
+                                key={item.id}
+                                onPress={() => router.push(item.route as any)}
+                                style={s.moduleChip}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name={item.icon as any} size={15} color="#D97706" />
+                                <Text style={s.moduleChipText}>{item.label}</Text>
+                                <Ionicons name="chevron-forward" size={12} color="#CBD5E1" />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {/* 6. LOGOUT BANNER BUTTON */}
+                <TouchableOpacity
+                    onPress={handleSignOut}
+                    style={s.logoutBox}
+                    activeOpacity={0.85}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View style={s.logoutIconCircle}>
+                            <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+                        </View>
+                        <View>
+                            <Text style={s.logoutTextTitle}>Logout</Text>
+                            <Text style={s.logoutTextSub}>Sign out from your admin account</Text>
+                        </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#DC2626" />
+                </TouchableOpacity>
+            </ScrollView>
 
             {/* Edit Profile Modal */}
             <Modal visible={showEditModal} animationType="slide" transparent>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={s.modalOverlay}
+                    style={s.modalBackdrop}
                 >
-                    <View style={s.modalContentCard}>
-                        <View style={s.modalHeader}>
+                    <View style={s.modalSheet}>
+                        <View style={s.modalHeadRow}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={[s.kpiIconBox, { backgroundColor: '#FEF3C7', width: 32, height: 32 }]}>
+                                <View style={[s.kpiIconCircle, { backgroundColor: '#FEF3C7', width: 32, height: 32 }]}>
                                     <Ionicons name="create" size={16} color="#D97706" />
                                 </View>
-                                <Text style={s.modalTitle}>Edit Profile Information</Text>
+                                <Text style={s.modalHeadTitle}>Edit Profile Information</Text>
                             </View>
                             <TouchableOpacity onPress={() => setShowEditModal(false)}>
                                 <Ionicons name="close-circle" size={24} color="#94A3B8" />
@@ -847,69 +797,69 @@ export default function AdminProfileScreen() {
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
-                            <View style={s.modalField}>
-                                <Text style={s.modalFieldLabel}>Full Name</Text>
+                            <View style={s.formGroup}>
+                                <Text style={s.formGroupLabel}>Full Name</Text>
                                 <TextInput
                                     value={editForm.full_name}
                                     onChangeText={(t) => setEditForm(prev => ({ ...prev, full_name: t }))}
-                                    style={s.modalInput}
+                                    style={s.formGroupInput}
                                     placeholder="Enter your full name"
                                     placeholderTextColor="#94A3B8"
                                 />
                             </View>
 
-                            <View style={s.modalField}>
-                                <Text style={s.modalFieldLabel}>Email Address</Text>
+                            <View style={s.formGroup}>
+                                <Text style={s.formGroupLabel}>Email Address</Text>
                                 <TextInput
                                     value={editForm.email}
                                     onChangeText={(t) => setEditForm(prev => ({ ...prev, email: t }))}
-                                    style={s.modalInput}
+                                    style={s.formGroupInput}
                                     placeholder="admin@abumafhal.com"
                                     placeholderTextColor="#94A3B8"
                                     keyboardType="email-address"
                                 />
                             </View>
 
-                            <View style={s.modalField}>
-                                <Text style={s.modalFieldLabel}>Phone Number</Text>
+                            <View style={s.formGroup}>
+                                <Text style={s.formGroupLabel}>Phone Number</Text>
                                 <TextInput
                                     value={editForm.phone}
                                     onChangeText={(t) => setEditForm(prev => ({ ...prev, phone: t }))}
-                                    style={s.modalInput}
+                                    style={s.formGroupInput}
                                     placeholder="+234..."
                                     placeholderTextColor="#94A3B8"
                                     keyboardType="phone-pad"
                                 />
                             </View>
 
-                            <View style={s.modalField}>
-                                <Text style={s.modalFieldLabel}>Country</Text>
+                            <View style={s.formGroup}>
+                                <Text style={s.formGroupLabel}>Country</Text>
                                 <TextInput
                                     value={editForm.country}
                                     onChangeText={(t) => setEditForm(prev => ({ ...prev, country: t }))}
-                                    style={s.modalInput}
+                                    style={s.formGroupInput}
                                     placeholder="Nigeria"
                                     placeholderTextColor="#94A3B8"
                                 />
                             </View>
                         </ScrollView>
 
-                        <View style={s.modalActionsRow}>
+                        <View style={s.modalBtnRow}>
                             <TouchableOpacity
                                 onPress={() => setShowEditModal(false)}
-                                style={s.modalCancelBtn}
+                                style={s.modalDismissBtn}
                             >
-                                <Text style={s.modalCancelText}>Cancel</Text>
+                                <Text style={s.modalDismissBtnText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={handleSaveProfile}
                                 disabled={saving}
-                                style={s.modalSaveBtn}
+                                style={s.modalSubmitBtn}
                             >
                                 {saving ? (
                                     <ActivityIndicator size="small" color="#0F172A" />
                                 ) : (
-                                    <Text style={s.modalSaveText}>Save Changes</Text>
+                                    <Text style={s.modalSubmitBtnText}>Save Changes</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -921,15 +871,15 @@ export default function AdminProfileScreen() {
             <Modal visible={showPasswordModal} animationType="slide" transparent>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={s.modalOverlay}
+                    style={s.modalBackdrop}
                 >
-                    <View style={s.modalContentCard}>
-                        <View style={s.modalHeader}>
+                    <View style={s.modalSheet}>
+                        <View style={s.modalHeadRow}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={[s.kpiIconBox, { backgroundColor: '#EFF6FF', width: 32, height: 32 }]}>
+                                <View style={[s.kpiIconCircle, { backgroundColor: '#EFF6FF', width: 32, height: 32 }]}>
                                     <Ionicons name="key" size={16} color="#2563EB" />
                                 </View>
-                                <Text style={s.modalTitle}>Change Admin Password</Text>
+                                <Text style={s.modalHeadTitle}>Change Admin Password</Text>
                             </View>
                             <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
                                 <Ionicons name="close-circle" size={24} color="#94A3B8" />
@@ -940,34 +890,34 @@ export default function AdminProfileScreen() {
                             Enter your new high-security password (minimum 6 characters). You will be logged out to verify credentials.
                         </Text>
 
-                        <View style={s.modalField}>
-                            <Text style={s.modalFieldLabel}>New Password</Text>
+                        <View style={s.formGroup}>
+                            <Text style={s.formGroupLabel}>New Password</Text>
                             <TextInput
                                 value={newPassword}
                                 onChangeText={setNewPassword}
-                                style={s.modalInput}
+                                style={s.formGroupInput}
                                 secureTextEntry
                                 placeholder="Enter at least 6 characters"
                                 placeholderTextColor="#94A3B8"
                             />
                         </View>
 
-                        <View style={s.modalActionsRow}>
+                        <View style={s.modalBtnRow}>
                             <TouchableOpacity
                                 onPress={() => setShowPasswordModal(false)}
-                                style={s.modalCancelBtn}
+                                style={s.modalDismissBtn}
                             >
-                                <Text style={s.modalCancelText}>Cancel</Text>
+                                <Text style={s.modalDismissBtnText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={handleChangePassword}
                                 disabled={changingPassword || newPassword.length < 6}
-                                style={[s.modalSaveBtn, { backgroundColor: T.navyDark }]}
+                                style={[s.modalSubmitBtn, { backgroundColor: T.navyDark }]}
                             >
                                 {changingPassword ? (
                                     <ActivityIndicator size="small" color="#F59E0B" />
                                 ) : (
-                                    <Text style={[s.modalSaveText, { color: '#F59E0B' }]}>Update Password</Text>
+                                    <Text style={[s.modalSubmitBtnText, { color: '#F59E0B' }]}>Update Password</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -985,7 +935,7 @@ const s = StyleSheet.create({
     },
     topBar: {
         paddingTop: Platform.OS === 'ios' ? 48 : 36,
-        paddingBottom: 16,
+        paddingBottom: 14,
         paddingHorizontal: 16,
         flexDirection: 'row',
         alignItems: 'center',
@@ -994,9 +944,9 @@ const s = StyleSheet.create({
         borderBottomColor: 'rgba(217, 119, 6, 0.25)',
     },
     backBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 10,
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1006,12 +956,12 @@ const s = StyleSheet.create({
     brandWrap: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
     },
     logoCircle: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         backgroundColor: '#0F172A',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1020,30 +970,30 @@ const s = StyleSheet.create({
     },
     brandTitle: {
         color: '#FFFFFF',
-        fontSize: 13,
+        fontSize: 12.5,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
     brandGold: {
         color: '#F59E0B',
-        fontSize: 13,
+        fontSize: 12.5,
         fontWeight: '900',
     },
     brandSub: {
         color: '#94A3B8',
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '800',
-        letterSpacing: 1,
+        letterSpacing: 0.8,
     },
     topBarRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
     },
     bellBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 10,
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1053,12 +1003,12 @@ const s = StyleSheet.create({
     },
     bellBadge: {
         position: 'absolute',
-        top: 6,
-        right: 6,
+        top: 5,
+        right: 5,
         backgroundColor: '#EF4444',
         borderRadius: 8,
-        minWidth: 16,
-        height: 16,
+        minWidth: 15,
+        height: 15,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 3,
@@ -1067,139 +1017,58 @@ const s = StyleSheet.create({
     },
     bellBadgeText: {
         color: '#FFFFFF',
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '900',
     },
     walletPill: {
         backgroundColor: '#070D1E',
-        borderRadius: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
+        borderRadius: 18,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
         borderWidth: 1,
         borderColor: 'rgba(217, 119, 6, 0.4)',
     },
     walletPillText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
     },
-    bodyLayout: {
-        flex: 1,
-        flexDirection: 'row',
-    },
-    sidebar: {
-        width: 210,
-        backgroundColor: '#0A122A',
-        borderRightWidth: 1,
-        borderRightColor: '#1E293B',
-        paddingTop: 16,
-    },
-    sidebarCompact: {
-        width: 65,
-    },
-    sidebarUserCard: {
-        alignItems: 'center',
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: '#1E293B',
-        marginBottom: 10,
-    },
-    sidebarAvatarWrap: {
-        position: 'relative',
-        marginBottom: 8,
-    },
-    sidebarAvatarImg: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        borderWidth: 1.5,
-        borderColor: '#F59E0B',
-    },
-    onlineBadgeDot: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        width: 13,
-        height: 13,
-        borderRadius: 6.5,
-        backgroundColor: '#10B981',
-        borderWidth: 2,
-        borderColor: '#0A122A',
-    },
-    sidebarUserName: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '900',
-        textAlign: 'center',
-        paddingHorizontal: 6,
-    },
-    sidebarUserRole: {
-        color: '#F59E0B',
-        fontSize: 10,
-        fontWeight: '800',
-        marginTop: 2,
-    },
-    sidebarNavItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 10,
-        marginHorizontal: 8,
-        marginBottom: 4,
-    },
-    sidebarNavItemActive: {
-        backgroundColor: 'rgba(217, 119, 6, 0.16)',
-        borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
-    },
-    sidebarNavLabel: {
-        color: '#94A3B8',
-        fontSize: 11.5,
-        fontWeight: '700',
-    },
-    sidebarNavLabelActive: {
-        color: '#F59E0B',
-        fontWeight: '900',
-    },
-    mainContent: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-    },
-    mainScroll: {
-        padding: 16,
-        paddingBottom: 60,
+    scrollContainer: {
+        padding: 14,
+        paddingBottom: 50,
     },
     heroCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
+        borderRadius: 18,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#E2E8F0',
-        marginBottom: 16,
+        marginBottom: 14,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
         elevation: 2,
     },
-    heroBanner: {
-        height: 85,
+    heroBannerGradient: {
+        height: 70,
         width: '100%',
     },
-    heroProfileRow: {
-        flexDirection: 'row',
+    heroContentWrap: {
         paddingHorizontal: 16,
         paddingBottom: 16,
-        marginTop: -38,
-        alignItems: 'flex-start',
-        gap: 14,
+        marginTop: -32,
     },
-    heroAvatarContainer: {
+    heroTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        marginBottom: 10,
+    },
+    heroAvatarFrame: {
         position: 'relative',
     },
     crownBadge: {
@@ -1209,14 +1078,14 @@ const s = StyleSheet.create({
         zIndex: 10,
         backgroundColor: '#FEF3C7',
         borderRadius: 10,
-        padding: 4,
+        padding: 3,
         borderWidth: 1,
         borderColor: '#FDE68A',
     },
     heroAvatarImg: {
-        width: 82,
-        height: 82,
-        borderRadius: 41,
+        width: 72,
+        height: 72,
+        borderRadius: 36,
         borderWidth: 3,
         borderColor: '#FFFFFF',
         backgroundColor: '#E2E8F0',
@@ -1226,47 +1095,42 @@ const s = StyleSheet.create({
         bottom: 0,
         right: 0,
         backgroundColor: '#0F172A',
-        width: 26,
-        height: 26,
-        borderRadius: 13,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
         borderColor: '#FFFFFF',
     },
-    heroTextContainer: {
-        flex: 1,
-        paddingTop: 42,
-    },
-    heroNameRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    heroName: {
-        color: '#0F172A',
-        fontSize: 18,
-        fontWeight: '900',
-    },
-    heroEditBtn: {
+    editProfileBtn: {
         backgroundColor: '#FFFFFF',
         borderWidth: 1.5,
         borderColor: '#CBD5E1',
         borderRadius: 10,
         paddingHorizontal: 12,
-        paddingVertical: 5,
+        paddingVertical: 6,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
     },
-    heroEditBtnText: {
+    editProfileBtnText: {
         color: '#0F172A',
         fontSize: 11,
         fontWeight: '800',
     },
-    rolePill: {
+    heroAdminName: {
+        color: '#0F172A',
+        fontSize: 18,
+        fontWeight: '900',
+        marginBottom: 4,
+    },
+    roleBadgePill: {
         backgroundColor: '#FEF3C7',
         alignSelf: 'flex-start',
         paddingHorizontal: 10,
@@ -1275,210 +1139,235 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        marginTop: 6,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    rolePillText: {
-        color: '#D97706',
-        fontSize: 10.5,
-        fontWeight: '900',
-    },
-    heroContactList: {
-        marginTop: 8,
-        gap: 4,
-    },
-    heroContactItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    heroContactText: {
-        color: '#475569',
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    memberSinceText: {
-        color: '#94A3B8',
-        fontSize: 10,
-        fontWeight: '600',
-        marginTop: 6,
-    },
-    kpiGrid: {
-        flexDirection: 'row',
-        gap: 12,
-        marginBottom: 16,
-    },
-    kpiCard: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        elevation: 1,
-    },
-    kpiTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         marginBottom: 10,
-    },
-    kpiIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    kpiValue: {
-        color: '#0F172A',
-        fontSize: 15,
-        fontWeight: '900',
-    },
-    kpiLabel: {
-        color: '#64748B',
-        fontSize: 10,
-        fontWeight: '700',
-        marginTop: 2,
-    },
-    cryptoPillMini: {
-        width: 17,
-        height: 17,
-        borderRadius: 8.5,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    cryptoPillText: {
-        color: '#FFFFFF',
-        fontSize: 9,
-        fontWeight: '900',
-    },
-    sectionCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 18,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        marginBottom: 16,
-    },
-    sectionHeaderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-    },
-    sectionTitle: {
-        color: '#0F172A',
-        fontSize: 14,
-        fontWeight: '900',
-    },
-    sectionSubtitle: {
-        color: '#64748B',
-        fontSize: 10.5,
-        marginTop: 1,
-    },
-    editDetailsBtn: {
-        backgroundColor: '#FEF3C7',
         borderWidth: 1,
         borderColor: '#FDE68A',
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    editDetailsBtnText: {
-        color: '#D97706',
-        fontSize: 11,
-        fontWeight: '800',
-    },
-    detailRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-    },
-    detailLabelCol: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        width: 120,
-    },
-    detailLabel: {
-        color: '#64748B',
-        fontSize: 11.5,
-        fontWeight: '700',
-    },
-    detailValueCol: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    detailValueText: {
-        color: '#0F172A',
-        fontSize: 12,
-        fontWeight: '800',
-    },
-    roleBadgePill: {
-        backgroundColor: '#FEF3C7',
-        alignSelf: 'flex-start',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
     },
     roleBadgePillText: {
         color: '#D97706',
         fontSize: 10.5,
         fontWeight: '900',
     },
-    quickActionsRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
+    heroMetaList: {
+        gap: 5,
+        marginBottom: 8,
     },
-    actionTile: {
-        flex: 1,
-        minWidth: 130,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-        padding: 10,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+    heroMetaItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 7,
     },
-    actionIconSquare: {
-        width: 32,
-        height: 32,
+    heroMetaText: {
+        color: '#475569',
+        fontSize: 11.5,
+        fontWeight: '600',
+    },
+    memberSinceText: {
+        color: '#94A3B8',
+        fontSize: 10.5,
+        fontWeight: '600',
+        marginTop: 4,
+    },
+    kpiGrid: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 14,
+    },
+    kpiCard: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    kpiCardTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    kpiIconCircle: {
+        width: 30,
+        height: 30,
         borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    actionTileTitle: {
+    kpiNumber: {
         color: '#0F172A',
-        fontSize: 11,
-        fontWeight: '800',
+        fontSize: 14,
+        fontWeight: '900',
     },
-    logoutBannerCard: {
-        backgroundColor: '#FEF2F2',
+    kpiSubtitle: {
+        color: '#64748B',
+        fontSize: 9.5,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    cryptoPillMini: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cryptoPillMiniText: {
+        color: '#FFFFFF',
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    sectionBox: {
+        backgroundColor: '#FFFFFF',
         borderRadius: 16,
         padding: 14,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 14,
+    },
+    sectionHeadRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        marginBottom: 10,
+    },
+    sectionHeadTitle: {
+        color: '#0F172A',
+        fontSize: 13.5,
+        fontWeight: '900',
+    },
+    sectionHeadSubtitle: {
+        color: '#64748B',
+        fontSize: 10,
+        marginTop: 1,
+    },
+    sectionEditPill: {
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    sectionEditPillText: {
+        color: '#D97706',
+        fontSize: 10.5,
+        fontWeight: '800',
+    },
+    infoRowsList: {
+        gap: 8,
+    },
+    infoRowItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    infoLabelCol: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        width: 105,
+    },
+    infoLabelText: {
+        color: '#64748B',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    infoValueBox: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    infoValueText: {
+        color: '#0F172A',
+        fontSize: 11.5,
+        fontWeight: '800',
+    },
+    roleBadgePillMini: {
+        backgroundColor: '#FEF3C7',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    roleBadgePillMiniText: {
+        color: '#D97706',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    quickGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    quickTile: {
+        width: '48.5%',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    quickTileIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quickTileText: {
+        flex: 1,
+        color: '#0F172A',
+        fontSize: 10.5,
+        fontWeight: '800',
+    },
+    moduleChipsWrap: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    moduleChip: {
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    moduleChipText: {
+        color: '#334155',
+        fontSize: 10.5,
+        fontWeight: '800',
+    },
+    logoutBox: {
+        backgroundColor: '#FEF2F2',
+        borderRadius: 14,
+        padding: 12,
         borderWidth: 1,
         borderColor: '#FCA5A5',
         flexDirection: 'row',
@@ -1486,111 +1375,106 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 20,
     },
-    logoutLeftCol: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    logoutIconBox: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
+    logoutIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
         backgroundColor: '#FEE2E2',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: '#FECACA',
     },
-    logoutTitle: {
+    logoutTextTitle: {
         color: '#DC2626',
-        fontSize: 13,
+        fontSize: 12.5,
         fontWeight: '900',
     },
-    logoutSub: {
+    logoutTextSub: {
         color: '#EF4444',
-        fontSize: 10.5,
+        fontSize: 10,
         fontWeight: '600',
         marginTop: 1,
     },
-    modalOverlay: {
+    modalBackdrop: {
         flex: 1,
         backgroundColor: 'rgba(15, 23, 42, 0.75)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 16,
     },
-    modalContentCard: {
+    modalSheet: {
         width: '100%',
-        maxWidth: 500,
+        maxWidth: 480,
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 20,
+        borderRadius: 18,
+        padding: 18,
         borderWidth: 1.5,
         borderColor: '#D97706',
     },
-    modalHeader: {
+    modalHeadRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
         paddingBottom: 10,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
     },
-    modalTitle: {
+    modalHeadTitle: {
         color: '#0F172A',
-        fontSize: 14,
+        fontSize: 13.5,
         fontWeight: '900',
     },
-    modalField: {
-        marginBottom: 12,
+    formGroup: {
+        marginBottom: 10,
     },
-    modalFieldLabel: {
+    formGroupLabel: {
         color: '#475569',
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '800',
         textTransform: 'uppercase',
         marginBottom: 4,
     },
-    modalInput: {
+    formGroupInput: {
         backgroundColor: '#F8FAFC',
         borderWidth: 1.5,
         borderColor: '#E2E8F0',
-        borderRadius: 10,
+        borderRadius: 8,
         paddingHorizontal: 12,
-        paddingVertical: 9,
+        paddingVertical: 8,
         color: '#0F172A',
-        fontSize: 13,
+        fontSize: 12.5,
         fontWeight: '700',
     },
-    modalActionsRow: {
+    modalBtnRow: {
         flexDirection: 'row',
-        gap: 10,
-        marginTop: 16,
+        gap: 8,
+        marginTop: 14,
     },
-    modalCancelBtn: {
+    modalDismissBtn: {
         flex: 1,
-        paddingVertical: 12,
-        borderRadius: 10,
+        paddingVertical: 10,
+        borderRadius: 8,
         backgroundColor: '#F1F5F9',
         alignItems: 'center',
     },
-    modalCancelText: {
+    modalDismissBtnText: {
         color: '#64748B',
         fontWeight: '800',
-        fontSize: 12,
+        fontSize: 11.5,
     },
-    modalSaveBtn: {
+    modalSubmitBtn: {
         flex: 1.5,
-        paddingVertical: 12,
-        borderRadius: 10,
+        paddingVertical: 10,
+        borderRadius: 8,
         backgroundColor: '#F59E0B',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    modalSaveText: {
+    modalSubmitBtnText: {
         color: '#0F172A',
         fontWeight: '900',
-        fontSize: 12,
+        fontSize: 11.5,
     },
 });
