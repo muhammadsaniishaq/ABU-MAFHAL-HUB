@@ -1,69 +1,125 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Switch, FlatList, Share, Modal } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator,
+    Alert, KeyboardAvoidingView, Platform, Switch, Share, Modal, StyleSheet
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { supabase } from '../../services/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../../services/supabase';
 
-export default function ReferralSettings() {
+// Executive Royal Light Palette (Consistent with Brand)
+const C = {
+    bg: '#F8FAFC',
+    card: '#FFFFFF',
+    navy: '#0F172A',
+    navyLight: '#1E293B',
+    gold: '#D97706',
+    goldLight: '#FEF3C7',
+    goldBorder: '#FDE68A',
+    emerald: '#059669',
+    emeraldLight: '#D1FAE5',
+    blue: '#2563EB',
+    blueLight: '#DBEAFE',
+    red: '#DC2626',
+    redLight: '#FEE2E2',
+    border: '#E2E8F0',
+    borderLight: '#F1F5F9',
+    textMuted: '#64748B',
+    textDim: '#94A3B8',
+};
+
+interface ReferralItem {
+    id: string;
+    status: 'paid' | 'pending' | 'revoked';
+    reward_amount: number;
+    created_at: string;
+    referrer_id?: string;
+    referee_id?: string;
+    referrer?: {
+        id?: string;
+        username?: string;
+        full_name?: string;
+    };
+    referee?: {
+        id?: string;
+        username?: string;
+        full_name?: string;
+        avatar_url?: string;
+    };
+}
+
+export default function ReferralSettingsScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    
+    const [refreshing, setRefreshing] = useState(false);
+
     // Config State
-    const [rewardAmount, setRewardAmount] = useState('4.00');
+    const [rewardAmount, setRewardAmount] = useState('500');
     const [referralUrl, setReferralUrl] = useState('https://abumafhal.com.ng');
     const [minWithdrawal, setMinWithdrawal] = useState('1000');
     const [systemEnabled, setSystemEnabled] = useState(true);
 
-    // Data Lists
+    // Data State
     const [stats, setStats] = useState({ totalReferrals: 0, totalPaid: 0, pendingAmount: 0 });
-    const [allReferrals, setAllReferrals] = useState<any[]>([]); // Store full list
-    const [filteredReferrals, setFilteredReferrals] = useState<any[]>([]); // Display list
-    const [topReferrers, setTopReferrers] = useState<any[]>([]);
+    const [allReferrals, setAllReferrals] = useState<ReferralItem[]>([]);
+    const [filteredReferrals, setFilteredReferrals] = useState<ReferralItem[]>([]);
+    const [topReferrers, setTopReferrers] = useState<{ name: string; count: number }[]>([]);
 
     // Search & Filter State
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending'>('all');
     const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week'>('all');
 
-    // Management Action State
-    const [selectedReferral, setSelectedReferral] = useState<any>(null);
+    // Management Modal State
+    const [selectedReferral, setSelectedReferral] = useState<ReferralItem | null>(null);
 
-    const fetchSettingsAndData = async () => {
-        setLoading(true);
+    const fetchSettingsAndData = useCallback(async () => {
         try {
-            // 1. Fetch Configs
-            const { data: settings, error } = await supabase
+            // 1. Fetch Configs from app_settings
+            const { data: settings } = await supabase
                 .from('app_settings')
                 .select('*')
                 .in('key', ['referral_reward', 'referral_url', 'referral_enabled', 'min_withdrawal']);
 
-            if (error) throw error;
-
             settings?.forEach(item => {
-                if (item.key === 'referral_reward') setRewardAmount(item.value.amount.toString());
-                if (item.key === 'referral_url') setReferralUrl(item.value.url);
-                if (item.key === 'referral_enabled') setSystemEnabled(item.value.enabled);
-                if (item.key === 'min_withdrawal') setMinWithdrawal(item.value.amount.toString());
+                if (item.key === 'referral_reward') {
+                    const amt = item.value?.amount !== undefined ? item.value.amount : item.value;
+                    if (amt !== undefined) setRewardAmount(String(amt));
+                }
+                if (item.key === 'referral_url') {
+                    const u = item.value?.url || item.value;
+                    if (u) setReferralUrl(String(u));
+                }
+                if (item.key === 'referral_enabled') {
+                    const en = item.value?.enabled !== undefined ? item.value.enabled : item.value;
+                    if (en !== undefined) setSystemEnabled(Boolean(en));
+                }
+                if (item.key === 'min_withdrawal') {
+                    const mw = item.value?.amount !== undefined ? item.value.amount : item.value;
+                    if (mw !== undefined) setMinWithdrawal(String(mw));
+                }
             });
 
-            // 2. Fetch Referrals Data
-            let combinedReferrals: any[] = [];
+            // 2. Fetch Referrals Data with Fallback
+            let combinedReferrals: ReferralItem[] = [];
+
+            // Primary query with join
             const { data: referrals, error: refError } = await supabase
                 .from('referrals')
                 .select(`
                     id, status, reward_amount, created_at,
                     referrer_id, referee_id,
-                    referrer:referrer_id(username, full_name, id),
-                    referee:referee_id(username, full_name, avatar_url, id)
+                    referrer:referrer_id(id, username, full_name),
+                    referee:referee_id(id, username, full_name, avatar_url)
                 `)
                 .order('created_at', { ascending: false });
 
             if (!refError && referrals && referrals.length > 0) {
-                combinedReferrals = [...referrals];
+                combinedReferrals = referrals as any;
             } else {
+                // Raw table fallback
                 const { data: rawRefs } = await supabase
                     .from('referrals')
                     .select('id, referrer_id, referee_id, status, reward_amount, created_at')
@@ -76,15 +132,20 @@ export default function ReferralSettings() {
                         const { data: profs } = await supabase.from('profiles').select('id, username, full_name, avatar_url').in('id', uids);
                         profs?.forEach((p: any) => { profMap[p.id] = p; });
                     }
-                    combinedReferrals = rawRefs.map(r => ({
-                        ...r,
+                    combinedReferrals = rawRefs.map((r: any) => ({
+                        id: r.id,
+                        status: r.status || 'paid',
+                        reward_amount: Number(r.reward_amount || 0),
+                        created_at: r.created_at,
+                        referrer_id: r.referrer_id,
+                        referee_id: r.referee_id,
                         referrer: profMap[r.referrer_id] || { username: 'User' },
                         referee: profMap[r.referee_id] || { username: 'User' }
                     }));
                 }
             }
 
-            // Also check profiles with referrer_id not yet logged into referrals table
+            // Also check profiles with referrer_id directly
             const { data: refProfiles } = await supabase
                 .from('profiles')
                 .select('id, username, full_name, avatar_url, referrer_id, created_at')
@@ -95,7 +156,7 @@ export default function ReferralSettings() {
             if (refProfiles && refProfiles.length > 0) {
                 const existingRefereeIds = new Set(combinedReferrals.map(r => r.referee_id || r.referee?.id));
                 const missingUids = refProfiles.filter(p => !existingRefereeIds.has(p.id)).map(p => p.referrer_id);
-                
+
                 if (missingUids.length > 0) {
                     const { data: refUserProfs } = await supabase.from('profiles').select('id, username, full_name').in('id', missingUids);
                     const refMap: Record<string, any> = {};
@@ -123,62 +184,65 @@ export default function ReferralSettings() {
                 }
             }
 
-            // Stats Logic
+            // Calculate Stats
             const total = combinedReferrals.length;
             const paid = combinedReferrals.filter(r => r.status === 'paid').reduce((sum, r) => sum + (Number(r.reward_amount) || 0), 0);
             const pending = combinedReferrals.filter(r => r.status === 'pending').reduce((sum, r) => sum + (Number(r.reward_amount) || 0), 0);
 
             setStats({ totalReferrals: total, totalPaid: paid, pendingAmount: pending });
             setAllReferrals(combinedReferrals);
-            setFilteredReferrals(combinedReferrals); // Initial load
+            setFilteredReferrals(combinedReferrals);
 
-            // Leaderboard Logic
-            const leaderboard: any = {};
-            combinedReferrals.forEach((r: any) => {
-                const name = r.referrer?.username || 'Unknown';
-                if (!leaderboard[name]) leaderboard[name] = 0;
-                leaderboard[name]++;
+            // Leaderboard
+            const leaderboard: Record<string, number> = {};
+            combinedReferrals.forEach(r => {
+                const name = r.referrer?.username || 'User';
+                leaderboard[name] = (leaderboard[name] || 0) + 1;
             });
             const sortedLeaderboard = Object.entries(leaderboard)
-                .sort(([, a]: any, [, b]: any) => b - a)
+                .sort(([, a], [, b]) => b - a)
                 .slice(0, 5)
                 .map(([name, count]) => ({ name, count }));
             setTopReferrers(sortedLeaderboard);
 
         } catch (error: any) {
-            Alert.alert("Error", error.message);
+            console.warn('Fetch referral error:', error);
+            Alert.alert("Notice", error.message || "Could not retrieve all referral records.");
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
-    };
+    }, [rewardAmount]);
 
     useEffect(() => {
         fetchSettingsAndData();
-    }, []);
+    }, [fetchSettingsAndData]);
 
-    // Effect to handle Filtering & Search
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchSettingsAndData();
+    };
+
+    // Filter Logic
     useEffect(() => {
         let result = allReferrals;
 
-        // 1. Search (Username of Referrer or Referee)
-        if (searchQuery) {
-            const lowQ = searchQuery.toLowerCase();
-            result = result.filter(r => 
-                r.referrer?.username?.toLowerCase().includes(lowQ) || 
+        if (searchQuery.trim()) {
+            const lowQ = searchQuery.toLowerCase().trim();
+            result = result.filter(r =>
+                r.referrer?.username?.toLowerCase().includes(lowQ) ||
                 r.referee?.username?.toLowerCase().includes(lowQ) ||
                 r.referee?.full_name?.toLowerCase().includes(lowQ)
             );
         }
 
-        // 2. Status Filter
         if (statusFilter !== 'all') {
             result = result.filter(r => r.status === statusFilter);
         }
 
-        // 3. Date Filter
         if (dateFilter !== 'all') {
             const now = new Date();
-            const todayStart = new Date(now.setHours(0,0,0,0)).getTime();
+            const todayStart = new Date(now.setHours(0, 0, 0, 0)).getTime();
             const weekStart = new Date(now.setDate(now.getDate() - 7)).getTime();
 
             result = result.filter(r => {
@@ -190,7 +254,6 @@ export default function ReferralSettings() {
         }
 
         setFilteredReferrals(result);
-
     }, [searchQuery, statusFilter, dateFilter, allReferrals]);
 
     const saveSettings = async () => {
@@ -208,9 +271,9 @@ export default function ReferralSettings() {
             await supabase.from('app_settings').upsert({ key: 'referral_url', value: { url: cleanUrl } });
             await supabase.from('app_settings').upsert({ key: 'referral_enabled', value: { enabled: systemEnabled } });
             await supabase.from('app_settings').upsert({ key: 'min_withdrawal', value: { amount: Number(minWithdrawal) } });
-            Alert.alert("Success", "Configuration saved!");
+            Alert.alert("Success 🎉", "Referral configuration updated successfully!");
         } catch (error: any) {
-            Alert.alert("Error", error.message);
+            Alert.alert("Error", error.message || "Failed to update configuration.");
         } finally {
             setSaving(false);
         }
@@ -222,340 +285,419 @@ export default function ReferralSettings() {
             return;
         }
 
-        // Generate CSV Content
-        let csv = "ID,Date,Referrer,Referee,Amount,Status\n";
+        let csv = "ID,Date,Referrer,Referee,Amount(NGN),Status\n";
         filteredReferrals.forEach(r => {
             const date = new Date(r.created_at).toLocaleDateString();
-            csv += `${r.id},${date},${r.referrer?.username},${r.referee?.username},${r.reward_amount},${r.status}\n`;
+            csv += `"${r.id}","${date}","${r.referrer?.username || ''}","${r.referee?.username || ''}",${r.reward_amount},"${r.status}"\n`;
         });
 
         try {
             await Share.share({
-                title: 'Referral_Report.csv',
+                title: 'AbuMafhal_Referrals_Report.csv',
                 message: csv
             });
         } catch (error: any) {
-            Alert.alert("Export Error", error.message);
+            Alert.alert("Export Notice", error.message || "Could not complete export.");
         }
     };
 
-    const updateStatus = async (status: string) => {
+    const updateStatus = async (status: 'paid' | 'pending') => {
         if (!selectedReferral) return;
         try {
-            const { error } = await supabase
-                .from('referrals')
-                .update({ status })
-                .eq('id', selectedReferral.id);
+            if (!selectedReferral.id.startsWith('prof-')) {
+                const { error } = await supabase
+                    .from('referrals')
+                    .update({ status })
+                    .eq('id', selectedReferral.id);
 
-            if (error) throw error;
-            
-            // Optimistic update
+                if (error) throw error;
+            }
+
             const updated = allReferrals.map(r => r.id === selectedReferral.id ? { ...r, status } : r);
             setAllReferrals(updated);
             setSelectedReferral(null);
-            Alert.alert("Success", `Status updated to ${status}`);
+            Alert.alert("Success", `Referral marked as ${status.toUpperCase()}!`);
         } catch (error: any) {
-            Alert.alert("Error", error.message);
+            Alert.alert("Error", error.message || "Could not update status.");
         }
     };
 
     const revokeReward = async () => {
-         if (!selectedReferral) return;
-         // For now, we just set amount to 0 and status to revoked/cancelled logic if needed, 
-         // but 'status' column constraint might only be paid/pending. 
-         // Let's assume we can set status to 'pending' and amount to 0 or just delete it?
-         // Safer: Set reward_amount to 0.
-         try {
-            const { error } = await supabase
-                .from('referrals')
-                .update({ reward_amount: 0, status: 'paid' }) // Effectively voiding it
-                .eq('id', selectedReferral.id);
+        if (!selectedReferral) return;
+        try {
+            if (!selectedReferral.id.startsWith('prof-')) {
+                const { error } = await supabase
+                    .from('referrals')
+                    .update({ reward_amount: 0, status: 'pending' })
+                    .eq('id', selectedReferral.id);
 
-            if (error) throw error;
+                if (error) throw error;
+            }
 
-             const updated = allReferrals.map(r => r.id === selectedReferral.id ? { ...r, reward_amount: 0, status: 'paid' } : r);
+            const updated = allReferrals.map(r => r.id === selectedReferral.id ? { ...r, reward_amount: 0, status: 'pending' as const } : r);
             setAllReferrals(updated);
             setSelectedReferral(null);
-            Alert.alert("Revoked", "Reward set to 0 and marked processed.");
-         } catch (error: any) {
-            Alert.alert("Error", error.message);
-         }
+            Alert.alert("Revoked", "Referral reward set to ₦0.");
+        } catch (error: any) {
+            Alert.alert("Error", error.message || "Failed to revoke reward.");
+        }
     };
 
-    const viewUserProfile = (userId: string) => {
+    const viewUserProfile = (userId?: string) => {
         setSelectedReferral(null);
-        // Navigate and maybe pass params if UserManagement supports it, otherwise generic link
-        // Current UserManagement supports search, but we can't easily deep link with params like `?search=` 
-        // unless we modify UserManagement to read params.
-        // For now, we'll just go to users.
-        router.push('/manage/users'); 
-        Alert.alert("Navigation", `Please search for ID: ${userId} or username manually (Deep link coming soon)`);
+        router.push('/manage/users' as any);
+        if (userId) {
+            Alert.alert("Staff Lookup", `Navigated to Users. Lookup User ID: ${userId.substring(0, 8)}...`);
+        }
     };
 
     return (
-        <View className="flex-1 bg-slate-50">
-             <Stack.Screen options={{ 
-                title: "Referral Manager",
-                headerStyle: { backgroundColor: '#F8FAFC' },
-                headerTintColor: '#0F172A',
-                headerShadowVisible: false,
-                headerRight: () => (
-                    <TouchableOpacity onPress={handleExport} className="bg-slate-200 p-2 rounded-full">
-                        <Ionicons name="share-outline" size={20} color="#334155" />
-                    </TouchableOpacity>
-                )
-            }} />
-            
+        <View style={styles.container}>
+            <Stack.Screen
+                options={{
+                    title: "Affiliate Referrals Manager",
+                    headerStyle: { backgroundColor: C.navy },
+                    headerTintColor: '#FFFFFF',
+                    headerTitleStyle: { fontWeight: '800', fontSize: 16 },
+                    headerShadowVisible: false,
+                    headerRight: () => (
+                        <TouchableOpacity onPress={handleExport} style={styles.exportHeaderBtn} activeOpacity={0.8}>
+                            <Ionicons name="share-outline" size={17} color="#FFFFFF" />
+                            <Text style={styles.exportHeaderBtnText}>Export</Text>
+                        </TouchableOpacity>
+                    )
+                }}
+            />
+
             {loading ? (
-                <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#4F46E5" />
+                <View style={styles.centerBox}>
+                    <ActivityIndicator size="large" color={C.gold} />
+                    <Text style={styles.loadingText}>Loading Referral System Data...</Text>
                 </View>
             ) : (
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-                    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }}>
-                        
-                        {/* Stats Overview */}
-                        <View className="flex-row gap-3 mb-6">
-                            <LinearGradient colors={['#4F46E5', '#4338ca']} style={{ flex: 1, padding: 16, borderRadius: 16 }}>
-                                <Text className="text-indigo-200 text-xs font-bold uppercase">Total Referrals</Text>
-                                <Text className="text-white text-2xl font-black mt-1">{stats.totalReferrals}</Text>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                    <ScrollView contentContainerStyle={styles.scrollContent}>
+
+                        {/* Top Overview Cards */}
+                        <View style={styles.statsRow}>
+                            <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.statCardHero}>
+                                <Text style={styles.statHeroLabel}>TOTAL REFERRALS</Text>
+                                <Text style={styles.statHeroVal}>{stats.totalReferrals}</Text>
+                                <Text style={styles.statHeroSub}>All-Time Network Registrations</Text>
                             </LinearGradient>
-                            <View className="flex-1 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <Text className="text-slate-400 text-xs font-bold uppercase">Pending</Text>
-                                <Text className="text-slate-900 text-xl font-black mt-1">₦{stats.pendingAmount.toLocaleString()}</Text>
-                            </View>
-                            <View className="flex-1 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <Text className="text-slate-400 text-xs font-bold uppercase">Paid Out</Text>
-                                <Text className="text-slate-900 text-xl font-black mt-1">₦{stats.totalPaid.toLocaleString()}</Text>
+
+                            <View style={styles.statCardSide}>
+                                <View style={styles.statSubBox}>
+                                    <Text style={styles.statSubLabel}>PENDING PAYOUT</Text>
+                                    <Text style={[styles.statSubVal, { color: C.gold }]}>₦{stats.pendingAmount.toLocaleString()}</Text>
+                                </View>
+                                <View style={[styles.statSubBox, { borderTopWidth: 1, borderTopColor: C.borderLight }]}>
+                                    <Text style={styles.statSubLabel}>TOTAL REWARD PAID</Text>
+                                    <Text style={[styles.statSubVal, { color: C.emerald }]}>₦{stats.totalPaid.toLocaleString()}</Text>
+                                </View>
                             </View>
                         </View>
 
-                        {/* Master Control */}
-                        <View className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm mb-6 flex-row items-center justify-between">
-                            <View className="flex-1 pr-4">
-                                <Text className="text-slate-900 font-bold text-base">Referral System</Text>
-                                <Text className="text-slate-400 text-xs mt-1">
-                                    {systemEnabled ? "System is LIVE. Users earn rewards." : "System is OFF. No rewards granted."}
-                                </Text>
+                        {/* Master System On/Off Switch */}
+                        <View style={styles.card}>
+                            <View style={styles.switchRow}>
+                                <View style={{ flex: 1, paddingRight: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <View style={[styles.dotLive, { backgroundColor: systemEnabled ? C.emerald : C.red }]} />
+                                        <Text style={styles.cardTitle}>Affiliate Program Status</Text>
+                                    </View>
+                                    <Text style={styles.cardSub}>
+                                        {systemEnabled
+                                            ? "System is ACTIVE. Users receive automatic instant referral credits."
+                                            : "System is PAUSED. Registration tracking continues, payouts halted."}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={systemEnabled}
+                                    onValueChange={setSystemEnabled}
+                                    trackColor={{ false: "#CBD5E1", true: "#F59E0B" }}
+                                    thumbColor={systemEnabled ? "#0F172A" : "#F8FAFC"}
+                                />
                             </View>
-                            <Switch 
-                                value={systemEnabled} 
-                                onValueChange={setSystemEnabled}
-                                trackColor={{ false: "#E2E8F0", true: "#4F46E5" }}
-                            />
                         </View>
 
                         {/* Configuration Form */}
-                        <Text className="text-slate-900 font-bold text-lg mb-3">Settings</Text>
-                        <View className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-8">
-                            <View className="flex-row gap-4 mb-4">
-                                <View className="flex-1">
-                                    <Text className="text-slate-500 font-bold text-xs uppercase mb-2">Reward (₦)</Text>
-                                    <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12">
-                                        <TextInput 
-                                            value={rewardAmount}
-                                            onChangeText={setRewardAmount}
-                                            keyboardType="numeric"
-                                            className="flex-1 font-bold text-slate-900 text-base"
-                                        />
-                                    </View>
-                                </View>
-                                <View className="flex-1">
-                                    <Text className="text-slate-500 font-bold text-xs uppercase mb-2">Min Withdraw (₦)</Text>
-                                    <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12">
-                                        <TextInput 
-                                            value={minWithdrawal}
-                                            onChangeText={setMinWithdrawal}
-                                            keyboardType="numeric"
-                                            className="flex-1 font-bold text-slate-900 text-base"
-                                        />
-                                    </View>
-                                </View>
+                        <View style={styles.card}>
+                            <View style={styles.cardHeaderRow}>
+                                <Ionicons name="settings" size={17} color={C.gold} />
+                                <Text style={styles.cardTitle}>Global Referral Settings</Text>
                             </View>
 
-                            <View className="mb-6">
-                                <Text className="text-slate-500 font-bold text-xs uppercase mb-2">Base URL</Text>
-                                <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12">
-                                    <Ionicons name="link-outline" size={20} color="#94A3B8" style={{ marginRight: 8 }} />
-                                    <TextInput 
-                                        value={referralUrl}
-                                        onChangeText={setReferralUrl}
-                                        autoCapitalize="none"
-                                        className="flex-1 font-medium text-slate-900 text-base"
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>REWARD PER SIGNUP (₦)</Text>
+                                    <TextInput
+                                        value={rewardAmount}
+                                        onChangeText={setRewardAmount}
+                                        keyboardType="numeric"
+                                        style={styles.inputBox}
+                                        placeholder="500"
+                                        placeholderTextColor={C.textDim}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>MIN WITHDRAWAL (₦)</Text>
+                                    <TextInput
+                                        value={minWithdrawal}
+                                        onChangeText={setMinWithdrawal}
+                                        keyboardType="numeric"
+                                        style={styles.inputBox}
+                                        placeholder="1000"
+                                        placeholderTextColor={C.textDim}
                                     />
                                 </View>
                             </View>
 
-                            <TouchableOpacity 
+                            <View style={{ marginTop: 12 }}>
+                                <Text style={styles.inputLabel}>BASE DOMAIN / REFERRAL URL</Text>
+                                <View style={styles.urlInputBox}>
+                                    <Ionicons name="link-outline" size={18} color={C.textDim} style={{ marginRight: 6 }} />
+                                    <TextInput
+                                        value={referralUrl}
+                                        onChangeText={setReferralUrl}
+                                        autoCapitalize="none"
+                                        style={styles.urlInput}
+                                        placeholder="https://abumafhal.com.ng"
+                                        placeholderTextColor={C.textDim}
+                                    />
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
                                 onPress={saveSettings}
                                 disabled={saving}
-                                className="bg-slate-900 py-4 rounded-xl items-center flex-row justify-center gap-2"
+                                style={styles.saveBtn}
+                                activeOpacity={0.8}
                             >
-                                {saving ? <ActivityIndicator color="white" /> : (
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
                                     <>
-                                        <Ionicons name="save-outline" size={18} color="white" />
-                                        <Text className="text-white font-bold">Save Changes</Text>
+                                        <Ionicons name="save" size={16} color="#FFFFFF" />
+                                        <Text style={styles.saveBtnText}>Save Configuration Changes</Text>
                                     </>
                                 )}
                             </TouchableOpacity>
                         </View>
 
-                        {/* Top Referrers */}
-                        <Text className="text-slate-900 font-bold text-lg mb-3">Top Referrers 🏆</Text>
-                        <View className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-8">
-                             {topReferrers.length === 0 ? (
-                                <Text className="text-slate-400 italic text-sm text-center py-4">No data yet</Text>
-                             ) : (
-                                 topReferrers.map((user, index) => (
-                                     <View key={user.name} className="flex-row justify-between items-center py-3 border-b border-slate-50 last:border-0">
-                                         <View className="flex-row items-center gap-3">
-                                             <View className={`w-8 h-8 rounded-full items-center justify-center ${index === 0 ? 'bg-amber-100' : 'bg-slate-100'}`}>
-                                                 <Text className={`font-bold ${index === 0 ? 'text-amber-600' : 'text-slate-500'}`}>{index + 1}</Text>
-                                             </View>
-                                             <Text className="font-bold text-slate-700">@{user.name}</Text>
-                                         </View>
-                                         <Text className="font-bold text-indigo-600">{user.count} Refs</Text>
-                                     </View>
-                                 ))
-                             )}
-                        </View>
-
-                        {/* Advanced Activity Section */}
-                        <Text className="text-slate-900 font-bold text-lg mb-3">Detailed Activity</Text>
-                        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-4">
-                            
-                            {/* Search Bar */}
-                            <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-3 h-10 mb-4">
-                                <Ionicons name="search" size={18} color="#94A3B8" />
-                                <TextInput 
-                                    placeholder="Search user..."
-                                    value={searchQuery}
-                                    onChangeText={setSearchQuery}
-                                    className="flex-1 ml-2 text-slate-900 font-medium"
-                                />
+                        {/* Top Referrers Leaderboard */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeaderRow}>
+                                <Ionicons name="trophy" size={18} color={C.gold} />
+                                <Text style={styles.cardTitle}>Top Referrers Leaderboard 🏆</Text>
                             </View>
 
-                            {/* Filter Pills */}
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-                                {['all', 'paid', 'pending'].map((s) => (
-                                    <TouchableOpacity 
-                                        key={s} 
-                                        onPress={() => setStatusFilter(s as any)}
-                                        className={`mr-2 px-3 py-1.5 rounded-full border ${statusFilter === s ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-200'}`}
-                                    >
-                                        <Text className={`text-xs font-bold uppercase ${statusFilter === s ? 'text-white' : 'text-slate-500'}`}>{s}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                                <View className="w-4" />
-                                {['all', 'today', 'week'].map((d) => (
-                                    <TouchableOpacity 
-                                        key={d} 
-                                        onPress={() => setDateFilter(d as any)}
-                                        className={`mr-2 px-3 py-1.5 rounded-full border ${dateFilter === d ? 'bg-slate-800 border-slate-800' : 'bg-white border-slate-200'}`}
-                                    >
-                                        <Text className={`text-xs font-bold uppercase ${dateFilter === d ? 'text-white' : 'text-slate-500'}`}>{d}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-
-                            {/* List */}
-                            {filteredReferrals.length === 0 ? (
-                                <Text className="text-slate-400 italic text-sm text-center py-8">No matching records</Text>
-                             ) : (
-                                filteredReferrals.map((item) => (
-                                    <TouchableOpacity 
-                                        key={item.id} 
-                                        onPress={() => setSelectedReferral(item)}
-                                        className="py-3 border-b border-slate-50 flex-row items-center justify-between last:border-0 active:bg-slate-50"
-                                    >
-                                        <View className="flex-row items-center gap-3">
-                                            <View className="w-10 h-10 bg-indigo-50 rounded-full items-center justify-center">
-                                                <Ionicons name="person-add" size={18} color="#4F46E5" />
-                                            </View>
-                                            <View>
-                                                <Text className="font-bold text-slate-700">{item.referee?.full_name || 'New User'}</Text>
-                                                <Text className="text-xs text-slate-400">
-                                                    Ref: <Text className="font-bold text-indigo-500">@{item.referrer?.username}</Text>
+                            {topReferrers.length === 0 ? (
+                                <Text style={styles.emptyNote}>No referral records available yet.</Text>
+                            ) : (
+                                topReferrers.map((user, index) => (
+                                    <View key={user.name + index} style={[styles.leaderRow, index === topReferrers.length - 1 && { borderBottomWidth: 0 }]}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <View style={[styles.rankBadge, index === 0 ? { backgroundColor: C.goldLight } : { backgroundColor: '#F1F5F9' }]}>
+                                                <Text style={[styles.rankBadgeText, index === 0 ? { color: C.gold } : { color: C.textMuted }]}>
+                                                    #{index + 1}
                                                 </Text>
                                             </View>
+                                            <Text style={styles.leaderName}>@{user.name}</Text>
                                         </View>
-                                        <View className="items-end">
-                                            <View className="flex-row items-center gap-1">
-                                                 <Text className={`font-bold ${item.status === 'paid' ? 'text-green-600' : 'text-amber-500'}`}>
-                                                    {item.status === 'paid' ? 'PAID' : 'PENDING'}
-                                                </Text>
-                                                <Ionicons name="ellipsis-vertical" size={12} color="#CBD5E1" />
-                                            </View>
-                                            <Text className="text-xs text-slate-400 font-mono">₦{item.reward_amount}</Text>
+                                        <View style={styles.leaderCountBadge}>
+                                            <Text style={styles.leaderCountText}>{user.count} Referrals</Text>
                                         </View>
-                                    </TouchableOpacity>
+                                    </View>
                                 ))
-                             )}
+                            )}
+                        </View>
+
+                        {/* Detailed Referral Activity Log */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeaderRow}>
+                                <Ionicons name="list" size={18} color={C.navy} />
+                                <Text style={styles.cardTitle}>Referral Audit & Operations</Text>
+                            </View>
+
+                            {/* Search Input */}
+                            <View style={styles.searchBox}>
+                                <Ionicons name="search" size={16} color={C.textDim} />
+                                <TextInput
+                                    placeholder="Search referrer or referee username..."
+                                    placeholderTextColor={C.textDim}
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    style={styles.searchInput}
+                                />
+                                {searchQuery.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Ionicons name="close-circle" size={16} color={C.textDim} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {/* Filter Chips */}
+                            <View style={styles.filterRow}>
+                                {(['all', 'paid', 'pending'] as const).map(s => (
+                                    <TouchableOpacity
+                                        key={s}
+                                        onPress={() => setStatusFilter(s)}
+                                        style={[styles.filterChip, statusFilter === s && styles.filterChipActive]}
+                                    >
+                                        <Text style={[styles.filterChipText, statusFilter === s && styles.filterChipTextActive]}>
+                                            {s.toUpperCase()}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+
+                                <View style={{ width: 1, height: 16, backgroundColor: C.border, marginHorizontal: 4 }} />
+
+                                {(['all', 'today', 'week'] as const).map(d => (
+                                    <TouchableOpacity
+                                        key={d}
+                                        onPress={() => setDateFilter(d)}
+                                        style={[styles.filterChip, dateFilter === d && { backgroundColor: C.navy, borderColor: C.navy }]}
+                                    >
+                                        <Text style={[styles.filterChipText, dateFilter === d && { color: '#FFFFFF' }]}>
+                                            {d === 'all' ? 'ANYTIME' : d.toUpperCase()}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            {/* Referrals List */}
+                            {filteredReferrals.length === 0 ? (
+                                <View style={styles.emptyList}>
+                                    <Ionicons name="people-outline" size={36} color={C.textDim} />
+                                    <Text style={styles.emptyListText}>No referrals match your current filters.</Text>
+                                </View>
+                            ) : (
+                                filteredReferrals.map((item, idx) => {
+                                    const isPaid = item.status === 'paid';
+                                    const refName = item.referee?.full_name || (item.referee?.username ? `@${item.referee.username}` : 'New User');
+                                    const inviter = item.referrer?.username ? `@${item.referrer.username}` : 'Direct Link';
+                                    const rewardVal = Number(item.reward_amount) || 0;
+
+                                    return (
+                                        <TouchableOpacity
+                                            key={item.id || idx}
+                                            onPress={() => setSelectedReferral(item)}
+                                            style={[
+                                                styles.referralItem,
+                                                idx === filteredReferrals.length - 1 && { borderBottomWidth: 0 }
+                                            ]}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                                <View style={[styles.refereeAvatar, isPaid ? { backgroundColor: C.emeraldLight } : { backgroundColor: C.goldLight }]}>
+                                                    <Ionicons name="person" size={17} color={isPaid ? C.emerald : C.gold} />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.refereeName} numberOfLines={1}>{refName}</Text>
+                                                    <Text style={styles.inviterName}>
+                                                        Referred by: <Text style={{ color: C.navy, fontWeight: '700' }}>{inviter}</Text>
+                                                    </Text>
+                                                    <Text style={styles.refDate}>{new Date(item.created_at).toLocaleDateString()} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={{ alignItems: 'flex-end', marginLeft: 10 }}>
+                                                <View style={[styles.statusBadge, isPaid ? { backgroundColor: C.emeraldLight } : { backgroundColor: C.goldLight }]}>
+                                                    <Text style={[styles.statusBadgeText, { color: isPaid ? C.emerald : C.gold }]}>
+                                                        {item.status.toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                                <Text style={styles.amountText}>₦{rewardVal.toLocaleString()}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })
+                            )}
                         </View>
 
                     </ScrollView>
 
-                    {/* Action Modal */}
+                    {/* Operational Action Modal */}
                     <Modal visible={!!selectedReferral} transparent animationType="fade" onRequestClose={() => setSelectedReferral(null)}>
-                        <BlurView intensity={20} style={{ flex: 1, justifyContent: 'flex-end' }}>
-                            <TouchableOpacity className="flex-1" onPress={() => setSelectedReferral(null)} />
-                            <View className="bg-white rounded-t-3xl p-6 pb-12 shadow-2xl">
-                                <View className="items-center mb-6">
-                                    <View className="w-12 h-1 bg-slate-200 rounded-full mb-4" />
-                                    <Text className="font-black text-xl text-slate-800">Manage Referral</Text>
-                                    <Text className="text-slate-400 text-sm mt-1">ID: {selectedReferral?.id}</Text>
+                        <View style={styles.modalBackdrop}>
+                            <TouchableOpacity style={{ flex: 1 }} onPress={() => setSelectedReferral(null)} />
+                            <View style={styles.modalSheet}>
+                                <View style={styles.sheetHandle} />
+
+                                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                                    <Text style={styles.modalTitle}>Manage Referral Transaction</Text>
+                                    <Text style={styles.modalSub}>Record Ref: {selectedReferral?.id.substring(0, 16)}...</Text>
                                 </View>
 
-                                {/* Actions */}
-                                <View className="space-y-3">
-                                    <TouchableOpacity onPress={() => updateStatus(selectedReferral?.status === 'paid' ? 'pending' : 'paid')} className="flex-row items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                         <View className={`w-10 h-10 rounded-full items-center justify-center ${selectedReferral?.status === 'paid' ? 'bg-amber-100' : 'bg-green-100'}`}>
-                                            <Ionicons name={selectedReferral?.status === 'paid' ? "time" : "checkmark"} size={20} color={selectedReferral?.status === 'paid' ? "#D97706" : "#16A34A"} />
-                                         </View>
-                                         <View className="ml-3 flex-1">
-                                             <Text className="font-bold text-slate-800">
-                                                 {selectedReferral?.status === 'paid' ? "Mark as Pending" : "Mark as Paid"}
-                                             </Text>
-                                             <Text className="text-xs text-slate-400">Change payment status manually</Text>
-                                         </View>
+                                <View style={styles.actionList}>
+                                    <TouchableOpacity
+                                        onPress={() => updateStatus(selectedReferral?.status === 'paid' ? 'pending' : 'paid')}
+                                        style={styles.actionOption}
+                                    >
+                                        <View style={[styles.actionIconBox, { backgroundColor: selectedReferral?.status === 'paid' ? C.goldLight : C.emeraldLight }]}>
+                                            <Ionicons
+                                                name={selectedReferral?.status === 'paid' ? "time-outline" : "checkmark-circle-outline"}
+                                                size={20}
+                                                color={selectedReferral?.status === 'paid' ? C.gold : C.emerald}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.actionOptionTitle}>
+                                                {selectedReferral?.status === 'paid' ? "Set as PENDING" : "Approve as PAID"}
+                                            </Text>
+                                            <Text style={styles.actionOptionSub}>Toggle manual commission verification</Text>
+                                        </View>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={() => viewUserProfile(selectedReferral?.referee?.id)} className="flex-row items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                         <View className="w-10 h-10 rounded-full items-center justify-center bg-blue-100">
-                                            <Ionicons name="person" size={20} color="#2563EB" />
-                                         </View>
-                                         <View className="ml-3 flex-1">
-                                             <Text className="font-bold text-slate-800">View Referee Profile</Text>
-                                             <Text className="text-xs text-slate-400">See user details for {selectedReferral?.referee?.username}</Text>
-                                         </View>
+                                    <TouchableOpacity
+                                        onPress={() => viewUserProfile(selectedReferral?.referee_id || selectedReferral?.referee?.id)}
+                                        style={styles.actionOption}
+                                    >
+                                        <View style={[styles.actionIconBox, { backgroundColor: C.blueLight }]}>
+                                            <Ionicons name="person-outline" size={20} color={C.blue} />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.actionOptionTitle}>Inspect Referee Profile</Text>
+                                            <Text style={styles.actionOptionSub}>View wallet & account records for {selectedReferral?.referee?.username || 'user'}</Text>
+                                        </View>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={() => viewUserProfile(selectedReferral?.referrer?.id)} className="flex-row items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                         <View className="w-10 h-10 rounded-full items-center justify-center bg-indigo-100">
-                                            <Ionicons name="people" size={20} color="#4F46E5" />
-                                         </View>
-                                         <View className="ml-3 flex-1">
-                                             <Text className="font-bold text-slate-800">View Referrer Profile</Text>
-                                             <Text className="text-xs text-slate-400">See user details for {selectedReferral?.referrer?.username}</Text>
-                                         </View>
+                                    <TouchableOpacity
+                                        onPress={() => viewUserProfile(selectedReferral?.referrer_id || selectedReferral?.referrer?.id)}
+                                        style={styles.actionOption}
+                                    >
+                                        <View style={[styles.actionIconBox, { backgroundColor: '#EDE9FE' }]}>
+                                            <Ionicons name="people-outline" size={20} color="#7C3AED" />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.actionOptionTitle}>Inspect Referrer Profile</Text>
+                                            <Text style={styles.actionOptionSub}>Check referral wallet balance for @{selectedReferral?.referrer?.username || 'referrer'}</Text>
+                                        </View>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={revokeReward} className="flex-row items-center p-4 bg-red-50 rounded-xl border border-red-100 mt-2">
-                                         <View className="w-10 h-10 rounded-full items-center justify-center bg-red-200">
-                                            <Ionicons name="trash" size={20} color="#DC2626" />
-                                         </View>
-                                         <View className="ml-3 flex-1">
-                                             <Text className="font-bold text-red-800">Revoke Reward</Text>
-                                             <Text className="text-xs text-red-400">Set amount to 0 (Fraud prevention)</Text>
-                                         </View>
+                                    <TouchableOpacity
+                                        onPress={revokeReward}
+                                        style={[styles.actionOption, { backgroundColor: C.redLight, borderColor: '#FECACA' }]}
+                                    >
+                                        <View style={[styles.actionIconBox, { backgroundColor: '#FEE2E2' }]}>
+                                            <Ionicons name="trash-outline" size={20} color={C.red} />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={[styles.actionOptionTitle, { color: C.red }]}>Revoke Commission</Text>
+                                            <Text style={[styles.actionOptionSub, { color: '#B91C1C' }]}>Set reward amount to ₦0 (Anti-Fraud protection)</Text>
+                                        </View>
                                     </TouchableOpacity>
                                 </View>
 
-                                 <TouchableOpacity onPress={() => setSelectedReferral(null)} className="mt-6 py-4 bg-slate-100 rounded-xl items-center">
-                                    <Text className="font-bold text-slate-600">Cancel</Text>
+                                <TouchableOpacity
+                                    onPress={() => setSelectedReferral(null)}
+                                    style={styles.modalCloseBtn}
+                                >
+                                    <Text style={styles.modalCloseBtnText}>Close Modal</Text>
                                 </TouchableOpacity>
                             </View>
-                        </BlurView>
+                        </View>
                     </Modal>
 
                 </KeyboardAvoidingView>
@@ -563,3 +705,391 @@ export default function ReferralSettings() {
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: C.bg,
+    },
+    exportHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        marginRight: 6,
+    },
+    exportHeaderBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    centerBox: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 13,
+        color: C.textMuted,
+        fontWeight: '600',
+    },
+    scrollContent: {
+        padding: 16,
+        paddingBottom: 40,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 14,
+    },
+    statCardHero: {
+        flex: 1.2,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(217, 119, 6, 0.3)',
+        justifyContent: 'space-between',
+    },
+    statHeroLabel: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#FDE68A',
+        letterSpacing: 0.5,
+    },
+    statHeroVal: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        marginVertical: 4,
+    },
+    statHeroSub: {
+        fontSize: 10.5,
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
+    statCardSide: {
+        flex: 1,
+        backgroundColor: C.card,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: C.border,
+        overflow: 'hidden',
+    },
+    statSubBox: {
+        flex: 1,
+        padding: 12,
+        justifyContent: 'center',
+    },
+    statSubLabel: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: C.textMuted,
+        letterSpacing: 0.5,
+    },
+    statSubVal: {
+        fontSize: 16,
+        fontWeight: '900',
+        marginTop: 2,
+    },
+    card: {
+        backgroundColor: C.card,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: C.border,
+    },
+    switchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    dotLive: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    cardTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: C.navy,
+    },
+    cardSub: {
+        fontSize: 11.5,
+        color: C.textMuted,
+        marginTop: 3,
+        lineHeight: 16,
+    },
+    cardHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    inputLabel: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: C.textMuted,
+        letterSpacing: 0.5,
+        marginBottom: 5,
+    },
+    inputBox: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.navy,
+    },
+    urlInputBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+    },
+    urlInput: {
+        flex: 1,
+        fontSize: 12.5,
+        fontWeight: '600',
+        color: C.navy,
+    },
+    saveBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: C.navy,
+        borderRadius: 10,
+        paddingVertical: 12,
+        marginTop: 14,
+    },
+    saveBtnText: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    emptyNote: {
+        fontSize: 12,
+        color: C.textDim,
+        fontStyle: 'italic',
+        textAlign: 'center',
+        paddingVertical: 14,
+    },
+    leaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: C.borderLight,
+    },
+    rankBadge: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    rankBadgeText: {
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    leaderName: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.navy,
+    },
+    leaderCountBadge: {
+        backgroundColor: C.goldLight,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    leaderCountText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: C.gold,
+    },
+    searchBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        marginTop: 12,
+        marginBottom: 10,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 12,
+        color: C.navy,
+        marginLeft: 6,
+    },
+    filterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 12,
+        flexWrap: 'wrap',
+    },
+    filterChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: C.border,
+    },
+    filterChipActive: {
+        backgroundColor: C.gold,
+        borderColor: C.gold,
+    },
+    filterChipText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: C.textMuted,
+    },
+    filterChipTextActive: {
+        color: '#FFFFFF',
+    },
+    emptyList: {
+        alignItems: 'center',
+        paddingVertical: 24,
+    },
+    emptyListText: {
+        fontSize: 12,
+        color: C.textDim,
+        marginTop: 6,
+    },
+    referralItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: C.borderLight,
+    },
+    refereeAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    refereeName: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.navy,
+    },
+    inviterName: {
+        fontSize: 11,
+        color: C.textMuted,
+        marginTop: 1,
+    },
+    refDate: {
+        fontSize: 10,
+        color: C.textDim,
+        marginTop: 1,
+    },
+    statusBadge: {
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginBottom: 3,
+    },
+    statusBadgeText: {
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    amountText: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: C.navy,
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        justifyContent: 'flex-end',
+    },
+    modalSheet: {
+        backgroundColor: C.card,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 20,
+        paddingBottom: 36,
+    },
+    sheetHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#CBD5E1',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    modalTitle: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: C.navy,
+    },
+    modalSub: {
+        fontSize: 11,
+        color: C.textMuted,
+        marginTop: 2,
+    },
+    actionList: {
+        gap: 10,
+        marginVertical: 12,
+    },
+    actionOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: C.border,
+    },
+    actionIconBox: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionOptionTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: C.navy,
+    },
+    actionOptionSub: {
+        fontSize: 11,
+        color: C.textMuted,
+        marginTop: 1,
+    },
+    modalCloseBtn: {
+        backgroundColor: '#F1F5F9',
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        marginTop: 6,
+    },
+    modalCloseBtnText: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: C.textMuted,
+    },
+});
