@@ -125,6 +125,67 @@ Deno.serve(async (req) => {
             });
         }
 
+        // ACTION 3: UPLOAD CUSTOM AUDIO RINGTONE (Bypasses Storage RLS using Service Role)
+        if (action === 'upload-ringtone') {
+            const { fileName, base64Data, contentType = 'audio/mpeg' } = body;
+            if (!fileName || !base64Data) {
+                throw new Error("fileName and base64Data are required for ringtone upload");
+            }
+
+            // Ensure 'avatars' or 'banners' public bucket exists
+            try {
+                const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+                const bucketExists = buckets?.some(b => b.name === 'banners' || b.name === 'avatars');
+                if (!bucketExists) {
+                    await supabaseAdmin.storage.createBucket('banners', { public: true });
+                }
+            } catch (bErr) {
+                console.warn('Bucket inspect error:', bErr);
+            }
+
+            const targetBucket = 'banners';
+            const cleanBase64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+            const binaryData = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
+            const storagePath = `ringtones/${fileName}`;
+
+            const { error: upError } = await supabaseAdmin.storage
+                .from(targetBucket)
+                .upload(storagePath, binaryData, {
+                    contentType,
+                    upsert: true
+                });
+
+            if (upError) {
+                // Try 'avatars' as alternative
+                const { error: fallbackError } = await supabaseAdmin.storage
+                    .from('avatars')
+                    .upload(storagePath, binaryData, { contentType, upsert: true });
+                if (fallbackError) throw fallbackError;
+                
+                const { data: pubData } = supabaseAdmin.storage.from('avatars').getPublicUrl(storagePath);
+                return new Response(JSON.stringify({
+                    status: 'success',
+                    publicUrl: pubData.publicUrl,
+                    bucket: 'avatars',
+                    path: storagePath
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200
+                });
+            }
+
+            const { data: pubData } = supabaseAdmin.storage.from(targetBucket).getPublicUrl(storagePath);
+            return new Response(JSON.stringify({
+                status: 'success',
+                publicUrl: pubData.publicUrl,
+                bucket: targetBucket,
+                path: storagePath
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200
+            });
+        }
+
         throw new Error(`Unknown action: ${action}`);
 
     } catch (err: any) {

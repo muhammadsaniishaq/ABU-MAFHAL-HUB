@@ -99,56 +99,44 @@ export default function AdminPushNotificationsScreen() {
         {
             id: 'executive_bell',
             name: 'Executive Crystal Bell',
-            hausa: 'Sautin Kararrawa ta Alfarma',
             icon: 'notifications',
             color: C.gold,
             uri: 'https://cdn.freesound.org/previews/264/264981_4486188-lq.mp3',
-            desc: 'Sleek executive chime for important briefings and notices.'
         },
         {
             id: 'siren_alert',
             name: 'Emergency Siren Alarm',
-            hausa: 'Sautin Faɗakarwa ta Gaggawa',
             icon: 'alert-circle',
             color: C.red,
             uri: 'https://cdn.freesound.org/previews/456/456544_5121236-lq.mp3',
-            desc: 'High-urgency alert for critical float depletion & incidents.'
         },
         {
             id: 'cash_register',
             name: 'Money & Wealth Chime',
-            hausa: 'Sautin Kudin Shiga da Asusun Kudi',
             icon: 'cash',
             color: C.green,
             uri: 'https://cdn.freesound.org/previews/333/333404_4684427-lq.mp3',
-            desc: 'Crisp cash top-up sound for wallet credits and payouts.'
         },
         {
             id: 'military_horn',
             name: 'Staff Summoning Horn',
-            hausa: 'Sautin Taron Ma’aikata na Gaggawa',
             icon: 'people',
             color: C.purple,
             uri: 'https://cdn.freesound.org/previews/387/387232_1474204-lq.mp3',
-            desc: 'Attention-grabbing bugle horn for emergency staff calls.'
         },
         {
             id: 'radar_ping',
             name: 'Sonar Radar Ping',
-            hausa: 'Sautin Radar na Binciken Tikitin User',
             icon: 'radio',
             color: C.blue,
             uri: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
-            desc: 'Futuristic sonar ping for user tracking and new tickets.'
         },
         {
             id: 'subtle_chime',
             name: 'Subtle Modern Pop',
-            hausa: 'Sauƙin Sauti Mai Taushi',
             icon: 'sparkles',
             color: C.cyan,
             uri: 'https://cdn.freesound.org/previews/352/352661_4019029-lq.mp3',
-            desc: 'Soft pleasant bubble pop for routine platform updates.'
         }
     ];
 
@@ -221,52 +209,71 @@ export default function AdminPushNotificationsScreen() {
 
     const loadSavedAdminRingtone = async () => {
         try {
-            // 1. Check local AsyncStorage for custom uploaded ringtones
-            const localCustoms = await AsyncStorage.getItem('admin_custom_uploaded_tones');
             let mergedCatalog = [...DEFAULT_RINGTONE_CATALOG];
-            if (localCustoms) {
-                const parsed = JSON.parse(localCustoms);
-                if (Array.isArray(parsed)) {
-                    mergedCatalog = [...DEFAULT_RINGTONE_CATALOG, ...parsed];
-                }
-            }
 
-            // 2. Sync from Supabase app_settings for custom uploaded tones
+            // 1. Sync custom uploaded ringtones from Supabase app_settings
             const { data: dbCustomTones } = await supabase
                 .from('app_settings')
                 .select('value')
                 .eq('key', 'admin_custom_ringtones_catalog')
                 .maybeSingle();
 
-            if (dbCustomTones?.value && Array.isArray(dbCustomTones.value)) {
-                const existingIds = new Set(mergedCatalog.map(m => m.id));
-                const newTones = dbCustomTones.value.filter((t: any) => !existingIds.has(t.id));
-                mergedCatalog = [...mergedCatalog, ...newTones];
+            if (dbCustomTones?.value) {
+                let parsedCustoms = dbCustomTones.value;
+                if (typeof parsedCustoms === 'string') {
+                    try { parsedCustoms = JSON.parse(parsedCustoms); } catch (e) {}
+                }
+                if (Array.isArray(parsedCustoms)) {
+                    const existingIds = new Set(mergedCatalog.map(m => m.id));
+                    const newTones = parsedCustoms.filter((t: any) => t && t.id && !existingIds.has(t.id));
+                    mergedCatalog = [...mergedCatalog, ...newTones];
+                }
+            }
+
+            // Also check local AsyncStorage backup
+            const localCustoms = await AsyncStorage.getItem('admin_custom_uploaded_tones');
+            if (localCustoms) {
+                try {
+                    const parsed = JSON.parse(localCustoms);
+                    if (Array.isArray(parsed)) {
+                        const existingIds = new Set(mergedCatalog.map(m => m.id));
+                        const newTones = parsed.filter((t: any) => t && t.id && !existingIds.has(t.id));
+                        mergedCatalog = [...mergedCatalog, ...newTones];
+                    }
+                } catch (e) {}
             }
 
             setRingtoneCatalog(mergedCatalog);
 
-            // 3. Load active tone selection
-            const localSaved = await AsyncStorage.getItem('admin_preferred_ringtone');
-            if (localSaved) {
-                setAdminRingtone(localSaved);
-                setSelectedRingtoneForPush(localSaved);
-            }
-
+            // 2. Load active tone selection
             const { data: dbActiveTone } = await supabase
                 .from('app_settings')
                 .select('value')
                 .eq('key', 'global_notification_ringtone')
                 .maybeSingle();
 
+            let targetToneId = '';
             if (dbActiveTone?.value) {
-                const globalTone = typeof dbActiveTone.value === 'string' ? dbActiveTone.value : dbActiveTone.value.ringtone || dbActiveTone.value.id;
-                if (globalTone) {
-                    setAdminRingtone(globalTone);
-                    setSelectedRingtoneForPush(globalTone);
-                    await AsyncStorage.setItem('admin_preferred_ringtone', globalTone);
-                    await AsyncStorage.setItem('global_notification_ringtone', globalTone);
+                let parsedActive = dbActiveTone.value;
+                if (typeof parsedActive === 'string') {
+                    try { parsedActive = JSON.parse(parsedActive); } catch (e) {}
                 }
+                if (typeof parsedActive === 'object' && parsedActive) {
+                    targetToneId = parsedActive.id || parsedActive.ringtone || '';
+                } else if (typeof parsedActive === 'string') {
+                    targetToneId = parsedActive;
+                }
+            }
+
+            if (!targetToneId) {
+                targetToneId = await AsyncStorage.getItem('global_notification_ringtone') || 'executive_bell';
+            }
+
+            if (targetToneId) {
+                setAdminRingtone(targetToneId);
+                setSelectedRingtoneForPush(targetToneId);
+                await AsyncStorage.setItem('admin_preferred_ringtone', targetToneId);
+                await AsyncStorage.setItem('global_notification_ringtone', targetToneId);
             }
         } catch (e) {
             console.log('Error loading saved ringtones:', e);
@@ -289,44 +296,50 @@ export default function AdminPushNotificationsScreen() {
             const file = res.assets[0];
             setUploadingTone(true);
 
-            // Upload to Supabase Storage or generate persistent media URI
             let audioUri = file.uri;
             const cleanFileName = `ringtone_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
 
+            // Read base64 data from file to upload via Edge Function (bypasses RLS)
             try {
-                if (file.file && Platform.OS === 'web') {
-                    // Browser Web upload
-                    const { error: upErr } = await supabase.storage
-                        .from('avatars')
-                        .upload(`ringtones/${cleanFileName}`, file.file, { contentType: file.mimeType || 'audio/mpeg' });
-                    if (!upErr) {
-                        const { data: pubData } = supabase.storage.from('avatars').getPublicUrl(`ringtones/${cleanFileName}`);
-                        if (pubData?.publicUrl) audioUri = pubData.publicUrl;
-                    }
-                } else if (Platform.OS !== 'web' && file.uri) {
-                    // Mobile Native upload
-                    const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
-                    const byteArray = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-                    const { error: upErr } = await supabase.storage
-                        .from('avatars')
-                        .upload(`ringtones/${cleanFileName}`, byteArray, { contentType: file.mimeType || 'audio/mpeg' });
-                    if (!upErr) {
-                        const { data: pubData } = supabase.storage.from('avatars').getPublicUrl(`ringtones/${cleanFileName}`);
-                        if (pubData?.publicUrl) audioUri = pubData.publicUrl;
+                let base64Data = '';
+                if (Platform.OS === 'web' && file.file) {
+                    const reader = new FileReader();
+                    base64Data = await new Promise((resolve, reject) => {
+                        reader.onload = () => {
+                            const res = reader.result as string;
+                            resolve(res.includes(',') ? res.split(',')[1] : res);
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file.file as any);
+                    });
+                } else if (file.uri) {
+                    base64Data = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
+                }
+
+                if (base64Data) {
+                    const { data: uploadRes, error: uploadErr } = await supabase.functions.invoke('admin-audit-logs', {
+                        body: {
+                            action: 'upload-ringtone',
+                            fileName: cleanFileName,
+                            base64Data: base64Data,
+                            contentType: file.mimeType || 'audio/mpeg'
+                        }
+                    });
+
+                    if (!uploadErr && uploadRes?.publicUrl) {
+                        audioUri = uploadRes.publicUrl;
                     }
                 }
             } catch (storageErr) {
-                console.log('[RingtoneStorage] Storage upload note (using local uri):', storageErr);
+                console.log('[RingtoneStorage] Upload note:', storageErr);
             }
 
             const newToneItem = {
                 id: `custom_${Date.now()}`,
                 name: file.name.replace(/\.[^/.]+$/, ''),
-                hausa: 'Sautin da Ka Loda (Custom Upload)',
                 icon: 'cloud-upload',
                 color: C.purple,
                 uri: audioUri,
-                desc: `Custom ringtone (${file.size ? Math.round(file.size / 1024) + ' KB' : 'Audio file'})`,
                 is_custom: true
             };
 
@@ -337,7 +350,7 @@ export default function AdminPushNotificationsScreen() {
             const customsOnly = updatedCatalog.filter(t => t.is_custom);
             await AsyncStorage.setItem('admin_custom_uploaded_tones', JSON.stringify(customsOnly));
 
-            // Persist to Supabase app_settings so all other admins and devices get the new uploaded ringtones
+            // Persist to Supabase app_settings so all devices get the new ringtone
             try {
                 await supabase.from('app_settings').upsert({
                     key: 'admin_custom_ringtones_catalog',
@@ -346,12 +359,12 @@ export default function AdminPushNotificationsScreen() {
                 }, { onConflict: 'key' });
             } catch (e) {}
 
-            // Auto-select this newly uploaded ringtone
+            // Auto-select and save this newly uploaded ringtone globally
             await handleSaveAdminRingtone(newToneItem.id, updatedCatalog);
 
             Alert.alert(
-                'Upload Successful 🎵',
-                `An yi nasarar lodawa tare da saita sabon sautin "${newToneItem.name}" a matsayin sautin dukkan wayoyi!`
+                'Upload Successful',
+                `"${newToneItem.name}" has been uploaded and set as the active ringtone for all devices.`
             );
         } catch (err: any) {
             Alert.alert('Upload Failed', err.message || 'Could not upload audio file.');
@@ -383,8 +396,8 @@ export default function AdminPushNotificationsScreen() {
 
             playPreviewSound(toneId, activeCat);
             Alert.alert(
-                'Ringtone Set for All Devices 🔔',
-                `An saita sautin "${chosenTone?.name || toneId}" a matsayin babban sautin faɗakarwa na dukkan asusu da wayoyin mutane!`
+                'Ringtone Saved',
+                `"${chosenTone?.name || toneId}" is now set as the active alert sound on all devices.`
             );
         } catch (e: any) {
             Alert.alert('Error', e.message);
@@ -1241,7 +1254,7 @@ export default function AdminPushNotificationsScreen() {
 
                     {/* 4. Notification Ringtone / Chime Selection */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 8 }}>
-                        <Text style={[s.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>4. SELECT ALERT RINGTONE (SAUTIN FAƊAKARWA)</Text>
+                        <Text style={[s.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>4. ALERT RINGTONE</Text>
                         <TouchableOpacity
                             onPress={handleUploadCustomRingtone}
                             disabled={uploadingTone}
@@ -1253,15 +1266,12 @@ export default function AdminPushNotificationsScreen() {
                             ) : (
                                 <>
                                     <Ionicons name="cloud-upload" size={13} color={C.gold} />
-                                    <Text style={s.uploadToneMiniBtnText}>Upload Sauti</Text>
+                                    <Text style={s.uploadToneMiniBtnText}>Upload Audio</Text>
                                 </>
                             )}
                         </TouchableOpacity>
                     </View>
                     <View style={s.ringtoneSelectorBox}>
-                        <Text style={s.ringtoneSelectorDesc}>
-                            Zaɓi ainihin sautin ringtone ɗin da zai yi ƙara a wayar Admin da mai karɓa idan an tura wannan sanarwar ko loda naka na musamman:
-                        </Text>
                         <View style={s.ringtoneListGrid}>
                             {ringtoneCatalog.map((tone) => {
                                 const isSelected = selectedRingtoneForPush === tone.id;
@@ -1287,7 +1297,6 @@ export default function AdminPushNotificationsScreen() {
                                                     </View>
                                                 )}
                                             </View>
-                                            <Text style={s.ringtoneCardHausa}>{tone.hausa}</Text>
                                         </View>
                                         <TouchableOpacity
                                             onPress={(e) => {
@@ -1393,8 +1402,8 @@ export default function AdminPushNotificationsScreen() {
                                     <Ionicons name="musical-notes" size={18} color={C.gold} />
                                 </View>
                                 <View>
-                                    <Text style={s.detailSheetTitle}>Ringtone Manager</Text>
-                                    <Text style={{ fontSize: 11, color: C.textMuted, fontWeight: '600' }}>Saitin Sautin Faɗakarwa na Admin</Text>
+                                    <Text style={s.detailSheetTitle}>Alert Ringtone Manager</Text>
+                                    <Text style={{ fontSize: 11, color: C.textMuted, fontWeight: '600' }}>Global System Notification Sound</Text>
                                 </View>
                             </View>
                             <TouchableOpacity onPress={() => setShowRingtoneModal(false)} style={s.detailCloseBtn}>
@@ -1416,8 +1425,8 @@ export default function AdminPushNotificationsScreen() {
                                     <>
                                         <Ionicons name="cloud-upload" size={18} color="#FFFFFF" />
                                         <View style={{ flex: 1 }}>
-                                            <Text style={s.uploadToneBannerTitle}>Loda Sabon Sauti Daga Na'urarka</Text>
-                                            <Text style={s.uploadToneBannerSub}>Loda sautin MP3, WAV, ko M4A domin zama ringtone na dukkan wayoyi</Text>
+                                            <Text style={s.uploadToneBannerTitle}>Upload Custom Ringtone</Text>
+                                            <Text style={s.uploadToneBannerSub}>Upload MP3, WAV, or M4A audio file</Text>
                                         </View>
                                         <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
                                     </>
@@ -1432,18 +1441,15 @@ export default function AdminPushNotificationsScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                 <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                                                <Text style={s.activeToneShowcaseLabel}>CURRENT ACTIVE RINGTONE (WANDA AKA SETA)</Text>
+                                                <Text style={s.activeToneShowcaseLabel}>CURRENT ACTIVE RINGTONE</Text>
                                             </View>
                                             <View style={s.activeRingtoneBadge}>
-                                                <Text style={s.activeRingtoneBadgeText}>LIVE ON ALL PHONES</Text>
+                                                <Text style={s.activeRingtoneBadgeText}>ACTIVE ON ALL DEVICES</Text>
                                             </View>
                                         </View>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                             <View style={{ flex: 1, paddingRight: 8 }}>
-                                                <Text style={s.activeToneShowcaseTitle}>{activeTone?.name || 'Executive Bell'}</Text>
-                                                <Text style={s.activeToneShowcaseSub}>
-                                                    {activeTone?.hausa || 'Wannan sautin ne zai yi ringing a duk wayoyin mutane'}
-                                                </Text>
+                                                <Text style={s.activeToneShowcaseTitle}>{activeTone?.name || 'Executive Crystal Bell'}</Text>
                                             </View>
                                             <TouchableOpacity
                                                 onPress={() => playPreviewSound(adminRingtone)}
@@ -1460,14 +1466,7 @@ export default function AdminPushNotificationsScreen() {
                                 );
                             })()}
 
-                            <View style={s.ringtoneModalNotice}>
-                                <Ionicons name="information-circle" size={16} color={C.blue} />
-                                <Text style={s.ringtoneModalNoticeText}>
-                                    Zaɓi ko loda sautin da kake so ya yi ringing a duk wayoyin mutane idan an tura musu sanarwa. Duk waya za ta yi ringing da wannan sautin maimakon sautin asali na wayarsu.
-                                </Text>
-                            </View>
-
-                            <View style={{ gap: 10, marginTop: 12, marginBottom: 20 }}>
+                            <View style={{ gap: 10, marginTop: 4, marginBottom: 20 }}>
                                 {ringtoneCatalog.map((tone) => {
                                     const isCurrent = adminRingtone === tone.id;
                                     const isPlaying = playingRingtone === tone.id;
@@ -1493,8 +1492,6 @@ export default function AdminPushNotificationsScreen() {
                                                         </View>
                                                     )}
                                                 </View>
-                                                <Text style={s.ringtoneCardHausa}>{tone.hausa}</Text>
-                                                <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{tone.desc}</Text>
                                             </View>
 
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
