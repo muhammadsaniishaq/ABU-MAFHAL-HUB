@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect, Circle, Line, Path, Text as SvgText, G, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { supabase } from '../../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Official Design Tokens
 const T = {
@@ -38,34 +39,73 @@ const T = {
 
 // All System Modules (Accessible via Drawer & More)
 const ALL_MODULES = [
-  { t: 'API Liquidity', i: 'wallet', r: '/manage/liquidity', c: '#f5a623', tag: 'Core' },
+  // Core & Finance
+  { t: 'API Liquidity', i: 'wallet', r: '/manage/liquidity', c: '#f5a623', tag: 'Float' },
   { t: 'API Vault Keys', i: 'key', r: '/manage/secrets', c: '#0d1b3e', tag: 'Vault' },
+  { t: 'Accounting & Profit', i: 'calculator', r: '/manage/accounting', c: '#16a34a', tag: 'Finance' },
   { t: 'Users Control', i: 'people', r: '/manage/users', c: '#2563eb', tag: 'Core' },
-  { t: 'Transactions', i: 'receipt', r: '/manage/transactions', c: '#7c3aed', tag: 'Live' },
+  { t: 'Transactions', i: 'receipt', r: '/manage/transactions', c: '#7c3aed', tag: 'Ledger' },
+  { t: 'Virtual Cards', i: 'card-outline', r: '/manage/cards', c: '#0284c7', tag: 'Cards' },
+  { t: 'Crypto Control', i: 'logo-bitcoin', r: '/manage/crypto', c: '#ea580c', tag: 'Crypto' },
+  { t: 'Manage Rates', i: 'stats-chart', r: '/manage/rates', c: '#f5a623', tag: 'Rates' },
+
+  // Identity & Verification
   { t: 'KYC Verification', i: 'shield-checkmark', r: '/manage/kyc', c: '#16a34a', tag: 'KYC' },
-  { t: 'NIN Tasks', i: 'card', r: '/manage/nin-tasks', c: '#0d1b3e', tag: 'Identity' },
+  { t: 'NIN Tasks', i: 'id-card-outline', r: '/manage/nin-tasks', c: '#0d1b3e', tag: 'Identity' },
   { t: 'BVN Tasks', i: 'finger-print', r: '/manage/bvn-tasks', c: '#f5a623', tag: 'Identity' },
+  { t: 'CAC Management', i: 'briefcase', r: '/manage/cac', c: '#0d1b3e', tag: 'CAC' },
+  { t: 'NIN Pricing', i: 'pricetag', r: '/manage/nin-pricing', c: '#0d1b3e', tag: 'Pricing' },
+  { t: 'BVN Pricing', i: 'pricetags', r: '/manage/bvn-pricing', c: '#f5a623', tag: 'Pricing' },
+  { t: 'CAC Pricing', i: 'pricetag', r: '/manage/cac-pricing', c: '#f5a623', tag: 'Pricing' },
+
+  // Telecom & Utility
   { t: 'Data Plans', i: 'wifi', r: '/manage/data-plans', c: '#2563eb', tag: 'Telecom' },
-  { t: 'SIM Pricing', i: 'hardware-chip', r: '/manage/sim-pricing', c: '#dc2626', tag: 'Telecom' },
-  { t: 'Features Control', i: 'apps', r: '/manage/features', c: '#8b5cf6', tag: 'Control' },
   { t: 'Airtime VTU', i: 'call', r: '/manage/airtime', c: '#0d1b3e', tag: 'VTU' },
-  { t: 'Manage Rates', i: 'stats-chart', r: '/manage/rates', c: '#f5a623', tag: 'Live' },
-  { t: 'CAC Management', i: 'briefcase', r: '/manage/cac', c: '#0d1b3e' },
-  { t: 'CAC Pricing', i: 'pricetag', r: '/manage/cac-pricing', c: '#f5a623' },
-  { t: 'NIN Pricing', i: 'pricetag', r: '/manage/nin-pricing', c: '#0d1b3e' },
-  { t: 'BVN Pricing', i: 'pricetags', r: '/manage/bvn-pricing', c: '#f5a623' },
-  { t: 'Push Notifications', i: 'notifications', r: '/manage/notifications', c: '#7c3aed', tag: 'Direct' },
-  { t: 'Broadcast & SMS', i: 'megaphone', r: '/manage/communications', c: '#2563eb' },
-  { t: 'Mail Center', i: 'mail-unread', r: '/manage/mail-center', c: '#f5a623' },
-  { t: 'Audit Logs', i: 'document-text', r: '/manage/logs', c: '#0d1b3e', tag: 'Security' },
-  { t: 'Infrastructure', i: 'server', r: '/manage/infrastructure', c: '#0d1b3e' },
-  { t: 'Database Hub', i: 'server', r: '/manage/db', c: '#16a34a' },
+  { t: 'SIM Pricing', i: 'hardware-chip', r: '/manage/sim-pricing', c: '#dc2626', tag: 'Telecom' },
+  { t: 'Bills & Utilities', i: 'flash', r: '/manage/bills-pricing', c: '#f59e0b', tag: 'Utility' },
+  { t: 'SMM Services', i: 'share-social', r: '/manage/smm-pricing', c: '#ec4899', tag: 'SMM' },
+
+  // Messaging & Notifications
+  { t: 'Push & Ringtone', i: 'notifications', r: '/manage/notifications', c: '#7c3aed', tag: 'Direct' },
+  { t: 'Broadcast & News', i: 'megaphone', r: '/manage/communications', c: '#2563eb', tag: 'Comms' },
+  { t: 'Bulk SMS Center', i: 'chatbox-ellipses', r: '/manage/bulk-sms', c: '#059669', tag: 'SMS' },
+  { t: 'Mail Center', i: 'mail-unread', r: '/manage/mail-center', c: '#f5a623', tag: 'Email' },
+  { t: 'Support Tickets', i: 'headset', r: '/manage/tickets', c: '#0284c7', tag: 'Support' },
+  { t: 'Customer Reviews', i: 'star', r: '/manage/reviews', c: '#eab308', tag: 'Feedback' },
+
+  // System & Infrastructure
+  { t: 'API Diagnostics', i: 'code-working', r: '/manage/api', c: '#2563eb', tag: 'API' },
+  { t: 'Audit Logs', i: 'document-text', r: '/manage/logs', c: '#0d1b3e', tag: 'Audit' },
+  { t: 'Infrastructure', i: 'server', r: '/manage/infrastructure', c: '#0d1b3e', tag: 'Cloud' },
+  { t: 'Database Hub', i: 'server', r: '/manage/db', c: '#16a34a', tag: 'DB' },
   { t: 'Cortex AI Engine', i: 'sparkles', r: '/manage/ai', c: '#f5a623', tag: 'AI' },
-  { t: 'Accounting & Profit', i: 'calculator', r: '/manage/accounting', c: '#f5a623' },
-  { t: 'App Updates', i: 'cloud-download', r: '/manage/app-update', c: '#2563eb' },
-  { t: 'Security & Forensics', i: 'finger-print', r: '/manage/forensics', c: '#dc2626' },
-  { t: 'Settings', i: 'settings', r: '/manage/settings', c: '#64748b' },
+  { t: 'App Updates OTA', i: 'cloud-download', r: '/manage/app-update', c: '#2563eb', tag: 'Updates' },
+  { t: 'Features Control', i: 'apps', r: '/manage/features', c: '#8b5cf6', tag: 'Control' },
+  { t: 'Automation Center', i: 'git-network', r: '/manage/automation', c: '#6366f1', tag: 'Auto' },
+  { t: 'Risk & Fraud', i: 'shield', r: '/manage/risk', c: '#ef4444', tag: 'Risk' },
+  { t: 'Security & Forensics', i: 'finger-print', r: '/manage/forensics', c: '#dc2626', tag: 'Forensics' },
+  { t: 'Terminal Shell', i: 'terminal', r: '/manage/terminal', c: '#1e293b', tag: 'CLI' },
+  { t: 'System Settings', i: 'settings', r: '/manage/settings', c: '#64748b', tag: 'System' },
+  { t: 'Super Admin Vault', i: 'shield-half', r: '/manage/super-admin', c: '#d97706', tag: 'Master' },
   { t: 'PANIC ROOM', i: 'warning', r: '/manage/panic', c: '#dc2626', tag: 'Emergency' },
+
+  // Management & Operations
+  { t: 'Staff Directory', i: 'people-circle', r: '/manage/staff', c: '#0d1b3e', tag: 'HR' },
+  { t: 'Team & Roles', i: 'person-add', r: '/manage/team', c: '#2563eb', tag: 'Team' },
+  { t: 'Kanban Projects', i: 'grid', r: '/manage/kanban', c: '#8b5cf6', tag: 'Kanban' },
+  { t: 'CMS Content', i: 'newspaper', r: '/manage/cms', c: '#059669', tag: 'CMS' },
+  { t: 'Reports & Export', i: 'bar-chart', r: '/manage/reports', c: '#0284c7', tag: 'Reports' },
+  { t: 'Affiliate Referrals', i: 'share', r: '/manage/referral-settings', c: '#ea580c', tag: 'Referrals' },
+  { t: 'App Appearance', i: 'color-palette', r: '/manage/appearance', c: '#d946ef', tag: 'Theme' },
+  { t: 'Localization', i: 'language', r: '/manage/localization', c: '#3b82f6', tag: 'Languages' },
+  { t: 'Legal & Policy', i: 'document-attach', r: '/manage/legal', c: '#475569', tag: 'Legal' },
+  { t: 'File Repository', i: 'folder', r: '/manage/files', c: '#64748b', tag: 'Storage' },
+  { t: 'Stores & Branches', i: 'storefront', r: '/manage/stores', c: '#14b8a6', tag: 'Stores' },
+  { t: 'Geo Map Tracking', i: 'map', r: '/manage/map', c: '#06b6d4', tag: 'Geo' },
+  { t: 'Marketing Campaigns', i: 'trending-up', r: '/manage/marketing', c: '#f59e0b', tag: 'Growth' },
+  { t: 'Audio & Voice', i: 'mic', r: '/manage/voice', c: '#84cc16', tag: 'Media' },
+  { t: 'Cinema Hub', i: 'film', r: '/manage/cinema', c: '#a855f7', tag: 'Media' },
+  { t: 'Academy Hub', i: 'school', r: '/manage/academy', c: '#3b82f6', tag: 'Learn' },
 ];
 
 function getInitials(name?: string | null): string {
@@ -85,6 +125,7 @@ function getAvatarColor(name: string): string {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
 
@@ -134,17 +175,20 @@ export default function AdminDashboard() {
     { id: '4', name: 'Termii SMS Gateway', uptime: '99.7% uptime', status: 'Healthy', icon: 'chatbubble-ellipses' as const, color: '#7c3aed' },
   ];
 
-  // Quick Action Items (9 Grid Tiles Matching Screenshot)
+  // Quick Action Items (12 Action Tiles)
   const quickActions = [
     { label: 'Add Provider', icon: 'add' as const, color: '#f5a623', isCircle: true, action: () => router.push('/manage/secrets') },
     { label: 'API Liquidity', icon: 'layers' as const, color: '#f5a623', action: () => router.push('/manage/liquidity') },
     { label: 'KYC Queue', icon: 'shield-checkmark' as const, color: '#2563eb', action: () => router.push('/manage/kyc') },
-    { label: 'View Transactions', icon: 'receipt' as const, color: '#2563eb', action: () => router.push('/manage/transactions') },
-    { label: 'API Vault', icon: 'key' as const, color: '#2563eb', action: () => router.push('/manage/secrets') },
+    { label: 'Transactions', icon: 'receipt' as const, color: '#2563eb', action: () => router.push('/manage/transactions') },
+    { label: 'Accounting', icon: 'calculator' as const, color: '#16a34a', action: () => router.push('/manage/accounting') },
+    { label: 'API Vault', icon: 'key' as const, color: '#0d1b3e', action: () => router.push('/manage/secrets') },
     { label: 'Audit Logs', icon: 'list' as const, color: '#16a34a', action: () => router.push('/manage/logs') },
     { label: 'Manage Rates', icon: 'settings' as const, color: '#0d1b3e', action: () => router.push('/manage/rates') },
+    { label: 'Push & Ringtone', icon: 'notifications' as const, color: '#7c3aed', action: () => router.push('/manage/notifications') },
+    { label: 'App Updates', icon: 'cloud-download' as const, color: '#2563eb', action: () => router.push('/manage/app-update') },
+    { label: 'Support Tickets', icon: 'headset' as const, color: '#0284c7', action: () => router.push('/manage/tickets') },
     { label: 'System Status', icon: 'desktop' as const, color: '#0d1b3e', action: () => router.push('/manage/infrastructure') },
-    { label: 'Push & Alerts', icon: 'notifications' as const, color: '#7c3aed', action: () => router.push('/manage/notifications') },
   ];
 
   useEffect(() => {
@@ -352,8 +396,8 @@ export default function AdminDashboard() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#070f26" />
 
-      {/* Top App Bar Matching Brand Standards */}
-      <View style={styles.topAppBar}>
+      {/* Top App Bar Matching Brand Standards with Safe Area Notch Inset */}
+      <View style={[styles.topAppBar, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 44) + 6 }]}>
         <View style={styles.topAppBarContent}>
           {/* Left: Hamburger + Logo + Brand text */}
           <View style={styles.topLeft}>
@@ -380,14 +424,23 @@ export default function AdminDashboard() {
             </View>
           </View>
 
-          {/* Right: Search + Bell + Real Dynamic Admin Avatar */}
+          {/* Right: User App Return + Search + Bell + Real Dynamic Admin Avatar */}
           <View style={styles.topRight}>
+            <TouchableOpacity 
+              onPress={() => router.replace('/(app)/dashboard')} 
+              style={styles.userDashboardBtn}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="apps-outline" size={14} color="#f5a623" style={{ marginRight: 4 }} />
+              <Text style={styles.userDashboardBtnText}>App</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity 
               onPress={() => setShowSearch(!showSearch)} 
               style={styles.topActionIcon}
               activeOpacity={0.8}
             >
-              <Ionicons name="search-outline" size={21} color="#ffffff" />
+              <Ionicons name="search-outline" size={20} color="#ffffff" />
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -925,11 +978,25 @@ export default function AdminDashboard() {
             <View style={styles.drawerHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Image source={require('../../assets/images/logo-icon.png')} style={{ width: 28, height: 28, marginRight: 8 }} />
-                <Text style={styles.drawerTitle}>All Administration Modules</Text>
+                <Text style={styles.drawerTitle}>All Admin Modules ({ALL_MODULES.length})</Text>
               </View>
-              <TouchableOpacity onPress={() => setShowDrawer(false)}>
-                <Ionicons name="close-circle" size={24} color="#94a3b8" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowDrawer(false);
+                    router.replace('/(app)/dashboard');
+                  }}
+                  style={styles.drawerUserAppBtn}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="home-outline" size={13} color="#f5a623" />
+                  <Text style={styles.drawerUserAppBtnText}>User App</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setShowDrawer(false)}>
+                  <Ionicons name="close-circle" size={26} color="#94a3b8" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Quick Search inside Drawer */}
@@ -1052,6 +1119,23 @@ const styles = StyleSheet.create({
   topRight: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  userDashboardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  userDashboardBtnText: {
+    color: '#f5a623',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   topActionIcon: {
     padding: 6,
@@ -1627,9 +1711,25 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   drawerTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#0f172a',
+  },
+  drawerUserAppBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#070f26',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.4)',
+    gap: 4,
+  },
+  drawerUserAppBtnText: {
+    color: '#f5a623',
+    fontSize: 11,
+    fontWeight: '700',
   },
   drawerSearchBox: {
     flexDirection: 'row',
