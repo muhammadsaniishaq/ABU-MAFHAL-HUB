@@ -186,19 +186,23 @@ export default function SecretsManager() {
                 await AsyncStorage.setItem(`@vault_${k}`, cleanVal).catch(() => {});
 
                 // 2. Direct client upsert into system_secrets and app_settings
-                await supabase.from('system_secrets').upsert({
-                    key: k,
-                    value: cleanVal,
-                    description: keyItem.desc,
-                    updated_at: new Date().toISOString()
-                }).catch(() => {});
+                try {
+                    await supabase.from('system_secrets').upsert({
+                        key: k,
+                        value: cleanVal,
+                        description: keyItem.desc,
+                        updated_at: new Date().toISOString()
+                    });
+                } catch {}
 
-                await supabase.from('app_settings').upsert({
-                    key: k,
-                    value: cleanVal,
-                    description: keyItem.desc,
-                    updated_at: new Date().toISOString()
-                }).catch(() => {});
+                try {
+                    await supabase.from('app_settings').upsert({
+                        key: k,
+                        value: cleanVal,
+                        description: keyItem.desc,
+                        updated_at: new Date().toISOString()
+                    });
+                } catch {}
             }
 
             // 3. Service Role Edge Function execution (100% bypasses RLS and permanently saves in DB)
