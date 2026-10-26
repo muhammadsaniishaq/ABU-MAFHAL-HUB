@@ -17,18 +17,37 @@ export const GLOBAL_RINGTONES: Record<string, string> = {
   subtle_chime: 'https://cdn.freesound.org/previews/352/352661_4019029-lq.mp3',
 };
 
-// Play ringtone on the device using Audio.Sound
-export async function playDeviceAlertSound(toneKey?: string) {
+// Play ringtone on the device using Audio.Sound (supports predefined key or direct URL)
+export async function playDeviceAlertSound(toneKeyOrUri?: string) {
   try {
-    let key = toneKey;
-    if (!key) {
-      // Check if global default ringtone exists in AsyncStorage
-      key = await AsyncStorage.getItem('global_notification_ringtone') || 'executive_bell';
+    let sourceUri = '';
+
+    if (toneKeyOrUri && (toneKeyOrUri.startsWith('http://') || toneKeyOrUri.startsWith('https://') || toneKeyOrUri.startsWith('file://'))) {
+      sourceUri = toneKeyOrUri;
+    } else {
+      let key = toneKeyOrUri;
+      if (!key) {
+        key = await AsyncStorage.getItem('global_notification_ringtone') || 'executive_bell';
+      }
+      // Check if key is itself a stored custom URI
+      if (key && (key.startsWith('http://') || key.startsWith('https://') || key.startsWith('file://'))) {
+        sourceUri = key;
+      } else {
+        sourceUri = GLOBAL_RINGTONES[key || 'executive_bell'] || GLOBAL_RINGTONES['executive_bell'];
+      }
     }
-    const soundUri = GLOBAL_RINGTONES[key] || GLOBAL_RINGTONES['executive_bell'];
-    if (soundUri) {
+
+    if (sourceUri) {
+      if (Platform.OS !== 'web') {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        }).catch(() => {});
+      }
+
       const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUri },
+        { uri: sourceUri },
         { shouldPlay: true, volume: 1.0 }
       );
       sound.setOnPlaybackStatusUpdate((status) => {

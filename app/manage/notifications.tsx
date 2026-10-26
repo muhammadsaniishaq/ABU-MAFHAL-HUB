@@ -19,6 +19,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Audio } from 'expo-av';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../services/supabase';
 import { sendInstantNotification } from '../../hooks/usePushNotifications';
@@ -92,29 +94,8 @@ export default function AdminPushNotificationsScreen() {
     // Detail Modal State
     const [selectedItem, setSelectedItem] = useState<AdminNotificationItem | null>(null);
 
-    // Ringtone Manager Modal State & Sound Player
-    const [showRingtoneModal, setShowRingtoneModal] = useState(false);
-    const [adminRingtone, setAdminRingtone] = useState<'executive_bell' | 'siren_alert' | 'cash_register' | 'subtle_chime' | 'military_horn' | 'radar_ping'>('executive_bell');
-    const [playingRingtone, setPlayingRingtone] = useState<string | null>(null);
-    const soundInstanceRef = React.useRef<Audio.Sound | null>(null);
-
-    // Compose State
-    const [dispatchType, setDispatchType] = useState<'support_track' | 'staff_meeting' | 'liquidity_low' | 'system_alert' | 'broadcast'>('broadcast');
-    const [targetAudience, setTargetAudience] = useState<'all' | 'admins' | 'staff' | 'single'>('all');
-    const [singleTargetQuery, setSingleTargetQuery] = useState('');
-    const [pushTitle, setPushTitle] = useState('');
-    const [pushBody, setPushBody] = useState('');
-    const [meetingTime, setMeetingTime] = useState('Today at 4:00 PM');
-    const [meetingLink, setMeetingLink] = useState('https://meet.google.com/abu-mafhal-team');
-    const [lowFloatProvider, setLowFloatProvider] = useState('BilalSadaSub Telecom');
-    const [lowFloatBalance, setLowFloatBalance] = useState('₦3,450.00');
-    const [isUrgent, setIsUrgent] = useState(false);
-    const [isPermanent, setIsPermanent] = useState(true); // Permanent broadcast that cannot be deleted
-    const [selectedRingtoneForPush, setSelectedRingtoneForPush] = useState<string>('executive_bell');
-    const [sending, setSending] = useState(false);
-
-    // Ringtone Catalog for Admins and Recipients
-    const RINGTONE_CATALOG = [
+    // Dynamic Ringtone Catalog State with Upload Support
+    const DEFAULT_RINGTONE_CATALOG = [
         {
             id: 'executive_bell',
             name: 'Executive Crystal Bell',
@@ -171,17 +152,52 @@ export default function AdminPushNotificationsScreen() {
         }
     ];
 
+    const [ringtoneCatalog, setRingtoneCatalog] = useState<any[]>(DEFAULT_RINGTONE_CATALOG);
+    const [uploadingTone, setUploadingTone] = useState(false);
+    const [showRingtoneModal, setShowRingtoneModal] = useState(false);
+    const [adminRingtone, setAdminRingtone] = useState<string>('executive_bell');
+    const [playingRingtone, setPlayingRingtone] = useState<string | null>(null);
+    const soundInstanceRef = React.useRef<any>(null);
+    const webAudioRef = React.useRef<any>(null);
+
+    // Compose State
+    const [dispatchType, setDispatchType] = useState<'support_track' | 'staff_meeting' | 'liquidity_low' | 'system_alert' | 'broadcast'>('broadcast');
+    const [targetAudience, setTargetAudience] = useState<'all' | 'admins' | 'staff' | 'single'>('all');
+    const [singleTargetQuery, setSingleTargetQuery] = useState('');
+    const [pushTitle, setPushTitle] = useState('');
+    const [pushBody, setPushBody] = useState('');
+    const [meetingTime, setMeetingTime] = useState('Today at 4:00 PM');
+    const [meetingLink, setMeetingLink] = useState('https://meet.google.com/abu-mafhal-team');
+    const [lowFloatProvider, setLowFloatProvider] = useState('BilalSadaSub Telecom');
+    const [lowFloatBalance, setLowFloatBalance] = useState('₦3,450.00');
+    const [isUrgent, setIsUrgent] = useState(false);
+    const [isPermanent, setIsPermanent] = useState(true); // Permanent broadcast that cannot be deleted
+    const [selectedRingtoneForPush, setSelectedRingtoneForPush] = useState<string>('executive_bell');
+    const [sending, setSending] = useState(false);
+
     useEffect(() => {
         loadSavedAdminRingtone();
         fetchAdminNotifications();
         subscribeToRealtimeNotifications();
 
         return () => {
-            if (soundInstanceRef.current) {
-                soundInstanceRef.current.unloadAsync().catch(() => {});
-            }
+            stopAnyPlayingAudio();
         };
     }, []);
+
+    const stopAnyPlayingAudio = () => {
+        try {
+            if (soundInstanceRef.current) {
+                soundInstanceRef.current.unloadAsync().catch(() => {});
+                soundInstanceRef.current = null;
+            }
+            if (webAudioRef.current) {
+                webAudioRef.current.pause();
+                webAudioRef.current = null;
+            }
+            setPlayingRingtone(null);
+        } catch (e) {}
+    };
 
     const fetchAdminNotifications = async () => {
         try {
@@ -205,78 +221,220 @@ export default function AdminPushNotificationsScreen() {
 
     const loadSavedAdminRingtone = async () => {
         try {
-            // First check local AsyncStorage
+            // 1. Check local AsyncStorage for custom uploaded ringtones
+            const localCustoms = await AsyncStorage.getItem('admin_custom_uploaded_tones');
+            let mergedCatalog = [...DEFAULT_RINGTONE_CATALOG];
+            if (localCustoms) {
+                const parsed = JSON.parse(localCustoms);
+                if (Array.isArray(parsed)) {
+                    mergedCatalog = [...DEFAULT_RINGTONE_CATALOG, ...parsed];
+                }
+            }
+
+            // 2. Sync from Supabase app_settings for custom uploaded tones
+            const { data: dbCustomTones } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'admin_custom_ringtones_catalog')
+                .maybeSingle();
+
+            if (dbCustomTones?.value && Array.isArray(dbCustomTones.value)) {
+                const existingIds = new Set(mergedCatalog.map(m => m.id));
+                const newTones = dbCustomTones.value.filter((t: any) => !existingIds.has(t.id));
+                mergedCatalog = [...mergedCatalog, ...newTones];
+            }
+
+            setRingtoneCatalog(mergedCatalog);
+
+            // 3. Load active tone selection
             const localSaved = await AsyncStorage.getItem('admin_preferred_ringtone');
             if (localSaved) {
-                setAdminRingtone(localSaved as any);
+                setAdminRingtone(localSaved);
                 setSelectedRingtoneForPush(localSaved);
             }
 
-            // Sync from Supabase app_settings so all devices are aligned
-            const { data } = await supabase
+            const { data: dbActiveTone } = await supabase
                 .from('app_settings')
                 .select('value')
                 .eq('key', 'global_notification_ringtone')
                 .maybeSingle();
 
-            if (data?.value) {
-                const globalTone = typeof data.value === 'string' ? data.value : data.value.ringtone || data.value.id;
+            if (dbActiveTone?.value) {
+                const globalTone = typeof dbActiveTone.value === 'string' ? dbActiveTone.value : dbActiveTone.value.ringtone || dbActiveTone.value.id;
                 if (globalTone) {
-                    setAdminRingtone(globalTone as any);
+                    setAdminRingtone(globalTone);
                     setSelectedRingtoneForPush(globalTone);
                     await AsyncStorage.setItem('admin_preferred_ringtone', globalTone);
                     await AsyncStorage.setItem('global_notification_ringtone', globalTone);
                 }
             }
         } catch (e) {
-            console.log('Error loading saved ringtone:', e);
+            console.log('Error loading saved ringtones:', e);
         }
     };
 
-    const handleSaveAdminRingtone = async (toneId: any) => {
+    // Upload New Custom Ringtone Audio (MP3 / WAV / AAC / M4A)
+    const handleUploadCustomRingtone = async () => {
+        try {
+            stopAnyPlayingAudio();
+            const res = await DocumentPicker.getDocumentAsync({
+                type: ['audio/*', 'audio/mpeg', 'audio/wav', 'audio/aac', 'audio/m4a', 'audio/x-m4a', 'audio/mp3'],
+                copyToCacheDirectory: true,
+            });
+
+            if (res.canceled || !res.assets || res.assets.length === 0) {
+                return;
+            }
+
+            const file = res.assets[0];
+            setUploadingTone(true);
+
+            // Upload to Supabase Storage or generate persistent media URI
+            let audioUri = file.uri;
+            const cleanFileName = `ringtone_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+
+            try {
+                if (file.file && Platform.OS === 'web') {
+                    // Browser Web upload
+                    const { error: upErr } = await supabase.storage
+                        .from('avatars')
+                        .upload(`ringtones/${cleanFileName}`, file.file, { contentType: file.mimeType || 'audio/mpeg' });
+                    if (!upErr) {
+                        const { data: pubData } = supabase.storage.from('avatars').getPublicUrl(`ringtones/${cleanFileName}`);
+                        if (pubData?.publicUrl) audioUri = pubData.publicUrl;
+                    }
+                } else if (Platform.OS !== 'web' && file.uri) {
+                    // Mobile Native upload
+                    const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
+                    const byteArray = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                    const { error: upErr } = await supabase.storage
+                        .from('avatars')
+                        .upload(`ringtones/${cleanFileName}`, byteArray, { contentType: file.mimeType || 'audio/mpeg' });
+                    if (!upErr) {
+                        const { data: pubData } = supabase.storage.from('avatars').getPublicUrl(`ringtones/${cleanFileName}`);
+                        if (pubData?.publicUrl) audioUri = pubData.publicUrl;
+                    }
+                }
+            } catch (storageErr) {
+                console.log('[RingtoneStorage] Storage upload note (using local uri):', storageErr);
+            }
+
+            const newToneItem = {
+                id: `custom_${Date.now()}`,
+                name: file.name.replace(/\.[^/.]+$/, ''),
+                hausa: 'Sautin da Ka Loda (Custom Upload)',
+                icon: 'cloud-upload',
+                color: C.purple,
+                uri: audioUri,
+                desc: `Custom ringtone (${file.size ? Math.round(file.size / 1024) + ' KB' : 'Audio file'})`,
+                is_custom: true
+            };
+
+            const updatedCatalog = [...ringtoneCatalog, newToneItem];
+            setRingtoneCatalog(updatedCatalog);
+
+            // Save to AsyncStorage
+            const customsOnly = updatedCatalog.filter(t => t.is_custom);
+            await AsyncStorage.setItem('admin_custom_uploaded_tones', JSON.stringify(customsOnly));
+
+            // Persist to Supabase app_settings so all other admins and devices get the new uploaded ringtones
+            try {
+                await supabase.from('app_settings').upsert({
+                    key: 'admin_custom_ringtones_catalog',
+                    value: customsOnly,
+                    description: 'Custom ringtones uploaded by Admin'
+                }, { onConflict: 'key' });
+            } catch (e) {}
+
+            // Auto-select this newly uploaded ringtone
+            await handleSaveAdminRingtone(newToneItem.id, updatedCatalog);
+
+            Alert.alert(
+                'Upload Successful 🎵',
+                `An yi nasarar lodawa tare da saita sabon sautin "${newToneItem.name}" a matsayin sautin dukkan wayoyi!`
+            );
+        } catch (err: any) {
+            Alert.alert('Upload Failed', err.message || 'Could not upload audio file.');
+        } finally {
+            setUploadingTone(false);
+        }
+    };
+
+    const handleSaveAdminRingtone = async (toneId: string, customCatalog?: any[]) => {
         try {
             setAdminRingtone(toneId);
             setSelectedRingtoneForPush(toneId);
             await AsyncStorage.setItem('admin_preferred_ringtone', toneId);
             await AsyncStorage.setItem('global_notification_ringtone', toneId);
 
+            const activeCat = customCatalog || ringtoneCatalog;
+            const chosenTone = activeCat.find(r => r.id === toneId);
+
             // Persist globally into app_settings so ALL users and devices ring with this sound
             try {
                 await supabase.from('app_settings').upsert({
                     key: 'global_notification_ringtone',
-                    value: toneId,
+                    value: { id: toneId, uri: chosenTone?.uri, name: chosenTone?.name },
                     description: 'Global system notification ringtone sound configured from Admin Panel'
                 }, { onConflict: 'key' });
             } catch (dbErr) {
                 console.log('[Ringtone] DB sync note:', dbErr);
             }
 
-            playPreviewSound(toneId);
+            playPreviewSound(toneId, activeCat);
             Alert.alert(
                 'Ringtone Set for All Devices 🔔',
-                `An saita sautin "${RINGTONE_CATALOG.find(r => r.id === toneId)?.name}" a matsayin babban sautin faɗakarwa na dukkan asusu da wayoyin mutane!`
+                `An saita sautin "${chosenTone?.name || toneId}" a matsayin babban sautin faɗakarwa na dukkan asusu da wayoyin mutane!`
             );
         } catch (e: any) {
             Alert.alert('Error', e.message);
         }
     };
 
-    const playPreviewSound = async (toneId: string) => {
+    // Bulletproof Audio Preview for Web and Native Mobile
+    const playPreviewSound = async (toneId: string, customCatalog?: any[]) => {
         try {
-            const tone = RINGTONE_CATALOG.find(t => t.id === toneId);
-            if (!tone) return;
+            const activeCat = customCatalog || ringtoneCatalog;
+            const tone = activeCat.find((t: any) => t.id === toneId);
+            if (!tone || !tone.uri) return;
 
-            if (soundInstanceRef.current) {
-                await soundInstanceRef.current.unloadAsync().catch(() => {});
-                soundInstanceRef.current = null;
-            }
-
+            // Toggle pause if currently playing
             if (playingRingtone === toneId) {
-                setPlayingRingtone(null);
+                stopAnyPlayingAudio();
                 return;
             }
 
+            stopAnyPlayingAudio();
             setPlayingRingtone(toneId);
+
+            // 1. Browser Web Player
+            if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).Audio) {
+                const audio = new (window as any).Audio(tone.uri);
+                audio.volume = 1.0;
+                audio.onended = () => {
+                    setPlayingRingtone(null);
+                    webAudioRef.current = null;
+                };
+                audio.onerror = (e: any) => {
+                    console.warn('HTML5 Audio playback error:', e);
+                    setPlayingRingtone(null);
+                    webAudioRef.current = null;
+                };
+                webAudioRef.current = audio;
+                await audio.play().catch((e: any) => {
+                    console.log('Audio play blocked/error:', e);
+                    setPlayingRingtone(null);
+                });
+                return;
+            }
+
+            // 2. Native Mobile Expo Audio Player
+            await Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+                staysActiveInBackground: false,
+                shouldDuckAndroid: true,
+            }).catch(() => {});
+
             const { sound } = await Audio.Sound.createAsync(
                 { uri: tone.uri },
                 { shouldPlay: true, volume: 1.0 }
@@ -286,6 +444,7 @@ export default function AdminPushNotificationsScreen() {
             sound.setOnPlaybackStatusUpdate((status) => {
                 if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
                     setPlayingRingtone(null);
+                    sound.unloadAsync().catch(() => {});
                 }
             });
         } catch (e) {
@@ -307,14 +466,7 @@ export default function AdminPushNotificationsScreen() {
                     // Play configured Admin Ringtone on incoming alert
                     try {
                         const targetToneId = newNotif.data?.ringtone || adminRingtone || 'executive_bell';
-                        const tone = RINGTONE_CATALOG.find(t => t.id === targetToneId) || RINGTONE_CATALOG[0];
-                        if (tone?.uri) {
-                            const { sound } = await Audio.Sound.createAsync(
-                                { uri: tone.uri },
-                                { shouldPlay: true, volume: 1.0 }
-                            );
-                            soundInstanceRef.current = sound;
-                        }
+                        playPreviewSound(targetToneId);
                     } catch (soundErr) {
                         console.log('Realtime sound playback error:', soundErr);
                     }
@@ -441,7 +593,7 @@ export default function AdminPushNotificationsScreen() {
                     type: dispatchType,
                     is_permanent: isPermanent,
                     ringtone: selectedRingtoneForPush,
-                    ringtone_name: RINGTONE_CATALOG.find(r => r.id === selectedRingtoneForPush)?.name,
+                    ringtone_name: ringtoneCatalog.find((r: any) => r.id === selectedRingtoneForPush)?.name || selectedRingtoneForPush,
                     target_audience: targetAudience,
                     sent_by_admin: true,
                     meeting_link: dispatchType === 'staff_meeting' ? meetingLink : undefined,
@@ -466,7 +618,7 @@ export default function AdminPushNotificationsScreen() {
                         type: dispatchType,
                         is_permanent: isPermanent,
                         ringtone: selectedRingtoneForPush,
-                        ringtone_name: RINGTONE_CATALOG.find(r => r.id === selectedRingtoneForPush)?.name,
+                        ringtone_name: ringtoneCatalog.find((r: any) => r.id === selectedRingtoneForPush)?.name || selectedRingtoneForPush,
                         target_audience: targetAudience,
                         sent_by_admin: true,
                         meeting_link: dispatchType === 'staff_meeting' ? meetingLink : undefined,
@@ -1084,13 +1236,30 @@ export default function AdminPushNotificationsScreen() {
                     </View>
 
                     {/* 4. Notification Ringtone / Chime Selection */}
-                    <Text style={s.sectionHeader}>4. SELECT ALERT RINGTONE (SAUTIN FAƊAKARWA)</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 8 }}>
+                        <Text style={[s.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>4. SELECT ALERT RINGTONE (SAUTIN FAƊAKARWA)</Text>
+                        <TouchableOpacity
+                            onPress={handleUploadCustomRingtone}
+                            disabled={uploadingTone}
+                            style={s.uploadToneMiniBtn}
+                            activeOpacity={0.8}
+                        >
+                            {uploadingTone ? (
+                                <ActivityIndicator size="small" color={C.gold} />
+                            ) : (
+                                <>
+                                    <Ionicons name="cloud-upload" size={13} color={C.gold} />
+                                    <Text style={s.uploadToneMiniBtnText}>Upload Sauti</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
                     <View style={s.ringtoneSelectorBox}>
                         <Text style={s.ringtoneSelectorDesc}>
-                            Zaɓi ainihin sautin ringtone ɗin da zai yi ƙara a wayar Admin da mai karɓa idan an tura wannan sanarwar:
+                            Zaɓi ainihin sautin ringtone ɗin da zai yi ƙara a wayar Admin da mai karɓa idan an tura wannan sanarwar ko loda naka na musamman:
                         </Text>
                         <View style={s.ringtoneListGrid}>
-                            {RINGTONE_CATALOG.map((tone) => {
+                            {ringtoneCatalog.map((tone) => {
                                 const isSelected = selectedRingtoneForPush === tone.id;
                                 const isPlaying = playingRingtone === tone.id;
                                 return (
@@ -1104,9 +1273,16 @@ export default function AdminPushNotificationsScreen() {
                                             <Ionicons name={tone.icon as any} size={16} color={isSelected ? '#FFFFFF' : tone.color} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[s.ringtoneCardTitle, isSelected && { color: C.navy, fontWeight: '900' }]}>
-                                                {tone.name}
-                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={[s.ringtoneCardTitle, isSelected && { color: C.navy, fontWeight: '900' }]}>
+                                                    {tone.name}
+                                                </Text>
+                                                {tone.is_custom && (
+                                                    <View style={s.customToneBadge}>
+                                                        <Text style={s.customToneBadgeText}>CUSTOM</Text>
+                                                    </View>
+                                                )}
+                                            </View>
                                             <Text style={s.ringtoneCardHausa}>{tone.hausa}</Text>
                                         </View>
                                         <TouchableOpacity
@@ -1223,6 +1399,27 @@ export default function AdminPushNotificationsScreen() {
                         </View>
 
                         <ScrollView style={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+                            {/* Upload Button in Modal */}
+                            <TouchableOpacity
+                                onPress={handleUploadCustomRingtone}
+                                disabled={uploadingTone}
+                                style={s.uploadToneBannerBtn}
+                                activeOpacity={0.85}
+                            >
+                                {uploadingTone ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="cloud-upload" size={18} color="#FFFFFF" />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.uploadToneBannerTitle}>Loda Sabon Sauti Daga Na'urarka</Text>
+                                            <Text style={s.uploadToneBannerSub}>Loda sautin MP3, WAV, ko M4A domin zama ringtone na dukkan wayoyi</Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
                             <View style={s.ringtoneModalNotice}>
                                 <Ionicons name="information-circle" size={16} color={C.blue} />
                                 <Text style={s.ringtoneModalNoticeText}>
@@ -1231,7 +1428,7 @@ export default function AdminPushNotificationsScreen() {
                             </View>
 
                             <View style={{ gap: 10, marginTop: 12, marginBottom: 20 }}>
-                                {RINGTONE_CATALOG.map((tone) => {
+                                {ringtoneCatalog.map((tone) => {
                                     const isCurrent = adminRingtone === tone.id;
                                     const isPlaying = playingRingtone === tone.id;
                                     return (
@@ -1245,6 +1442,11 @@ export default function AdminPushNotificationsScreen() {
                                                     <Text style={[s.ringtoneCardTitle, isCurrent && { color: C.navy, fontWeight: '900' }]}>
                                                         {tone.name}
                                                     </Text>
+                                                    {tone.is_custom && (
+                                                        <View style={s.customToneBadge}>
+                                                            <Text style={s.customToneBadgeText}>CUSTOM</Text>
+                                                        </View>
+                                                    )}
                                                     {isCurrent && (
                                                         <View style={s.activeRingtoneBadge}>
                                                             <Text style={s.activeRingtoneBadgeText}>ACTIVE</Text>
@@ -1952,4 +2154,57 @@ const s = StyleSheet.create({
         fontWeight: '800',
         color: '#334155',
     },
+    customToneBadge: {
+        backgroundColor: '#8B5CF6',
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 4,
+    },
+    customToneBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    uploadToneMiniBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    uploadToneMiniBtnText: {
+        fontSize: 10.5,
+        fontWeight: '800',
+        color: '#B45309',
+    },
+    uploadToneBannerBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#0F172A',
+        padding: 14,
+        borderRadius: 12,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    uploadToneBannerTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    uploadToneBannerSub: {
+        fontSize: 11,
+        color: '#94A3B8',
+        marginTop: 2,
+        lineHeight: 15,
+    },
 });
+
