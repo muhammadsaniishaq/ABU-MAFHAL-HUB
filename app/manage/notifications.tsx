@@ -587,9 +587,17 @@ export default function AdminPushNotificationsScreen() {
     };
 
     // Dispatch Push Notification
+    const showNotificationAlert = (title: string, message: string) => {
+        if (Platform.OS === 'web') {
+            window.alert(`${title}\n\n${message}`);
+        } else {
+            Alert.alert(title, message);
+        }
+    };
+
     const handleDispatchNotification = async () => {
         if (!pushTitle.trim() || !pushBody.trim()) {
-            return Alert.alert('Fields Required', 'Please enter both Title and Body for the notification.');
+            return showNotificationAlert('Fields Required', 'Please enter both Title and Body for the notification before dispatching.');
         }
 
         setSending(true);
@@ -708,13 +716,13 @@ export default function AdminPushNotificationsScreen() {
                 }
             }
 
-            Alert.alert('Push Dispatched 🚀', `Notification successfully dispatched to ${targetUsers.length > 0 ? targetUsers.length : 1} recipient(s) (${tokens.length} live device tokens).`);
+            showNotificationAlert('Push Dispatched 🚀', `Notification successfully dispatched to ${targetUsers.length > 0 ? targetUsers.length : 1} recipient(s) (${tokens.length} live device tokens).`);
             setPushTitle('');
             setPushBody('');
             setActiveTab('inbox');
             fetchAdminNotifications();
         } catch (e: any) {
-            Alert.alert('Dispatch Failed', e.message || 'Could not send notification');
+            showNotificationAlert('Dispatch Failed', e.message || 'Could not send notification');
         } finally {
             setSending(false);
         }
@@ -1094,6 +1102,8 @@ export default function AdminPushNotificationsScreen() {
                     style={{ flex: 1 }}
                     contentContainerStyle={s.composeScrollContent}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
                 >
                     {/* 1. Quick Presets Bar */}
                     <Text style={s.sectionHeader}>1. SELECT NOTIFICATION SCENARIO</Text>
@@ -1328,6 +1338,23 @@ export default function AdminPushNotificationsScreen() {
                                 thumbColor="#FFFFFF"
                             />
                         </View>
+
+                        {/* Quick Dispatch CTA directly inside Message Card */}
+                        <TouchableOpacity
+                            onPress={handleDispatchNotification}
+                            disabled={sending}
+                            style={[s.dispatchSubmitBtn, { marginTop: 14 }]}
+                            activeOpacity={0.8}
+                        >
+                            {sending ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name="paper-plane" size={17} color="#FFFFFF" />
+                                    <Text style={s.dispatchSubmitBtnText}>Dispatch Push Notification Now</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     </View>
 
                     {/* 4. Notification Ringtone / Chime Selection */}
@@ -1850,7 +1877,7 @@ const s = StyleSheet.create({
     },
     composeScrollContent: {
         padding: 14,
-        paddingBottom: 60,
+        paddingBottom: 120,
     },
     sectionHeader: {
         fontSize: 11,
