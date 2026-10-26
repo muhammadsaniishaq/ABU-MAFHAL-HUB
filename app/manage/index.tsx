@@ -54,7 +54,7 @@ const ALL_MODULES = [
   { t: 'CAC Pricing', i: 'pricetag', r: '/manage/cac-pricing', c: '#f5a623' },
   { t: 'NIN Pricing', i: 'pricetag', r: '/manage/nin-pricing', c: '#0d1b3e' },
   { t: 'BVN Pricing', i: 'pricetags', r: '/manage/bvn-pricing', c: '#f5a623' },
-  { t: 'Push Notifications', i: 'notifications', r: '/manage/communications?tab=push', c: '#7c3aed', tag: 'Direct' },
+  { t: 'Push Notifications', i: 'notifications', r: '/manage/notifications', c: '#7c3aed', tag: 'Direct' },
   { t: 'Broadcast & SMS', i: 'megaphone', r: '/manage/communications', c: '#2563eb' },
   { t: 'Mail Center', i: 'mail-unread', r: '/manage/mail-center', c: '#f5a623' },
   { t: 'Audit Logs', i: 'document-text', r: '/manage/logs', c: '#0d1b3e', tag: 'Security' },
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
     { label: 'Audit Logs', icon: 'list' as const, color: '#16a34a', action: () => router.push('/manage/logs') },
     { label: 'Manage Rates', icon: 'settings' as const, color: '#0d1b3e', action: () => router.push('/manage/rates') },
     { label: 'System Status', icon: 'desktop' as const, color: '#0d1b3e', action: () => router.push('/manage/infrastructure') },
-    { label: 'Push & Alerts', icon: 'notifications' as const, color: '#7c3aed', action: () => router.push('/manage/communications?tab=push' as any) },
+    { label: 'Push & Alerts', icon: 'notifications' as const, color: '#7c3aed', action: () => router.push('/manage/notifications') },
   ];
 
   useEffect(() => {
@@ -391,7 +391,7 @@ export default function AdminDashboard() {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              onPress={() => router.push('/manage/logs')} 
+              onPress={() => router.push('/manage/notifications')} 
               style={styles.notifBtn}
               activeOpacity={0.8}
             >

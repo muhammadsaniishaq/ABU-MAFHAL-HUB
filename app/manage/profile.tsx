@@ -352,7 +352,7 @@ export default function AdminProfileScreen() {
         { id: 'security', label: 'Security', icon: 'shield-checkmark-outline', route: '/manage/security' },
         { id: 'access', label: 'Access & Roles', icon: 'people-outline', route: '/manage/staff' },
         { id: 'wallet', label: 'Wallet & Payments', icon: 'wallet-outline', route: '/manage/liquidity' },
-        { id: 'notifications', label: 'Notifications', icon: 'notifications-outline', route: '/manage/communications?tab=push' },
+        { id: 'notifications', label: 'Notifications', icon: 'notifications-outline', route: '/manage/notifications' },
         { id: 'appearance', label: 'Appearance', icon: 'color-palette-outline', route: '/manage/appearance' },
         { id: 'activity', label: 'Activity Logs', icon: 'document-text-outline', route: '/manage/logs' },
         { id: 'api', label: 'API & Integrations', icon: 'link-outline', route: '/manage/secrets' },
@@ -400,7 +400,7 @@ export default function AdminProfileScreen() {
 
                 <View style={s.topBarRight}>
                     <TouchableOpacity
-                        onPress={() => router.push('/manage/communications?tab=push' as any)}
+                        onPress={() => router.push('/manage/notifications')}
                         style={s.bellBtn}
                         activeOpacity={0.8}
                     >
