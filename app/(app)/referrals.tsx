@@ -117,33 +117,102 @@ export default function ReferralsScreen() {
                 .eq('id', user.id)
                 .single();
 
-            // 2. Get Referrals List
-            const { data: refs, error } = await supabase
+            // 2. Get Referrals List with multiple fallbacks
+            let fetchedReferrals: Referral[] = [];
+            
+            // First attempt: try standard foreign key join
+            const { data: refsWithJoin, error: joinErr } = await supabase
                 .from('referrals')
                 .select(`
                     id, 
                     status, 
                     reward_amount, 
                     created_at,
-                    profiles:referee_id (full_name, username, avatar_url)
+                    referee_id,
+                    referee:referee_id (full_name, username, avatar_url)
                 `)
                 .eq('referrer_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (error && error.code !== 'PGRST116') {
-                console.warn('Referrals fetch notice:', error.message);
+            if (!joinErr && refsWithJoin && refsWithJoin.length > 0) {
+                fetchedReferrals = refsWithJoin.map((r: any) => ({
+                    id: r.id,
+                    referee_id: r.referee_id,
+                    status: r.status || 'paid',
+                    reward_amount: Number(r.reward_amount || 0),
+                    created_at: r.created_at,
+                    profiles: r.referee || r.profiles || null
+                }));
+            } else {
+                // Second attempt: query plain referrals table
+                const { data: plainRefs } = await supabase
+                    .from('referrals')
+                    .select('id, referee_id, status, reward_amount, created_at')
+                    .eq('referrer_id', user.id)
+                    .order('created_at', { ascending: false });
+
+                if (plainRefs && plainRefs.length > 0) {
+                    const refereeIds = plainRefs.map(r => r.referee_id).filter(Boolean);
+                    let profileMap: Record<string, any> = {};
+
+                    if (refereeIds.length > 0) {
+                        const { data: profs } = await supabase
+                            .from('profiles')
+                            .select('id, full_name, username, avatar_url')
+                            .in('id', refereeIds);
+
+                        profs?.forEach((p: any) => {
+                            profileMap[p.id] = p;
+                        });
+                    }
+
+                    fetchedReferrals = plainRefs.map((r: any) => ({
+                        id: r.id,
+                        referee_id: r.referee_id,
+                        status: r.status || 'paid',
+                        reward_amount: Number(r.reward_amount || 0),
+                        created_at: r.created_at,
+                        profiles: profileMap[r.referee_id] || null
+                    }));
+                }
             }
 
-            const total = refs?.reduce((acc, curr) => acc + (curr.status === 'paid' ? (curr.reward_amount || 0) : 0), 0) || 0;
-            const pending = refs?.reduce((acc, curr) => acc + (curr.status === 'pending' ? (curr.reward_amount || 0) : 0), 0) || 0;
+            // Third fallback: If referrals table has no rows or is missing links, check profiles table directly where referrer_id = user.id
+            const { data: directProfiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, username, avatar_url, created_at')
+                .eq('referrer_id', user.id)
+                .order('created_at', { ascending: false });
 
+            if (directProfiles && directProfiles.length > 0) {
+                const existingRefereeIds = new Set(fetchedReferrals.map(r => r.referee_id));
+                directProfiles.forEach(dp => {
+                    if (!existingRefereeIds.has(dp.id)) {
+                        fetchedReferrals.push({
+                            id: `direct-${dp.id}`,
+                            referee_id: dp.id,
+                            status: 'paid',
+                            reward_amount: configuredReward || 500,
+                            created_at: dp.created_at || new Date().toISOString(),
+                            profiles: {
+                                full_name: dp.full_name,
+                                username: dp.username,
+                                avatar_url: dp.avatar_url
+                            }
+                        });
+                    }
+                });
+            }
+
+            const total = fetchedReferrals.reduce((acc, curr) => acc + (curr.status === 'paid' ? (curr.reward_amount || 0) : 0), 0);
+            const pending = fetchedReferrals.reduce((acc, curr) => acc + (curr.status === 'pending' ? (curr.reward_amount || 0) : 0), 0);
             const userCode = profile?.referral_code || profile?.username || user.id.substring(0, 8);
 
-            setReferrals((refs as any) || []);
+            setReferrals(fetchedReferrals);
             setStats({
                 totalEarnings: total,
                 pendingEarnings: pending,
-                referralCount: refs?.length || 0,
+                referralCount: fetchedReferrals.length,
                 balance: profile?.referral_balance || 0,
                 code: userCode,
                 baseUrl: dynamicUrl

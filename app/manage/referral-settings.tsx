@@ -50,29 +50,91 @@ export default function ReferralSettings() {
             });
 
             // 2. Fetch Referrals Data
+            let combinedReferrals: any[] = [];
             const { data: referrals, error: refError } = await supabase
                 .from('referrals')
                 .select(`
                     id, status, reward_amount, created_at,
+                    referrer_id, referee_id,
                     referrer:referrer_id(username, full_name, id),
                     referee:referee_id(username, full_name, avatar_url, id)
                 `)
                 .order('created_at', { ascending: false });
 
-            if (refError) throw refError;
+            if (!refError && referrals && referrals.length > 0) {
+                combinedReferrals = [...referrals];
+            } else {
+                const { data: rawRefs } = await supabase
+                    .from('referrals')
+                    .select('id, referrer_id, referee_id, status, reward_amount, created_at')
+                    .order('created_at', { ascending: false });
+
+                if (rawRefs && rawRefs.length > 0) {
+                    const uids = Array.from(new Set([...rawRefs.map(r => r.referrer_id), ...rawRefs.map(r => r.referee_id)].filter(Boolean)));
+                    let profMap: Record<string, any> = {};
+                    if (uids.length > 0) {
+                        const { data: profs } = await supabase.from('profiles').select('id, username, full_name, avatar_url').in('id', uids);
+                        profs?.forEach((p: any) => { profMap[p.id] = p; });
+                    }
+                    combinedReferrals = rawRefs.map(r => ({
+                        ...r,
+                        referrer: profMap[r.referrer_id] || { username: 'User' },
+                        referee: profMap[r.referee_id] || { username: 'User' }
+                    }));
+                }
+            }
+
+            // Also check profiles with referrer_id not yet logged into referrals table
+            const { data: refProfiles } = await supabase
+                .from('profiles')
+                .select('id, username, full_name, avatar_url, referrer_id, created_at')
+                .not('referrer_id', 'is', null)
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (refProfiles && refProfiles.length > 0) {
+                const existingRefereeIds = new Set(combinedReferrals.map(r => r.referee_id || r.referee?.id));
+                const missingUids = refProfiles.filter(p => !existingRefereeIds.has(p.id)).map(p => p.referrer_id);
+                
+                if (missingUids.length > 0) {
+                    const { data: refUserProfs } = await supabase.from('profiles').select('id, username, full_name').in('id', missingUids);
+                    const refMap: Record<string, any> = {};
+                    refUserProfs?.forEach((p: any) => { refMap[p.id] = p; });
+
+                    refProfiles.forEach(p => {
+                        if (!existingRefereeIds.has(p.id)) {
+                            combinedReferrals.push({
+                                id: `prof-${p.id}`,
+                                status: 'paid',
+                                reward_amount: Number(rewardAmount) || 500,
+                                created_at: p.created_at || new Date().toISOString(),
+                                referrer_id: p.referrer_id,
+                                referee_id: p.id,
+                                referrer: refMap[p.referrer_id] || { username: 'Referrer' },
+                                referee: {
+                                    id: p.id,
+                                    username: p.username,
+                                    full_name: p.full_name,
+                                    avatar_url: p.avatar_url
+                                }
+                            });
+                        }
+                    });
+                }
+            }
 
             // Stats Logic
-            const total = referrals?.length || 0;
-            const paid = referrals?.filter(r => r.status === 'paid').reduce((sum, r) => sum + r.reward_amount, 0) || 0;
-            const pending = referrals?.filter(r => r.status === 'pending').reduce((sum, r) => sum + r.reward_amount, 0) || 0;
+            const total = combinedReferrals.length;
+            const paid = combinedReferrals.filter(r => r.status === 'paid').reduce((sum, r) => sum + (Number(r.reward_amount) || 0), 0);
+            const pending = combinedReferrals.filter(r => r.status === 'pending').reduce((sum, r) => sum + (Number(r.reward_amount) || 0), 0);
 
             setStats({ totalReferrals: total, totalPaid: paid, pendingAmount: pending });
-            setAllReferrals(referrals || []);
-            setFilteredReferrals(referrals || []); // Initial load
+            setAllReferrals(combinedReferrals);
+            setFilteredReferrals(combinedReferrals); // Initial load
 
             // Leaderboard Logic
             const leaderboard: any = {};
-            referrals?.forEach((r: any) => {
+            combinedReferrals.forEach((r: any) => {
                 const name = r.referrer?.username || 'Unknown';
                 if (!leaderboard[name]) leaderboard[name] = 0;
                 leaderboard[name]++;
