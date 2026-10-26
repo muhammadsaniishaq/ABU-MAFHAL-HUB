@@ -18,6 +18,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../services/supabase';
 import { sendInstantNotification } from '../../hooks/usePushNotifications';
 
@@ -90,6 +92,12 @@ export default function AdminPushNotificationsScreen() {
     // Detail Modal State
     const [selectedItem, setSelectedItem] = useState<AdminNotificationItem | null>(null);
 
+    // Ringtone Manager Modal State & Sound Player
+    const [showRingtoneModal, setShowRingtoneModal] = useState(false);
+    const [adminRingtone, setAdminRingtone] = useState<'executive_bell' | 'siren_alert' | 'cash_register' | 'subtle_chime' | 'military_horn' | 'radar_ping'>('executive_bell');
+    const [playingRingtone, setPlayingRingtone] = useState<string | null>(null);
+    const soundInstanceRef = React.useRef<Audio.Sound | null>(null);
+
     // Compose State
     const [dispatchType, setDispatchType] = useState<'support_track' | 'staff_meeting' | 'liquidity_low' | 'system_alert' | 'broadcast'>('broadcast');
     const [targetAudience, setTargetAudience] = useState<'all' | 'admins' | 'staff' | 'single'>('all');
@@ -102,11 +110,77 @@ export default function AdminPushNotificationsScreen() {
     const [lowFloatBalance, setLowFloatBalance] = useState('₦3,450.00');
     const [isUrgent, setIsUrgent] = useState(false);
     const [isPermanent, setIsPermanent] = useState(true); // Permanent broadcast that cannot be deleted
+    const [selectedRingtoneForPush, setSelectedRingtoneForPush] = useState<string>('executive_bell');
     const [sending, setSending] = useState(false);
 
+    // Ringtone Catalog for Admins and Recipients
+    const RINGTONE_CATALOG = [
+        {
+            id: 'executive_bell',
+            name: 'Executive Crystal Bell',
+            hausa: 'Sautin Kararrawa ta Alfarma',
+            icon: 'notifications',
+            color: C.gold,
+            uri: 'https://cdn.freesound.org/previews/264/264981_4486188-lq.mp3',
+            desc: 'Sleek executive chime for important briefings and notices.'
+        },
+        {
+            id: 'siren_alert',
+            name: 'Emergency Siren Alarm',
+            hausa: 'Sautin Faɗakarwa ta Gaggawa',
+            icon: 'alert-circle',
+            color: C.red,
+            uri: 'https://cdn.freesound.org/previews/456/456544_5121236-lq.mp3',
+            desc: 'High-urgency alert for critical float depletion & incidents.'
+        },
+        {
+            id: 'cash_register',
+            name: 'Money & Wealth Chime',
+            hausa: 'Sautin Kudin Shiga da Asusun Kudi',
+            icon: 'cash',
+            color: C.green,
+            uri: 'https://cdn.freesound.org/previews/333/333404_4684427-lq.mp3',
+            desc: 'Crisp cash top-up sound for wallet credits and payouts.'
+        },
+        {
+            id: 'military_horn',
+            name: 'Staff Summoning Horn',
+            hausa: 'Sautin Taron Ma’aikata na Gaggawa',
+            icon: 'people',
+            color: C.purple,
+            uri: 'https://cdn.freesound.org/previews/387/387232_1474204-lq.mp3',
+            desc: 'Attention-grabbing bugle horn for emergency staff calls.'
+        },
+        {
+            id: 'radar_ping',
+            name: 'Sonar Radar Ping',
+            hausa: 'Sautin Radar na Binciken Tikitin User',
+            icon: 'radio',
+            color: C.blue,
+            uri: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
+            desc: 'Futuristic sonar ping for user tracking and new tickets.'
+        },
+        {
+            id: 'subtle_chime',
+            name: 'Subtle Modern Pop',
+            hausa: 'Sauƙin Sauti Mai Taushi',
+            icon: 'sparkles',
+            color: C.cyan,
+            uri: 'https://cdn.freesound.org/previews/352/352661_4019029-lq.mp3',
+            desc: 'Soft pleasant bubble pop for routine platform updates.'
+        }
+    ];
+
     useEffect(() => {
+        loadSavedAdminRingtone();
         fetchAdminNotifications();
         subscribeToRealtimeNotifications();
+
+        return () => {
+            if (soundInstanceRef.current) {
+                soundInstanceRef.current.unloadAsync().catch(() => {});
+            }
+        };
     }, []);
 
     const fetchAdminNotifications = async () => {
@@ -129,16 +203,91 @@ export default function AdminPushNotificationsScreen() {
         }
     };
 
+    const loadSavedAdminRingtone = async () => {
+        try {
+            const saved = await AsyncStorage.getItem('admin_preferred_ringtone');
+            if (saved) {
+                setAdminRingtone(saved as any);
+                setSelectedRingtoneForPush(saved);
+            }
+        } catch (e) {
+            console.log('Error loading saved ringtone:', e);
+        }
+    };
+
+    const handleSaveAdminRingtone = async (toneId: any) => {
+        try {
+            setAdminRingtone(toneId);
+            await AsyncStorage.setItem('admin_preferred_ringtone', toneId);
+            playPreviewSound(toneId);
+            Alert.alert(
+                'Ringtone Updated 🔔',
+                `An saita sautin "${RINGTONE_CATALOG.find(r => r.id === toneId)?.name}" a matsayin sautin faɗakarwa na Admin!`
+            );
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        }
+    };
+
+    const playPreviewSound = async (toneId: string) => {
+        try {
+            const tone = RINGTONE_CATALOG.find(t => t.id === toneId);
+            if (!tone) return;
+
+            if (soundInstanceRef.current) {
+                await soundInstanceRef.current.unloadAsync().catch(() => {});
+                soundInstanceRef.current = null;
+            }
+
+            if (playingRingtone === toneId) {
+                setPlayingRingtone(null);
+                return;
+            }
+
+            setPlayingRingtone(toneId);
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: tone.uri },
+                { shouldPlay: true, volume: 1.0 }
+            );
+            soundInstanceRef.current = sound;
+
+            sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
+                    setPlayingRingtone(null);
+                }
+            });
+        } catch (e) {
+            console.log('Error playing audio preview:', e);
+            setPlayingRingtone(null);
+        }
+    };
+
     const subscribeToRealtimeNotifications = () => {
         const channel = supabase
             .channel('admin-notifs-realtime')
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'notifications' },
-                (payload) => {
+                async (payload) => {
                     const newNotif = payload.new as AdminNotificationItem;
                     setNotifications(prev => [newNotif, ...prev]);
-                    // Instant in-app trigger
+
+                    // Play configured Admin Ringtone on incoming alert
+                    try {
+                        const targetToneId = newNotif.data?.ringtone || adminRingtone || 'executive_bell';
+                        const tone = RINGTONE_CATALOG.find(t => t.id === targetToneId) || RINGTONE_CATALOG[0];
+                        if (tone?.uri) {
+                            const { sound } = await Audio.Sound.createAsync(
+                                { uri: tone.uri },
+                                { shouldPlay: true, volume: 1.0 }
+                            );
+                            soundInstanceRef.current = sound;
+                        }
+                    } catch (soundErr) {
+                        console.log('Realtime sound playback error:', soundErr);
+                    }
+
+                    // Instant in-app heads-up trigger
                     sendInstantNotification(
                         newNotif.title || 'New Admin Notification',
                         newNotif.body || 'You have an important platform alert.',
@@ -246,7 +395,7 @@ export default function AdminPushNotificationsScreen() {
                 if (data) targetUsers = [data];
             }
 
-            // 1. Insert into notifications table (Marked as permanent broadcast)
+            // 1. Insert into notifications table (Marked as permanent broadcast with customized ringtone)
             const insertRows: any[] = targetUsers.map(u => ({
                 user_id: u.id || null,
                 title: pushTitle.trim(),
@@ -259,6 +408,8 @@ export default function AdminPushNotificationsScreen() {
                 data: {
                     type: dispatchType,
                     is_permanent: isPermanent,
+                    ringtone: selectedRingtoneForPush,
+                    ringtone_name: RINGTONE_CATALOG.find(r => r.id === selectedRingtoneForPush)?.name,
                     target_audience: targetAudience,
                     sent_by_admin: true,
                     meeting_link: dispatchType === 'staff_meeting' ? meetingLink : undefined,
@@ -282,6 +433,8 @@ export default function AdminPushNotificationsScreen() {
                     data: { 
                         type: dispatchType,
                         is_permanent: isPermanent,
+                        ringtone: selectedRingtoneForPush,
+                        ringtone_name: RINGTONE_CATALOG.find(r => r.id === selectedRingtoneForPush)?.name,
                         target_audience: targetAudience,
                         sent_by_admin: true,
                         meeting_link: dispatchType === 'staff_meeting' ? meetingLink : undefined,
@@ -405,12 +558,23 @@ export default function AdminPushNotificationsScreen() {
                     </View>
                 </View>
 
-                {activeTab === 'inbox' && unreadCount > 0 && (
-                    <TouchableOpacity onPress={markAllAsRead} style={s.markReadBtn} activeOpacity={0.8}>
-                        <Ionicons name="checkmark-done" size={14} color={C.blue} />
-                        <Text style={s.markReadText}>Read All</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TouchableOpacity
+                        onPress={() => setShowRingtoneModal(true)}
+                        style={s.ringtoneHeaderBtn}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="musical-notes" size={15} color={C.gold} />
+                        <Text style={s.ringtoneHeaderBtnText}>Ringtone</Text>
                     </TouchableOpacity>
-                )}
+
+                    {activeTab === 'inbox' && unreadCount > 0 && (
+                        <TouchableOpacity onPress={markAllAsRead} style={s.markReadBtn} activeOpacity={0.8}>
+                            <Ionicons name="checkmark-done" size={14} color={C.blue} />
+                            <Text style={s.markReadText}>Read All</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
             </View>
 
             {/* Mode Switcher Tabs */}
@@ -886,6 +1050,47 @@ export default function AdminPushNotificationsScreen() {
                         </View>
                     </View>
 
+                    {/* 4. Notification Ringtone / Chime Selection */}
+                    <Text style={s.sectionHeader}>4. SELECT ALERT RINGTONE (SAUTIN FAƊAKARWA)</Text>
+                    <View style={s.ringtoneSelectorBox}>
+                        <Text style={s.ringtoneSelectorDesc}>
+                            Zaɓi ainihin sautin ringtone ɗin da zai yi ƙara a wayar Admin da mai karɓa idan an tura wannan sanarwar:
+                        </Text>
+                        <View style={s.ringtoneListGrid}>
+                            {RINGTONE_CATALOG.map((tone) => {
+                                const isSelected = selectedRingtoneForPush === tone.id;
+                                const isPlaying = playingRingtone === tone.id;
+                                return (
+                                    <TouchableOpacity
+                                        key={tone.id}
+                                        onPress={() => setSelectedRingtoneForPush(tone.id)}
+                                        style={[s.ringtoneCardItem, isSelected && s.ringtoneCardItemActive]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={[s.ringtoneIconCircle, { backgroundColor: isSelected ? tone.color : '#F1F5F9' }]}>
+                                            <Ionicons name={tone.icon as any} size={16} color={isSelected ? '#FFFFFF' : tone.color} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[s.ringtoneCardTitle, isSelected && { color: C.navy, fontWeight: '900' }]}>
+                                                {tone.name}
+                                            </Text>
+                                            <Text style={s.ringtoneCardHausa}>{tone.hausa}</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                playPreviewSound(tone.id);
+                                            }}
+                                            style={[s.previewSoundBtn, isPlaying && s.previewSoundBtnActive]}
+                                        >
+                                            <Ionicons name={isPlaying ? 'pause' : 'play'} size={14} color={isPlaying ? '#FFFFFF' : tone.color} />
+                                        </TouchableOpacity>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+
                     {/* Dispatch Action Button */}
                     <TouchableOpacity
                         onPress={handleDispatchNotification}
@@ -961,6 +1166,84 @@ export default function AdminPushNotificationsScreen() {
                                 )}
                             </ScrollView>
                         )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Admin Ringtone Manager Modal */}
+            <Modal visible={showRingtoneModal} animationType="slide" transparent>
+                <View style={s.modalBackdrop}>
+                    <View style={s.detailSheet}>
+                        <View style={s.detailSheetHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={[s.notifIconCircle, { width: 34, height: 34, backgroundColor: C.goldLight }]}>
+                                    <Ionicons name="musical-notes" size={18} color={C.gold} />
+                                </View>
+                                <View>
+                                    <Text style={s.detailSheetTitle}>Ringtone Manager</Text>
+                                    <Text style={{ fontSize: 11, color: C.textMuted, fontWeight: '600' }}>Saitin Sautin Faɗakarwa na Admin</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowRingtoneModal(false)} style={s.detailCloseBtn}>
+                                <Ionicons name="close" size={20} color="#0F172A" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+                            <View style={s.ringtoneModalNotice}>
+                                <Ionicons name="information-circle" size={16} color={C.blue} />
+                                <Text style={s.ringtoneModalNoticeText}>
+                                    Zaɓi sautin ringtone ɗin da Admin zai riƙa ji a wayarsa idan sabon notification ko broadcast ya shigo. Hakanan zaka iya danna maɓallin play domin sauraron kowane sauti.
+                                </Text>
+                            </View>
+
+                            <View style={{ gap: 10, marginTop: 12, marginBottom: 20 }}>
+                                {RINGTONE_CATALOG.map((tone) => {
+                                    const isCurrent = adminRingtone === tone.id;
+                                    const isPlaying = playingRingtone === tone.id;
+                                    return (
+                                        <View key={tone.id} style={[s.ringtoneManagerItem, isCurrent && s.ringtoneManagerItemActive]}>
+                                            <View style={[s.ringtoneIconCircle, { backgroundColor: isCurrent ? tone.color : '#F1F5F9' }]}>
+                                                <Ionicons name={tone.icon as any} size={18} color={isCurrent ? '#FFFFFF' : tone.color} />
+                                            </View>
+
+                                            <View style={{ flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Text style={[s.ringtoneCardTitle, isCurrent && { color: C.navy, fontWeight: '900' }]}>
+                                                        {tone.name}
+                                                    </Text>
+                                                    {isCurrent && (
+                                                        <View style={s.activeRingtoneBadge}>
+                                                            <Text style={s.activeRingtoneBadgeText}>ACTIVE</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <Text style={s.ringtoneCardHausa}>{tone.hausa}</Text>
+                                                <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{tone.desc}</Text>
+                                            </View>
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <TouchableOpacity
+                                                    onPress={() => playPreviewSound(tone.id)}
+                                                    style={[s.previewSoundBtn, isPlaying && s.previewSoundBtnActive]}
+                                                >
+                                                    <Ionicons name={isPlaying ? 'pause' : 'play'} size={14} color={isPlaying ? '#FFFFFF' : tone.color} />
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    onPress={() => handleSaveAdminRingtone(tone.id)}
+                                                    style={[s.selectToneBtn, isCurrent && s.selectToneBtnActive]}
+                                                >
+                                                    <Text style={[s.selectToneBtnText, isCurrent && { color: '#FFFFFF' }]}>
+                                                        {isCurrent ? 'Selected' : 'Use'}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -1497,5 +1780,143 @@ const s = StyleSheet.create({
         color: '#B45309',
         fontSize: 9.5,
         fontWeight: '800',
+    },
+    ringtoneHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    ringtoneHeaderBtnText: {
+        color: '#B45309',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    ringtoneSelectorBox: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 16,
+    },
+    ringtoneSelectorDesc: {
+        fontSize: 12,
+        color: '#64748B',
+        lineHeight: 18,
+        marginBottom: 12,
+        fontWeight: '500',
+    },
+    ringtoneListGrid: {
+        gap: 8,
+    },
+    ringtoneCardItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 10,
+    },
+    ringtoneCardItemActive: {
+        backgroundColor: '#FFFBEB',
+        borderColor: '#F59E0B',
+    },
+    ringtoneIconCircle: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    ringtoneCardTitle: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: '#334155',
+    },
+    ringtoneCardHausa: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 1,
+    },
+    previewSoundBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    previewSoundBtnActive: {
+        backgroundColor: '#0F172A',
+        borderColor: '#0F172A',
+    },
+    ringtoneModalNotice: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 10,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    ringtoneModalNoticeText: {
+        flex: 1,
+        fontSize: 11.5,
+        color: '#1E40AF',
+        lineHeight: 17,
+        fontWeight: '500',
+    },
+    ringtoneManagerItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 10,
+    },
+    ringtoneManagerItemActive: {
+        backgroundColor: '#FFFBEB',
+        borderColor: '#F59E0B',
+    },
+    activeRingtoneBadge: {
+        backgroundColor: '#10B981',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    activeRingtoneBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    selectToneBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+    },
+    selectToneBtnActive: {
+        backgroundColor: '#0F172A',
+        borderColor: '#0F172A',
+    },
+    selectToneBtnText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#334155',
     },
 });
