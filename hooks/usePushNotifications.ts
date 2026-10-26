@@ -2,8 +2,45 @@ import { useState, useEffect, useRef } from 'react';
 import { Platform, Alert, Linking } from 'react-native';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import { useRouter } from 'expo-router';
+
+// Audio Catalog URLs for all devices and notifications
+export const GLOBAL_RINGTONES: Record<string, string> = {
+  executive_bell: 'https://cdn.freesound.org/previews/264/264981_4486188-lq.mp3',
+  siren_alert: 'https://cdn.freesound.org/previews/456/456544_5121236-lq.mp3',
+  cash_register: 'https://cdn.freesound.org/previews/333/333404_4684427-lq.mp3',
+  military_horn: 'https://cdn.freesound.org/previews/387/387232_1474204-lq.mp3',
+  radar_ping: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
+  subtle_chime: 'https://cdn.freesound.org/previews/352/352661_4019029-lq.mp3',
+};
+
+// Play ringtone on the device using Audio.Sound
+export async function playDeviceAlertSound(toneKey?: string) {
+  try {
+    let key = toneKey;
+    if (!key) {
+      // Check if global default ringtone exists in AsyncStorage
+      key = await AsyncStorage.getItem('global_notification_ringtone') || 'executive_bell';
+    }
+    const soundUri = GLOBAL_RINGTONES[key] || GLOBAL_RINGTONES['executive_bell'];
+    if (soundUri) {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: soundUri },
+        { shouldPlay: true, volume: 1.0 }
+      );
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+        }
+      });
+    }
+  } catch (err) {
+    console.log('[PushSound] Audio playback error:', err);
+  }
+}
 
 let NotificationsModule: any = null;
 
@@ -110,6 +147,9 @@ export async function sendInstantNotification(
       },
       trigger: null, // triggers instantly
     });
+
+    // Play configured ringtone audio chime on device
+    await playDeviceAlertSound(data?.ringtone);
     console.log(`[Push] Instant notification dispatched to ${selectedChannel} channel: ${title}`);
   } catch (err) {
     console.warn('[Notification] Failed to dispatch instant notification:', err);
@@ -274,7 +314,12 @@ export function usePushNotifications() {
               await sendInstantNotification(
                 title,
                 body,
-                { route: '/(app)/history', transaction_id: tr.id, is_funding: isFunding },
+                { 
+                  route: '/(app)/history', 
+                  transaction_id: tr.id, 
+                  is_funding: isFunding,
+                  ringtone: isFunding ? 'cash_register' : 'subtle_chime'
+                },
                 'transactions'
               );
             }

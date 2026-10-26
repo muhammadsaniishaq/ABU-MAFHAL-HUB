@@ -205,10 +205,28 @@ export default function AdminPushNotificationsScreen() {
 
     const loadSavedAdminRingtone = async () => {
         try {
-            const saved = await AsyncStorage.getItem('admin_preferred_ringtone');
-            if (saved) {
-                setAdminRingtone(saved as any);
-                setSelectedRingtoneForPush(saved);
+            // First check local AsyncStorage
+            const localSaved = await AsyncStorage.getItem('admin_preferred_ringtone');
+            if (localSaved) {
+                setAdminRingtone(localSaved as any);
+                setSelectedRingtoneForPush(localSaved);
+            }
+
+            // Sync from Supabase app_settings so all devices are aligned
+            const { data } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'global_notification_ringtone')
+                .maybeSingle();
+
+            if (data?.value) {
+                const globalTone = typeof data.value === 'string' ? data.value : data.value.ringtone || data.value.id;
+                if (globalTone) {
+                    setAdminRingtone(globalTone as any);
+                    setSelectedRingtoneForPush(globalTone);
+                    await AsyncStorage.setItem('admin_preferred_ringtone', globalTone);
+                    await AsyncStorage.setItem('global_notification_ringtone', globalTone);
+                }
             }
         } catch (e) {
             console.log('Error loading saved ringtone:', e);
@@ -218,11 +236,25 @@ export default function AdminPushNotificationsScreen() {
     const handleSaveAdminRingtone = async (toneId: any) => {
         try {
             setAdminRingtone(toneId);
+            setSelectedRingtoneForPush(toneId);
             await AsyncStorage.setItem('admin_preferred_ringtone', toneId);
+            await AsyncStorage.setItem('global_notification_ringtone', toneId);
+
+            // Persist globally into app_settings so ALL users and devices ring with this sound
+            try {
+                await supabase.from('app_settings').upsert({
+                    key: 'global_notification_ringtone',
+                    value: toneId,
+                    description: 'Global system notification ringtone sound configured from Admin Panel'
+                }, { onConflict: 'key' });
+            } catch (dbErr) {
+                console.log('[Ringtone] DB sync note:', dbErr);
+            }
+
             playPreviewSound(toneId);
             Alert.alert(
-                'Ringtone Updated 🔔',
-                `An saita sautin "${RINGTONE_CATALOG.find(r => r.id === toneId)?.name}" a matsayin sautin faɗakarwa na Admin!`
+                'Ringtone Set for All Devices 🔔',
+                `An saita sautin "${RINGTONE_CATALOG.find(r => r.id === toneId)?.name}" a matsayin babban sautin faɗakarwa na dukkan asusu da wayoyin mutane!`
             );
         } catch (e: any) {
             Alert.alert('Error', e.message);
@@ -459,7 +491,8 @@ export default function AdminPushNotificationsScreen() {
                     channelId: isUrgent ? 'security' : 'transactions',
                     priority: isUrgent ? 'high' : 'default',
                     data: {
-                        route: dispatchType === 'liquidity_low' ? '/manage/liquidity' : dispatchType === 'support_track' ? '/manage/tickets' : '/manage/communications'
+                        ringtone: selectedRingtoneForPush,
+                        route: dispatchType === 'liquidity_low' ? '/manage/liquidity' : dispatchType === 'support_track' ? '/manage/tickets' : '/manage/notifications'
                     }
                 }));
 
