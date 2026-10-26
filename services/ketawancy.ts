@@ -42,18 +42,21 @@ export async function getKetawancyApiKey(): Promise<string> {
         }
 
         // 2. Check app_settings table (accessible to all authenticated users)
-        const { data: setting } = await supabase
+        const { data: settings } = await supabase
             .from('app_settings')
-            .select('value')
-            .in('key', ['KETAWANCY_API_KEY', 'ketawancy_api_key', 'ketawancy_key', 'KETAWANCY_KEY'])
-            .maybeSingle();
+            .select('key, value')
+            .or('key.ilike.%ketawanc%,key.ilike.%ketawans%');
 
-        if (setting?.value) {
-            const val = typeof setting.value === 'object' ? setting.value?.key || setting.value?.value : setting.value;
-            if (val && typeof val === 'string' && val.trim() !== '') {
-                cachedApiKey = val.trim();
-                lastKeyFetchTime = now;
-                return cachedApiKey;
+        if (settings && settings.length > 0) {
+            for (const s of settings) {
+                const val = typeof s.value === 'object' && s.value !== null 
+                    ? (s.value?.key || s.value?.value || s.value?.token || s.value?.apiKey) 
+                    : s.value;
+                if (val && typeof val === 'string' && val.trim() !== '') {
+                    cachedApiKey = val.trim();
+                    lastKeyFetchTime = now;
+                    return cachedApiKey;
+                }
             }
         }
 

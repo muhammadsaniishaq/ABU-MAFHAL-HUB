@@ -183,6 +183,49 @@ Deno.serve(async (req) => {
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200
+        }
+
+        // ACTION 4: SAVE SYSTEM SECRETS & KEYS (Bypasses RLS with Service Role)
+        if (action === 'save-secrets') {
+            const { secretsMap, syncAppSettings = true } = body;
+            if (!secretsMap || typeof secretsMap !== 'object') {
+                throw new Error("secretsMap object is required");
+            }
+
+            const upsertPromises: Promise<any>[] = [];
+            for (const [key, val] of Object.entries(secretsMap)) {
+                if (typeof val === 'string' && val.trim()) {
+                    const cleanVal = val.trim();
+                    // Store in system_secrets
+                    upsertPromises.push(
+                        supabaseAdmin.from('system_secrets').upsert({
+                            key,
+                            value: cleanVal,
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'key' })
+                    );
+
+                    // If requested or is telecom key (like Ketawancy), sync to app_settings so mobile client can read
+                    if (syncAppSettings || key.toUpperCase().includes('KETAWANC')) {
+                        upsertPromises.push(
+                            supabaseAdmin.from('app_settings').upsert({
+                                key,
+                                value: cleanVal,
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: 'key' })
+                        );
+                    }
+                }
+            }
+
+            await Promise.all(upsertPromises);
+
+            return new Response(JSON.stringify({
+                status: 'success',
+                message: 'Secrets saved and synchronized successfully',
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
             });
         }
 
