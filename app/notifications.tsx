@@ -119,6 +119,24 @@ export default function NotificationsScreen() {
     };
 
     const confirmDelete = (id: string, item: any) => {
+        // Protect permanent official admin broadcasts & critical notices from deletion
+        const isPermanent = item.is_permanent || 
+            item.type === 'broadcast' || 
+            item.type === 'admin_push' || 
+            item.type === 'announcement' || 
+            item.type === 'staff_meeting' ||
+            item.type === 'liquidity_low' ||
+            item.data?.is_permanent === true ||
+            item.data?.type === 'broadcast';
+
+        if (isPermanent) {
+            Alert.alert(
+                'Permanent Notice 📌',
+                'Wannan sakon sanarwa ne na hukuma (Official Admin Broadcast). An tsara shi ta yadda ba ya goguwa domin ya zama ainihin tarihin bayanai ga kowane mai asusu.'
+            );
+            return;
+        }
+
         if (Platform.OS !== 'web') {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
@@ -161,24 +179,43 @@ export default function NotificationsScreen() {
             if (Platform.OS !== 'web') {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             }
-            setNotifications([]);
+            // Keep permanent broadcast announcements, only clear regular transient alerts
+            const retained = notifications.filter((n) => 
+                n.is_permanent || 
+                n.type === 'broadcast' || 
+                n.type === 'admin_push' || 
+                n.type === 'announcement' ||
+                n.data?.is_permanent === true ||
+                n.data?.type === 'broadcast'
+            );
+            setNotifications(retained);
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) await supabase.from('notifications').delete().eq('user_id', user.id);
+            if (user) {
+                await supabase
+                    .from('notifications')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .not('type', 'in', '("broadcast","admin_push","announcement","staff_meeting","liquidity_low")');
+            }
         };
 
         if (Platform.OS === 'web') {
-            if (confirm('Delete All: Are you sure you want to clear all notifications?')) {
+            if (confirm('Delete non-permanent notifications? Official Admin Broadcasts will be permanently retained.')) {
                 executeClear();
             }
         } else {
-            Alert.alert('Clear All Notifications', 'Are you sure you want to delete all notifications?', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Clear All',
-                    style: 'destructive',
-                    onPress: executeClear,
-                },
-            ]);
+            Alert.alert(
+                'Clear Notifications', 
+                'Duk wasu sanarwa na yau da kullum za a goge su, amma dukkan Official Admin Broadcasts za su ci gaba da zama a ajiye ba sa goguwa.', 
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Clear Regular',
+                        style: 'destructive',
+                        onPress: executeClear,
+                    },
+                ]
+            );
         }
     };
 
@@ -379,13 +416,21 @@ export default function NotificationsScreen() {
                                 <Ionicons name="share-outline" size={14} color="#64748B" />
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                                onPress={() => confirmDelete(item.id, item)}
-                                style={s.actionIconButton}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                            </TouchableOpacity>
+                            {/* If permanent broadcast, show pinned badge instead of trash icon */}
+                            {item.is_permanent || item.type === 'broadcast' || item.type === 'admin_push' || item.data?.is_permanent ? (
+                                <View style={s.permanentLockBadge}>
+                                    <Ionicons name="pin" size={11} color="#D97706" />
+                                    <Text style={s.permanentLockBadgeText}>Permanent</Text>
+                                </View>
+                            ) : (
+                                <TouchableOpacity
+                                    onPress={() => confirmDelete(item.id, item)}
+                                    style={s.actionIconButton}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -1148,6 +1193,22 @@ const s = StyleSheet.create({
     changePasswordBtnText: {
         color: '#FFFFFF',
         fontSize: 11,
+        fontWeight: '800',
+    },
+    permanentLockBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    permanentLockBadgeText: {
+        color: '#B45309',
+        fontSize: 10,
         fontWeight: '800',
     },
 });

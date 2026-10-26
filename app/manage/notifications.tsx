@@ -77,8 +77,8 @@ export default function AdminPushNotificationsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
 
-    // Mode tabs: 'inbox' (Admin Alert Center) vs 'compose' (Send New Push / Broadcast)
-    const [activeTab, setActiveTab] = useState<'inbox' | 'compose'>((params.tab as any) === 'compose' ? 'compose' : 'inbox');
+    // Mode tabs: 'inbox' (Admin Alert Center) vs 'broadcasts' (Permanent Broadcast Archive) vs 'compose' (Send New Push)
+    const [activeTab, setActiveTab] = useState<'inbox' | 'broadcasts' | 'compose'>((params.tab as any) === 'compose' ? 'compose' : (params.tab as any) === 'broadcasts' ? 'broadcasts' : 'inbox');
     
     // Notifications Feed State
     const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
@@ -92,7 +92,7 @@ export default function AdminPushNotificationsScreen() {
 
     // Compose State
     const [dispatchType, setDispatchType] = useState<'support_track' | 'staff_meeting' | 'liquidity_low' | 'system_alert' | 'broadcast'>('broadcast');
-    const [targetAudience, setTargetAudience] = useState<'all' | 'admins' | 'staff' | 'single'>('admins');
+    const [targetAudience, setTargetAudience] = useState<'all' | 'admins' | 'staff' | 'single'>('all');
     const [singleTargetQuery, setSingleTargetQuery] = useState('');
     const [pushTitle, setPushTitle] = useState('');
     const [pushBody, setPushBody] = useState('');
@@ -101,6 +101,7 @@ export default function AdminPushNotificationsScreen() {
     const [lowFloatProvider, setLowFloatProvider] = useState('BilalSadaSub Telecom');
     const [lowFloatBalance, setLowFloatBalance] = useState('₦3,450.00');
     const [isUrgent, setIsUrgent] = useState(false);
+    const [isPermanent, setIsPermanent] = useState(true); // Permanent broadcast that cannot be deleted
     const [sending, setSending] = useState(false);
 
     useEffect(() => {
@@ -245,7 +246,7 @@ export default function AdminPushNotificationsScreen() {
                 if (data) targetUsers = [data];
             }
 
-            // 1. Insert into notifications table
+            // 1. Insert into notifications table (Marked as permanent broadcast)
             const insertRows: any[] = targetUsers.map(u => ({
                 user_id: u.id || null,
                 title: pushTitle.trim(),
@@ -254,8 +255,12 @@ export default function AdminPushNotificationsScreen() {
                 category: dispatchType === 'liquidity_low' ? 'liquidity' : dispatchType === 'staff_meeting' ? 'staff' : 'system',
                 priority: isUrgent ? 'urgent' : 'normal',
                 is_read: false,
+                is_permanent: isPermanent,
                 data: {
                     type: dispatchType,
+                    is_permanent: isPermanent,
+                    target_audience: targetAudience,
+                    sent_by_admin: true,
                     meeting_link: dispatchType === 'staff_meeting' ? meetingLink : undefined,
                     provider: dispatchType === 'liquidity_low' ? lowFloatProvider : undefined,
                     route: dispatchType === 'liquidity_low' ? '/manage/liquidity' : dispatchType === 'support_track' ? '/manage/tickets' : '/manage/notifications'
@@ -273,8 +278,12 @@ export default function AdminPushNotificationsScreen() {
                     category: 'system',
                     priority: isUrgent ? 'urgent' : 'normal',
                     is_read: false,
+                    is_permanent: isPermanent,
                     data: { 
                         type: dispatchType,
+                        is_permanent: isPermanent,
+                        target_audience: targetAudience,
+                        sent_by_admin: true,
                         meeting_link: dispatchType === 'staff_meeting' ? meetingLink : undefined,
                         provider: dispatchType === 'liquidity_low' ? lowFloatProvider : undefined,
                         route: dispatchType === 'liquidity_low' ? '/manage/liquidity' : dispatchType === 'support_track' ? '/manage/tickets' : '/manage/notifications'
@@ -337,6 +346,24 @@ export default function AdminPushNotificationsScreen() {
         });
     }, [notifications, categoryFilter, searchQuery]);
 
+    // Permanent Broadcasts Archive (Duk wani sako da aka tura wanda ba ya goguwa)
+    const broadcastArchive = useMemo(() => {
+        return notifications.filter(item => {
+            const isBroadcast = item.type === 'broadcast' || 
+                item.type === 'system_alert' || 
+                item.type === 'admin_push' || 
+                item.type === 'staff_meeting' ||
+                item.data?.sent_by_admin === true ||
+                item.data?.is_permanent === true;
+            
+            if (!isBroadcast) return false;
+            if (!searchQuery.trim()) return true;
+
+            return (item.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                   (item.body || '').toLowerCase().includes(searchQuery.toLowerCase());
+        });
+    }, [notifications, searchQuery]);
+
     const unreadCount = notifications.filter(n => !n.is_read).length;
 
     const getIconForType = (type?: string, title?: string) => {
@@ -392,9 +419,9 @@ export default function AdminPushNotificationsScreen() {
                     onPress={() => setActiveTab('inbox')}
                     style={[s.tabSwitchBtn, activeTab === 'inbox' && s.tabSwitchBtnActive]}
                 >
-                    <Ionicons name="file-tray-full-outline" size={16} color={activeTab === 'inbox' ? '#FFFFFF' : C.textSub} />
+                    <Ionicons name="notifications-outline" size={15} color={activeTab === 'inbox' ? '#FFFFFF' : C.textSub} />
                     <Text style={[s.tabSwitchText, activeTab === 'inbox' && s.tabSwitchTextActive]}>
-                        Notifications Feed
+                        Alerts
                     </Text>
                     {unreadCount > 0 && (
                         <View style={s.tabBadge}>
@@ -404,15 +431,25 @@ export default function AdminPushNotificationsScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                    onPress={() => setActiveTab('broadcasts')}
+                    style={[s.tabSwitchBtn, activeTab === 'broadcasts' && s.tabSwitchBtnActive]}
+                >
+                    <Ionicons name="archive-outline" size={15} color={activeTab === 'broadcasts' ? '#FFFFFF' : C.textSub} />
+                    <Text style={[s.tabSwitchText, activeTab === 'broadcasts' && s.tabSwitchTextActive]}>
+                        Broadcasts ({broadcastArchive.length})
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                     onPress={() => {
                         setActiveTab('compose');
-                        if (!pushTitle) applyComposePreset('staff_meeting');
+                        if (!pushTitle) applyComposePreset('broadcast');
                     }}
                     style={[s.tabSwitchBtn, activeTab === 'compose' && s.tabSwitchBtnActive]}
                 >
-                    <Ionicons name="paper-plane-outline" size={16} color={activeTab === 'compose' ? '#FFFFFF' : C.textSub} />
+                    <Ionicons name="paper-plane-outline" size={15} color={activeTab === 'compose' ? '#FFFFFF' : C.textSub} />
                     <Text style={[s.tabSwitchText, activeTab === 'compose' && s.tabSwitchTextActive]}>
-                        Send Push Alert
+                        Send Push
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -552,8 +589,101 @@ export default function AdminPushNotificationsScreen() {
                         )}
                     </ScrollView>
                 </View>
+            ) : activeTab === 'broadcasts' ? (
+                /* TAB 2: PERMANENT BROADCAST ARCHIVE (Ba ya goguwa) */
+                <View style={{ flex: 1 }}>
+                    {/* Header banner explaining permanent retention */}
+                    <View style={s.permanentNoticeBanner}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="shield-checkmark" size={16} color={C.gold} />
+                            <Text style={s.permanentNoticeTitle}>Permanent Broadcast Vault</Text>
+                        </View>
+                        <Text style={s.permanentNoticeSub}>
+                            Duk wani sakon Broadcast da sanarwar gaggawa da ka tura yana nan a ajiye ba ya goguwa domin ya zama cikakken tarihin bayanai (Audit Trail).
+                        </Text>
+                    </View>
+
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        contentContainerStyle={s.feedScrollContent}
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />}
+                    >
+                        {loading ? (
+                            <View style={{ paddingVertical: 50, alignItems: 'center' }}>
+                                <ActivityIndicator size="large" color={C.gold} />
+                                <Text style={{ marginTop: 10, fontSize: 13, color: C.textSub, fontWeight: '700' }}>
+                                    Loading Broadcast History...
+                                </Text>
+                            </View>
+                        ) : broadcastArchive.length === 0 ? (
+                            <View style={s.emptyBox}>
+                                <Ionicons name="megaphone-outline" size={42} color="#CBD5E1" />
+                                <Text style={s.emptyTitle}>No Broadcasts Sent Yet</Text>
+                                <Text style={s.emptySub}>
+                                    Whenever you dispatch a system alert, staff meeting, or platform announcement, it will be permanently preserved here.
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setActiveTab('compose');
+                                        applyComposePreset('broadcast');
+                                    }}
+                                    style={s.emptyActionBtn}
+                                >
+                                    <Ionicons name="add-circle" size={16} color="#FFFFFF" />
+                                    <Text style={s.emptyActionBtnText}>Send First Broadcast</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            broadcastArchive.map((item, idx) => {
+                                const iconMeta = getIconForType(item.type, item.title);
+                                return (
+                                    <TouchableOpacity
+                                        key={item.id || `bcast-${idx}`}
+                                        onPress={() => {
+                                            setSelectedItem(item);
+                                        }}
+                                        style={s.broadcastArchiveCard}
+                                        activeOpacity={0.75}
+                                    >
+                                        <View style={[s.notifIconCircle, { backgroundColor: iconMeta.bg }]}>
+                                            <Ionicons name={iconMeta.name as any} size={18} color={iconMeta.color} />
+                                        </View>
+
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                                                <Text style={[s.notifTitle, { flex: 1, paddingRight: 6 }]} numberOfLines={1}>
+                                                    {item.title}
+                                                </Text>
+                                                <View style={s.permanentTag}>
+                                                    <Ionicons name="lock-closed" size={10} color="#D97706" />
+                                                    <Text style={s.permanentTagText}>Permanent</Text>
+                                                </View>
+                                            </View>
+
+                                            <Text style={s.notifBody} numberOfLines={2}>
+                                                {item.body}
+                                            </Text>
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                                                <View style={[s.tagBadge, { backgroundColor: iconMeta.bg }]}>
+                                                    <Text style={[s.tagBadgeText, { color: iconMeta.color }]}>
+                                                        {iconMeta.label}
+                                                    </Text>
+                                                </View>
+                                                <Text style={s.notifTime}>
+                                                    {new Date(item.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
+                    </ScrollView>
+                </View>
             ) : (
-                /* TAB 2: COMPOSE PUSH NOTIFICATION STUDIO */
+                /* TAB 3: COMPOSE PUSH NOTIFICATION STUDIO */
                 <ScrollView
                     style={{ flex: 1 }}
                     contentContainerStyle={s.composeScrollContent}
@@ -735,6 +865,22 @@ export default function AdminPushNotificationsScreen() {
                                 value={isUrgent}
                                 onValueChange={setIsUrgent}
                                 trackColor={{ false: '#CBD5E1', true: C.red }}
+                                thumbColor="#FFFFFF"
+                            />
+                        </View>
+
+                        <View style={[s.switchRow, { borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 10, paddingTop: 10 }]}>
+                            <View style={{ flex: 1, paddingRight: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="lock-closed" size={14} color={C.gold} />
+                                    <Text style={[s.switchTitle, { color: C.textMain }]}>Permanent Broadcast (Ba ya goguwa)</Text>
+                                </View>
+                                <Text style={s.switchSub}>Preserves this broadcast permanently in the archive so it can never be deleted</Text>
+                            </View>
+                            <Switch
+                                value={isPermanent}
+                                onValueChange={setIsPermanent}
+                                trackColor={{ false: '#CBD5E1', true: C.gold }}
                                 thumbColor="#FFFFFF"
                             />
                         </View>
@@ -1299,6 +1445,57 @@ const s = StyleSheet.create({
     takeActionBtnText: {
         color: '#FFFFFF',
         fontSize: 12.5,
+        fontWeight: '800',
+    },
+    permanentNoticeBanner: {
+        backgroundColor: '#FFFBEB',
+        borderBottomWidth: 1,
+        borderBottomColor: '#FDE68A',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 4,
+    },
+    permanentNoticeTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#92400E',
+    },
+    permanentNoticeSub: {
+        fontSize: 11.5,
+        color: '#B45309',
+        lineHeight: 16,
+        fontWeight: '500',
+    },
+    broadcastArchiveCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    permanentTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    permanentTagText: {
+        color: '#B45309',
+        fontSize: 9.5,
         fontWeight: '800',
     },
 });
