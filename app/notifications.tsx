@@ -182,6 +182,27 @@ export default function NotificationsScreen() {
         }
     };
 
+    const handleLogoutOtherSessions = async () => {
+        try {
+            if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            }
+            const { error } = await supabase.auth.signOut({ scope: 'others' });
+            if (error) throw error;
+            Alert.alert(
+                'Sessions Terminated 🔒',
+                'Successfully logged out of all other active devices and browser sessions. Only this current session remains logged in.'
+            );
+        } catch (err: any) {
+            Alert.alert('Logout Error', err.message || 'Failed to terminate other sessions.');
+        }
+    };
+
+    const handleChangePassword = () => {
+        setShowDetailModal(false);
+        router.push('/manage/security' as any);
+    };
+
     const shareNotification = async (item: any) => {
         try {
             await Share.share({
@@ -553,6 +574,39 @@ export default function NotificationsScreen() {
                         <View style={s.modalBodyBox}>
                             <Text style={s.modalBodyContent}>{selectedItem?.body || selectedItem?.message || selectedItem?.massage}</Text>
                         </View>
+
+                        {/* Security Alert Quick Responses */}
+                        {(selectedItem?.type === 'security' || selectedItem?.data?.type === 'security' || selectedItem?.data?.security_action) && (
+                            <View style={s.securityActionPanel}>
+                                <View style={s.securityAlertHeaderRow}>
+                                    <Ionicons name="shield-half" size={16} color="#DC2626" />
+                                    <Text style={s.securityAlertHeaderTitle}>Security Recommendation</Text>
+                                </View>
+                                <Text style={s.securityAlertHeaderSubtitle}>
+                                    If you did not authorize this login, terminate other sessions immediately and update your password.
+                                </Text>
+
+                                <View style={s.securityButtonsRow}>
+                                    <TouchableOpacity
+                                        onPress={handleLogoutOtherSessions}
+                                        style={s.remoteLogoutBtn}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="log-out-outline" size={15} color="#DC2626" />
+                                        <Text style={s.remoteLogoutBtnText}>Log Out Other Devices</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={handleChangePassword}
+                                        style={s.changePasswordBtn}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="key-outline" size={15} color="#FFFFFF" />
+                                        <Text style={s.changePasswordBtnText}>Change Password</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
 
                         <View style={s.modalActionsRow}>
                             <TouchableOpacity
@@ -1030,6 +1084,70 @@ const s = StyleSheet.create({
     modalActionBtnText: {
         color: '#FFFFFF',
         fontSize: 12,
+        fontWeight: '800',
+    },
+    securityActionPanel: {
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 16,
+    },
+    securityAlertHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 4,
+    },
+    securityAlertHeaderTitle: {
+        color: '#991B1B',
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    securityAlertHeaderSubtitle: {
+        color: '#7F1D1D',
+        fontSize: 11,
+        lineHeight: 16,
+        fontWeight: '500',
+        marginBottom: 12,
+    },
+    securityButtonsRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    remoteLogoutBtn: {
+        flex: 1,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+    },
+    remoteLogoutBtnText: {
+        color: '#DC2626',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    changePasswordBtn: {
+        flex: 1,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: '#0F172A',
+        borderWidth: 1,
+        borderColor: '#0F172A',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+    },
+    changePasswordBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11,
         fontWeight: '800',
     },
 });

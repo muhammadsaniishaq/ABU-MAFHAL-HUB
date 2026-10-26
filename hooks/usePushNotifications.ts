@@ -224,13 +224,26 @@ export function usePushNotifications() {
               filter: `user_id=eq.${userId}`,
             },
             async (payload) => {
-              const { title, body, data } = payload.new || {};
+              const { title, body, data, type } = payload.new || {};
               if (title || body) {
+                const notifType = type || data?.type;
+                let targetChannel: 'transactions' | 'updates' | 'security' = 'updates';
+                if (notifType === 'security' || data?.priority === 'high') {
+                  targetChannel = 'security';
+                } else if (
+                  notifType === 'wallet_credit' || 
+                  notifType === 'wallet_debit' || 
+                  notifType === 'funding' || 
+                  notifType === 'transaction'
+                ) {
+                  targetChannel = 'transactions';
+                }
+
                 await sendInstantNotification(
                   title || 'Abu Mafhal Sub',
                   body || 'You have a new update.',
                   data || {},
-                  data?.priority === 'high' ? 'security' : 'transactions'
+                  targetChannel
                 );
               }
             }
@@ -245,16 +258,23 @@ export function usePushNotifications() {
             },
             async (payload) => {
               const tr = payload.new || {};
-              const type = tr.service_type || tr.type || 'Transaction';
+              const rawType = (tr.service_type || tr.type || 'Transaction').toLowerCase();
+              const isFunding = rawType.includes('fund') || rawType.includes('credit') || rawType.includes('deposit') || rawType.includes('topup');
               const amt = tr.amount ? `₦${Number(tr.amount).toLocaleString()}` : '';
               const status = tr.status || 'Completed';
-              const title = `⚡ ${type.toUpperCase()} ${status}`;
-              const body = `Your ${type} transaction for ${amt} has been processed (${status}).`;
+              
+              let title = `⚡ ${rawType.toUpperCase()} ${status}`;
+              let body = `Your ${rawType} transaction for ${amt} has been processed (${status}).`;
+
+              if (isFunding) {
+                title = `💰 Wallet Credited Successfully!`;
+                body = `Your Abu Mafhal wallet has been credited with ${amt}. Status: ${status}.`;
+              }
 
               await sendInstantNotification(
                 title,
                 body,
-                { route: '/(app)/history', transaction_id: tr.id },
+                { route: '/(app)/history', transaction_id: tr.id, is_funding: isFunding },
                 'transactions'
               );
             }

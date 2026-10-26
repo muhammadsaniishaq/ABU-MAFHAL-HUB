@@ -318,15 +318,70 @@ export default function LoginScreen() {
                 try {
                     const res = await fetch('https://api.ipify.org?format=json');
                     const json = await res.json();
-                    ip = json.ip;
+                    ip = json.ip || 'Unknown IP';
                 } catch (e) { console.log("Failed fetching IP", e); }
 
+                const deviceLabel = Platform.OS === 'web' 
+                    ? 'Web Browser (Chrome/Safari)' 
+                    : `${Platform.OS.toUpperCase()} Phone Device`;
+                const loginAlertTitle = "New Login Detected 🔐";
+                const loginAlertBody = `An account login was recorded from ${deviceLabel} (IP: ${ip}). If this was not you, tap to secure your account immediately.`;
+
+                // 1. Insert In-App Notification with security metadata
                 await supabase.from('notifications').insert({
                     user_id: data.user.id,
-                    title: "New Login Detected 🔐",
-                    body: `New login from IP: ${ip} on ${Platform.OS.toUpperCase()}.`,
-                    data: { priority: 'high', type: 'security', ip }
+                    title: loginAlertTitle,
+                    body: loginAlertBody,
+                    data: {
+                        priority: 'high',
+                        type: 'security',
+                        security_action: 'review_login',
+                        ip,
+                        device: deviceLabel,
+                        platform: Platform.OS,
+                        login_time: new Date().toISOString(),
+                        route: '/notifications'
+                    }
                 });
+
+                // 2. Dispatch Direct Remote Expo Push to registered mobile device(s)
+                try {
+                    const { data: profToken } = await supabase
+                        .from('profiles')
+                        .select('expo_push_token')
+                        .eq('id', data.user.id)
+                        .maybeSingle();
+
+                    if (profToken?.expo_push_token) {
+                        await fetch('https://exp.host/--/api/v2/push/send', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Accept-encoding': 'gzip, deflate',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                to: profToken.expo_push_token,
+                                sound: 'default',
+                                title: loginAlertTitle,
+                                body: loginAlertBody,
+                                channelId: 'security',
+                                priority: 'high',
+                                badge: 1,
+                                data: {
+                                    type: 'security',
+                                    security_action: 'review_login',
+                                    route: '/notifications',
+                                    ip,
+                                    platform: Platform.OS,
+                                    timestamp: new Date().toISOString()
+                                }
+                            }),
+                        });
+                    }
+                } catch (pushErr) {
+                    console.log('[LoginPushAlert] Remote push failed:', pushErr);
+                }
 
                 const KNOWN_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'admin@abumafhal.com', 'abumafhal@gmail.com'];
                 const userEmail = data.user.email ? data.user.email.toLowerCase().trim() : '';
