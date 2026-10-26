@@ -17,6 +17,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
@@ -120,6 +121,51 @@ const VOICE_COMMANDS = [
         reply: 'Fetching real-time API wallet balances and provider health.',
         icon: 'wallet',
         color: C.gold,
+    },
+    {
+        id: 'cmd_map',
+        phrase: 'Open Geo Map and Live Traffic Radar',
+        action: 'map',
+        route: '/manage/map',
+        reply: 'Opening live traffic radar and state geolocation ingress.',
+        icon: 'map',
+        color: C.blue,
+    },
+    {
+        id: 'cmd_marketing',
+        phrase: 'Launch marketing campaign studio',
+        action: 'marketing',
+        route: '/manage/marketing',
+        reply: 'Accessing marketing campaign and promotional broadcast studio.',
+        icon: 'megaphone',
+        color: C.gold,
+    },
+    {
+        id: 'cmd_legal',
+        phrase: 'Open Legal and Policy compliance center',
+        action: 'legal',
+        route: '/manage/legal',
+        reply: 'Accessing Central Bank compliance, policies, and contracts vault.',
+        icon: 'document-text',
+        color: C.purple,
+    },
+    {
+        id: 'cmd_files',
+        phrase: 'Open Cloud File Repository',
+        action: 'files',
+        route: '/manage/files',
+        reply: 'Opening Supabase cloud storage buckets and file repository.',
+        icon: 'folder',
+        color: C.blue,
+    },
+    {
+        id: 'cmd_infrastructure',
+        phrase: 'Check system status and infrastructure',
+        action: 'infrastructure',
+        route: '/manage/infrastructure',
+        reply: 'Opening database ledger probes and live latency health.',
+        icon: 'server',
+        color: C.green,
     },
     {
         id: 'cmd_kyc',
@@ -348,35 +394,38 @@ export default function AudioVoiceControlHub() {
             let audioUri = file.uri;
             const cleanFileName = `voice_hub_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
 
-            if (Platform.OS === 'web') {
-                const response = await fetch(file.uri);
-                const blob = await response.blob();
-                const { error } = await supabase.storage
-                    .from('banners')
-                    .upload(`ringtones/${cleanFileName}`, blob, {
-                        contentType: file.mimeType || 'audio/mpeg',
-                        upsert: true,
+            try {
+                let base64Data = '';
+                if (Platform.OS === 'web' && (file as any).file) {
+                    const reader = new FileReader();
+                    base64Data = await new Promise((resolve, reject) => {
+                        reader.onload = () => {
+                            const res = reader.result as string;
+                            resolve(res.includes(',') ? res.split(',')[1] : res);
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL((file as any).file);
                     });
-
-                if (!error) {
-                    const { data: publicUrlData } = supabase.storage
-                        .from('banners')
-                        .getPublicUrl(`ringtones/${cleanFileName}`);
-                    if (publicUrlData?.publicUrl) audioUri = publicUrlData.publicUrl;
+                } else if (file.uri) {
+                    base64Data = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
                 }
-            } else {
-                try {
-                    const { data: uploadRes } = await supabase.functions.invoke('admin-audit-logs', {
+
+                if (base64Data) {
+                    const { data: uploadRes, error: uploadErr } = await supabase.functions.invoke('admin-audit-logs', {
                         body: {
                             action: 'upload-ringtone',
                             fileName: cleanFileName,
-                            fileUri: file.uri,
-                            fileBase64: file.base64 || null,
-                            mimeType: file.mimeType || 'audio/mpeg',
+                            base64Data: base64Data,
+                            contentType: file.mimeType || 'audio/mpeg'
                         }
                     });
-                    if (uploadRes?.publicUrl) audioUri = uploadRes.publicUrl;
-                } catch (e) {}
+
+                    if (!uploadErr && uploadRes?.publicUrl) {
+                        audioUri = uploadRes.publicUrl;
+                    }
+                }
+            } catch (storageErr) {
+                console.log('[VoiceHubStorage] Upload fallback:', storageErr);
             }
 
             const newClip = {
@@ -406,6 +455,36 @@ export default function AudioVoiceControlHub() {
         } finally {
             setUploadingClip(false);
         }
+    };
+
+    const handleDeleteCustomAudio = (clip: any) => {
+        Alert.alert(
+            'Delete Audio',
+            `Remove "${clip.title || clip.name}" from your custom sound vault?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await stopAudio();
+                        const updated = audioCatalog.filter(c => c.id !== clip.id);
+                        setAudioCatalog(updated);
+
+                        const customs = updated.filter(c => c.is_custom);
+                        await supabase.from('app_settings').upsert({
+                            key: 'admin_custom_ringtones_catalog',
+                            value: customs,
+                            description: 'Custom ringtones uploaded by Admin'
+                        }, { onConflict: 'key' });
+
+                        if (activeToneId === clip.id) {
+                            await setAsGlobalSound(PRESET_AUDIO_CLIPS[0]);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     // Text to Speech Engine
@@ -761,6 +840,16 @@ export default function AudioVoiceControlHub() {
                                                 activeOpacity={0.8}
                                             >
                                                 <Text style={styles.setAsDefaultText}>Set Default</Text>
+                                            </TouchableOpacity>
+                                        )}
+
+                                        {item.is_custom && (
+                                            <TouchableOpacity
+                                                onPress={() => handleDeleteCustomAudio(item)}
+                                                style={[styles.previewBtn, { backgroundColor: C.redLight, borderColor: C.redBorder }]}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="trash-outline" size={16} color={C.red} />
                                             </TouchableOpacity>
                                         )}
                                     </View>
