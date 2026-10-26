@@ -750,7 +750,11 @@ export default function AdminPushNotificationsScreen() {
                         activeOpacity={0.8}
                     >
                         <Ionicons name="musical-notes" size={15} color={C.gold} />
-                        <Text style={s.ringtoneHeaderBtnText}>Ringtone</Text>
+                        <View style={{ maxWidth: 110 }}>
+                            <Text style={s.ringtoneHeaderBtnText} numberOfLines={1}>
+                                {ringtoneCatalog.find(r => r.id === adminRingtone)?.name || 'Ringtone'}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
 
                     {activeTab === 'inbox' && unreadCount > 0 && (
@@ -1420,10 +1424,46 @@ export default function AdminPushNotificationsScreen() {
                                 )}
                             </TouchableOpacity>
 
+                            {/* Active Ringtone Showcase Card */}
+                            {(() => {
+                                const activeTone = ringtoneCatalog.find(r => r.id === adminRingtone);
+                                return (
+                                    <View style={s.activeToneShowcaseCard}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                                <Text style={s.activeToneShowcaseLabel}>CURRENT ACTIVE RINGTONE (WANDA AKA SETA)</Text>
+                                            </View>
+                                            <View style={s.activeRingtoneBadge}>
+                                                <Text style={s.activeRingtoneBadgeText}>LIVE ON ALL PHONES</Text>
+                                            </View>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                                <Text style={s.activeToneShowcaseTitle}>{activeTone?.name || 'Executive Bell'}</Text>
+                                                <Text style={s.activeToneShowcaseSub}>
+                                                    {activeTone?.hausa || 'Wannan sautin ne zai yi ringing a duk wayoyin mutane'}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => playPreviewSound(adminRingtone)}
+                                                style={[s.previewSoundBtn, playingRingtone === adminRingtone && s.previewSoundBtnActive]}
+                                            >
+                                                <Ionicons
+                                                    name={playingRingtone === adminRingtone ? 'pause' : 'play'}
+                                                    size={15}
+                                                    color={playingRingtone === adminRingtone ? '#FFFFFF' : '#10B981'}
+                                                />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                );
+                            })()}
+
                             <View style={s.ringtoneModalNotice}>
                                 <Ionicons name="information-circle" size={16} color={C.blue} />
                                 <Text style={s.ringtoneModalNoticeText}>
-                                    Zaɓi sautin ringtone ɗin da Admin zai riƙa ji a wayarsa idan sabon notification ko broadcast ya shigo. Hakanan zaka iya danna maɓallin play domin sauraron kowane sauti.
+                                    Zaɓi ko loda sautin da kake so ya yi ringing a duk wayoyin mutane idan an tura musu sanarwa. Duk waya za ta yi ringing da wannan sautin maimakon sautin asali na wayarsu.
                                 </Text>
                             </View>
 
@@ -2205,6 +2245,31 @@ const s = StyleSheet.create({
         color: '#94A3B8',
         marginTop: 2,
         lineHeight: 15,
+    },
+    activeToneShowcaseCard: {
+        backgroundColor: '#ECFDF5',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1.5,
+        borderColor: '#A7F3D0',
+        marginBottom: 12,
+    },
+    activeToneShowcaseLabel: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#065F46',
+        letterSpacing: 0.4,
+    },
+    activeToneShowcaseTitle: {
+        fontSize: 14.5,
+        fontWeight: '900',
+        color: '#064E3B',
+    },
+    activeToneShowcaseSub: {
+        fontSize: 11.5,
+        color: '#047857',
+        marginTop: 2,
+        fontWeight: '600',
     },
 });
 

@@ -17,7 +17,7 @@ export const GLOBAL_RINGTONES: Record<string, string> = {
   subtle_chime: 'https://cdn.freesound.org/previews/352/352661_4019029-lq.mp3',
 };
 
-// Play ringtone on the device using Audio.Sound (supports predefined key or direct URL)
+// Play ringtone on the device using Audio.Sound (supports predefined key, direct URL, or dynamic app_settings sync)
 export async function playDeviceAlertSound(toneKeyOrUri?: string) {
   try {
     let sourceUri = '';
@@ -27,13 +27,49 @@ export async function playDeviceAlertSound(toneKeyOrUri?: string) {
     } else {
       let key = toneKeyOrUri;
       if (!key) {
-        key = await AsyncStorage.getItem('global_notification_ringtone') || 'executive_bell';
+        key = await AsyncStorage.getItem('global_notification_ringtone') || '';
       }
-      // Check if key is itself a stored custom URI
-      if (key && (key.startsWith('http://') || key.startsWith('https://') || key.startsWith('file://'))) {
-        sourceUri = key;
-      } else {
-        sourceUri = GLOBAL_RINGTONES[key || 'executive_bell'] || GLOBAL_RINGTONES['executive_bell'];
+
+      // Check if stored key is a JSON string containing uri or id
+      if (key && key.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(key);
+          if (parsed.uri) sourceUri = parsed.uri;
+          else if (parsed.id) key = parsed.id;
+        } catch (e) {}
+      }
+
+      if (!sourceUri) {
+        if (key && (key.startsWith('http://') || key.startsWith('https://') || key.startsWith('file://'))) {
+          sourceUri = key;
+        } else if (key && GLOBAL_RINGTONES[key]) {
+          sourceUri = GLOBAL_RINGTONES[key];
+        } else {
+          // If still unknown or custom, fetch real-time from Supabase app_settings
+          try {
+            const { data: dbTone } = await supabase
+              .from('app_settings')
+              .select('value')
+              .eq('key', 'global_notification_ringtone')
+              .maybeSingle();
+
+            if (dbTone?.value) {
+              if (typeof dbTone.value === 'object' && dbTone.value.uri) {
+                sourceUri = dbTone.value.uri;
+              } else if (typeof dbTone.value === 'string') {
+                if (dbTone.value.startsWith('http://') || dbTone.value.startsWith('https://')) {
+                  sourceUri = dbTone.value;
+                } else if (GLOBAL_RINGTONES[dbTone.value]) {
+                  sourceUri = GLOBAL_RINGTONES[dbTone.value];
+                }
+              }
+            }
+          } catch (e) {}
+
+          if (!sourceUri) {
+            sourceUri = GLOBAL_RINGTONES['executive_bell'];
+          }
+        }
       }
     }
 
@@ -71,7 +107,7 @@ try {
       NotificationsModule.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
-          shouldPlaySound: true,
+          shouldPlaySound: false, // Prevents system default beep from overriding our chosen ringtone
           shouldSetBadge: true,
           shouldShowBanner: true,
           shouldShowList: true,
@@ -383,8 +419,11 @@ export function usePushNotifications() {
     // Native Notification Listeners
     if (NotificationsModule && !isExpoGo) {
       notificationListener.current = NotificationsModule.addNotificationReceivedListener(
-        (notif: any) => {
+        async (notif: any) => {
           if (isMounted) setNotification(notif);
+          // Play the custom ringtone on any incoming remote push notification
+          const pushData = notif?.request?.content?.data;
+          await playDeviceAlertSound(pushData?.ringtone);
         }
       );
 
