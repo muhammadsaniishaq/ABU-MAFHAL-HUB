@@ -107,7 +107,7 @@ try {
       NotificationsModule.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
-          shouldPlaySound: false, // Prevents system default beep from overriding our chosen ringtone
+          shouldPlaySound: true, // Guarantees native sound alerts even when app is closed / in background
           shouldSetBadge: true,
           shouldShowBanner: true,
           shouldShowList: true,
@@ -140,7 +140,20 @@ export async function setupChannels() {
         bypassDnd: true,
       });
 
-      // Channel 2: Default / General Alerts
+      // Channel 2: Updates & Announcements (High Priority, Banner, Sound)
+      await NotificationsModule.setNotificationChannelAsync('updates', {
+        name: 'Updates & Announcements',
+        importance: NotificationsModule.AndroidImportance.MAX,
+        vibrationPattern: [0, 200, 200],
+        lightColor: '#0056D2',
+        sound: 'default',
+        enableLights: true,
+        enableVibrate: true,
+        showBadge: true,
+        lockscreenVisibility: NotificationsModule.AndroidNotificationVisibility.PUBLIC,
+      });
+
+      // Channel 3: Default / General Alerts
       await NotificationsModule.setNotificationChannelAsync('default', {
         name: 'General Alerts',
         importance: NotificationsModule.AndroidImportance.MAX,
@@ -153,7 +166,7 @@ export async function setupChannels() {
         lockscreenVisibility: NotificationsModule.AndroidNotificationVisibility.PUBLIC,
       });
 
-      // Channel 3: Security & Auth
+      // Channel 4: Security & Auth
       await NotificationsModule.setNotificationChannelAsync('security', {
         name: 'Security & Auth',
         importance: NotificationsModule.AndroidImportance.MAX,
@@ -254,7 +267,8 @@ export function usePushNotifications() {
           return null;
         }
 
-        if (Device.isDevice) {
+        // Attempt to get token on all native devices
+        try {
           const projectId =
             Constants?.expoConfig?.extra?.eas?.projectId ??
             Constants?.easConfig?.projectId ??
@@ -263,6 +277,15 @@ export function usePushNotifications() {
           const tokenResult = await NotificationsModule.getExpoPushTokenAsync({ projectId });
           token = tokenResult?.data;
           console.log('[Push] Registered Token successfully:', token);
+        } catch (innerTokErr: any) {
+          try {
+            // Fallback without explicit projectId if EAS config has it embedded
+            const tokenResult = await NotificationsModule.getExpoPushTokenAsync();
+            token = tokenResult?.data;
+            console.log('[Push] Registered Token (fallback) successfully:', token);
+          } catch (tokErr2: any) {
+            console.log('[Push] Expo push token registration note:', tokErr2?.message || tokErr2);
+          }
         }
       } catch (e: any) {
         console.warn('[Push] Push registration note:', e?.message || e);

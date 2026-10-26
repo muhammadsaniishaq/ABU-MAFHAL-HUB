@@ -645,8 +645,13 @@ export default function AdminPushNotificationsScreen() {
             const { error: insErr } = await supabase.from('notifications').insert(insertRows);
             if (insErr) throw insErr;
 
-            // 2. Dispatch via Expo Push API for users with valid tokens
-            const tokens = targetUsers.map(u => u.expo_push_token).filter((t): t is string => Boolean(t && (t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken['))));
+            // 2. Dispatch via Expo Push API for users with valid tokens (Chunked in batches of 100)
+            const tokens = Array.from(new Set(
+                targetUsers
+                    .map(u => u.expo_push_token)
+                    .filter((t): t is string => Boolean(t && (t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken['))))
+            ));
+
             if (tokens.length > 0) {
                 const messages = tokens.map(token => ({
                     to: token,
@@ -655,20 +660,30 @@ export default function AdminPushNotificationsScreen() {
                     body: pushBody.trim(),
                     channelId: isUrgent ? 'security' : 'transactions',
                     priority: isUrgent ? 'high' : 'default',
+                    badge: 1,
                     data: {
                         ringtone: selectedRingtoneForPush,
                         route: dispatchType === 'liquidity_low' ? '/manage/liquidity' : dispatchType === 'support_track' ? '/manage/tickets' : '/manage/notifications'
                     }
                 }));
 
-                await fetch('https://exp.host/--/api/v2/push/send', {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify(messages)
-                }).catch(() => {});
+                // Chunk into arrays of 100 for Expo API rate limits
+                const chunkSize = 100;
+                for (let i = 0; i < messages.length; i += chunkSize) {
+                    const chunk = messages.slice(i, i + chunkSize);
+                    await fetch('https://exp.host/--/api/v2/push/send', {
+                        method: 'POST',
+                        headers: { 
+                            'Accept': 'application/json', 
+                            'Accept-Encoding': 'gzip, deflate',
+                            'Content-Type': 'application/json' 
+                        },
+                        body: JSON.stringify(chunk)
+                    }).catch(err => console.log('Expo Push dispatch error:', err));
+                }
             }
 
-            Alert.alert('Push Dispatched 🚀', `Notification successfully dispatched to ${targetUsers.length > 0 ? targetUsers.length : 1} recipient(s).`);
+            Alert.alert('Push Dispatched 🚀', `Notification successfully dispatched to ${targetUsers.length > 0 ? targetUsers.length : 1} recipient(s) (${tokens.length} live device tokens).`);
             setPushTitle('');
             setPushBody('');
             setActiveTab('inbox');
