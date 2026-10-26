@@ -24,6 +24,7 @@ import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../services/supabase';
 import { sendInstantNotification } from '../../hooks/usePushNotifications';
+import { AIService } from '../../services/ai';
 
 const { width } = Dimensions.get('window');
 
@@ -162,6 +163,25 @@ export default function AdminPushNotificationsScreen() {
     const [isPermanent, setIsPermanent] = useState(true); // Permanent broadcast that cannot be deleted
     const [selectedRingtoneForPush, setSelectedRingtoneForPush] = useState<string>('executive_bell');
     const [sending, setSending] = useState(false);
+    const [generatingAI, setGeneratingAI] = useState(false);
+
+    // AI Broadcast Assistant Generator
+    const handleAIGenerateBroadcast = async (topic?: string) => {
+        setGeneratingAI(true);
+        try {
+            const prompt = topic || pushTitle || 'Exclusive discount on data and high-speed automated VTU services for all users on Abu Mafhal Sub.';
+            const result = await AIService.generateEmail(prompt, '📢 Abu Mafhal Sub Announcement');
+            if (result?.subject && result?.body) {
+                setPushTitle(result.subject.slice(0, 60));
+                setPushBody(result.body.slice(0, 240));
+                Alert.alert('AI Broadcast Ready ✨', 'Cortex AI has crafted your announcement message! You can review or edit before dispatching.');
+            }
+        } catch (e: any) {
+            Alert.alert('AI Notice', e?.message || 'Could not generate message at this moment.');
+        } finally {
+            setGeneratingAI(false);
+        }
+    };
 
     useEffect(() => {
         loadSavedAdminRingtone();
@@ -577,7 +597,7 @@ export default function AdminPushNotificationsScreen() {
             let targetUsers: { id?: string; expo_push_token?: string }[] = [];
 
             if (targetAudience === 'all') {
-                const { data } = await supabase.from('profiles').select('id, expo_push_token').limit(200);
+                const { data } = await supabase.from('profiles').select('id, expo_push_token').limit(2000);
                 targetUsers = data || [];
             } else if (targetAudience === 'admins' || targetAudience === 'staff') {
                 const { data } = await supabase.from('profiles').select('id, expo_push_token').in('role', ['admin', 'super_admin']);
@@ -586,9 +606,14 @@ export default function AdminPushNotificationsScreen() {
                 const q = singleTargetQuery.trim();
                 let col = 'email';
                 if (/^\d+$/.test(q) || q.startsWith('+')) col = 'phone';
-                else if (q.length === 36) col = 'id';
+                else if (q.length === 36 && q.includes('-')) col = 'id';
+                else col = 'username';
 
-                const { data } = await supabase.from('profiles').select('id, expo_push_token').eq(col, q).maybeSingle();
+                let { data } = await supabase.from('profiles').select('id, expo_push_token').ilike(col, q).maybeSingle();
+                if (!data && col === 'username') {
+                    const { data: byEmail } = await supabase.from('profiles').select('id, expo_push_token').ilike('email', q).maybeSingle();
+                    data = byEmail;
+                }
                 if (data) targetUsers = [data];
             }
 
@@ -1211,8 +1236,46 @@ export default function AdminPushNotificationsScreen() {
                         </View>
                     )}
 
-                    {/* 4. Notification Message Content */}
-                    <Text style={s.sectionHeader}>3. NOTIFICATION MESSAGE</Text>
+                    {/* 3. Notification Message Content with Cortex AI Generator */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 8 }}>
+                        <Text style={[s.sectionHeader, { marginTop: 0, marginBottom: 0 }]}>3. NOTIFICATION MESSAGE</Text>
+                        <TouchableOpacity
+                            onPress={() => handleAIGenerateBroadcast()}
+                            disabled={generatingAI}
+                            style={[s.aiMagicBtn, generatingAI && { opacity: 0.6 }]}
+                            activeOpacity={0.8}
+                        >
+                            {generatingAI ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name="sparkles" size={13} color="#FFFFFF" />
+                                    <Text style={s.aiMagicBtnText}>AI Broadcast</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* AI Quick Idea Chips */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                        {[
+                            { label: '⚡ Data Promo ₦250/GB', topic: 'Weekend special discount: 1GB MTN data at only ₦250. Instant delivery on Abu Mafhal Sub!' },
+                            { label: '🛡️ Core Maintenance', topic: 'Core telecom banking network maintenance completed successfully. All funding and VTU services are 100% active.' },
+                            { label: '💰 Virtual Bank Accounts', topic: 'New PalmPay and Wema Bank dedicated virtual accounts are live for instant auto wallet topup.' },
+                            { label: '📢 Urgent Admin Advisory', topic: 'Urgent operational advisory from Abu Mafhal Sub management regarding account security and 2FA.' },
+                        ].map((chip, idx) => (
+                            <TouchableOpacity
+                                key={idx}
+                                onPress={() => handleAIGenerateBroadcast(chip.topic)}
+                                disabled={generatingAI}
+                                style={s.aiIdeaChip}
+                            >
+                                <Ionicons name="bulb-outline" size={11} color={C.gold} />
+                                <Text style={s.aiIdeaChipText}>{chip.label}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
                     <View style={s.messageCard}>
                         <View style={s.formGroup}>
                             <Text style={s.formLabel}>Notification Title</Text>
@@ -2051,6 +2114,37 @@ const s = StyleSheet.create({
         shadowOpacity: 0.04,
         shadowRadius: 3,
         elevation: 1,
+    },
+    aiMagicBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#7C3AED',
+        paddingHorizontal: 11,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    aiMagicBtnText: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    aiIdeaChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 14,
+        marginRight: 6,
+    },
+    aiIdeaChipText: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#334155',
     },
     permanentTag: {
         flexDirection: 'row',
