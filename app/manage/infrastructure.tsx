@@ -219,11 +219,11 @@ export default function SystemStatusScreen() {
             }
 
             // 3. Update Services Status with Real Latencies
-            const updated = services.map(s => {
+            const updated: ServiceHealth[] = services.map(s => {
                 if (s.id === 'supabase_db') {
                     return {
                         ...s,
-                        status: usersErr ? 'Degraded' : 'Operational',
+                        status: (usersErr ? 'Degraded' : 'Operational') as 'Operational' | 'Degraded',
                         latencyMs: dbLatency || 38,
                     };
                 }
