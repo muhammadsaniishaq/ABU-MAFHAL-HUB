@@ -296,6 +296,29 @@ Deno.serve(async (req) => {
                     const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token').limit(500);
                     if (allUsers) targetUsers = allUsers;
                 }
+            } else if (targetAudience === 'admins') {
+                const { data: adminUsers } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, expo_push_token')
+                    .in('role', ['admin', 'super_admin', 'support', 'staff'])
+                    .limit(500);
+                if (adminUsers && adminUsers.length > 0) targetUsers = adminUsers;
+            } else if (targetAudience === 'new_users') {
+                const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+                const { data: recentUsers } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, expo_push_token')
+                    .gte('created_at', thirtyDaysAgo)
+                    .limit(2000);
+                if (recentUsers && recentUsers.length > 0) targetUsers = recentUsers;
+                else {
+                    const { data: latestUsers } = await supabaseAdmin
+                        .from('profiles')
+                        .select('id, expo_push_token')
+                        .order('created_at', { ascending: false })
+                        .limit(200);
+                    if (latestUsers) targetUsers = latestUsers;
+                }
             } else if (targetAudience === 'groups') {
                 const grp = body.groupQuery || 'active';
                 if (grp === 'agents' || grp === 'vip') {
@@ -314,6 +337,7 @@ Deno.serve(async (req) => {
                     if (allUsers) targetUsers = allUsers;
                 }
             }
+
 
             // Fallback: If no users found, fetch at least current admin or any single profile so user_id NOT NULL constraint is met
             if (targetUsers.length === 0) {

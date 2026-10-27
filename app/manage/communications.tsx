@@ -116,7 +116,7 @@ export default function BroadcastCenterScreen() {
 
     // Active Channel: 'push' | 'sms' | 'email'
     const [activeChannel, setActiveChannel] = useState<'push' | 'sms' | 'email'>((params.tab as any) || 'push');
-    const [recipientAudience, setRecipientAudience] = useState<'all' | 'specific' | 'groups' | 'location'>('all');
+    const [recipientAudience, setRecipientAudience] = useState<'all' | 'specific' | 'groups' | 'location' | 'admins' | 'new_users'>('all');
     const [scheduleType, setScheduleType] = useState<'now' | 'later'>('now');
     const [previewType, setPreviewType] = useState<'push' | 'sms' | 'email'>('push');
 
@@ -130,7 +130,7 @@ export default function BroadcastCenterScreen() {
     const [actionRoute, setActionRoute] = useState('/(app)/data');
     const [specificRecipient, setSpecificRecipient] = useState('');
     const [selectedGroup, setSelectedGroup] = useState<'vip' | 'tier2' | 'agents' | 'active'>('active');
-    const [selectedLocation, setSelectedLocation] = useState('Kano, Nigeria');
+    const [selectedLocation, setSelectedLocation] = useState('Kano');
     const [mediaAttached, setMediaAttached] = useState(true);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [scheduleTimeSlot, setScheduleTimeSlot] = useState<'1h' | 'today_evening' | 'tomorrow_morning' | 'custom'>('1h');
@@ -153,7 +153,7 @@ export default function BroadcastCenterScreen() {
     // AI Drafter Modal
     const [showAiModal, setShowAiModal] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
-    const [aiLanguage, setAiLanguage] = useState<'English' | 'Hausa'>('Hausa');
+    const [aiLanguage, setAiLanguage] = useState<'English'>('English');
     const [aiGenerating, setAiGenerating] = useState(false);
 
     // Selected Log Detail Modal
@@ -281,18 +281,16 @@ export default function BroadcastCenterScreen() {
         setBody(item.body);
     };
 
-    // AI Smart Drafter (100% Real Intelligent AI with Bilingual Hausa & English)
+    // AI Smart Drafter (100% Real Intelligent AI)
     const handleGenerateAiDraft = async () => {
         if (!aiPrompt.trim()) {
-            showNotify('Ana Bukatar Bayani', 'Da fatan za a rubuta bayanin saƙon da kuke son a tsara.');
+            showNotify('Input Required', 'Please enter a description for the message you want to generate.');
             return;
         }
 
         setAiGenerating(true);
         try {
-            const contextTag = aiLanguage === 'Hausa'
-                ? 'Sanarwar VTU, data da hada-hadar kudi a harshen Hausa'
-                : 'Official telecom & banking customer announcement';
+            const contextTag = 'Official telecom, VTU and banking customer announcement';
 
             const aiResult = await AIService.generateEmail(aiPrompt, contextTag);
             if (aiResult?.body && !aiResult.body.includes('Dear Valued Customer,\n\nWe are sharing')) {
@@ -302,39 +300,23 @@ export default function BroadcastCenterScreen() {
                 const cleanInput = aiPrompt.trim();
                 const lower = cleanInput.toLowerCase();
 
-                if (aiLanguage === 'Hausa') {
-                    if (lower.includes('data') || lower.includes('promo') || lower.includes('rangwame') || lower.includes('cashback')) {
-                        setTitle('Babban Rangwamen Farashin Data! 🔥');
-                        setBody(`Sannun ku masoyan ABU MAFHAL SUB! Akwai babban rangwamen farashin data (MTN, Airtel, Glo) a yau tare da samun cashback nan take. Shiga manhajar ku yanzu don morewa!`);
-                    } else if (lower.includes('gyara') || lower.includes('maintenance') || lower.includes('tsayawa') || lower.includes('network')) {
-                        setTitle('Sanarwa: Ana Gyaran Tsarin Network ⚙️');
-                        setBody(`Muna sanar da dukkan abokan cinikinmu cewa za a gudanar da aikin inganta tsarin hanyar sadarwa domin ba ku damar yin hada-hadar ku cikin sauri da kwanciyar hankali. Muna ba da hakuri game da duk wata 'yar matsala.`);
-                    } else if (lower.includes('kyc') || lower.includes('nin') || lower.includes('bvn') || lower.includes('tsaro')) {
-                        setTitle('Sanarwar Tsaro & Tabbatar da NIN/BVN 🛡️');
-                        setBody(`Domin tabbatar da tsaron asusunku da bude damar yin mu'amalar kudi ba tare da iyaka ba, muna rokonku ku kammala shigar da lambar NIN ko BVN a cikin shafin tsaro na manhajar ABU MAFHAL SUB.`);
-                    } else {
-                        setTitle('Muhimmiyar Sanarwa Daga ABU MAFHAL SUB 📢');
-                        setBody(`Barka da sadarwa daga shugabancin ABU MAFHAL SUB:\n\n${cleanInput}\n\nDomin karin bayani ko samun taimako, tuntubi cibiyar tallafinmu da ke aiki 24/7.`);
-                    }
+                if (lower.includes('data') || lower.includes('promo') || lower.includes('cashback') || lower.includes('discount')) {
+                    setTitle('Special Offer: Instant Cashback on Data Plans! ⚡');
+                    setBody(`Great news! Enjoy high-speed data bundles across MTN, Airtel, and Glo at unbeatable wholesale prices with up to 5% instant cashback today. Open your ABU MAFHAL SUB app to top up now!`);
+                } else if (lower.includes('maintenance') || lower.includes('upgrade') || lower.includes('downtime')) {
+                    setTitle('Scheduled Core System Optimization ⚙️');
+                    setBody(`Notice to our valued users: We are running scheduled infrastructure optimizations to deliver lightning-fast transaction speeds. Automated wallet funding and VTU services remain secured.`);
+                } else if (lower.includes('security') || lower.includes('pin') || lower.includes('fraud')) {
+                    setTitle('Important Security Notice 🛡️');
+                    setBody(`Protect your funds: ABU MAFHAL SUB staff will never call or ask for your 4-digit transaction PIN, password, or OTP code. Always keep your credentials safe.`);
                 } else {
-                    if (lower.includes('data') || lower.includes('promo') || lower.includes('cashback') || lower.includes('discount')) {
-                        setTitle('Special Offer: Instant Cashback on Data Plans! ⚡');
-                        setBody(`Great news! Enjoy high-speed data bundles across MTN, Airtel, and Glo at unbeatable wholesale prices with up to 5% instant cashback today. Open your ABU MAFHAL SUB app to top up now!`);
-                    } else if (lower.includes('maintenance') || lower.includes('upgrade') || lower.includes('downtime')) {
-                        setTitle('Scheduled Core System Optimization ⚙️');
-                        setBody(`Notice to our valued users: We are running scheduled infrastructure optimizations to deliver lightning-fast transaction speeds. Automated wallet funding and VTU services remain secured.`);
-                    } else if (lower.includes('security') || lower.includes('pin') || lower.includes('fraud')) {
-                        setTitle('Important Security Notice 🛡️');
-                        setBody(`Protect your funds: ABU MAFHAL SUB staff will never call or ask for your 4-digit transaction PIN, password, or OTP code. Always keep your credentials safe.`);
-                    } else {
-                        setTitle('Official Announcement from ABU MAFHAL SUB 📢');
-                        setBody(`Notice to all customers:\n\n${cleanInput}\n\nThank you for choosing ABU MAFHAL SUB as your trusted digital telecom and financial services provider.`);
-                    }
+                    setTitle('Official Announcement from ABU MAFHAL SUB 📢');
+                    setBody(`Notice to all customers:\n\n${cleanInput}\n\nThank you for choosing ABU MAFHAL SUB as your trusted digital telecom and financial services provider.`);
                 }
             }
             setShowAiModal(false);
             setAiPrompt('');
-            showNotify('AI Draft Ready ✨', 'An tsara saƙon cikin nasara.');
+            showNotify('AI Draft Ready ✨', 'Message draft generated successfully.');
         } catch (e: any) {
             setTitle('Official Notice from ABU MAFHAL SUB');
             setBody(aiPrompt.trim());
@@ -353,20 +335,20 @@ export default function BroadcastCenterScreen() {
         const cleanBody = (body || '').trim();
 
         if (!cleanBody) {
-            const err = 'Da fatan za a rubuta abin da ke cikin saƙon kafin tura shi.';
+            const err = 'Please enter message content before dispatching.';
             setFeedback({ type: 'error', message: err });
-            showNotify('Ana Bukatar Bayani', err);
+            showNotify('Input Required', err);
             return;
         }
 
         if (recipientAudience === 'specific' && !specificRecipient.trim()) {
-            const err = 'Da fatan za a saka email, lambar waya, ko kuma User ID.';
+            const err = 'Please provide recipient email, phone number, or User ID.';
             setFeedback({ type: 'error', message: err });
-            showNotify('Ana Bukatar Bayani', err);
+            showNotify('Input Required', err);
             return;
         }
 
-        setFeedback({ type: 'info', message: `Ana kan tura ${activeChannel.toUpperCase()} ga masu amfani...` });
+        setFeedback({ type: 'info', message: `Sending ${activeChannel.toUpperCase()} broadcast to recipients...` });
         setSending(true);
 
         try {
@@ -448,17 +430,17 @@ export default function BroadcastCenterScreen() {
             if (activeChannel === 'sms') setSmsSentCount(prev => prev + 1);
             if (activeChannel === 'email') setEmailSentCount(prev => prev + 1);
 
-            const successMsg = `An tura ${activeChannel.toUpperCase()} cikin nasara zuwa ga masu amfani!`;
+            const successMsg = `Successfully dispatched ${activeChannel.toUpperCase()} broadcast!`;
             setFeedback({ type: 'success', message: successMsg });
-            showNotify('An Tura Cikin Nasara 🚀', successMsg);
+            showNotify('Broadcast Dispatched 🚀', successMsg);
 
             // Re-sync all live analytics
             fetchRealtimeData();
 
         } catch (e: any) {
-            const err = e.message || 'An sami matsala wajen tura saƙon';
+            const err = e.message || 'Failed to dispatch broadcast message';
             setFeedback({ type: 'error', message: err });
-            showNotify('Kuskure', err);
+            showNotify('Dispatch Error', err);
         } finally {
             setSending(false);
         }
@@ -834,7 +816,7 @@ export default function BroadcastCenterScreen() {
                                         <Ionicons name="person" size={18} color="#2563EB" />
                                     </View>
                                     <Text style={styles.segmentCardTitle}>Specific Users</Text>
-                                    <Text style={styles.segmentCardSub}>Choose individual user</Text>
+                                    <Text style={styles.segmentCardSub}>Individual customer</Text>
                                 </TouchableOpacity>
 
                                 {/* Segment 3: User Groups */}
@@ -852,7 +834,7 @@ export default function BroadcastCenterScreen() {
                                         <Ionicons name="pricetag" size={18} color="#7C3AED" />
                                     </View>
                                     <Text style={styles.segmentCardTitle}>User Groups</Text>
-                                    <Text style={styles.segmentCardSub}>VIP, KYC, Active etc.</Text>
+                                    <Text style={styles.segmentCardSub}>VIP, KYC, Agents, etc.</Text>
                                 </TouchableOpacity>
 
                                 {/* Segment 4: By Location */}
@@ -870,7 +852,43 @@ export default function BroadcastCenterScreen() {
                                         <Ionicons name="location" size={18} color="#059669" />
                                     </View>
                                     <Text style={styles.segmentCardTitle}>By Location</Text>
-                                    <Text style={styles.segmentCardSub}>Select state or region</Text>
+                                    <Text style={styles.segmentCardSub}>Select state / region</Text>
+                                </TouchableOpacity>
+
+                                {/* Segment 5: Admins & Staff */}
+                                <TouchableOpacity
+                                    onPress={() => setRecipientAudience('admins')}
+                                    style={[styles.audienceSegmentCard, recipientAudience === 'admins' && styles.audienceSegmentCardActive]}
+                                    activeOpacity={0.8}
+                                >
+                                    {recipientAudience === 'admins' && (
+                                        <View style={styles.segmentCheckBadge}>
+                                            <Ionicons name="checkmark" size={11} color="#FFFFFF" />
+                                        </View>
+                                    )}
+                                    <View style={[styles.segmentIconBox, { backgroundColor: '#FEF2F2' }]}>
+                                        <Ionicons name="shield-checkmark" size={18} color="#DC2626" />
+                                    </View>
+                                    <Text style={styles.segmentCardTitle}>Admins & Staff</Text>
+                                    <Text style={styles.segmentCardSub}>Super admin & team</Text>
+                                </TouchableOpacity>
+
+                                {/* Segment 6: New Registered Users */}
+                                <TouchableOpacity
+                                    onPress={() => setRecipientAudience('new_users')}
+                                    style={[styles.audienceSegmentCard, recipientAudience === 'new_users' && styles.audienceSegmentCardActive]}
+                                    activeOpacity={0.8}
+                                >
+                                    {recipientAudience === 'new_users' && (
+                                        <View style={styles.segmentCheckBadge}>
+                                            <Ionicons name="checkmark" size={11} color="#FFFFFF" />
+                                        </View>
+                                    )}
+                                    <View style={[styles.segmentIconBox, { backgroundColor: '#FFFBEB' }]}>
+                                        <Ionicons name="sparkles" size={18} color="#D97706" />
+                                    </View>
+                                    <Text style={styles.segmentCardTitle}>New Users</Text>
+                                    <Text style={styles.segmentCardSub}>Joined in last 30 days</Text>
                                 </TouchableOpacity>
                             </View>
 
@@ -911,7 +929,7 @@ export default function BroadcastCenterScreen() {
                             {/* Location Selector (Interactive Dropdown with all 36 States + FCT) */}
                             {recipientAudience === 'location' && (
                                 <View style={styles.locationSelectorContainer}>
-                                    <Text style={styles.locationHelpLabel}>Zaɓi Jiha / Select Target State (Duk Jihohin Najeriya):</Text>
+                                    <Text style={styles.locationHelpLabel}>Target State (All 36 Nigerian States + FCT):</Text>
                                     
                                     {/* Dropdown Opener Button */}
                                     <TouchableOpacity
@@ -925,18 +943,18 @@ export default function BroadcastCenterScreen() {
                                         <View style={styles.stateDropdownLeft}>
                                             <Ionicons name="location-sharp" size={18} color="#059669" />
                                             <Text style={styles.stateDropdownSelectedText}>
-                                                {selectedLocation || 'Zaɓi Jiha daga Dropdown...'}
+                                                {selectedLocation || 'Select State from Dropdown...'}
                                             </Text>
                                         </View>
                                         <View style={styles.stateDropdownRight}>
-                                            <Text style={styles.stateDropdownChangeText}>Canza Jiha</Text>
+                                            <Text style={styles.stateDropdownChangeText}>Change State</Text>
                                             <Ionicons name="chevron-down" size={16} color="#059669" />
                                         </View>
                                     </TouchableOpacity>
 
                                     {/* Quick Popular State Chips */}
                                     <View style={styles.quickStatesWrap}>
-                                        <Text style={styles.quickStatesHeading}>Jihohi Masu Yawa (Quick Picks):</Text>
+                                        <Text style={styles.quickStatesHeading}>Quick Picks:</Text>
                                         <View style={styles.subPillsRow}>
                                             {['Kano', 'Kaduna', 'FCT - Abuja', 'Lagos', 'Sokoto', 'Katsina', 'Bauchi', 'Borno'].map(st => (
                                                 <TouchableOpacity
@@ -1007,13 +1025,13 @@ export default function BroadcastCenterScreen() {
                             {/* When 'Schedule for Later' is active, show selectable time options */}
                             {scheduleType === 'later' && (
                                 <View style={styles.scheduleOptionsContainer}>
-                                    <Text style={styles.scheduleOptionsLabel}>Select Delivery Time / Lokacin Aikawa:</Text>
+                                    <Text style={styles.scheduleOptionsLabel}>Select Delivery Time Slot:</Text>
                                     <View style={styles.subPillsRow}>
                                         {[
-                                            { id: '1h', label: 'In 1 Hour (Cikin Awa 1)' },
-                                            { id: 'today_evening', label: 'Today 6:00 PM (Yau Da Yamma)' },
-                                            { id: 'tomorrow_morning', label: 'Tomorrow 9:00 AM (Gobe Da Safe)' },
-                                            { id: 'custom', label: 'Custom Time (Zabi Lokaci)' },
+                                            { id: '1h', label: 'In 1 Hour' },
+                                            { id: 'today_evening', label: 'Today 6:00 PM' },
+                                            { id: 'tomorrow_morning', label: 'Tomorrow 9:00 AM' },
+                                            { id: 'custom', label: 'Custom Time' },
                                         ].map(slot => (
                                             <TouchableOpacity
                                                 key={slot.id}
@@ -1068,7 +1086,7 @@ export default function BroadcastCenterScreen() {
                         <View style={styles.bottomButtonsRow}>
                             <TouchableOpacity
                                 onPress={() => {
-                                    showNotify('Draft Saved 💾', 'An ajiye bayanin saƙonka a ma’adanar gida.');
+                                    showNotify('Draft Saved 💾', 'Broadcast message draft saved to local storage.');
                                 }}
                                 style={styles.saveDraftBtn}
                             >
@@ -1124,8 +1142,8 @@ export default function BroadcastCenterScreen() {
                                     <Ionicons name="eye" size={20} color="#FFFFFF" />
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
-                                    <Text style={styles.openPreviewBtnTitle}>Bude Preview a Karamin Shafi</Text>
-                                    <Text style={styles.openPreviewBtnSub}>Danna nan domin ganin yadda saƙon zai bayyana a waya</Text>
+                                    <Text style={styles.openPreviewBtnTitle}>Open Live Screen Preview</Text>
+                                    <Text style={styles.openPreviewBtnSub}>Click to view simulated smartphone notification popup</Text>
                                 </View>
                                 <Ionicons name="chevron-forward-circle" size={22} color={T.goldBright} />
                             </TouchableOpacity>
@@ -1332,7 +1350,7 @@ export default function BroadcastCenterScreen() {
                                 </View>
                                 <View>
                                     <Text style={styles.previewModalTitle}>Live Device Preview</Text>
-                                    <Text style={styles.previewModalSubtitle}>Yadda saƙon zai bayyana a allon waya</Text>
+                                    <Text style={styles.previewModalSubtitle}>How your message will appear on mobile screens</Text>
                                 </View>
                             </View>
                             <TouchableOpacity
@@ -1450,7 +1468,7 @@ export default function BroadcastCenterScreen() {
                                 onPress={() => setShowPreviewModal(false)}
                                 style={styles.previewCloseBtn}
                             >
-                                <Text style={styles.previewCloseBtnText}>Rufe Shafin Preview</Text>
+                                <Text style={styles.previewCloseBtnText}>Close Preview</Text>
                             </TouchableOpacity>
                         </ScrollView>
                     </View>
@@ -1473,8 +1491,8 @@ export default function BroadcastCenterScreen() {
                                     <Ionicons name="map" size={17} color="#FFFFFF" />
                                 </View>
                                 <View>
-                                    <Text style={styles.previewModalTitle}>Zaɓi Jiha / Select State</Text>
-                                    <Text style={styles.previewModalSubtitle}>Dukkan jihohi 36 na Najeriya da babban birnin tarayya Abuja</Text>
+                                    <Text style={styles.previewModalTitle}>Select Target State</Text>
+                                    <Text style={styles.previewModalSubtitle}>All 36 Nigerian States and FCT Abuja</Text>
                                 </View>
                             </View>
                             <TouchableOpacity
@@ -1491,7 +1509,7 @@ export default function BroadcastCenterScreen() {
                             <TextInput
                                 value={stateSearchQuery}
                                 onChangeText={setStateSearchQuery}
-                                placeholder="Bincika jiha (misali: Kano, Lagos, Abuja)..."
+                                placeholder="Search state (e.g. Kano, Lagos, Abuja)..."
                                 placeholderTextColor="#94A3B8"
                                 style={styles.stateSearchInput}
                                 autoFocus={false}
@@ -1519,7 +1537,7 @@ export default function BroadcastCenterScreen() {
                                             onPress={() => {
                                                 setSelectedLocation(stateName);
                                                 setShowStateDropdownModal(false);
-                                                showNotify('An Zaɓi Jiha ✅', `An saita masu karɓar saƙo daga: ${stateName}`);
+                                                showNotify('State Selected ✅', `Target audience location set to: ${stateName}`);
                                             }}
                                             style={[styles.stateItemRow, isSelected && styles.stateItemRowSelected]}
                                             activeOpacity={0.7}
@@ -1546,7 +1564,7 @@ export default function BroadcastCenterScreen() {
                             {NIGERIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQuery.toLowerCase().trim())).length === 0 && (
                                 <View style={styles.noStateFound}>
                                     <Ionicons name="alert-circle-outline" size={32} color="#94A3B8" />
-                                    <Text style={styles.noStateFoundText}>Babu jihar da ta dace da sunan da kuka rubuta.</Text>
+                                    <Text style={styles.noStateFoundText}>No Nigerian state found matching your query.</Text>
                                 </View>
                             )}
                         </ScrollView>
@@ -1555,7 +1573,7 @@ export default function BroadcastCenterScreen() {
                             onPress={() => setShowStateDropdownModal(false)}
                             style={styles.modalCancelBtn}
                         >
-                            <Text style={styles.modalCancelBtnText}>Rufe / Close</Text>
+                            <Text style={styles.modalCancelBtnText}>Close</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1582,24 +1600,11 @@ export default function BroadcastCenterScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.modalLabel}>Language / Harshe</Text>
-                        <View style={styles.languagePillsRow}>
-                            {(['Hausa', 'English'] as const).map(lang => (
-                                <TouchableOpacity
-                                    key={lang}
-                                    onPress={() => setAiLanguage(lang)}
-                                    style={[styles.langPill, aiLanguage === lang && styles.langPillActive]}
-                                >
-                                    <Text style={[styles.langPillText, aiLanguage === lang && styles.langPillTextActive]}>{lang}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
-                        <Text style={styles.modalLabel}>Bayanin Saƙon da Kuke Son a Tsara</Text>
+                        <Text style={styles.modalLabel}>Describe the announcement you want to generate:</Text>
                         <TextInput
                             value={aiPrompt}
                             onChangeText={setAiPrompt}
-                            placeholder="e.g. Sanar da abokan ciniki rangwamen kudin data na 5% a yau..."
+                            placeholder="e.g. Notify customers about 5% cashback on data plans today..."
                             placeholderTextColor="#94A3B8"
                             multiline
                             numberOfLines={4}
@@ -1623,6 +1628,7 @@ export default function BroadcastCenterScreen() {
                     </View>
                 </View>
             </Modal>
+
 
             {/* MODAL 2: LOG DETAIL */}
             <Modal
