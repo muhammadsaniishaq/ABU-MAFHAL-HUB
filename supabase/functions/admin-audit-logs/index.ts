@@ -460,43 +460,79 @@ Deno.serve(async (req) => {
                         .filter((p): p is string => Boolean(p && p.trim().length >= 9))
                 ));
 
-                // Fetch termii API key from system_secrets or environment
+                // Fetch SMS API credentials from system_secrets or environment
                 let termiiApiKey = Deno.env.get("TERMII_API_KEY");
-                if (!termiiApiKey) {
-                    const { data: sec } = await supabaseAdmin
-                        .from('system_secrets')
-                        .select('value')
-                        .eq('key', 'TERMII_API_KEY')
-                        .maybeSingle();
-                    if (sec?.value) termiiApiKey = sec.value.trim();
-                }
+                let bigiApiToken = Deno.env.get("BIGI_API_TOKEN");
+                let bigiPin = Deno.env.get("BIGI_API_PIN");
 
-                if (termiiApiKey && validPhones.length > 0) {
-                    for (const rawPhone of validPhones) {
+                const { data: secList } = await supabaseAdmin
+                    .from('system_secrets')
+                    .select('key, value')
+                    .in('key', ['TERMII_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN', 'KETAWANCY_API_KEY']);
+                
+                (secList || []).forEach(s => {
+                    if (s.key === 'TERMII_API_KEY' && s.value) termiiApiKey = s.value.trim();
+                    if (s.key === 'BIGI_API_TOKEN' && s.value) bigiApiToken = s.value.trim();
+                    if (s.key === 'BIGI_API_PIN' && s.value) bigiPin = s.value.trim();
+                });
+
+                if (validPhones.length > 0) {
+                    // METHOD A: If BigiHub token is available, dispatch batch via BigiHub SMS gateway
+                    if (bigiApiToken) {
                         try {
-                            let formatted = rawPhone.replace(/\s/g, '');
-                            if (formatted.startsWith('0')) formatted = '234' + formatted.substring(1);
-                            if (formatted.startsWith('+')) formatted = formatted.substring(1);
-
-                            const smsRes = await fetch("https://v3.api.termii.com/api/sms/send", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    api_key: termiiApiKey,
-                                    to: formatted,
-                                    from: "ABUMAFHAL",
-                                    sms: String(notifBody).trim(),
-                                    type: "plain",
-                                    channel: "generic"
-                                })
+                            const bigiPayload = {
+                                sender: "ABUMAFHAL",
+                                sender_id: "ABUMAFHAL",
+                                message: String(notifBody).trim(),
+                                recipients: validPhones,
+                                pin: bigiPin || '1234',
+                                pin_code: bigiPin || '1234'
+                            };
+                            const bigiRes = await fetch("https://api.bigisub.ng/api/v2/communications/sms/send/", {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Token ${bigiApiToken}`
+                                },
+                                body: JSON.stringify(bigiPayload)
                             });
-                            if (smsRes.ok) smsDeliveredCount++;
-                        } catch (sErr) {
-                            console.warn(`SMS dispatch note for ${rawPhone}:`, sErr);
+                            if (bigiRes.ok) {
+                                smsDeliveredCount = validPhones.length;
+                            }
+                        } catch (bErr) {
+                            console.warn("BigiHub SMS dispatch fallback note:", bErr);
+                        }
+                    }
+
+                    // METHOD B: Fallback or primary Termii SMS with DND bypass
+                    if (smsDeliveredCount === 0 && termiiApiKey) {
+                        for (const rawPhone of validPhones) {
+                            try {
+                                let formatted = rawPhone.replace(/\s/g, '');
+                                if (formatted.startsWith('0')) formatted = '234' + formatted.substring(1);
+                                if (formatted.startsWith('+')) formatted = formatted.substring(1);
+
+                                const smsRes = await fetch("https://v3.api.termii.com/api/sms/send", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                        api_key: termiiApiKey,
+                                        to: formatted,
+                                        from: "ABUMAFHAL",
+                                        sms: String(notifBody).trim(),
+                                        type: "plain",
+                                        channel: "dnd" // 'dnd' or 'generic'
+                                    })
+                                });
+                                if (smsRes.ok) smsDeliveredCount++;
+                            } catch (sErr) {
+                                console.warn(`SMS dispatch note for ${rawPhone}:`, sErr);
+                            }
                         }
                     }
                 }
             }
+
 
             // Also record in communication_logs & audit_logs using Service Role
             try {

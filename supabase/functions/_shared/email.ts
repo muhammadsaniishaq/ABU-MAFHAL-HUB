@@ -78,16 +78,18 @@ export const sendEmail = async (
             console.log("[sendEmail] Email successfully sent via Zoho/SMTP to %s (ID: %s)", to, info.messageId);
             return { success: true, method: 'SMTP', messageId: info.messageId, info };
         } catch (smtpErr: any) {
-            console.error("[sendEmail] SMTP exception, attempting Resend API fallback:", smtpErr?.message || smtpErr);
+            const errStr = smtpErr?.message || String(smtpErr);
+            console.error("[sendEmail] SMTP exception (e.g. 554 sender blocked), attempting Resend API fallback:", errStr);
+            // Continue execution to METHOD 2: Resend HTTP API
         }
     }
 
     // METHOD 2: Resend HTTP API (Fallback or standalone)
     if (resendApiKey) {
         try {
-            const resendFrom = (zohoUser && zohoUser.includes('@')) 
-                ? `"Abu Mafhal Sub" <${zohoUser.trim()}>`
-                : 'Abu Mafhal Sub <onboarding@resend.dev>';
+            // When Zoho sender is blocked or fails, use verified Resend onboarding address or domain
+            const resendFrom = 'Abu Mafhal Sub <onboarding@resend.dev>';
+
 
             console.log(`[sendEmail] Sending email via Resend API from ${resendFrom} to ${to}...`);
             const resendRes = await fetch('https://api.resend.com/emails', {

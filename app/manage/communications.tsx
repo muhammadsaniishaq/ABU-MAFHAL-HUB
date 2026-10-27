@@ -11,7 +11,7 @@ import {
     Platform,
     RefreshControl,
     StyleSheet,
-    Dimensions
+    useWindowDimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
@@ -21,8 +21,6 @@ import { supabase } from '../../services/supabase';
 import { sendInstantNotification } from '../../hooks/usePushNotifications';
 import { AIService } from '../../services/ai';
 
-const { width } = Dimensions.get('window');
-const isLargeScreen = width >= 860;
 
 // High-End Luxury Royal Navy & Imperial Gold Palette
 const T = {
@@ -113,6 +111,8 @@ const NIGERIAN_STATES = [
 export default function BroadcastCenterScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
+    const { width } = useWindowDimensions();
+    const isLargeScreen = width >= 1024;
 
     // Active Channel: 'push' | 'sms' | 'email'
     const [activeChannel, setActiveChannel] = useState<'push' | 'sms' | 'email'>((params.tab as any) || 'push');
@@ -637,12 +637,13 @@ export default function BroadcastCenterScreen() {
                 </View>
 
                 {/* Main 2-Column Responsive Layout */}
-                <View style={[styles.layoutRow, isLargeScreen ? { flexDirection: 'row' } : { flexDirection: 'column' }]}>
+                <View style={[styles.layoutRow, isLargeScreen ? { flexDirection: 'row', alignItems: 'flex-start' } : { flexDirection: 'column' }]}>
                     {/* LEFT COLUMN: 3 Numbered Steps */}
-                    <View style={[styles.leftColumn, isLargeScreen && { flex: 1.15, marginRight: 16 }]}>
+                    <View style={[styles.leftColumn, isLargeScreen ? { flex: 1.15, width: undefined, marginRight: 16 } : { width: '100%' }]}>
                         
                         {/* STEP 1: Compose Message */}
                         <View style={styles.sectionContainer}>
+
                             <View style={styles.sectionHeaderRow}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                     <View style={styles.sectionNumberCircle}>
@@ -1120,9 +1121,10 @@ export default function BroadcastCenterScreen() {
                     </View>
 
                     {/* RIGHT COLUMN: Live Summary, Preview Launcher & Quick Templates */}
-                    <View style={[styles.rightColumn, isLargeScreen && { flex: 0.85 }]}>
+                    <View style={[styles.rightColumn, isLargeScreen ? { flex: 0.85, width: undefined } : { width: '100%' }]}>
                         {/* Live Preview Launcher Card - User taps to open small preview modal */}
                         <View style={styles.previewContainer}>
+
                             <View style={styles.previewHeaderRow}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                     <Ionicons name="phone-portrait-outline" size={17} color="#2563EB" />
@@ -2014,14 +2016,16 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
     layoutRow: {
+        width: '100%',
         gap: 16,
     },
     leftColumn: {
-        flex: 1,
+        width: '100%',
     },
     rightColumn: {
-        flex: 1,
+        width: '100%',
     },
+
     sectionContainer: {
         backgroundColor: '#FFFFFF',
         borderRadius: 14,
