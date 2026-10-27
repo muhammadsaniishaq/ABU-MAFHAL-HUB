@@ -11,8 +11,10 @@ import {
     Platform,
     RefreshControl,
     StyleSheet,
-    useWindowDimensions
+    useWindowDimensions,
+    Image
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +22,7 @@ import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../services/supabase';
 import { sendInstantNotification } from '../../hooks/usePushNotifications';
 import { AIService } from '../../services/ai';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 
 // High-End Luxury Royal Navy & Imperial Gold Palette
@@ -132,9 +135,56 @@ export default function BroadcastCenterScreen() {
     const [selectedGroup, setSelectedGroup] = useState<'vip' | 'tier2' | 'agents' | 'active'>('active');
     const [selectedLocation, setSelectedLocation] = useState('Kano');
     const [mediaAttached, setMediaAttached] = useState(true);
+    const [customMediaUri, setCustomMediaUri] = useState<string | null>(null);
+    const [isUploadingMedia, setIsUploadingMedia] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [scheduleTimeSlot, setScheduleTimeSlot] = useState<'1h' | 'today_evening' | 'tomorrow_morning' | 'custom'>('1h');
     const [customScheduleDate, setCustomScheduleDate] = useState('');
+
+    // Native & Web Image Picker for Broadcast Media Mockup
+    const handlePickCustomMedia = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted' && Platform.OS !== 'web') {
+                Alert.alert('Permission Denied', 'Please grant photo library access to attach custom banners.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: false,
+                quality: 0.9,
+                base64: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const asset = result.assets[0];
+                setCustomMediaUri(asset.uri);
+                setMediaAttached(true);
+
+                // Auto-upload in background to Supabase Storage if online
+                setIsUploadingMedia(true);
+                try {
+                    const upRes = await uploadMediaFile({
+                        uri: asset.uri,
+                        bucket: 'banners',
+                        folder: 'broadcasts',
+                        base64: asset.base64 || null,
+                        mimeType: asset.mimeType || 'image/jpeg'
+                    });
+                    if (upRes.success && upRes.publicUrl) {
+                        setCustomMediaUri(upRes.publicUrl);
+                    }
+                } catch (e) {
+                    console.warn('Background banner upload notice:', e);
+                } finally {
+                    setIsUploadingMedia(false);
+                }
+            }
+        } catch (err: any) {
+            Alert.alert('Image Selection Error', err?.message || 'Could not pick image.');
+        }
+    };
 
     // Live Real-Time Telemetry & Counts (Direct Live Supabase values)
     const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
@@ -358,6 +408,7 @@ export default function BroadcastCenterScreen() {
                 sent_by_admin: true,
                 is_permanent: true,
                 has_media: mediaAttached,
+                media_url: mediaAttached ? customMediaUri : null,
                 channel: activeChannel
             };
 
@@ -377,6 +428,7 @@ export default function BroadcastCenterScreen() {
                     scheduleType,
                     scheduleTimeSlot,
                     customScheduleDate,
+                    mediaUrl: mediaAttached ? customMediaUri : null,
                     extraData: pushData
                 }
             });
@@ -789,28 +841,48 @@ export default function BroadcastCenterScreen() {
 
                             {/* Add Media (Optional) */}
                             <View style={styles.inputGroup}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                                    <Ionicons name="image-outline" size={16} color={T.navyPrimary} />
-                                    <Text style={styles.inputFieldLabel}>Add Media (Optional)</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="image" size={16} color={T.navyPrimary} />
+                                        <Text style={styles.inputFieldLabel}>Add Media & Banner Mockup</Text>
+                                    </View>
+                                    {isUploadingMedia && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <ActivityIndicator size="small" color="#2563EB" />
+                                            <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>Uploading...</Text>
+                                        </View>
+                                    )}
                                 </View>
-                                <Text style={styles.mediaHintText}>Add image, banner or file (JPG, PNG, WEBP - Max 5MB)</Text>
+                                <Text style={styles.mediaHintText}>Attach promotional banner graphic (JPG, PNG, WEBP) to display in mobile mockups</Text>
 
                                 <View style={styles.mediaRow}>
                                     {mediaAttached ? (
                                         <View style={styles.mediaPreviewCard}>
-                                            <LinearGradient
-                                                colors={[T.navyPrimary, '#132147', T.navyDeep]}
-                                                style={styles.bannerMockVisual}
-                                            >
-                                                <Ionicons name="megaphone" size={28} color={T.goldBright} />
-                                                <View style={{ marginLeft: 8, flex: 1 }}>
-                                                    <Text style={styles.bannerVisualSub} numberOfLines={1}>ABU MAFHAL SUB</Text>
-                                                    <Text style={styles.bannerVisualTitle} numberOfLines={1}>{title || 'New Update Available!'}</Text>
-                                                </View>
-                                            </LinearGradient>
+                                            {customMediaUri ? (
+                                                <Image
+                                                    source={{ uri: customMediaUri }}
+                                                    style={styles.mediaPreviewImage}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <LinearGradient
+                                                    colors={[T.navyPrimary, '#132147', T.navyDeep]}
+                                                    style={styles.bannerMockVisual}
+                                                >
+                                                    <Ionicons name="megaphone" size={24} color={T.goldBright} />
+                                                    <View style={{ marginLeft: 8, flex: 1 }}>
+                                                        <Text style={styles.bannerVisualSub} numberOfLines={1}>ABU MAFHAL SUB</Text>
+                                                        <Text style={styles.bannerVisualTitle} numberOfLines={1}>{title || 'New Update Available!'}</Text>
+                                                    </View>
+                                                </LinearGradient>
+                                            )}
                                             <TouchableOpacity
-                                                onPress={() => setMediaAttached(false)}
+                                                onPress={() => {
+                                                    setMediaAttached(false);
+                                                    setCustomMediaUri(null);
+                                                }}
                                                 style={styles.mediaRemoveBtn}
+                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                             >
                                                 <Ionicons name="close" size={12} color="#FFFFFF" />
                                             </TouchableOpacity>
@@ -818,12 +890,24 @@ export default function BroadcastCenterScreen() {
                                     ) : null}
 
                                     <TouchableOpacity
-                                        onPress={() => setMediaAttached(true)}
+                                        onPress={handlePickCustomMedia}
                                         style={styles.addMediaDashedBox}
+                                        activeOpacity={0.7}
                                     >
-                                        <Ionicons name="add-circle-outline" size={22} color="#3B82F6" />
-                                        <Text style={styles.addMediaText}>Add Image</Text>
+                                        <Ionicons name="cloud-upload" size={20} color="#2563EB" />
+                                        <Text style={styles.addMediaText}>{customMediaUri ? 'Change' : 'Upload Image'}</Text>
                                     </TouchableOpacity>
+
+                                    {!customMediaUri && !mediaAttached && (
+                                        <TouchableOpacity
+                                            onPress={() => setMediaAttached(true)}
+                                            style={[styles.addMediaDashedBox, { borderColor: T.gold, backgroundColor: T.goldBg }]}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="sparkles" size={18} color={T.goldDark} />
+                                            <Text style={[styles.addMediaText, { color: T.goldDark }]}>Mockup Banner</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             </View>
                         </View>
@@ -1520,20 +1604,34 @@ export default function BroadcastCenterScreen() {
                                     {/* In-App Hero Banner Graphic inside Phone (for Push Mode) */}
                                     {previewType === 'push' && mediaAttached && (
                                         <View style={styles.phoneInAppHero}>
-                                            <LinearGradient
-                                                colors={[T.navyPrimary, '#132147', T.navyDeep]}
-                                                style={styles.phoneBannerGradient}
-                                            >
-                                                <Ionicons name="megaphone" size={28} color={T.goldBright} />
-                                                <Text style={styles.phoneBannerSub}>ABU MAFHAL SUB</Text>
-                                                <Text style={styles.phoneBannerHeading}>{title || 'New Data Plans Available!'}</Text>
-                                                <Text style={styles.phoneBannerDesc} numberOfLines={2}>
-                                                    {body || 'Enjoy affordable data plans at the best prices.'}
-                                                </Text>
-                                                <TouchableOpacity style={styles.phoneBuyNowBtn}>
-                                                    <Text style={styles.phoneBuyNowText}>Buy Now</Text>
-                                                </TouchableOpacity>
-                                            </LinearGradient>
+                                            {customMediaUri ? (
+                                                <View style={{ width: '100%', position: 'relative' }}>
+                                                    <Image
+                                                        source={{ uri: customMediaUri }}
+                                                        style={styles.phoneHeroImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                    <View style={styles.phoneHeroImageOverlay}>
+                                                        <Text style={styles.phoneHeroImageSub} numberOfLines={1}>ABU MAFHAL SUB</Text>
+                                                        <Text style={styles.phoneHeroImageTitle} numberOfLines={1}>{title || 'New Data Plans Available!'}</Text>
+                                                    </View>
+                                                </View>
+                                            ) : (
+                                                <LinearGradient
+                                                    colors={[T.navyPrimary, '#132147', T.navyDeep]}
+                                                    style={styles.phoneBannerGradient}
+                                                >
+                                                    <Ionicons name="megaphone" size={26} color={T.goldBright} />
+                                                    <Text style={styles.phoneBannerSub}>ABU MAFHAL SUB</Text>
+                                                    <Text style={styles.phoneBannerHeading}>{title || 'New Data Plans Available!'}</Text>
+                                                    <Text style={styles.phoneBannerDesc} numberOfLines={2}>
+                                                        {body || 'Enjoy affordable data plans at the best prices.'}
+                                                    </Text>
+                                                    <TouchableOpacity style={styles.phoneBuyNowBtn}>
+                                                        <Text style={styles.phoneBuyNowText}>Buy Now</Text>
+                                                    </TouchableOpacity>
+                                                </LinearGradient>
+                                            )}
                                         </View>
                                     )}
                                 </View>
@@ -2242,6 +2340,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#CBD5E1',
     },
+    mediaPreviewImage: {
+        width: '100%',
+        height: '100%',
+    },
     bannerMockVisual: {
         flex: 1,
         flexDirection: 'row',
@@ -2677,6 +2779,29 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    phoneHeroImage: {
+        width: '100%',
+        height: 110,
+    },
+    phoneHeroImageOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(7, 13, 30, 0.85)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    phoneHeroImageSub: {
+        color: T.goldBright,
+        fontSize: 7.5,
+        fontWeight: '800',
+    },
+    phoneHeroImageTitle: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
     },
     phoneBannerGradient: {
         alignItems: 'center',

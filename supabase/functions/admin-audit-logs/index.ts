@@ -242,6 +242,7 @@ Deno.serve(async (req) => {
                 isPermanent = true,
                 selectedRingtone = 'executive_bell',
                 singleTargetQuery = '',
+                mediaUrl = null,
                 extraData = {}
             } = body;
 
@@ -468,7 +469,11 @@ Deno.serve(async (req) => {
 
                           <!-- Email Body Content (Clean White Background, High Readability) -->
                           <tr>
-                            <td style="padding: 36px 32px 28px; background-color: #FFFFFF;">
+                            <td style="padding: 32px 32px 28px; background-color: #FFFFFF;">
+                              ${mediaUrl ? `
+                              <div style="margin-bottom: 24px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0;">
+                                <img src="${mediaUrl}" alt="Announcement Banner" style="width: 100%; max-height: 240px; object-fit: cover; display: block;" />
+                              </div>` : ''}
                               <h1 style="margin: 0 0 18px; font-size: 20px; font-weight: 800; color: #0F172A; line-height: 1.4;">${String(title).trim()}</h1>
                               <div style="font-size: 15px; line-height: 1.75; color: #334155; white-space: pre-wrap; font-weight: 400;">${String(notifBody).trim()}</div>
                             </td>
