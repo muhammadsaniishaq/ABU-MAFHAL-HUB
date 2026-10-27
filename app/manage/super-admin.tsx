@@ -11,7 +11,8 @@ import {
   Modal, 
   StyleSheet, 
   Dimensions, 
-  Image 
+  Image,
+  Platform 
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
@@ -82,9 +83,10 @@ export default function SuperAdminMasterHubScreen() {
   
   // Broadcast Modal State
   const [broadcastVisible, setBroadcastVisible] = useState(false);
-  const [broadcastTitle, setBroadcastTitle] = useState('');
-  const [broadcastBody, setBroadcastBody] = useState('');
+  const [broadcastTitle, setBroadcastTitle] = useState('📢 Important Platform Notice');
+  const [broadcastBody, setBroadcastBody] = useState('Welcome to Abu Mafhal Sub. Fast VTU, data bundles, and banking transactions are operational 24/7.');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
 
   // Create Admin Modal State & Rich Features
   const [createAdminVisible, setCreateAdminVisible] = useState(false);
@@ -327,30 +329,74 @@ export default function SuperAdminMasterHubScreen() {
     );
   };
 
+  const showBroadcastAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const handleSendBroadcast = async () => {
-    if (!broadcastTitle.trim() || !broadcastBody.trim()) {
-      return Alert.alert('Error', 'Please enter title and message body');
+    setBroadcastError(null);
+    console.log('[SuperAdmin] handleSendBroadcast triggered. Title:', broadcastTitle, 'Body:', broadcastBody);
+
+    const cleanTitle = (broadcastTitle || '').trim();
+    const cleanBody = (broadcastBody || '').trim();
+
+    if (!cleanTitle || !cleanBody) {
+      const err = 'Please enter both Notice Title and Message Body.';
+      setBroadcastError(err);
+      return showBroadcastAlert('Required Fields', err);
     }
 
     try {
       setSendingBroadcast(true);
 
+      // 1. Update global announcement banner in app_settings
       await supabase.from('app_settings').upsert({
         key: 'global_announcement_banner',
-        value: JSON.stringify({
+        value: {
           title: broadcastTitle.trim(),
           body: broadcastBody.trim(),
           active: true,
           timestamp: new Date().toISOString()
-        })
+        },
+        description: 'Global broadcast announcement banner configured from Super Admin'
       }, { onConflict: 'key' });
 
+      // 2. Insert into notifications table for all users
+      try {
+        const { data: userProfiles } = await supabase.from('profiles').select('id, expo_push_token').limit(2000);
+        if (userProfiles && userProfiles.length > 0) {
+          const notifRows = userProfiles.map(u => ({
+            user_id: u.id,
+            title: broadcastTitle.trim(),
+            body: broadcastBody.trim(),
+            message: broadcastBody.trim(),
+            massage: broadcastBody.trim(),
+            type: 'broadcast',
+            priority: 'high',
+            is_read: false,
+            data: { type: 'broadcast', is_permanent: true, sent_by_admin: true },
+            created_at: new Date().toISOString()
+          }));
+          const { error: insErr } = await supabase.from('notifications').insert(notifRows);
+          if (insErr) console.warn('Super-admin broadcast notifications insert note:', insErr.message);
+        }
+      } catch (err) {
+        console.warn('Super-admin broadcast notifications insert note:', err);
+      }
+
       setBroadcastVisible(false);
+      const dispatchedTitle = broadcastTitle.trim();
       setBroadcastTitle('');
       setBroadcastBody('');
-      Alert.alert('Broadcast Sent 📢', 'Global broadcast notification has been published to all active users!');
+      showBroadcastAlert('Broadcast Dispatched 📢', `Global broadcast "${dispatchedTitle}" has been successfully published to all active users!`);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      setBroadcastError(e.message || 'Failed to dispatch broadcast');
+      showBroadcastAlert('Broadcast Error', e.message || 'Failed to dispatch broadcast');
+    } finally {
       setSendingBroadcast(false);
     }
   };
@@ -940,11 +986,32 @@ export default function SuperAdminMasterHubScreen() {
               style={[s.textInput, { height: 90, textAlignVertical: 'top' }]}
             />
 
+            {/* Inline Error Notice */}
+            {broadcastError && (
+              <View style={{
+                backgroundColor: '#fee2e2',
+                borderWidth: 1,
+                borderColor: '#fca5a5',
+                padding: 10,
+                borderRadius: 10,
+                marginTop: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <Ionicons name="alert-circle" size={16} color="#dc2626" />
+                <Text style={{ color: '#b91c1c', fontSize: 12, fontWeight: '700', flex: 1 }}>
+                  {broadcastError}
+                </Text>
+              </View>
+            )}
+
             <TouchableOpacity
               onPress={handleSendBroadcast}
               disabled={sendingBroadcast}
               style={s.sendBtn}
-              activeOpacity={0.85}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               {sendingBroadcast ? (
                 <ActivityIndicator color={C.white} />
@@ -1782,6 +1849,8 @@ const s = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
     marginTop: 20,
+    cursor: 'pointer' as any,
+    zIndex: 10,
   },
   sendBtnTxt: {
     color: C.white,

@@ -153,8 +153,8 @@ export default function AdminPushNotificationsScreen() {
     const [dispatchType, setDispatchType] = useState<'support_track' | 'staff_meeting' | 'liquidity_low' | 'system_alert' | 'broadcast'>('broadcast');
     const [targetAudience, setTargetAudience] = useState<'all' | 'admins' | 'staff' | 'single'>('all');
     const [singleTargetQuery, setSingleTargetQuery] = useState('');
-    const [pushTitle, setPushTitle] = useState('');
-    const [pushBody, setPushBody] = useState('');
+    const [pushTitle, setPushTitle] = useState('📢 Important Platform Announcement');
+    const [pushBody, setPushBody] = useState('New high-speed VTU features and automated wallet services are now fully active on Abu Mafhal Sub.');
     const [meetingTime, setMeetingTime] = useState('Today at 4:00 PM');
     const [meetingLink, setMeetingLink] = useState('https://meet.google.com/abu-mafhal-team');
     const [lowFloatProvider, setLowFloatProvider] = useState('BilalSadaSub Telecom');
@@ -164,6 +164,7 @@ export default function AdminPushNotificationsScreen() {
     const [selectedRingtoneForPush, setSelectedRingtoneForPush] = useState<string>('executive_bell');
     const [sending, setSending] = useState(false);
     const [generatingAI, setGeneratingAI] = useState(false);
+    const [formFeedback, setFormFeedback] = useState<{ type: 'error' | 'success' | 'info'; message: string } | null>(null);
 
     // AI Broadcast Assistant Generator
     const handleAIGenerateBroadcast = async (topic?: string) => {
@@ -596,10 +597,20 @@ export default function AdminPushNotificationsScreen() {
     };
 
     const handleDispatchNotification = async () => {
-        if (!pushTitle.trim() || !pushBody.trim()) {
-            return showNotificationAlert('Fields Required', 'Please enter both Title and Body for the notification before dispatching.');
+        setFormFeedback(null);
+        console.log('[Broadcast] Dispatch button pressed. Title:', pushTitle, 'Body:', pushBody);
+
+        const cleanTitle = (pushTitle || '').trim();
+        const cleanBody = (pushBody || '').trim();
+
+        if (!cleanTitle || !cleanBody) {
+            const err = 'Please enter both Title and Body for the notification before dispatching.';
+            setFormFeedback({ type: 'error', message: err });
+            showNotificationAlert('Fields Required', err);
+            return;
         }
 
+        setFormFeedback({ type: 'info', message: 'Dispatching notification across active devices and users...' });
         setSending(true);
         try {
             const extraData: any = {
@@ -736,12 +747,14 @@ export default function AdminPushNotificationsScreen() {
             // Trigger local audible confirmation
             playPreviewSound(selectedRingtoneForPush);
 
+            setFormFeedback({ type: 'success', message: dispatchSummary || 'Broadcast notice dispatched successfully!' });
             showNotificationAlert('Broadcast Dispatched 🚀', dispatchSummary || 'Your broadcast notice was successfully sent across all active user accounts and devices.');
             setPushTitle('');
             setPushBody('');
             setActiveTab('broadcasts');
             fetchAdminNotifications();
         } catch (e: any) {
+            setFormFeedback({ type: 'error', message: e.message || 'Could not send notification' });
             showNotificationAlert('Dispatch Failed', e.message || 'Could not send notification');
         } finally {
             setSending(false);
@@ -1359,12 +1372,43 @@ export default function AdminPushNotificationsScreen() {
                             />
                         </View>
 
+                        {/* Inline Form Feedback Banner (Visible even if system alert is blocked) */}
+                        {formFeedback && (
+                            <View style={{
+                                padding: 12,
+                                borderRadius: 10,
+                                marginTop: 12,
+                                marginBottom: 4,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 8,
+                                backgroundColor: formFeedback.type === 'error' ? '#FEE2E2' : formFeedback.type === 'success' ? '#DCFCE7' : '#EFF6FF',
+                                borderWidth: 1,
+                                borderColor: formFeedback.type === 'error' ? '#FCA5A5' : formFeedback.type === 'success' ? '#86EFAC' : '#BFDBFE'
+                            }}>
+                                <Ionicons
+                                    name={formFeedback.type === 'error' ? 'alert-circle' : formFeedback.type === 'success' ? 'checkmark-circle' : 'information-circle'}
+                                    size={18}
+                                    color={formFeedback.type === 'error' ? '#DC2626' : formFeedback.type === 'success' ? '#16A34A' : '#2563EB'}
+                                />
+                                <Text style={{
+                                    flex: 1,
+                                    fontSize: 12.5,
+                                    fontWeight: '700',
+                                    color: formFeedback.type === 'error' ? '#991B1B' : formFeedback.type === 'success' ? '#166534' : '#1E40AF'
+                                }}>
+                                    {formFeedback.message}
+                                </Text>
+                            </View>
+                        )}
+
                         {/* Quick Dispatch CTA directly inside Message Card */}
                         <TouchableOpacity
                             onPress={handleDispatchNotification}
                             disabled={sending}
                             style={[s.dispatchSubmitBtn, { marginTop: 14 }]}
-                            activeOpacity={0.8}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
                             {sending ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -1443,7 +1487,8 @@ export default function AdminPushNotificationsScreen() {
                         onPress={handleDispatchNotification}
                         disabled={sending}
                         style={s.dispatchSubmitBtn}
-                        activeOpacity={0.85}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     >
                         {sending ? (
                             <ActivityIndicator size="small" color="#FFFFFF" />
@@ -2040,7 +2085,9 @@ const s = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        elevation: 2,
+        elevation: 3,
+        zIndex: 10,
+        cursor: 'pointer' as any,
     },
     dispatchSubmitBtnText: {
         color: '#FFFFFF',
