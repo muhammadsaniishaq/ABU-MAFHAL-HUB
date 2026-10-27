@@ -411,10 +411,47 @@ export default function BroadcastCenterScreen() {
                             <div style="padding: 28px 28px 24px; background-color: #FFFFFF;">
                                 <h2 style="color: #0F172A; margin: 0 0 14px 0; font-size: 18px; font-weight: 800;">${dispatchTitle}</h2>
                                 <p style="font-size: 14px; line-height: 1.7; color: #334155; margin: 0 0 20px 0; white-space: pre-wrap;">${cleanBody}</p>
+
+                                <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid #F1F5F9;">
+                                    <p style="margin: 0 0 10px; font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.8px;">Download Mobile App</p>
+                                    <table cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td style="padding-right: 12px;">
+                                                <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" style="display: inline-block; background-color: #000000; color: #FFFFFF; border-radius: 8px; padding: 8px 16px; text-decoration: none; border: 1px solid #334155;">
+                                                    <table cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td style="padding-right: 10px; vertical-align: middle;">
+                                                                <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/Google_Play_Arrow_logo.svg" width="20" height="20" alt="Google Play" style="display: block; border: 0;" />
+                                                            </td>
+                                                            <td style="vertical-align: middle; text-align: left;">
+                                                                <div style="font-size: 9px; text-transform: uppercase; color: #CBD5E1; letter-spacing: 0.5px; line-height: 1;">GET IT ON</div>
+                                                                <div style="font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2; margin-top: 2px;">Google Play</div>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <a href="https://abumafhal.com.ng" target="_blank" style="display: inline-block; background-color: #F8FAFC; color: #0F172A; border-radius: 8px; padding: 10px 16px; text-decoration: none; border: 1px solid #CBD5E1; font-size: 12px; font-weight: 700;">
+                                                    Open Web App &rarr;
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
                             </div>
                             <div style="padding: 18px 28px; background-color: #F8FAFC; border-top: 1px solid #E2E8F0;">
-                                <p style="margin: 0; font-size: 11px; font-weight: 700; color: #0F172A;">ABU MAFHAL SUB Telecom & Payment Systems</p>
-                                <p style="margin: 4px 0 0; font-size: 10px; color: #64748B;">Automated 24/7 Digital Services • &copy; ${new Date().getFullYear()}</p>
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td>
+                                            <p style="margin: 0; font-size: 11px; font-weight: 700; color: #0F172A;">ABU MAFHAL SUB Telecom & Payment Systems</p>
+                                            <p style="margin: 4px 0 0; font-size: 10px; color: #64748B;">Automated 24/7 Digital Services • &copy; ${new Date().getFullYear()}</p>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" style="font-size: 11px; color: #2563EB; font-weight: 700; text-decoration: none;">Play Store App &rarr;</a>
+                                        </td>
+                                    </tr>
+                                </table>
                             </div>
                         </div>`,
                         is_read: false,
@@ -1461,9 +1498,22 @@ export default function BroadcastCenterScreen() {
                                                 <Text style={styles.phoneEmailFrom}>From: admin@abumafhal.com.ng</Text>
                                                 <Text style={styles.phoneEmailSubject} numberOfLines={1}>{title || 'Official Announcement'}</Text>
                                             </View>
-                                            <Text style={styles.phoneEmailBody} numberOfLines={6}>
+                                            <Text style={styles.phoneEmailBody} numberOfLines={5}>
                                                 {body || 'Enjoy affordable data plans at the best prices. Buy now on ABU MAFHAL SUB.'}
                                             </Text>
+                                            
+                                            {/* Play Store App Download Button */}
+                                            <View style={styles.phoneEmailPlayStoreBtn}>
+                                                <Ionicons name="logo-google-playstore" size={13} color="#FFFFFF" />
+                                                <View style={{ marginLeft: 6 }}>
+                                                    <Text style={styles.phoneEmailPlayStoreSub}>GET IT ON</Text>
+                                                    <Text style={styles.phoneEmailPlayStoreMain}>Google Play</Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.phoneEmailFooterRow}>
+                                                <Text style={styles.phoneEmailFooterText}>ABU MAFHAL SUB • 100% Encrypted</Text>
+                                            </View>
                                         </View>
                                     )}
 
@@ -2587,6 +2637,39 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#334155',
         lineHeight: 14,
+    },
+    phoneEmailPlayStoreBtn: {
+        marginTop: 10,
+        backgroundColor: '#000000',
+        borderRadius: 6,
+        paddingVertical: 5,
+        paddingHorizontal: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+    },
+    phoneEmailPlayStoreSub: {
+        color: '#CBD5E1',
+        fontSize: 7,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+    },
+    phoneEmailPlayStoreMain: {
+        color: '#FFFFFF',
+        fontSize: 9.5,
+        fontWeight: '900',
+        lineHeight: 11,
+    },
+    phoneEmailFooterRow: {
+        marginTop: 10,
+        paddingTop: 6,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    phoneEmailFooterText: {
+        fontSize: 8.5,
+        color: '#64748B',
+        fontWeight: '600',
     },
 
     phoneInAppHero: {

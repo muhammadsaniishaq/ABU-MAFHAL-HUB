@@ -471,17 +471,45 @@ Deno.serve(async (req) => {
                             <td style="padding: 36px 32px 28px; background-color: #FFFFFF;">
                               <h1 style="margin: 0 0 18px; font-size: 20px; font-weight: 800; color: #0F172A; line-height: 1.4;">${String(title).trim()}</h1>
                               <div style="font-size: 15px; line-height: 1.75; color: #334155; white-space: pre-wrap; font-weight: 400;">${String(notifBody).trim()}</div>
+                            </td>
+                          </tr>
 
-                              <!-- Action Button -->
-                              <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #F1F5F9;">
-                                <table cellpadding="0" cellspacing="0">
-                                  <tr>
-                                    <td style="background-color: #070D1E; border-radius: 8px;">
-                                      <a href="https://abumafhal.com.ng" target="_blank" style="display: inline-block; padding: 12px 24px; color: #FFFFFF; text-decoration: none; font-size: 13.5px; font-weight: 700; letter-spacing: 0.3px;">Open ABU MAFHAL App &rarr;</a>
-                                    </td>
-                                  </tr>
-                                </table>
-                              </div>
+                          <!-- App Download & Action Section -->
+                          <tr>
+                            <td style="padding: 24px 32px 28px; background-color: #FFFFFF; border-top: 1px solid #F1F5F9;">
+                              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                  <td style="vertical-align: middle;">
+                                    <p style="margin: 0 0 10px; font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.8px;">Download Mobile App</p>
+                                    <table cellpadding="0" cellspacing="0" border="0">
+                                      <tr>
+                                        <!-- Google Play Store Button -->
+                                        <td style="padding-right: 12px;">
+                                          <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" style="display: inline-block; background-color: #000000; color: #FFFFFF; border-radius: 8px; padding: 8px 16px; text-decoration: none; border: 1px solid #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                                            <table cellpadding="0" cellspacing="0" border="0">
+                                              <tr>
+                                                <td style="padding-right: 10px; vertical-align: middle;">
+                                                  <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/Google_Play_Arrow_logo.svg" width="22" height="22" alt="Google Play" style="display: block; border: 0;" />
+                                                </td>
+                                                <td style="vertical-align: middle; text-align: left;">
+                                                  <div style="font-size: 9px; text-transform: uppercase; color: #CBD5E1; letter-spacing: 0.5px; line-height: 1;">GET IT ON</div>
+                                                  <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; line-height: 1.2; margin-top: 2px;">Google Play</div>
+                                                </td>
+                                              </tr>
+                                            </table>
+                                          </a>
+                                        </td>
+                                        <!-- Direct Web Access Button -->
+                                        <td>
+                                          <a href="https://abumafhal.com.ng" target="_blank" style="display: inline-block; background-color: #F8FAFC; color: #0F172A; border-radius: 8px; padding: 11px 18px; text-decoration: none; border: 1px solid #CBD5E1; font-size: 12.5px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                                            Open Web Portal &rarr;
+                                          </a>
+                                        </td>
+                                      </tr>
+                                    </table>
+                                  </td>
+                                </tr>
+                              </table>
                             </td>
                           </tr>
 
@@ -496,6 +524,7 @@ Deno.serve(async (req) => {
                                     <p style="margin: 6px 0 0; font-size: 10.5px; color: #94A3B8;">&copy; ${new Date().getFullYear()} ABU MAFHAL SUB. All rights reserved.</p>
                                   </td>
                                   <td style="text-align: right; vertical-align: middle;">
+                                    <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" style="display: inline-block; font-size: 11px; color: #2563EB; font-weight: 700; text-decoration: none; margin-bottom: 4px;">Get Android App</a><br/>
                                     <span style="font-size: 11px; color: #059669; font-weight: 700;">&#10003; 100% Encrypted</span>
                                   </td>
                                 </tr>
