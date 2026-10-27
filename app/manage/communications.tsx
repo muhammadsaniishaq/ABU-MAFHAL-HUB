@@ -390,16 +390,39 @@ export default function BroadcastCenterScreen() {
                 try {
                     await supabase.from('in_app_emails').insert({
                         sender_email: 'admin@abumafhal.com.ng',
-                        sender_name: 'ABU MAFHAL SUB Broadcast',
+                        sender_name: 'ABU MAFHAL SUB Official',
                         recipient_email: recipientAudience === 'specific' ? specificRecipient : 'subscribers@abumafhal.com.ng',
                         subject: dispatchTitle,
                         body_text: cleanBody,
-                        body_html: `<div style="font-family: sans-serif; padding: 24px; background: #070D1E; color: #FFFFFF; border-radius: 12px; border: 1px solid #D97706;"><h2 style="color: #F59E0B; margin-top: 0;">${dispatchTitle}</h2><p style="font-size: 14px; line-height: 1.6; color: #E2E8F0;">${cleanBody.replace(/\n/g, '<br/>')}</p><hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;"/><p style="font-size: 11px; color: #94A3B8;">Sent securely by ABU MAFHAL SUB Broadcast Center</p></div>`,
+                        body_html: `
+                        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #FFFFFF; border-radius: 14px; border: 1px solid #E2E8F0; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); max-width: 600px; margin: 0 auto;">
+                            <div style="background: linear-gradient(135deg, #070D1E 0%, #0F172A 100%); padding: 22px 28px; border-bottom: 3px solid #F59E0B;">
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td>
+                                            <span style="color: #FFFFFF; font-size: 16px; font-weight: 900; letter-spacing: 0.5px;">ABU MAFHAL <span style="color: #FBBF24;">SUB</span></span>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            <span style="background-color: rgba(245, 158, 11, 0.2); color: #FBBF24; font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.4);">Official Broadcast</span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div style="padding: 28px 28px 24px; background-color: #FFFFFF;">
+                                <h2 style="color: #0F172A; margin: 0 0 14px 0; font-size: 18px; font-weight: 800;">${dispatchTitle}</h2>
+                                <p style="font-size: 14px; line-height: 1.7; color: #334155; margin: 0 0 20px 0; white-space: pre-wrap;">${cleanBody}</p>
+                            </div>
+                            <div style="padding: 18px 28px; background-color: #F8FAFC; border-top: 1px solid #E2E8F0;">
+                                <p style="margin: 0; font-size: 11px; font-weight: 700; color: #0F172A;">ABU MAFHAL SUB Telecom & Payment Systems</p>
+                                <p style="margin: 4px 0 0; font-size: 10px; color: #64748B;">Automated 24/7 Digital Services • &copy; ${new Date().getFullYear()}</p>
+                            </div>
+                        </div>`,
                         is_read: false,
                         folder: 'inbox',
                     });
                 } catch (e) {}
             }
+
 
             // Local native push notification alert on this device
             try {
@@ -2531,34 +2554,41 @@ const styles = StyleSheet.create({
         lineHeight: 14,
     },
     phoneEmailCard: {
-        backgroundColor: '#0F172A',
-        borderRadius: 10,
-        padding: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 12,
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: '#E2E8F0',
         marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     phoneEmailHeader: {
-        marginBottom: 6,
+        marginBottom: 8,
         borderBottomWidth: 1,
-        borderBottomColor: '#1E293B',
-        paddingBottom: 4,
+        borderBottomColor: '#F1F5F9',
+        paddingBottom: 6,
     },
     phoneEmailFrom: {
-        fontSize: 8.5,
-        color: '#94A3B8',
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#64748B',
     },
     phoneEmailSubject: {
-        fontSize: 10.5,
-        fontWeight: '800',
-        color: T.goldBright,
+        fontSize: 11.5,
+        fontWeight: '900',
+        color: T.navyPrimary,
         marginTop: 2,
     },
     phoneEmailBody: {
-        fontSize: 9.5,
-        color: '#E2E8F0',
-        lineHeight: 13,
+        fontSize: 10,
+        color: '#334155',
+        lineHeight: 14,
     },
+
     phoneInAppHero: {
         borderRadius: 12,
         overflow: 'hidden',
