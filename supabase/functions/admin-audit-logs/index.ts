@@ -415,6 +415,57 @@ Deno.serve(async (req) => {
             });
         }
 
+        // ACTION 6: GET BROADCAST REALTIME ANALYTICS (Service Role bypasses RLS)
+        if (action === 'get-broadcast-analytics') {
+            const { count: usersCount } = await supabaseAdmin
+                .from('profiles')
+                .select('*', { count: 'exact', head: true });
+
+            const { count: notifsCount } = await supabaseAdmin
+                .from('notifications')
+                .select('*', { count: 'exact', head: true });
+
+            const { count: emailsCount } = await supabaseAdmin
+                .from('in_app_emails')
+                .select('*', { count: 'exact', head: true });
+
+            const { data: auditLogs } = await supabaseAdmin
+                .from('audit_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            const { data: topAdmin } = await supabaseAdmin
+                .from('profiles')
+                .select('balance, role, full_name')
+                .in('role', ['super_admin', 'admin'])
+                .order('balance', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const pushLogsCount = (auditLogs || []).filter((l: any) => 
+                (l.target_resource?.toLowerCase().includes('push') || l.action?.toLowerCase().includes('push'))
+            ).length;
+
+            const smsLogsCount = (auditLogs || []).filter((l: any) => 
+                (l.target_resource?.toLowerCase().includes('sms') || l.action?.toLowerCase().includes('sms'))
+            ).length;
+
+            return new Response(JSON.stringify({
+                status: 'success',
+                usersCount: usersCount || 0,
+                notifsCount: notifsCount || 0,
+                emailsCount: emailsCount || 0,
+                pushCount: pushLogsCount,
+                smsCount: smsLogsCount,
+                adminBalance: topAdmin?.balance || 0,
+                auditLogs: auditLogs || []
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
         throw new Error(`Unknown action: ${action}`);
 
     } catch (err: any) {
