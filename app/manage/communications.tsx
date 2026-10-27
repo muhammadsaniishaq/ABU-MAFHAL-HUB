@@ -385,16 +385,18 @@ export default function BroadcastCenterScreen() {
 
             // In-app Email insertion if email channel
             if (activeChannel === 'email') {
-                await supabase.from('in_app_emails').insert({
-                    sender_email: 'admin@abumafhal.com.ng',
-                    sender_name: 'ABU MAFHAL SUB Broadcast',
-                    recipient_email: recipientAudience === 'specific' ? specificRecipient : 'subscribers@abumafhal.com.ng',
-                    subject: dispatchTitle,
-                    body_text: cleanBody,
-                    body_html: `<div style="font-family: sans-serif; padding: 24px; background: #070D1E; color: #FFFFFF; border-radius: 12px; border: 1px solid #D97706;"><h2 style="color: #F59E0B; margin-top: 0;">${dispatchTitle}</h2><p style="font-size: 14px; line-height: 1.6; color: #E2E8F0;">${cleanBody.replace(/\n/g, '<br/>')}</p><hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;"/><p style="font-size: 11px; color: #94A3B8;">Sent securely by ABU MAFHAL SUB Broadcast Center</p></div>`,
-                    is_read: false,
-                    folder: 'inbox',
-                }).catch(() => {});
+                try {
+                    await supabase.from('in_app_emails').insert({
+                        sender_email: 'admin@abumafhal.com.ng',
+                        sender_name: 'ABU MAFHAL SUB Broadcast',
+                        recipient_email: recipientAudience === 'specific' ? specificRecipient : 'subscribers@abumafhal.com.ng',
+                        subject: dispatchTitle,
+                        body_text: cleanBody,
+                        body_html: `<div style="font-family: sans-serif; padding: 24px; background: #070D1E; color: #FFFFFF; border-radius: 12px; border: 1px solid #D97706;"><h2 style="color: #F59E0B; margin-top: 0;">${dispatchTitle}</h2><p style="font-size: 14px; line-height: 1.6; color: #E2E8F0;">${cleanBody.replace(/\n/g, '<br/>')}</p><hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;"/><p style="font-size: 11px; color: #94A3B8;">Sent securely by ABU MAFHAL SUB Broadcast Center</p></div>`,
+                        is_read: false,
+                        folder: 'inbox',
+                    });
+                } catch (e) {}
             }
 
             // Local native push notification alert on this device
