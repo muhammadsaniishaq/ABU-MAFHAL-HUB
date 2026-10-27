@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
                     .select('id, expo_push_token')
                     .in('role', ['admin', 'super_admin']);
                 if (!sErr && staffUsers) targetUsers = staffUsers;
-            } else if (targetAudience === 'single' && singleTargetQuery?.trim()) {
+            } else if ((targetAudience === 'single' || targetAudience === 'specific') && singleTargetQuery?.trim()) {
                 const q = singleTargetQuery.trim();
                 let col = 'email';
                 if (/^\d+$/.test(q) || q.startsWith('+')) col = 'phone';
@@ -283,6 +283,36 @@ Deno.serve(async (req) => {
                     singleUser = byEmail;
                 }
                 if (singleUser) targetUsers = [singleUser];
+            } else if (targetAudience === 'location' && body.locationQuery) {
+                const locQ = String(body.locationQuery).split(',')[0].trim();
+                const { data: locUsers } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, expo_push_token')
+                    .or(`state.ilike.%${locQ}%,address.ilike.%${locQ}%`)
+                    .limit(2000);
+                if (locUsers && locUsers.length > 0) targetUsers = locUsers;
+                else {
+                    // Fallback to all users if specific state query yields few records
+                    const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token').limit(500);
+                    if (allUsers) targetUsers = allUsers;
+                }
+            } else if (targetAudience === 'groups') {
+                const grp = body.groupQuery || 'active';
+                if (grp === 'agents' || grp === 'vip') {
+                    const { data: grpUsers } = await supabaseAdmin
+                        .from('profiles')
+                        .select('id, expo_push_token')
+                        .in('role', ['agent', 'merchant', 'admin'])
+                        .limit(2000);
+                    if (grpUsers && grpUsers.length > 0) targetUsers = grpUsers;
+                    else {
+                        const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token').limit(200);
+                        if (allUsers) targetUsers = allUsers;
+                    }
+                } else {
+                    const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token').limit(500);
+                    if (allUsers) targetUsers = allUsers;
+                }
             }
 
             // Fallback: If no users found, fetch at least current admin or any single profile so user_id NOT NULL constraint is met

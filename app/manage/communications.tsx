@@ -102,6 +102,14 @@ const QUICK_PRESETS = [
     }
 ];
 
+const NIGERIAN_STATES = [
+    'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
+    'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT - Abuja', 'Gombe',
+    'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara',
+    'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau',
+    'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'
+];
+
 export default function BroadcastCenterScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
@@ -111,6 +119,10 @@ export default function BroadcastCenterScreen() {
     const [recipientAudience, setRecipientAudience] = useState<'all' | 'specific' | 'groups' | 'location'>('all');
     const [scheduleType, setScheduleType] = useState<'now' | 'later'>('now');
     const [previewType, setPreviewType] = useState<'push' | 'sms' | 'email'>('push');
+
+    // Location Dropdown & Search Modal
+    const [showStateDropdownModal, setShowStateDropdownModal] = useState(false);
+    const [stateSearchQuery, setStateSearchQuery] = useState('');
 
     // Real-Time Form Fields
     const [title, setTitle] = useState('New Data Plans Available! 🔥');
@@ -378,6 +390,11 @@ export default function BroadcastCenterScreen() {
                     isUrgent: true,
                     isPermanent: true,
                     singleTargetQuery: specificRecipient,
+                    locationQuery: selectedLocation,
+                    groupQuery: selectedGroup,
+                    scheduleType,
+                    scheduleTimeSlot,
+                    customScheduleDate,
                     extraData: pushData
                 }
             });
@@ -891,18 +908,47 @@ export default function BroadcastCenterScreen() {
                                 </View>
                             )}
 
-                            {/* Location Selector */}
+                            {/* Location Selector (Interactive Dropdown with all 36 States + FCT) */}
                             {recipientAudience === 'location' && (
-                                <View style={styles.subPillsRow}>
-                                    {['Kano, Nigeria', 'Kaduna, Nigeria', 'Abuja (FCT)', 'Lagos, Nigeria', 'Sokoto, Nigeria', 'Bauchi, Nigeria'].map(loc => (
-                                        <TouchableOpacity
-                                            key={loc}
-                                            onPress={() => setSelectedLocation(loc)}
-                                            style={[styles.subPill, selectedLocation === loc && styles.subPillActive]}
-                                        >
-                                            <Text style={[styles.subPillText, selectedLocation === loc && styles.subPillTextActive]}>{loc}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                <View style={styles.locationSelectorContainer}>
+                                    <Text style={styles.locationHelpLabel}>Zaɓi Jiha / Select Target State (Duk Jihohin Najeriya):</Text>
+                                    
+                                    {/* Dropdown Opener Button */}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setStateSearchQuery('');
+                                            setShowStateDropdownModal(true);
+                                        }}
+                                        style={styles.stateDropdownBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={styles.stateDropdownLeft}>
+                                            <Ionicons name="location-sharp" size={18} color="#059669" />
+                                            <Text style={styles.stateDropdownSelectedText}>
+                                                {selectedLocation || 'Zaɓi Jiha daga Dropdown...'}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.stateDropdownRight}>
+                                            <Text style={styles.stateDropdownChangeText}>Canza Jiha</Text>
+                                            <Ionicons name="chevron-down" size={16} color="#059669" />
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {/* Quick Popular State Chips */}
+                                    <View style={styles.quickStatesWrap}>
+                                        <Text style={styles.quickStatesHeading}>Jihohi Masu Yawa (Quick Picks):</Text>
+                                        <View style={styles.subPillsRow}>
+                                            {['Kano', 'Kaduna', 'FCT - Abuja', 'Lagos', 'Sokoto', 'Katsina', 'Bauchi', 'Borno'].map(st => (
+                                                <TouchableOpacity
+                                                    key={st}
+                                                    onPress={() => setSelectedLocation(st)}
+                                                    style={[styles.subPill, selectedLocation === st && styles.subPillActive]}
+                                                >
+                                                    <Text style={[styles.subPillText, selectedLocation === st && styles.subPillTextActive]}>{st}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
                                 </View>
                             )}
                         </View>
@@ -1407,6 +1453,110 @@ export default function BroadcastCenterScreen() {
                                 <Text style={styles.previewCloseBtnText}>Rufe Shafin Preview</Text>
                             </TouchableOpacity>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* MODAL: NIGERIAN STATES DROPDOWN & LIVE SEARCH MODAL */}
+            <Modal
+                visible={showStateDropdownModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowStateDropdownModal(false)}
+            >
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.stateModalContentCard}>
+                        {/* Modal Header */}
+                        <View style={styles.stateModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={[styles.previewModalHeaderIcon, { backgroundColor: '#059669' }]}>
+                                    <Ionicons name="map" size={17} color="#FFFFFF" />
+                                </View>
+                                <View>
+                                    <Text style={styles.previewModalTitle}>Zaɓi Jiha / Select State</Text>
+                                    <Text style={styles.previewModalSubtitle}>Dukkan jihohi 36 na Najeriya da babban birnin tarayya Abuja</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setShowStateDropdownModal(false)}
+                                style={styles.modalCloseCircle}
+                            >
+                                <Ionicons name="close" size={20} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Search Input for States */}
+                        <View style={styles.stateSearchBox}>
+                            <Ionicons name="search" size={16} color="#64748B" />
+                            <TextInput
+                                value={stateSearchQuery}
+                                onChangeText={setStateSearchQuery}
+                                placeholder="Bincika jiha (misali: Kano, Lagos, Abuja)..."
+                                placeholderTextColor="#94A3B8"
+                                style={styles.stateSearchInput}
+                                autoFocus={false}
+                            />
+                            {stateSearchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setStateSearchQuery('')}>
+                                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Scrollable List of All 36 States + FCT */}
+                        <ScrollView
+                            showsVerticalScrollIndicator={true}
+                            style={styles.statesScrollList}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            {NIGERIAN_STATES
+                                .filter(s => s.toLowerCase().includes(stateSearchQuery.toLowerCase().trim()))
+                                .map((stateName) => {
+                                    const isSelected = selectedLocation === stateName || selectedLocation.startsWith(stateName);
+                                    return (
+                                        <TouchableOpacity
+                                            key={stateName}
+                                            onPress={() => {
+                                                setSelectedLocation(stateName);
+                                                setShowStateDropdownModal(false);
+                                                showNotify('An Zaɓi Jiha ✅', `An saita masu karɓar saƙo daga: ${stateName}`);
+                                            }}
+                                            style={[styles.stateItemRow, isSelected && styles.stateItemRowSelected]}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                <Ionicons
+                                                    name={isSelected ? "checkmark-circle" : "location-outline"}
+                                                    size={18}
+                                                    color={isSelected ? "#059669" : "#64748B"}
+                                                />
+                                                <Text style={[styles.stateItemText, isSelected && styles.stateItemTextSelected]}>
+                                                    {stateName}
+                                                </Text>
+                                            </View>
+                                            {isSelected && (
+                                                <View style={styles.stateItemActiveBadge}>
+                                                    <Text style={styles.stateItemActiveBadgeText}>Selected</Text>
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+
+                            {NIGERIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQuery.toLowerCase().trim())).length === 0 && (
+                                <View style={styles.noStateFound}>
+                                    <Ionicons name="alert-circle-outline" size={32} color="#94A3B8" />
+                                    <Text style={styles.noStateFoundText}>Babu jihar da ta dace da sunan da kuka rubuta.</Text>
+                                </View>
+                            )}
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            onPress={() => setShowStateDropdownModal(false)}
+                            style={styles.modalCancelBtn}
+                        >
+                            <Text style={styles.modalCancelBtnText}>Rufe / Close</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -3024,5 +3174,174 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: T.navyPrimary,
         marginBottom: 6,
+    },
+
+    // Location & State Dropdown Styles
+    locationSelectorContainer: {
+        marginTop: 10,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        padding: 12,
+    },
+    locationHelpLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        marginBottom: 8,
+    },
+    stateDropdownBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#10B981',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 11,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    stateDropdownLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flex: 1,
+    },
+    stateDropdownSelectedText: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: T.navyPrimary,
+    },
+    stateDropdownRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    stateDropdownChangeText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#059669',
+    },
+    quickStatesWrap: {
+        marginTop: 12,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
+    },
+    quickStatesHeading: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#64748B',
+        marginBottom: 6,
+    },
+
+    // Nigerian States Dropdown Modal
+    stateModalContentCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 16,
+        width: '92%',
+        maxWidth: 440,
+        maxHeight: '85%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    stateModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        marginBottom: 10,
+    },
+    stateSearchBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        gap: 8,
+        marginBottom: 12,
+    },
+    stateSearchInput: {
+        flex: 1,
+        fontSize: 12,
+        color: T.textMain,
+    },
+    statesScrollList: {
+        maxHeight: 320,
+        marginBottom: 10,
+    },
+    stateItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        marginBottom: 4,
+        backgroundColor: '#F8FAFC',
+    },
+    stateItemRowSelected: {
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    stateItemText: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: '#334155',
+    },
+    stateItemTextSelected: {
+        color: '#065F46',
+        fontWeight: '900',
+    },
+    stateItemActiveBadge: {
+        backgroundColor: '#059669',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    stateItemActiveBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
+    noStateFound: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 30,
+        gap: 6,
+    },
+    noStateFoundText: {
+        fontSize: 11.5,
+        color: '#94A3B8',
+        textAlign: 'center',
+    },
+    modalCancelBtn: {
+        backgroundColor: '#F1F5F9',
+        paddingVertical: 11,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 6,
+    },
+    modalCancelBtnText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#475569',
     },
 });
