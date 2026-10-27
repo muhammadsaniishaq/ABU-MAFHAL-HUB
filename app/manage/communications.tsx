@@ -120,6 +120,9 @@ export default function BroadcastCenterScreen() {
     const [selectedGroup, setSelectedGroup] = useState<'vip' | 'tier2' | 'agents' | 'active'>('active');
     const [selectedLocation, setSelectedLocation] = useState('Kano, Nigeria');
     const [mediaAttached, setMediaAttached] = useState(true);
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [scheduleTimeSlot, setScheduleTimeSlot] = useState<'1h' | 'today_evening' | 'tomorrow_morning' | 'custom'>('1h');
+    const [customScheduleDate, setCustomScheduleDate] = useState('');
 
     // Live Real-Time Telemetry & Counts (Direct Live Supabase values)
     const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
@@ -583,7 +586,7 @@ export default function BroadcastCenterScreen() {
                     </View>
                 </View>
 
-                {/* 3-Way Channel Selector (Push / SMS / Email) - High Precision Layout */}
+                {/* 3-Way Channel Selector (Push / SMS / Email) - Responsive & No Overlap */}
                 <View style={styles.channelSelectorRow}>
                     <TouchableOpacity
                         onPress={() => { setActiveChannel('push'); setPreviewType('push'); }}
@@ -591,13 +594,13 @@ export default function BroadcastCenterScreen() {
                         activeOpacity={0.8}
                     >
                         <View style={[styles.channelBtnIconBox, activeChannel === 'push' ? { backgroundColor: 'rgba(245, 158, 11, 0.25)' } : { backgroundColor: '#F1F5F9' }]}>
-                            <Ionicons name="notifications" size={18} color={activeChannel === 'push' ? T.goldBright : '#64748B'} />
+                            <Ionicons name="notifications" size={17} color={activeChannel === 'push' ? T.goldBright : '#64748B'} />
                         </View>
                         <View style={styles.channelBtnTextContainer}>
                             <Text style={[styles.channelBtnTitle, activeChannel === 'push' && styles.channelBtnTitleActive]} numberOfLines={1}>
-                                Push Notification
+                                Push
                             </Text>
-                            <Text style={styles.channelBtnSub} numberOfLines={1}>In-App Notifications</Text>
+                            <Text style={[styles.channelBtnSub, activeChannel === 'push' && styles.channelBtnSubActive]} numberOfLines={1}>In-App</Text>
                         </View>
                     </TouchableOpacity>
 
@@ -607,13 +610,13 @@ export default function BroadcastCenterScreen() {
                         activeOpacity={0.8}
                     >
                         <View style={[styles.channelBtnIconBox, activeChannel === 'sms' ? { backgroundColor: 'rgba(245, 158, 11, 0.25)' } : { backgroundColor: '#F1F5F9' }]}>
-                            <Ionicons name="chatbubbles" size={18} color={activeChannel === 'sms' ? T.goldBright : '#64748B'} />
+                            <Ionicons name="chatbubbles" size={17} color={activeChannel === 'sms' ? T.goldBright : '#64748B'} />
                         </View>
                         <View style={styles.channelBtnTextContainer}>
                             <Text style={[styles.channelBtnTitle, activeChannel === 'sms' && styles.channelBtnTitleActive]} numberOfLines={1}>
-                                SMS Broadcast
+                                SMS
                             </Text>
-                            <Text style={styles.channelBtnSub} numberOfLines={1}>SMS Gateway</Text>
+                            <Text style={[styles.channelBtnSub, activeChannel === 'sms' && styles.channelBtnSubActive]} numberOfLines={1}>Gateway</Text>
                         </View>
                     </TouchableOpacity>
 
@@ -623,13 +626,13 @@ export default function BroadcastCenterScreen() {
                         activeOpacity={0.8}
                     >
                         <View style={[styles.channelBtnIconBox, activeChannel === 'email' ? { backgroundColor: 'rgba(245, 158, 11, 0.25)' } : { backgroundColor: '#F1F5F9' }]}>
-                            <Ionicons name="mail" size={18} color={activeChannel === 'email' ? T.goldBright : '#64748B'} />
+                            <Ionicons name="mail" size={17} color={activeChannel === 'email' ? T.goldBright : '#64748B'} />
                         </View>
                         <View style={styles.channelBtnTextContainer}>
                             <Text style={[styles.channelBtnTitle, activeChannel === 'email' && styles.channelBtnTitleActive]} numberOfLines={1}>
-                                Email Broadcast
+                                Email
                             </Text>
-                            <Text style={styles.channelBtnSub} numberOfLines={1}>Email Service</Text>
+                            <Text style={[styles.channelBtnSub, activeChannel === 'email' && styles.channelBtnSubActive]} numberOfLines={1}>Service</Text>
                         </View>
                     </TouchableOpacity>
                 </View>
@@ -649,10 +652,21 @@ export default function BroadcastCenterScreen() {
                                     <Text style={styles.sectionHeaderTitle}>Compose Message</Text>
                                 </View>
 
-                                <TouchableOpacity onPress={() => setShowAiModal(true)} style={styles.useTemplateGoldBtn}>
-                                    <Ionicons name="sparkles" size={14} color={T.goldDark} />
-                                    <Text style={styles.useTemplateGoldBtnText}>Cortex AI</Text>
-                                </TouchableOpacity>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <TouchableOpacity
+                                        onPress={() => setShowPreviewModal(true)}
+                                        style={styles.previewPopupBtn}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="eye-outline" size={14} color="#2563EB" />
+                                        <Text style={styles.previewPopupBtnText}>Preview</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity onPress={() => setShowAiModal(true)} style={styles.useTemplateGoldBtn}>
+                                        <Ionicons name="sparkles" size={14} color={T.goldDark} />
+                                        <Text style={styles.useTemplateGoldBtnText}>Cortex AI</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
 
                             {/* Title (Optional) */}
@@ -916,10 +930,10 @@ export default function BroadcastCenterScreen() {
                                         </View>
                                     )}
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                        <Ionicons name="paper-plane" size={20} color={T.goldDark} />
-                                        <View>
+                                        <Ionicons name="paper-plane" size={20} color={scheduleType === 'now' ? T.goldDark : '#64748B'} />
+                                        <View style={{ flex: 1 }}>
                                             <Text style={styles.scheduleTitle}>Send Now</Text>
-                                            <Text style={styles.scheduleSub}>Send immediately</Text>
+                                            <Text style={styles.scheduleSub} numberOfLines={1}>Send immediately</Text>
                                         </View>
                                     </View>
                                 </TouchableOpacity>
@@ -935,14 +949,52 @@ export default function BroadcastCenterScreen() {
                                         </View>
                                     )}
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                        <Ionicons name="calendar-outline" size={20} color="#64748B" />
-                                        <View>
-                                            <Text style={styles.scheduleTitle}>Schedule for Later</Text>
-                                            <Text style={styles.scheduleSub}>Choose date and time</Text>
+                                        <Ionicons name="calendar-outline" size={20} color={scheduleType === 'later' ? T.goldDark : '#64748B'} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.scheduleTitle}>Schedule Later</Text>
+                                            <Text style={styles.scheduleSub} numberOfLines={1}>Choose date & time</Text>
                                         </View>
                                     </View>
                                 </TouchableOpacity>
                             </View>
+
+                            {/* When 'Schedule for Later' is active, show selectable time options */}
+                            {scheduleType === 'later' && (
+                                <View style={styles.scheduleOptionsContainer}>
+                                    <Text style={styles.scheduleOptionsLabel}>Select Delivery Time / Lokacin Aikawa:</Text>
+                                    <View style={styles.subPillsRow}>
+                                        {[
+                                            { id: '1h', label: 'In 1 Hour (Cikin Awa 1)' },
+                                            { id: 'today_evening', label: 'Today 6:00 PM (Yau Da Yamma)' },
+                                            { id: 'tomorrow_morning', label: 'Tomorrow 9:00 AM (Gobe Da Safe)' },
+                                            { id: 'custom', label: 'Custom Time (Zabi Lokaci)' },
+                                        ].map(slot => (
+                                            <TouchableOpacity
+                                                key={slot.id}
+                                                onPress={() => setScheduleTimeSlot(slot.id as any)}
+                                                style={[styles.subPill, scheduleTimeSlot === slot.id && styles.subPillActive]}
+                                            >
+                                                <Text style={[styles.subPillText, scheduleTimeSlot === slot.id && styles.subPillTextActive]}>
+                                                    {slot.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+
+                                    {scheduleTimeSlot === 'custom' && (
+                                        <View style={styles.conditionalInputWrap}>
+                                            <Ionicons name="time-outline" size={16} color="#64748B" />
+                                            <TextInput
+                                                value={customScheduleDate}
+                                                onChangeText={setCustomScheduleDate}
+                                                placeholder="e.g. 2026-10-28 14:00 (YYYY-MM-DD HH:MM)"
+                                                placeholderTextColor="#94A3B8"
+                                                style={styles.conditionalInput}
+                                            />
+                                        </View>
+                                    )}
+                                </View>
+                            )}
                         </View>
 
                         {/* Feedback Banner */}
@@ -1003,142 +1055,45 @@ export default function BroadcastCenterScreen() {
                         </View>
                     </View>
 
-                    {/* RIGHT COLUMN: Live Mobile Preview & Templates */}
+                    {/* RIGHT COLUMN: Live Summary, Preview Launcher & Quick Templates */}
                     <View style={[styles.rightColumn, isLargeScreen && { flex: 0.85 }]}>
-                        {/* Live Preview Card */}
+                        {/* Live Preview Launcher Card - User taps to open small preview modal */}
                         <View style={styles.previewContainer}>
                             <View style={styles.previewHeaderRow}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="eye" size={16} color="#3B82F6" />
-                                    <Text style={styles.previewHeading}>Live Preview</Text>
+                                    <Ionicons name="phone-portrait-outline" size={17} color="#2563EB" />
+                                    <Text style={styles.previewHeading}>Live Message Preview</Text>
                                 </View>
-
-                                <View style={styles.deviceSwitcher}>
-                                    <TouchableOpacity
-                                        onPress={() => setPreviewType('push')}
-                                        style={[styles.deviceIconBtn, previewType === 'push' && styles.deviceIconBtnActive]}
-                                    >
-                                        <Ionicons name="phone-portrait-outline" size={15} color={previewType === 'push' ? '#FFFFFF' : '#64748B'} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        onPress={() => setPreviewType('sms')}
-                                        style={[styles.deviceIconBtn, previewType === 'sms' && styles.deviceIconBtnActive]}
-                                    >
-                                        <Ionicons name="chatbubble-outline" size={14} color={previewType === 'sms' ? '#FFFFFF' : '#64748B'} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        onPress={() => setPreviewType('email')}
-                                        style={[styles.deviceIconBtn, previewType === 'email' && styles.deviceIconBtnActive]}
-                                    >
-                                        <Ionicons name="mail-outline" size={15} color={previewType === 'email' ? '#FFFFFF' : '#64748B'} />
-                                    </TouchableOpacity>
+                                <View style={[styles.previewBadgeSmall, { backgroundColor: '#EFF6FF' }]}>
+                                    <Text style={[styles.previewBadgeSmallText, { color: '#2563EB' }]}>{activeChannel.toUpperCase()}</Text>
                                 </View>
                             </View>
 
-                            {/* Realistic Smartphone Screen Mockup with Real Interactive Preview */}
-                            <View style={styles.phoneFrame}>
-                                <View style={styles.phoneScreen}>
-                                    {/* Phone Status Bar */}
-                                    <View style={styles.phoneStatusBar}>
-                                        <Text style={styles.phoneTimeText}>9:41</Text>
-                                        <View style={styles.phoneStatusIcons}>
-                                            <Ionicons name="cellular" size={12} color="#FFFFFF" />
-                                            <Ionicons name="wifi" size={12} color="#FFFFFF" />
-                                            <Ionicons name="battery-full" size={14} color="#FFFFFF" />
-                                        </View>
-                                    </View>
-
-                                    {/* PREVIEW TYPE 1: PUSH NOTIFICATION */}
-                                    {previewType === 'push' && (
-                                        <View style={styles.phoneNotificationCard}>
-                                            <View style={styles.phoneNotifHeader}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <View style={styles.phoneAppIcon}>
-                                                        <Ionicons name="flash" size={10} color={T.goldBright} />
-                                                    </View>
-                                                    <Text style={styles.phoneAppName}>ABU MAFHAL SUB</Text>
-                                                </View>
-                                                <Text style={styles.phoneNowText}>now</Text>
-                                            </View>
-
-                                            <Text style={styles.phoneNotifTitle}>{title || 'New Data Plans Available! 🔥'}</Text>
-                                            <Text style={styles.phoneNotifBody} numberOfLines={3}>
-                                                {body || 'Enjoy affordable data plans at the best prices. Buy now on ABU MAFHAL SUB.'}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {/* PREVIEW TYPE 2: SMS TEXT MESSAGE */}
-                                    {previewType === 'sms' && (
-                                        <View style={styles.phoneSmsBubble}>
-                                            <View style={styles.phoneSmsHeader}>
-                                                <Text style={styles.phoneSmsSender}>ABUMAFHAL</Text>
-                                                <Text style={styles.phoneSmsTime}>Today 9:41 AM</Text>
-                                            </View>
-                                            <Text style={styles.phoneSmsText}>
-                                                {body || 'Enjoy affordable data plans at the best prices. Buy now on ABU MAFHAL SUB.'}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {/* PREVIEW TYPE 3: IN-APP EMAIL PREVIEW */}
-                                    {previewType === 'email' && (
-                                        <View style={styles.phoneEmailCard}>
-                                            <View style={styles.phoneEmailHeader}>
-                                                <Text style={styles.phoneEmailFrom}>From: admin@abumafhal.com.ng</Text>
-                                                <Text style={styles.phoneEmailSubject} numberOfLines={1}>{title || 'Official Announcement'}</Text>
-                                            </View>
-                                            <Text style={styles.phoneEmailBody} numberOfLines={4}>
-                                                {body || 'Enjoy affordable data plans at the best prices. Buy now on ABU MAFHAL SUB.'}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {/* In-App Hero Banner Graphic inside Phone (for Push Mode) */}
-                                    {previewType === 'push' && mediaAttached && (
-                                        <View style={styles.phoneInAppHero}>
-                                            <LinearGradient
-                                                colors={[T.navyPrimary, '#132147', T.navyDeep]}
-                                                style={styles.phoneBannerGradient}
-                                            >
-                                                <Ionicons name="megaphone" size={32} color={T.goldBright} />
-                                                <Text style={styles.phoneBannerSub}>ABU MAFHAL SUB</Text>
-                                                <Text style={styles.phoneBannerHeading}>{title || 'New Data Plans Available!'}</Text>
-                                                <Text style={styles.phoneBannerDesc} numberOfLines={2}>
-                                                    {body || 'Enjoy affordable data plans at the best prices.'}
-                                                </Text>
-                                                <TouchableOpacity style={styles.phoneBuyNowBtn}>
-                                                    <Text style={styles.phoneBuyNowText}>Buy Now</Text>
-                                                </TouchableOpacity>
-                                            </LinearGradient>
-                                        </View>
-                                    )}
+                            <TouchableOpacity
+                                onPress={() => setShowPreviewModal(true)}
+                                style={styles.openPreviewBannerBtn}
+                                activeOpacity={0.85}
+                            >
+                                <View style={styles.openPreviewIconCircle}>
+                                    <Ionicons name="eye" size={20} color="#FFFFFF" />
                                 </View>
-                            </View>
-
-                            {/* Preview as Switcher */}
-                            <View style={styles.previewAsRow}>
-                                <Text style={styles.previewAsLabel}>Preview as</Text>
-                                <View style={styles.previewPillsGroup}>
-                                    {(['push', 'sms', 'email'] as const).map(p => (
-                                        <TouchableOpacity
-                                            key={p}
-                                            onPress={() => setPreviewType(p)}
-                                            style={[styles.previewPill, previewType === p && styles.previewPillActive]}
-                                        >
-                                            <Text style={[styles.previewPillText, previewType === p && styles.previewPillTextActive]}>
-                                                {p === 'push' ? 'Push' : p.toUpperCase()}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={styles.openPreviewBtnTitle}>Bude Preview a Karamin Shafi</Text>
+                                    <Text style={styles.openPreviewBtnSub}>Danna nan domin ganin yadda saƙon zai bayyana a waya</Text>
                                 </View>
-                            </View>
+                                <Ionicons name="chevron-forward-circle" size={22} color={T.goldBright} />
+                            </TouchableOpacity>
 
                             {/* Target Summary Widget - 100% Real Live Database Math */}
                             <View style={styles.targetSummaryCard}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                                     <Ionicons name="bar-chart" size={16} color={T.navyPrimary} />
                                     <Text style={styles.targetSummaryTitle}>Target Summary</Text>
+                                </View>
+
+                                <View style={styles.targetRow}>
+                                    <Text style={styles.targetLabel}>Selected Channel</Text>
+                                    <Text style={[styles.targetValue, { color: T.navyPrimary }]}>{activeChannel.toUpperCase()} Broadcast</Text>
                                 </View>
 
                                 <View style={styles.targetRow}>
@@ -1254,7 +1209,207 @@ export default function BroadcastCenterScreen() {
                         ))
                     )}
                 </View>
+                <View style={{ height: 90 }} />
             </ScrollView>
+
+            {/* STICKY BOTTOM ACTION BAR ("BOTTOM SEND") */}
+            <View style={styles.stickyBottomBar}>
+                <View style={styles.stickyBottomInner}>
+                    <View style={styles.stickyAudienceBadge}>
+                        <View style={styles.stickyAudienceDot} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.stickyAudienceLabel} numberOfLines={1}>
+                                {recipientAudience === 'all'
+                                    ? `All Users (${totalUsersCount.toLocaleString()})`
+                                    : recipientAudience === 'specific'
+                                    ? (specificRecipient || '1 Specific User')
+                                    : recipientAudience === 'groups'
+                                    ? `Group: ${selectedGroup.toUpperCase()}`
+                                    : `Location: ${selectedLocation}`}
+                            </Text>
+                            <Text style={styles.stickyChannelSub}>
+                                Channel: {activeChannel.toUpperCase()} • {scheduleType === 'now' ? 'Send Now' : 'Scheduled'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.stickyActionBtnsRow}>
+                        <TouchableOpacity
+                            onPress={() => setShowPreviewModal(true)}
+                            style={styles.stickyPreviewBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="eye" size={16} color="#2563EB" />
+                            <Text style={styles.stickyPreviewBtnText}>Preview</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={handleSendBroadcast}
+                            disabled={sending}
+                            style={styles.stickySendBtn}
+                            activeOpacity={0.8}
+                        >
+                            <LinearGradient
+                                colors={['#F59E0B', '#D97706']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.stickySendGradient}
+                            >
+                                {sending ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="paper-plane" size={16} color="#FFFFFF" />
+                                        <Text style={styles.stickySendBtnText}>Send Now</Text>
+                                    </>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+
+            {/* MODAL 0: INTERACTIVE SMARTPHONE LIVE PREVIEW (SHAFI KARAMI) */}
+            <Modal
+                visible={showPreviewModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowPreviewModal(false)}
+            >
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.previewModalCard}>
+                        {/* Modal Header */}
+                        <View style={styles.previewModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={styles.previewModalHeaderIcon}>
+                                    <Ionicons name="phone-portrait" size={17} color={T.goldBright} />
+                                </View>
+                                <View>
+                                    <Text style={styles.previewModalTitle}>Live Device Preview</Text>
+                                    <Text style={styles.previewModalSubtitle}>Yadda saƙon zai bayyana a allon waya</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setShowPreviewModal(false)}
+                                style={styles.modalCloseCircle}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Ionicons name="close" size={20} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Interactive Device Channel Switcher */}
+                        <View style={styles.previewModalTabs}>
+                            {(['push', 'sms', 'email'] as const).map(tab => (
+                                <TouchableOpacity
+                                    key={tab}
+                                    onPress={() => setPreviewType(tab)}
+                                    style={[styles.previewModalTabBtn, previewType === tab && styles.previewModalTabBtnActive]}
+                                >
+                                    <Ionicons
+                                        name={tab === 'push' ? 'notifications' : tab === 'sms' ? 'chatbubbles' : 'mail'}
+                                        size={14}
+                                        color={previewType === tab ? '#FFFFFF' : '#64748B'}
+                                    />
+                                    <Text style={[styles.previewModalTabText, previewType === tab && styles.previewModalTabTextActive]}>
+                                        {tab === 'push' ? 'Push Notification' : tab === 'sms' ? 'SMS Text' : 'Email Message'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* Simulated Phone Screen Frame */}
+                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
+                            <View style={styles.phoneFrame}>
+                                <View style={styles.phoneScreen}>
+                                    {/* Phone Status Bar */}
+                                    <View style={styles.phoneStatusBar}>
+                                        <Text style={styles.phoneTimeText}>9:41</Text>
+                                        <View style={styles.phoneStatusIcons}>
+                                            <Ionicons name="cellular" size={12} color="#FFFFFF" />
+                                            <Ionicons name="wifi" size={12} color="#FFFFFF" />
+                                            <Ionicons name="battery-full" size={14} color="#FFFFFF" />
+                                        </View>
+                                    </View>
+
+                                    {/* PREVIEW TYPE 1: PUSH NOTIFICATION */}
+                                    {previewType === 'push' && (
+                                        <View style={styles.phoneNotificationCard}>
+                                            <View style={styles.phoneNotifHeader}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <View style={styles.phoneAppIcon}>
+                                                        <Ionicons name="flash" size={10} color={T.goldBright} />
+                                                    </View>
+                                                    <Text style={styles.phoneAppName}>ABU MAFHAL SUB</Text>
+                                                </View>
+                                                <Text style={styles.phoneNowText}>now</Text>
+                                            </View>
+
+                                            <Text style={styles.phoneNotifTitle}>{title || 'New Data Plans Available! 🔥'}</Text>
+                                            <Text style={styles.phoneNotifBody} numberOfLines={4}>
+                                                {body || 'Enjoy affordable data plans at the best prices. Buy now on ABU MAFHAL SUB.'}
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {/* PREVIEW TYPE 2: SMS TEXT MESSAGE */}
+                                    {previewType === 'sms' && (
+                                        <View style={styles.phoneSmsBubble}>
+                                            <View style={styles.phoneSmsHeader}>
+                                                <Text style={styles.phoneSmsSender}>ABUMAFHAL</Text>
+                                                <Text style={styles.phoneSmsTime}>Today 9:41 AM</Text>
+                                            </View>
+                                            <Text style={styles.phoneSmsText}>
+                                                {body || 'Enjoy affordable data plans at the best prices. Buy now on ABU MAFHAL SUB.'}
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {/* PREVIEW TYPE 3: IN-APP EMAIL PREVIEW */}
+                                    {previewType === 'email' && (
+                                        <View style={styles.phoneEmailCard}>
+                                            <View style={styles.phoneEmailHeader}>
+                                                <Text style={styles.phoneEmailFrom}>From: admin@abumafhal.com.ng</Text>
+                                                <Text style={styles.phoneEmailSubject} numberOfLines={1}>{title || 'Official Announcement'}</Text>
+                                            </View>
+                                            <Text style={styles.phoneEmailBody} numberOfLines={6}>
+                                                {body || 'Enjoy affordable data plans at the best prices. Buy now on ABU MAFHAL SUB.'}
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {/* In-App Hero Banner Graphic inside Phone (for Push Mode) */}
+                                    {previewType === 'push' && mediaAttached && (
+                                        <View style={styles.phoneInAppHero}>
+                                            <LinearGradient
+                                                colors={[T.navyPrimary, '#132147', T.navyDeep]}
+                                                style={styles.phoneBannerGradient}
+                                            >
+                                                <Ionicons name="megaphone" size={28} color={T.goldBright} />
+                                                <Text style={styles.phoneBannerSub}>ABU MAFHAL SUB</Text>
+                                                <Text style={styles.phoneBannerHeading}>{title || 'New Data Plans Available!'}</Text>
+                                                <Text style={styles.phoneBannerDesc} numberOfLines={2}>
+                                                    {body || 'Enjoy affordable data plans at the best prices.'}
+                                                </Text>
+                                                <TouchableOpacity style={styles.phoneBuyNowBtn}>
+                                                    <Text style={styles.phoneBuyNowText}>Buy Now</Text>
+                                                </TouchableOpacity>
+                                            </LinearGradient>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={() => setShowPreviewModal(false)}
+                                style={styles.previewCloseBtn}
+                            >
+                                <Text style={styles.previewCloseBtnText}>Rufe Shafin Preview</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             {/* MODAL 1: CORTEX AI DRAFTER */}
             <Modal
@@ -1681,6 +1836,25 @@ const styles = StyleSheet.create({
         fontSize: 9,
         color: '#64748B',
         marginTop: 1,
+    },
+    channelBtnSubActive: {
+        color: '#CBD5E1',
+    },
+    previewPopupBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    previewPopupBtnText: {
+        color: '#2563EB',
+        fontSize: 11,
+        fontWeight: '800',
     },
     layoutRow: {
         gap: 16,
@@ -2609,5 +2783,246 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '900',
+    },
+
+    // Sticky Bottom Send Bar Styles
+    stickyBottomBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#FFFFFF',
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 8,
+        zIndex: 99,
+    },
+    stickyBottomInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        maxWidth: 1200,
+        alignSelf: 'center',
+        width: '100%',
+        gap: 12,
+    },
+    stickyAudienceBadge: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    stickyAudienceDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#10B981',
+    },
+    stickyAudienceLabel: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: T.navyPrimary,
+    },
+    stickyChannelSub: {
+        fontSize: 9.5,
+        color: '#64748B',
+        marginTop: 1,
+    },
+    stickyActionBtnsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    stickyPreviewBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 10,
+    },
+    stickyPreviewBtnText: {
+        color: '#2563EB',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    stickySendBtn: {
+        borderRadius: 10,
+        overflow: 'hidden',
+        minWidth: 120,
+    },
+    stickySendGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
+    stickySendBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12.5,
+        fontWeight: '900',
+    },
+
+    // Preview Launcher Banner in Right Column
+    openPreviewBannerBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 14,
+    },
+    openPreviewIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#16A34A',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    openPreviewBtnTitle: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: '#15803D',
+    },
+    openPreviewBtnSub: {
+        fontSize: 9.5,
+        color: '#166534',
+        marginTop: 2,
+    },
+    previewBadgeSmall: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    previewBadgeSmallText: {
+        fontSize: 10,
+        fontWeight: '900',
+    },
+
+    // Preview Modal (Shafi Karami)
+    previewModalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 16,
+        width: '92%',
+        maxWidth: 420,
+        maxHeight: '90%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    previewModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        marginBottom: 10,
+    },
+    previewModalHeaderIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: T.navyPrimary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    previewModalTitle: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: T.navyPrimary,
+    },
+    previewModalSubtitle: {
+        fontSize: 10,
+        color: '#64748B',
+    },
+    modalCloseCircle: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    previewModalTabs: {
+        flexDirection: 'row',
+        gap: 6,
+        backgroundColor: '#F8FAFC',
+        padding: 4,
+        borderRadius: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    previewModalTabBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: 7,
+        borderRadius: 8,
+    },
+    previewModalTabBtnActive: {
+        backgroundColor: T.navyPrimary,
+    },
+    previewModalTabText: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    previewModalTabTextActive: {
+        color: '#FFFFFF',
+        fontWeight: '800',
+    },
+    previewCloseBtn: {
+        backgroundColor: '#F1F5F9',
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 6,
+    },
+    previewCloseBtnText: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: '#475569',
+    },
+
+    // Schedule Options
+    scheduleOptionsContainer: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    scheduleOptionsLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.navyPrimary,
+        marginBottom: 6,
     },
 });
