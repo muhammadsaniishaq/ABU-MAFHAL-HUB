@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
 
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -247,18 +249,18 @@ Deno.serve(async (req) => {
                 throw new Error("Title and Body are required for broadcast dispatch");
             }
 
-            let targetUsers: { id: string; expo_push_token?: string }[] = [];
+            let targetUsers: { id: string; expo_push_token?: string; email?: string; phone?: string }[] = [];
 
             if (targetAudience === 'all') {
                 const { data: allUsers, error: uErr } = await supabaseAdmin
                     .from('profiles')
-                    .select('id, expo_push_token')
+                    .select('id, expo_push_token, email, phone')
                     .limit(2000);
                 if (!uErr && allUsers) targetUsers = allUsers;
             } else if (targetAudience === 'admins' || targetAudience === 'staff') {
                 const { data: staffUsers, error: sErr } = await supabaseAdmin
                     .from('profiles')
-                    .select('id, expo_push_token')
+                    .select('id, expo_push_token, email, phone')
                     .in('role', ['admin', 'super_admin']);
                 if (!sErr && staffUsers) targetUsers = staffUsers;
             } else if ((targetAudience === 'single' || targetAudience === 'specific') && singleTargetQuery?.trim()) {
@@ -270,14 +272,14 @@ Deno.serve(async (req) => {
 
                 let { data: singleUser } = await supabaseAdmin
                     .from('profiles')
-                    .select('id, expo_push_token')
+                    .select('id, expo_push_token, email, phone')
                     .ilike(col, q)
                     .maybeSingle();
 
                 if (!singleUser && col === 'username') {
                     const { data: byEmail } = await supabaseAdmin
                         .from('profiles')
-                        .select('id, expo_push_token')
+                        .select('id, expo_push_token, email, phone')
                         .ilike('email', q)
                         .maybeSingle();
                     singleUser = byEmail;
@@ -287,34 +289,26 @@ Deno.serve(async (req) => {
                 const locQ = String(body.locationQuery).split(',')[0].trim();
                 const { data: locUsers } = await supabaseAdmin
                     .from('profiles')
-                    .select('id, expo_push_token')
+                    .select('id, expo_push_token, email, phone')
                     .or(`state.ilike.%${locQ}%,address.ilike.%${locQ}%`)
                     .limit(2000);
                 if (locUsers && locUsers.length > 0) targetUsers = locUsers;
                 else {
-                    // Fallback to all users if specific state query yields few records
-                    const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token').limit(500);
+                    const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token, email, phone').limit(500);
                     if (allUsers) targetUsers = allUsers;
                 }
-            } else if (targetAudience === 'admins') {
-                const { data: adminUsers } = await supabaseAdmin
-                    .from('profiles')
-                    .select('id, expo_push_token')
-                    .in('role', ['admin', 'super_admin', 'support', 'staff'])
-                    .limit(500);
-                if (adminUsers && adminUsers.length > 0) targetUsers = adminUsers;
             } else if (targetAudience === 'new_users') {
                 const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
                 const { data: recentUsers } = await supabaseAdmin
                     .from('profiles')
-                    .select('id, expo_push_token')
+                    .select('id, expo_push_token, email, phone')
                     .gte('created_at', thirtyDaysAgo)
                     .limit(2000);
                 if (recentUsers && recentUsers.length > 0) targetUsers = recentUsers;
                 else {
                     const { data: latestUsers } = await supabaseAdmin
                         .from('profiles')
-                        .select('id, expo_push_token')
+                        .select('id, expo_push_token, email, phone')
                         .order('created_at', { ascending: false })
                         .limit(200);
                     if (latestUsers) targetUsers = latestUsers;
@@ -324,19 +318,20 @@ Deno.serve(async (req) => {
                 if (grp === 'agents' || grp === 'vip') {
                     const { data: grpUsers } = await supabaseAdmin
                         .from('profiles')
-                        .select('id, expo_push_token')
+                        .select('id, expo_push_token, email, phone')
                         .in('role', ['agent', 'merchant', 'admin'])
                         .limit(2000);
                     if (grpUsers && grpUsers.length > 0) targetUsers = grpUsers;
                     else {
-                        const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token').limit(200);
+                        const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token, email, phone').limit(200);
                         if (allUsers) targetUsers = allUsers;
                     }
                 } else {
-                    const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token').limit(500);
+                    const { data: allUsers } = await supabaseAdmin.from('profiles').select('id, expo_push_token, email, phone').limit(500);
                     if (allUsers) targetUsers = allUsers;
                 }
             }
+
 
 
             // Fallback: If no users found, fetch at least current admin or any single profile so user_id NOT NULL constraint is met
@@ -385,14 +380,14 @@ Deno.serve(async (req) => {
                 }
             }
 
-            // Remote Expo Push Notifications
+            // Remote Expo Push Notifications (when channel is push or all)
             const validTokens = Array.from(new Set(
                 targetUsers
                     .map(u => u.expo_push_token)
                     .filter((t): t is string => Boolean(t && (t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken['))))
             ));
 
-            if (validTokens.length > 0) {
+            if (validTokens.length > 0 && (dispatchType === 'push' || dispatchType === 'broadcast')) {
                 const expoMessages = validTokens.map(token => ({
                     to: token,
                     sound: 'default',
@@ -423,11 +418,91 @@ Deno.serve(async (req) => {
                 }
             }
 
+            // Real Email Channel Dispatch (when channel is email)
+            let emailsDeliveredCount = 0;
+            if (dispatchType === 'email') {
+                const validEmails = Array.from(new Set(
+                    targetUsers
+                        .map(u => u.email)
+                        .filter((e): e is string => Boolean(e && e.includes('@') && e.length > 5))
+                ));
+
+                const emailHtml = `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #070D1E; color: #FFFFFF; padding: 28px; border-radius: 12px; border: 1px solid #D97706; max-width: 580px; margin: 0 auto;">
+                    <h2 style="color: #F59E0B; margin-top: 0; font-size: 20px;">${String(title).trim()}</h2>
+                    <p style="font-size: 14.5px; line-height: 1.7; color: #E2E8F0; white-space: pre-wrap;">${String(notifBody).trim()}</p>
+                    <hr style="border: 0; border-top: 1px solid #334155; margin: 24px 0;" />
+                    <p style="font-size: 11px; color: #94A3B8; margin: 0;">Sent officially from ABU MAFHAL SUB Communications Center • &copy; ${new Date().getFullYear()}</p>
+                </div>`;
+
+                for (const em of validEmails) {
+                    try {
+                        await sendEmail(
+                            em,
+                            String(title).trim(),
+                            String(notifBody).trim(),
+                            emailHtml,
+                            supabaseAdmin
+                        );
+                        emailsDeliveredCount++;
+                    } catch (mErr) {
+                        console.warn(`Email delivery note for ${em}:`, mErr);
+                    }
+                }
+            }
+
+            // Real SMS Channel Dispatch (when channel is sms)
+            let smsDeliveredCount = 0;
+            if (dispatchType === 'sms') {
+                const validPhones = Array.from(new Set(
+                    targetUsers
+                        .map(u => u.phone)
+                        .filter((p): p is string => Boolean(p && p.trim().length >= 9))
+                ));
+
+                // Fetch termii API key from system_secrets or environment
+                let termiiApiKey = Deno.env.get("TERMII_API_KEY");
+                if (!termiiApiKey) {
+                    const { data: sec } = await supabaseAdmin
+                        .from('system_secrets')
+                        .select('value')
+                        .eq('key', 'TERMII_API_KEY')
+                        .maybeSingle();
+                    if (sec?.value) termiiApiKey = sec.value.trim();
+                }
+
+                if (termiiApiKey && validPhones.length > 0) {
+                    for (const rawPhone of validPhones) {
+                        try {
+                            let formatted = rawPhone.replace(/\s/g, '');
+                            if (formatted.startsWith('0')) formatted = '234' + formatted.substring(1);
+                            if (formatted.startsWith('+')) formatted = formatted.substring(1);
+
+                            const smsRes = await fetch("https://v3.api.termii.com/api/sms/send", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    api_key: termiiApiKey,
+                                    to: formatted,
+                                    from: "ABUMAFHAL",
+                                    sms: String(notifBody).trim(),
+                                    type: "plain",
+                                    channel: "generic"
+                                })
+                            });
+                            if (smsRes.ok) smsDeliveredCount++;
+                        } catch (sErr) {
+                            console.warn(`SMS dispatch note for ${rawPhone}:`, sErr);
+                        }
+                    }
+                }
+            }
+
             // Also record in communication_logs & audit_logs using Service Role
             try {
                 await supabaseAdmin.from('communication_logs').insert({
-                    channel: 'push',
-                    recipient: targetAudience === 'single' ? singleTargetQuery : targetAudience,
+                    channel: dispatchType,
+                    recipient: targetAudience === 'single' || targetAudience === 'specific' ? singleTargetQuery : targetAudience,
                     subject: String(title).trim(),
                     content: String(notifBody).trim(),
                     status: 'delivered',
@@ -435,6 +510,8 @@ Deno.serve(async (req) => {
                         priority: isUrgent,
                         totalRecipients: targetUsers.length,
                         tokensDispatched: validTokens.length,
+                        emailsDispatched: emailsDeliveredCount,
+                        smsDispatched: smsDeliveredCount,
                         dispatchType,
                         extraData
                     },

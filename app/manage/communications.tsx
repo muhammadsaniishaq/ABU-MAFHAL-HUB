@@ -1797,8 +1797,9 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 16,
-        paddingBottom: 60,
+        paddingBottom: 120,
     },
+
     heroBanner: {
         borderRadius: 16,
         padding: 18,
@@ -2211,12 +2212,12 @@ const styles = StyleSheet.create({
     audienceSegmentsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        justifyContent: 'space-between',
+        rowGap: 10,
         marginBottom: 8,
     },
     audienceSegmentCard: {
-        flex: 1,
-        minWidth: 130,
+        width: '48.5%',
         backgroundColor: '#F8FAFC',
         borderRadius: 10,
         padding: 12,
@@ -2228,6 +2229,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFBEB',
         borderColor: T.goldDark,
     },
+
     segmentCheckBadge: {
         position: 'absolute',
         top: 8,
@@ -2298,6 +2300,8 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     scheduleRow: {
+
+
         flexDirection: 'row',
         gap: 10,
     },
