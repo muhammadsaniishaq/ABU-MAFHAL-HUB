@@ -231,6 +231,52 @@ Deno.serve(async (req) => {
             });
         }
 
+        // ACTION 4B: SECURELY RESOLVE TELECOM API KEY (Service Role bypasses RLS for authenticated clients)
+        if (action === 'get-telecom-key') {
+            const target = body.provider || 'ketawancy';
+            const keysToSearch = target.toLowerCase().includes('ketawan') 
+                ? ['KETAWANCY_API_KEY', 'KETAWANCY_KEY', 'KETAWANCY_TOKEN', 'KETAWANSY_API_KEY']
+                : [body.key || ''];
+
+            let resolvedVal = '';
+            // 1. Check system_secrets
+            const { data: secData } = await supabaseAdmin
+                .from('system_secrets')
+                .select('key, value')
+                .in('key', keysToSearch);
+
+            if (secData && secData.length > 0) {
+                const found = secData.find(s => s.value && s.value.trim());
+                if (found) resolvedVal = found.value.trim();
+            }
+
+            // 2. Check app_settings
+            if (!resolvedVal) {
+                const { data: appData } = await supabaseAdmin
+                    .from('app_settings')
+                    .select('key, value')
+                    .in('key', keysToSearch);
+
+                if (appData && appData.length > 0) {
+                    const found = appData.find(s => s.value && s.value.trim());
+                    if (found) resolvedVal = found.value.trim();
+                }
+            }
+
+            // 3. Check environment
+            if (!resolvedVal && target.toLowerCase().includes('ketawan')) {
+                resolvedVal = Deno.env.get('KETAWANCY_API_KEY') || Deno.env.get('KETAWANCY_KEY') || '';
+            }
+
+            return new Response(JSON.stringify({
+                status: 'success',
+                key: resolvedVal
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200
+            });
+        }
+
         // ACTION 5: DISPATCH BROADCAST & PUSH NOTIFICATIONS (Service Role bypasses RLS and triggers Expo Push)
         if (action === 'dispatch-broadcast') {
             const { 

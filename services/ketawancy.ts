@@ -70,6 +70,19 @@ export async function getKetawancyApiKey(): Promise<string> {
         if (secret?.value && typeof secret.value === 'string' && secret.value.trim() !== '') {
             cachedApiKey = secret.value.trim();
             lastKeyFetchTime = now;
+            await AsyncStorage.setItem('@vault_KETAWANCY_API_KEY', cachedApiKey).catch(() => {});
+            return cachedApiKey;
+        }
+
+        // 4. Edge Function Fallback (Service Role securely resolves key bypassing RLS)
+        const { data: edgeRes } = await supabase.functions.invoke('admin-audit-logs', {
+            body: { action: 'get-telecom-key', provider: 'ketawancy' }
+        });
+
+        if (edgeRes?.key && typeof edgeRes.key === 'string' && edgeRes.key.trim() !== '') {
+            cachedApiKey = edgeRes.key.trim();
+            lastKeyFetchTime = now;
+            await AsyncStorage.setItem('@vault_KETAWANCY_API_KEY', cachedApiKey).catch(() => {});
             return cachedApiKey;
         }
     } catch (e) {
@@ -94,32 +107,55 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
     }
 
     const url = `${KETAWANCY_BASE_URL}${endpoint}`;
-    const response = await fetch(url, {
-        method: options.method || 'GET',
-        headers,
-        body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+    
+    // Automatic Retry Loop for Telecom API stability (up to 2 attempts with 10s timeout)
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const data = await response.json().catch(() => ({}));
+        try {
+            const response = await fetch(url, {
+                method: options.method || 'GET',
+                headers,
+                body: options.body ? JSON.stringify(options.body) : undefined,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
 
-    // Detect authentication errors from the provider
-    if (!response.ok || data?.status === 'fail' || data?.status === 'error') {
-        const errorText = String(data?.message || data?.msg || '').toLowerCase();
-        if (
-            response.status === 401 ||
-            errorText.includes('logged in') ||
-            errorText.includes('get access') ||
-            errorText.includes('unauthorized') ||
-            errorText.includes('invalid token')
-        ) {
-            console.warn('[Ketawancy] API Authentication Error:', data?.message);
-            throw new Error(
-                "Telecom Provider Authentication Error: The Ketawancy API Key or Bearer Token is invalid or expired. Please update KETAWANCY_API_KEY in Admin Settings -> API Vault."
-            );
+            const data = await response.json().catch(() => ({}));
+
+            // Detect authentication errors from the provider
+            if (!response.ok || data?.status === 'fail' || data?.status === 'error') {
+                const errorText = String(data?.message || data?.msg || '').toLowerCase();
+                if (
+                    response.status === 401 ||
+                    errorText.includes('logged in') ||
+                    errorText.includes('get access') ||
+                    errorText.includes('unauthorized') ||
+                    errorText.includes('invalid token')
+                ) {
+                    console.warn('[Ketawancy] API Authentication Error:', data?.message);
+                    throw new Error(
+                        "Telecom Provider Authentication Error: The Ketawancy API Key or Bearer Token is invalid or expired. Please update KETAWANCY_API_KEY in Admin Settings -> API Vault."
+                    );
+                }
+            }
+
+            return data;
+        } catch (fetchErr: any) {
+            clearTimeout(timeoutId);
+            lastError = fetchErr;
+            if (fetchErr.message?.includes('Telecom Provider Authentication Error')) {
+                throw fetchErr; // Do not retry on auth failure
+            }
+            if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 800)); // Brief pause before retry
+            }
         }
     }
 
-    return data;
+    throw lastError || new Error('Ketawancy API Network Timeout / Error');
 }
 
 export interface KetawancySimPlan {
