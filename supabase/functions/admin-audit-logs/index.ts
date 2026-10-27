@@ -183,6 +183,7 @@ Deno.serve(async (req) => {
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200
+            });
         }
 
         // ACTION 4: SAVE SYSTEM SECRETS & KEYS (Bypasses RLS with Service Role)
@@ -219,6 +220,14 @@ Deno.serve(async (req) => {
             }
 
             await Promise.all(upsertPromises);
+            return new Response(JSON.stringify({
+                status: 'success',
+                message: 'Secrets saved successfully'
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200
+            });
+        }
 
         // ACTION 5: DISPATCH BROADCAST & PUSH NOTIFICATIONS (Service Role bypasses RLS and triggers Expo Push)
         if (action === 'dispatch-broadcast') {
@@ -360,7 +369,27 @@ Deno.serve(async (req) => {
                 }
             }
 
-            // Also record in audit_logs
+            // Also record in communication_logs & audit_logs using Service Role
+            try {
+                await supabaseAdmin.from('communication_logs').insert({
+                    channel: 'push',
+                    recipient: targetAudience === 'single' ? singleTargetQuery : targetAudience,
+                    subject: String(title).trim(),
+                    content: String(notifBody).trim(),
+                    status: 'delivered',
+                    metadata: {
+                        priority: isUrgent,
+                        totalRecipients: targetUsers.length,
+                        tokensDispatched: validTokens.length,
+                        dispatchType,
+                        extraData
+                    },
+                    created_at: new Date().toISOString()
+                });
+            } catch (cErr) {
+                console.warn('Edge communication_logs insert notice:', cErr);
+            }
+
             await supabaseAdmin.from('audit_logs').insert({
                 action: 'BROADCAST_PUSH_DISPATCHED',
                 target_resource: `Audience: ${targetAudience}`,
