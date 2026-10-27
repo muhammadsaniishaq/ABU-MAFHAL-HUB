@@ -679,7 +679,9 @@ Deno.serve(async (req) => {
                 status: 'success',
                 message: 'Broadcast dispatched successfully',
                 recipients: targetUsers.length,
-                tokensDispatched: validTokens.length
+                tokensDispatched: validTokens.length,
+                emailsDispatched: emailsDeliveredCount,
+                smsDispatched: smsDeliveredCount
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
