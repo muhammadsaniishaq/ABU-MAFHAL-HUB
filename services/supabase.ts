@@ -110,15 +110,18 @@ export async function processOAuthReturn(): Promise<boolean> {
  */
 export async function forceSignOut(): Promise<void> {
   try {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut().catch(() => {});
     if (isWeb && typeof window !== 'undefined') {
       try {
         if (window.localStorage) {
           window.localStorage.removeItem('user_transaction_pin');
           window.localStorage.removeItem('saved_user_pin');
+          window.localStorage.removeItem('saved_user_identifier');
+          window.localStorage.removeItem('has_active_session');
           window.localStorage.removeItem('@cached_admin_profile');
           window.localStorage.removeItem('user_profile_cache');
           window.localStorage.removeItem('app_unlocked');
+          window.localStorage.removeItem('pin_return_path');
         }
         if (window.sessionStorage) {
           window.sessionStorage.clear();
@@ -127,9 +130,12 @@ export async function forceSignOut(): Promise<void> {
     }
     await AsyncStorage.removeItem('user_transaction_pin');
     await AsyncStorage.removeItem('saved_user_pin');
+    await AsyncStorage.removeItem('saved_user_identifier');
+    await AsyncStorage.removeItem('has_active_session');
     await AsyncStorage.removeItem('@cached_admin_profile');
     await AsyncStorage.removeItem('user_profile_cache');
     await AsyncStorage.removeItem('app_unlocked');
+    await AsyncStorage.removeItem('pin_return_path');
   } catch (e) {
     console.warn('forceSignOut error:', e);
   }

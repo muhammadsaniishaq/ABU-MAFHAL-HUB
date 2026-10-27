@@ -290,21 +290,20 @@ export default function SplashScreen() {
       }
 
       // 2. Mobile Native App handling (Play Store app):
-      let { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const hasActive = await AsyncStorage.getItem('has_active_session');
-      const savedUser = await AsyncStorage.getItem('saved_user_identifier');
 
-      if (session?.user || hasActive === 'true' || savedUser) {
-        // User is already logged in! Immediately direct them to PIN screen without showing splash slides
-        await AsyncStorage.setItem('has_active_session', 'true');
-        // Keep locked state so PIN is required
+      if (session?.user && hasActive === 'true') {
+        // User is currently authenticated with active session! Route to PIN lock screen
         await AsyncStorage.removeItem('app_unlocked');
         setHasValidSession(true);
         router.replace('/(auth)/pin' as any);
         return;
       } else {
+        // Logged out or fresh install: clear flags and display Splash/Landing Screen directly
         await AsyncStorage.removeItem('has_active_session');
         await AsyncStorage.removeItem('app_unlocked');
+        await AsyncStorage.removeItem('saved_user_identifier');
         setHasValidSession(false);
       }
     } catch (e) {

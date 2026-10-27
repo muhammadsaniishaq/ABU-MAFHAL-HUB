@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
-import { supabase } from '../../services/supabase';
+import { supabase, forceSignOut } from '../../services/supabase';
 
 // Executive Luxury Theme Colors
 const T = {
@@ -328,8 +328,13 @@ export default function AdminProfileScreen() {
                     text: 'Logout',
                     style: 'destructive',
                     onPress: async () => {
-                        await supabase.auth.signOut();
-                        router.replace('/(auth)/login');
+                        await forceSignOut();
+                        if (Platform.OS === 'web') {
+                            if (typeof window !== 'undefined') window.location.replace('/landing.html');
+                            else router.replace('/');
+                        } else {
+                            router.replace('/');
+                        }
                     }
                 }
             ]

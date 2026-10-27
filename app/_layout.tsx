@@ -174,12 +174,9 @@ export default function RootLayout() {
                     if (cached) setUserRole(cached);
                     fetchUserRole(session.user.id, session.user.email);
                 } else {
-                    const hasActive = await AsyncStorage.getItem('has_active_session');
-                    const savedUser = await AsyncStorage.getItem('saved_user_identifier');
-                    if (hasActive !== 'true' && !savedUser) {
-                        await AsyncStorage.removeItem('has_active_session');
-                        await AsyncStorage.removeItem('app_unlocked');
-                    }
+                    await AsyncStorage.removeItem('has_active_session');
+                    await AsyncStorage.removeItem('app_unlocked');
+                    await AsyncStorage.removeItem('saved_user_identifier');
                     setSession(null);
                 }
             } catch (err) {
@@ -214,7 +211,14 @@ export default function RootLayout() {
                 setUserRole(null);
                 await AsyncStorage.removeItem('has_active_session');
                 await AsyncStorage.removeItem('app_unlocked');
+                await AsyncStorage.removeItem('saved_user_identifier');
                 setAuthChecked(true);
+                if (Platform.OS === 'web') {
+                    if (typeof window !== 'undefined') window.location.replace('/landing.html');
+                    else router.replace('/');
+                } else {
+                    router.replace('/');
+                }
                 return;
             }
 
