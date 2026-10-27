@@ -93,6 +93,36 @@ export async function getKetawancyApiKey(): Promise<string> {
 }
 
 async function requestKetawancy<T = any>(endpoint: string, options: { method?: 'GET' | 'POST'; body?: any } = {}): Promise<T> {
+    // 1. PRIMARY ENTERPRISE METHOD: Server-Side Edge Function Proxy
+    // Shields the API Key 100% on the server so no client APK or sniffer can ever see it
+    try {
+        const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('admin-audit-logs', {
+            body: {
+                action: 'proxy-ketawancy',
+                endpoint,
+                method: options.method || 'GET',
+                payload: options.body || null
+            }
+        });
+
+        if (!edgeErr && edgeRes) {
+            if (edgeRes.status === 'success' && edgeRes.data) {
+                const proxyData = edgeRes.data;
+                // If telecom provider returned an explicit failure
+                if (proxyData?.status === 'fail' || proxyData?.status === 'error') {
+                    const errMsg = proxyData?.message || proxyData?.msg || 'Telecom Provider Rejected Request';
+                    console.warn('[Ketawancy Proxy Upstream]', errMsg);
+                }
+                return proxyData as T;
+            } else if (edgeRes.status === 'error' && edgeRes.message?.includes('not configured')) {
+                console.warn('[Ketawancy Proxy]', edgeRes.message);
+            }
+        }
+    } catch (proxyErr) {
+        console.warn('[Ketawancy Proxy Note] Falling back to direct client transport:', proxyErr);
+    }
+
+    // 2. FALLBACK CLIENT-SIDE TRANSPORT (if Edge Function is offline/unreachable)
     const apiKey = await getKetawancyApiKey();
 
     const headers: Record<string, string> = {
@@ -101,14 +131,13 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
     };
 
     if (apiKey) {
-        // Pass both standard custom header and Bearer token for maximum provider compatibility
         headers['x-api-key'] = apiKey;
         headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
     }
 
     const url = `${KETAWANCY_BASE_URL}${endpoint}`;
     
-    // Automatic Retry Loop for Telecom API stability (up to 2 attempts with 10s timeout)
+    // Automatic Retry Loop for Telecom API stability (up to 2 attempts with 12s timeout)
     let lastError: any = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
         const controller = new AbortController();
@@ -147,10 +176,10 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
             clearTimeout(timeoutId);
             lastError = fetchErr;
             if (fetchErr.message?.includes('Telecom Provider Authentication Error')) {
-                throw fetchErr; // Do not retry on auth failure
+                throw fetchErr;
             }
             if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 800)); // Brief pause before retry
+                await new Promise(r => setTimeout(r, 800));
             }
         }
     }

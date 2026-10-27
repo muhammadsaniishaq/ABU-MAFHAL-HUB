@@ -231,15 +231,15 @@ Deno.serve(async (req) => {
             });
         }
 
-        // ACTION 4B: SECURELY RESOLVE TELECOM API KEY (Service Role bypasses RLS for authenticated clients)
-        if (action === 'get-telecom-key') {
+        // ACTION 4B: SECURELY RESOLVE OR PROXY KETAWANCY TELECOM API (Key completely hidden from client)
+        if (action === 'proxy-ketawancy' || action === 'get-telecom-key') {
             const target = body.provider || 'ketawancy';
             const keysToSearch = target.toLowerCase().includes('ketawan') 
                 ? ['KETAWANCY_API_KEY', 'KETAWANCY_KEY', 'KETAWANCY_TOKEN', 'KETAWANSY_API_KEY']
                 : [body.key || ''];
 
             let resolvedVal = '';
-            // 1. Check system_secrets
+            // 1. Check system_secrets (Primary encrypted vault)
             const { data: secData } = await supabaseAdmin
                 .from('system_secrets')
                 .select('key, value')
@@ -268,6 +268,80 @@ Deno.serve(async (req) => {
                 resolvedVal = Deno.env.get('KETAWANCY_API_KEY') || Deno.env.get('KETAWANCY_KEY') || '';
             }
 
+            // If action is proxy-ketawancy, execute request SERVER-SIDE so client NEVER sees the API key
+            if (action === 'proxy-ketawancy') {
+                const endpoint = body.endpoint || '';
+                const method = (body.method || 'GET').toUpperCase();
+                const payload = body.payload || body.body || null;
+                const ketawancyBaseUrl = 'https://myapi.ketawancy.com/api/v1';
+
+                if (!resolvedVal) {
+                    return new Response(JSON.stringify({
+                        status: 'error',
+                        message: 'Ketawancy API Key is not configured in Server Secrets or API Vault.'
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        status: 400
+                    });
+                }
+
+                const targetUrl = `${ketawancyBaseUrl}${endpoint}`;
+                const proxyHeaders: Record<string, string> = {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'x-api-key': resolvedVal,
+                    'Authorization': resolvedVal.startsWith('Bearer ') ? resolvedVal : `Bearer ${resolvedVal}`
+                };
+
+                let lastError = null;
+                let responseData = null;
+                let statusCode = 200;
+
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const ctl = new AbortController();
+                    const timer = setTimeout(() => ctl.abort(), 14000);
+                    try {
+                        const upstreamRes = await fetch(targetUrl, {
+                            method,
+                            headers: proxyHeaders,
+                            body: payload && method !== 'GET' ? JSON.stringify(payload) : undefined,
+                            signal: ctl.signal
+                        });
+                        clearTimeout(timer);
+                        statusCode = upstreamRes.status;
+                        responseData = await upstreamRes.json().catch(() => ({}));
+                        lastError = null;
+                        break;
+                    } catch (err: any) {
+                        clearTimeout(timer);
+                        lastError = err;
+                        if (attempt < 2) {
+                            await new Promise(r => setTimeout(r, 600));
+                        }
+                    }
+                }
+
+                if (lastError) {
+                    return new Response(JSON.stringify({
+                        status: 'error',
+                        message: `Ketawancy upstream connection failure: ${lastError.message || 'Timeout'}`
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        status: 502
+                    });
+                }
+
+                return new Response(JSON.stringify({
+                    status: 'success',
+                    data: responseData,
+                    upstreamStatus: statusCode
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200
+                });
+            }
+
+            // Fallback for legacy calls (only returns if caller needs it)
             return new Response(JSON.stringify({
                 status: 'success',
                 key: resolvedVal
