@@ -544,18 +544,26 @@ Deno.serve(async (req) => {
                 </html>`;
 
 
+                let emailErrors: string[] = [];
                 for (const em of validEmails) {
                     try {
-                        await sendEmail(
+                        const res = await sendEmail(
                             em,
                             String(title).trim(),
                             String(notifBody).trim(),
                             emailHtml,
                             supabaseAdmin
                         );
-                        emailsDeliveredCount++;
-                    } catch (mErr) {
-                        console.warn(`Email delivery note for ${em}:`, mErr);
+                        if (res?.success) {
+                            emailsDeliveredCount++;
+                        } else {
+                            const errNote = res?.error || 'Email provider rejected delivery';
+                            console.warn(`Email delivery failed for ${em}:`, errNote);
+                            emailErrors.push(errNote);
+                        }
+                    } catch (mErr: any) {
+                        console.warn(`Email delivery exception for ${em}:`, mErr);
+                        emailErrors.push(mErr?.message || String(mErr));
                     }
                 }
             }
@@ -682,11 +690,14 @@ Deno.serve(async (req) => {
 
             return new Response(JSON.stringify({
                 status: 'success',
-                message: 'Broadcast dispatched successfully',
+                message: emailsDeliveredCount > 0 
+                    ? 'Broadcast dispatched successfully' 
+                    : (emailErrors.length > 0 ? emailErrors[0] : 'Broadcast dispatched successfully'),
                 recipients: targetUsers.length,
                 tokensDispatched: validTokens.length,
                 emailsDispatched: emailsDeliveredCount,
-                smsDispatched: smsDeliveredCount
+                smsDispatched: smsDeliveredCount,
+                emailErrors: emailErrors.length > 0 ? emailErrors : undefined
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,

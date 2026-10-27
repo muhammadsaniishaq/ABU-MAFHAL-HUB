@@ -18,7 +18,7 @@ export const sendEmail = async (
     // 1. Fetch credentials from DB system_secrets and app_settings if supabaseAdmin is provided
     if (supabaseAdmin) {
         try {
-            const targetKeys = ['RESEND_API_KEY', 'ZOHO_EMAIL', 'ZOHO_PASSWORD', 'SMTP_USER', 'SMTP_PASS', 'SMTP_HOST', 'SMTP_PORT'];
+            const targetKeys = ['RESEND_API_KEY', 'RESEND_KEY', 'ZOHO_EMAIL', 'ZOHO_PASSWORD', 'SMTP_USER', 'SMTP_PASS', 'SMTP_HOST', 'SMTP_PORT'];
             const { data: dbSecrets } = await supabaseAdmin
                 .from('system_secrets')
                 .select('key, value')
@@ -32,7 +32,7 @@ export const sendEmail = async (
             const combined = [...(dbSecrets || []), ...(appSettings || [])];
             if (combined.length > 0) {
                 const getVal = (k: string) => combined.find(s => s.key === k && s.value && s.value.trim() !== '')?.value?.trim();
-                if (!resendApiKey) resendApiKey = getVal('RESEND_API_KEY');
+                if (!resendApiKey) resendApiKey = getVal('RESEND_API_KEY') || getVal('RESEND_KEY');
                 if (!zohoUser) zohoUser = getVal('ZOHO_EMAIL') || getVal('SMTP_USER');
                 if (!zohoPass) zohoPass = getVal('ZOHO_PASSWORD') || getVal('SMTP_PASS');
                 if (getVal('SMTP_HOST')) smtpHost = getVal('SMTP_HOST')!;
@@ -42,6 +42,8 @@ export const sendEmail = async (
             console.warn("[sendEmail] DB Secrets lookup warning:", e);
         }
     }
+
+    let lastSmtpError: string | null = null;
 
     // METHOD 1: SMTP / Nodemailer (Zoho, Google, Custom SMTP) - Prioritized if configured
     if (zohoUser && zohoPass) {
@@ -78,8 +80,8 @@ export const sendEmail = async (
             console.log("[sendEmail] Email successfully sent via Zoho/SMTP to %s (ID: %s)", to, info.messageId);
             return { success: true, method: 'SMTP', messageId: info.messageId, info };
         } catch (smtpErr: any) {
-            const errStr = smtpErr?.message || String(smtpErr);
-            console.error("[sendEmail] SMTP exception (e.g. 554 sender blocked), attempting Resend API fallback:", errStr);
+            lastSmtpError = smtpErr?.message || String(smtpErr);
+            console.error("[sendEmail] SMTP exception (e.g. 554 sender blocked), attempting Resend API fallback:", lastSmtpError);
             // Continue execution to METHOD 2: Resend HTTP API
         }
     }
@@ -123,6 +125,13 @@ export const sendEmail = async (
             console.error("[sendEmail] Resend API exception:", err);
             return { success: false, method: 'Resend', error: err.message || "Resend API network exception" };
         }
+    }
+
+    if (lastSmtpError) {
+        return { 
+            success: false, 
+            error: `Zoho Mail Rate Limit / Blocked: ${lastSmtpError}. Please unblock your Zoho account in Zoho Mail Admin Console or add RESEND_API_KEY to API Vault for automatic fallback.` 
+        };
     }
 
     console.warn("[sendEmail] No working email credentials found. Please configure RESEND_API_KEY or ZOHO_EMAIL/ZOHO_PASSWORD in Admin Settings -> API Vault.");
