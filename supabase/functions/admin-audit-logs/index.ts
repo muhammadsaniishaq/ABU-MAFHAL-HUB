@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
+import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -548,120 +549,17 @@ Deno.serve(async (req) => {
                         .filter((e): e is string => Boolean(e && e.includes('@') && e.length > 5))
                 ));
 
-                const emailHtml = `
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                  <meta charset="UTF-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  <title>${String(title).trim()}</title>
-                </head>
-                <body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-                  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8FAFC; padding: 32px 12px;">
-                    <tr>
-                      <td align="center">
-                        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); border: 1px solid #E2E8F0;">
-                          <!-- Royal Gold & Navy Brand Header -->
-                          <tr>
-                            <td style="background: linear-gradient(135deg, #070D1E 0%, #0F172A 100%); padding: 26px 32px; border-bottom: 3px solid #F59E0B;">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td style="vertical-align: middle;">
-                                    <table cellpadding="0" cellspacing="0">
-                                      <tr>
-                                        <td style="background-color: #F59E0B; width: 34px; height: 34px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                                          <span style="color: #070D1E; font-size: 18px; font-weight: 900; line-height: 34px;">⚡</span>
-                                        </td>
-                                        <td style="padding-left: 12px;">
-                                          <span style="color: #FFFFFF; font-size: 17px; font-weight: 900; letter-spacing: 0.5px;">ABU MAFHAL</span>
-                                          <span style="color: #FBBF24; font-size: 17px; font-weight: 900;"> SUB</span>
-                                        </td>
-                                      </tr>
-                                    </table>
-                                  </td>
-                                  <td style="text-align: right; vertical-align: middle;">
-                                    <span style="display: inline-block; background-color: rgba(245, 158, 11, 0.15); color: #FBBF24; font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(245, 158, 11, 0.3); text-transform: uppercase;">Verified Notice</span>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-
-                          <!-- Email Body Content (Clean White Background, High Readability) -->
-                          <tr>
-                            <td style="padding: 32px 32px 28px; background-color: #FFFFFF;">
-                              ${mediaUrl ? `
-                              <div style="margin-bottom: 24px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0;">
-                                <img src="${mediaUrl}" alt="Announcement Banner" style="width: 100%; max-height: 240px; object-fit: cover; display: block;" />
-                              </div>` : ''}
-                              <h1 style="margin: 0 0 18px; font-size: 20px; font-weight: 800; color: #0F172A; line-height: 1.4;">${String(title).trim()}</h1>
-                              <div style="font-size: 15px; line-height: 1.75; color: #334155; white-space: pre-wrap; font-weight: 400;">${String(notifBody).trim()}</div>
-                            </td>
-                          </tr>
-
-                          <!-- App Download & Action Section -->
-                          <tr>
-                            <td style="padding: 24px 32px 28px; background-color: #FFFFFF; border-top: 1px solid #F1F5F9;">
-                              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                                <tr>
-                                  <td style="vertical-align: middle;">
-                                    <p style="margin: 0 0 10px; font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.8px;">Download Mobile App</p>
-                                    <table cellpadding="0" cellspacing="0" border="0">
-                                      <tr>
-                                        <!-- Google Play Store Button -->
-                                        <td style="padding-right: 12px;">
-                                          <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" style="display: inline-block; background-color: #000000; color: #FFFFFF; border-radius: 8px; padding: 8px 16px; text-decoration: none; border: 1px solid #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-                                            <table cellpadding="0" cellspacing="0" border="0">
-                                              <tr>
-                                                <td style="padding-right: 10px; vertical-align: middle;">
-                                                  <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/Google_Play_Arrow_logo.svg" width="22" height="22" alt="Google Play" style="display: block; border: 0;" />
-                                                </td>
-                                                <td style="vertical-align: middle; text-align: left;">
-                                                  <div style="font-size: 9px; text-transform: uppercase; color: #CBD5E1; letter-spacing: 0.5px; line-height: 1;">GET IT ON</div>
-                                                  <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; line-height: 1.2; margin-top: 2px;">Google Play</div>
-                                                </td>
-                                              </tr>
-                                            </table>
-                                          </a>
-                                        </td>
-                                        <!-- Direct Web Access Button -->
-                                        <td>
-                                          <a href="https://abumafhal.com.ng" target="_blank" style="display: inline-block; background-color: #F8FAFC; color: #0F172A; border-radius: 8px; padding: 11px 18px; text-decoration: none; border: 1px solid #CBD5E1; font-size: 12.5px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-                                            Open Web Portal &rarr;
-                                          </a>
-                                        </td>
-                                      </tr>
-                                    </table>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-
-                          <!-- Premium Clean Footer -->
-                          <tr>
-                            <td style="padding: 24px 32px; background-color: #F8FAFC; border-top: 1px solid #E2E8F0;">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td style="text-align: left; vertical-align: middle;">
-                                    <p style="margin: 0; font-size: 12px; font-weight: 700; color: #0F172A;">ABU MAFHAL SUB Telecom & Services</p>
-                                    <p style="margin: 4px 0 0; font-size: 11px; color: #64748B;">Automated VTU, Bill Payments & Instant Data Bundles</p>
-                                    <p style="margin: 6px 0 0; font-size: 10.5px; color: #94A3B8;">&copy; ${new Date().getFullYear()} ABU MAFHAL SUB. All rights reserved.</p>
-                                  </td>
-                                  <td style="text-align: right; vertical-align: middle;">
-                                    <a href="https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub" target="_blank" style="display: inline-block; font-size: 11px; color: #2563EB; font-weight: 700; text-decoration: none; margin-bottom: 4px;">Get Android App</a><br/>
-                                    <span style="font-size: 11px; color: #059669; font-weight: 700;">&#10003; 100% Encrypted</span>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                </body>
-                </html>`;
+                const emailHtml = renderAbuMafhalEmailTemplate({
+                    recipientName: targetAudience === 'single' ? (singleTargetQuery || 'User') : 'Valued Partner',
+                    headlineBadge: isUrgent ? 'Urgent Update' : 'Special Announcement',
+                    headlineTitle: String(title).trim(),
+                    headlineSubtitle: 'Fast, secure and affordable digital services in one app.',
+                    greeting: `Hi there 👋`,
+                    messageBody: String(notifBody).trim().replace(/\n/g, '<br/>'),
+                    buttonText: 'Open ABU MAFHAL SUB &rarr;',
+                    buttonUrl: 'https://abumafhal.com.ng',
+                    bannerUrl: mediaUrl || undefined
+                });
 
 
                 let emailErrors: string[] = [];

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 import { sendEmail } from "../_shared/email.ts";
+import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -22,7 +23,7 @@ Deno.serve(async (req) => {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         const body = await req.json();
-        const { to, from = 'admin@abumafhal.com.ng', subject, text, html } = body;
+        const { to, from = 'admin@abumafhal.com.ng', subject, text, html, userName, headlineBadge } = body;
 
         if (!to || !subject || (!text && !html)) {
             return new Response(JSON.stringify({ error: "Missing required fields (to, subject, text/html)" }), {
@@ -31,8 +32,22 @@ Deno.serve(async (req) => {
             });
         }
 
+        // Render via modern official design template if html is omitted or simple text
+        const finalHtml = html && html.includes('<!DOCTYPE html>')
+            ? html
+            : renderAbuMafhalEmailTemplate({
+                recipientName: userName || 'Valued Partner',
+                headlineBadge: headlineBadge || 'Official Notification',
+                headlineTitle: subject,
+                headlineSubtitle: 'Fast, secure and affordable digital services in one app.',
+                greeting: `Hi ${userName || 'there'} 👋`,
+                messageBody: (html || text || '').replace(/\n/g, '<br/>'),
+                buttonText: 'Open ABU MAFHAL SUB &rarr;',
+                buttonUrl: 'https://abumafhal.com.ng'
+            });
+
         // 1. Send Email via Resend / SMTP
-        const dispatchResult = await sendEmail(to, subject, text || '', html, supabaseAdmin);
+        const dispatchResult = await sendEmail(to, subject, text || '', finalHtml, supabaseAdmin);
 
         const isSuccess = dispatchResult?.success === true;
         const errorMessage = dispatchResult?.error || (isSuccess ? null : "Email delivery failed via active providers");

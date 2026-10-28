@@ -2,6 +2,7 @@
 import { serve } from "std/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
+import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -110,77 +111,16 @@ serve(async (req) => {
 
     // --- TEMPLATE HELPER ---
     const generateHtmlEmail = (bodyContent: string, title: string, logoUrl: string | null) => {
-        const currentYear = new Date().getFullYear();
-        
-        // Use the fetched logo, or a simple text AM if it fails
-        const finalLogo = logoUrl 
-            ? `<img src="${logoUrl}" alt="Abu Mafhal Sub" width="36" height="36" style="display:block; border-radius:6px; border:1px solid #D9A73A;" />`
-            : `<table cellpadding="0" cellspacing="0" style="background-color:#D9A73A; border-radius:6px; width:36px; height:36px; text-align:center;"><tr><td style="vertical-align:middle; text-align:center; color:#ffffff; font-size:16px; font-weight:bold; font-family:Arial,sans-serif; height:36px;">AM</td></tr></table>`;
-
-        return `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${title}</title>
-        </head>
-        <body style="margin:0;padding:0;background-color:#F4F7FA;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;-webkit-font-smoothing:antialiased;">
-          <!-- OUTER WRAPPER WITH NAVY TOP BANNER -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F7FA; padding-bottom:40px;">
-            <tr>
-              <td align="center" style="background-color:#0E1A2E; height:120px; vertical-align:top; padding-top:30px;">
-                <!-- FLOATING HEADER -->
-                <table width="460" cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                  <tr>
-                    <td align="center">
-                      <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                        <tr>
-                          <td style="padding-right:12px;">
-                            ${finalLogo}
-                          </td>
-                          <td style="vertical-align:middle;">
-                            <span style="font-size:20px; font-weight:700; color:#ffffff; letter-spacing:0.5px;">Abu Mafhal Sub</span>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="margin-top:-40px;">
-                <!-- FLOATING WHITE CARD -->
-                <table width="460" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; box-shadow:0 10px 30px rgba(14,26,46,0.1); margin-top:-40px; border-top:4px solid #D9A73A;">
-                  <tr>
-                    <td style="padding:30px; text-align:left;">
-                      <h2 style="margin:0 0 15px 0; font-size:18px; font-weight:700; color:#0E1A2E;">${title}</h2>
-                      <div style="font-size:14px; color:#475569; line-height:1.7;">
-                        ${bodyContent.replace(/\n/g, '<br/>')}
-                      </div>
-                    </td>
-                  </tr>
-                  <!-- MODERN FOOTER INSIDE CARD -->
-                  <tr>
-                    <td style="padding:20px 30px; background-color:#FAFCFF; border-top:1px solid #F1F5F9; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
-                      <table width="100%" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td style="text-align:center;">
-                            <p style="margin:0; font-size:12px; color:#64748b; font-weight:500;">&copy; ${currentYear} Abu Mafhal Sub. All rights reserved.</p>
-                            <p style="margin:6px 0 0; font-size:11px; color:#94A3B8;">This is an automated notification. Please do not reply directly to this email.</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-        `;
+        return renderAbuMafhalEmailTemplate({
+            recipientName: 'Valued Customer',
+            headlineBadge: 'Official Update',
+            headlineTitle: title,
+            headlineSubtitle: 'Fast, secure and affordable digital services in one app.',
+            greeting: `Hello 👋`,
+            messageBody: bodyContent.replace(/\n/g, '<br/>'),
+            buttonText: 'Open ABU MAFHAL SUB &rarr;',
+            buttonUrl: 'https://abumafhal.com.ng'
+        });
     };
 
     console.log(`Sending ${type} to ${type === 'push' ? pushRecipients.length : recipients.length} recipients (Mode: ${mode})`);
