@@ -1,6 +1,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
+import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -69,10 +70,25 @@ Deno.serve(async (req: Request) => {
 
             // Send Rejection Email
             console.log(`Sending rejection email to ${profile.email}`);
+            const rejectSubject = "KYC Update: Verification Status";
+            const rejectText = `Dear ${profile.full_name || 'User'}, your KYC request could not be approved at this time. Reason: ${adminNote || 'Document issues'}. Please review your information and submit again in your mobile app.`;
+            const rejectHtml = renderAbuMafhalEmailTemplate({
+                recipientName: profile.full_name || 'User',
+                headlineBadge: 'Verification Notice',
+                headlineTitle: 'KYC Verification Update',
+                headlineSubtitle: 'Please review your document information.',
+                greeting: `Dear ${profile.full_name || 'User'} 👋`,
+                messageBody: `Your KYC upgrade request could not be completed at this time.<br/><br/><strong>Reason:</strong> ${adminNote || 'Document or image quality issues'}.<br/><br/>You can submit clear, updated identity documents directly inside the Abu Mafhal app to upgrade your tier limit.`,
+                buttonText: 'Open App to Resubmit &rarr;',
+                buttonUrl: 'https://abumafhal.com.ng'
+            });
+
             await sendEmail(
                 profile.email,
-                "KYC Update: Request Rejected",
-                `Dear ${profile.full_name}, your KYC request has been rejected. Reason: ${adminNote || 'Document issues'}. Please review and try again.`
+                rejectSubject,
+                rejectText,
+                rejectHtml,
+                supabaseAdmin
             );
             
             return new Response(JSON.stringify({ success: true, message: "Request Rejected and Email Sent" }), {

@@ -577,9 +577,10 @@ export default function MailCenterScreen() {
             body: {
               to: targetCleanEmail,
               from: senderAccount,
+              userName: p.full_name || p.username || 'Valued Partner',
               subject: subjectInput.trim(),
               text: finalBodyText,
-              html: formattedHtml
+              html: bodyInput.trim().replace(/\n/g, '<br/>') + attachmentHtml
             }
           });
 

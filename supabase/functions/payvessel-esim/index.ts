@@ -26,6 +26,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendEmail } from '../_shared/email.ts';
+import { renderAbuMafhalEmailTemplate } from '../_shared/email-template.ts';
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
 const CORS = {
@@ -654,6 +656,57 @@ serve(async (req) => {
                 message: `Your ${country_name ?? 'Global'} eSIM (${data_amount}) is ready. Scan the QR code to activate roaming.`,
                 type:    'SUCCESS',
             }).catch(() => {});
+
+            // ── 9. Official Email Delivery ────────────────────────────────────
+            if (user?.email && user.email.includes('@')) {
+                try {
+                    const recipientName = user.user_metadata?.full_name || 'Valued Traveler';
+                    const countryLabel = country_name || 'Global';
+                    const esimHtml = renderAbuMafhalEmailTemplate({
+                        recipientName,
+                        headlineBadge: 'eSIM Activated',
+                        headlineTitle: `Your ${countryLabel} eSIM is Ready! 🌐`,
+                        headlineSubtitle: `Instant international high-speed roaming data.`,
+                        greeting: `Hi ${recipientName} 👋`,
+                        messageBody: `
+                            Your international eSIM profile for <strong>${countryLabel}</strong> has been successfully issued.<br/><br/>
+                            <div style="background: #F8FAFC; border-radius: 14px; border: 1.5px solid #E2E8F0; padding: 18px 20px; margin: 16px 0;">
+                                <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #0284C7; letter-spacing: 0.5px;">eSIM Profile Details</div>
+                                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 13.5px; line-height: 2; margin-top: 8px;">
+                                    <tr>
+                                        <td style="color: #64748B;">Destination:</td>
+                                        <td align="right" style="font-weight: 800; color: #0A192F;">${countryLabel}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #64748B;">Package:</td>
+                                        <td align="right" style="font-weight: 700; color: #0A192F;">${data_amount ?? 'Data'} (${validity_days ?? 30} Days)</td>
+                                    </tr>
+                                    ${esimDetails.iccid ? `
+                                    <tr>
+                                        <td style="color: #64748B;">ICCID:</td>
+                                        <td align="right" style="font-family: monospace; font-size: 12px; color: #475569;">${esimDetails.iccid}</td>
+                                    </tr>` : ''}
+                                </table>
+                            </div>
+                            <p style="font-size: 13.5px; color: #475569; line-height: 1.5;">
+                                Open your Abu Mafhal Sub app to display your instant installation QR Code or copy your LPA Activation Code directly into your phone settings.
+                            </p>
+                        `,
+                        buttonText: 'View eSIM & QR Code &rarr;',
+                        buttonUrl: 'https://abumafhal.com.ng'
+                    });
+
+                    sendEmail(
+                        user.email,
+                        `Your ${countryLabel} eSIM is Ready! 🌐 - ABU MAFHAL SUB`,
+                        `Your ${countryLabel} eSIM (${data_amount}) is active. Open Abu Mafhal Sub to scan your QR code.`,
+                        esimHtml,
+                        sb
+                    ).catch(emErr => console.warn('[eSIM Email Delivery Warn]:', emErr));
+                } catch (eErr) {
+                    console.warn('[eSIM Email Prepare Warn]:', eErr);
+                }
+            }
 
             console.log(`[eSIM] SUCCESS ref=${orderRef} iccid=${esimDetails.iccid ?? 'null'}`);
 

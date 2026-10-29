@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
+import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -2794,28 +2795,42 @@ async function handleFundWallet(
             const subject = `Wallet Funding Notification - ₦${formattedAmount}`;
             const plainText = `Hi ${customerName},\n\nYour wallet has been credited with ₦${formattedAmount}.\n\nReference: ${reference}\nProvider: ${provider.toUpperCase()}\nNew Balance: ₦${formattedBalance}\n\nThank you for choosing Abu Mafhal Sub!`;
             
-            const htmlBody = `
-                <div style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 20px; color: #333;">
-                    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                        <div style="background: linear-gradient(135deg, #060d21 0%, #0d1b3e 100%); color: #f5a623; padding: 20px; text-align: center;">
-                            <h1 style="margin: 0; font-size: 22px;">Abu Mafhal Sub</h1>
-                            <p style="margin: 5px 0 0; font-size: 14px; color: #ffffff;">Wallet Funding Receipt</p>
-                        </div>
-                        <div style="padding: 24px;">
-                            <h2 style="color: #107c10; font-size: 20px; margin-top: 0;">Deposit Successful! 🎉</h2>
-                            <p>Hello <b>${customerName}</b>,</p>
-                            <p>We are pleased to inform you that your wallet funding has been successfully processed.</p>
-                            <div style="background: #f8fafc; border-left: 4px solid #107c10; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                                <p style="margin: 4px 0;"><b>Amount Credited:</b> <span style="color: #107c10; font-weight: bold;">₦${formattedAmount}</span></p>
-                                <p style="margin: 4px 0;"><b>New Balance:</b> ₦${formattedBalance}</p>
-                                <p style="margin: 4px 0;"><b>Payment Provider:</b> ${provider.toUpperCase()}</p>
-                                <p style="margin: 4px 0;"><b>Transaction Reference:</b> ${reference}</p>
-                                <p style="margin: 4px 0;"><b>Date:</b> ${new Date().toLocaleString()}</p>
-                            </div>
-                        </div>
-                    </div>
+            const receiptContent = `
+                We are pleased to inform you that your wallet funding has been successfully processed.
+                <div style="background: #F8FAFC; border-radius: 14px; border: 1.5px solid #E2E8F0; padding: 18px 20px; margin: 20px 0;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #10B981; letter-spacing: 0.5px;">Deposit Successful &bull; Credited</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #0A192F; margin: 8px 0 16px;">₦${formattedAmount}</div>
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 13px; line-height: 2;">
+                        <tr>
+                            <td style="color: #64748B;">New Balance:</td>
+                            <td align="right" style="font-weight: 800; color: #0A192F;">₦${formattedBalance}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #64748B;">Channel:</td>
+                            <td align="right" style="font-weight: 700; color: #0A192F;">${provider.toUpperCase()}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #64748B;">Reference:</td>
+                            <td align="right" style="font-family: monospace; font-size: 11.5px; color: #475569;">${reference}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #64748B;">Date:</td>
+                            <td align="right" style="color: #64748B;">${new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' })}</td>
+                        </tr>
+                    </table>
                 </div>
             `;
+
+            const htmlBody = renderAbuMafhalEmailTemplate({
+                recipientName: customerName,
+                headlineBadge: 'Deposit Confirmed',
+                headlineTitle: 'Wallet Credited Successfully!',
+                headlineSubtitle: `₦${formattedAmount} has been credited to your wallet balance.`,
+                greeting: `Hi ${customerName} 👋`,
+                messageBody: receiptContent,
+                buttonText: 'View Wallet Balance &rarr;',
+                buttonUrl: 'https://abumafhal.com.ng'
+            });
 
             sendEmail(userEmail, subject, plainText, htmlBody, supabaseAdmin).catch(err => {
                 console.warn("[FundWallet Email Dispatch Warning]:", err?.message || err);

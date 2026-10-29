@@ -1,6 +1,6 @@
-
 import nodemailer from "npm:nodemailer@6.9.13";
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { renderAbuMafhalEmailTemplate } from "./email-template.ts";
 
 export const sendEmail = async (
     to: string, 
@@ -43,6 +43,21 @@ export const sendEmail = async (
         }
     }
 
+    // Automatically ensure all emails are wrapped in the official Abu Mafhal Sub template
+    let finalHtml = html;
+    if (!finalHtml || !finalHtml.includes('<!DOCTYPE html>')) {
+        finalHtml = renderAbuMafhalEmailTemplate({
+            recipientName: 'Valued Partner',
+            headlineBadge: 'Official Notification',
+            headlineTitle: subject || 'Abu Mafhal Sub Notification',
+            headlineSubtitle: 'Fast, secure and affordable digital services in one app.',
+            greeting: 'Hello 👋',
+            messageBody: (html || text || '').replace(/\n/g, '<br/>'),
+            buttonText: 'Open ABU MAFHAL SUB &rarr;',
+            buttonUrl: 'https://abumafhal.com.ng'
+        });
+    }
+
     let lastSmtpError: string | null = null;
 
     // METHOD 1: SMTP / Nodemailer (Zoho, Google, Custom SMTP) - Prioritized if configured
@@ -67,7 +82,7 @@ export const sendEmail = async (
                 to,
                 subject,
                 text,
-                html: html || text,
+                html: finalHtml,
                 headers: {
                     'X-Priority': '3',
                     'X-MSMail-Priority': 'Normal',
@@ -82,17 +97,13 @@ export const sendEmail = async (
         } catch (smtpErr: any) {
             lastSmtpError = smtpErr?.message || String(smtpErr);
             console.error("[sendEmail] SMTP exception (e.g. 554 sender blocked), attempting Resend API fallback:", lastSmtpError);
-            // Continue execution to METHOD 2: Resend HTTP API
         }
     }
 
     // METHOD 2: Resend HTTP API (Fallback or standalone)
     if (resendApiKey) {
         try {
-            // When Zoho sender is blocked or fails, use verified Resend onboarding address or domain
             const resendFrom = 'Abu Mafhal Sub <onboarding@resend.dev>';
-
-
             console.log(`[sendEmail] Sending email via Resend API from ${resendFrom} to ${to}...`);
             const resendRes = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
@@ -106,7 +117,7 @@ export const sendEmail = async (
                     reply_to: zohoUser ? zohoUser.trim() : undefined,
                     subject,
                     text,
-                    html: html || text,
+                    html: finalHtml,
                     headers: {
                         'X-Entity-Ref-ID': `${Date.now()}`
                     }
@@ -137,4 +148,3 @@ export const sendEmail = async (
     console.warn("[sendEmail] No working email credentials found. Please configure RESEND_API_KEY or ZOHO_EMAIL/ZOHO_PASSWORD in Admin Settings -> API Vault.");
     return { success: false, error: "No working email credentials found. Please configure SMTP Password (ZOHO_PASSWORD) in Admin Vault or verify domain in Resend." };
 };
-

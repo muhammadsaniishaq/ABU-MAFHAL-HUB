@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { ClubKonnectClient, type ClubKonnectResponse } from "../_shared/clubkonnect.ts";
 import { BigiClient } from "../_shared/bigi.ts";
 import { BilalsadasubClient } from "../_shared/bilalsadasub.ts";
+import { sendEmail } from "../_shared/email.ts";
+import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -766,6 +768,49 @@ Deno.serve(async (req: Request) => {
                         });
                     } catch (pinErr) {
                         console.warn('[Bills] recharge_pins insert note:', pinErr);
+                    }
+
+                    // Dispatch Official Email with generated PINs
+                    if (user?.email && user.email.includes('@')) {
+                        try {
+                            const recipientName = user.user_metadata?.full_name || 'Valued Customer';
+                            const formattedPinsHtml = pinsList.map((p: any, idx: number) => `
+                                <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+                                    <div style="font-size: 11px; color: #64748B;">Card #${idx + 1} (${planInfo.network} ${planInfo.denom})</div>
+                                    <div style="font-size: 18px; font-weight: 900; color: #0A192F; font-family: monospace; letter-spacing: 2px; margin-top: 2px;">
+                                        ${p.pin || p.token || p}
+                                    </div>
+                                    ${p.serial ? `<div style="font-size: 11px; color: #94A3B8;">S/N: ${p.serial}</div>` : ''}
+                                </div>
+                            `).join('');
+
+                            const pinEmailHtml = renderAbuMafhalEmailTemplate({
+                                recipientName,
+                                headlineBadge: 'PINs Generated',
+                                headlineTitle: 'Recharge Cards Ready! 🎟️',
+                                headlineSubtitle: `Your ${qty}x ${planInfo.network} ${planInfo.denom} cards have been generated.`,
+                                greeting: `Hello ${recipientName} 👋`,
+                                messageBody: `
+                                    Your order for <strong>${qty}x ${planInfo.network} ${planInfo.denom}</strong> Recharge PIN(s) has been successfully fulfilled.<br/><br/>
+                                    ${formattedPinsHtml}
+                                    <p style="font-size: 13px; color: #64748B; margin-top: 14px;">
+                                        <strong>Recharge Code:</strong> Dial <code>${pinsList[0]?.load_code || '*311*PIN#'}</code> on your phone to load.
+                                    </p>
+                                `,
+                                buttonText: 'Open ABU MAFHAL SUB &rarr;',
+                                buttonUrl: 'https://abumafhal.com.ng'
+                            });
+
+                            sendEmail(
+                                user.email,
+                                `Your ${planInfo.network} ${planInfo.denom} Recharge Cards (${qty}x) - ABU MAFHAL SUB`,
+                                `Your ${qty}x ${planInfo.network} ${planInfo.denom} recharge card pins have been generated. Check your account in Abu Mafhal Sub.`,
+                                pinEmailHtml,
+                                rpcClient
+                            ).catch(mErr => console.warn('[Bills PIN Email Note]:', mErr));
+                        } catch (mailEx) {
+                            console.warn('[Bills PIN Email Prepare Note]:', mailEx);
+                        }
                     }
 
                     return new Response(JSON.stringify({

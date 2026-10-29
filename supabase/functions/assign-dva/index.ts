@@ -1,6 +1,8 @@
 // Removed std/http/server.ts import
 import { createClient } from "@supabase/supabase-js";
 import { createPayvesselDVA } from "../_shared/payvessel.ts";
+import { sendEmail } from "../_shared/email.ts";
+import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
 
 interface VirtualAccountData {
     user_id: string;
@@ -144,6 +146,57 @@ Deno.serve(async (req) => {
                 throw insertError;
             }
             console.log("DVA Saved to Database");
+
+            // Dispatch Official Dedicated Account Ready Email
+            if (profile?.email && profile.email.includes('@')) {
+                try {
+                    const recipientName = profile.full_name || 'Valued User';
+                    const dvaBody = `
+                        Your dedicated automatic virtual funding bank account is now ready and linked to your Abu Mafhal Sub wallet.<br/><br/>
+                        <div style="background: #F8FAFC; border-radius: 14px; border: 1.5px solid #E2E8F0; padding: 18px 20px; margin: 16px 0;">
+                            <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #0284C7; letter-spacing: 0.5px;">Dedicated Virtual Account</div>
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 13.5px; line-height: 2; margin-top: 8px;">
+                                <tr>
+                                    <td style="color: #64748B;">Bank Name:</td>
+                                    <td align="right" style="font-weight: 800; color: #0A192F;">${virtualAccountData.bank_name}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #64748B;">Account Number:</td>
+                                    <td align="right" style="font-weight: 900; font-size: 17px; color: #EAB308; letter-spacing: 1px;">${virtualAccountData.account_number}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #64748B;">Account Name:</td>
+                                    <td align="right" style="font-weight: 700; color: #0A192F;">${virtualAccountData.account_name}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <p style="font-size: 13px; color: #64748B; margin-top: 10px;">
+                            Any bank transfer sent to this account number will automatically fund your Abu Mafhal wallet within seconds, 24/7.
+                        </p>
+                    `;
+
+                    const dvaHtml = renderAbuMafhalEmailTemplate({
+                        recipientName,
+                        headlineBadge: 'Account Ready',
+                        headlineTitle: 'Dedicated Bank Account Assigned! 🏦',
+                        headlineSubtitle: 'Automatic, instant 24/7 wallet funding is now enabled.',
+                        greeting: `Hi ${recipientName} 👋`,
+                        messageBody: dvaBody,
+                        buttonText: 'Open ABU MAFHAL SUB &rarr;',
+                        buttonUrl: 'https://abumafhal.com.ng'
+                    });
+
+                    sendEmail(
+                        profile.email,
+                        'Your Dedicated Funding Account is Ready! 🏦 - ABU MAFHAL SUB',
+                        `Hello ${recipientName}, your dedicated virtual account (${virtualAccountData.bank_name} - ${virtualAccountData.account_number}) is ready. Transfers sent to this account fund your wallet instantly!`,
+                        dvaHtml,
+                        supabaseAdmin
+                    ).catch(mErr => console.warn('[Assign-DVA Email Warning]:', mErr));
+                } catch (emErr) {
+                    console.warn('[Assign-DVA Email Prepare Warning]:', emErr);
+                }
+            }
         } else {
             // failed to create
             throw providerError || new Error("Failed to generate virtual account");

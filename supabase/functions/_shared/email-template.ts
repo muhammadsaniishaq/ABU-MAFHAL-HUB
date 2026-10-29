@@ -1,15 +1,15 @@
 /**
- * Premium Email Template Generator for Abu Mafhal Sub
- * Matches the official design specification:
- * - Top brand bar: Logo, "ABU MAFHAL SUB", "Your Trusted Digital Partner", "Simple • Secure • Reliable"
- * - Hero 3D Card: "✨ Welcome Aboard", "Your Digital Life, Simplified", with 3D smartphone, Floating badges (Airtime, Bills, Data, SIM)
- * - Personal Greeting & Message: "Hi {{user_name}} 👋"
- * - Feature Quick-Pill Badges: Airtime (Top up instantly), Data (Stay connected), Wallet (Safe & secure), SIM (Buy & manage)
- * - Primary Action Button: "Open ABU MAFHAL SUB ➔"
- * - Store Badges: Google Play & Apple App Store
- * - Need Help / Support Card: Shield icon, "Need Help? Our support team is always here for you", "💬 Contact Support" button
- * - Footer: Logo + "ABU MAFHAL SUB Your Trusted Digital Partner", Social icons (Facebook, Instagram, X, YouTube, TikTok)
- * - Navigation links: Help Center | Privacy Policy | Terms of Service | Unsubscribe | abumafhal.com
+ * Premium Official Email Template Generator for Abu Mafhal Sub
+ * Matches the official design specification pixel-for-pixel:
+ * - Brand Header: AM Logo, "ABU MAFHAL SUB", "Your Trusted Digital Partner", "Simple • Secure • Reliable"
+ * - Hero 3D Card: "✨ Welcome Aboard", "Your Digital Life, Simplified", with 3D smartphone & floating pill badges (Airtime, Bills, Data, SIM)
+ * - Greeting: "Hi {{user_name}} 👋"
+ * - Quick-Action 4-Pill Feature Badges: Airtime, Data, Wallet, SIM
+ * - High-Contrast Pill CTA: "Open ABU MAFHAL SUB ➔"
+ * - App Store Badges: Google Play & Apple App Store
+ * - Need Help / Support Card: Shield icon, "Need Help? Our support team is always here for you", "💬 Contact Support"
+ * - Social Footer: Facebook, Instagram, X, YouTube, TikTok
+ * - Legal: Help Center | Privacy Policy | Terms of Service | Unsubscribe | abumafhal.com
  */
 
 export interface EmailTemplateOptions {
@@ -19,7 +19,6 @@ export interface EmailTemplateOptions {
     headlineSubtitle?: string;
     greeting?: string;
     messageBody?: string;
-    heroImageUrl?: string;
     buttonText?: string;
     buttonUrl?: string;
     helpText?: string;
@@ -39,9 +38,6 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
     const buttonUrl = options.buttonUrl || 'https://abumafhal.com.ng';
     const supportUrl = options.supportUrl || 'https://wa.me/2348083833077';
     const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub';
-
-    // SVG Icons and Brand Assets encoded as clean, high-compatibility inline graphics
-    const logoAmSvg = `https://uagcxrtdqttayulvgpwg.supabase.co/storage/v1/object/public/static/logo.png`;
 
     return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -68,7 +64,7 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
     @media only screen and (max-width: 620px) {
       .email-container { width: 100% !important; margin: auto !important; }
       .mobile-stack { display: block !important; width: 100% !important; }
-      .hero-pad { padding: 28px 20px !important; }
+      .hero-pad { padding: 26px 20px !important; }
       .grid-item { display: inline-block !important; width: 46% !important; margin-bottom: 12px !important; }
     }
   </style>
@@ -80,7 +76,7 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
       <td align="center">
 
         <!-- MAIN CONTAINER (600px Max) -->
-        <table role="presentation" class="email-container" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: #FFFFFF; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08); border: 1px solid #E2E8F0; margin: 0 auto;">
+        <table role="presentation" class="email-container" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: #FFFFFF; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08); border: 1px solid #E2E8F0; margin: 0 auto;">
           
           <!-- 1. TOP BRAND HEADER -->
           <tr>
@@ -91,9 +87,11 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="padding-right: 12px; vertical-align: middle;">
-                          <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #0A192F 0%, #1E3A8A 100%); border: 2px solid #EAB308; text-align: center; line-height: 44px; color: #EAB308; font-weight: 900; font-size: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            AM
-                          </div>
+                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #0A192F 0%, #1E3A8A 100%); border: 2px solid #EAB308;">
+                            <tr>
+                              <td align="center" style="color: #EAB308; font-weight: 900; font-size: 17px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">AM</td>
+                            </tr>
+                          </table>
                         </td>
                         <td style="vertical-align: middle;">
                           <div style="font-size: 19px; font-weight: 900; color: #0A192F; letter-spacing: 0.2px; line-height: 1.2;">
@@ -119,9 +117,9 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
           <!-- 2. HERO LUXURY 3D CARD -->
           <tr>
             <td style="padding: 0 24px 24px;">
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #071329 0%, #0F2347 50%, #1A386D 100%); border-radius: 18px; overflow: hidden; position: relative;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #071329 0%, #0F2347 50%, #1A386D 100%); border-radius: 20px; overflow: hidden;">
                 <tr>
-                  <td class="hero-pad" style="padding: 36px 32px; vertical-align: middle;">
+                  <td class="hero-pad" style="padding: 34px 30px; vertical-align: middle;">
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <!-- Left Content Column -->
@@ -140,11 +138,13 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
                           </p>
                         </td>
 
-                        <!-- Right Graphic Column: 3D Floating Phone Mockup & Badges -->
+                        <!-- Right Graphic Column: 3D Floating Phone Mockup & Service Badges -->
                         <td class="mobile-stack" style="vertical-align: middle; width: 40%; text-align: center; padding-left: 12px;">
                           <!-- Phone Mockup Container -->
-                          <div style="display: inline-block; background: linear-gradient(145deg, #0A192F, #1E3A8A); border: 2.5px solid #F59E0B; border-radius: 18px; padding: 14px 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.5); width: 140px; margin: auto;">
+                          <div style="display: inline-block; background: linear-gradient(145deg, #0A192F, #1E3A8A); border: 2.5px solid #F59E0B; border-radius: 18px; padding: 14px 10px; box-shadow: 0 14px 32px rgba(0,0,0,0.5); width: 142px; margin: auto;">
+                            <!-- Top speaker bar -->
                             <div style="width: 28px; height: 3px; background-color: #475569; border-radius: 2px; margin: 0 auto 8px;"></div>
+                            
                             <!-- Mini App Header inside screen -->
                             <div style="background-color: #071329; border-radius: 10px; padding: 8px 4px; border: 1px solid rgba(245, 158, 11, 0.3);">
                               <div style="width: 24px; height: 24px; border-radius: 50%; background: #EAB308; margin: 0 auto 4px; line-height: 24px; color: #071329; font-size: 11px; font-weight: 900; text-align: center;">AM</div>
@@ -155,21 +155,21 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
                             <!-- Floating Action Grid in phone screen -->
                             <table role="presentation" border="0" cellpadding="0" cellspacing="4" width="100%" style="margin-top: 8px;">
                               <tr>
-                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 5px 2px; text-align: center;">
+                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 6px 2px; text-align: center;">
                                   <div style="font-size: 11px;">📱</div>
                                   <div style="font-size: 7.5px; font-weight: 700; color: #0F172A;">Airtime</div>
                                 </td>
-                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 5px 2px; text-align: center;">
+                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 6px 2px; text-align: center;">
                                   <div style="font-size: 11px;">📄</div>
                                   <div style="font-size: 7.5px; font-weight: 700; color: #0F172A;">Bills</div>
                                 </td>
                               </tr>
                               <tr>
-                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 5px 2px; text-align: center;">
+                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 6px 2px; text-align: center;">
                                   <div style="font-size: 11px;">📶</div>
                                   <div style="font-size: 7.5px; font-weight: 700; color: #0F172A;">Data</div>
                                 </td>
-                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 5px 2px; text-align: center;">
+                                <td style="background-color: #FFFFFF; border-radius: 6px; padding: 6px 2px; text-align: center;">
                                   <div style="font-size: 11px;">💳</div>
                                   <div style="font-size: 7.5px; font-weight: 700; color: #0F172A;">SIM</div>
                                 </td>
@@ -306,9 +306,11 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F0F7FF; border: 1px solid #BAE6FD; border-radius: 16px; padding: 16px 20px;">
                 <tr>
                   <td style="vertical-align: middle; width: 44px;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background-color: #0284C7; text-align: center; line-height: 38px; color: #FFFFFF; font-size: 18px;">
-                      🛡️
-                    </div>
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 38px; height: 38px; border-radius: 50%; background-color: #0284C7;">
+                      <tr>
+                        <td align="center" style="font-size: 18px; color: #FFFFFF;">🛡️</td>
+                      </tr>
+                    </table>
                   </td>
                   <td style="vertical-align: middle; padding: 0 14px;">
                     <div style="font-size: 14.5px; font-weight: 800; color: #0A192F;">Need Help?</div>
@@ -348,9 +350,11 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="padding-right: 10px; vertical-align: middle;">
-                          <div style="width: 36px; height: 36px; border-radius: 50%; background: #0A192F; border: 2px solid #EAB308; text-align: center; line-height: 36px; color: #EAB308; font-weight: 900; font-size: 15px;">
-                            AM
-                          </div>
+                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 36px; height: 36px; border-radius: 50%; background: #0A192F; border: 2px solid #EAB308;">
+                            <tr>
+                              <td align="center" style="color: #EAB308; font-weight: 900; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">AM</td>
+                            </tr>
+                          </table>
                         </td>
                         <td style="vertical-align: middle;">
                           <div style="font-size: 15px; font-weight: 900; color: #0A192F;">

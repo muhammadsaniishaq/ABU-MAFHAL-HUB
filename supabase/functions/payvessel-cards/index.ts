@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendEmail } from '../_shared/email.ts';
+import { renderAbuMafhalEmailTemplate } from '../_shared/email-template.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -460,6 +462,55 @@ serve(async (req) => {
 
             if (dbErr) {
                 console.error('[Payvessel Cards] DB save error:', dbErr);
+            }
+
+            // Dispatch Official Virtual Card Provisioning Email
+            if (user?.email && user.email.includes('@')) {
+                try {
+                    const recipientName = profile?.full_name || 'Valued Client';
+                    const cardHtml = renderAbuMafhalEmailTemplate({
+                        recipientName,
+                        headlineBadge: 'Virtual Card Ready',
+                        headlineTitle: 'Virtual Card Activated! 💳',
+                        headlineSubtitle: 'Your international USD card is ready for online shopping.',
+                        greeting: `Hi ${recipientName} 👋`,
+                        messageBody: `
+                            Your new <strong>${cardBrand.toUpperCase()} Virtual Card</strong> has been successfully created and linked to your wallet.<br/><br/>
+                            <div style="background: #F8FAFC; border-radius: 14px; border: 1.5px solid #E2E8F0; padding: 18px 20px; margin: 16px 0;">
+                                <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #CA8A04; letter-spacing: 0.5px;">Global Virtual Card</div>
+                                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 13.5px; line-height: 2; margin-top: 8px;">
+                                    <tr>
+                                        <td style="color: #64748B;">Card Name:</td>
+                                        <td align="right" style="font-weight: 800; color: #0A192F;">${cardData.card_name || 'Abu Mafhal Dollar Card'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #64748B;">Card Type:</td>
+                                        <td align="right" style="font-weight: 700; color: #0A192F;">${cardBrand.toUpperCase()} (${cardType.toUpperCase()})</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #64748B;">Currency:</td>
+                                        <td align="right" style="font-weight: 800; color: #10B981;">USD ($)</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <p style="font-size: 13px; color: #64748B; margin-top: 10px;">
+                                You can view your CVV, full 16-digit card number, and manage card funding safely inside the Abu Mafhal Sub app.
+                            </p>
+                        `,
+                        buttonText: 'Manage My Card &rarr;',
+                        buttonUrl: 'https://abumafhal.com.ng'
+                    });
+
+                    sendEmail(
+                        user.email,
+                        `Your New Virtual Card is Ready! 💳 - ABU MAFHAL SUB`,
+                        `Your Abu Mafhal Sub virtual card has been issued and is ready for international payments.`,
+                        cardHtml,
+                        supabase
+                    ).catch(e => console.warn('[Payvessel Card Email Note]:', e));
+                } catch (cardMailErr) {
+                    console.warn('[Payvessel Card Email Prepare Note]:', cardMailErr);
+                }
             }
 
             return new Response(JSON.stringify({
