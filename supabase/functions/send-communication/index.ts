@@ -221,7 +221,8 @@ serve(async (req) => {
                         contact,
                         emailSubject,
                         "Please view this email in a HTML compatible client.",
-                        htmlContent // Sending the templated HTML
+                        htmlContent,
+                        supabaseAdmin
                     );
                 } else if (type === 'sms') {
                     // Normalize Phone: 080... -> 23480...

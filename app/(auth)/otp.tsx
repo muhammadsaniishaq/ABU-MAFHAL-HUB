@@ -148,17 +148,7 @@ export default function OTP() {
                             recipient_mode: 'single',
                             recipient: cleanEmailLower,
                             subject: 'Your 6-Digit Password Reset Code 🔑 - ABU MAFHAL SUB',
-                            body: `
-                                <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
-                                    <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
-                                    <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Account Password Reset</p>
-                                    <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit password reset code is:</p>
-                                    <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
-                                        ${generatedResetOtp}
-                                    </div>
-                                    <p style="color:#64748B; font-size:11px; margin-top:16px;">Enter this 6-digit code in the Abu Mafhal mobile app to set your new password. This code is valid for 15 minutes. Never share this code with anyone.</p>
-                                </div>
-                            `,
+                            body: `Your 6-digit password reset verification code is:<br/><br/><div style="background:#FEF3C7; border:2px dashed #F59E0B; color:#0A192F; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; text-align:center; margin:16px 0;">${generatedResetOtp}</div><br/>Enter this 6-digit code in the Abu Mafhal mobile app to set your new password. This code is valid for 15 minutes. Never share this code with anyone.`,
                         },
                     });
                     if (!edgeErr && edgeData?.success !== false) {
