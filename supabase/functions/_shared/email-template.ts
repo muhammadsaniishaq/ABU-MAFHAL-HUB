@@ -60,8 +60,8 @@ export function renderAbuMafhalEmailTemplate(options: EmailTemplateOptions): str
     const supportUrl = options.supportUrl || 'https://wa.me/2348083833077';
     const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub';
 
-    // Official gold luxury logo hosted directly on repository main branch
-    const logoUrl = "https://raw.githubusercontent.com/muhammadsaniishaq/ABU-MAFHAL-HUB/main/assets/images/am_luxury_logo.png";
+    // Official Authentic Abu Mafhal Sub Logo (Gold 3D Crest with Trust Quality Value)
+    const logoUrl = "https://raw.githubusercontent.com/muhammadsaniishaq/ABU-MAFHAL-HUB/main/assets/images/logo.png";
 
     return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
