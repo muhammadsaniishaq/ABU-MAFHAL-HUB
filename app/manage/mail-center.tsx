@@ -441,37 +441,45 @@ export default function MailCenterScreen() {
     try {
       setSendingMail(true);
 
-      let targetProfiles: { id?: string; email: string }[] = [];
+      let targetProfiles: { id?: string; email: string; full_name?: string; username?: string }[] = [];
 
       if (rawRecipient.toLowerCase() === 'all' || rawRecipient.toLowerCase() === 'all_users') {
         const { data: userProfiles } = await supabase
           .from('profiles')
-          .select('id, email')
+          .select('id, email, full_name, username')
           .not('email', 'is', null);
 
         if (userProfiles && userProfiles.length > 0) {
-          targetProfiles = userProfiles.filter(u => u.email).map(u => ({ id: u.id, email: u.email.toLowerCase() }));
+          targetProfiles = userProfiles.filter(u => u.email).map(u => ({
+            id: u.id,
+            email: u.email.toLowerCase(),
+            full_name: u.full_name,
+            username: u.username
+          }));
         }
       } else if (rawRecipient.includes(',')) {
         const emails = rawRecipient.split(',').map(e => e.trim().toLowerCase()).filter(e => e.includes('@'));
         if (emails.length > 0) {
           const { data: userProfiles } = await supabase
             .from('profiles')
-            .select('id, email')
+            .select('id, email, full_name, username')
             .in('email', emails);
 
-          const foundMap = new Map((userProfiles || []).map(u => [u.email.toLowerCase(), u.id]));
-          targetProfiles = emails.map(e => ({ id: foundMap.get(e), email: e }));
+          const foundMap = new Map((userProfiles || []).map(u => [u.email.toLowerCase(), u]));
+          targetProfiles = emails.map(e => {
+            const u = foundMap.get(e);
+            return { id: u?.id, email: e, full_name: u?.full_name, username: u?.username };
+          });
         }
       } else {
         const singleEmail = rawRecipient.toLowerCase();
         const { data: userProfile } = await supabase
           .from('profiles')
-          .select('id, email')
+          .select('id, email, full_name, username')
           .eq('email', singleEmail)
           .maybeSingle();
 
-        targetProfiles = [{ id: userProfile?.id, email: singleEmail }];
+        targetProfiles = [{ id: userProfile?.id, email: singleEmail, full_name: userProfile?.full_name, username: userProfile?.username }];
       }
 
       if (targetProfiles.length === 0) {

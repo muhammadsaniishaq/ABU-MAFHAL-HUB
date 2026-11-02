@@ -1,10 +1,12 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image, Platform, Modal, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image, Platform, Modal, StyleSheet, Clipboard } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -150,11 +152,14 @@ export default function TrackingScreen() {
 
     const fetchPrices = async () => {
         try {
-            const { data, error } = await supabase.from('service_pricing').select('*').eq('service_category', 'personalization');
+            const { data, error } = await supabase
+                .from('service_pricing')
+                .select('*')
+                .or('service_category.eq.personalization,id.in.(pers_status,nin_personalization)');
             if (error || !data) return;
             
             setSlipTypes(prev => prev.map(item => {
-                const dbPrice = data.find(d => d.id === item.db_id);
+                const dbPrice = data.find(d => d.id === item.db_id || d.id === item.id);
                 if (dbPrice) {
                     return { ...item, price: Number(dbPrice.cost_price) + Number(dbPrice.markup_price) };
                 }
@@ -234,10 +239,126 @@ export default function TrackingScreen() {
     });
 
     if (result) {
+        const rawData = result.data?.data || result.data || {};
+        const pdfBase64 = rawData.pdf_base64 || result.pdf_base64 || rawData.slip_url || result.slip_url;
+
+        // Resolve names and identity attributes
+        const firstName = rawData.firstname || rawData.first_name || rawData.firstName || '';
+        const middleName = rawData.middlename || rawData.middle_name || rawData.middleName || '';
+        const surname = rawData.surname || rawData.last_name || rawData.lastname || rawData.lastName || '';
+        const fullName = [firstName, middleName, surname].filter(Boolean).join(' ') || rawData.name || rawData.fullName || 'Registered Applicant';
+
+        const rawNin = rawData.nin || rawData.NIN || rawData.number || '';
+        const cleanNin = String(rawNin).replace(/\D/g, '');
+        const displayNin = cleanNin.length === 11
+            ? `${cleanNin.slice(0, 4)} ${cleanNin.slice(4, 7)} ${cleanNin.slice(7)}`
+            : cleanNin || '—';
+
+        const displayTracking = rawData.trackingId || rawData.tracking_id || rawData.trackingID || trackingID.trim();
+        const dob = rawData.dob || rawData.birthdate || rawData.dateOfBirth || '—';
+        const rawGender = String(rawData.gender || rawData.sex || 'M').trim().toUpperCase();
+        const gender = rawGender.startsWith('F') ? 'FEMALE' : 'MALE';
+        const phone = rawData.telephoneno || rawData.phone || rawData.phoneNumber || '—';
+        const stateOfOrigin = rawData.birthstate || rawData.state_of_origin || rawData.state || '—';
+        const lgaOfOrigin = rawData.birthlga || rawData.lga_of_origin || rawData.lga || '—';
+        const cardStatus = String(rawData.card_status || rawData.status || rawData.request_status || 'COMPLETED').toUpperCase();
+        const stageMessage = rawData.message || rawData.response || rawData.remark || 'Personalization records matched and verified successfully.';
+
+        const photoUri = rawData.photo || rawData.image || rawData.picture
+            ? (String(rawData.photo || rawData.image || rawData.picture).startsWith('data:') || String(rawData.photo || rawData.image || rawData.picture).startsWith('http')
+                ? (rawData.photo || rawData.image || rawData.picture)
+                : `data:image/jpeg;base64,${rawData.photo || rawData.image || rawData.picture}`)
+            : null;
+
+        const isCompleted = cardStatus.includes('COMPLETE') || cardStatus.includes('SUCCESS') || cardStatus.includes('READY') || cardStatus.includes('PRINTED') || cardStatus === 'TRUE';
+        const isProcessing = cardStatus.includes('PROCESS') || cardStatus.includes('PENDING') || cardStatus.includes('IN_PROGRESS');
+
+        const handleDownloadOfficialSlip = async () => {
+            if (!pdfBase64) {
+                return showAlert('No Document Attached', 'The registry has not attached a downloadable slip file for this tracking record yet.', 'info');
+            }
+            try {
+                if (String(pdfBase64).startsWith('http://') || String(pdfBase64).startsWith('https://')) {
+                    if (Platform.OS === 'web') {
+                        const link = document.createElement('a');
+                        link.href = pdfBase64;
+                        link.target = '_blank';
+                        link.download = `personalization_${displayTracking}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        showAlert('Download Started', 'Official personalization document downloading.', 'success');
+                    } else {
+                        const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                        const fileUri = `${docDir}personalization_${displayTracking}.pdf`;
+                        await FileSystem.downloadAsync(pdfBase64, fileUri);
+                        if (await Sharing.isAvailableAsync()) {
+                            await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Personalization Document' });
+                        } else {
+                            showAlert('Downloaded', `Saved to ${fileUri}`, 'success');
+                        }
+                    }
+                    return;
+                }
+
+                // If Base64
+                let cleanB64 = String(pdfBase64);
+                if (cleanB64.includes('base64,')) {
+                    cleanB64 = cleanB64.split('base64,')[1];
+                }
+                cleanB64 = cleanB64.trim().replace(/\s/g, '');
+
+                if (Platform.OS === 'web') {
+                    const byteChars = atob(cleanB64);
+                    const byteNumbers = new Array(byteChars.length);
+                    for (let i = 0; i < byteChars.length; i++) {
+                        byteNumbers[i] = byteChars.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `personalization_${displayTracking}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+                    showAlert('Download Started', 'Official personalization document downloaded.', 'success');
+                } else {
+                    const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                    const fileUri = `${docDir}personalization_${displayTracking}.pdf`;
+                    await FileSystem.writeAsStringAsync(fileUri, cleanB64, {
+                        encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any
+                    });
+                    if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Personalization Document' });
+                    } else {
+                        showAlert('Saved', 'Personalization slip saved successfully.', 'success');
+                    }
+                }
+            } catch (err: any) {
+                showAlert('Download Error', err.message || 'Could not download slip file.', 'error');
+            }
+        };
+
+        const copyTextToClipboard = async (textToCopy: string, label: string) => {
+            try {
+                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                    await navigator.clipboard.writeText(textToCopy);
+                } else {
+                    Clipboard.setString(textToCopy);
+                }
+                showAlert('Copied!', `${label} copied to clipboard.`, 'success');
+            } catch (e) {
+                showAlert('Copy Failed', 'Unable to copy text.', 'error');
+            }
+        };
+
         return (
-            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+            <View style={{ flex: 1, backgroundColor: '#f1f5f9' }}>
                 <Stack.Screen options={{ 
-                    title: 'Personalization Status', 
+                    title: 'Personalization Details', 
                     headerStyle: { backgroundColor: '#060d21' }, 
                     headerTintColor: '#fff', 
                     headerShadowVisible: false,
@@ -247,28 +368,213 @@ export default function TrackingScreen() {
                         </TouchableOpacity>
                     )
                 }} />
-                
-                {/* Header Banner */}
-                <LinearGradient colors={['#060d21', '#121F42']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="shield-checkmark" size={16} color="#f5a623" />
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Personalization Details</Text>
+                <StatusBar style="light" />
+
+                {/* Hero Top Header */}
+                <LinearGradient colors={['#060d21', '#0f2347']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 20, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}>
+                        <Ionicons name="shield-checkmark" size={14} color="#f5a623" />
+                        <Text style={{ color: '#f8fafc', fontWeight: '800', fontSize: 11, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.8 }}>National Identity Registry</Text>
                     </View>
-                    <Text style={{ color: '#94a3b8', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>Personalization Completed</Text>
+                    <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3, textAlign: 'center' }}>NIMC Personalization Dossier</Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 11, letterSpacing: 0.4, marginTop: 3 }}>Official Verification & Card Production Track</Text>
                 </LinearGradient>
 
-                <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: -32 }} contentContainerStyle={{ paddingBottom: 80 }}>
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, marginBottom: 16 }}>
-                        <StatusResult result={result} title="Personalization Report" />
+                <ScrollView style={{ flex: 1, paddingHorizontal: 14, marginTop: -36 }} contentContainerStyle={{ paddingBottom: 90 }} showsVerticalScrollIndicator={false}>
+                    
+                    {/* Status Badge Card */}
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 18, padding: 16, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 18,
+                                    backgroundColor: isCompleted ? '#ecfdf5' : isProcessing ? '#fef3c7' : '#eff6ff',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 1,
+                                    borderColor: isCompleted ? '#a7f3d0' : isProcessing ? '#fde68a' : '#bfdbfe',
+                                    marginRight: 10
+                                }}>
+                                    <Ionicons 
+                                        name={isCompleted ? "checkmark-circle" : isProcessing ? "hourglass" : "information-circle"} 
+                                        size={20} 
+                                        color={isCompleted ? "#059669" : isProcessing ? "#d97706" : "#2563eb"} 
+                                    />
+                                </View>
+                                <View>
+                                    <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 }}>PRODUCTION STATUS</Text>
+                                    <Text style={{ fontSize: 14, fontWeight: '900', color: isCompleted ? '#059669' : isProcessing ? '#d97706' : '#1e293b' }}>
+                                        {isCompleted ? 'COMPLETED / READY' : isProcessing ? 'IN PROCESSING' : cardStatus}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={{ backgroundColor: isCompleted ? '#d1fae5' : '#fef3c7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: isCompleted ? '#065f46' : '#92400e' }}>
+                                    {isCompleted ? '100% VERIFIED' : 'ACTIVE'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#64748b" style={{ marginRight: 6 }} />
+                            <Text style={{ fontSize: 11.5, color: '#475569', fontWeight: '500', flex: 1 }}>{stageMessage}</Text>
+                        </View>
                     </View>
 
-                    {/* Back Button */}
+                    {/* Citizen Identity Profile Card */}
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 18, padding: 18, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                        
+                        {/* Profile Header (Photo + Name) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18 }}>
+                            <View style={{ width: 72, height: 86, borderRadius: 10, backgroundColor: '#f1f5f9', borderWidth: 1.5, borderColor: '#cbd5e1', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
+                                {photoUri ? (
+                                    <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                ) : (
+                                    <Ionicons name="person" size={38} color="#94a3b8" />
+                                )}
+                            </View>
+
+                            <View style={{ flex: 1, marginLeft: 14 }}>
+                                <Text style={{ fontSize: 9.5, color: '#64748b', fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' }}>CITIZEN FULL NAME</Text>
+                                <Text style={{ fontSize: 15, fontWeight: '900', color: '#0f172a', letterSpacing: -0.2, marginTop: 2 }} numberOfLines={2}>
+                                    {fullName}
+                                </Text>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                                    <View style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 6 }}>
+                                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#334155' }}>{gender}</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#475569' }}>DOB: {dob}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* NIN & Tracking Numbers Bar */}
+                        <View style={{ backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>NATIONAL IDENTITY NUMBER (NIN)</Text>
+                                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#060d21', letterSpacing: 1.5, marginTop: 2 }}>{displayNin}</Text>
+                                </View>
+                                {cleanNin ? (
+                                    <TouchableOpacity 
+                                        onPress={() => copyTextToClipboard(cleanNin, 'NIN')}
+                                        style={{ backgroundColor: '#ffffff', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', flexDirection: 'row', alignItems: 'center' }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="copy-outline" size={13} color="#060d21" style={{ marginRight: 4 }} />
+                                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#060d21' }}>Copy</Text>
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+
+                            <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 4 }} />
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>TRACKING IDENTIFIER</Text>
+                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155', letterSpacing: 0.5, marginTop: 2 }}>{displayTracking}</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => copyTextToClipboard(displayTracking, 'Tracking ID')}
+                                    style={{ backgroundColor: '#ffffff', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', flexDirection: 'row', alignItems: 'center' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="copy-outline" size={13} color="#060d21" style={{ marginRight: 4 }} />
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#060d21' }}>Copy</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Citizen Demographic Grid */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 }}>
+                            <View style={{ width: '50%', paddingHorizontal: 4, marginBottom: 12 }}>
+                                <Text style={{ fontSize: 9.5, color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>STATE OF ORIGIN</Text>
+                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1e293b', marginTop: 2 }}>{stateOfOrigin}</Text>
+                            </View>
+                            <View style={{ width: '50%', paddingHorizontal: 4, marginBottom: 12 }}>
+                                <Text style={{ fontSize: 9.5, color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>LGA OF ORIGIN</Text>
+                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1e293b', marginTop: 2 }}>{lgaOfOrigin}</Text>
+                            </View>
+                            <View style={{ width: '50%', paddingHorizontal: 4, marginBottom: 6 }}>
+                                <Text style={{ fontSize: 9.5, color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>PHONE NUMBER</Text>
+                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1e293b', marginTop: 2 }}>{phone}</Text>
+                            </View>
+                            <View style={{ width: '50%', paddingHorizontal: 4, marginBottom: 6 }}>
+                                <Text style={{ fontSize: 9.5, color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>RECORD TYPE</Text>
+                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#059669', marginTop: 2 }}>Personalization</Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Personalization Production Timeline */}
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 18, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>
+                            Production Pipeline
+                        </Text>
+
+                        {/* Step 1 */}
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
+                            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#10b981', marginRight: 10, marginTop: 1 }}>
+                                <Ionicons name="checkmark" size={13} color="#10b981" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a' }}>1. Enrollment Registered</Text>
+                                <Text style={{ fontSize: 10.5, color: '#64748b', marginTop: 1 }}>Biometrics and demographics captured in NIMC National Database.</Text>
+                            </View>
+                        </View>
+
+                        {/* Step 2 */}
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
+                            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#10b981', marginRight: 10, marginTop: 1 }}>
+                                <Ionicons name="checkmark" size={13} color="#10b981" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a' }}>2. Identity De-duplication (ABIS)</Text>
+                                <Text style={{ fontSize: 10.5, color: '#64748b', marginTop: 1 }}>Automated Biometric Identification System cleared citizen records.</Text>
+                            </View>
+                        </View>
+
+                        {/* Step 3 */}
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: isCompleted ? '#ecfdf5' : '#fef3c7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isCompleted ? '#10b981' : '#f59e0b', marginRight: 10, marginTop: 1 }}>
+                                <Ionicons name={isCompleted ? "checkmark" : "hourglass-outline"} size={13} color={isCompleted ? "#10b981" : "#d97706"} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: isCompleted ? '#0f172a' : '#d97706' }}>
+                                    3. Card Personalization & Issuance
+                                </Text>
+                                <Text style={{ fontSize: 10.5, color: '#64748b', marginTop: 1 }}>
+                                    {isCompleted ? 'Physical card personalized and data packet linked to National ID.' : 'Card production record is queueing / in progress at the central bureau.'}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Action Hub Buttons */}
+                    {pdfBase64 ? (
+                        <TouchableOpacity 
+                            onPress={handleDownloadOfficialSlip} 
+                            style={{ height: 50, borderRadius: 14, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 10, shadowColor: '#059669', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 }}
+                            activeOpacity={0.85}
+                        >
+                            <Ionicons name="download-outline" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, letterSpacing: 0.4 }}>DOWNLOAD OFFICIAL SLIP (PDF)</Text>
+                        </TouchableOpacity>
+                    ) : null}
+
                     <TouchableOpacity 
                         onPress={() => setResult(null)} 
-                        style={{ height: 48, borderRadius: 12, backgroundColor: '#060d21', alignItems: 'center', justifyContent: 'center', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }}
-                        activeOpacity={0.8}
+                        style={{ height: 48, borderRadius: 14, backgroundColor: '#060d21', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', borderWidth: 1, borderColor: '#1e293b' }}
+                        activeOpacity={0.85}
                     >
-                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>RUN ANOTHER CHECK</Text>
+                        <Ionicons name="refresh-outline" size={17} color="#ffffff" style={{ marginRight: 8 }} />
+                        <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, letterSpacing: 0.4 }}>CHECK ANOTHER TRACKING ID</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>

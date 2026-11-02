@@ -68,10 +68,11 @@ export async function getKetawancyApiKey(): Promise<string> {
             .maybeSingle();
 
         if (secret?.value && typeof secret.value === 'string' && secret.value.trim() !== '') {
-            cachedApiKey = secret.value.trim();
+            const resolvedKey: string = secret.value.trim();
+            cachedApiKey = resolvedKey;
             lastKeyFetchTime = now;
-            await AsyncStorage.setItem('@vault_KETAWANCY_API_KEY', cachedApiKey).catch(() => {});
-            return cachedApiKey;
+            await AsyncStorage.setItem('@vault_KETAWANCY_API_KEY', resolvedKey).catch(() => {});
+            return resolvedKey;
         }
 
         // 4. Edge Function Fallback (Service Role securely resolves key bypassing RLS)
@@ -80,10 +81,11 @@ export async function getKetawancyApiKey(): Promise<string> {
         });
 
         if (edgeRes?.key && typeof edgeRes.key === 'string' && edgeRes.key.trim() !== '') {
-            cachedApiKey = edgeRes.key.trim();
+            const resolvedKey: string = edgeRes.key.trim();
+            cachedApiKey = resolvedKey;
             lastKeyFetchTime = now;
-            await AsyncStorage.setItem('@vault_KETAWANCY_API_KEY', cachedApiKey).catch(() => {});
-            return cachedApiKey;
+            await AsyncStorage.setItem('@vault_KETAWANCY_API_KEY', resolvedKey).catch(() => {});
+            return resolvedKey;
         }
     } catch (e) {
         console.warn('[Ketawancy] Secret resolution note:', e);

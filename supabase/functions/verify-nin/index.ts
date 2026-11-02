@@ -116,6 +116,8 @@ serve(async (req: Request) => {
           'nin-standard': 'nin_standard',
           'nin-premium': 'nin_premium',
           'nin-regular': 'nin_regular',
+          'nin-basic': 'nin_info',
+          'nin-info': 'nin_info',
           'nin-slip': 'nin_premium',
           'nin-slip-v2': 'nin_premium',
           'nin-validation': 'val_bypass_nin',
@@ -342,6 +344,32 @@ serve(async (req: Request) => {
     const slipType = String(requestData.slip_type || requestData.layout || '').toUpperCase();
 
     switch (searchType) {
+      case 'nin-standard':
+      case 'standard':
+        endpoint = '/nin/standard-slip';
+        payload.nin = searchValue;
+        break;
+
+      case 'nin-regular':
+      case 'regular':
+        endpoint = '/nin/regular-slip';
+        payload.nin = searchValue;
+        break;
+
+      case 'nin-basic':
+      case 'nin-info':
+      case 'basic':
+      case 'info':
+        endpoint = '/nin/basic-slip';
+        payload.nin = searchValue;
+        break;
+
+      case 'nin-premium':
+      case 'premium':
+        endpoint = '/nin/premium-slip';
+        payload.nin = searchValue;
+        break;
+
       case 'nin':
       case 'nin-slip':
       case 'nin-slip-v2':
@@ -750,7 +778,11 @@ serve(async (req: Request) => {
                   skbData.pdf ||
                   rawPerson.pdf ||
                   skbData.document ||
-                  rawPerson.document || '';
+                  rawPerson.document ||
+                  skbData.file ||
+                  rawPerson.file ||
+                  skbData.download_url ||
+                  rawPerson.download_url || '';
 
     // Check attachments array (SKBTECH returns links to slips in attachments)
     if (!slipDoc && Array.isArray(skbData.attachments) && skbData.attachments.length > 0) {
