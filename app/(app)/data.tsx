@@ -994,17 +994,16 @@ export default function DataScreen() {
                     console.log('Error fetching DB plans for Ketawancy:', e);
                 }
 
-                // Fallback: Fetch directly from KetawancyService if not yet seeded
+                // Fetch directly and purely from KetawancyService live API
                 let rawPlans: any[] = [];
                 if (netLower === 'smile') rawPlans = await KetawancyService.getSmilePlans();
                 else if (netLower === 'alpha') rawPlans = await KetawancyService.getAlphaPlans();
                 else if (netLower === 'kirani') rawPlans = await KetawancyService.getKiraniPlans();
                 else if (netLower === 'ratel') rawPlans = await KetawancyService.getRatelPlans();
-                else if (netLower === 'sahal') rawPlans = [
-                    { planId: 1, planName: 'Sahal 1GB', price: 600, validity: '30 Days' },
-                    { planId: 2, planName: 'Sahal 2GB', price: 1100, validity: '30 Days' },
-                    { planId: 3, planName: 'Sahal 5GB', price: 2500, validity: '30 Days' }
-                ];
+                else if (netLower === 'sahal') {
+                    const res = await (KetawancyService as any).getDataPlans?.(5).catch(() => []);
+                    rawPlans = Array.isArray(res) ? res : [];
+                }
 
                 const mapped = rawPlans.map(p => {
                     const cost = Number(p.price) || 0;

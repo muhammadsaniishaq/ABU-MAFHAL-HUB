@@ -287,20 +287,22 @@ Deno.serve(async (req) => {
                 }
 
                 const targetUrl = `${ketawancyBaseUrl}${endpoint}`;
+                const cleanKey = resolvedVal.replace(/^Bearer\s+/i, '').trim();
                 const proxyHeaders: Record<string, string> = {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    'x-api-key': resolvedVal,
-                    'Authorization': resolvedVal.startsWith('Bearer ') ? resolvedVal : `Bearer ${resolvedVal}`
+                    'x-api-key': cleanKey,
+                    'Authorization': `Bearer ${cleanKey}`
                 };
 
                 let lastError = null;
                 let responseData = null;
                 let statusCode = 200;
 
-                for (let attempt = 1; attempt <= 2; attempt++) {
+                // 3 retry attempts with resilient 25-second timeout for server stability
+                for (let attempt = 1; attempt <= 3; attempt++) {
                     const ctl = new AbortController();
-                    const timer = setTimeout(() => ctl.abort(), 14000);
+                    const timer = setTimeout(() => ctl.abort(), 25000);
                     try {
                         const upstreamRes = await fetch(targetUrl, {
                             method,
@@ -316,8 +318,8 @@ Deno.serve(async (req) => {
                     } catch (err: any) {
                         clearTimeout(timer);
                         lastError = err;
-                        if (attempt < 2) {
-                            await new Promise(r => setTimeout(r, 600));
+                        if (attempt < 3) {
+                            await new Promise(r => setTimeout(r, 1200));
                         }
                     }
                 }

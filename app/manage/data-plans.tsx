@@ -211,11 +211,10 @@ export default function ManageDataPlans() {
                         else if (selectedNetwork === 'alpha') liveKetPlans = await KetawancyService.getAlphaPlans();
                         else if (selectedNetwork === 'kirani') liveKetPlans = await KetawancyService.getKiraniPlans();
                         else if (selectedNetwork === 'ratel') liveKetPlans = await KetawancyService.getRatelPlans();
-                        else if (selectedNetwork === 'sahal') liveKetPlans = [
-                            { planId: 1, planName: 'Sahal 1GB', price: 600, validity: '30 Days' },
-                            { planId: 2, planName: 'Sahal 2GB', price: 1100, validity: '30 Days' },
-                            { planId: 3, planName: 'Sahal 5GB', price: 2500, validity: '30 Days' }
-                        ];
+                        else if (selectedNetwork === 'sahal') {
+                            const res = await KetawancyService.getDataPlans(5).catch(() => []);
+                            liveKetPlans = Array.isArray(res) ? res : [];
+                        }
 
                         if (liveKetPlans && liveKetPlans.length > 0) {
                             const conf = configs.find(c => c.network === selectedNetwork);
@@ -615,11 +614,10 @@ export default function ManageDataPlans() {
                     else if (netKey === 'alpha') liveKetPlans = await KetawancyService.getAlphaPlans();
                     else if (netKey === 'kirani') liveKetPlans = await KetawancyService.getKiraniPlans();
                     else if (netKey === 'ratel') liveKetPlans = await KetawancyService.getRatelPlans();
-                    else if (netKey === 'sahal') liveKetPlans = [
-                        { planId: 1, planName: 'Sahal 1GB', price: 600, validity: '30 Days' },
-                        { planId: 2, planName: 'Sahal 2GB', price: 1100, validity: '30 Days' },
-                        { planId: 3, planName: 'Sahal 5GB', price: 2500, validity: '30 Days' }
-                    ];
+                    else if (netKey === 'sahal') {
+                        const res = await KetawancyService.getDataPlans(5).catch(() => []);
+                        liveKetPlans = Array.isArray(res) ? res : [];
+                    }
 
                     if (liveKetPlans && liveKetPlans.length > 0) {
                         const toInsert = liveKetPlans.map((kp, idx) => {

@@ -64,7 +64,7 @@ export async function getKetawancyApiKey(): Promise<string> {
         const { data: secret } = await supabase
             .from('system_secrets')
             .select('value')
-            .in('key', ['KETAWANCY_API_KEY', 'KETAWANCY_KEY', 'KETAWANCY_TOKEN'])
+            .in('key', ['KETAWANCY_API_KEY', 'KETAWANCY_KEY', 'KETAWANCY_TOKEN', 'KETAWANSY_API_KEY', 'KETAWANSY_KEY'])
             .maybeSingle();
 
         if (secret?.value && typeof secret.value === 'string' && secret.value.trim() !== '') {
@@ -114,8 +114,9 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
                     console.warn('[Ketawancy Proxy Upstream]', errMsg);
                 }
                 return proxyData as T;
-            } else if (edgeRes.status === 'error' && edgeRes.message?.includes('not configured')) {
+            } else if (edgeRes.status === 'error') {
                 console.warn('[Ketawancy Proxy]', edgeRes.message);
+                // If key is missing or upstream timed out, we still attempt fallback client transport
             }
         }
     } catch (proxyErr) {
@@ -125,23 +126,24 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
     // 2. FALLBACK CLIENT-SIDE TRANSPORT (if Edge Function is offline/unreachable)
     const apiKey = await getKetawancyApiKey();
 
+    const cleanClientKey = (apiKey || '').replace(/^Bearer\s+/i, '').trim();
     const headers: Record<string, string> = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
     };
 
-    if (apiKey) {
-        headers['x-api-key'] = apiKey;
-        headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
+    if (cleanClientKey) {
+        headers['x-api-key'] = cleanClientKey;
+        headers['Authorization'] = `Bearer ${cleanClientKey}`;
     }
 
     const url = `${KETAWANCY_BASE_URL}${endpoint}`;
     
-    // Automatic Retry Loop for Telecom API stability (up to 2 attempts with 12s timeout)
+    // Resilient Retry Loop: up to 3 attempts with 25s timeout
     let lastError: any = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
         try {
             const response = await fetch(url, {
@@ -178,8 +180,8 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
             if (fetchErr.message?.includes('Telecom Provider Authentication Error')) {
                 throw fetchErr;
             }
-            if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 800));
+            if (attempt < 3) {
+                await new Promise(r => setTimeout(r, 1200));
             }
         }
     }
@@ -206,32 +208,22 @@ export interface KetawancyDataPlan {
 }
 
 export const KetawancyService = {
-    // ─── 1. SIM CARDS ───
     getSimPlans: async (): Promise<KetawancySimPlan[]> => {
         try {
             const res = await requestKetawancy('/sim/plans');
             if (res?.status === 'success' && Array.isArray(res.data)) {
                 return res.data;
             }
-            // Fallback / Live mapped plans from Ketawancy Documentation
-            return [
-                { _id: '67c31cc8f3f0f520426fe893', name: 'Ratel SIM Card', price: 3000, status: 'on', network: 'ratel', description: 'Ratel Telecom Physical SIM Card with instant activation' },
-                { _id: '67c32387927afc9fa58e0595', name: 'Kirani SIM Card', price: 5900, status: 'on', network: 'kirani', description: 'Kirani 4G/LTE Physical SIM card with fast broadband' },
-                { _id: '67c32391927afc9fa58e0599', name: 'Alpha SIM Card', price: 2750, status: 'on', network: 'alpha', description: 'Alpha Network SIM Card for voice & high-speed data' },
-                { _id: '67d204183bd4d1bd7d1a8fd', name: 'Smile 4G SIM Card', price: 5000, status: 'on', network: 'smile', description: 'Smile 4G LTE High-speed broadband SIM Card' },
-                { _id: '6a9e0d7ec7aba8077b3266e2', name: 'Sahal SIM Card', price: 4500, status: 'on', network: 'sahal', description: 'Sahal Telecom Physical SIM Card' },
-                { _id: '6a9e0da1c7aba8077b3266ec', name: 'Vitel SIM Card', price: 3500, status: 'on', network: 'vitel', description: 'Vitel Telecom SIM Card' },
-            ];
+            if (Array.isArray(res)) {
+                return res;
+            }
+            if (res?.data && Array.isArray(res.data.plans)) {
+                return res.data.plans;
+            }
+            return [];
         } catch (e) {
-            console.error('[Ketawancy] getSimPlans error:', e);
-            return [
-                { _id: '67c31cc8f3f0f520426fe893', name: 'Ratel SIM Card', price: 3000, status: 'on', network: 'ratel', description: 'Ratel Telecom Physical SIM Card' },
-                { _id: '67c32387927afc9fa58e0595', name: 'Kirani SIM Card', price: 5900, status: 'on', network: 'kirani', description: 'Kirani 4G/LTE Physical SIM card' },
-                { _id: '67c32391927afc9fa58e0599', name: 'Alpha SIM Card', price: 2750, status: 'on', network: 'alpha', description: 'Alpha Network SIM Card' },
-                { _id: '67d204183bd4d1bd7d1a8fd', name: 'Smile 4G SIM Card', price: 5000, status: 'on', network: 'smile', description: 'Smile 4G LTE SIM' },
-                { _id: '6a9e0d7ec7aba8077b3266e2', name: 'Sahal SIM Card', price: 4500, status: 'on', network: 'sahal', description: 'Sahal Telecom Physical SIM Card' },
-                { _id: '6a9e0da1c7aba8077b3266ec', name: 'Vitel SIM Card', price: 3500, status: 'on', network: 'vitel', description: 'Vitel Telecom SIM Card' },
-            ];
+            console.error('[Ketawancy] getSimPlans live fetch error:', e);
+            throw new Error(`Ketawancy Live API Error: Failed to load SIM plans (${(e as any)?.message || 'Service unavailable'})`);
         }
     },
 
@@ -606,67 +598,19 @@ export const KetawancyService = {
     getSmilePlans: async (): Promise<KetawancyDataPlan[]> => {
         try {
             const res = await requestKetawancy('/services/smile/plans');
-            if (res?.status === 'success' && Array.isArray(res.data) && res.data.length > 0) {
+            if (res?.status === 'success' && Array.isArray(res.data)) {
                 return res.data;
             }
-            return [
-                { planId: 4, planName: 'SmileVoice ONLY 65', price: 900, validity: '30 Days' },
-                { planId: 9, planName: 'SmileVoice ONLY 135', price: 1850, validity: '30 Days' },
-                { planId: 16, planName: 'SmileVoice ONLY 175', price: 3600, validity: '90 Days' },
-                { planId: 20, planName: 'SmileVoice ONLY 430', price: 5700, validity: '30 Days' },
-                { planId: 23, planName: 'SmileVoice ONLY 450', price: 7200, validity: '60 Days' },
-                { planId: 24, planName: 'SmileVoice ONLY 500', price: 9000, validity: '90 Days' },
-                { planId: 13, planName: 'SmileVoice ONLY 150', price: 2700, validity: '60 Days' },
-                { planId: 1, planName: 'SmileMINI 1GB', price: 450, validity: '1 Day' },
-                { planId: 2, planName: 'Smile MINI 2.5GB', price: 750, validity: '1 Day' },
-                { planId: 3, planName: 'Smile MINI 1GB', price: 750, validity: '7 Days' },
-                { planId: 5, planName: 'Smile MINI 1.5GB', price: 1300, validity: '30 Days' },
-                { planId: 6, planName: 'Smile MINI 2.GB', price: 1500, validity: '30 Days' },
-                { planId: 7, planName: 'Smile MINI 3GB', price: 1700, validity: '2 Days' },
-                { planId: 8, planName: 'Smile MINI 3.5GB', price: 1500, validity: '7 Days' },
-                { planId: 10, planName: 'Smile MIDI 3GB', price: 2000, validity: '30 Days' },
-                { planId: 11, planName: 'Smile MINI 5GB', price: 2500, validity: '7 Days' },
-                { planId: 12, planName: 'Smile MINI 6GB', price: 2300, validity: '2 Days' },
-                { planId: 14, planName: 'Smile MIDI 6GB', price: 3000, validity: '30 Days' },
-                { planId: 15, planName: 'Smile MIDI 8GB', price: 3500, validity: '30 Days' },
-                { planId: 17, planName: 'Smile MIDI 10GB', price: 4000, validity: '30 Days' },
-                { planId: 18, planName: 'Smile MIDI 13GB', price: 5000, validity: '30 Days' },
-                { planId: 19, planName: 'Freedom Mobile Plan', price: 5000, validity: '30 Days' },
-                { planId: 21, planName: 'Smile MIDI 18GB', price: 6000, validity: '30 Days' },
-                { planId: 22, planName: 'Smile MIDI 20GB', price: 7000, validity: '30 Days' },
-                { planId: 25, planName: 'Smile MIDI 25GB', price: 9000, validity: '30 Days' },
-                { planId: 26, planName: 'Smile MIDI 40GB', price: 12500, validity: '30 Days' },
-                { planId: 27, planName: 'Smile ANNUAL 20GB', price: 14000, validity: '365 Days' },
-                { planId: 28, planName: 'Smile MAXI Lite', price: 15000, validity: '30 Days' },
-                { planId: 29, planName: 'Smile MIDI 65GB', price: 15000, validity: '30 Days' },
-                { planId: 30, planName: 'Smile MIDI 100GB', price: 20000, validity: '30 Days' },
-                { planId: 31, planName: 'Smile MIDI 130GB', price: 25000, validity: '30 Days' },
-                { planId: 32, planName: 'Smile JUMBO 90GB', price: 25000, validity: '60 Days' },
-                { planId: 33, planName: 'Smile MAXI Essential', price: 27700, validity: '30 Days' },
-                { planId: 34, planName: 'Smile ANNUAL 50GB', price: 29000, validity: '365 Days' },
-                { planId: 35, planName: 'Smile Maxi Home', price: 38500, validity: '30 Days' },
-                { planId: 36, planName: 'Smile MIDI 210GB', price: 40000, validity: '30 Days' },
-                { planId: 37, planName: 'Smile MAXI Office', price: 45000, validity: '30 Days' },
-                { planId: 38, planName: 'Smile ANNUAL 120GB', price: 49500, validity: '365 Days' },
-                { planId: 39, planName: 'Smile JUMBO 300GB', price: 50000, validity: '90 Days' },
-                { planId: 40, planName: 'Smile JUMBO 350GB', price: 60000, validity: '120 Days' },
-                { planId: 41, planName: 'Smile MAXI DataFlux', price: 61500, validity: '30 Days' },
-                { planId: 42, planName: 'Smile JUMBO 500GB', price: 77000, validity: '180 Days' },
-                { planId: 43, planName: 'Smile ANNUAL 250GB', price: 77000, validity: '365 Days' },
-                { planId: 44, planName: 'Smile ANNUAL 450GB', price: 107000, validity: '365 Days' },
-                { planId: 45, planName: 'Smile ANNUAL 700GB', price: 154000, validity: '365 Days' },
-                { planId: 46, planName: 'Smile ANNUAL 1TB', price: 180000, validity: '365 Days' },
-            ];
+            if (Array.isArray(res)) {
+                return res;
+            }
+            if (res?.data && Array.isArray(res.data.plans)) {
+                return res.data.plans;
+            }
+            return [];
         } catch (e) {
-            console.error('[Ketawancy] getSmilePlans error:', e);
-            return [
-                { planId: 1, planName: 'SmileMINI 1GB', price: 450, validity: '1 Day' },
-                { planId: 2, planName: 'Smile MINI 2.5GB', price: 750, validity: '1 Day' },
-                { planId: 5, planName: 'Smile MINI 1.5GB', price: 1300, validity: '30 Days' },
-                { planId: 10, planName: 'Smile MIDI 3GB', price: 2000, validity: '30 Days' },
-                { planId: 14, planName: 'Smile MIDI 6GB', price: 3000, validity: '30 Days' },
-                { planId: 17, planName: 'Smile MIDI 10GB', price: 4000, validity: '30 Days' },
-            ];
+            console.error('[Ketawancy] getSmilePlans live fetch error:', e);
+            throw new Error(`Ketawancy Smile API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
     },
 
@@ -766,34 +710,19 @@ export const KetawancyService = {
     getAlphaPlans: async (): Promise<KetawancyDataPlan[]> => {
         try {
             const res = await requestKetawancy('/services/alpha-plans');
-            if (res?.status === 'success' && Array.isArray(res.data) && res.data.length > 0) {
+            if (res?.status === 'success' && Array.isArray(res.data)) {
                 return res.data;
             }
-            return [
-                { planId: 2, planName: 'Alpha N750', price: 888, validity: 'Unlimited' },
-                { planId: 3, planName: 'Alpha N1000', price: 1100, validity: 'Unlimited' },
-                { planId: 4, planName: 'Alpha N1500', price: 1600, validity: 'Unlimited' },
-                { planId: 5, planName: 'Alpha N2000', price: 2110, validity: 'Unlimited' },
-                { planId: 50, planName: 'Alpha 2,500', price: 2650, validity: 'Unlimited' },
-                { planId: 14, planName: 'Alpha N2900', price: 3050, validity: 'Unlimited' },
-                { planId: 6, planName: 'Alpha N3000', price: 3120, validity: 'Unlimited' },
-                { planId: 7, planName: 'Alpha N5000', price: 5150, validity: 'Unlimited' },
-                { planId: 8, planName: 'Alpha N7500', price: 7700, validity: 'Unlimited' },
-                { planId: 9, planName: 'Alpha N9000', price: 9150, validity: 'Unlimited' },
-                { planId: 10, planName: 'Alpha N10000', price: 10250, validity: 'Unlimited' },
-            ];
+            if (Array.isArray(res)) {
+                return res;
+            }
+            if (res?.data && Array.isArray(res.data.plans)) {
+                return res.data.plans;
+            }
+            return [];
         } catch (e) {
-            console.error('[Ketawancy] getAlphaPlans error:', e);
-            return [
-                { planId: 2, planName: 'Alpha N750', price: 888, validity: 'Unlimited' },
-                { planId: 3, planName: 'Alpha N1000', price: 1100, validity: 'Unlimited' },
-                { planId: 4, planName: 'Alpha N1500', price: 1600, validity: 'Unlimited' },
-                { planId: 5, planName: 'Alpha N2000', price: 2110, validity: 'Unlimited' },
-                { planId: 50, planName: 'Alpha 2,500', price: 2650, validity: 'Unlimited' },
-                { planId: 14, planName: 'Alpha N2900', price: 3050, validity: 'Unlimited' },
-                { planId: 6, planName: 'Alpha N3000', price: 3120, validity: 'Unlimited' },
-                { planId: 7, planName: 'Alpha N5000', price: 5150, validity: 'Unlimited' },
-            ];
+            console.error('[Ketawancy] getAlphaPlans live fetch error:', e);
+            throw new Error(`Ketawancy Alpha API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
     },
 
@@ -892,41 +821,19 @@ export const KetawancyService = {
     getKiraniPlans: async (): Promise<KetawancyDataPlan[]> => {
         try {
             const res = await requestKetawancy('/services/kirani/plans');
-            if (res?.status === 'success' && Array.isArray(res.data) && res.data.length > 0) {
+            if (res?.status === 'success' && Array.isArray(res.data)) {
                 return res.data;
             }
-            return [
-                { planId: 18, planName: 'Kirani 30 minutes', price: 480, validity: '—' },
-                { planId: 17, planName: 'Kirani 50 Minutes', price: 790, validity: '—' },
-                { planId: 5, planName: 'Kirani 70 Minutes', price: 1080, validity: '—' },
-                { planId: 16, planName: 'Kirani 100 Minutes', price: 1540, validity: '—' },
-                { planId: 8, planName: 'Kirani 150 Minutes', price: 2350, validity: '—' },
-                { planId: 15, planName: 'Kirani 200 Minutes', price: 3100, validity: '—' },
-                { planId: 7, planName: 'Kirani 250 Minutes', price: 3900, validity: '—' },
-                { planId: 14, planName: 'Kirani 300 Minutes', price: 4650, validity: '—' },
-                { planId: 60, planName: 'Kirani Standard', price: 5000, validity: '—' },
-                { planId: 6, planName: 'Kirani 350 Minutes (Standard)', price: 5300, validity: '—' },
-                { planId: 3, planName: 'Kirani 350 Minutes (Premium)', price: 5420, validity: '—' },
-                { planId: 13, planName: 'Kirani 400 Minutes', price: 6050, validity: '—' },
-                { planId: 9, planName: 'Kirani 450 Minutes (Standard)', price: 6530, validity: '—' },
-                { planId: 2, planName: 'Kirani 450 Minutes (Premium)', price: 6700, validity: '—' },
-                { planId: 12, planName: 'Kirani 500 Minutes', price: 7500, validity: '—' },
-                { planId: 1, planName: 'Kirani 550 Minutes', price: 8200, validity: '—' },
-                { planId: 19, planName: 'Kirani 700 Minutes', price: 10500, validity: '—' },
-                { planId: 10, planName: 'Kirani 800 Minutes', price: 12050, validity: '—' },
-                { planId: 4, planName: 'Kirani 900 Minutes', price: 13830, validity: '—' },
-                { planId: 11, planName: 'Kirani 1000 Minutes', price: 15000, validity: '—' },
-            ];
+            if (Array.isArray(res)) {
+                return res;
+            }
+            if (res?.data && Array.isArray(res.data.plans)) {
+                return res.data.plans;
+            }
+            return [];
         } catch (e) {
-            console.error('[Ketawancy] getKiraniPlans error:', e);
-            return [
-                { planId: 18, planName: 'Kirani 30 minutes', price: 480, validity: '—' },
-                { planId: 17, planName: 'Kirani 50 Minutes', price: 790, validity: '—' },
-                { planId: 5, planName: 'Kirani 70 Minutes', price: 1080, validity: '—' },
-                { planId: 16, planName: 'Kirani 100 Minutes', price: 1540, validity: '—' },
-                { planId: 8, planName: 'Kirani 150 Minutes', price: 2350, validity: '—' },
-                { planId: 15, planName: 'Kirani 200 Minutes', price: 3100, validity: '—' },
-            ];
+            console.error('[Ketawancy] getKiraniPlans live fetch error:', e);
+            throw new Error(`Ketawancy Kirani API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
     },
 
@@ -1025,35 +932,19 @@ export const KetawancyService = {
     getRatelPlans: async (): Promise<KetawancyDataPlan[]> => {
         try {
             const res = await requestKetawancy('/services/ratel/plans');
-            if (res?.status === 'success' && Array.isArray(res.data) && res.data.length > 0) {
+            if (res?.status === 'success' && Array.isArray(res.data)) {
                 return res.data;
             }
-            return [
-                { planId: 5, planName: 'Ratel N1000. Unlimited', price: 1190, validity: 'Unlimited' },
-                { planId: 6, planName: 'Ratel N2000. Unlimited', price: 2350, validity: 'Unlimited' },
-                { planId: 7, planName: 'Ratel N3000. Unlimited', price: 3550, validity: 'Unlimited' },
-                { planId: 8, planName: 'Ratel N5000. Unlimited', price: 5900, validity: 'Unlimited' },
-                { planId: 9, planName: 'Ratel N9000 Unlimited', price: 10200, validity: 'Unlimited' },
-                { planId: 10, planName: 'Ratel N10000. Unlimited', price: 11200, validity: 'Unlimited' },
-                { planId: 40, planName: 'Ratel 2,500. Unlimited', price: 2800, validity: 'Unlimited' },
-                { planId: 39, planName: 'Ratel. 1,500. Unlimited', price: 1800, validity: 'Unlimited' },
-                { planId: 38, planName: 'Ratel. 3,500. Unlimited', price: 4000, validity: 'Unlimited' },
-                { planId: 4, planName: 'Ratel 1500', price: 1700, validity: 'Unlimited' },
-            ];
+            if (Array.isArray(res)) {
+                return res;
+            }
+            if (res?.data && Array.isArray(res.data.plans)) {
+                return res.data.plans;
+            }
+            return [];
         } catch (e) {
-            console.error('[Ketawancy] getRatelPlans error:', e);
-            return [
-                { planId: 5, planName: 'Ratel N1000. Unlimited', price: 1190, validity: 'Unlimited' },
-                { planId: 6, planName: 'Ratel N2000. Unlimited', price: 2350, validity: 'Unlimited' },
-                { planId: 7, planName: 'Ratel N3000. Unlimited', price: 3550, validity: 'Unlimited' },
-                { planId: 8, planName: 'Ratel N5000. Unlimited', price: 5900, validity: 'Unlimited' },
-                { planId: 9, planName: 'Ratel N9000 Unlimited', price: 10200, validity: 'Unlimited' },
-                { planId: 10, planName: 'Ratel N10000. Unlimited', price: 11200, validity: 'Unlimited' },
-                { planId: 40, planName: 'Ratel 2,500. Unlimited', price: 2800, validity: 'Unlimited' },
-                { planId: 39, planName: 'Ratel. 1,500. Unlimited', price: 1800, validity: 'Unlimited' },
-                { planId: 38, planName: 'Ratel. 3,500. Unlimited', price: 4000, validity: 'Unlimited' },
-                { planId: 4, planName: 'Ratel 1500', price: 1700, validity: 'Unlimited' },
-            ];
+            console.error('[Ketawancy] getRatelPlans live fetch error:', e);
+            throw new Error(`Ketawancy Ratel API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
     },
 
