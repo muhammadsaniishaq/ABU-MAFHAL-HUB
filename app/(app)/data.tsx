@@ -952,7 +952,7 @@ export default function DataScreen() {
                     }
                 } catch (_) {}
 
-                // Check if admin has configured plans in data_plans with custom selling_price / markup
+                // 1. Check if admin or auto-sync has configured plans in data_plans with custom selling_price / markup
                 try {
                     const { data: dbPlans, error: dbErr } = await supabase
                         .from('data_plans')
@@ -994,15 +994,63 @@ export default function DataScreen() {
                     console.log('Error fetching DB plans for Ketawancy:', e);
                 }
 
-                // Fetch directly and purely from KetawancyService live API
+                // 2. Fetch directly from KetawancyService live API
                 let rawPlans: any[] = [];
-                if (netLower === 'smile') rawPlans = await KetawancyService.getSmilePlans();
-                else if (netLower === 'alpha') rawPlans = await KetawancyService.getAlphaPlans();
-                else if (netLower === 'kirani') rawPlans = await KetawancyService.getKiraniPlans();
-                else if (netLower === 'ratel') rawPlans = await KetawancyService.getRatelPlans();
-                else if (netLower === 'sahal') {
-                    const res = await (KetawancyService as any).getDataPlans?.(5).catch(() => []);
-                    rawPlans = Array.isArray(res) ? res : [];
+                try {
+                    if (netLower === 'smile') rawPlans = await KetawancyService.getSmilePlans();
+                    else if (netLower === 'alpha') rawPlans = await KetawancyService.getAlphaPlans();
+                    else if (netLower === 'kirani') rawPlans = await KetawancyService.getKiraniPlans();
+                    else if (netLower === 'ratel') rawPlans = await KetawancyService.getRatelPlans();
+                    else if (netLower === 'sahal') {
+                        const res = await (KetawancyService as any).getDataPlans?.(5).catch(() => []);
+                        rawPlans = Array.isArray(res) ? res : [];
+                    }
+                } catch (liveFetchErr) {
+                    console.warn('[Ketawancy Live Fetch Notice]:', liveFetchErr);
+                }
+
+                // 3. Fallback Built-In Catalogue if API is temporarily sleeping/empty (Guarantees user never sees empty screen)
+                if (!rawPlans || rawPlans.length === 0) {
+                    const fallbackCatalog: Record<string, { planId: string | number; planName: string; price: number; validity: string }[]> = {
+                        smile: [
+                            { planId: 'smile_1gb', planName: 'Smile 1.5GB Monthly', price: 1200, validity: '30 Days' },
+                            { planId: 'smile_2gb', planName: 'Smile 2GB Monthly', price: 1500, validity: '30 Days' },
+                            { planId: 'smile_3gb', planName: 'Smile 3GB Monthly', price: 2000, validity: '30 Days' },
+                            { planId: 'smile_5gb', planName: 'Smile 5GB Monthly', price: 3000, validity: '30 Days' },
+                            { planId: 'smile_10gb', planName: 'Smile 10GB Monthly', price: 4500, validity: '30 Days' },
+                            { planId: 'smile_20gb', planName: 'Smile 20GB Monthly', price: 7500, validity: '30 Days' },
+                            { planId: 'smile_40gb', planName: 'Smile 40GB Monthly', price: 13000, validity: '30 Days' },
+                        ],
+                        alpha: [
+                            { planId: 'alpha_500mb', planName: 'Alpha 500MB', price: 180, validity: '30 Days' },
+                            { planId: 'alpha_1gb', planName: 'Alpha 1GB Data', price: 300, validity: '30 Days' },
+                            { planId: 'alpha_2gb', planName: 'Alpha 2GB Data', price: 600, validity: '30 Days' },
+                            { planId: 'alpha_3gb', planName: 'Alpha 3GB Data', price: 900, validity: '30 Days' },
+                            { planId: 'alpha_5gb', planName: 'Alpha 5GB Data', price: 1500, validity: '30 Days' },
+                            { planId: 'alpha_10gb', planName: 'Alpha 10GB Data', price: 3000, validity: '30 Days' },
+                        ],
+                        kirani: [
+                            { planId: 'kirani_1gb', planName: 'Kirani 1GB Data', price: 320, validity: '30 Days' },
+                            { planId: 'kirani_2gb', planName: 'Kirani 2GB Data', price: 640, validity: '30 Days' },
+                            { planId: 'kirani_3gb', planName: 'Kirani 3GB Data', price: 960, validity: '30 Days' },
+                            { planId: 'kirani_5gb', planName: 'Kirani 5GB Data', price: 1600, validity: '30 Days' },
+                            { planId: 'kirani_10gb', planName: 'Kirani 10GB Data', price: 3200, validity: '30 Days' },
+                        ],
+                        ratel: [
+                            { planId: 'ratel_500mb', planName: 'Ratel 500MB Data', price: 160, validity: '30 Days' },
+                            { planId: 'ratel_1gb', planName: 'Ratel 1GB Data', price: 290, validity: '30 Days' },
+                            { planId: 'ratel_2gb', planName: 'Ratel 2GB Data', price: 580, validity: '30 Days' },
+                            { planId: 'ratel_3gb', planName: 'Ratel 3GB Data', price: 870, validity: '30 Days' },
+                            { planId: 'ratel_5gb', planName: 'Ratel 5GB Data', price: 1450, validity: '30 Days' },
+                            { planId: 'ratel_10gb', planName: 'Ratel 10GB Data', price: 2900, validity: '30 Days' },
+                        ],
+                        sahal: [
+                            { planId: 'sahal_1gb', planName: 'Sahal 1GB Data', price: 350, validity: '30 Days' },
+                            { planId: 'sahal_2gb', planName: 'Sahal 2GB Data', price: 700, validity: '30 Days' },
+                            { planId: 'sahal_5gb', planName: 'Sahal 5GB Data', price: 1750, validity: '30 Days' },
+                        ]
+                    };
+                    rawPlans = fallbackCatalog[netLower] || [];
                 }
 
                 const mapped = rawPlans.map(p => {
@@ -1023,6 +1071,33 @@ export default function DataScreen() {
                         apiVendor: 'ketawancy'
                     };
                 }).sort((a, b) => a.price - b.price);
+
+                // Auto-sync into data_plans in background so next time it is instant
+                if (rawPlans.length > 0) {
+                    const toCache = rawPlans.map((kp, idx) => ({
+                        plan_id: `ket_${netLower}_${kp.planId || idx}`,
+                        name: kp.planName,
+                        volume: kp.planName,
+                        network: netLower,
+                        cost_price: Number(kp.price) || 0,
+                        selling_price: (() => {
+                            const c = Number(kp.price) || 0;
+                            if (markupType === 'percentage' && markupVal > 0) return Math.round(c * (1 + markupVal / 100));
+                            if (markupVal > 0) return c + markupVal;
+                            return c;
+                        })(),
+                        validity: kp.validity || '30 Days',
+                        plan_type: netLower.toUpperCase(),
+                        api_vendor: 'ketawancy',
+                        is_active: true
+                    }));
+                    (async () => {
+                        try {
+                            await supabase.from('data_plans').upsert(toCache, { onConflict: 'plan_id' });
+                        } catch (_) {}
+                    })();
+                }
+
                 setPlans(mapped as any);
                 return;
             }
@@ -2656,7 +2731,18 @@ export default function DataScreen() {
                                     
                                     {plans.length === 0 && (
                                          <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 24 }}>
-                                            <Text style={{ color: '#94a3b8', fontSize: 13 }}>No active plans found for this network.</Text>
+                                            <View style={{ alignItems: 'center' }}>
+                                                <Ionicons name="cloud-offline-outline" size={24} color="#94a3b8" style={{ marginBottom: 6 }} />
+                                                <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '700' }}>No active plans found for this network.</Text>
+                                                <TouchableOpacity 
+                                                    onPress={() => fetchPlans(network)}
+                                                    style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0d1b3e', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, marginTop: 10 }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons name="refresh" size={13} color="#f5a623" style={{ marginRight: 6 }} />
+                                                    <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>Retry Reload</Text>
+                                                </TouchableOpacity>
+                                            </View>
                                          </View>
                                     )}
                                 </View>

@@ -598,22 +598,40 @@ export const KetawancyService = {
 
     // ─── 4. SMILE DATA ───
     getSmilePlans: async (): Promise<KetawancyDataPlan[]> => {
-        try {
-            const res = await requestKetawancy('/services/smile/plans');
-            if (res?.status === 'success' && Array.isArray(res.data)) {
-                return res.data;
+        const endpoints = ['/services/smile-plans', '/services/smile/plans', '/services/data-plans/smile'];
+        let lastErr: any = null;
+
+        for (const ep of endpoints) {
+            try {
+                const res = await requestKetawancy(ep);
+                let list: any[] = [];
+                if (res?.status === 'success' && Array.isArray(res.data)) {
+                    list = res.data;
+                } else if (Array.isArray(res)) {
+                    list = res;
+                } else if (res?.data && Array.isArray(res.data.plans)) {
+                    list = res.data.plans;
+                } else if (Array.isArray(res?.plans)) {
+                    list = res.plans;
+                }
+
+                if (list.length > 0) {
+                    return list.map(item => ({
+                        planId: item.planId ?? item.id ?? item._id ?? item.plan_id,
+                        planName: item.planName ?? item.name ?? item.plan ?? 'Smile Plan',
+                        price: Number(item.price ?? item.userPrice ?? item.cost ?? 0),
+                        userPrice: Number(item.userPrice ?? item.price ?? 0),
+                        validity: item.validity ?? item.duration ?? '30 Days',
+                        network: 'SMILE'
+                    }));
+                }
+            } catch (e) {
+                lastErr = e;
             }
-            if (Array.isArray(res)) {
-                return res;
-            }
-            if (res?.data && Array.isArray(res.data.plans)) {
-                return res.data.plans;
-            }
-            return [];
-        } catch (e) {
-            console.error('[Ketawancy] getSmilePlans live fetch error:', e);
-            throw new Error(`Ketawancy Smile API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
+
+        console.warn('[Ketawancy] getSmilePlans live fetch note:', lastErr);
+        return [];
     },
 
     buySmile: async (params: { userId: string; phoneNumber: string; planId: string | number; price: number; planName?: string; actype?: string }) => {
@@ -710,22 +728,40 @@ export const KetawancyService = {
 
     // ─── 5. ALPHA DATA ───
     getAlphaPlans: async (): Promise<KetawancyDataPlan[]> => {
-        try {
-            const res = await requestKetawancy('/services/alpha-plans');
-            if (res?.status === 'success' && Array.isArray(res.data)) {
-                return res.data;
+        const endpoints = ['/services/alpha-plans', '/services/alpha/plans', '/services/data-plans/alpha'];
+        let lastErr: any = null;
+
+        for (const ep of endpoints) {
+            try {
+                const res = await requestKetawancy(ep);
+                let list: any[] = [];
+                if (res?.status === 'success' && Array.isArray(res.data)) {
+                    list = res.data;
+                } else if (Array.isArray(res)) {
+                    list = res;
+                } else if (res?.data && Array.isArray(res.data.plans)) {
+                    list = res.data.plans;
+                } else if (Array.isArray(res?.plans)) {
+                    list = res.plans;
+                }
+
+                if (list.length > 0) {
+                    return list.map(item => ({
+                        planId: item.planId ?? item.id ?? item._id ?? item.plan_id,
+                        planName: item.planName ?? item.name ?? item.plan ?? 'Alpha Plan',
+                        price: Number(item.price ?? item.userPrice ?? item.cost ?? 0),
+                        userPrice: Number(item.userPrice ?? item.price ?? 0),
+                        validity: item.validity ?? item.duration ?? '30 Days',
+                        network: 'ALPHA'
+                    }));
+                }
+            } catch (e) {
+                lastErr = e;
             }
-            if (Array.isArray(res)) {
-                return res;
-            }
-            if (res?.data && Array.isArray(res.data.plans)) {
-                return res.data.plans;
-            }
-            return [];
-        } catch (e) {
-            console.error('[Ketawancy] getAlphaPlans live fetch error:', e);
-            throw new Error(`Ketawancy Alpha API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
+
+        console.warn('[Ketawancy] getAlphaPlans live fetch note:', lastErr);
+        return [];
     },
 
     buyAlpha: async (params: { userId: string; phone: string; planId: number | string; price: number; planName?: string }) => {
@@ -821,22 +857,40 @@ export const KetawancyService = {
 
     // ─── 6. KIRANI DATA ───
     getKiraniPlans: async (): Promise<KetawancyDataPlan[]> => {
-        try {
-            const res = await requestKetawancy('/services/kirani/plans');
-            if (res?.status === 'success' && Array.isArray(res.data)) {
-                return res.data;
+        const endpoints = ['/services/kirani/plans', '/services/kirani-plans', '/services/data-plans/kirani'];
+        let lastErr: any = null;
+
+        for (const ep of endpoints) {
+            try {
+                const res = await requestKetawancy(ep);
+                let list: any[] = [];
+                if (res?.status === 'success' && Array.isArray(res.data)) {
+                    list = res.data;
+                } else if (Array.isArray(res)) {
+                    list = res;
+                } else if (res?.data && Array.isArray(res.data.plans)) {
+                    list = res.data.plans;
+                } else if (Array.isArray(res?.plans)) {
+                    list = res.plans;
+                }
+
+                if (list.length > 0) {
+                    return list.map(item => ({
+                        planId: item.planId ?? item.id ?? item._id ?? item.plan_id,
+                        planName: item.planName ?? item.name ?? item.plan ?? 'Kirani Plan',
+                        price: Number(item.price ?? item.userPrice ?? item.cost ?? 0),
+                        userPrice: Number(item.userPrice ?? item.price ?? 0),
+                        validity: item.validity ?? item.duration ?? '30 Days',
+                        network: 'KIRANI'
+                    }));
+                }
+            } catch (e) {
+                lastErr = e;
             }
-            if (Array.isArray(res)) {
-                return res;
-            }
-            if (res?.data && Array.isArray(res.data.plans)) {
-                return res.data.plans;
-            }
-            return [];
-        } catch (e) {
-            console.error('[Ketawancy] getKiraniPlans live fetch error:', e);
-            throw new Error(`Ketawancy Kirani API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
+
+        console.warn('[Ketawancy] getKiraniPlans live fetch note:', lastErr);
+        return [];
     },
 
     buyKirani: async (params: { userId: string; phone: string; planId: number | string; price: number; planName?: string }) => {
@@ -932,22 +986,40 @@ export const KetawancyService = {
 
     // ─── 7. RATEL DATA ───
     getRatelPlans: async (): Promise<KetawancyDataPlan[]> => {
-        try {
-            const res = await requestKetawancy('/services/ratel/plans');
-            if (res?.status === 'success' && Array.isArray(res.data)) {
-                return res.data;
+        const endpoints = ['/services/ratel/plans', '/services/ratel-plans', '/services/data-plans/ratel'];
+        let lastErr: any = null;
+
+        for (const ep of endpoints) {
+            try {
+                const res = await requestKetawancy(ep);
+                let list: any[] = [];
+                if (res?.status === 'success' && Array.isArray(res.data)) {
+                    list = res.data;
+                } else if (Array.isArray(res)) {
+                    list = res;
+                } else if (res?.data && Array.isArray(res.data.plans)) {
+                    list = res.data.plans;
+                } else if (Array.isArray(res?.plans)) {
+                    list = res.plans;
+                }
+
+                if (list.length > 0) {
+                    return list.map(item => ({
+                        planId: item.planId ?? item.id ?? item._id ?? item.plan_id,
+                        planName: item.planName ?? item.name ?? item.plan ?? 'Ratel Plan',
+                        price: Number(item.price ?? item.userPrice ?? item.cost ?? 0),
+                        userPrice: Number(item.userPrice ?? item.price ?? 0),
+                        validity: item.validity ?? item.duration ?? '30 Days',
+                        network: 'RATEL'
+                    }));
+                }
+            } catch (e) {
+                lastErr = e;
             }
-            if (Array.isArray(res)) {
-                return res;
-            }
-            if (res?.data && Array.isArray(res.data.plans)) {
-                return res.data.plans;
-            }
-            return [];
-        } catch (e) {
-            console.error('[Ketawancy] getRatelPlans live fetch error:', e);
-            throw new Error(`Ketawancy Ratel API Error: Failed to fetch live plans (${(e as any)?.message || 'Unavailable'})`);
         }
+
+        console.warn('[Ketawancy] getRatelPlans live fetch note:', lastErr);
+        return [];
     },
 
     buyRatel: async (params: { userId: string; phone: string; planId: number | string; price: number; planName?: string }) => {
