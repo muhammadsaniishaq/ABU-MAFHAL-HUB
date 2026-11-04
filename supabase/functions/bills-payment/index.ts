@@ -378,6 +378,24 @@ Deno.serve(async (req: Request) => {
              const qty = Math.max(1, Number(data.quantity || 1));
              amountToCharge = Math.round(unitCost * qty * 10) / 10;
              providerParams = { planId: pId, quantity: qty, businessName: data.businessName || 'ABU MAFHAL VTU' };
+        } else if (type === 'electricity') {
+             amountToCharge = Number(data.amount || 0);
+             if (amountToCharge < 500) throw new Error("Minimum Electricity purchase is ₦500");
+             providerParams = {
+                 provider: data.provider,
+                 meterNumber: data.meterNumber,
+                 amount: amountToCharge,
+                 meterType: data.meterType || 'prepaid'
+             };
+        } else if (type === 'tv') {
+             amountToCharge = Number(data.amount || 0);
+             if (amountToCharge < 500) throw new Error("Invalid TV subscription amount");
+             providerParams = {
+                 provider: data.provider,
+                 smartCard: data.smartCard,
+                 packageId: data.packageId,
+                 amount: amountToCharge
+             };
         } else if (type === 'recharge_pin_plans') {
              // Pass through without balance deduction
         } else if (type === 'get_plans') {
@@ -663,6 +681,23 @@ Deno.serve(async (req: Request) => {
                 } else {
                     throw new Error("Bigi API credentials not configured for recharge pins");
                 }
+            } else if (type === 'electricity') {
+                const ckClient = new ClubKonnectClient(ckUserId, ckApiKey);
+                result = await ckClient.payElectricity(
+                    providerParams.provider as string,
+                    providerParams.meterNumber as string,
+                    providerParams.amount as number,
+                    (providerParams.meterType as 'prepaid' | 'postpaid') || 'prepaid',
+                    requestId
+                );
+            } else if (type === 'tv') {
+                const ckClient = new ClubKonnectClient(ckUserId, ckApiKey);
+                result = await ckClient.payCableTV(
+                    providerParams.provider as string,
+                    providerParams.smartCard as string,
+                    providerParams.packageId as string,
+                    requestId
+                );
             } else if (type === 'recharge_pin_plans') {
                 if (bigiToken && bigiPin) {
                     const bigiClient = new BigiClient(bigiToken, bigiPin);
