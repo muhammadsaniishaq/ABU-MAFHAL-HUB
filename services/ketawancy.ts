@@ -191,6 +191,58 @@ async function requestKetawancy<T = any>(endpoint: string, options: { method?: '
     throw lastError || new Error('Ketawancy API Network Timeout / Error');
 }
 
+/**
+ * Execute a telecom purchase via the secure Server-Side Edge Function.
+ * Returns { handled: true, result } if handled by the server shield,
+ * or { handled: false } if the Edge function is unreachable so client fallback can run.
+ */
+async function executeServerTelecomPurchase(params: {
+    userId: string;
+    price: number;
+    serviceType: string;
+    endpoint: string;
+    payload: any;
+    description: string;
+    reference?: string;
+}): Promise<{ handled: boolean; result?: any; error?: string }> {
+    try {
+        const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('admin-audit-logs', {
+            body: {
+                action: 'execute-telecom-purchase',
+                userId: params.userId,
+                price: params.price,
+                serviceType: params.serviceType,
+                endpoint: params.endpoint,
+                payload: params.payload,
+                description: params.description,
+                reference: params.reference
+            }
+        });
+
+        if (!edgeErr && edgeRes) {
+            if (edgeRes.status === 'success') {
+                return { handled: true, result: edgeRes };
+            }
+            if (edgeRes.status === 'error') {
+                // Legitimate provider rejection or insufficient balance: throw directly
+                throw new Error(edgeRes.message || 'Transaction rejected by telecom provider');
+            }
+        }
+    } catch (err: any) {
+        // If it's a known error from provider or insufficient balance, rethrow
+        if (err.message && (
+            err.message.includes('Insufficient') ||
+            err.message.includes('rejected') ||
+            err.message.includes('credentials not configured')
+        )) {
+            throw err;
+        }
+        console.warn('[Server Telecom Shield Note] Falling back to client-side purchase flow:', err);
+    }
+
+    return { handled: false };
+}
+
 export interface KetawancySimPlan {
     _id: string;
     name: string;
@@ -247,6 +299,28 @@ export const KetawancyService = {
 
         // Generate client transaction reference upfront
         const refNo = `sim_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+        // PRIMARY ENTERPRISE ATTEMPT: Server-Side Edge Execution Shield
+        const serverAttempt = await executeServerTelecomPurchase({
+            userId,
+            price,
+            serviceType: 'sim',
+            endpoint: `/sim/purchase/${planId}`,
+            payload: null,
+            description: `SIM Purchase: ${planName || 'SIM Card'} for ${phone || email || 'User'}`,
+            reference: refNo
+        });
+
+        if (serverAttempt.handled && serverAttempt.result) {
+            const resData = serverAttempt.result.data;
+            const simDetails = resData?.simCard || { number: 'Assigned by Provider', email: profile.email || 'N/A' };
+            return {
+                success: true,
+                refNo: serverAttempt.result.refNo || refNo,
+                simCard: simDetails,
+                newBalance: serverAttempt.result.newBalance
+            };
+        }
 
         // 2. Initialize Transaction in Supabase (omit 'title' as transactions table has 'description' and 'details')
         let txnId: string | null = null;
@@ -398,6 +472,31 @@ export const KetawancyService = {
         }
 
         const refNo = `airtime-${Date.now()}`;
+
+        // PRIMARY ENTERPRISE ATTEMPT: Server-Side Edge Execution Shield
+        const serverAttempt = await executeServerTelecomPurchase({
+            userId,
+            price: amount,
+            serviceType: 'airtime',
+            endpoint: '/services/buy-airtime',
+            payload: {
+                amount: String(amount),
+                number: phone,
+                network: networkId,
+                buyFrom: 'balance'
+            },
+            description: `Airtime: ${networkName || 'Airtime'} ₦${amount} -> ${phone}`,
+            reference: refNo
+        });
+
+        if (serverAttempt.handled && serverAttempt.result) {
+            return {
+                success: true,
+                refNo: serverAttempt.result.refNo || refNo,
+                newBalance: serverAttempt.result.newBalance
+            };
+        }
+
         let txnId: string | null = null;
         try {
             const { data: txn, error: txnErr } = await supabase
@@ -512,6 +611,31 @@ export const KetawancyService = {
         }
 
         const refNo = `data-${Date.now()}`;
+
+        // PRIMARY ENTERPRISE ATTEMPT: Server-Side Edge Execution Shield
+        const serverAttempt = await executeServerTelecomPurchase({
+            userId,
+            price,
+            serviceType: 'data',
+            endpoint: '/services/buy-data',
+            payload: {
+                phone,
+                network: networkId,
+                data_plan: dataPlanId,
+                buyFrom: 'balance'
+            },
+            description: `Data: ${planName || 'Data Plan'} -> ${phone}`,
+            reference: refNo
+        });
+
+        if (serverAttempt.handled && serverAttempt.result) {
+            return {
+                success: true,
+                refNo: serverAttempt.result.refNo || refNo,
+                newBalance: serverAttempt.result.newBalance
+            };
+        }
+
         let txnId: string | null = null;
         try {
             const { data: txn, error: txnErr } = await supabase
@@ -642,6 +766,31 @@ export const KetawancyService = {
         if (userBal < price) throw new Error(`Insufficient wallet balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
         const refNo = `smile-${Date.now()}`;
+
+        // PRIMARY ENTERPRISE ATTEMPT: Server-Side Edge Execution Shield
+        const serverAttempt = await executeServerTelecomPurchase({
+            userId,
+            price,
+            serviceType: 'smile',
+            endpoint: '/services/buy-smile',
+            payload: {
+                phoneNumber,
+                planId,
+                actype,
+                buyFrom: 'balance'
+            },
+            description: `Smile Data: ${planName || 'Smile Plan'} -> ${phoneNumber}`,
+            reference: refNo
+        });
+
+        if (serverAttempt.handled && serverAttempt.result) {
+            return {
+                success: true,
+                refNo: serverAttempt.result.refNo || refNo,
+                newBalance: serverAttempt.result.newBalance
+            };
+        }
+
         let txnId: string | null = null;
         try {
             const { data: txn, error: txnErr } = await supabase
@@ -772,6 +921,30 @@ export const KetawancyService = {
         if (userBal < price) throw new Error(`Insufficient wallet balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
         const refNo = `alpha-${Date.now()}`;
+
+        // PRIMARY ENTERPRISE ATTEMPT: Server-Side Edge Execution Shield
+        const serverAttempt = await executeServerTelecomPurchase({
+            userId,
+            price,
+            serviceType: 'alpha',
+            endpoint: '/services/buy-alpha',
+            payload: {
+                phone,
+                planid: Number(planId),
+                buyFrom: 'balance'
+            },
+            description: `Alpha Plan: ${planName || 'Alpha'} -> ${phone}`,
+            reference: refNo
+        });
+
+        if (serverAttempt.handled && serverAttempt.result) {
+            return {
+                success: true,
+                refNo: serverAttempt.result.refNo || refNo,
+                newBalance: serverAttempt.result.newBalance
+            };
+        }
+
         let txnId: string | null = null;
         try {
             const { data: txn, error: txnErr } = await supabase
@@ -901,6 +1074,30 @@ export const KetawancyService = {
         if (userBal < price) throw new Error(`Insufficient balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
         const refNo = `kirani-${Date.now()}`;
+
+        // PRIMARY ENTERPRISE ATTEMPT: Server-Side Edge Execution Shield
+        const serverAttempt = await executeServerTelecomPurchase({
+            userId,
+            price,
+            serviceType: 'kirani',
+            endpoint: '/services/buy/kirani',
+            payload: {
+                phone,
+                planid: Number(planId),
+                buyFrom: 'balance'
+            },
+            description: `Kirani: ${planName || 'Kirani Data'} -> ${phone}`,
+            reference: refNo
+        });
+
+        if (serverAttempt.handled && serverAttempt.result) {
+            return {
+                success: true,
+                refNo: serverAttempt.result.refNo || refNo,
+                newBalance: serverAttempt.result.newBalance
+            };
+        }
+
         let txnId: string | null = null;
         try {
             const { data: txn, error: txnErr } = await supabase
@@ -1030,6 +1227,30 @@ export const KetawancyService = {
         if (userBal < price) throw new Error(`Insufficient balance. You have ₦${userBal.toLocaleString()}, but required is ₦${price.toLocaleString()}.`);
 
         const refNo = `ratel-${Date.now()}`;
+
+        // PRIMARY ENTERPRISE ATTEMPT: Server-Side Edge Execution Shield
+        const serverAttempt = await executeServerTelecomPurchase({
+            userId,
+            price,
+            serviceType: 'ratel',
+            endpoint: '/services/buy/ratel',
+            payload: {
+                phone,
+                planid: Number(planId),
+                buyFrom: 'balance'
+            },
+            description: `Ratel: ${planName || 'Ratel Data'} -> ${phone}`,
+            reference: refNo
+        });
+
+        if (serverAttempt.handled && serverAttempt.result) {
+            return {
+                success: true,
+                refNo: serverAttempt.result.refNo || refNo,
+                newBalance: serverAttempt.result.newBalance
+            };
+        }
+
         let txnId: string | null = null;
         try {
             const { data: txn, error: txnErr } = await supabase
