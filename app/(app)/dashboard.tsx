@@ -77,6 +77,7 @@ export default function Dashboard() {
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
   const [telecomBannerConfig, setTelecomBannerConfig] = useState<{ is_visible?: boolean; banners?: any[] } | null>(null);
   const [telecomSlideIdx, setTelecomSlideIdx] = useState(0);
+  const [waBotNumber, setWaBotNumber] = useState('2348145853539');
 
   // Auto-cycle telecom slides if multiple exist
   useEffect(() => {
@@ -305,10 +306,16 @@ export default function Dashboard() {
   const fetchAppSettings = async () => {
     try {
       const { data } = await supabase.from('app_settings').select('key, value').in('key', [
-        'app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations', 'celebration_event_settings', 'telecom_hub_banner_config'
+        'app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations', 'celebration_event_settings', 'telecom_hub_banner_config', 'whatsapp_bot_number', 'support_whatsapp'
       ]);
       if (data) {
         data.forEach(setting => {
+          if (setting.key === 'whatsapp_bot_number' && setting.value) {
+            setWaBotNumber(setting.value);
+          }
+          if (setting.key === 'support_whatsapp' && setting.value) {
+            setWaBotNumber(prev => prev === '2348145853539' ? setting.value : prev);
+          }
           if (setting.key === 'app_logo' && setting.value) {
             let url = setting.value;
             try { const parsed = JSON.parse(setting.value); if (parsed.url) url = parsed.url; } catch (e) {}
@@ -759,7 +766,7 @@ export default function Dashboard() {
 
               <TouchableOpacity
                 onPress={() => {
-                  const botNum = '2348145853539';
+                  const botNum = (waBotNumber || '2348145853539').replace(/\D/g, '');
                   const target = `whatsapp://send?phone=${botNum}&text=Hi`;
                   Linking.openURL(target).catch(() => {
                     Linking.openURL(`https://wa.me/${botNum}?text=Hi`).catch(() => {});

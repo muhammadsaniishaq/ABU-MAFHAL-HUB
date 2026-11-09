@@ -460,27 +460,40 @@ Deno.serve(async (req: Request) => {
                 }
 
                 // Fetch active plans for this network from data_plans
-                const { data: plans, error: planErr } = await supabaseAdmin
+                let activePlans: any[] = [];
+                const { data: plans } = await supabaseAdmin
                     .from('data_plans')
-                    .select('id, plan_id, name, selling_price, api_vendor')
+                    .select('*')
                     .ilike('network', chosenNetwork)
                     .eq('is_active', true)
                     .order('selling_price', { ascending: true })
                     .limit(10);
 
-                if (planErr || !plans || plans.length === 0) {
+                if (plans && plans.length > 0) {
+                    activePlans = plans;
+                } else {
+                    const { data: fallbackPlans } = await supabaseAdmin
+                        .from('data_plans')
+                        .select('*')
+                        .ilike('network', chosenNetwork)
+                        .order('selling_price', { ascending: true })
+                        .limit(10);
+                    activePlans = fallbackPlans || [];
+                }
+
+                if (activePlans.length === 0) {
                     return reply(`⚠️ A halin yanzu ba a sami data plans na ${chosenNetwork.toUpperCase()} ba. Da fatan a gwada wani network ɗin ko tura '0'.`, 'IDLE');
                 }
 
                 let plansText = `📦 *Zaɓi Plan na ${chosenNetwork.toUpperCase()}:*\n`;
-                plans.forEach((p, idx) => {
+                activePlans.forEach((p, idx) => {
                     plansText += `\n${idx + 1}️⃣ ${p.name} - *₦${Number(p.selling_price).toLocaleString()}*`;
                 });
                 plansText += `\n\n(Tura lambar plan ɗin da kake so, ko '0' don sokewa)`;
 
                 return reply(plansText, 'DATA_SELECT_PLAN', {
                     network: chosenNetwork,
-                    available_plans: plans
+                    available_plans: activePlans
                 });
             }
 
@@ -920,6 +933,129 @@ Deno.serve(async (req: Request) => {
                     if (data.success) {
                         const token = data.token || data.meter_token || data.mainToken || "Token ya tafi cikin nasara";
                         return reply(`✅ *Katin Wuta Ya Yi Nasara!* 🎉\n\n⚡ Token: *${token}*\n🔢 Meter: *${sessionData.meter_no}*\n💰 Kuɗi: *₦${Number(sessionData.amount).toLocaleString()}*\n\n(Tura '0' don komawa babban menu)`, 'IDLE', {});
+                    } else {
+                        return reply(`❌ *Ba a samu nasara ba:*\n${data.error || "An samu matsala"}\n\n(Tura '0' don komawa babban menu)`, 'IDLE', {});
+                    }
+                } catch (_) {
+                    return reply(`❌ An samu matsalar sadarwa. Da fatan a sake gwadawa anjima.`, 'IDLE', {});
+                }
+            }
+
+            // 3. Cable TV Flow
+            if (currentStep === 'CABLE_SELECT_PROVIDER') {
+                const provMap: Record<string, { code: string, name: string }> = {
+                    '1': { code: '01', name: 'DSTV' },
+                    '2': { code: '02', name: 'GOTV' },
+                    '3': { code: '03', name: 'STARTIMES' }
+                };
+                const prov = provMap[text];
+                if (!prov) {
+                    return reply(`❌ Zaɓi 1 na DSTV, 2 na GOTV, ko 3 na STARTIMES (ko '0' don sokewa):`, 'CABLE_SELECT_PROVIDER');
+                }
+
+                return reply(
+                    `📺 Sanya lambar IUC / SmartCard na *${prov.name}*:\n_(Misali: 2012345678)_`,
+                    'CABLE_ENTER_SMARTCARD',
+                    { provider: prov }
+                );
+            }
+
+            if (currentStep === 'CABLE_ENTER_SMARTCARD') {
+                const smartCard = text.replace(/\D/g, '');
+                if (smartCard.length < 8) {
+                    return reply(`❌ Lambar SmartCard ba ta da inganci. Sake gwadawa (ko tura '0' don sokewa):`, 'CABLE_ENTER_SMARTCARD', sessionData);
+                }
+
+                const provCode = sessionData.provider.code;
+                let packages: Array<{ id: string, name: string, price: number }> = [];
+
+                if (provCode === '02') { // GOTV
+                    packages = [
+                        { id: 'gotv-smallie', name: 'GOtv Smallie', price: 1575 },
+                        { id: 'gotv-jinja', name: 'GOtv Jinja', price: 3300 },
+                        { id: 'gotv-jolli', name: 'GOtv Jolli', price: 4850 },
+                        { id: 'gotv-max', name: 'GOtv Max', price: 7200 },
+                        { id: 'gotv-supa', name: 'GOtv Supa', price: 9600 }
+                    ];
+                } else if (provCode === '01') { // DSTV
+                    packages = [
+                        { id: 'dstv-padi', name: 'DStv Padi', price: 3600 },
+                        { id: 'dstv-yanga', name: 'DStv Yanga', price: 5100 },
+                        { id: 'dstv-confam', name: 'DStv Confam', price: 9300 },
+                        { id: 'dstv-compact', name: 'DStv Compact', price: 15700 }
+                    ];
+                } else { // STARTIMES
+                    packages = [
+                        { id: 'nova', name: 'Nova Bouquet', price: 1700 },
+                        { id: 'basic', name: 'Basic Bouquet', price: 3300 },
+                        { id: 'classic', name: 'Classic Bouquet', price: 5000 }
+                    ];
+                }
+
+                let pkgList = `📦 *Zaɓi Package na ${sessionData.provider.name}:*\n`;
+                packages.forEach((pkg, idx) => {
+                    pkgList += `\n${idx + 1}️⃣ ${pkg.name} - *₦${pkg.price.toLocaleString()}*`;
+                });
+                pkgList += `\n\n(Tura lambar package ɗin da kake so, ko '0' don sokewa)`;
+
+                return reply(pkgList, 'CABLE_SELECT_PACKAGE', {
+                    ...sessionData,
+                    smart_card: smartCard,
+                    packages: packages
+                });
+            }
+
+            if (currentStep === 'CABLE_SELECT_PACKAGE') {
+                const packages = sessionData.packages || [];
+                const pkgIndex = parseInt(text, 10) - 1;
+
+                if (isNaN(pkgIndex) || pkgIndex < 0 || pkgIndex >= packages.length) {
+                    return reply(`❌ Zaɓi lamba daga 1 zuwa ${packages.length} (ko tura '0' don sokewa):`, 'CABLE_SELECT_PACKAGE', sessionData);
+                }
+
+                const selectedPkg = packages[pkgIndex];
+                if (currentBalance < selectedPkg.price) {
+                    return reply(`⚠️ Kuɗin Wallet ɗinka bai isa ba! Farashi: ₦${selectedPkg.price.toLocaleString()}, Balance ɗinka: ₦${currentBalance.toLocaleString()}.\n\n(Tura '0' don babban menu)`, 'IDLE', {});
+                }
+
+                return reply(
+                    `📋 *Tabbatar da Biyan Cable TV:*\n\n• Mai Ba Da Sabis: *${sessionData.provider.name}*\n• SmartCard/IUC: *${sessionData.smart_card}*\n• Package: *${selectedPkg.name}*\n• Kuɗi: *₦${selectedPkg.price.toLocaleString()}*\n\n🔐 Sanya *Transaction PIN* ɗinka mai lamba 4 don tabbatarwa:\n_(Ko tura '0' don sokewa)_`,
+                    'CABLE_CONFIRM_PIN',
+                    { ...sessionData, selected_pkg: selectedPkg }
+                );
+            }
+
+            if (currentStep === 'CABLE_CONFIRM_PIN') {
+                if (!profile.transaction_pin || profile.transaction_pin !== text.trim()) {
+                    return reply(`❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`, 'CABLE_CONFIRM_PIN', sessionData);
+                }
+
+                const pkg = sessionData.selected_pkg;
+                await sendWhatsAppMessage(senderPhone, `⏳ Ana kunna sub ɗinka na ${sessionData.provider.name}, da fatan a ɗan jira...`, phoneNumberId, accessToken);
+
+                try {
+                    const res = await fetch(`${supabaseUrl}/functions/v1/bills-payment`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${supabaseServiceKey}`,
+                            'Content-Type': 'application/json',
+                            'x-internal-service': supabaseServiceKey
+                        },
+                        body: JSON.stringify({
+                            type: 'tv',
+                            user_id: userId,
+                            provider: sessionData.provider.code,
+                            smartCard: sessionData.smart_card,
+                            packageId: pkg.id,
+                            amount: pkg.price,
+                            phone: profile.phone || senderPhone,
+                            requestId: `WA_TV_${Date.now()}`
+                        })
+                    });
+
+                    const data = await res.json().catch(() => ({ success: false, error: "Network error" }));
+                    if (data.success) {
+                        return reply(`✅ *Biyan Cable TV Ya Yi Nasara!* 🎉\n\n📺 TV: *${sessionData.provider.name}*\n📦 Package: *${pkg.name}*\n🔢 SmartCard: *${sessionData.smart_card}*\n💰 Kuɗi: *₦${Number(pkg.price).toLocaleString()}*\n\n_Mun gode da amfani da ABU-MAFHAL-HUB!_\n\n(Tura '0' don komawa babban menu)`, 'IDLE', {});
                     } else {
                         return reply(`❌ *Ba a samu nasara ba:*\n${data.error || "An samu matsala"}\n\n(Tura '0' don komawa babban menu)`, 'IDLE', {});
                     }
