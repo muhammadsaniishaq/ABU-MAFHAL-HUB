@@ -757,9 +757,19 @@ export default function Dashboard() {
                 </LinearGradient>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={(e) => handleActionPress({ route: '/history', label: 'Tx History' }, e)} style={s.historyBtn} activeOpacity={0.85}>
-                <Ionicons name="receipt-outline" size={12} color="rgba(255,255,255,0.75)" style={{ marginRight: 4 }} />
-                <Text style={s.historyBtnTxt}>Tx History</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const botNum = '2348145853539';
+                  const target = `whatsapp://send?phone=${botNum}&text=Hi`;
+                  Linking.openURL(target).catch(() => {
+                    Linking.openURL(`https://wa.me/${botNum}?text=Hi`).catch(() => {});
+                  });
+                }}
+                style={[s.historyBtn, { backgroundColor: 'rgba(37, 211, 102, 0.18)', borderColor: 'rgba(37, 211, 102, 0.45)' }]}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="logo-whatsapp" size={13} color="#25D366" style={{ marginRight: 4 }} />
+                <Text style={[s.historyBtnTxt, { color: '#4ade80', fontWeight: '800' }]}>WA Bot</Text>
               </TouchableOpacity>
             </View>
           </View>
