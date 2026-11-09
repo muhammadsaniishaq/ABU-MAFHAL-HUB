@@ -177,6 +177,40 @@ export default function SupportScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
+        {/* 24/7 WHATSAPP VTU BOT CARD */}
+        <TouchableOpacity
+          style={[s.aiCardWrapper, { marginTop: 12 }]}
+          onPress={() => {
+            const botNum = settings.whatsapp_bot_number || settings.support_whatsapp || '2348145853539';
+            const cleanNum = botNum.replace(/\D/g, '');
+            const target = `whatsapp://send?phone=${cleanNum}&text=Hi`;
+            Linking.openURL(target).catch(() => {
+              Linking.openURL(`https://wa.me/${cleanNum}?text=Hi`).catch(() => {});
+            });
+          }}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={['#064e3b', '#065f46', '#047857']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.aiCardGrad}
+          >
+            <View style={s.aiCardLeft}>
+              <View style={[s.aiBadge, { backgroundColor: 'rgba(37, 211, 102, 0.2)', borderColor: '#25D366' }]}>
+                <Ionicons name="logo-whatsapp" size={11} color="#25D366" />
+                <Text style={[s.aiBadgeText, { color: '#4ade80' }]}>WHATSAPP BOT • 24/7</Text>
+              </View>
+              <Text style={[s.aiCardTitle, { color: '#ffffff' }]}>Siyan Data a WhatsApp</Text>
+              <Text style={[s.aiCardDesc, { color: 'rgba(255, 255, 255, 0.85)' }]}>Siya data, katin kira, kuma duba balance kai tsaye a WhatsApp chat.</Text>
+            </View>
+
+            <View style={[s.aiIconCircle, { backgroundColor: '#25D366' }]}>
+              <Ionicons name="chatbubble-ellipses" size={16} color="#FFFFFF" />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
         {/* 2-COLUMN ACTION CARDS: TICKETS & TELEGRAM */}
         <View style={s.twoGridRow}>
           <TouchableOpacity style={s.gridCard} onPress={() => router.push('/(app)/tickets')} activeOpacity={0.75}>

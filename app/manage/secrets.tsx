@@ -89,7 +89,12 @@ const REQUIRED_SECRETS = [
     { key: 'SMTP_PORT', aliases: ['ZOHO_PORT'], desc: 'SMTP Server Port (Default: 465)', provider: 'Email & Notifications' },
     { key: 'LIVEKIT_URL', aliases: ['LIVEKIT_WS_URL'], desc: 'LiveKit Cloud WebSocket URL (e.g. wss://abu-mafhal-sub-ndlajsjm.livekit.cloud)', provider: 'LiveKit Meetings' },
     { key: 'LIVEKIT_API_KEY', aliases: ['LIVEKIT_KEY'], desc: 'LiveKit Cloud API Key (e.g. APIiTbTpxxxGdtV)', provider: 'LiveKit Meetings' },
-    { key: 'LIVEKIT_API_SECRET', aliases: ['LIVEKIT_SECRET'], desc: 'LiveKit Cloud API Secret for Video Conference JWT Tokens', provider: 'LiveKit Meetings' }
+    { key: 'LIVEKIT_API_SECRET', aliases: ['LIVEKIT_SECRET'], desc: 'LiveKit Cloud API Secret for Video Conference JWT Tokens', provider: 'LiveKit Meetings' },
+    { key: 'WHATSAPP_PHONE_NUMBER_ID', aliases: ['WA_PHONE_NUMBER_ID', 'META_PHONE_NUMBER_ID'], desc: 'Meta WhatsApp Cloud API Phone Number ID (From Meta Developers Console)', provider: 'WhatsApp Bot' },
+    { key: 'WHATSAPP_ACCESS_TOKEN', aliases: ['WA_ACCESS_TOKEN', 'META_ACCESS_TOKEN'], desc: 'Meta Permanent System User Access Token for sending WhatsApp messages', provider: 'WhatsApp Bot' },
+    { key: 'WHATSAPP_VERIFY_TOKEN', aliases: ['WA_VERIFY_TOKEN'], desc: 'Meta WhatsApp Webhook Verification Token (Default: abumafhal_wa_verify_2026)', provider: 'WhatsApp Bot' },
+    { key: 'WHATSAPP_BOT_NUMBER', aliases: ['WA_BOT_NUMBER', 'WHATSAPP_NUMBER'], desc: 'Official WhatsApp Bot Phone Number (e.g. 2348145853539)', provider: 'WhatsApp Bot' },
+    { key: 'WHATSAPP_ADMIN_CALL_PHONE', aliases: ['WA_ADMIN_PHONE', 'ADMIN_CALL_PHONE'], desc: 'Admin Phone Number for urgent calls & WhatsApp bot escalations', provider: 'WhatsApp Bot' }
 ];
 
 export default function SecretsManager() {

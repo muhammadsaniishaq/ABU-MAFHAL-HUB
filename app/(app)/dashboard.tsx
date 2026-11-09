@@ -522,6 +522,14 @@ export default function Dashboard() {
       const flag = featureFlags[featureKey];
       if (flag && !flag.is_enabled) { alert(flag.maintenance_message || 'This feature is currently under maintenance.'); return; }
     }
+    if (action.id === 'whatsapp_bot') {
+      const botNum = '2348145853539';
+      const target = `whatsapp://send?phone=${botNum}&text=Hi`;
+      Linking.openURL(target).catch(() => {
+        Linking.openURL(`https://wa.me/${botNum}?text=Hi`).catch(() => {});
+      });
+      return;
+    }
     if (action.route) router.push(action.route as any);
   };
 
@@ -529,6 +537,7 @@ export default function Dashboard() {
   const BASE_CATALOG = [
     { id: 'airtime',      icon: 'phone-portrait-outline', label: 'Airtime',         color: '#f97316', route: '/airtime',        badge: null },
     { id: 'data',         icon: 'wifi-outline',           label: 'Data',            color: '#22c55e', route: '/data',           badge: null },
+    { id: 'whatsapp_bot', icon: 'logo-whatsapp',          label: 'WA Bot',          color: '#25D366', route: 'whatsapp_bot',    badge: 'NEW' },
     { id: 'sim',          icon: 'hardware-chip-outline',  image: require('../../assets/images/telecom_hub.jpg'), label: 'Buy SIM',         color: '#dc2626', route: '/sim',            badge: 'HOT' },
     { id: 'transfer',     icon: 'swap-horizontal-outline',label: 'Transfer',        color: '#2563eb', route: '/transfer',       badge: null },
     { id: 'recharge_pin', icon: 'key-outline',            label: 'Recharge PIN',   color: '#10b981', route: '/recharge-pin',   badge: 'HOT' },

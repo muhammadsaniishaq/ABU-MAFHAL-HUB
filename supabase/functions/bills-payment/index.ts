@@ -53,17 +53,24 @@ Deno.serve(async (req: Request) => {
             global: { headers: { Authorization: authHeader } }
         });
 
-        // 1. Identify User
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-        if (userError || !user) {
-             console.error("[Bills] Auth verification failed:", userError?.message);
-             return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { 
-                 status: 200, 
-                 headers: { ...corsHeaders, "Content-Type": "application/json" } 
-             });
+        // 1. Identify User (Supports both user JWT and internal service_role call with userId)
+        let userId = '';
+        const isInternalService = authHeader.includes(supabaseServiceRoleKey) || req.headers.get('x-internal-service') === supabaseServiceRoleKey;
+        if (isInternalService && (data.user_id || data.userId || payload.userId || payload.user_id)) {
+            userId = (data.user_id || data.userId || payload.userId || payload.user_id).toString();
+            console.log(`[Bills] Internal Service Role Caller for User: ${userId}`);
+        } else {
+            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+            if (userError || !user) {
+                 console.error("[Bills] Auth verification failed:", userError?.message);
+                 return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { 
+                     status: 200, 
+                     headers: { ...corsHeaders, "Content-Type": "application/json" } 
+                 });
+            }
+            userId = user.id;
+            console.log(`[Bills] User Authenticated: ${userId}`);
         }
-        const userId = user.id;
-        console.log(`[Bills] User Authenticated: ${userId}`);
 
         // Fetch dynamic secrets from Admin API Vault & app_settings
         const rpcClient = createClient(supabaseUrl, supabaseServiceRoleKey);

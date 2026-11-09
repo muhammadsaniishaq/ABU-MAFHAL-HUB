@@ -118,6 +118,14 @@ export default function AdminSettings() {
     const [supportYoutube, setSupportYoutube] = useState('');
     const [supportLinkedin, setSupportLinkedin] = useState('');
     const [supportOfficeAddress, setSupportOfficeAddress] = useState('');
+
+    // WhatsApp VTU Bot & Automation
+    const [whatsappBotEnabled, setWhatsappBotEnabled] = useState(true);
+    const [whatsappBotNumber, setWhatsappBotNumber] = useState('');
+    const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState('');
+    const [whatsappAccessToken, setWhatsappAccessToken] = useState('');
+    const [whatsappVerifyToken, setWhatsappVerifyToken] = useState('abumafhal_wa_verify_2026');
+    const [whatsappAdminCallPhone, setWhatsappAdminCallPhone] = useState('');
     
     // Global Announcement
     const [announcementText, setAnnouncementText] = useState('');
@@ -207,6 +215,18 @@ export default function AdminSettings() {
             const { data } = await supabase.from('exchange_rates').select('sell_rate').eq('pair', 'USDT / NGN').single();
             if (data) setUsdNgnRate(String(data.sell_rate));
 
+            // System Secrets for WhatsApp Bot
+            const { data: systemSecrets } = await supabase.from('system_secrets').select('key, value');
+            if (systemSecrets) {
+                systemSecrets.forEach(s => {
+                    if (s.key === 'WHATSAPP_PHONE_NUMBER_ID' && s.value) setWhatsappPhoneNumberId(s.value);
+                    if (s.key === 'WHATSAPP_ACCESS_TOKEN' && s.value) setWhatsappAccessToken(s.value);
+                    if (s.key === 'WHATSAPP_VERIFY_TOKEN' && s.value) setWhatsappVerifyToken(s.value);
+                    if (s.key === 'WHATSAPP_BOT_NUMBER' && s.value) setWhatsappBotNumber(s.value);
+                    if (s.key === 'WHATSAPP_ADMIN_CALL_PHONE' && s.value) setWhatsappAdminCallPhone(s.value);
+                });
+            }
+
             const { data: appSettings } = await supabase.from('app_settings').select('*');
             if (appSettings) {
                 appSettings.forEach(s => {
@@ -253,6 +273,12 @@ export default function AdminSettings() {
                     if (s.key === 'support_youtube') setSupportYoutube(s.value || '');
                     if (s.key === 'support_linkedin') setSupportLinkedin(s.value || '');
                     if (s.key === 'support_office_address') setSupportOfficeAddress(s.value);
+                    if (s.key === 'whatsapp_bot_enabled') setWhatsappBotEnabled(s.value === 'true' || s.value === true);
+                    if (s.key === 'whatsapp_bot_number') setWhatsappBotNumber(prev => prev || s.value || '');
+                    if (s.key === 'whatsapp_admin_call_phone') setWhatsappAdminCallPhone(prev => prev || s.value || '');
+                    if (s.key === 'WHATSAPP_PHONE_NUMBER_ID') setWhatsappPhoneNumberId(prev => prev || s.value || '');
+                    if (s.key === 'WHATSAPP_ACCESS_TOKEN') setWhatsappAccessToken(prev => prev || s.value || '');
+                    if (s.key === 'WHATSAPP_VERIFY_TOKEN') setWhatsappVerifyToken(prev => prev || s.value || 'abumafhal_wa_verify_2026');
                     if (s.key === 'global_announcement') {
                         try {
                             const parsed = JSON.parse(s.value);
@@ -436,6 +462,12 @@ export default function AdminSettings() {
                 { key: 'support_youtube', value: supportYoutube },
                 { key: 'support_linkedin', value: supportLinkedin },
                 { key: 'support_office_address', value: supportOfficeAddress },
+                { key: 'whatsapp_bot_enabled', value: String(whatsappBotEnabled) },
+                { key: 'whatsapp_bot_number', value: whatsappBotNumber },
+                { key: 'whatsapp_admin_call_phone', value: whatsappAdminCallPhone },
+                { key: 'WHATSAPP_PHONE_NUMBER_ID', value: whatsappPhoneNumberId },
+                { key: 'WHATSAPP_ACCESS_TOKEN', value: whatsappAccessToken },
+                { key: 'WHATSAPP_VERIFY_TOKEN', value: whatsappVerifyToken },
                 { key: 'vtu_vendor', value: vtuVendor },
                 { key: 'global_announcement', value: JSON.stringify({
                     text: announcementText,
@@ -459,6 +491,20 @@ export default function AdminSettings() {
             
             const { error } = await supabase.from('app_settings').upsert(settingsToSave, { onConflict: 'key' });
             if (error) throw error;
+
+            // Sync WhatsApp secrets to system_secrets table
+            const waSecretsToSync = [
+                { key: 'WHATSAPP_PHONE_NUMBER_ID', value: whatsappPhoneNumberId },
+                { key: 'WHATSAPP_ACCESS_TOKEN', value: whatsappAccessToken },
+                { key: 'WHATSAPP_VERIFY_TOKEN', value: whatsappVerifyToken },
+                { key: 'WHATSAPP_BOT_NUMBER', value: whatsappBotNumber },
+                { key: 'WHATSAPP_ADMIN_CALL_PHONE', value: whatsappAdminCallPhone }
+            ];
+            for (const item of waSecretsToSync) {
+                if (item.value) {
+                    await supabase.from('system_secrets').upsert({ key: item.key, value: item.value }, { onConflict: 'key' });
+                }
+            }
             
             try {
                 await AsyncStorage.setItem('@app_hidden_features_cache', JSON.stringify(hiddenFeaturesList));
@@ -704,6 +750,60 @@ export default function AdminSettings() {
                             <InputRow label="YouTube Channel Link" value={supportYoutube} onChangeText={setSupportYoutube} placeholder="https://youtube.com/@..." keyboardType="url" />
                             <InputRow label="LinkedIn Profile Link" value={supportLinkedin} onChangeText={setSupportLinkedin} placeholder="https://linkedin.com/in/..." keyboardType="url" />
                             <InputRow label="Office Address" value={supportOfficeAddress} onChangeText={setSupportOfficeAddress} placeholder="No. 1 Abu Mafhal Ltd Goni Aji Street, Yobe State..." />
+                        </View>
+
+                        <Text style={s.groupLabel}>WhatsApp VTU Chatbot & Automation</Text>
+                        <View style={s.card}>
+                            <ToggleRow 
+                                title="Enable WhatsApp Bot" 
+                                subtitle="Bada damar siyan data, katin kira da duba balance ta WhatsApp" 
+                                icon="logo-whatsapp" 
+                                color="#25D366" 
+                                value={whatsappBotEnabled} 
+                                onValueChange={setWhatsappBotEnabled} 
+                            />
+                            <View style={s.divider} />
+                            <InputRow 
+                                label="WhatsApp Bot Number" 
+                                value={whatsappBotNumber} 
+                                onChangeText={setWhatsappBotNumber} 
+                                prefix="WA" 
+                                keyboardType="phone-pad" 
+                                placeholder="2348145853539" 
+                            />
+                            <InputRow 
+                                label="Meta Phone Number ID" 
+                                value={whatsappPhoneNumberId} 
+                                onChangeText={setWhatsappPhoneNumberId} 
+                                placeholder="Daga Meta Developers Console (Misali: 1092837465...)" 
+                            />
+                            <InputRow 
+                                label="Meta Permanent Access Token" 
+                                value={whatsappAccessToken} 
+                                onChangeText={setWhatsappAccessToken} 
+                                placeholder="EAAG..." 
+                                secureTextEntry 
+                            />
+                            <InputRow 
+                                label="Webhook Verify Token" 
+                                value={whatsappVerifyToken} 
+                                onChangeText={setWhatsappVerifyToken} 
+                                placeholder="abumafhal_wa_verify_2026" 
+                            />
+                            <InputRow 
+                                label="Admin Escalation & Call Line" 
+                                value={whatsappAdminCallPhone} 
+                                onChangeText={setWhatsappAdminCallPhone} 
+                                prefix="CALL" 
+                                keyboardType="phone-pad" 
+                                placeholder="Lambar kiran gaggawa na Admin (Misali: 2348145853539)" 
+                            />
+                            <View style={{ padding: 12, backgroundColor: '#F0FDF4', borderRadius: 8, marginTop: 8, borderWidth: 1, borderColor: '#DCFCE7' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#166534', marginBottom: 4 }}>🔗 Meta Webhook Endpoint URL:</Text>
+                                <Text style={{ fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#15803D' }}>
+                                    https://&lt;PROJECT_REF&gt;.supabase.co/functions/v1/whatsapp-bot
+                                </Text>
+                            </View>
                         </View>
 
                         <Text style={s.groupLabel}>Global Announcement</Text>
