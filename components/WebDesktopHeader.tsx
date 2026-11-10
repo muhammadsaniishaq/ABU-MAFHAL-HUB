@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { supabase } from '../services/supabase';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { useAppSettings, formatWhatsAppPhone } from '../hooks/useAppSettings';
 
 interface WebDesktopHeaderProps {
     onToggleSidebar?: () => void;
@@ -117,8 +117,8 @@ export default function WebDesktopHeader({
                 {/* 24/7 WhatsApp Action */}
                 <TouchableOpacity
                     onPress={() => {
-                        const phone = settings?.support_whatsapp || '2348145853539';
-                        Linking.openURL(`https://wa.me/${phone}?text=Hello%20Abu%20Mafhal%20Support`).catch(() => {});
+                        const phone = formatWhatsAppPhone(settings?.whatsapp_bot_number || settings?.support_whatsapp, '2349065645747');
+                        Linking.openURL(`https://wa.me/${phone}?text=Hi`).catch(() => {});
                     }}
                     style={styles.actionPillBtn}
                     activeOpacity={0.8}

@@ -121,14 +121,100 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        // Health check fallback
+        // Health check & Diagnostic mode
         if (!mode && !token) {
+            let metaCheck: any = null;
+            let testSendResult: any = null;
+            let recentLogs: any = null;
+
+            if (url.searchParams.get('diag') === '1') {
+                // 1. Verify Meta Graph API connection with stored credentials
+                if (phoneNumberId && accessToken) {
+                    try {
+                        const metaRes = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}`, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        metaCheck = {
+                            status: metaRes.status,
+                            ok: metaRes.ok,
+                            body: await metaRes.json().catch(() => null)
+                        };
+                    } catch (e: any) {
+                        metaCheck = { error: e.message };
+                    }
+                }
+
+                // 2. Fetch last 5 logs from whatsapp_bot_logs
+                const { data: logs } = await supabaseAdmin
+                    .from('whatsapp_bot_logs')
+                    .select('id, phone_number, direction, message_type, content, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                recentLogs = logs;
+
+                // 2b. Fetch current app_settings & secrets for whatsapp
+                if (url.searchParams.get('sync_bot_number') === '1') {
+                    const updates = [
+                        { key: 'whatsapp_bot_number', value: '09065645747' },
+                        { key: 'WHATSAPP_BOT_NUMBER', value: '09065645747' },
+                        { key: 'support_whatsapp', value: '09065645747' },
+                        { key: 'whatsapp_number', value: '09065645747' },
+                        { key: 'whatsapp_admin_call_phone', value: '08145853539' },
+                        { key: 'WHATSAPP_ADMIN_CALL_PHONE', value: '08145853539' }
+                    ];
+                    await supabaseAdmin.from('app_settings').upsert(updates, { onConflict: 'key' });
+                    await supabaseAdmin.from('system_secrets').upsert([
+                        { key: 'WHATSAPP_BOT_NUMBER', value: '09065645747' },
+                        { key: 'WHATSAPP_ADMIN_CALL_PHONE', value: '08145853539' }
+                    ], { onConflict: 'key' });
+                }
+
+                const { data: allWaSettings } = await supabaseAdmin
+                    .from('app_settings')
+                    .select('key, value')
+                    .or('key.ilike.%whatsapp%,key.ilike.%support%');
+                metaCheck = { ...metaCheck, current_db_settings: allWaSettings, system_secrets: secrets };
+
+                // 3. Optional test send
+                const testTo = url.searchParams.get('test_to');
+                if (testTo && phoneNumberId && accessToken) {
+                    try {
+                        const sendRes = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                messaging_product: 'whatsapp',
+                                recipient_type: 'individual',
+                                to: testTo,
+                                type: 'text',
+                                text: { body: "Test message from Abu Mafhal Sub diagnostic check." }
+                            })
+                        });
+                        testSendResult = {
+                            status: sendRes.status,
+                            ok: sendRes.ok,
+                            body: await sendRes.json().catch(() => null)
+                        };
+                    } catch (err: any) {
+                        testSendResult = { error: err.message };
+                    }
+                }
+            }
+
             return new Response(JSON.stringify({
                 status: "active",
-                service: "ABU-MAFHAL-HUB WhatsApp Bot",
+                service: "Abu Mafhal Sub WhatsApp Bot",
                 has_phone_id: Boolean(phoneNumberId),
                 has_access_token: Boolean(accessToken),
+                phone_id_preview: phoneNumberId ? `${phoneNumberId.slice(0, 4)}...${phoneNumberId.slice(-4)}` : null,
+                token_preview: accessToken ? `${accessToken.slice(0, 7)}...${accessToken.slice(-6)}` : null,
                 admin_call_phone: adminCallPhone,
+                meta_check: metaCheck,
+                recent_logs: recentLogs,
+                test_send_result: testSendResult,
                 timestamp: new Date().toISOString()
             }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -284,7 +370,7 @@ Deno.serve(async (req: Request) => {
                     } catch (_) {}
                 }
 
-                const escalationMsg = `📞 *ABU-MAFHAL-HUB Admin Call & Support:*\n\nMun tura sanarwa ga Admin a take! Zaka iya kiran Admin kai tsaye ko yin magana da shi:\n\n📱 *Kira Kai Tsaye (Direct Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20bu%C6%99atar%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n(Tura '0' don komawa babban menu)`;
+                const escalationMsg = `📞 *Abu Mafhal Sub Admin Support:*\n\nMun sanar da Admin a take! Zaka iya kiran Admin kai tsaye ko yin magana da shi:\n\n📱 *Kira Kai Tsaye (Direct Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20neman%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n(Tura '0' don komawa babban menu)`;
                 return reply(escalationMsg, 'IDLE');
             }
 
@@ -302,7 +388,7 @@ Deno.serve(async (req: Request) => {
 
                     if (!userProfile) {
                         return reply(
-                            `❌ Ba a sami asusu mai Email din "${text}" ba.\n\nDa fatan ka duba ka sake turawa, ko ka shiga manhajar ABU-MAFHAL-HUB don yin rajista.\n\n(Tura '0' don sokewa)`,
+                            `❌ Ba a sami asusu mai Email din "${text}" ba.\n\nDa fatan ka duba ka sake turawa, ko ka shiga manhajar Abu Mafhal Sub don yin rajista.\n\n(Tura '0' don sokewa)`,
                             'AWAITING_LINK_EMAIL'
                         );
                     }
@@ -342,13 +428,13 @@ Deno.serve(async (req: Request) => {
                         await supabaseAdmin.from('profiles').update({ phone: localPhone }).eq('id', userProfile.id);
                     }
 
-                    const welcomeMsg = `✅ Asusu ya haɗu cikin nasara! 🎉\n\n👤 *${userProfile.full_name || 'Customer'}*\n💰 Balance: ₦${Number(userProfile.balance || 0).toLocaleString()}\n\nBarka da zuwa ABU-MAFHAL-HUB!\n\nZaɓi hidimar da kake so:\n1️⃣ Siyan Data (MTN, Airtel, Glo, 9mobile)\n2️⃣ Siyan Airtime\n3️⃣ Duba Balance & Lambar Asusu (DVA)\n4️⃣ Sauran Hidimomi (Exam PIN, PHCN, Cable TV)\n5️⃣ Tarihin Kwanan Nan (Recent Transactions)\n6️⃣ Kira / Magana da Admin (Support & Call)\n\n(Tura lambar zaɓinka)`;
+                    const welcomeMsg = `✅ Asusu ya haɗu cikin nasara! 🎉\n\n👤 *${userProfile.full_name || 'Customer'}*\n💰 Balance: ₦${Number(userProfile.balance || 0).toLocaleString()}\n\nBarka da zuwa *Abu Mafhal Sub*!\n\nZaɓi lambar hidimar da kake so:\n1️⃣ Siyan Data (MTN, Airtel, Glo, 9mobile)\n2️⃣ Siyan Airtime (Katin Kira)\n3️⃣ Zuba Kuɗi / Bank Accounts (DVA)\n4️⃣ Katin Cable TV (DSTV, GOTV, Startimes)\n5️⃣ Wutar Lantarki (PHCN Electricity)\n6️⃣ Exam PINs (WAEC, NECO, NABTEB)\n7️⃣ Canza Airtime zuwa Kuɗi (Airtime to Cash)\n8️⃣ Buga Katin Recharge (Recharge PIN)\n9️⃣ Tarihin Kwanan Nan (Recent History)\n🔟 Tuntubi Admin / Support (Call & Chat)\n\n(Tura lambar zaɓinka)`;
                     return reply(welcomeMsg, 'IDLE', {});
                 }
 
                 // Default Guest Message
                 return reply(
-                    `🌟 *Barka da zuwa ABU-MAFHAL-HUB WhatsApp Bot!* 🌟\n\nLambar wayarka (${senderPhone}) ba ta haɗu da asusunka ba tukuna.\n\n👉 *Don haɗa asusunka:* Tura mana *Email* ɗinka da kayi rajista da shi a ABU-MAFHAL-HUB.\n\n🌐 Idan baka da asusu, sauke manhajarmu ko ziyarci shafinmu don buɗe asusu cikin daƙiƙa 60!`,
+                    `🌟 *Barka da zuwa Abu Mafhal Sub WhatsApp Bot!* 🌟\n\nLambar wayarka (${senderPhone}) ba ta haɗu da asusunka ba tukuna.\n\n👉 *Don haɗa asusunka:* Tura mana *Email* ɗinka da kayi rajista da shi a Abu Mafhal Sub.\n\n🌐 Idan baka da asusu, sauke manhajar Abu Mafhal Sub ko buɗe shafinmu don yin rajista cikin daƙiƙa 60!`,
                     'AWAITING_LINK_EMAIL'
                 );
             }
@@ -374,13 +460,13 @@ Deno.serve(async (req: Request) => {
             if (currentStep === 'IDLE') {
                 if (text === '1') {
                     // Option 1: Buy Data -> Choose Network
-                    const networkMenu = `📶 *Zaɓi Network ɗin da kake so:*\n\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Tura lambar network ɗin, ko '0' don komawa babban menu)`;
+                    const networkMenu = `📶 *Siyan Data (Buy Data)*\n\nZaɓi Network ɗin da kake so:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Tura lamba, ko '0' don babban menu)`;
                     return reply(networkMenu, 'DATA_SELECT_NETWORK', {});
                 }
 
                 if (text === '2') {
                     // Option 2: Buy Airtime -> Choose Network
-                    const airtimeNetMenu = `📲 *Siyan Airtime: Zaɓi Network:*\n\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Tura lambar network ɗin, ko '0' don sokewa)`;
+                    const airtimeNetMenu = `📲 *Siyan Airtime (Buy Airtime)*\n\nZaɓi Network ɗin da kake so:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Tura lamba, ko '0' don babban menu)`;
                     return reply(airtimeNetMenu, 'AIRTIME_SELECT_NETWORK', {});
                 }
 
@@ -393,27 +479,60 @@ Deno.serve(async (req: Request) => {
 
                     let bankText = '';
                     if (dvaAccounts && dvaAccounts.length > 0) {
-                        bankText = `\n\n🏦 *Lambobin Asusu don Zuba Kuɗi (DVA):*`;
+                        bankText = `\n\n🏦 *Lambobin Asusu don Zuba Kuɗi (Bank Accounts - DVA):*`;
                         dvaAccounts.forEach((acc) => {
                             bankText += `\n• *${acc.bank_name}*: \`${acc.account_number}\`\n  Suna: ${acc.account_name}`;
                         });
-                        bankText += `\n\n💡 _Duk kuɗin da ka tura zuwa wannan asusun za su shiga wallet ɗinka a take!_`;
+                        bankText += `\n\n💡 _Duk kuɗin da ka tura zuwa wannan asusun za su shiga wallet ɗinka a take._`;
                     } else {
-                        bankText = `\n\n💡 Don samun lambar asusu ta musamman (DVA), shiga manhajarka ka duba shafin Wallet.`;
+                        bankText = `\n\n💡 Don samun lambar asusu ta musamman (DVA), shiga manhajar Abu Mafhal Sub ka duba shafin Wallet.`;
                     }
 
-                    const balMsg = `💰 *Bayanin Balance ɗinka:*\n\n👤 Suna: *${profile.full_name}*\n💳 Balance: *₦${currentBalance.toLocaleString()}*${bankText}\n\n(Tura '0' don komawa babban menu)`;
+                    const balMsg = `💰 *Bayanin Asusu (Wallet Info)*\n\n👤 Suna: *${profile.full_name}*\n💳 Balance: *₦${currentBalance.toLocaleString()}*${bankText}\n\n(Tura '0' don komawa babban menu)`;
                     return reply(balMsg, 'IDLE');
                 }
 
                 if (text === '4') {
-                    // Option 4: Other Activities
-                    const otherMenu = `🛠️ *Sauran Hidimominmu (Other Services):*\n\n1️⃣ Exam PINs (WAEC, NECO, NABTEB)\n2️⃣ Katin Wutar Lantarki (PHCN / Electricity)\n3️⃣ Katin Cable TV (DSTV, GOTV, Startimes)\n\n(Tura lambar da kake so, ko '0' don komawa babban menu)`;
-                    return reply(otherMenu, 'OTHER_SELECT_SERVICE', {});
+                    // Option 4: Cable TV
+                    return reply(
+                        `📺 *Katin Cable TV: Zaɓi Mai Ba Da Sabis:*\n\n1️⃣ DSTV\n2️⃣ GOTV\n3️⃣ STARTIMES\n\n(Tura lamba, ko '0' don komawa babban menu)`,
+                        'CABLE_SELECT_PROVIDER',
+                        {}
+                    );
                 }
 
                 if (text === '5') {
-                    // Option 5: Recent Transactions
+                    // Option 5: Electricity
+                    return reply(
+                        `⚡ *Katin Wutar Lantarki (PHCN Electricity):*\n\n1️⃣ AEDC (Abuja)\n2️⃣ IBEDC (Ibadan)\n3️⃣ EKEDC (Eko)\n4️⃣ IKEDC (Ikeja)\n5️⃣ KEDCO (Kano/Yobe/Katsina)\n6️⃣ EEDC (Enugu)\n7️⃣ PHED (Port Harcourt)\n\n(Tura lamba, ko '0' don komawa babban menu)`,
+                        'ELECTRICITY_SELECT_DISCO',
+                        {}
+                    );
+                }
+
+                if (text === '6') {
+                    // Option 6: Exam PINs
+                    return reply(
+                        `🎓 *Exam Scratch Cards: Zaɓi Jarabawa:*\n\n1️⃣ WAEC Scratch Card\n2️⃣ NECO Result Token\n3️⃣ NABTEB Result PIN\n\n(Tura lamba, ko '0' don komawa babban menu)`,
+                        'EXAM_SELECT_TYPE',
+                        {}
+                    );
+                }
+
+                if (text === '7') {
+                    // Option 7: Airtime to Cash
+                    const a2cMsg = `💵 *Canza Airtime zuwa Kuɗi (Airtime to Cash)*\n\nMuna canza katin kiran MTN, Airtel, Glo, da 9mobile zuwa kuɗi a wallet ɗinka ko asusun banki:\n\n• MTN: 80% - 85%\n• Airtel: 75% - 80%\n• Glo: 70% - 75%\n• 9mobile: 70% - 75%\n\n💬 *Don canza airtime a take:* Tuntuɓi Admin a WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20canza%20airtime%20zuwa%20kudi\n\n(Tura '0' don komawa babban menu)`;
+                    return reply(a2cMsg, 'IDLE');
+                }
+
+                if (text === '8') {
+                    // Option 8: Recharge Card PIN
+                    const rPinMsg = `🖨️ *Buga Katin Recharge (Recharge PIN)*\n\nZaka iya samarwa ko buga katin recharge na MTN, Airtel, Glo, da 9mobile kai tsaye a cikin manhajar *Abu Mafhal Sub* tare da samun rangwame na musamman.\n\n🌐 Don shiga shafin buga kati, buɗe manhajar Abu Mafhal Sub ka duba shafin *Recharge PIN*.\n\n(Tura '0' don komawa babban menu)`;
+                    return reply(rPinMsg, 'IDLE');
+                }
+
+                if (text === '9') {
+                    // Option 9: Recent Transactions
                     const { data: txs } = await supabaseAdmin
                         .from('transactions')
                         .select('type, amount, status, description, created_at')
@@ -425,7 +544,7 @@ Deno.serve(async (req: Request) => {
                         return reply(`📜 Ba ka da wani transaction kwanan nan a asusunka.\n\n(Tura '0' don komawa babban menu)`, 'IDLE');
                     }
 
-                    let txMsg = `📜 *Sabbin Transactions 5 na Kwanan Nan:*\n`;
+                    let txMsg = `📜 *Transactions 5 na Kwanan Nan:*\n`;
                     txs.forEach((t, idx) => {
                         const icon = t.status === 'success' ? '✅' : t.status === 'failed' ? '❌' : '⏳';
                         const dateStr = new Date(t.created_at).toLocaleDateString('en-GB');
@@ -435,8 +554,8 @@ Deno.serve(async (req: Request) => {
                     return reply(txMsg, 'IDLE');
                 }
 
-                if (text === '6') {
-                    // Option 6: Call & Support Escalation
+                if (text === '10' || text === 'admin' || text === 'call' || text === 'support') {
+                    // Option 10: Call & Support Escalation
                     try {
                         const { data: ticket } = await supabaseAdmin
                             .from('tickets')
@@ -458,12 +577,12 @@ Deno.serve(async (req: Request) => {
                         }
                     } catch (_) {}
 
-                    const supportMsg = `📞 *ABU-MAFHAL-HUB Admin Call & Support:*\n\n✅ An buɗe maka Support Ticket a manhaja kuma an sanar da Admin a take!\n\n📱 *Kira Kai Tsaye (Direct Phone Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20bu%C6%99atar%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n📧 *Email:* support@abumafhal.com\n\n(Tura '0' don komawa babban menu)`;
+                    const supportMsg = `📞 *Abu Mafhal Sub Support & Call:*\n\n✅ An buɗe maka Support Ticket kuma an sanar da Admin a take.\n\n📱 *Kira Kai Tsaye (Direct Phone Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20neman%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n📧 *Email:* support@abumafhal.com.ng\n\n(Tura '0' don komawa babban menu)`;
                     return reply(supportMsg, 'IDLE');
                 }
 
                 // Default Main Menu
-                const mainMenu = `🌟 *Barka da zuwa ABU-MAFHAL-HUB!* 🌟\n👤 Sannu *${userFirstName}*,\n💰 Balance: *₦${currentBalance.toLocaleString()}*\n\nZaɓi lambar hidimar da kake so:\n1️⃣ Siyan Data (MTN, Airtel, Glo, 9mobile)\n2️⃣ Siyan Airtime (Katin Kira)\n3️⃣ Duba Balance & Zuba Kuɗi (DVA)\n4️⃣ Sauran Hidimomi (Exam PIN, PHCN, Cable)\n5️⃣ Tarihin Kwanan Nan (Recent History)\n6️⃣ Kira / Magana da Admin (Support & Call)\n\n_(Kowane lokaci zaka iya tura '0' don sake ganin wannan menu)_`;
+                const mainMenu = `🌟 *Barka da zuwa Abu Mafhal Sub!* 🌟\n👤 Sannu *${userFirstName}*,\n💰 Balance: *₦${currentBalance.toLocaleString()}*\n\nZaɓi lambar hidimar da kake so:\n1️⃣ Siyan Data (MTN, Airtel, Glo, 9mobile)\n2️⃣ Siyan Airtime (Katin Kira)\n3️⃣ Zuba Kuɗi / Bank Accounts (DVA)\n4️⃣ Katin Cable TV (DSTV, GOTV, Startimes)\n5️⃣ Wutar Lantarki (PHCN Electricity)\n6️⃣ Exam PINs (WAEC, NECO, NABTEB)\n7️⃣ Canza Airtime zuwa Kuɗi (Airtime to Cash)\n8️⃣ Buga Katin Recharge (Recharge PIN)\n9️⃣ Tarihin Kwanan Nan (Recent History)\n🔟 Tuntubi Admin / Support (Call & Chat)\n\n_(Tura lambar zaɓinka, ko '0' kowane lokaci don sake ganin menu)_`;
                 return reply(mainMenu, 'IDLE');
             }
 
@@ -622,7 +741,7 @@ Deno.serve(async (req: Request) => {
 
                         const newBal = Number(updatedProfile?.balance || (currentBalance - Number(selectedPlan.selling_price)));
 
-                        const successMsg = `✅ *Transaction Ya Yi Nasara!* 🎉\n\n📦 Sabis: *${selectedPlan.name}*\n📶 Network: *${network.toUpperCase()}*\n📱 Lamba: *${recipientPhone}*\n💰 Kuɗi: *₦${Number(selectedPlan.selling_price).toLocaleString()}*\n💳 Sabon Balance: *₦${newBal.toLocaleString()}*\n\n_Mun gode da kasuwanci da ABU-MAFHAL-HUB!_\n\n(Tura '0' ko 'menu' don sabon transaction)`;
+                        const successMsg = `✅ *Transaction Ya Yi Nasara!* 🎉\n\n📦 Sabis: *${selectedPlan.name}*\n📶 Network: *${network.toUpperCase()}*\n📱 Lamba: *${recipientPhone}*\n💰 Kuɗi: *₦${Number(selectedPlan.selling_price).toLocaleString()}*\n💳 Sabon Balance: *₦${newBal.toLocaleString()}*\n\n_Mun gode da kasuwanci da Abu Mafhal Sub!_\n\n(Tura '0' ko 'menu' don sabon transaction)`;
                         return reply(successMsg, 'IDLE', {});
                     } else {
                         const errMsg = billsData.error || billsData.message || "An samu matsala wajen sarrafa wannan oda.";
@@ -748,7 +867,7 @@ Deno.serve(async (req: Request) => {
 
                         const newBal = Number(updatedProfile?.balance || (currentBalance - amount));
 
-                        const successMsg = `✅ *Airtime Ya Yi Nasara!* 🎉\n\n📶 Network: *${network.toUpperCase()}*\n📱 Lamba: *${recipientPhone}*\n💰 Adadi: *₦${amount.toLocaleString()}*\n💳 Sabon Balance: *₦${newBal.toLocaleString()}*\n\n_Mun gode da amfani da ABU-MAFHAL-HUB!_\n\n(Tura '0' ko 'menu' don sabon transaction)`;
+                        const successMsg = `✅ *Airtime Ya Yi Nasara!* 🎉\n\n📶 Network: *${network.toUpperCase()}*\n📱 Lamba: *${recipientPhone}*\n💰 Adadi: *₦${amount.toLocaleString()}*\n💳 Sabon Balance: *₦${newBal.toLocaleString()}*\n\n_Mun gode da amfani da Abu Mafhal Sub!_\n\n(Tura '0' ko 'menu' don sabon transaction)`;
                         return reply(successMsg, 'IDLE', {});
                     } else {
                         const errMsg = billsData.error || billsData.message || "An samu matsala wajen tura katin kira.";
@@ -1079,7 +1198,7 @@ Deno.serve(async (req: Request) => {
 
                     const data = await res.json().catch(() => ({ success: false, error: "Network error" }));
                     if (data.success) {
-                        return reply(`✅ *Biyan Cable TV Ya Yi Nasara!* 🎉\n\n📺 TV: *${sessionData.provider.name}*\n📦 Package: *${pkg.name}*\n🔢 SmartCard: *${sessionData.smart_card}*\n💰 Kuɗi: *₦${Number(pkg.price).toLocaleString()}*\n\n_Mun gode da amfani da ABU-MAFHAL-HUB!_\n\n(Tura '0' don komawa babban menu)`, 'IDLE', {});
+                        return reply(`✅ *Biyan Cable TV Ya Yi Nasara!* 🎉\n\n📺 TV: *${sessionData.provider.name}*\n📦 Package: *${pkg.name}*\n🔢 SmartCard: *${sessionData.smart_card}*\n💰 Kuɗi: *₦${Number(pkg.price).toLocaleString()}*\n\n_Mun gode da amfani da Abu Mafhal Sub!_\n\n(Tura '0' don komawa babban menu)`, 'IDLE', {});
                     } else {
                         return reply(`❌ *Ba a samu nasara ba:*\n${data.error || "An samu matsala"}\n\n(Tura '0' don komawa babban menu)`, 'IDLE', {});
                     }
@@ -1089,7 +1208,7 @@ Deno.serve(async (req: Request) => {
             }
 
             // Fallback for unhandled input: return to main menu
-            return reply(`🌟 *ABU-MAFHAL-HUB WhatsApp Bot*\n\nBa a gane wannan umarni ba. Da fatan ka tura '0' ko 'menu' don duba jerin hidimominmu.`, 'IDLE');
+            return reply(`🌟 *Abu Mafhal Sub WhatsApp Bot*\n\nBa a gane wannan zaɓin ba. Da fatan ka tura '0' ko 'menu' don ganin dukkan hidimominmu.`, 'IDLE');
 
         } catch (err: any) {
             console.error("[WhatsApp Bot] Unexpected error:", err);

@@ -10,7 +10,7 @@ import { usePushNotifications } from '../../hooks/usePushNotifications';
 import ModernTabBar from '../../components/ModernTabBar';
 import WebDesktopSidebar from '../../components/WebDesktopSidebar';
 import WebDesktopHeader from '../../components/WebDesktopHeader';
-import { useAppSettings } from '../../hooks/useAppSettings';
+import { useAppSettings, formatWhatsAppPhone } from '../../hooks/useAppSettings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppRatingModal from '../../components/AppRatingModal';
 
@@ -81,10 +81,10 @@ export default function AppLayout() {
     const handleOpenWhatsAppChat = async () => {
         setIsFabOpen(false);
         setIsSocialFabOpen(false);
-        const rawPhone = settings?.support_whatsapp || '2348145853539';
-        const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
-        const nativeUrl = `whatsapp://send?phone=${cleanPhone}&text=Hello%20Abu%20Mafhal%20Support`;
-        const webUrl = `https://wa.me/${cleanPhone}?text=Hello%20Abu%20Mafhal%20Support`;
+        const rawPhone = settings?.whatsapp_bot_number || settings?.support_whatsapp || '2349065645747';
+        const cleanPhone = formatWhatsAppPhone(rawPhone, '2349065645747');
+        const nativeUrl = `whatsapp://send?phone=${cleanPhone}&text=Hi`;
+        const webUrl = `https://wa.me/${cleanPhone}?text=Hi`;
         try {
             const canOpen = await Linking.canOpenURL(nativeUrl).catch(() => false);
             if (canOpen) {
