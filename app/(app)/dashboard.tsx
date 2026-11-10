@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAppSettings } from '../../hooks/useAppSettings';
+import { useAppSettings, formatWhatsAppPhone } from '../../hooks/useAppSettings';
 import GlobalAnnouncementModal from '../../components/GlobalAnnouncementModal';
 import CelebrationConfetti, { CelebrationSettings, triggerGlobalConfetti } from '../../components/CelebrationConfetti';
 import DynamicBanners from '../../components/DynamicBanners';
@@ -77,7 +77,7 @@ export default function Dashboard() {
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
   const [telecomBannerConfig, setTelecomBannerConfig] = useState<{ is_visible?: boolean; banners?: any[] } | null>(null);
   const [telecomSlideIdx, setTelecomSlideIdx] = useState(0);
-  const [waBotNumber, setWaBotNumber] = useState('2348145853539');
+  const [waBotNumber, setWaBotNumber] = useState('2349065645747');
 
   // Auto-cycle telecom slides if multiple exist
   useEffect(() => {
@@ -306,15 +306,12 @@ export default function Dashboard() {
   const fetchAppSettings = async () => {
     try {
       const { data } = await supabase.from('app_settings').select('key, value').in('key', [
-        'app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations', 'celebration_event_settings', 'telecom_hub_banner_config', 'whatsapp_bot_number', 'support_whatsapp'
+        'app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations', 'celebration_event_settings', 'telecom_hub_banner_config', 'whatsapp_bot_number', 'WHATSAPP_BOT_NUMBER', 'whatsapp_number', 'WHATSAPP_NUMBER', 'support_whatsapp'
       ]);
       if (data) {
         data.forEach(setting => {
-          if (setting.key === 'whatsapp_bot_number' && setting.value) {
-            setWaBotNumber(setting.value);
-          }
-          if (setting.key === 'support_whatsapp' && setting.value) {
-            setWaBotNumber(prev => prev === '2348145853539' ? setting.value : prev);
+          if ((setting.key === 'whatsapp_bot_number' || setting.key === 'WHATSAPP_BOT_NUMBER' || setting.key === 'whatsapp_number' || setting.key === 'WHATSAPP_NUMBER') && setting.value) {
+            setWaBotNumber(formatWhatsAppPhone(setting.value));
           }
           if (setting.key === 'app_logo' && setting.value) {
             let url = setting.value;
@@ -530,7 +527,7 @@ export default function Dashboard() {
       if (flag && !flag.is_enabled) { alert(flag.maintenance_message || 'This feature is currently under maintenance.'); return; }
     }
     if (action.id === 'whatsapp_bot') {
-      const botNum = '2348145853539';
+      const botNum = formatWhatsAppPhone(waBotNumber);
       const target = `whatsapp://send?phone=${botNum}&text=Hi`;
       Linking.openURL(target).catch(() => {
         Linking.openURL(`https://wa.me/${botNum}?text=Hi`).catch(() => {});
@@ -766,7 +763,7 @@ export default function Dashboard() {
 
               <TouchableOpacity
                 onPress={() => {
-                  const botNum = (waBotNumber || '2348145853539').replace(/\D/g, '');
+                  const botNum = formatWhatsAppPhone(waBotNumber);
                   const target = `whatsapp://send?phone=${botNum}&text=Hi`;
                   Linking.openURL(target).catch(() => {
                     Linking.openURL(`https://wa.me/${botNum}?text=Hi`).catch(() => {});

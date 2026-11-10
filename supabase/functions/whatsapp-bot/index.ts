@@ -96,7 +96,12 @@ Deno.serve(async (req: Request) => {
     const verifyToken = secrets['WHATSAPP_VERIFY_TOKEN'] || Deno.env.get('WHATSAPP_VERIFY_TOKEN') || 'abumafhal_wa_verify_2026';
     const phoneNumberId = secrets['WHATSAPP_PHONE_NUMBER_ID'] || Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') || '';
     const accessToken = secrets['WHATSAPP_ACCESS_TOKEN'] || Deno.env.get('WHATSAPP_ACCESS_TOKEN') || '';
-    const adminCallPhone = (secrets['WHATSAPP_ADMIN_CALL_PHONE'] || settingsMap['whatsapp_admin_call_phone'] || settingsMap['support_whatsapp'] || '2348145853539').replace(/\D/g, '');
+    let adminCallPhone = (secrets['WHATSAPP_ADMIN_CALL_PHONE'] || settingsMap['whatsapp_admin_call_phone'] || settingsMap['support_whatsapp'] || '2348145853539').replace(/\D/g, '');
+    if (adminCallPhone.startsWith('0') && adminCallPhone.length === 11) {
+        adminCallPhone = '234' + adminCallPhone.slice(1);
+    } else if (adminCallPhone.length === 10) {
+        adminCallPhone = '234' + adminCallPhone;
+    }
 
     // ==========================================
     // 1. GET: Webhook Verification (Meta Setup)
@@ -196,15 +201,25 @@ Deno.serve(async (req: Request) => {
 
             // 1. Try resolving user if not already linked
             if (!userId) {
-                const { data: matchedUser } = await supabaseAdmin
-                    .rpc('get_user_by_whatsapp_phone', { wa_phone: senderPhone });
+                const cleanDigits = senderPhone.replace(/\D/g, '');
+                const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
 
-                if (matchedUser && matchedUser.length > 0) {
-                    userId = matchedUser[0].id;
-                    await supabaseAdmin
-                        .from('whatsapp_bot_sessions')
-                        .update({ user_id: userId })
-                        .eq('phone_number', senderPhone);
+                try {
+                    const { data: matchedProfiles } = await supabaseAdmin
+                        .from('profiles')
+                        .select('id, full_name, email, balance, transaction_pin, phone')
+                        .or(`phone.eq.${senderPhone},phone.eq.0${last10},phone.eq.+234${last10},phone.eq.234${last10},phone.eq.${last10}`)
+                        .limit(1);
+
+                    if (matchedProfiles && matchedProfiles.length > 0) {
+                        userId = matchedProfiles[0].id;
+                        await supabaseAdmin
+                            .from('whatsapp_bot_sessions')
+                            .update({ user_id: userId })
+                            .eq('phone_number', senderPhone);
+                    }
+                } catch (e) {
+                    console.error("[WhatsApp Bot] Profile resolution error:", e);
                 }
             }
 
@@ -215,23 +230,32 @@ Deno.serve(async (req: Request) => {
             }
 
             // Helper to reply and update state
-            const reply = async (msg: string, nextStep: string = 'IDLE', nextData: any = sessionData) => {
+            const reply = async (msg: string, nextStep: string = 'IDLE', nextData: any = sessionData): Promise<Response> => {
                 await sendWhatsAppMessage(senderPhone, msg, phoneNumberId, accessToken);
-                await supabaseAdmin
-                    .from('whatsapp_bot_sessions')
-                    .update({
-                        step: nextStep,
-                        session_data: nextData,
-                        last_interaction: new Date().toISOString()
-                    })
-                    .eq('phone_number', senderPhone);
+                try {
+                    await supabaseAdmin
+                        .from('whatsapp_bot_sessions')
+                        .update({
+                            step: nextStep,
+                            session_data: nextData,
+                            last_interaction: new Date().toISOString()
+                        })
+                        .eq('phone_number', senderPhone);
 
-                supabaseAdmin.from('whatsapp_bot_logs').insert({
-                    phone_number: senderPhone,
-                    direction: 'outgoing',
-                    message_type: 'text',
-                    content: msg
-                }).then(() => {}).catch(() => {});
+                    await supabaseAdmin.from('whatsapp_bot_logs').insert({
+                        phone_number: senderPhone,
+                        direction: 'outgoing',
+                        message_type: 'text',
+                        content: msg
+                    });
+                } catch (logErr) {
+                    console.error("[WhatsApp Bot] Session/log update error:", logErr);
+                }
+
+                return new Response(JSON.stringify({ status: "success", step: nextStep }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
             };
 
             // Direct Call / Support Escalation keyword trigger
@@ -334,7 +358,7 @@ Deno.serve(async (req: Request) => {
                 .from('profiles')
                 .select('id, full_name, email, balance, transaction_pin, phone')
                 .eq('id', userId)
-                .single();
+                .maybeSingle();
 
             if (!profile) {
                 await supabaseAdmin.from('whatsapp_bot_sessions').update({ user_id: null }).eq('phone_number', senderPhone);

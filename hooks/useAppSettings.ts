@@ -39,6 +39,15 @@ export interface AppSettings {
     [key: string]: any;
 }
 
+export function formatWhatsAppPhone(raw?: string | null, fallback = '2349065645747'): string {
+    if (!raw) return fallback;
+    const clean = raw.toString().replace(/\D/g, '');
+    if (clean.startsWith('234') && clean.length === 13) return clean;
+    if (clean.startsWith('0') && clean.length === 11) return '234' + clean.slice(1);
+    if (clean.length === 10) return '234' + clean;
+    return clean || fallback;
+}
+
 const DEFAULT_SETTINGS: AppSettings = {
     maintenance_mode: false,
     allow_registrations: true,

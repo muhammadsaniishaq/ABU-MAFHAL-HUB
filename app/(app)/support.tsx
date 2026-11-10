@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppSettings } from '../../hooks/useAppSettings';
+import { useAppSettings, formatWhatsAppPhone } from '../../hooks/useAppSettings';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -42,7 +42,8 @@ export default function SupportScreen() {
 
   const handleContact = (type: 'whatsapp' | 'email' | 'phone' | 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'whatsapp_group' | 'whatsapp_channel') => {
     let url = '';
-    const whatsappNumber = settings.support_whatsapp || '2348145853539';
+    const adminPhoneRaw = settings.whatsapp_admin_call_phone || (settings as any).WHATSAPP_ADMIN_CALL_PHONE || settings.support_whatsapp || '2348145853539';
+    const whatsappNumber = formatWhatsAppPhone(adminPhoneRaw, '2348145853539');
     const emailAddress = settings.support_email || 'admin@abumafhal.com.ng';
     
     switch (type) {
@@ -181,11 +182,11 @@ export default function SupportScreen() {
         <TouchableOpacity
           style={[s.aiCardWrapper, { marginTop: 12 }]}
           onPress={() => {
-            const botNum = settings.whatsapp_bot_number || settings.support_whatsapp || '2348145853539';
-            const cleanNum = botNum.replace(/\D/g, '');
-            const target = `whatsapp://send?phone=${cleanNum}&text=Hi`;
+            const rawBotNum = settings.whatsapp_bot_number || (settings as any).WHATSAPP_BOT_NUMBER || (settings as any).WHATSAPP_NUMBER || '2349065645747';
+            const botNum = formatWhatsAppPhone(rawBotNum, '2349065645747');
+            const target = `whatsapp://send?phone=${botNum}&text=Hi`;
             Linking.openURL(target).catch(() => {
-              Linking.openURL(`https://wa.me/${cleanNum}?text=Hi`).catch(() => {});
+              Linking.openURL(`https://wa.me/${botNum}?text=Hi`).catch(() => {});
             });
           }}
           activeOpacity={0.88}
