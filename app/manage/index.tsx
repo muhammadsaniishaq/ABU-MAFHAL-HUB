@@ -66,6 +66,7 @@ const ALL_MODULES = [
   { t: 'SMM Services', i: 'share-social', r: '/manage/smm-pricing', c: '#ec4899', tag: 'SMM' },
 
   // Messaging & Notifications
+  { t: 'WhatsApp Bot 24/7', i: 'logo-whatsapp', r: '/manage/whatsapp-bot', c: '#25D366', tag: 'Live' },
   { t: 'Push & Ringtone', i: 'notifications', r: '/manage/notifications', c: '#7c3aed', tag: 'Direct' },
   { t: 'Broadcast & News', i: 'megaphone', r: '/manage/communications', c: '#2563eb', tag: 'Comms' },
   { t: 'Bulk SMS Center', i: 'chatbox-ellipses', r: '/manage/bulk-sms', c: '#059669', tag: 'SMS' },

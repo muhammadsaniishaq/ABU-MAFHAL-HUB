@@ -21,6 +21,17 @@ function formatToLocalPhone(rawPhone: string): string {
     return p;
 }
 
+// Helper: Sanitize plan name to remove any vendor tags ([BILAL], [BIGI], [CK], etc.)
+function cleanPlanName(rawName: string): string {
+    if (!rawName) return '';
+    return rawName
+        .replace(/\[\s*(bilal|bilalsadasub|bigi|bigisub|ck|clubkonnect|shago|vtpass|baxi|ketawancy|simhost)[^\]]*\]/gi, '')
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/\b(bilal\s*sada|bilalsadasub|bigisub|clubkonnect|shago|vtpass|ketawancy)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 // Helper: Send message back to user via WhatsApp Meta Cloud API
 async function sendWhatsAppMessage(
     toPhone: string,
@@ -94,6 +105,7 @@ Deno.serve(async (req: Request) => {
             'whatsapp_admin_call_phone', 
             'support_phone', 
             'whatsapp_bot_enabled', 
+            'maintenance_mode',
             'play_store_url', 
             'company_name',
             'site_url',
@@ -129,6 +141,9 @@ Deno.serve(async (req: Request) => {
     } else if (adminCallPhone.length === 10) {
         adminCallPhone = '234' + adminCallPhone;
     }
+
+    const isSystemMaintenance = settingsMap['maintenance_mode'] === 'true';
+    const isBotEnabled = settingsMap['whatsapp_bot_enabled'] !== 'false';
 
     // ==========================================
     // 1. GET: Webhook Verification & Diagnostics
@@ -174,7 +189,7 @@ Deno.serve(async (req: Request) => {
                     .from('whatsapp_bot_logs')
                     .select('id, phone_number, direction, message_type, content, created_at')
                     .order('created_at', { ascending: false })
-                    .limit(5);
+                    .limit(10);
                 recentLogs = logs;
 
                 if (url.searchParams.get('sync_bot_number') === '1') {
@@ -233,6 +248,8 @@ Deno.serve(async (req: Request) => {
                 default_language: "en",
                 domain: webBaseUrl,
                 play_store_url: playStoreLink,
+                maintenance_mode: isSystemMaintenance,
+                bot_enabled: isBotEnabled,
                 has_phone_id: Boolean(phoneNumberId),
                 has_access_token: Boolean(accessToken),
                 phone_id_preview: phoneNumberId ? `${phoneNumberId.slice(0, 4)}...${phoneNumberId.slice(-4)}` : null,
@@ -331,73 +348,6 @@ Deno.serve(async (req: Request) => {
                     .eq('phone_number', senderPhone);
             }
 
-            // 2. Try resolving user profile if not already linked
-            if (!userId) {
-                const cleanDigits = senderPhone.replace(/\D/g, '');
-                const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
-
-                try {
-                    const { data: matchedProfiles } = await supabaseAdmin
-                        .from('profiles')
-                        .select('id, full_name, email, balance, transaction_pin, phone')
-                        .or(`phone.eq.${senderPhone},phone.eq.0${last10},phone.eq.+234${last10},phone.eq.234${last10},phone.eq.${last10}`)
-                        .limit(1);
-
-                    if (matchedProfiles && matchedProfiles.length > 0) {
-                        userId = matchedProfiles[0].id;
-                        await supabaseAdmin
-                            .from('whatsapp_bot_sessions')
-                            .update({ user_id: userId })
-                            .eq('phone_number', senderPhone);
-                    }
-                } catch (e) {
-                    console.error("[WhatsApp Bot] Profile resolution error:", e);
-                }
-            }
-
-            // 3. Load Hidden Features & Feature Flags from DB
-            const { data: hiddenRow } = await supabaseAdmin
-                .from('app_settings')
-                .select('value')
-                .eq('key', 'hidden_features')
-                .maybeSingle();
-
-            let hiddenList: string[] = [];
-            if (hiddenRow?.value) {
-                try {
-                    const parsed = typeof hiddenRow.value === 'string' ? JSON.parse(hiddenRow.value) : hiddenRow.value;
-                    if (Array.isArray(parsed)) hiddenList = parsed;
-                } catch (_) {}
-            }
-
-            const { data: flags } = await supabaseAdmin
-                .from('feature_flags')
-                .select('feature_key, is_enabled');
-
-            if (flags) {
-                flags.forEach(f => {
-                    if (f.is_enabled === false && !hiddenList.includes(f.feature_key)) {
-                        hiddenList.push(f.feature_key);
-                    }
-                });
-            }
-
-            // Function to check if a feature is enabled
-            const isEnabled = (key: string): boolean => {
-                if (hiddenList.includes(key)) return false;
-                // If parent bills category is hidden, hide electricity and cable
-                if ((key === 'cable' || key === 'electricity') && hiddenList.includes('bills')) return false;
-                // If sim or telecom_hub is hidden
-                if (key === 'sim' && (hiddenList.includes('sim') || hiddenList.includes('telecom_hub'))) return false;
-                return true;
-            };
-
-            // Quick reset / Main Menu command
-            if (lowerText === '0' || lowerText === 'menu' || lowerText === 'start' || lowerText === 'reset' || lowerText === 'hi' || lowerText === 'hello' || lowerText === 'sannu' || lowerText === 'barka') {
-                currentStep = 'IDLE';
-                sessionData = { lang: userLang };
-            }
-
             // Helper to reply and update state
             const reply = async (msg: string, nextStep: string = 'IDLE', nextData: any = sessionData): Promise<Response> => {
                 await sendWhatsAppMessage(senderPhone, msg, phoneNumberId, accessToken);
@@ -426,6 +376,95 @@ Deno.serve(async (req: Request) => {
                     status: 200
                 });
             };
+
+            // -------------------------------------------------------------
+            // 2. GLOBAL MAINTENANCE / BOT DISABLED CHECK
+            // -------------------------------------------------------------
+            if (isSystemMaintenance) {
+                const maintMsg = userLang === 'ha'
+                    ? `🚧 *Sanarwar Kulawa da Tsari (Maintenance)* 🚧\n\nBarka! A halin yanzu ana kan aikin inganta tsarin *Abu Mafhal Sub* don yi muku hidima mafi inganci.\n\nDukkan sabis an dakatar da su na ɗan lokaci kaɗan. Za mu dawo nan ba da jimawa ba. Mun gode da haƙuri da fahimta!\n\n📞 *Tuntuɓi Admin Don Gaggawa:*\n📱 Kira: +${adminCallPhone}\n💬 WhatsApp: https://wa.me/${adminCallPhone}\n🌐 Shafin Gizo: ${webBaseUrl}`
+                    : `🚧 *Scheduled System Maintenance* 🚧\n\nDear customer, *Abu Mafhal Sub* is currently undergoing scheduled maintenance & system upgrade to serve you better.\n\nTransactions are temporarily paused and will resume shortly. We apologize for any inconvenience!\n\n📞 *Urgent Inquiries:*\n📱 Direct Call: +${adminCallPhone}\n💬 WhatsApp: https://wa.me/${adminCallPhone}\n🌐 Web Portal: ${webBaseUrl}`;
+                return reply(maintMsg, 'IDLE', sessionData);
+            }
+
+            if (!isBotEnabled) {
+                const offMsg = userLang === 'ha'
+                    ? `⚠️ A halin yanzu an dakatar da WhatsApp Bot na ɗan lokaci don yin gyare-gyare.\n\nDa fatan a sauke manhajar mu a Play Store ko kiran Admin:\n📱 Play Store: ${playStoreLink}\n📞 Kira: +${adminCallPhone}`
+                    : `⚠️ The WhatsApp bot is currently offline for scheduled updates.\n\nPlease use our official mobile app or contact Admin directly:\n📱 Play Store: ${playStoreLink}\n📞 Call: +${adminCallPhone}`;
+                return reply(offMsg, 'IDLE', sessionData);
+            }
+
+            // 3. Try resolving user profile if not already linked
+            if (!userId) {
+                const cleanDigits = senderPhone.replace(/\D/g, '');
+                const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+
+                try {
+                    const { data: matchedProfiles } = await supabaseAdmin
+                        .from('profiles')
+                        .select('id, full_name, email, balance, transaction_pin, phone')
+                        .or(`phone.eq.${senderPhone},phone.eq.0${last10},phone.eq.+234${last10},phone.eq.234${last10},phone.eq.${last10}`)
+                        .limit(1);
+
+                    if (matchedProfiles && matchedProfiles.length > 0) {
+                        userId = matchedProfiles[0].id;
+                        await supabaseAdmin
+                            .from('whatsapp_bot_sessions')
+                            .update({ user_id: userId })
+                            .eq('phone_number', senderPhone);
+                    }
+                } catch (e) {
+                    console.error("[WhatsApp Bot] Profile resolution error:", e);
+                }
+            }
+
+            // 4. Load Hidden Features & Feature Flags from DB
+            const { data: hiddenRow } = await supabaseAdmin
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'hidden_features')
+                .maybeSingle();
+
+            let hiddenList: string[] = [];
+            if (hiddenRow?.value) {
+                try {
+                    const parsed = typeof hiddenRow.value === 'string' ? JSON.parse(hiddenRow.value) : hiddenRow.value;
+                    if (Array.isArray(parsed)) hiddenList = parsed.map(x => String(x).toLowerCase().trim());
+                } catch (_) {}
+            }
+
+            const { data: flags } = await supabaseAdmin
+                .from('feature_flags')
+                .select('feature_key, is_enabled');
+
+            if (flags) {
+                flags.forEach(f => {
+                    const rawKey = String(f.feature_key || '').toLowerCase().trim();
+                    const cleanKey = rawKey.replace(/^feature_/, '');
+                    if (f.is_enabled === false) {
+                        if (!hiddenList.includes(rawKey)) hiddenList.push(rawKey);
+                        if (!hiddenList.includes(cleanKey)) hiddenList.push(cleanKey);
+                    }
+                });
+            }
+
+            // Strict Function to check if a feature is enabled
+            const isEnabled = (key: string): boolean => {
+                const k = key.toLowerCase().trim();
+                const fk = 'feature_' + k;
+                if (hiddenList.includes(k) || hiddenList.includes(fk)) return false;
+                // If parent bills category is hidden, hide electricity and cable
+                if ((k === 'cable' || k === 'electricity') && (hiddenList.includes('bills') || hiddenList.includes('feature_bills'))) return false;
+                // If sim or telecom_hub is hidden
+                if (k === 'sim' && (hiddenList.includes('sim') || hiddenList.includes('telecom_hub') || hiddenList.includes('feature_sim') || hiddenList.includes('feature_telecom_sim'))) return false;
+                return true;
+            };
+
+            // Quick reset / Main Menu command
+            if (lowerText === '0' || lowerText === 'menu' || lowerText === 'start' || lowerText === 'reset' || lowerText === 'hi' || lowerText === 'hello' || lowerText === 'sannu' || lowerText === 'barka') {
+                currentStep = 'IDLE';
+                sessionData = { lang: userLang };
+            }
 
             // Language switcher selection
             if (lowerText === 'lang' || lowerText === 'language' || lowerText === 'yare') {
@@ -487,24 +526,24 @@ Deno.serve(async (req: Request) => {
             }
 
             const masterCatalog: CatalogItem[] = [
-                { key: 'data',          icon: '📶', titleEn: 'Buy Data (MTN, Airtel, Glo, 9mobile)', titleHa: 'Siyan Data (MTN, Airtel, Glo, 9mobile)' },
-                { key: 'airtime',       icon: '📲', titleEn: 'Buy Airtime (VTU Recharge)',            titleHa: 'Siyan Airtime (Katin Kira)' },
-                { key: 'wallet',        icon: '🏦', titleEn: 'Fund Wallet / Virtual Account (DVA)',   titleHa: 'Zuba Kuɗi a Asusu (DVA)' },
-                { key: 'cable',         icon: '📺', titleEn: 'Cable TV (DSTV, GOtv, Startimes)',      titleHa: 'Katin Cable TV (DSTV, GOTV, Startimes)' },
-                { key: 'electricity',   icon: '⚡', titleEn: 'Electricity Bill (PHCN Token)',         titleHa: 'Wutar Lantarki (PHCN Electricity)' },
-                { key: 'education',     icon: '🎓', titleEn: 'Exam Result PINs (WAEC, NECO, NABTEB)', titleHa: 'Exam Scratch Cards (WAEC, NECO, NABTEB)' },
-                { key: 'airtime_cash',  icon: '💵', titleEn: 'Airtime to Cash (Convert Airtime)',     titleHa: 'Canza Airtime zuwa Kuɗi' },
-                { key: 'recharge_pin',  icon: '🖨️', titleEn: 'Recharge Card PIN / Printing',          titleHa: 'Buga Katin Recharge (Recharge PIN)' },
-                { key: 'bulk_sms',      icon: '💬', titleEn: 'Bulk SMS (Custom Sender ID)',           titleHa: 'Bulk SMS (Tura Saƙonni)' },
-                { key: 'nin',           icon: '🪪', titleEn: 'NIN Verification & Slip Printing',      titleHa: 'Binciken NIN & Buga Slip' },
-                { key: 'bvn',           icon: '🔍', titleEn: 'BVN Verification Services',             titleHa: 'Binciken BVN' },
-                { key: 'cac',           icon: '🏢', titleEn: 'CAC Business Registration',             titleHa: 'Rijistar Kamfani (CAC)' },
-                { key: 'sim',           icon: '💳', titleEn: 'Buy SIM Cards (Kirani 4G SIM)',         titleHa: 'Siyan SIM Card' },
-                { key: 'cards',         icon: '💳', titleEn: 'Virtual Dollar & Naira Cards',          titleHa: 'Katin Virtual Card (Dollar & Naira)' },
-                { key: 'crypto',        icon: '🪙', titleEn: 'Crypto Exchange (USDT, BTC, Web3)',     titleHa: 'Harkokin Crypto (USDT, BTC)' },
-                { key: 'history',       icon: '📜', titleEn: 'Recent Transactions (History)',         titleHa: 'Tarihin Kwanan Nan (History)' },
-                { key: 'support',       icon: '📞', titleEn: 'Customer Support / Call Admin',         titleHa: 'Tuntubi Admin / Kira da Magana' },
-                { key: 'language',      icon: '🌐', titleEn: 'Change Language (English / Hausa)',     titleHa: 'Sauya Yare (English / Hausa)' },
+                { key: 'data',          icon: '📶', titleEn: 'Buy Data (MTN, Airtel, Glo, 9mobile, Smile)', titleHa: 'Siyan Data (MTN, Airtel, Glo, 9mobile, Smile)' },
+                { key: 'airtime',       icon: '📲', titleEn: 'Buy Airtime (VTU Recharge)',                  titleHa: 'Siyan Airtime (Katin Kira)' },
+                { key: 'wallet',        icon: '🏦', titleEn: 'Fund Wallet / Virtual Account (DVA)',         titleHa: 'Zuba Kuɗi a Asusu (DVA)' },
+                { key: 'cable',         icon: '📺', titleEn: 'Cable TV (DSTV, GOtv, Startimes)',            titleHa: 'Katin Cable TV (DSTV, GOTV, Startimes)' },
+                { key: 'electricity',   icon: '⚡', titleEn: 'Electricity Bill (PHCN Token)',               titleHa: 'Wutar Lantarki (PHCN Electricity)' },
+                { key: 'education',     icon: '🎓', titleEn: 'Exam Result PINs (WAEC, NECO, NABTEB)',       titleHa: 'Exam Scratch Cards (WAEC, NECO, NABTEB)' },
+                { key: 'airtime_cash',  icon: '💵', titleEn: 'Airtime to Cash (Convert Airtime)',           titleHa: 'Canza Airtime zuwa Kuɗi' },
+                { key: 'recharge_pin',  icon: '🖨️', titleEn: 'Recharge Card PIN / Printing',                titleHa: 'Buga Katin Recharge (Recharge PIN)' },
+                { key: 'bulk_sms',      icon: '💬', titleEn: 'Bulk SMS (Custom Sender ID)',                 titleHa: 'Bulk SMS (Tura Saƙonni)' },
+                { key: 'nin',           icon: '🪪', titleEn: 'NIN Verification & Slip Printing',            titleHa: 'Binciken NIN & Buga Slip' },
+                { key: 'bvn',           icon: '🔍', titleEn: 'BVN Verification Services',                   titleHa: 'Binciken BVN' },
+                { key: 'cac',           icon: '🏢', titleEn: 'CAC Business Registration',                   titleHa: 'Rijistar Kamfani (CAC)' },
+                { key: 'sim',           icon: '💳', titleEn: 'Buy SIM Cards (Kirani 4G SIM)',               titleHa: 'Siyan SIM Card' },
+                { key: 'cards',         icon: '💳', titleEn: 'Virtual Dollar & Naira Cards',                titleHa: 'Katin Virtual Card (Dollar & Naira)' },
+                { key: 'crypto',        icon: '🪙', titleEn: 'Crypto Exchange (USDT, BTC, Web3)',           titleHa: 'Harkokin Crypto (USDT, BTC)' },
+                { key: 'history',       icon: '📜', titleEn: 'Recent Transactions (History)',               titleHa: 'Tarihin Kwanan Nan (History)' },
+                { key: 'support',       icon: '📞', titleEn: 'Customer Support / Call Admin',               titleHa: 'Tuntubi Admin / Kira da Magana' },
+                { key: 'language',      icon: '🌐', titleEn: 'Change Language (English / Hausa)',           titleHa: 'Sauya Yare (English / Hausa)' },
             ];
 
             // Strict Dynamic Feature Visibility: Filter out any feature hidden in Admin!
@@ -604,10 +643,18 @@ Deno.serve(async (req: Request) => {
                 if (!isNaN(choiceNum) && choiceNum >= 1 && choiceNum <= availableItems.length) {
                     const chosen = availableItems[choiceNum - 1];
 
+                    // Check if feature is closed/disabled
+                    if (!isEnabled(chosen.key)) {
+                        const closedMsg = userLang === 'ha'
+                            ? `⚠️ Wannan sabis ɗin yana fuskantar kulawa ta musamman (Maintenance) a halin yanzu. Da fatan a gwada wani sabis ɗin ko tura '0' don komawa babban menu.`
+                            : `⚠️ This service is currently under maintenance. Please try another option or type '0' for main menu.`;
+                        return reply(closedMsg, 'IDLE', { lang: userLang });
+                    }
+
                     if (chosen.key === 'data') {
                         const netMenu = userLang === 'ha'
-                            ? `📶 *Siyan Data (Buy Data)*\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Tura lamba 1-4, ko '0' don sokewa)`
-                            : `📶 *Buy Data Bundle*\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Reply with number 1-4, or '0' to cancel)`;
+                            ? `📶 *Siyan Data (Buy Data Bundle)*\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Tura lamba 1-5 ko sunan network, ko '0' don sokewa)`
+                            : `📶 *Buy Data Bundle*\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Reply with 1-5 or network name, or '0' to cancel)`;
                         return reply(netMenu, 'DATA_SELECT_NETWORK', { lang: userLang });
                     }
 
@@ -806,43 +853,93 @@ Deno.serve(async (req: Request) => {
             }
 
             // -------------------------------------------------------------
-            // C. BUY DATA FLOW (Bilingual based on userLang)
+            // C. BUY DATA FLOW (All Networks + Smart Curation + Vendor Stripping)
             // -------------------------------------------------------------
             if (currentStep === 'DATA_SELECT_NETWORK') {
-                const netMap: Record<string, string> = {
-                    '1': 'mtn',
-                    '2': 'airtel',
-                    '3': 'glo',
-                    '4': '9mobile'
-                };
+                const netInput = lowerText.replace(/\s+/g, '');
+                let chosenNetwork = '';
 
-                const chosenNetwork = netMap[text];
+                if (netInput === '1' || netInput.includes('mtn')) chosenNetwork = 'mtn';
+                else if (netInput === '2' || netInput.includes('airtel')) chosenNetwork = 'airtel';
+                else if (netInput === '3' || netInput.includes('glo')) chosenNetwork = 'glo';
+                else if (netInput === '4' || netInput.includes('9mobile') || netInput.includes('etisalat') || netInput.includes('9mob')) chosenNetwork = '9mobile';
+                else if (netInput === '5' || netInput.includes('smile')) chosenNetwork = 'smile';
+
                 if (!chosenNetwork) {
                     const invNet = userLang === 'ha'
-                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi:\n1 na MTN\n2 na AIRTEL\n3 na GLO\n4 na 9MOBILE\n(Ko tura '0' don sokewa):`
-                        : `❌ Invalid choice.\n\nSelect:\n1 for MTN\n2 for AIRTEL\n3 for GLO\n4 for 9MOBILE\n(Or reply '0' to cancel):`;
+                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Tura lamba 1-5 ko sunan network, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Reply with 1-5 or network name, or '0' to cancel):`;
                     return reply(invNet, 'DATA_SELECT_NETWORK', sessionData);
                 }
 
-                let activePlans: any[] = [];
-                const { data: plans } = await supabaseAdmin
-                    .from('data_plans')
-                    .select('*')
-                    .ilike('network', chosenNetwork)
-                    .eq('is_active', true)
-                    .order('selling_price', { ascending: true })
-                    .limit(10);
+                // Fallback built-in catalog for Smile if not in data_plans
+                const smileFallback = [
+                    { id: 'smile_1.5gb', plan_id: 'smile_1gb', name: 'Smile 1.5GB Monthly', selling_price: 1200, validity: '30 Days' },
+                    { id: 'smile_2gb', plan_id: 'smile_2gb', name: 'Smile 2GB Monthly', selling_price: 1500, validity: '30 Days' },
+                    { id: 'smile_3gb', plan_id: 'smile_3gb', name: 'Smile 3GB Monthly', selling_price: 2000, validity: '30 Days' },
+                    { id: 'smile_5gb', plan_id: 'smile_5gb', name: 'Smile 5GB Monthly', selling_price: 3000, validity: '30 Days' },
+                    { id: 'smile_10gb', plan_id: 'smile_10gb', name: 'Smile 10GB Monthly', selling_price: 4500, validity: '30 Days' },
+                ];
 
-                if (plans && plans.length > 0) {
-                    activePlans = plans;
+                let activePlans: any[] = [];
+
+                if (chosenNetwork === 'smile') {
+                    const { data: dbSmile } = await supabaseAdmin
+                        .from('data_plans')
+                        .select('*')
+                        .ilike('network', 'smile')
+                        .eq('is_active', true);
+
+                    if (dbSmile && dbSmile.length > 0) activePlans = dbSmile;
+                    else activePlans = smileFallback;
                 } else {
-                    const { data: fallbackPlans } = await supabaseAdmin
+                    // Fetch all active plans for the network
+                    const { data: dbPlans } = await supabaseAdmin
                         .from('data_plans')
                         .select('*')
                         .ilike('network', chosenNetwork)
+                        .eq('is_active', true)
                         .order('selling_price', { ascending: true })
-                        .limit(10);
-                    activePlans = fallbackPlans || [];
+                        .limit(100);
+
+                    if (dbPlans && dbPlans.length > 0) {
+                        // Smart curation: pick top bundles (500MB, 1GB, 1.5GB, 2GB, 3GB, 5GB, 10GB, 20GB)
+                        const targetVols = ['500mb', '1gb', '1.5gb', '2gb', '3gb', '5gb', '10gb', '15gb', '20gb'];
+                        const selectedPicks: any[] = [];
+                        const usedTargets = new Set<string>();
+
+                        for (const target of targetVols) {
+                            const matches = dbPlans.filter(p => {
+                                const n = (p.name || '').toLowerCase();
+                                const v = (p.volume || '').toLowerCase();
+                                return (n.includes(target) || v.includes(target)) && !n.includes('night') && !n.includes('social');
+                            });
+
+                            if (matches.length > 0) {
+                                // Prefer monthly / 30 days / SME / CG
+                                matches.sort((a, b) => {
+                                    const a30 = (a.name.includes('30') || a.name.toLowerCase().includes('monthly')) ? 1 : 0;
+                                    const b30 = (b.name.includes('30') || b.name.toLowerCase().includes('monthly')) ? 1 : 0;
+                                    if (a30 !== b30) return b30 - a30;
+                                    return Number(a.selling_price) - Number(b.selling_price);
+                                });
+                                selectedPicks.push(matches[0]);
+                                usedTargets.add(target);
+                            }
+                        }
+
+                        // If less than 6 plans picked, fill up with other unique clean plans
+                        if (selectedPicks.length < 6) {
+                            for (const p of dbPlans) {
+                                if (!selectedPicks.some(sp => sp.id === p.id)) {
+                                    selectedPicks.push(p);
+                                    if (selectedPicks.length >= 8) break;
+                                }
+                            }
+                        }
+
+                        activePlans = selectedPicks.length > 0 ? selectedPicks : dbPlans.slice(0, 10);
+                    }
                 }
 
                 if (activePlans.length === 0) {
@@ -852,15 +949,17 @@ Deno.serve(async (req: Request) => {
                     return reply(noPlans, 'IDLE', sessionData);
                 }
 
+                // Clean up plan display names (stripping vendor tags!)
                 let plansText = userLang === 'ha'
                     ? `📦 *Zaɓi Plan na ${chosenNetwork.toUpperCase()}:*\n`
                     : `📦 *Select ${chosenNetwork.toUpperCase()} Data Plan:*\n`;
 
                 activePlans.forEach((p, idx) => {
-                    plansText += `\n${idx + 1}️⃣ ${p.name} - *₦${Number(p.selling_price).toLocaleString()}*`;
+                    const cleanName = cleanPlanName(p.name);
+                    plansText += `\n${idx + 1}️⃣ ${cleanName} - *₦${Number(p.selling_price).toLocaleString()}*`;
                 });
                 plansText += userLang === 'ha'
-                    ? `\n\n(Tura lambar plan ɗin da kake so, ko '0' don sokewa)`
+                    ? `\n\n(Tura lambar plan ɗin da kake so 1-${activePlans.length}, ko '0' don sokewa)`
                     : `\n\n(Reply with plan number 1-${activePlans.length}, or '0' to cancel)`;
 
                 return reply(plansText, 'DATA_SELECT_PLAN', {
@@ -882,14 +981,16 @@ Deno.serve(async (req: Request) => {
                 }
 
                 const selectedPlan = plans[planIndex];
+                const cleanName = cleanPlanName(selectedPlan.name);
 
                 const promptPhone = userLang === 'ha'
-                    ? `📱 Ka zaɓi: *${selectedPlan.name}* (₦${Number(selectedPlan.selling_price).toLocaleString()})\n\nSanya lambar wayar da za a tura wa data:\n_(Misali: 08012345678)_`
-                    : `📱 You selected: *${selectedPlan.name}* (₦${Number(selectedPlan.selling_price).toLocaleString()})\n\nPlease enter the recipient 11-digit phone number:\n_(e.g. 08012345678)_`;
+                    ? `📱 Ka zaɓi: *${cleanName}* (₦${Number(selectedPlan.selling_price).toLocaleString()})\n\nSanya lambar wayar da za a tura wa data:\n_(Misali: 08012345678)_`
+                    : `📱 You selected: *${cleanName}* (₦${Number(selectedPlan.selling_price).toLocaleString()})\n\nPlease enter the recipient 11-digit phone number:\n_(e.g. 08012345678)_`;
 
                 return reply(promptPhone, 'DATA_ENTER_PHONE', {
                     ...sessionData,
-                    selected_plan: selectedPlan
+                    selected_plan: selectedPlan,
+                    clean_plan_name: cleanName
                 });
             }
 
@@ -909,6 +1010,7 @@ Deno.serve(async (req: Request) => {
                 }
 
                 const selectedPlan = sessionData.selected_plan;
+                const cleanName = sessionData.clean_plan_name || cleanPlanName(selectedPlan.name);
                 const planPrice = Number(selectedPlan.selling_price);
 
                 if (currentBalance < planPrice) {
@@ -919,8 +1021,8 @@ Deno.serve(async (req: Request) => {
                 }
 
                 const confirmMsg = userLang === 'ha'
-                    ? `📋 *Tabbatar da Siyan Data:*\n\n• Network: *${sessionData.network.toUpperCase()}*\n• Package: *${selectedPlan.name}*\n• Lambar Waya: *${cleanPhone}*\n• Kuɗin da za a cire: *₦${planPrice.toLocaleString()}*\n\n🔐 Don tabbatarwa da tura data a take, sanya *Transaction PIN* ɗinka mai lamba 4:\n_(Ko tura '0' don sokewa)_`
-                    : `📋 *Confirm Data Purchase:*\n\n• Network: *${sessionData.network.toUpperCase()}*\n• Bundle: *${selectedPlan.name}*\n• Recipient Phone: *${cleanPhone}*\n• Amount to Debit: *₦${planPrice.toLocaleString()}*\n\n🔐 To confirm and deliver instantly, enter your 4-digit *Transaction PIN*:\n_(Or type '0' to cancel)_`;
+                    ? `📋 *Tabbatar da Siyan Data:*\n\n• Network: *${sessionData.network.toUpperCase()}*\n• Package: *${cleanName}*\n• Lambar Waya: *${cleanPhone}*\n• Kuɗin da za a cire: *₦${planPrice.toLocaleString()}*\n\n🔐 Don tabbatarwa da tura data a take, sanya *Transaction PIN* ɗinka mai lamba 4:\n_(Ko tura '0' don sokewa)_`
+                    : `📋 *Confirm Data Purchase:*\n\n• Network: *${sessionData.network.toUpperCase()}*\n• Bundle: *${cleanName}*\n• Recipient Phone: *${cleanPhone}*\n• Amount to Debit: *₦${planPrice.toLocaleString()}*\n\n🔐 To confirm and deliver instantly, enter your 4-digit *Transaction PIN*:\n_(Or type '0' to cancel)_`;
 
                 return reply(confirmMsg, 'DATA_CONFIRM_PIN', {
                     ...sessionData,
@@ -939,6 +1041,7 @@ Deno.serve(async (req: Request) => {
                 }
 
                 const selectedPlan = sessionData.selected_plan;
+                const cleanName = sessionData.clean_plan_name || cleanPlanName(selectedPlan.name);
                 const recipientPhone = sessionData.recipient_phone;
                 const network = sessionData.network;
 
@@ -978,8 +1081,8 @@ Deno.serve(async (req: Request) => {
                         const newBal = Number(updatedProfile?.balance || (currentBalance - Number(selectedPlan.selling_price)));
 
                         const successMsg = userLang === 'ha'
-                            ? `✅ *Transaction Ya Yi Nasara!* 🎉\n\n📦 Sabis: *${selectedPlan.name}*\n📶 Network: *${network.toUpperCase()}*\n📱 Lamba: *${recipientPhone}*\n💰 Kuɗi: *₦${Number(selectedPlan.selling_price).toLocaleString()}*\n💳 Sabon Balance: *₦${newBal.toLocaleString()}*\n\n_Mun gode da kasuwanci da Abu Mafhal Sub!_\n\n(Tura '0' ko 'menu' don sabon transaction)`
-                            : `✅ *Data Purchase Successful!* 🎉\n\n📦 Package: *${selectedPlan.name}*\n📶 Network: *${network.toUpperCase()}*\n📱 Recipient: *${recipientPhone}*\n💰 Amount: *₦${Number(selectedPlan.selling_price).toLocaleString()}*\n💳 New Balance: *₦${newBal.toLocaleString()}*\n\n_Thank you for choosing Abu Mafhal Sub!_\n\n(Type '0' or 'menu' for main menu)`;
+                            ? `✅ *Transaction Ya Yi Nasara!* 🎉\n\n📦 Sabis: *${cleanName}*\n📶 Network: *${network.toUpperCase()}*\n📱 Lamba: *${recipientPhone}*\n💰 Kuɗi: *₦${Number(selectedPlan.selling_price).toLocaleString()}*\n💳 Sabon Balance: *₦${newBal.toLocaleString()}*\n\n_Mun gode da kasuwanci da Abu Mafhal Sub!_\n\n(Tura '0' ko 'menu' don sabon transaction)`
+                            : `✅ *Data Purchase Successful!* 🎉\n\n📦 Package: *${cleanName}*\n📶 Network: *${network.toUpperCase()}*\n📱 Recipient: *${recipientPhone}*\n💰 Amount: *₦${Number(selectedPlan.selling_price).toLocaleString()}*\n💳 New Balance: *₦${newBal.toLocaleString()}*\n\n_Thank you for choosing Abu Mafhal Sub!_\n\n(Type '0' or 'menu' for main menu)`;
                         return reply(successMsg, 'IDLE', { lang: userLang });
                     } else {
                         const errMsg = billsData.error || billsData.message || "Could not process request.";
@@ -1001,14 +1104,14 @@ Deno.serve(async (req: Request) => {
             // D. BUY AIRTIME FLOW (Bilingual based on userLang)
             // -------------------------------------------------------------
             if (currentStep === 'AIRTIME_SELECT_NETWORK') {
-                const netMap: Record<string, string> = {
-                    '1': 'mtn',
-                    '2': 'airtel',
-                    '3': 'glo',
-                    '4': '9mobile'
-                };
+                const netInput = lowerText.replace(/\s+/g, '');
+                let chosenNetwork = '';
 
-                const chosenNetwork = netMap[text];
+                if (netInput === '1' || netInput.includes('mtn')) chosenNetwork = 'mtn';
+                else if (netInput === '2' || netInput.includes('airtel')) chosenNetwork = 'airtel';
+                else if (netInput === '3' || netInput.includes('glo')) chosenNetwork = 'glo';
+                else if (netInput === '4' || netInput.includes('9mobile') || netInput.includes('etisalat') || netInput.includes('9mob')) chosenNetwork = '9mobile';
+
                 if (!chosenNetwork) {
                     const invNet = userLang === 'ha'
                         ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi:\n1 na MTN\n2 na AIRTEL\n3 na GLO\n4 na 9MOBILE\n(Ko tura '0' don sokewa):`

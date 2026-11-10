@@ -179,6 +179,7 @@ export default function AdminWebSidebar({
         { label: 'System Transactions', route: '/manage/transactions', icon: 'receipt' },
         { label: 'Analytics Reports', route: '/manage/reports', icon: 'bar-chart' },
         { label: 'Broadcasting & Mail', route: '/manage/communications', icon: 'megaphone' },
+        { label: 'WhatsApp Bot 24/7', route: '/manage/whatsapp-bot', icon: 'logo-whatsapp', tag: 'Live' },
         { label: 'Cortex AI Engine', route: '/manage/ai', icon: 'sparkles', tag: 'AI' },
         { label: 'Crypto Liquidity', route: '/manage/crypto', icon: 'logo-bitcoin' },
       ],

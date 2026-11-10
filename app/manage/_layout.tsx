@@ -184,6 +184,7 @@ export default function AdminLayout() {
             <Stack.Screen name="academy" options={{ title: 'Admin Academy' }} />
             <Stack.Screen name="legal" options={{ title: 'Legal Vault' }} />
             <Stack.Screen name="voice" options={{ title: 'Voice OS' }} />
+            <Stack.Screen name="whatsapp-bot" options={{ title: 'WhatsApp Bot Manager' }} />
             <Stack.Screen name="cards" options={{ title: 'Card Issuer' }} />
             <Stack.Screen name="accounting" options={{ title: 'Profit & Expense Ledger' }} />
         </Stack>
