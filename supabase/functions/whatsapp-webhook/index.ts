@@ -6,8 +6,8 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub";
-const WEB_URL = "https://abumafhalsub.com";
+const DEFAULT_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub";
+const DEFAULT_WEB_URL = "https://abumafhal.com.ng";
 
 // Helper: Format Nigerian phone number into canonical display format (080...)
 function formatToLocalPhone(rawPhone: string): string {
@@ -89,14 +89,37 @@ Deno.serve(async (req: Request) => {
     const { data: appSettingsData } = await supabaseAdmin
         .from('app_settings')
         .select('key, value')
-        .in('key', ['support_whatsapp', 'whatsapp_admin_call_phone', 'support_phone', 'whatsapp_bot_enabled', 'play_store_url', 'company_name']);
+        .in('key', [
+            'support_whatsapp', 
+            'whatsapp_admin_call_phone', 
+            'support_phone', 
+            'whatsapp_bot_enabled', 
+            'play_store_url', 
+            'company_name',
+            'site_url',
+            'app_url',
+            'website_url',
+            'referral_url'
+        ]);
 
     const settingsMap: Record<string, string> = {};
     if (appSettingsData) {
         appSettingsData.forEach(s => { settingsMap[s.key] = s.value; });
     }
 
-    const playStoreLink = settingsMap['play_store_url'] || PLAY_STORE_URL;
+    // Dynamic resolution of official URLs
+    const playStoreLink = (settingsMap['play_store_url'] || DEFAULT_PLAY_STORE_URL).trim();
+    let webBaseUrl = (settingsMap['site_url'] || settingsMap['app_url'] || settingsMap['website_url'] || DEFAULT_WEB_URL).trim();
+    if (webBaseUrl.endsWith('/')) {
+        webBaseUrl = webBaseUrl.slice(0, -1);
+    }
+    if (webBaseUrl.includes('abumafhalsub.com')) {
+        webBaseUrl = DEFAULT_WEB_URL;
+    }
+    if (!webBaseUrl.startsWith('http')) {
+        webBaseUrl = 'https://' + webBaseUrl;
+    }
+
     const verifyToken = secrets['WHATSAPP_VERIFY_TOKEN'] || Deno.env.get('WHATSAPP_VERIFY_TOKEN') || 'abumafhal_wa_verify_2026';
     const phoneNumberId = secrets['WHATSAPP_PHONE_NUMBER_ID'] || Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') || '';
     const accessToken = secrets['WHATSAPP_ACCESS_TOKEN'] || Deno.env.get('WHATSAPP_ACCESS_TOKEN') || '';
@@ -208,6 +231,8 @@ Deno.serve(async (req: Request) => {
                 status: "active",
                 service: "Abu Mafhal Sub WhatsApp Bot",
                 default_language: "en",
+                domain: webBaseUrl,
+                play_store_url: playStoreLink,
                 has_phone_id: Boolean(phoneNumberId),
                 has_access_token: Boolean(accessToken),
                 phone_id_preview: phoneNumberId ? `${phoneNumberId.slice(0, 4)}...${phoneNumberId.slice(-4)}` : null,
@@ -448,8 +473,8 @@ Deno.serve(async (req: Request) => {
                 }
 
                 const escalationMsg = userLang === 'ha'
-                    ? `📞 *Abu Mafhal Sub Taimako & Kira:*\n\nMun sanar da Admin a take! Zaka iya kiran Admin kai tsaye ko yin magana da shi:\n\n📱 *Kira Kai Tsaye (Direct Phone Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20neman%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n(Tura '0' don babban menu)`
-                    : `📞 *Abu Mafhal Sub Support & Direct Call:*\n\nAdmin has been notified! You can reach Admin directly:\n\n📱 *Direct Phone Call:*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20need%20support%20(Phone:%20${senderPhone})\n\n(Type '0' for main menu)`;
+                    ? `📞 *Abu Mafhal Sub Taimako & Kira:*\n\nMun sanar da Admin a take! Zaka iya kiran Admin kai tsaye ko yin magana da shi:\n\n📱 *Kira Kai Tsaye (Direct Phone Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20neman%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}\n\n(Tura '0' don babban menu)`
+                    : `📞 *Abu Mafhal Sub Support & Direct Call:*\n\nAdmin has been notified! You can reach Admin directly:\n\n📱 *Direct Phone Call:*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20need%20support%20(Phone:%20${senderPhone})\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}\n\n(Type '0' for main menu)`;
                 return reply(escalationMsg, 'IDLE');
             }
 
@@ -502,8 +527,8 @@ Deno.serve(async (req: Request) => {
 
                     if (!userProfile) {
                         const notFoundMsg = userLang === 'ha'
-                            ? `❌ *Ba a sami asusun Abu Mafhal Sub mai Email din "${text}" ba.*\n\nDa fatan ka duba ka sake turawa, ko ka sauke manhajar mu a Play Store don yin sabuwar rajista:\n\n📱 *Google Play Store:*\n${playStoreLink}\n\n🌐 *Shafin Yanar Gizo:* ${WEB_URL}\n\n(Tura '0' don sokewa)`
-                            : `❌ *No Abu Mafhal Sub account found with Email "${text}".*\n\nPlease check the email and try again, or download our mobile app from Google Play Store to create a free account:\n\n📱 *Download on Google Play Store:*\n${playStoreLink}\n\n🌐 *Web Portal:* ${WEB_URL}\n\n(Reply '0' to cancel)`;
+                            ? `❌ *Ba a sami asusun Abu Mafhal Sub mai Email din "${text}" ba.*\n\nDa fatan ka duba ka sake turawa, ko ka sauke manhajar mu a Play Store don yin sabuwar rajista:\n\n📱 *Google Play Store:*\n${playStoreLink}\n\n🌐 *Shafin Yanar Gizo:* ${webBaseUrl}\n\n(Tura '0' don sokewa)`
+                            : `❌ *No Abu Mafhal Sub account found with Email "${text}".*\n\nPlease check the email and try again, or download our mobile app from Google Play Store to create a free account:\n\n📱 *Download on Google Play Store:*\n${playStoreLink}\n\n🌐 *Web Portal:* ${webBaseUrl}\n\n(Reply '0' to cancel)`;
                         return reply(notFoundMsg, 'AWAITING_LINK_EMAIL', sessionData);
                     }
 
@@ -546,10 +571,10 @@ Deno.serve(async (req: Request) => {
                     return reply(welcomeMsg, 'IDLE', { lang: userLang });
                 }
 
-                // Default Guest / Unlinked Prompt with Google Play Store Link
+                // Default Guest / Unlinked Prompt with Google Play Store Link + Official Domain
                 const guestMsg = userLang === 'ha'
-                    ? `🌟 *Barka da zuwa Abu Mafhal Sub WhatsApp Bot!* 🌟\n\nLambar wayarka (*${senderPhone}*) ba ta haɗu da asusun Abu Mafhal Sub ba tukuna.\n\n👉 *Kana da asusu?*\nTura mana *Email* ɗinka da kayi rajista da shi don haɗa asusunka cikin daƙiƙa kaɗan.\n\n📲 *Baka da asusu tukuna?*\nSauke manhajar *Abu Mafhal Sub* a Google Play Store don yin rajista a take:\n🔗 ${playStoreLink}\n\n🌐 *Shafin Yanar Gizo:* ${WEB_URL}\n\n━━━━━━━━━━━━━━━━━━━━\n💡 _Tura 'lang' ko 'english' don komawa Turanci._`
-                    : `🌟 *Welcome to Abu Mafhal Sub WhatsApp Bot!* 🌟\n\nYour phone number (*${senderPhone}*) is not yet linked to an Abu Mafhal Sub account.\n\n👉 *Already registered?*\nReply with your registered *Email address* to link your account in seconds!\n\n📲 *Don't have an account yet?*\nDownload our official mobile app on Google Play Store to create a free account:\n🔗 ${playStoreLink}\n\n🌐 *Web Portal:* ${WEB_URL}\n\n━━━━━━━━━━━━━━━━━━━━\n💡 _Type 'hausa' or 'yare' to switch to Hausa language._`;
+                    ? `🌟 *Barka da zuwa Abu Mafhal Sub WhatsApp Bot!* 🌟\n\nLambar wayarka (*${senderPhone}*) ba ta haɗu da asusun Abu Mafhal Sub ba tukuna.\n\n👉 *Kana da asusu?*\nTura mana *Email* ɗinka da kayi rajista da shi don haɗa asusunka cikin daƙiƙa kaɗan.\n\n📲 *Baka da asusu tukuna?*\nSauke manhajar *Abu Mafhal Sub* a Google Play Store don yin rajista a take:\n🔗 ${playStoreLink}\n\n🌐 *Shafin Yanar Gizo:* ${webBaseUrl}\n\n━━━━━━━━━━━━━━━━━━━━\n💡 _Tura 'lang' ko 'english' don komawa Turanci._`
+                    : `🌟 *Welcome to Abu Mafhal Sub WhatsApp Bot!* 🌟\n\nYour phone number (*${senderPhone}*) is not yet linked to an Abu Mafhal Sub account.\n\n👉 *Already registered?*\nReply with your registered *Email address* to link your account in seconds!\n\n📲 *Don't have an account yet?*\nDownload our official mobile app on Google Play Store to create a free account:\n🔗 ${playStoreLink}\n\n🌐 *Web Portal:* ${webBaseUrl}\n\n━━━━━━━━━━━━━━━━━━━━\n💡 _Type 'hausa' or 'yare' to switch to Hausa language._`;
                 return reply(guestMsg, 'AWAITING_LINK_EMAIL', { lang: userLang });
             }
 
@@ -563,8 +588,8 @@ Deno.serve(async (req: Request) => {
             if (!profile) {
                 await supabaseAdmin.from('whatsapp_bot_sessions').update({ user_id: null }).eq('phone_number', senderPhone);
                 const relinkPrompt = userLang === 'ha'
-                    ? `⚠️ Ba a sami bayanan asusunka ba. Da fatan ka sake tura Email ɗinka don haɗawa, ko ka sauke manhajarmu:\n${playStoreLink}`
-                    : `⚠️ Unable to locate your account profile. Please reply with your registered Email address, or download our app:\n${playStoreLink}`;
+                    ? `⚠️ Ba a sami bayanan asusunka ba. Da fatan ka sake tura Email ɗinka don haɗawa, ko ka sauke manhajarmu:\n📱 *Google Play Store:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}`
+                    : `⚠️ Unable to locate your account profile. Please reply with your registered Email address, or download our app:\n📱 *Google Play Store:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}`;
                 return reply(relinkPrompt, 'AWAITING_LINK_EMAIL', { lang: userLang });
             }
 
@@ -608,9 +633,9 @@ Deno.serve(async (req: Request) => {
                             bankText += userLang === 'ha' ? `\n\n💡 _Duk kuɗin da ka tura zuwa wannan asusun za su shiga wallet ɗinka a take._` : `\n\n💡 _Any bank transfer to these accounts automatically funds your wallet within seconds!_`;
                         } else {
                             bankText = userLang === 'ha'
-                                ? `\n\n💡 Shiga manhajar Abu Mafhal Sub ka duba shafin Wallet don samun lambobin DVA:`
-                                : `\n\n💡 Open the Abu Mafhal Sub app to generate and view your personalized virtual bank accounts:`;
-                            bankText += `\n🔗 ${playStoreLink}`;
+                                ? `\n\n💡 Shiga manhajar Abu Mafhal Sub ko shafinmu ka duba shafin Wallet don samun lambobin DVA:`
+                                : `\n\n💡 Open the Abu Mafhal Sub app or web portal to generate and view your personalized virtual bank accounts:`;
+                            bankText += `\n📱 *Play Store:* ${playStoreLink}\n🌐 *Web:* ${webBaseUrl}`;
                         }
 
                         const balMsg = userLang === 'ha'
@@ -642,64 +667,64 @@ Deno.serve(async (req: Request) => {
 
                     if (chosen.key === 'airtime_cash') {
                         const a2cMsg = userLang === 'ha'
-                            ? `💵 *Canza Airtime zuwa Kuɗi (Airtime to Cash)*\n\nMuna canza katin kiran MTN, Airtel, Glo, da 9mobile zuwa kuɗi a wallet ɗinka ko banki a mafi sauƙin charges:\n\n• MTN: 80% - 85%\n• Airtel: 75% - 80%\n• Glo: 70% - 75%\n• 9mobile: 70% - 75%\n\n💬 *Don canza airtime a take:* Tuntuɓi Admin a WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20canza%20airtime%20zuwa%20kudi\n\n(Tura '0' don komawa babban menu)`
-                            : `💵 *Airtime to Cash (Instant Conversion)*\n\nConvert excess MTN, Airtel, Glo, and 9mobile airtime directly to cash in your bank account or wallet:\n\n• MTN: 80% - 85%\n• Airtel: 75% - 80%\n• Glo: 70% - 75%\n• 9mobile: 70% - 75%\n\n💬 *To convert airtime now:* Chat directly with Admin on WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20want%20to%20convert%20airtime%20to%20cash\n\n(Type '0' for main menu)`;
+                            ? `💵 *Canza Airtime zuwa Kuɗi (Airtime to Cash)*\n\nMuna canza katin kiran MTN, Airtel, Glo, da 9mobile zuwa kuɗi a wallet ɗinka ko banki a mafi sauƙin charges:\n\n• MTN: 80% - 85%\n• Airtel: 75% - 80%\n• Glo: 70% - 75%\n• 9mobile: 70% - 75%\n\n💬 *Don canza airtime a take:* Tuntuɓi Admin a WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20canza%20airtime%20zuwa%20kudi\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/airtime-to-cash\n\n(Tura '0' don komawa babban menu)`
+                            : `💵 *Airtime to Cash (Instant Conversion)*\n\nConvert excess MTN, Airtel, Glo, and 9mobile airtime directly to cash in your bank account or wallet:\n\n• MTN: 80% - 85%\n• Airtel: 75% - 80%\n• Glo: 70% - 75%\n• 9mobile: 70% - 75%\n\n💬 *To convert airtime now:* Chat directly with Admin on WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20want%20to%20convert%20airtime%20to%20cash\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/airtime-to-cash\n\n(Type '0' for main menu)`;
                         return reply(a2cMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'recharge_pin') {
                         const rPinMsg = userLang === 'ha'
-                            ? `🖨️ *Buga Katin Recharge (Recharge PIN)*\n\nZaka iya buga katin recharge na MTN, Airtel, Glo, da 9mobile kai tsaye a cikin manhajar *Abu Mafhal Sub* tare da samun rangwame na musamman.\n\n🌐 Buɗe manhajar Abu Mafhal Sub ka duba shafin *Recharge PIN*:\n${playStoreLink}\n\n(Tura '0' don komawa babban menu)`
-                            : `🖨️ *Recharge Card Printing & E-PINs*\n\nGenerate and print customized recharge card PINs for MTN, Airtel, Glo, and 9mobile with your brand name on *Abu Mafhal Sub*.\n\n🌐 Open the app and visit the *Recharge PIN* section:\n${playStoreLink}\n\n(Type '0' for main menu)`;
+                            ? `🖨️ *Buga Katin Recharge (Recharge PIN)*\n\nZaka iya buga katin recharge na MTN, Airtel, Glo, da 9mobile kai tsaye tare da sunan kamfaninka a sauƙaƙe:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/recharge-pin\n\n(Tura '0' don komawa babban menu)`
+                            : `🖨️ *Recharge Card Printing & E-PINs*\n\nGenerate and print customized recharge card PINs for MTN, Airtel, Glo, and 9mobile with your brand name on *Abu Mafhal Sub*:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/recharge-pin\n\n(Type '0' for main menu)`;
                         return reply(rPinMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'bulk_sms') {
                         const bulkMsg = userLang === 'ha'
-                            ? `💬 *Bulk SMS (Saƙonni Masu Yawa)*\n\nTura saƙonni da sunan kamfaninka (Custom Sender ID) zuwa lambobi dubbai a take ba tare da matsalar DND ba a farashin ₦3.50 kacal.\n\n🌐 Ziyarci: *${WEB_URL}/bulk-sms*\n\n(Tura '0' don babban menu)`
-                            : `💬 *Bulk SMS Services*\n\nSend branded SMS with custom Sender ID to all Nigerian networks (delivered to DND & Non-DND numbers) at just ₦3.50/unit.\n\n🌐 Visit: *${WEB_URL}/bulk-sms*\n\n(Type '0' for main menu)`;
+                            ? `💬 *Bulk SMS (Saƙonni Masu Yawa)*\n\nTura saƙonni da sunan kamfaninka (Custom Sender ID) zuwa lambobi dubbai a take ba tare da matsalar DND ba a farashin ₦3.50 kacal:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/bulk-sms\n\n(Tura '0' don babban menu)`
+                            : `💬 *Bulk SMS Services*\n\nSend branded SMS with custom Sender ID to all Nigerian networks (delivered to DND & Non-DND numbers) at just ₦3.50/unit:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/bulk-sms\n\n(Type '0' for main menu)`;
                         return reply(bulkMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'nin') {
                         const ninMsg = userLang === 'ha'
-                            ? `🪪 *Binciken NIN & Buga Slip*\n\nYin binciken NIN da buga Standard Slip ko Premium Plastic Slip a take a manhajar Abu Mafhal Sub.\n\n🌐 Ziyarci: *${WEB_URL}/nin-services*\n\n(Tura '0' don babban menu)`
-                            : `🪪 *NIN Verification & Premium Slip Printing*\n\nVerify National Identity Number (NIN) and generate verifiable color slips directly on Abu Mafhal Sub.\n\n🌐 Visit: *${WEB_URL}/nin-services*\n\n(Type '0' for main menu)`;
+                            ? `🪪 *Binciken NIN & Buga Slip*\n\nYin binciken NIN da buga Standard Slip ko Premium Plastic Slip a take:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/nin-services\n\n(Tura '0' don babban menu)`
+                            : `🪪 *NIN Verification & Premium Slip Printing*\n\nVerify National Identity Number (NIN) and generate verifiable color slips directly on Abu Mafhal Sub:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/nin-services\n\n(Type '0' for main menu)`;
                         return reply(ninMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'bvn') {
                         const bvnMsg = userLang === 'ha'
-                            ? `🔍 *Binciken BVN*\n\nTabbatar da lambar BVN da buga slip mai inganci a manhajar Abu Mafhal Sub.\n\n🌐 Ziyarci: *${WEB_URL}/bvn-services*\n\n(Tura '0' don babban menu)`
-                            : `🔍 *BVN Verification Services*\n\nValidate Bank Verification Number (BVN) details securely on Abu Mafhal Sub.\n\n🌐 Visit: *${WEB_URL}/bvn-services*\n\n(Type '0' for main menu)`;
+                            ? `🔍 *Binciken BVN*\n\nTabbatar da lambar BVN da buga slip mai inganci:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/bvn-services\n\n(Tura '0' don babban menu)`
+                            : `🔍 *BVN Verification Services*\n\nValidate Bank Verification Number (BVN) details securely on Abu Mafhal Sub:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/bvn-services\n\n(Type '0' for main menu)`;
                         return reply(bvnMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'cac') {
                         const cacMsg = userLang === 'ha'
-                            ? `🏢 *Rijistar Kamfani (CAC)*\n\nYin rijistar Business Name, Company (LLC), ko NGO a hukumar CAC cikin gaggawa.\n\n💬 Yi magana da Admin a WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20yin%20rijistar%20CAC\n\n(Tura '0' don babban menu)`
-                            : `🏢 *CAC Business & Company Registration*\n\nRegister Business Name, Company (LLC), or NGO with the Corporate Affairs Commission (CAC) with fast certificate delivery.\n\n💬 Chat with CAC Specialist:\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20want%20to%20register%20my%20business%20on%20CAC\n\n(Type '0' for main menu)`;
+                            ? `🏢 *Rijistar Kamfani (CAC)*\n\nYin rijistar Business Name, Company (LLC), ko NGO a hukumar CAC cikin gaggawa tare da samun takardar Certificate:\n\n💬 *Yi Magana da Masani a WhatsApp:*\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20yin%20rijistar%20CAC\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/cac-services\n\n(Tura '0' don babban menu)`
+                            : `🏢 *CAC Business & Company Registration*\n\nRegister Business Name, Company (LLC), or NGO with the Corporate Affairs Commission (CAC) with fast certificate delivery:\n\n💬 *Chat with CAC Specialist:*\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20want%20to%20register%20my%20business%20on%20CAC\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/cac-services\n\n(Type '0' for main menu)`;
                         return reply(cacMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'sim') {
                         const simMsg = userLang === 'ha'
-                            ? `💳 *Siyan SIM Card*\n\nSayi Kirani 4G SIM cards da data bundles a sauƙaƙe tare da isarwa har gida.\n\n🌐 Ziyarci: *${WEB_URL}/sim*\n\n(Tura '0' don babban menu)`
-                            : `💳 *Buy SIM Cards & Telecom Hub*\n\nOrder Kirani 4G SIM cards and data plans with instant doorstep delivery.\n\n🌐 Visit: *${WEB_URL}/sim*\n\n(Type '0' for main menu)`;
+                            ? `💳 *Siyan SIM Card*\n\nSayi Kirani 4G SIM cards da data bundles a sauƙaƙe tare da isarwa har gida:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/sim\n\n(Tura '0' don babban menu)`
+                            : `💳 *Buy SIM Cards & Telecom Hub*\n\nOrder Kirani 4G SIM cards and data plans with instant doorstep delivery:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/sim\n\n(Type '0' for main menu)`;
                         return reply(simMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'cards') {
                         const cardMsg = userLang === 'ha'
-                            ? `💳 *Katin Virtual Dollar & Naira*\n\nƘirƙiri katin biyan kuɗi na ƙasashen waje (USD Mastercard/Visa) don biyan kuɗin Facebook Ads, Netflix, Apple, da Amazon.\n\n🌐 Ziyarci: *${WEB_URL}/virtual-cards*\n\n(Tura '0' don babban menu)`
-                            : `💳 *Virtual Dollar & Naira Cards*\n\nInstant virtual USD Mastercard/Visa cards for international payments (Netflix, Apple, Google, Amazon, Facebook Ads).\n\n🌐 Visit: *${WEB_URL}/virtual-cards*\n\n(Type '0' for main menu)`;
+                            ? `💳 *Katin Virtual Dollar & Naira*\n\nƘirƙiri katin biyan kuɗi na ƙasashen waje (USD Mastercard/Visa) don biyan kuɗin Facebook Ads, Netflix, Apple, da Amazon:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/virtual-cards\n\n(Tura '0' don babban menu)`
+                            : `💳 *Virtual Dollar & Naira Cards*\n\nInstant virtual USD Mastercard/Visa cards for international payments (Netflix, Apple, Google, Amazon, Facebook Ads):\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/virtual-cards\n\n(Type '0' for main menu)`;
                         return reply(cardMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'crypto') {
                         const cryptoMsg = userLang === 'ha'
-                            ? `🪙 *Harkokin Crypto (USDT, BTC)*\n\nSayi, sayar, ko canza USDT, BTC, ETH a mafi kyawun farashi tare da zuba kuɗi a wallet take.\n\n🌐 Ziyarci: *${WEB_URL}/crypto*\n\n(Tura '0' don babban menu)`
-                            : `🪙 *Crypto Exchange & Web3*\n\nBuy, Sell, and Swap USDT, BTC, ETH, and TON at the best live exchange rates with instant wallet funding.\n\n🌐 Visit: *${WEB_URL}/crypto*\n\n(Type '0' for main menu)`;
+                            ? `🪙 *Harkokin Crypto (USDT, BTC)*\n\nSayi, sayar, ko canza USDT, BTC, ETH a mafi kyawun farashi tare da zuba kuɗi a wallet take:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/crypto\n\n(Tura '0' don babban menu)`
+                            : `🪙 *Crypto Exchange & Web3*\n\nBuy, Sell, and Swap USDT, BTC, ETH, and TON at the best live exchange rates with instant wallet funding:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/crypto\n\n(Type '0' for main menu)`;
                         return reply(cryptoMsg, 'IDLE', { lang: userLang });
                     }
 
@@ -751,8 +776,8 @@ Deno.serve(async (req: Request) => {
                         } catch (_) {}
 
                         const supportMsg = userLang === 'ha'
-                            ? `📞 *Abu Mafhal Sub Support & Call:*\n\n✅ An buɗe maka Support Ticket kuma an sanar da Admin a take.\n\n📱 *Kira Kai Tsaye (Direct Phone Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20neman%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n📧 *Email:* support@abumafhal.com.ng\n\n(Tura '0' don komawa babban menu)`
-                            : `📞 *Abu Mafhal Sub Customer Support & Direct Call:*\n\n✅ Support ticket created and Admin notified instantly.\n\n📱 *Direct Phone Call:*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20need%20support%20(Phone:%20${senderPhone})\n\n📧 *Email:* support@abumafhal.com.ng\n\n(Type '0' for main menu)`;
+                            ? `📞 *Abu Mafhal Sub Taimako & Kira:*\n\n✅ An buɗe maka Support Ticket kuma an sanar da Admin a take.\n\n📱 *Kira Kai Tsaye (Direct Phone Call):*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Assalamu%20Alaikum%20Admin,%20ina%20neman%20taimako%20(Lambar%20Waya:%20${senderPhone})\n\n📧 *Email:* support@abumafhal.com.ng\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}\n\n(Tura '0' don komawa babban menu)`
+                            : `📞 *Abu Mafhal Sub Customer Support & Direct Call:*\n\n✅ Support ticket created and Admin notified instantly.\n\n📱 *Direct Phone Call:*\n+${adminCallPhone}\n\n💬 *WhatsApp Chat:* https://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20need%20support%20(Phone:%20${senderPhone})\n\n📧 *Email:* support@abumafhal.com.ng\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}\n\n(Type '0' for main menu)`;
                         return reply(supportMsg, 'IDLE', { lang: userLang });
                     }
 
@@ -762,20 +787,20 @@ Deno.serve(async (req: Request) => {
                     }
                 }
 
-                // Render Main Menu strictly in userLang (English by default)
+                // Render Main Menu strictly in userLang (English by default) + Links Footer
                 let menuText = '';
                 if (userLang === 'ha') {
                     menuText = `🌟 *Barka da zuwa Abu Mafhal Sub!* 🌟\n👤 Sannu *${userFirstName}*,\n💰 Balance: *₦${currentBalance.toLocaleString()}*\n\nZaɓi lambar hidimar da kake so:`;
                     availableItems.forEach((item, idx) => {
                         menuText += `\n${idx + 1}️⃣ ${item.icon} ${item.titleHa}`;
                     });
-                    menuText += `\n\n_(Tura lambar zaɓinka, ko '0' don sake ganin menu)_`;
+                    menuText += `\n\n_(Tura lambar zaɓinka, ko '0' don sake ganin menu)\n\n━━━━━━━━━━━━━━━━━━━━\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}_`;
                 } else {
                     menuText = `🌟 *Welcome to Abu Mafhal Sub!* 🌟\n👤 Hello *${userFirstName}*,\n💰 Wallet Balance: *₦${currentBalance.toLocaleString()}*\n\nSelect a service:`;
                     availableItems.forEach((item, idx) => {
                         menuText += `\n${idx + 1}️⃣ ${item.icon} ${item.titleEn}`;
                     });
-                    menuText += `\n\n_(Reply with a number, e.g. 1, or type 0 for menu)_`;
+                    menuText += `\n\n_(Reply with a number, e.g. 1, or type 0 for menu)\n\n━━━━━━━━━━━━━━━━━━━━\n📱 *Download Android App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}_`;
                 }
                 return reply(menuText, 'IDLE', { lang: userLang });
             }
@@ -1529,8 +1554,8 @@ Deno.serve(async (req: Request) => {
 
             // Fallback for unhandled input: return to main menu
             const fallbackMsg = userLang === 'ha'
-                ? `🌟 *Abu Mafhal Sub WhatsApp Bot*\n\nBa a gane wannan zaɓin ba. Da fatan ka tura '0' ko 'menu' don ganin dukkan hidimominmu.`
-                : `🌟 *Abu Mafhal Sub WhatsApp Bot*\n\nUnrecognized command. Type *0* or *menu* to view our available services.`;
+                ? `🌟 *Abu Mafhal Sub WhatsApp Bot*\n\nBa a gane wannan zaɓin ba. Da fatan ka tura '0' ko 'menu' don ganin dukkan hidimominmu.\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}`
+                : `🌟 *Abu Mafhal Sub WhatsApp Bot*\n\nUnrecognized command. Type *0* or *menu* to view our available services.\n\n📱 *Download Android App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}`;
             return reply(fallbackMsg, 'IDLE', { lang: userLang });
 
         } catch (err: any) {

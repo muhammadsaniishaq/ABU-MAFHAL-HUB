@@ -85,7 +85,7 @@ const safeFormatDate = (dateStr: any) => {
 // ─── Bulletproof QR Code Component with Dual Rendering Engine ─────────────────
 function SafeQRCode({ value, size = 180 }: { value: string; size?: number }) {
   const [hasError, setHasError] = useState(false);
-  const encodedVal = encodeURIComponent(value || 'https://abumafhalsub.com');
+  const encodedVal = encodeURIComponent(value || 'https://abumafhal.com.ng');
   const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size * 2}x${size * 2}&data=${encodedVal}&margin=1&color=0D1B3E`;
 
   if (hasError || Platform.OS === 'web') {
@@ -102,7 +102,7 @@ function SafeQRCode({ value, size = 180 }: { value: string; size?: number }) {
     return (
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
         <QRCode
-          value={value || 'https://abumafhalsub.com'}
+          value={value || 'https://abumafhal.com.ng'}
           size={size}
           color={T.navy}
           backgroundColor={T.white}
@@ -577,8 +577,8 @@ Date: ${safeFormatDate(receiptData.date)}
 Type: Instant QR Transfer
 Status: SUCCESSFUL (Instant Settlement)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-Thank you for transacting with Abu Mafhal Hub!
-https://abumafhalsub.com`;
+Thank you for transacting with Abu Mafhal Sub!
+https://abumafhal.com.ng`;
 
       await Share.share({
         title: `Receipt - ${receiptData.ref}`,
@@ -608,13 +608,13 @@ https://abumafhalsub.com`;
     const amountStr = requestedAmount && parseFloat(requestedAmount) > 0 
       ? `\nRequested Amount: ₦${safeFormatCurrency(requestedAmount)}`
       : '';
-    const shareText = `Hi! You can pay me instantly on Abu Mafhal Hub:
+    const shareText = `Hi! You can pay me instantly on Abu Mafhal Sub:
 Name: ${currentUser.full_name}
 Wallet ID: ${walletId}${amountStr}
 Email: ${currentUser.email}
 
-Open Abu Mafhal Hub app > QR Pay to send money in seconds!
-https://abumafhalsub.com`;
+Open Abu Mafhal Sub app > QR Pay to send money in seconds!
+https://abumafhal.com.ng`;
 
     try {
       await Share.share({
@@ -626,7 +626,7 @@ https://abumafhalsub.com`;
 
   // ─── Build User QR Payload ──────────────────────────────────────────────────
   const myCodePayload = useMemo(() => {
-    if (!currentUser) return 'https://abumafhalsub.com';
+    if (!currentUser) return 'https://abumafhal.com.ng';
     return JSON.stringify({
       app: 'abumafhal',
       type: 'p2p_transfer',
@@ -911,7 +911,7 @@ https://abumafhalsub.com`;
               {/* User Account Info */}
               <View style={s.cardUserInfo}>
                 <Text style={s.userNameText}>{currentUser?.full_name || 'Valued Member'}</Text>
-                <Text style={s.userEmailText}>{currentUser?.email || 'user@abumafhalsub.com'}</Text>
+                <Text style={s.userEmailText}>{currentUser?.email || 'user@abumafhal.com.ng'}</Text>
               </View>
 
               {/* Wallet ID Pill with 1-Tap Copy */}

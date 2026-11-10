@@ -147,7 +147,7 @@ export default function WalletScreen() {
                 supabase.from('app_settings').select('key, value').in('key', ['funding_fee_fixed_threshold', 'funding_fee_under_threshold', 'funding_fee_above_threshold'])
             ]);
 
-            const fallbackEmail = user.email || (user.phone ? `${user.phone.replace(/\D/g, '')}@abumafhalsub.com.ng` : 'customer@abumafhalsub.com.ng');
+            const fallbackEmail = user.email || (user.phone ? `${user.phone.replace(/\D/g, '')}@abumafhal.com.ng` : 'customer@abumafhal.com.ng');
             setUserEmail(fallbackEmail);
 
             let finalKey = '';
@@ -1024,7 +1024,7 @@ export default function WalletScreen() {
                 <PaystackPayment
                     visible={paystackVisible}
                     amount={Number(fundAmount)}
-                    email={userEmail || 'customer@abumafhalsub.com.ng'}
+                    email={userEmail || 'customer@abumafhal.com.ng'}
                     userId={currentUserId}
                     publicKey={paystackKey}
                     onSuccess={handlePaystackSuccess}
