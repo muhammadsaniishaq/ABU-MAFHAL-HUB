@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
@@ -29,100 +28,133 @@ import { NIGERIA_STATES } from '../../utils/nigeriaStates';
 
 const STATE_LIST = Object.keys(NIGERIA_STATES);
 
-// Executive Palette
+// Official JTB Theme Colors
 const COLORS = {
-  navyDark: '#070f26',
-  navy: '#0d1b3e',
-  navyCard: '#132347',
+  jtbGreen: '#008751',
+  jtbGreenDark: '#00663d',
+  jtbGreenLight: '#e6f4ea',
+  jtbGreenBorder: '#a8dab5',
+  navyDark: '#0d1b3e',
+  navy: '#132347',
   gold: '#d97706',
-  goldBright: '#f59e0b',
-  goldBg: '#fffbeb',
   white: '#ffffff',
   bg: '#f8fafc',
   cardBg: '#ffffff',
-  text: '#0f172a',
-  subText: '#64748b',
-  mutedText: '#94a3b8',
-  border: '#e2e8f0',
+  text: '#1f2937',
+  subText: '#4b5563',
+  mutedText: '#9ca3af',
+  border: '#d1d5db',
+  borderLight: '#e5e7eb',
   success: '#10b981',
   successBg: '#dcfce7',
   warning: '#f59e0b',
   warningBg: '#fef3c7',
   danger: '#ef4444',
   dangerBg: '#fee2e2',
-  emerald: '#059669',
-  emeraldDark: '#047857',
-  emeraldLight: '#ecfdf5',
-  blue: '#2563eb',
-  blueLight: '#eff6ff',
 };
+
+// Official Organization Types from Screenshot 5 & 6
+const ORGANIZATION_TYPES = [
+  'BUSINESS NAME',
+  'INCORPORATED TRUSTEE',
+  'LIMITED PARTNERSHIP',
+  'LIMITED BY GUARANTEE',
+  'LIMITED LIABILITY PARTNERSHIP',
+  'PARTNERSHIP',
+  'PRIVATE LIMITED COMPANY',
+  'PRIVATE UNLIMITED COMPANY',
+  'PUBLIC LIMITED COMPANY',
+  'SOLE PROPRIETORSHIP',
+];
+
+const MDA_TYPES = [
+  'Federal Ministry, Department or Agency',
+  'State Ministry, Department or Agency',
+  'Local Government Authority',
+  'Parastatal or Statutory Body',
+];
 
 export default function TinServicesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // Navigation: Form vs History
-  const [activeTab, setActiveTab] = useState<'form' | 'history'>('form');
+  // Top Tabs: Search Portal vs Requests History
+  const [activeTab, setActiveTab] = useState<'portal' | 'history'>('portal');
 
-  // Category: Individual vs Business
-  const [category, setCategory] = useState<'individual' | 'business'>('individual');
+  // Category (Screenshot 1 & 3): Individual vs Non-Individual
+  const [category, setCategory] = useState<'individual' | 'non_individual'>('individual');
 
-  // Action: Register vs Retrieve
-  const [action, setAction] = useState<'register' | 'retrieve'>('register');
+  // Search Criteria for Individual (Screenshot 2)
+  // Options: 'nin_name_dob' | 'tax_id_dob' | 'prev_tin_dob'
+  const [indivCriteria, setIndivCriteria] = useState<'nin_name_dob' | 'tax_id_dob' | 'prev_tin_dob'>('nin_name_dob');
 
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // Entity Type for Non-Individual (Screenshot 3, 8, 10): Corporate | MDA | Cooperative
+  const [entityType, setEntityType] = useState<'corporate' | 'mda' | 'cooperative'>('corporate');
 
-  // Pricing
-  const [individualPrice, setIndividualPrice] = useState<number>(1500);
-  const [businessPrice, setBusinessPrice] = useState<number>(3000);
+  // Search Criteria for Corporate (Screenshot 4)
+  // Options: 'cac_reg' | 'tax_id' | 'prev_tin'
+  const [corpCriteria, setCorpCriteria] = useState<'cac_reg' | 'tax_id' | 'prev_tin'>('cac_reg');
 
-  const activeFee = category === 'individual' ? individualPrice : businessPrice;
+  // Search Criteria for MDA (Screenshot 9)
+  // Options: 'registered_name' | 'registration_number' | 'tax_id' | 'prev_tin'
+  const [mdaCriteria, setMdaCriteria] = useState<'registered_name' | 'registration_number' | 'tax_id' | 'prev_tin'>('registered_name');
 
-  // Individual Fields
-  const [fullName, setFullName] = useState('');
+  // Search Criteria for Cooperative (Screenshot 10)
+  // Options: 'registration_number' | 'tax_id' | 'prev_tin'
+  const [coopCriteria, setCoopCriteria] = useState<'registration_number' | 'tax_id' | 'prev_tin'>('registration_number');
+
+  // ── Form Fields ──
+  // Individual Fields (Screenshot 1)
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [nin, setNin] = useState('');
   const [dob, setDob] = useState('');
-  const [phone, setPhone] = useState('');
-  const [state, setState] = useState('');
   const [taxId, setTaxId] = useState('');
+  const [previousTin, setPreviousTin] = useState('');
 
-  // Business Fields
-  const [bizName, setBizName] = useState('');
-  const [cacNumber, setCacNumber] = useState('');
-  const [incorpDate, setIncorpDate] = useState('');
-  const [directorName, setDirectorName] = useState('');
-  const [directorNin, setDirectorNin] = useState('');
+  // Non-Individual Fields
+  const [orgType, setOrgType] = useState('PRIVATE LIMITED COMPANY');
+  const [cacRegNumber, setCacRegNumber] = useState('');
+  const [dateOfIncorp, setDateOfIncorp] = useState('');
+  const [mdaType, setMdaType] = useState(MDA_TYPES[0]);
+  const [registeredName, setRegisteredName] = useState('');
+  const [coopState, setCoopState] = useState('');
 
-  // Modals
+  // Contact Phone (For receiving official certificate notice)
+  const [phone, setPhone] = useState('');
+
+  // ── Modals ──
+  const [showOrgModal, setShowOrgModal] = useState(false);
+  const [showMdaModal, setShowMdaModal] = useState(false);
   const [showStateModal, setShowStateModal] = useState(false);
   const [stateSearch, setStateSearch] = useState('');
+
+  // Dropdown selector modals
+  const [showIndivCriteriaModal, setShowIndivCriteriaModal] = useState(false);
+  const [showCorpCriteriaModal, setShowCorpCriteriaModal] = useState(false);
+  const [showMdaCriteriaModal, setShowMdaCriteriaModal] = useState(false);
+  const [showCoopCriteriaModal, setShowCoopCriteriaModal] = useState(false);
+
+  // Confirmation, Balance & Success
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [insufficientModalVisible, setInsufficientModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successRef, setSuccessRef] = useState('');
 
-  // History
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // Pricing: Individual vs Non-Individual (Business)
+  const [individualPrice, setIndividualPrice] = useState<number>(1500);
+  const [businessPrice, setBusinessPrice] = useState<number>(3000);
+
+  const activeFee = category === 'individual' ? individualPrice : businessPrice;
+
+  // History List
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [historySearch, setHistorySearch] = useState('');
 
-  const filteredStates = useMemo(() => {
-    if (!stateSearch.trim()) return STATE_LIST;
-    return STATE_LIST.filter(s => s.toLowerCase().includes(stateSearch.toLowerCase().trim()));
-  }, [stateSearch]);
-
-  const filteredHistory = useMemo(() => {
-    return historyList.filter(item => {
-      if (!historySearch.trim()) return true;
-      const q = historySearch.toLowerCase().trim();
-      const holder = (item.holder_name || '').toLowerCase();
-      const ref = (item.search_number || '').toLowerCase();
-      return holder.includes(q) || ref.includes(q);
-    });
-  }, [historyList, historySearch]);
-
-  // Bottom clearance to ensure submit button is elevated comfortably above bottom navigation bar
   const bottomClearance = Math.max(insets.bottom, 24) + 140;
 
   useEffect(() => {
@@ -131,7 +163,6 @@ export default function TinServicesScreen() {
 
   const loadData = async () => {
     try {
-      // 1. Fetch user profile
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
       if (user) {
@@ -143,12 +174,16 @@ export default function TinServicesScreen() {
 
         if (profile) {
           setWalletBalance(Number(profile.balance || 0));
-          if (profile.full_name && !fullName) setFullName(profile.full_name);
+          if (profile.full_name) {
+            const parts = profile.full_name.trim().split(' ');
+            if (parts.length > 0 && !firstName) setFirstName(parts[0]);
+            if (parts.length > 1 && !lastName) setLastName(parts.slice(1).join(' '));
+          }
           if (profile.phone && !phone) setPhone(profile.phone);
         }
       }
 
-      // 2. Fetch pricing
+      // Read pricing
       const { data: settingsData } = await supabase
         .from('app_settings')
         .select('key, value')
@@ -177,11 +212,10 @@ export default function TinServicesScreen() {
         });
       }
 
-      // 3. Fetch history
       const items = await verificationHistory.getAll('tin');
       setHistoryList(items || []);
     } catch (e) {
-      console.warn('Error loading TIN data:', e);
+      console.warn('Error loading JTB portal data:', e);
     }
   };
 
@@ -197,38 +231,62 @@ export default function TinServicesScreen() {
     else setter(`${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`);
   };
 
-  const validateAndConfirm = () => {
+  const handleSearchSubmit = () => {
     if (walletBalance !== null && walletBalance < activeFee) {
       setInsufficientModalVisible(true);
       return;
     }
 
     if (category === 'individual') {
-      if (!fullName.trim()) return Alert.alert('Required', 'Please enter your Full Name.');
-      const cleanNin = nin.replace(/\D/g, '');
-      if (cleanNin.length !== 11 && !taxId.trim()) {
-        return Alert.alert('Required', 'Please enter your 11-digit NIN.');
+      if (indivCriteria === 'nin_name_dob') {
+        if (!firstName.trim()) return Alert.alert('Required', 'Please enter First Name.');
+        if (!lastName.trim()) return Alert.alert('Required', 'Please enter Last Name.');
+        if (nin.replace(/\D/g, '').length !== 11) return Alert.alert('Required', 'Please enter valid 11-digit NIN.');
+        if (dob.length < 10) return Alert.alert('Required', 'Please enter Date of Birth (DD/MM/YYYY).');
+      } else if (indivCriteria === 'tax_id_dob') {
+        if (!taxId.trim()) return Alert.alert('Required', 'Please enter Tax ID.');
+        if (dob.length < 10) return Alert.alert('Required', 'Please enter Date of Birth (DD/MM/YYYY).');
+      } else if (indivCriteria === 'prev_tin_dob') {
+        if (!previousTin.trim()) return Alert.alert('Required', 'Please enter Previous TIN.');
+        if (dob.length < 10) return Alert.alert('Required', 'Please enter Date of Birth (DD/MM/YYYY).');
       }
-      if (dob.length < 10) return Alert.alert('Required', 'Please enter Date of Birth (DD/MM/YYYY).');
-      if (phone.replace(/\D/g, '').length < 11) return Alert.alert('Required', 'Please enter an 11-digit Phone number.');
     } else {
-      if (!bizName.trim()) return Alert.alert('Required', 'Please enter Business / Company Name.');
-      if (!cacNumber.trim() && !taxId.trim()) return Alert.alert('Required', 'Please enter CAC Registration Number (RC/BN).');
-      if (incorpDate.length < 10) return Alert.alert('Required', 'Please enter Date of Incorporation (DD/MM/YYYY).');
-      if (phone.replace(/\D/g, '').length < 11) return Alert.alert('Required', 'Please enter an 11-digit Phone number.');
+      // Non-Individual
+      if (entityType === 'corporate') {
+        if (corpCriteria === 'cac_reg') {
+          if (!cacRegNumber.trim()) return Alert.alert('Required', 'Please enter CAC Registration Number (RC/BN).');
+          if (dateOfIncorp.length < 10) return Alert.alert('Required', 'Please enter Date of Incorporation (DD/MM/YYYY).');
+        } else if (corpCriteria === 'tax_id') {
+          if (!taxId.trim()) return Alert.alert('Required', 'Please enter Tax ID.');
+          if (dateOfIncorp.length < 10) return Alert.alert('Required', 'Please enter Date of Incorporation (DD/MM/YYYY).');
+        } else if (corpCriteria === 'prev_tin') {
+          if (!previousTin.trim()) return Alert.alert('Required', 'Please enter Previous JTB TIN.');
+          if (dateOfIncorp.length < 10) return Alert.alert('Required', 'Please enter Date of Incorporation (DD/MM/YYYY).');
+        }
+      } else if (entityType === 'mda') {
+        if (!registeredName.trim()) return Alert.alert('Required', 'Please enter Registered MDA Name.');
+      } else if (entityType === 'cooperative') {
+        if (!coopState) return Alert.alert('Required', 'Please select State of Registration.');
+        if (!cacRegNumber.trim()) return Alert.alert('Required', 'Please enter Registration Number.');
+        if (dateOfIncorp.length < 10) return Alert.alert('Required', 'Please enter Date of Incorporation (DD/MM/YYYY).');
+      }
+    }
+
+    if (phone.replace(/\D/g, '').length < 11) {
+      return Alert.alert('Phone Required', 'Please enter an 11-digit phone number for notification.');
     }
 
     setConfirmModalVisible(true);
   };
 
-  const executeSubmit = async () => {
+  const executeSearch = async () => {
     setLoading(true);
     try {
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id;
-      if (!userId) throw new Error('Please sign in to proceed.');
+      if (!userId) throw new Error('Please sign in to continue.');
 
-      // Balance check
+      // Balance check & atomic debit
       const { data: prof } = await supabase.from('profiles').select('balance').eq('id', userId).single();
       const bal = Number(prof?.balance || 0);
       if (bal < activeFee) {
@@ -237,7 +295,6 @@ export default function TinServicesScreen() {
         throw new Error('Insufficient wallet balance.');
       }
 
-      // Deduct
       const newBal = bal - activeFee;
       const { error: debitErr } = await supabase
         .from('profiles')
@@ -248,11 +305,16 @@ export default function TinServicesScreen() {
       if (debitErr) throw new Error('Payment deduction failed. Please check wallet balance.');
       setWalletBalance(newBal);
 
-      const txnRef = `TIN_${Date.now()}`;
-      const applicant = category === 'individual' ? fullName.trim() : bizName.trim();
-      const searchNum = category === 'individual' ? (nin.trim() || taxId.trim()) : (cacNumber.trim() || taxId.trim());
+      const txnRef = `JTB_${Date.now()}`;
+      const applicantName = category === 'individual'
+        ? `${firstName.trim()} ${lastName.trim()}`
+        : (registeredName.trim() || cacRegNumber.trim() || 'Corporate Entity');
 
-      // Transaction
+      const searchNumber = category === 'individual'
+        ? (nin.trim() || taxId.trim() || previousTin.trim())
+        : (cacRegNumber.trim() || taxId.trim() || previousTin.trim() || registeredName.trim());
+
+      // Save transaction
       await supabase.from('transactions').insert({
         user_id: userId,
         type: 'debit',
@@ -260,33 +322,40 @@ export default function TinServicesScreen() {
         amount: activeFee,
         status: 'success',
         reference: txnRef,
-        description: `${category === 'individual' ? 'Individual' : 'Business'} Tax ID (${action}): ${applicant}`,
+        description: `Tax ID Certificate Retrieval: ${applicantName} (${searchNumber})`,
       });
 
-      // Verification history
+      // Save to verification_history for admin fulfillment
       await verificationHistory.save({
         service_category: 'tin',
-        service_type: action === 'register' ? 'tin_registration' : 'tin_certificate_retrieval',
-        search_number: searchNum,
-        holder_name: applicant,
-        layout: 'jtb_official_tin',
+        service_type: 'tin_certificate_retrieval',
+        search_number: searchNumber,
+        holder_name: applicantName,
+        layout: 'jtb_tax_certificate',
         details: {
           category,
-          action,
-          fee: activeFee,
-          fullName: category === 'individual' ? fullName : undefined,
-          nin: category === 'individual' ? nin : undefined,
-          dob: category === 'individual' ? dob : undefined,
-          state: category === 'individual' ? state : undefined,
-          businessName: category === 'business' ? bizName : undefined,
-          cacNumber: category === 'business' ? cacNumber : undefined,
-          incorpDate: category === 'business' ? incorpDate : undefined,
-          directorName: category === 'business' ? directorName : undefined,
-          directorNin: category === 'business' ? directorNin : undefined,
-          phone,
+          entityType: category === 'non_individual' ? entityType : undefined,
+          indivCriteria: category === 'individual' ? indivCriteria : undefined,
+          corpCriteria: category === 'non_individual' && entityType === 'corporate' ? corpCriteria : undefined,
+          mdaCriteria: category === 'non_individual' && entityType === 'mda' ? mdaCriteria : undefined,
+          coopCriteria: category === 'non_individual' && entityType === 'cooperative' ? coopCriteria : undefined,
+          firstName,
+          lastName,
+          nin,
+          dob,
           taxId,
+          previousTin,
+          orgType: category === 'non_individual' && entityType === 'corporate' ? orgType : undefined,
+          cacRegNumber,
+          dateOfIncorp,
+          mdaType: category === 'non_individual' && entityType === 'mda' ? mdaType : undefined,
+          registeredName,
+          coopState: category === 'non_individual' && entityType === 'cooperative' ? coopState : undefined,
+          phone,
+          fee: activeFee,
           txnRef,
           status: 'PENDING',
+          portal: 'taxidcert.jrb.gov.ng',
         },
       });
 
@@ -299,7 +368,7 @@ export default function TinServicesScreen() {
       setSuccessModalVisible(true);
       loadData();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to submit request.');
+      Alert.alert('Search Error', err.message || 'Failed to submit search request.');
     } finally {
       setLoading(false);
     }
@@ -308,245 +377,266 @@ export default function TinServicesScreen() {
   const copyText = (t: string, label: string) => {
     Clipboard.setStringAsync(t);
     if (Platform.OS !== 'web') Haptics.selectionAsync();
-    Alert.alert('Copied', `${label} copied.`);
+    Alert.alert('Copied', `${label} copied to clipboard.`);
   };
 
+  const filteredHistory = useMemo(() => {
+    return historyList.filter(item => {
+      if (!historySearch.trim()) return true;
+      const q = historySearch.toLowerCase().trim();
+      const holder = (item.holder_name || '').toLowerCase();
+      const ref = (item.search_number || '').toLowerCase();
+      return holder.includes(q) || ref.includes(q);
+    });
+  }, [historyList, historySearch]);
+
+  const filteredStates = useMemo(() => {
+    if (!stateSearch.trim()) return STATE_LIST;
+    return STATE_LIST.filter(s => s.toLowerCase().includes(stateSearch.toLowerCase().trim()));
+  }, [stateSearch]);
+
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* COMPACT CLEAN HEADER */}
-      <View style={[s.header, { paddingTop: Math.max(insets.top, 14) }]}>
-        <View style={s.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={20} color={COLORS.text} />
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* JTB TOP BRANDED HEADER */}
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) }]}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={20} color={COLORS.navyDark} />
           </TouchableOpacity>
 
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={s.headerTitle}>Tax ID / TIN</Text>
-            <Text style={s.headerSubtitle}>Joint Tax Board (JTB) Portal</Text>
+            <Text style={styles.headerTitle}>Tax ID Certificate Retrieval</Text>
+            <Text style={styles.headerSubtitle}>Joint Revenue Board (JRB / JTB) Portal</Text>
           </View>
 
-          <View style={s.walletPill}>
-            <Ionicons name="wallet-outline" size={13} color={COLORS.emerald} style={{ marginRight: 4 }} />
-            <Text style={s.walletPillText}>
+          <View style={styles.walletPill}>
+            <Ionicons name="wallet-outline" size={13} color={COLORS.jtbGreenDark} style={{ marginRight: 4 }} />
+            <Text style={styles.walletPillText}>
               ₦{walletBalance !== null ? walletBalance.toLocaleString() : '---'}
             </Text>
           </View>
         </View>
 
-        {/* CLEAN TAB SWITCH */}
-        <View style={s.tabBar}>
+        {/* TOP TAB SWITCHER: SEARCH FORM VS MY REQUESTS */}
+        <View style={styles.topTabBar}>
           <TouchableOpacity
-            style={[s.tabBtn, activeTab === 'form' && s.tabBtnActive]}
-            onPress={() => setActiveTab('form')}
+            style={[styles.topTabBtn, activeTab === 'portal' && styles.topTabBtnActive]}
+            onPress={() => setActiveTab('portal')}
             activeOpacity={0.7}
           >
-            <Text style={[s.tabBtnText, activeTab === 'form' && s.tabBtnTextActive]}>
-              New Request
+            <Text style={[styles.topTabBtnText, activeTab === 'portal' && styles.topTabBtnTextActive]}>
+              Search Certificate
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[s.tabBtn, activeTab === 'history' && s.tabBtnActive]}
+            style={[styles.topTabBtn, activeTab === 'history' && styles.topTabBtnActive]}
             onPress={() => setActiveTab('history')}
             activeOpacity={0.7}
           >
-            <Text style={[s.tabBtnText, activeTab === 'history' && s.tabBtnTextActive]}>
-              My Requests ({historyList.length})
+            <Text style={[styles.topTabBtnText, activeTab === 'history' && styles.topTabBtnTextActive]}>
+              My Certificates ({historyList.length})
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {activeTab === 'form' ? (
+      {activeTab === 'portal' ? (
         <ScrollView
-          style={s.scroll}
-          contentContainerStyle={[s.scrollContent, { paddingBottom: bottomClearance }]}
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomClearance }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="on-drag"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.jtbGreen} />}
         >
-          {/* SMOOTH CATEGORY SWITCHER */}
-          <View style={s.segmentContainer}>
-            <TouchableOpacity
-              style={[s.segmentBtn, category === 'individual' && s.segmentBtnActiveIndiv]}
-              onPress={() => setCategory('individual')}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="person"
-                size={16}
-                color={category === 'individual' ? COLORS.emeraldDark : COLORS.subText}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={[s.segmentText, category === 'individual' && s.segmentTextActiveIndiv]}>
-                Individual • ₦{individualPrice.toLocaleString()}
-              </Text>
-            </TouchableOpacity>
+          {/* WHITE PORTAL CARD (Matching Screenshot 1 & 3) */}
+          <View style={styles.portalCard}>
+            <Text style={styles.portalCardTitle}>Tax ID Certificate Retrieval</Text>
+            <Text style={styles.portalCardSubtitle}>Enter your details to retrieve your Tax ID certificate</Text>
 
-            <TouchableOpacity
-              style={[s.segmentBtn, category === 'business' && s.segmentBtnActiveBiz]}
-              onPress={() => setCategory('business')}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="business"
-                size={16}
-                color={category === 'business' ? '#1E40AF' : COLORS.subText}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={[s.segmentText, category === 'business' && s.segmentTextActiveBiz]}>
-                Business • ₦{businessPrice.toLocaleString()}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ACTION CHIPS: REGISTER VS RETRIEVE */}
-          <View style={s.actionRow}>
-            <TouchableOpacity
-              style={[s.actionChip, action === 'register' && s.actionChipActive]}
-              onPress={() => setAction('register')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="add-circle-outline"
-                size={14}
-                color={action === 'register' ? COLORS.white : COLORS.subText}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[s.actionChipText, action === 'register' && s.actionChipTextActive]}>
-                Register New TIN
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[s.actionChip, action === 'retrieve' && s.actionChipActive]}
-              onPress={() => setAction('retrieve')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="document-text-outline"
-                size={14}
-                color={action === 'retrieve' ? COLORS.white : COLORS.subText}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[s.actionChipText, action === 'retrieve' && s.actionChipTextActive]}>
-                Retrieve Certificate
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* STREAMLINED INPUT CARD */}
-          <View style={s.card}>
-            {category === 'individual' ? (
-              <>
-                <Text style={s.label}>Full Name (as on NIN)</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="e.g. Ibrahim Abubakar"
-                  placeholderTextColor={COLORS.mutedText}
-                  value={fullName}
-                  onChangeText={setFullName}
+            {/* CATEGORY SWITCHER (Screenshot 1: Individual vs Non-Individual) */}
+            <Text style={styles.fieldHeading}>Category</Text>
+            <View style={styles.categoryToggleBox}>
+              <TouchableOpacity
+                style={[styles.categoryOption, category === 'individual' && styles.categoryOptionActive]}
+                onPress={() => setCategory('individual')}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="person-outline"
+                  size={16}
+                  color={category === 'individual' ? COLORS.jtbGreen : COLORS.subText}
+                  style={{ marginRight: 6 }}
                 />
+                <Text style={[styles.categoryOptionText, category === 'individual' && styles.categoryOptionTextActive]}>
+                  Individual (₦{individualPrice.toLocaleString()})
+                </Text>
+              </TouchableOpacity>
 
-                <Text style={s.label}>{action === 'register' ? 'NIN (11 Digits)' : 'NIN or Tax ID'}</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="11-digit NIN or Tax ID"
-                  placeholderTextColor={COLORS.mutedText}
-                  keyboardType="numeric"
-                  value={nin}
-                  onChangeText={t => setNin(t.replace(/\D/g, ''))}
+              <TouchableOpacity
+                style={[styles.categoryOption, category === 'non_individual' && styles.categoryOptionActive]}
+                onPress={() => setCategory('non_individual')}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="people-outline"
+                  size={16}
+                  color={category === 'non_individual' ? COLORS.jtbGreen : COLORS.subText}
+                  style={{ marginRight: 6 }}
                 />
+                <Text style={[styles.categoryOptionText, category === 'non_individual' && styles.categoryOptionTextActive]}>
+                  Non-Individual (₦{businessPrice.toLocaleString()})
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-                <View style={s.rowInputs}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={s.label}>Date of Birth</Text>
-                    <TextInput
-                      style={s.input}
-                      placeholder="DD/MM/YYYY"
-                      placeholderTextColor={COLORS.mutedText}
-                      keyboardType="numeric"
-                      maxLength={10}
-                      value={dob}
-                      onChangeText={t => handleDateInput(t, setDob)}
-                    />
-                  </View>
+            {/* ═════════════════════════════════════════════════════ */}
+            {/* 1. INDIVIDUAL SECTION (Screenshots 1 & 2)             */}
+            {/* ═════════════════════════════════════════════════════ */}
+            {category === 'individual' && (
+              <View style={{ marginTop: 16 }}>
+                {/* Search Criteria Dropdown */}
+                <Text style={styles.fieldHeading}>Search Criteria</Text>
+                <TouchableOpacity
+                  style={styles.dropdownTrigger}
+                  onPress={() => setShowIndivCriteriaModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dropdownTriggerText}>
+                    {indivCriteria === 'nin_name_dob' && 'NIN (with Name and DOB)'}
+                    {indivCriteria === 'tax_id_dob' && 'Tax ID (with DOB)'}
+                    {indivCriteria === 'prev_tin_dob' && 'Previous TIN (with DOB)'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
+                </TouchableOpacity>
 
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={s.label}>Phone Number</Text>
-                    <TextInput
-                      style={s.input}
-                      placeholder="08012345678"
-                      placeholderTextColor={COLORS.mutedText}
-                      keyboardType="phone-pad"
-                      maxLength={11}
-                      value={phone}
-                      onChangeText={t => setPhone(t.replace(/\D/g, ''))}
-                    />
-                  </View>
-                </View>
-
-                {action === 'register' && (
+                {/* Form fields based on selected criteria */}
+                {indivCriteria === 'nin_name_dob' && (
                   <>
-                    <Text style={s.label}>State of Origin</Text>
-                    <TouchableOpacity
-                      style={s.pickerBtn}
-                      onPress={() => {
-                        setStateSearch('');
-                        setShowStateModal(true);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={state ? s.pickerText : s.pickerPlaceholder}>
-                        {state || 'Select State'}
-                      </Text>
-                      <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
-                    </TouchableOpacity>
+                    <View style={styles.twoColRow}>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={styles.fieldHeading}>First Name</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Enter first name"
+                          placeholderTextColor={COLORS.mutedText}
+                          value={firstName}
+                          onChangeText={setFirstName}
+                        />
+                      </View>
+
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={styles.fieldHeading}>Last Name</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Enter last name"
+                          placeholderTextColor={COLORS.mutedText}
+                          value={lastName}
+                          onChangeText={setLastName}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.twoColRow}>
+                      <View style={{ flex: 1.2, marginRight: 8 }}>
+                        <Text style={styles.fieldHeading}>National Identification Number (NIN)</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Enter 11-digit NIN"
+                          placeholderTextColor={COLORS.mutedText}
+                          keyboardType="numeric"
+                          maxLength={11}
+                          value={nin}
+                          onChangeText={t => setNin(t.replace(/\D/g, ''))}
+                        />
+                      </View>
+
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={styles.fieldHeading}>Date of Birth</Text>
+                        <View style={styles.inputWithIcon}>
+                          <TextInput
+                            style={styles.inputInside}
+                            placeholder="DD/MM/YYYY"
+                            placeholderTextColor={COLORS.mutedText}
+                            keyboardType="numeric"
+                            maxLength={10}
+                            value={dob}
+                            onChangeText={t => handleDateInput(t, setDob)}
+                          />
+                          <Ionicons name="calendar-outline" size={16} color={COLORS.jtbGreen} />
+                        </View>
+                      </View>
+                    </View>
                   </>
                 )}
-              </>
-            ) : (
-              <>
-                <Text style={s.label}>Company / Business Name</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="e.g. Abu Mafhal Integrated Services LTD"
-                  placeholderTextColor={COLORS.mutedText}
-                  value={bizName}
-                  onChangeText={setBizName}
-                />
 
-                <View style={s.rowInputs}>
-                  <View style={{ flex: 1.2, marginRight: 8 }}>
-                    <Text style={s.label}>CAC Number (RC / BN)</Text>
-                    <TextInput
-                      style={s.input}
-                      placeholder="e.g. RC123456"
-                      placeholderTextColor={COLORS.mutedText}
-                      autoCapitalize="characters"
-                      value={cacNumber}
-                      onChangeText={setCacNumber}
-                    />
+                {indivCriteria === 'tax_id_dob' && (
+                  <View style={styles.twoColRow}>
+                    <View style={{ flex: 1.2, marginRight: 8 }}>
+                      <Text style={styles.fieldHeading}>Tax ID</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Tax Identification Number"
+                        placeholderTextColor={COLORS.mutedText}
+                        value={taxId}
+                        onChangeText={setTaxId}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={styles.fieldHeading}>Date of Birth</Text>
+                      <View style={styles.inputWithIcon}>
+                        <TextInput
+                          style={styles.inputInside}
+                          placeholder="DD/MM/YYYY"
+                          placeholderTextColor={COLORS.mutedText}
+                          keyboardType="numeric"
+                          maxLength={10}
+                          value={dob}
+                          onChangeText={t => handleDateInput(t, setDob)}
+                        />
+                        <Ionicons name="calendar-outline" size={16} color={COLORS.jtbGreen} />
+                      </View>
+                    </View>
                   </View>
+                )}
 
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={s.label}>Incorp. Date</Text>
-                    <TextInput
-                      style={s.input}
-                      placeholder="DD/MM/YYYY"
-                      placeholderTextColor={COLORS.mutedText}
-                      keyboardType="numeric"
-                      maxLength={10}
-                      value={incorpDate}
-                      onChangeText={t => handleDateInput(t, setIncorpDate)}
-                    />
+                {indivCriteria === 'prev_tin_dob' && (
+                  <View style={styles.twoColRow}>
+                    <View style={{ flex: 1.2, marginRight: 8 }}>
+                      <Text style={styles.fieldHeading}>Previous TIN</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Previous TIN"
+                        placeholderTextColor={COLORS.mutedText}
+                        value={previousTin}
+                        onChangeText={setPreviousTin}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={styles.fieldHeading}>Date of Birth</Text>
+                      <View style={styles.inputWithIcon}>
+                        <TextInput
+                          style={styles.inputInside}
+                          placeholder="DD/MM/YYYY"
+                          placeholderTextColor={COLORS.mutedText}
+                          keyboardType="numeric"
+                          maxLength={10}
+                          value={dob}
+                          onChangeText={t => handleDateInput(t, setDob)}
+                        />
+                        <Ionicons name="calendar-outline" size={16} color={COLORS.jtbGreen} />
+                      </View>
+                    </View>
                   </View>
-                </View>
+                )}
 
-                <Text style={s.label}>Contact Phone Number</Text>
+                {/* Contact Phone Number */}
+                <Text style={styles.fieldHeading}>WhatsApp / Notification Phone</Text>
                 <TextInput
-                  style={s.input}
+                  style={styles.input}
                   placeholder="08012345678"
                   placeholderTextColor={COLORS.mutedText}
                   keyboardType="phone-pad"
@@ -554,68 +644,342 @@ export default function TinServicesScreen() {
                   value={phone}
                   onChangeText={t => setPhone(t.replace(/\D/g, ''))}
                 />
-
-                {action === 'register' && (
-                  <View style={s.rowInputs}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={s.label}>Director Name</Text>
-                      <TextInput
-                        style={s.input}
-                        placeholder="Director Name"
-                        placeholderTextColor={COLORS.mutedText}
-                        value={directorName}
-                        onChangeText={setDirectorName}
-                      />
-                    </View>
-
-                    <View style={{ flex: 1, marginLeft: 8 }}>
-                      <Text style={s.label}>Director NIN</Text>
-                      <TextInput
-                        style={s.input}
-                        placeholder="11-digit NIN"
-                        placeholderTextColor={COLORS.mutedText}
-                        keyboardType="numeric"
-                        maxLength={11}
-                        value={directorNin}
-                        onChangeText={t => setDirectorNin(t.replace(/\D/g, ''))}
-                      />
-                    </View>
-                  </View>
-                )}
-              </>
+              </View>
             )}
 
-            {/* DIRECT SUBMIT BUTTON */}
+            {/* ═════════════════════════════════════════════════════ */}
+            {/* 2. NON-INDIVIDUAL SECTION (Screenshots 3 to 10)       */}
+            {/* ═════════════════════════════════════════════════════ */}
+            {category === 'non_individual' && (
+              <View style={{ marginTop: 16 }}>
+                {/* Entity Type Chips (Screenshot 3, 8, 10) */}
+                <Text style={styles.fieldHeading}>Entity Type *</Text>
+                <View style={styles.entityTypeRow}>
+                  <TouchableOpacity
+                    style={[styles.entityChip, entityType === 'corporate' && styles.entityChipActive]}
+                    onPress={() => setEntityType('corporate')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="business" size={15} color={entityType === 'corporate' ? COLORS.jtbGreen : COLORS.subText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.entityChipText, entityType === 'corporate' && styles.entityChipTextActive]}>
+                      Corporate
+                    </Text>
+                    {entityType === 'corporate' && (
+                      <Ionicons name="checkmark-circle" size={15} color={COLORS.jtbGreen} style={{ marginLeft: 6 }} />
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.entityChip, entityType === 'mda' && styles.entityChipActive]}
+                    onPress={() => setEntityType('mda')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="business-outline" size={15} color={entityType === 'mda' ? COLORS.jtbGreen : COLORS.subText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.entityChipText, entityType === 'mda' && styles.entityChipTextActive]}>
+                      MDA
+                    </Text>
+                    {entityType === 'mda' && (
+                      <Ionicons name="checkmark-circle" size={15} color={COLORS.jtbGreen} style={{ marginLeft: 6 }} />
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.entityChip, entityType === 'cooperative' && styles.entityChipActive]}
+                    onPress={() => setEntityType('cooperative')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="people-outline" size={15} color={entityType === 'cooperative' ? COLORS.jtbGreen : COLORS.subText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.entityChipText, entityType === 'cooperative' && styles.entityChipTextActive]}>
+                      Cooperative So...
+                    </Text>
+                    {entityType === 'cooperative' && (
+                      <Ionicons name="checkmark-circle" size={15} color={COLORS.jtbGreen} style={{ marginLeft: 6 }} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* ── Sub-Form: CORPORATE (Screenshots 3, 4, 5, 6, 7) ── */}
+                {entityType === 'corporate' && (
+                  <>
+                    {/* Search Criteria Dropdown (Screenshot 4) */}
+                    <Text style={[styles.fieldHeading, { marginTop: 14 }]}>Search Criteria</Text>
+                    <TouchableOpacity
+                      style={styles.dropdownTrigger}
+                      onPress={() => setShowCorpCriteriaModal(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.dropdownTriggerText}>
+                        {corpCriteria === 'cac_reg' && 'CAC Registration Number'}
+                        {corpCriteria === 'tax_id' && 'Tax ID'}
+                        {corpCriteria === 'prev_tin' && 'Previous JTB TIN'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
+                    </TouchableOpacity>
+
+                    {corpCriteria === 'cac_reg' && (
+                      <>
+                        {/* Organization Type Dropdown (Screenshots 5 & 6) */}
+                        <Text style={styles.fieldHeading}>Organization Type</Text>
+                        <TouchableOpacity
+                          style={styles.dropdownTrigger}
+                          onPress={() => setShowOrgModal(true)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.dropdownTriggerText}>{orgType}</Text>
+                          <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
+                        </TouchableOpacity>
+
+                        {/* CAC Reg Number & Date of Incorporation */}
+                        <View style={styles.twoColRow}>
+                          <View style={{ flex: 1.2, marginRight: 8 }}>
+                            <Text style={styles.fieldHeading}>CAC Registration Number</Text>
+                            <TextInput
+                              style={styles.input}
+                              placeholder="Enter CAC Registration Number (e.g. RC...)"
+                              placeholderTextColor={COLORS.mutedText}
+                              autoCapitalize="characters"
+                              value={cacRegNumber}
+                              onChangeText={setCacRegNumber}
+                            />
+                          </View>
+
+                          <View style={{ flex: 1, marginLeft: 8 }}>
+                            <Text style={styles.fieldHeading}>Date of Incorporation</Text>
+                            <View style={styles.inputWithIcon}>
+                              <TextInput
+                                style={styles.inputInside}
+                                placeholder="DD/MM/YYYY"
+                                placeholderTextColor={COLORS.mutedText}
+                                keyboardType="numeric"
+                                maxLength={10}
+                                value={dateOfIncorp}
+                                onChangeText={t => handleDateInput(t, setDateOfIncorp)}
+                              />
+                              <Ionicons name="calendar-outline" size={16} color={COLORS.jtbGreen} />
+                            </View>
+                          </View>
+                        </View>
+                      </>
+                    )}
+
+                    {corpCriteria === 'tax_id' && (
+                      <View style={styles.twoColRow}>
+                        <View style={{ flex: 1.2, marginRight: 8 }}>
+                          <Text style={styles.fieldHeading}>Tax ID</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="Enter Tax Identification Number"
+                            placeholderTextColor={COLORS.mutedText}
+                            value={taxId}
+                            onChangeText={setTaxId}
+                          />
+                        </View>
+
+                        <View style={{ flex: 1, marginLeft: 8 }}>
+                          <Text style={styles.fieldHeading}>Date of Incorporation</Text>
+                          <View style={styles.inputWithIcon}>
+                            <TextInput
+                              style={styles.inputInside}
+                              placeholder="DD/MM/YYYY"
+                              placeholderTextColor={COLORS.mutedText}
+                              keyboardType="numeric"
+                              maxLength={10}
+                              value={dateOfIncorp}
+                              onChangeText={t => handleDateInput(t, setDateOfIncorp)}
+                            />
+                            <Ionicons name="calendar-outline" size={16} color={COLORS.jtbGreen} />
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    {corpCriteria === 'prev_tin' && (
+                      <View style={styles.twoColRow}>
+                        <View style={{ flex: 1.2, marginRight: 8 }}>
+                          <Text style={styles.fieldHeading}>Previous JTB TIN</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="Enter Previous JTB TIN"
+                            placeholderTextColor={COLORS.mutedText}
+                            value={previousTin}
+                            onChangeText={setPreviousTin}
+                          />
+                        </View>
+
+                        <View style={{ flex: 1, marginLeft: 8 }}>
+                          <Text style={styles.fieldHeading}>Date of Incorporation</Text>
+                          <View style={styles.inputWithIcon}>
+                            <TextInput
+                              style={styles.inputInside}
+                              placeholder="DD/MM/YYYY"
+                              placeholderTextColor={COLORS.mutedText}
+                              keyboardType="numeric"
+                              maxLength={10}
+                              value={dateOfIncorp}
+                              onChangeText={t => handleDateInput(t, setDateOfIncorp)}
+                            />
+                            <Ionicons name="calendar-outline" size={16} color={COLORS.jtbGreen} />
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                )}
+
+                {/* ── Sub-Form: MDA (Screenshots 8 & 9) ── */}
+                {entityType === 'mda' && (
+                  <>
+                    <Text style={[styles.fieldHeading, { marginTop: 14 }]}>Search Criteria</Text>
+                    <TouchableOpacity
+                      style={styles.dropdownTrigger}
+                      onPress={() => setShowMdaCriteriaModal(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.dropdownTriggerText}>
+                        {mdaCriteria === 'registered_name' && 'Registered Name'}
+                        {mdaCriteria === 'registration_number' && 'Registration Number'}
+                        {mdaCriteria === 'tax_id' && 'Tax ID'}
+                        {mdaCriteria === 'prev_tin' && 'Previous JTB TIN'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
+                    </TouchableOpacity>
+
+                    <Text style={styles.fieldHeading}>MDA Type *</Text>
+                    <TouchableOpacity
+                      style={styles.dropdownTrigger}
+                      onPress={() => setShowMdaModal(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.dropdownTriggerText}>{mdaType}</Text>
+                      <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
+                    </TouchableOpacity>
+
+                    <Text style={styles.fieldHeading}>Registered Name</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter Registered Name"
+                      placeholderTextColor={COLORS.mutedText}
+                      value={registeredName}
+                      onChangeText={setRegisteredName}
+                    />
+                  </>
+                )}
+
+                {/* ── Sub-Form: COOPERATIVE SOCIETY (Screenshot 10) ── */}
+                {entityType === 'cooperative' && (
+                  <>
+                    <Text style={[styles.fieldHeading, { marginTop: 14 }]}>Search Criteria</Text>
+                    <TouchableOpacity
+                      style={styles.dropdownTrigger}
+                      onPress={() => setShowCoopCriteriaModal(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.dropdownTriggerText}>
+                        {coopCriteria === 'registration_number' && 'Registration Number'}
+                        {coopCriteria === 'tax_id' && 'Tax ID'}
+                        {coopCriteria === 'prev_tin' && 'Previous JTB TIN'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
+                    </TouchableOpacity>
+
+                    <Text style={styles.fieldHeading}>State of Registration *</Text>
+                    <TouchableOpacity
+                      style={styles.dropdownTrigger}
+                      onPress={() => {
+                        setStateSearch('');
+                        setShowStateModal(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={coopState ? styles.dropdownTriggerText : { color: COLORS.mutedText }}>
+                        {coopState || 'Select State'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={COLORS.subText} />
+                    </TouchableOpacity>
+                    <Text style={styles.helperText}>The same registration number can exist in more than one state.</Text>
+
+                    <View style={styles.twoColRow}>
+                      <View style={{ flex: 1.2, marginRight: 8 }}>
+                        <Text style={styles.fieldHeading}>Registration Number</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Enter Registration Number"
+                          placeholderTextColor={COLORS.mutedText}
+                          value={cacRegNumber}
+                          onChangeText={setCacRegNumber}
+                        />
+                      </View>
+
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={styles.fieldHeading}>Date of Incorporation</Text>
+                        <View style={styles.inputWithIcon}>
+                          <TextInput
+                            style={styles.inputInside}
+                            placeholder="DD/MM/YYYY"
+                            placeholderTextColor={COLORS.mutedText}
+                            keyboardType="numeric"
+                            maxLength={10}
+                            value={dateOfIncorp}
+                            onChangeText={t => handleDateInput(t, setDateOfIncorp)}
+                          />
+                          <Ionicons name="calendar-outline" size={16} color={COLORS.jtbGreen} />
+                        </View>
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {/* Contact Phone Number */}
+                <Text style={styles.fieldHeading}>Notification Phone / WhatsApp</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="08012345678"
+                  placeholderTextColor={COLORS.mutedText}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  value={phone}
+                  onChangeText={t => setPhone(t.replace(/\D/g, ''))}
+                />
+              </View>
+            )}
+
+            {/* ACTION SUBMIT BUTTON (Matching Screenshot Search Certificate) */}
             <TouchableOpacity
-              style={[s.submitBtn, loading && { opacity: 0.7 }]}
-              onPress={validateAndConfirm}
+              style={[styles.searchBtn, loading && { opacity: 0.7 }]}
+              onPress={handleSearchSubmit}
               disabled={loading}
               activeOpacity={0.8}
             >
               {loading ? (
                 <ActivityIndicator color={COLORS.white} size="small" />
               ) : (
-                <Text style={s.submitBtnText}>
-                  Submit Request • ₦{activeFee.toLocaleString()}
+                <Text style={styles.searchBtnText}>
+                  Search Certificate (₦{activeFee.toLocaleString()})
                 </Text>
               )}
             </TouchableOpacity>
+
+            <Text style={styles.footerNote}>
+              © 2026 Joint Revenue Board. All Rights Reserved. Go to Settings to activate Windows.
+            </Text>
           </View>
         </ScrollView>
       ) : (
-        /* MY REQUESTS TAB */
+        /* ═════════════════════════════════════════════════════ */
+        /* MY CERTIFICATES & REQUESTS HISTORY TAB               */
+        /* ═════════════════════════════════════════════════════ */
         <ScrollView
-          style={s.scroll}
-          contentContainerStyle={[s.scrollContent, { paddingBottom: bottomClearance }]}
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomClearance }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.jtbGreen} />}
         >
           {historyList.length > 0 && (
-            <View style={s.searchBox}>
+            <View style={styles.searchBox}>
               <Ionicons name="search" size={16} color={COLORS.subText} style={{ marginRight: 6 }} />
               <TextInput
-                style={s.searchInput}
-                placeholder="Search requests..."
+                style={styles.searchInput}
+                placeholder="Search certificates..."
                 placeholderTextColor={COLORS.mutedText}
                 value={historySearch}
                 onChangeText={setHistorySearch}
@@ -624,10 +988,10 @@ export default function TinServicesScreen() {
           )}
 
           {filteredHistory.length === 0 ? (
-            <View style={s.emptyBox}>
-              <Ionicons name="document-text-outline" size={40} color={COLORS.mutedText} />
-              <Text style={s.emptyTitle}>No Requests Yet</Text>
-              <Text style={s.emptySub}>Your submitted Tax ID requests will appear here.</Text>
+            <View style={styles.emptyBox}>
+              <Ionicons name="document-text-outline" size={44} color={COLORS.mutedText} />
+              <Text style={styles.emptyTitle}>No Tax ID Certificates Yet</Text>
+              <Text style={styles.emptySub}>Your verified Tax ID certificates and retrieval requests will appear here.</Text>
             </View>
           ) : (
             filteredHistory.map((item, i) => {
@@ -638,55 +1002,55 @@ export default function TinServicesScreen() {
               const assignedTin = details.generated_tin || details.retrieved_tin || details.taxId;
 
               return (
-                <View key={item.id || i} style={s.historyCard}>
-                  <View style={s.historyCardTop}>
+                <View key={item.id || i} style={styles.historyCard}>
+                  <View style={styles.historyCardTop}>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.historyName} numberOfLines={1}>
+                      <Text style={styles.historyName} numberOfLines={1}>
                         {item.holder_name || 'Tax ID Applicant'}
                       </Text>
-                      <Text style={s.historyRef}>
-                        {details.category === 'business' ? 'Business' : 'Individual'} • Ref: {item.search_number || 'N/A'}
+                      <Text style={styles.historyRef}>
+                        {details.category === 'non_individual' ? 'Non-Individual' : 'Individual'} • Ref: {item.search_number || 'N/A'}
                       </Text>
                     </View>
 
-                    <View style={[s.badge, isDone ? s.badgeDone : s.badgePending]}>
-                      <Text style={[s.badgeText, isDone ? s.badgeTextDone : s.badgeTextPending]}>
+                    <View style={[styles.badge, isDone ? styles.badgeDone : styles.badgePending]}>
+                      <Text style={[styles.badgeText, isDone ? styles.badgeTextDone : styles.badgeTextPending]}>
                         {status}
                       </Text>
                     </View>
                   </View>
 
                   {assignedTin && (
-                    <View style={s.tinRow}>
-                      <Text style={s.tinLabel}>Tax ID: </Text>
+                    <View style={styles.tinRow}>
+                      <Text style={styles.tinLabel}>Assigned Tax ID: </Text>
                       <TouchableOpacity
                         onPress={() => copyText(assignedTin, 'Tax ID')}
                         style={{ flexDirection: 'row', alignItems: 'center' }}
                       >
-                        <Text style={s.tinValue}>{assignedTin}</Text>
-                        <Ionicons name="copy-outline" size={12} color={COLORS.emeraldDark} style={{ marginLeft: 4 }} />
+                        <Text style={styles.tinValue}>{assignedTin}</Text>
+                        <Ionicons name="copy-outline" size={12} color={COLORS.jtbGreenDark} style={{ marginLeft: 4 }} />
                       </TouchableOpacity>
                     </View>
                   )}
 
-                  <View style={s.historyFooter}>
-                    <Text style={s.historyDate}>
+                  <View style={styles.historyFooter}>
+                    <Text style={styles.historyDate}>
                       {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Recent'}
                     </Text>
 
                     {certUrl ? (
                       <TouchableOpacity
-                        style={s.downloadBtn}
+                        style={styles.downloadBtn}
                         onPress={() => {
                           if (Platform.OS === 'web') window.open(certUrl, '_blank');
                           else WebBrowser.openBrowserAsync(certUrl);
                         }}
                       >
                         <Ionicons name="download-outline" size={13} color={COLORS.white} style={{ marginRight: 4 }} />
-                        <Text style={s.downloadBtnText}>Certificate PDF</Text>
+                        <Text style={styles.downloadBtnText}>Download PDF</Text>
                       </TouchableOpacity>
                     ) : (
-                      <Text style={s.pendingNote}>In Progress</Text>
+                      <Text style={styles.pendingNote}>Processing Search</Text>
                     )}
                   </View>
                 </View>
@@ -696,30 +1060,30 @@ export default function TinServicesScreen() {
         </ScrollView>
       )}
 
-      {/* CONFIRMATION MODAL */}
+      {/* ───────────────── CONFIRMATION MODAL ───────────────── */}
       <Modal visible={confirmModalVisible} transparent animationType="fade" onRequestClose={() => setConfirmModalVisible(false)}>
-        <View style={s.modalBackdrop}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Confirm Request</Text>
-            <Text style={s.modalSub}>
-              {category === 'individual' ? 'Individual' : 'Business'} Tax ID ({action === 'register' ? 'Registration' : 'Retrieval'})
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Confirm Certificate Search</Text>
+            <Text style={styles.modalSub}>
+              {category === 'individual' ? 'Individual' : 'Non-Individual'} Certificate Retrieval
             </Text>
 
-            <View style={s.modalFeeRow}>
-              <Text style={s.modalFeeLabel}>Service Fee</Text>
-              <Text style={s.modalFeeVal}>₦{activeFee.toLocaleString()}</Text>
+            <View style={styles.modalFeeRow}>
+              <Text style={styles.modalFeeLabel}>Service Fee</Text>
+              <Text style={styles.modalFeeVal}>₦{activeFee.toLocaleString()}</Text>
             </View>
 
-            <View style={s.modalBtnRow}>
-              <TouchableOpacity style={s.modalCancelBtn} onPress={() => setConfirmModalVisible(false)}>
-                <Text style={s.modalCancelText}>Cancel</Text>
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setConfirmModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={s.modalSubmitBtn} onPress={executeSubmit} disabled={loading}>
+              <TouchableOpacity style={styles.modalSubmitBtn} onPress={executeSearch} disabled={loading}>
                 {loading ? (
                   <ActivityIndicator color={COLORS.white} size="small" />
                 ) : (
-                  <Text style={s.modalSubmitText}>Confirm & Pay</Text>
+                  <Text style={styles.modalSubmitText}>Search Certificate</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -727,88 +1091,265 @@ export default function TinServicesScreen() {
         </View>
       </Modal>
 
-      {/* INSUFFICIENT BALANCE MODAL */}
+      {/* ───────────────── INSUFFICIENT BALANCE MODAL ───────────────── */}
       <Modal visible={insufficientModalVisible} transparent animationType="fade" onRequestClose={() => setInsufficientModalVisible(false)}>
-        <View style={s.modalBackdrop}>
-          <View style={s.modalCard}>
-            <Text style={[s.modalTitle, { color: COLORS.danger }]}>Insufficient Balance</Text>
-            <Text style={s.modalSub}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { color: COLORS.danger }]}>Insufficient Wallet Balance</Text>
+            <Text style={styles.modalSub}>
               Available: ₦{walletBalance !== null ? walletBalance.toLocaleString() : '0'}. Required: ₦{activeFee.toLocaleString()}.
             </Text>
 
-            <View style={s.modalBtnRow}>
-              <TouchableOpacity style={s.modalCancelBtn} onPress={() => setInsufficientModalVisible(false)}>
-                <Text style={s.modalCancelText}>Dismiss</Text>
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setInsufficientModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Dismiss</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[s.modalSubmitBtn, { backgroundColor: COLORS.gold }]}
+                style={[styles.modalSubmitBtn, { backgroundColor: COLORS.gold }]}
                 onPress={() => {
                   setInsufficientModalVisible(false);
                   router.push('/(app)/fund-wallet' as any);
                 }}
               >
-                <Text style={s.modalSubmitText}>Fund Wallet</Text>
+                <Text style={styles.modalSubmitText}>Fund Wallet</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* SUCCESS MODAL */}
+      {/* ───────────────── SUCCESS MODAL ───────────────── */}
       <Modal visible={successModalVisible} transparent animationType="fade" onRequestClose={() => setSuccessModalVisible(false)}>
-        <View style={s.modalBackdrop}>
-          <View style={s.modalCard}>
-            <Ionicons name="checkmark-circle" size={48} color={COLORS.emerald} style={{ alignSelf: 'center', marginBottom: 8 }} />
-            <Text style={s.modalTitle}>Request Submitted!</Text>
-            <Text style={s.modalSub}>Reference: {successRef}</Text>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Ionicons name="checkmark-circle" size={48} color={COLORS.jtbGreen} style={{ alignSelf: 'center', marginBottom: 8 }} />
+            <Text style={styles.modalTitle}>Search Request Submitted!</Text>
+            <Text style={styles.modalSub}>Reference: {successRef}</Text>
 
             <TouchableOpacity
-              style={[s.modalSubmitBtn, { backgroundColor: COLORS.emerald, marginTop: 14 }]}
+              style={[styles.modalSubmitBtn, { backgroundColor: COLORS.jtbGreen, marginTop: 14 }]}
               onPress={() => {
                 setSuccessModalVisible(false);
                 setActiveTab('history');
               }}
             >
-              <Text style={s.modalSubmitText}>View in Requests</Text>
+              <Text style={styles.modalSubmitText}>View in My Certificates</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* STATE MODAL */}
+      {/* ───────────────── INDIVIDUAL CRITERIA DROPDOWN MODAL ───────────────── */}
+      <Modal visible={showIndivCriteriaModal} transparent animationType="fade" onRequestClose={() => setShowIndivCriteriaModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dropdownModalCard}>
+            <Text style={styles.dropdownModalTitle}>Select Search Criteria</Text>
+            {[
+              { id: 'nin_name_dob', label: 'NIN (with Name and DOB)' },
+              { id: 'tax_id_dob', label: 'Tax ID (with DOB)' },
+              { id: 'prev_tin_dob', label: 'Previous TIN (with DOB)' },
+            ].map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.dropdownItemRow, indivCriteria === item.id && styles.dropdownItemRowActive]}
+                onPress={() => {
+                  setIndivCriteria(item.id as any);
+                  setShowIndivCriteriaModal(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, indivCriteria === item.id && styles.dropdownItemTextActive]}>
+                  {item.label}
+                </Text>
+                {indivCriteria === item.id && <Ionicons name="checkmark" size={16} color={COLORS.jtbGreen} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ───────────────── CORPORATE CRITERIA DROPDOWN MODAL ───────────────── */}
+      <Modal visible={showCorpCriteriaModal} transparent animationType="fade" onRequestClose={() => setShowCorpCriteriaModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dropdownModalCard}>
+            <Text style={styles.dropdownModalTitle}>Select Search Criteria</Text>
+            {[
+              { id: 'cac_reg', label: 'CAC Registration Number' },
+              { id: 'tax_id', label: 'Tax ID' },
+              { id: 'prev_tin', label: 'Previous JTB TIN' },
+            ].map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.dropdownItemRow, corpCriteria === item.id && styles.dropdownItemRowActive]}
+                onPress={() => {
+                  setCorpCriteria(item.id as any);
+                  setShowCorpCriteriaModal(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, corpCriteria === item.id && styles.dropdownItemTextActive]}>
+                  {item.label}
+                </Text>
+                {corpCriteria === item.id && <Ionicons name="checkmark" size={16} color={COLORS.jtbGreen} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ───────────────── ORGANIZATION TYPE MODAL (Screenshots 5 & 6) ───────────────── */}
+      <Modal visible={showOrgModal} transparent animationType="slide" onRequestClose={() => setShowOrgModal(false)}>
+        <View style={styles.sheetBackdrop}>
+          <View style={styles.sheetCard}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Select Organization Type</Text>
+              <TouchableOpacity onPress={() => setShowOrgModal(false)}>
+                <Ionicons name="close" size={20} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 320 }}>
+              {ORGANIZATION_TYPES.map(type => (
+                <TouchableOpacity
+                  key={type}
+                  style={styles.sheetItem}
+                  onPress={() => {
+                    setOrgType(type);
+                    setShowOrgModal(false);
+                  }}
+                >
+                  <Text style={[styles.sheetItemText, orgType === type && { fontWeight: '700', color: COLORS.jtbGreen }]}>
+                    {type}
+                  </Text>
+                  {orgType === type && <Ionicons name="checkmark" size={16} color={COLORS.jtbGreen} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ───────────────── MDA CRITERIA MODAL ───────────────── */}
+      <Modal visible={showMdaCriteriaModal} transparent animationType="fade" onRequestClose={() => setShowMdaCriteriaModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dropdownModalCard}>
+            <Text style={styles.dropdownModalTitle}>Select Search Criteria</Text>
+            {[
+              { id: 'registered_name', label: 'Registered Name' },
+              { id: 'registration_number', label: 'Registration Number' },
+              { id: 'tax_id', label: 'Tax ID' },
+              { id: 'prev_tin', label: 'Previous JTB TIN' },
+            ].map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.dropdownItemRow, mdaCriteria === item.id && styles.dropdownItemRowActive]}
+                onPress={() => {
+                  setMdaCriteria(item.id as any);
+                  setShowMdaCriteriaModal(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, mdaCriteria === item.id && styles.dropdownItemTextActive]}>
+                  {item.label}
+                </Text>
+                {mdaCriteria === item.id && <Ionicons name="checkmark" size={16} color={COLORS.jtbGreen} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ───────────────── MDA TYPE MODAL ───────────────── */}
+      <Modal visible={showMdaModal} transparent animationType="slide" onRequestClose={() => setShowMdaModal(false)}>
+        <View style={styles.sheetBackdrop}>
+          <View style={styles.sheetCard}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Select MDA Type</Text>
+              <TouchableOpacity onPress={() => setShowMdaModal(false)}>
+                <Ionicons name="close" size={20} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 260 }}>
+              {MDA_TYPES.map(m => (
+                <TouchableOpacity
+                  key={m}
+                  style={styles.sheetItem}
+                  onPress={() => {
+                    setMdaType(m);
+                    setShowMdaModal(false);
+                  }}
+                >
+                  <Text style={[styles.sheetItemText, mdaType === m && { fontWeight: '700', color: COLORS.jtbGreen }]}>
+                    {m}
+                  </Text>
+                  {mdaType === m && <Ionicons name="checkmark" size={16} color={COLORS.jtbGreen} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ───────────────── COOP CRITERIA MODAL ───────────────── */}
+      <Modal visible={showCoopCriteriaModal} transparent animationType="fade" onRequestClose={() => setShowCoopCriteriaModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dropdownModalCard}>
+            <Text style={styles.dropdownModalTitle}>Select Search Criteria</Text>
+            {[
+              { id: 'registration_number', label: 'Registration Number' },
+              { id: 'tax_id', label: 'Tax ID' },
+              { id: 'prev_tin', label: 'Previous JTB TIN' },
+            ].map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.dropdownItemRow, coopCriteria === item.id && styles.dropdownItemRowActive]}
+                onPress={() => {
+                  setCoopCriteria(item.id as any);
+                  setShowCoopCriteriaModal(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, coopCriteria === item.id && styles.dropdownItemTextActive]}>
+                  {item.label}
+                </Text>
+                {coopCriteria === item.id && <Ionicons name="checkmark" size={16} color={COLORS.jtbGreen} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ───────────────── STATE MODAL ───────────────── */}
       <Modal visible={showStateModal} transparent animationType="slide" onRequestClose={() => setShowStateModal(false)}>
-        <View style={s.sheetBackdrop}>
-          <View style={s.sheetCard}>
-            <View style={s.sheetHeader}>
-              <Text style={s.sheetTitle}>Select State</Text>
+        <View style={styles.sheetBackdrop}>
+          <View style={styles.sheetCard}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Select State of Registration</Text>
               <TouchableOpacity onPress={() => setShowStateModal(false)}>
                 <Ionicons name="close" size={20} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
             <TextInput
-              style={s.sheetSearch}
+              style={styles.sheetSearch}
               placeholder="Search state..."
               placeholderTextColor={COLORS.mutedText}
               value={stateSearch}
               onChangeText={setStateSearch}
             />
 
-            <ScrollView style={{ maxHeight: 300 }}>
+            <ScrollView style={{ maxHeight: 280 }}>
               {filteredStates.map(st => (
                 <TouchableOpacity
                   key={st}
-                  style={s.sheetItem}
+                  style={styles.sheetItem}
                   onPress={() => {
-                    setState(st);
+                    setCoopState(st);
                     setShowStateModal(false);
                   }}
                 >
-                  <Text style={[s.sheetItemText, state === st && { fontWeight: '700', color: COLORS.emerald }]}>
+                  <Text style={[styles.sheetItemText, coopState === st && { fontWeight: '700', color: COLORS.jtbGreen }]}>
                     {st}
                   </Text>
-                  {state === st && <Ionicons name="checkmark" size={16} color={COLORS.emerald} />}
+                  {coopState === st && <Ionicons name="checkmark" size={16} color={COLORS.jtbGreen} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -819,17 +1360,17 @@ export default function TinServicesScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#F3F4F6',
   },
   header: {
     backgroundColor: COLORS.white,
     paddingHorizontal: 16,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: COLORS.borderLight,
   },
   headerRow: {
     flexDirection: 'row',
@@ -840,14 +1381,14 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: COLORS.text,
+    color: COLORS.navyDark,
   },
   headerSubtitle: {
     fontSize: 11,
@@ -856,7 +1397,7 @@ const s = StyleSheet.create({
   walletPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: COLORS.jtbGreenLight,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -864,35 +1405,31 @@ const s = StyleSheet.create({
   walletPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: COLORS.emeraldDark,
+    color: COLORS.jtbGreenDark,
   },
-  tabBar: {
+  topTabBar: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
     padding: 3,
   },
-  tabBtn: {
+  topTabBtn: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 7,
-    borderRadius: 8,
+    borderRadius: 6,
   },
-  tabBtnActive: {
+  topTabBtnActive: {
     backgroundColor: COLORS.white,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
-      android: { elevation: 1 },
-    }),
   },
-  tabBtnText: {
+  topTabBtnText: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.subText,
   },
-  tabBtnTextActive: {
-    fontWeight: '800',
+  topTabBtnTextActive: {
     color: COLORS.navyDark,
+    fontWeight: '800',
   },
   scroll: {
     flex: 1,
@@ -900,133 +1437,167 @@ const s = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 3,
-    marginBottom: 12,
+  portalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  segmentBtn: {
+  portalCardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  portalCardSubtitle: {
+    fontSize: 12,
+    color: COLORS.subText,
+    marginTop: 2,
+    marginBottom: 14,
+  },
+  fieldHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+  categoryToggleBox: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 3,
+  },
+  categoryOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 8,
   },
-  segmentBtnActiveIndiv: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1.5,
-    borderColor: COLORS.emerald,
+  categoryOptionActive: {
+    backgroundColor: COLORS.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  segmentBtnActiveBiz: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1.5,
-    borderColor: COLORS.blue,
-  },
-  segmentText: {
+  categoryOptionText: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.subText,
   },
-  segmentTextActiveIndiv: {
+  categoryOptionTextActive: {
+    color: COLORS.jtbGreenDark,
     fontWeight: '800',
-    color: COLORS.emeraldDark,
   },
-  segmentTextActiveBiz: {
-    fontWeight: '800',
-    color: '#1E40AF',
-  },
-  actionRow: {
+  dropdownTrigger: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 42,
+    backgroundColor: COLORS.white,
     marginBottom: 12,
   },
-  actionChip: {
+  dropdownTriggerText: {
+    fontSize: 13,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  twoColRow: {
+    flexDirection: 'row',
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 42,
+    fontSize: 13,
+    color: COLORS.text,
+    backgroundColor: COLORS.white,
+    marginBottom: 12,
+  },
+  inputWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 42,
+    backgroundColor: COLORS.white,
+    marginBottom: 12,
+  },
+  inputInside: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.text,
+    height: '100%',
+  },
+  entityTypeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  entityChip: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
-    paddingVertical: 8,
     borderRadius: 8,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
   },
-  actionChipActive: {
-    backgroundColor: COLORS.navyDark,
-    borderColor: COLORS.navyDark,
+  entityChipActive: {
+    borderColor: COLORS.jtbGreen,
+    backgroundColor: COLORS.jtbGreenLight,
   },
-  actionChipText: {
+  entityChipText: {
     fontSize: 11,
     fontWeight: '600',
     color: COLORS.subText,
   },
-  actionChipTextActive: {
-    color: COLORS.white,
-    fontWeight: '700',
+  entityChipTextActive: {
+    color: COLORS.jtbGreenDark,
+    fontWeight: '800',
   },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 13,
-    color: COLORS.text,
-    marginBottom: 10,
-  },
-  rowInputs: {
-    flexDirection: 'row',
-  },
-  pickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 40,
-    marginBottom: 10,
-  },
-  pickerText: {
-    fontSize: 13,
-    color: COLORS.text,
-    fontWeight: '600',
-  },
-  pickerPlaceholder: {
-    fontSize: 13,
+  helperText: {
+    fontSize: 10,
     color: COLORS.mutedText,
+    marginTop: -8,
+    marginBottom: 10,
   },
-  submitBtn: {
-    backgroundColor: COLORS.navyDark,
-    borderRadius: 10,
-    paddingVertical: 12,
+  searchBtn: {
+    backgroundColor: COLORS.jtbGreen,
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
+    marginTop: 12,
   },
-  submitBtnText: {
+  searchBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
+  },
+  footerNote: {
+    fontSize: 10,
+    color: COLORS.mutedText,
+    textAlign: 'center',
+    marginTop: 14,
   },
   searchBox: {
     flexDirection: 'row',
@@ -1058,13 +1629,14 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: COLORS.subText,
     marginTop: 2,
+    textAlign: 'center',
   },
   historyCard: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.borderLight,
     marginBottom: 8,
   },
   historyCardTop: {
@@ -1114,12 +1686,12 @@ const s = StyleSheet.create({
   tinLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: COLORS.emeraldDark,
+    color: COLORS.jtbGreenDark,
   },
   tinValue: {
     fontSize: 11,
     fontWeight: '800',
-    color: COLORS.emeraldDark,
+    color: COLORS.jtbGreenDark,
   },
   historyFooter: {
     flexDirection: 'row',
@@ -1128,7 +1700,7 @@ const s = StyleSheet.create({
     marginTop: 8,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: '#F3F4F6',
   },
   historyDate: {
     fontSize: 10,
@@ -1137,7 +1709,7 @@ const s = StyleSheet.create({
   downloadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.emerald,
+    backgroundColor: COLORS.jtbGreen,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -1182,7 +1754,7 @@ const s = StyleSheet.create({
   modalFeeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F9FAFB',
     borderRadius: 8,
     padding: 10,
     marginBottom: 14,
@@ -1195,7 +1767,7 @@ const s = StyleSheet.create({
   modalFeeVal: {
     fontSize: 14,
     fontWeight: '800',
-    color: COLORS.emerald,
+    color: COLORS.jtbGreen,
   },
   modalBtnRow: {
     flexDirection: 'row',
@@ -1205,7 +1777,7 @@ const s = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
   },
   modalCancelText: {
@@ -1217,7 +1789,7 @@ const s = StyleSheet.create({
     flex: 1.5,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: COLORS.navyDark,
+    backgroundColor: COLORS.jtbGreen,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1225,6 +1797,40 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  dropdownModalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 14,
+    width: '100%',
+    maxWidth: 340,
+  },
+  dropdownModalTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 10,
+  },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownItemRowActive: {
+    backgroundColor: COLORS.jtbGreenLight,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  dropdownItemText: {
+    fontSize: 13,
+    color: COLORS.text,
+  },
+  dropdownItemTextActive: {
+    color: COLORS.jtbGreenDark,
+    fontWeight: '700',
   },
   sheetBackdrop: {
     flex: 1,
@@ -1249,7 +1855,7 @@ const s = StyleSheet.create({
     color: COLORS.text,
   },
   sheetSearch: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F3F4F6',
     borderRadius: 8,
     paddingHorizontal: 10,
     height: 36,
@@ -1261,7 +1867,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: '#F9FAFB',
   },
   sheetItemText: {
     fontSize: 13,
