@@ -100,6 +100,11 @@ export default function WhatsAppBotAdmin() {
     const [customBroadcastPhones, setCustomBroadcastPhones] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('🌟 Sanarwa ta Musamman daga Abu Mafhal Sub!\n\nKuna iya samun sauƙin siyan Data, Airtime, NIN, BVN, da CAC a take a WhatsApp ko shafinmu na gizo.');
     const [broadcastResult, setBroadcastResult] = useState<any>(null);
+    const [showBroadcastConfirmModal, setShowBroadcastConfirmModal] = useState(false);
+    const [preparedRecipients, setPreparedRecipients] = useState<string[]>([]);
+    const [broadcastAudienceLabel, setBroadcastAudienceLabel] = useState('');
+    const [broadcastError, setBroadcastError] = useState<string | null>(null);
+    const [broadcastSuccessStats, setBroadcastSuccessStats] = useState<{ successCount: number; failCount: number; total: number } | null>(null);
 
     // Quick Test Sender Tool
     const [testPhone, setTestPhone] = useState('');
@@ -521,85 +526,161 @@ export default function WhatsAppBotAdmin() {
 
     // Send Bulk Broadcast
     const handleSendBroadcast = async () => {
+        setBroadcastError(null);
+        setBroadcastResult(null);
+        setBroadcastSuccessStats(null);
+
         if (!broadcastMessage.trim()) {
-            Alert.alert('Required', 'Please enter a message to broadcast.');
+            setBroadcastError('Please enter a message to broadcast.');
             return;
         }
 
         let recipients: string[] = [];
+        let label = '';
 
         if (broadcastAudience === 'all_registered') {
-            recipients = registeredUsers
-                .map(u => {
-                    let c = (u.phone || '').replace(/\D/g, '');
+            label = 'All Registered Users';
+            let users = registeredUsers;
+
+            // Direct fallback fetch from profiles if registeredUsers is empty
+            if (users.length === 0) {
+                try {
+                    const { data: pData } = await supabase
+                        .from('profiles')
+                        .select('phone')
+                        .not('phone', 'is', null);
+                    if (pData && pData.length > 0) {
+                        users = pData;
+                    }
+                } catch (e) {
+                    console.error('Error fetching fallback profiles:', e);
+                }
+            }
+
+            recipients = users
+                .map((u: any) => {
+                    let c = (u.phone || u.phone_number || '').toString().replace(/\D/g, '');
                     if (c.startsWith('0') && c.length === 11) c = '234' + c.slice(1);
                     else if (c.length === 10) c = '234' + c;
                     return c;
                 })
                 .filter(c => c.length >= 10);
         } else if (broadcastAudience === 'bot_chatters') {
-            recipients = customerThreads.map(c => c.clean_phone).filter(Boolean);
+            label = 'WhatsApp Bot Chatters';
+            recipients = customerThreads
+                .map(c => {
+                    let p = (c.clean_phone || '').replace(/\D/g, '');
+                    if (p.startsWith('0') && p.length === 11) p = '234' + p.slice(1);
+                    else if (p.length === 10) p = '234' + p;
+                    return p;
+                })
+                .filter(Boolean);
         } else if (broadcastAudience === 'active_7d') {
+            label = 'Active Customers (Last 7 Days)';
             const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
             recipients = customerThreads
                 .filter(c => new Date(c.last_interaction || 0).getTime() >= sevenDaysAgo)
-                .map(c => c.clean_phone)
+                .map(c => {
+                    let p = (c.clean_phone || '').replace(/\D/g, '');
+                    if (p.startsWith('0') && p.length === 11) p = '234' + p.slice(1);
+                    else if (p.length === 10) p = '234' + p;
+                    return p;
+                })
                 .filter(Boolean);
         } else if (broadcastAudience === 'custom') {
+            label = 'Custom Phone List';
             recipients = customBroadcastPhones
                 .split(/[\n,;]+/)
-                .map(p => p.trim().replace(/\D/g, ''))
+                .map(p => {
+                    let c = p.trim().replace(/\D/g, '');
+                    if (c.startsWith('0') && c.length === 11) c = '234' + c.slice(1);
+                    else if (c.length === 10) c = '234' + c;
+                    return c;
+                })
                 .filter(p => p.length >= 10);
         }
 
         recipients = Array.from(new Set(recipients));
 
         if (recipients.length === 0) {
-            Alert.alert('No Recipients', 'No valid recipient phone numbers found for this audience.');
+            setBroadcastError(`No valid recipient phone numbers found for ${label}. Please select another audience or add numbers manually.`);
             return;
         }
 
-        Alert.alert(
-            'Confirm Broadcast',
-            `Are you sure you want to broadcast this WhatsApp message to ${recipients.length} customer(s)?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: `Send to ${recipients.length} Users`,
-                    style: 'default',
-                    onPress: async () => {
-                        setBroadcasting(true);
-                        setBroadcastResult(null);
+        setPreparedRecipients(recipients);
+        setBroadcastAudienceLabel(label);
+        setShowBroadcastConfirmModal(true);
+    };
 
-                        try {
-                            const res = await fetch(webhookUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    action: 'admin_broadcast',
-                                    recipients,
-                                    message: broadcastMessage.trim()
-                                })
-                            });
+    // Execute Broadcast via Edge Function / Meta API
+    const executeBroadcast = async () => {
+        if (preparedRecipients.length === 0) return;
 
-                            const data = await res.json();
-                            setBroadcastResult(data);
+        setBroadcasting(true);
+        setBroadcastResult(null);
+        setBroadcastSuccessStats(null);
+        setBroadcastError(null);
 
-                            if (res.ok && data?.status === 'completed') {
-                                Alert.alert('🎉 Broadcast Complete', `Successfully sent to ${data.success_count} user(s). Failed: ${data.fail_count}`);
-                                loadAll();
-                            } else {
-                                Alert.alert('⚠️ Broadcast Notice', data?.error || 'Broadcast completed with notices.');
-                            }
-                        } catch (err: any) {
-                            Alert.alert('❌ Broadcast Failed', err.message || 'Network error');
-                        } finally {
-                            setBroadcasting(false);
-                        }
+        try {
+            let data: any = null;
+
+            // 1. First attempt: invoke Supabase edge function
+            try {
+                const { data: fnData, error: fnError } = await supabase.functions.invoke('whatsapp-bot', {
+                    body: {
+                        action: 'admin_broadcast',
+                        recipients: preparedRecipients,
+                        message: broadcastMessage.trim()
                     }
+                });
+
+                if (!fnError && fnData) {
+                    data = fnData;
+                } else if (fnError) {
+                    console.warn('Supabase edge invoke notice, will fallback to direct webhook POST:', fnError);
                 }
-            ]
-        );
+            } catch (invokeErr) {
+                console.warn('Edge function invoke catch:', invokeErr);
+            }
+
+            // 2. Direct HTTP POST fallback to webhookUrl
+            if (!data || (!data.status && data.success_count === undefined)) {
+                const res = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'admin_broadcast',
+                        recipients: preparedRecipients,
+                        message: broadcastMessage.trim()
+                    })
+                });
+                data = await res.json();
+            }
+
+            setBroadcastResult(data);
+
+            if (data?.status === 'completed' || data?.success_count !== undefined) {
+                const sCount = Number(data.success_count || 0);
+                const fCount = Number(data.fail_count || 0);
+                setBroadcastSuccessStats({
+                    successCount: sCount,
+                    failCount: fCount,
+                    total: preparedRecipients.length
+                });
+                setShowBroadcastConfirmModal(false);
+                if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                loadAll();
+            } else {
+                setBroadcastError(data?.error || 'Broadcast completed with notices or partial delivery.');
+            }
+        } catch (err: any) {
+            console.error('Broadcast execution error:', err);
+            setBroadcastError(err.message || 'Network error while broadcasting.');
+        } finally {
+            setBroadcasting(false);
+        }
     };
 
     // Quick Send Test Message
@@ -759,8 +840,10 @@ export default function WhatsAppBotAdmin() {
             ) : (
                 <ScrollView
                     style={s.body}
+                    keyboardShouldPersistTaps="always"
+                    keyboardDismissMode="on-drag"
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                    contentContainerStyle={{ paddingBottom: 60 }}
+                    contentContainerStyle={{ paddingBottom: 160 }}
                 >
                     {/* TAB 1: OVERVIEW */}
                     {activeTab === 'overview' && (
@@ -1165,13 +1248,55 @@ export default function WhatsAppBotAdmin() {
                                     </View>
                                 </View>
 
+                                {broadcastError && (
+                                    <View style={s.broadcastErrorCard}>
+                                        <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 8 }} />
+                                        <Text style={s.broadcastErrorText}>{broadcastError}</Text>
+                                        <TouchableOpacity onPress={() => setBroadcastError(null)} style={{ padding: 4 }}>
+                                            <Ionicons name="close" size={16} color="#DC2626" />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {broadcastSuccessStats && (
+                                    <View style={s.broadcastSuccessCard}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#16A34A" style={{ marginRight: 6 }} />
+                                            <Text style={s.broadcastSuccessTitle}>Broadcast Delivered Successfully!</Text>
+                                        </View>
+                                        <Text style={s.broadcastSuccessSub}>
+                                            WhatsApp messages dispatched to {broadcastSuccessStats.total} recipient(s).
+                                        </Text>
+                                        <View style={s.broadcastStatsRow}>
+                                            <View style={s.statBadgeGreen}>
+                                                <Text style={s.statBadgeGreenText}>✅ Sent: {broadcastSuccessStats.successCount}</Text>
+                                            </View>
+                                            {broadcastSuccessStats.failCount > 0 && (
+                                                <View style={s.statBadgeRed}>
+                                                    <Text style={s.statBadgeRedText}>⚠️ Failed: {broadcastSuccessStats.failCount}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => setBroadcastSuccessStats(null)}
+                                            style={s.broadcastDismissBtn}
+                                        >
+                                            <Text style={s.broadcastDismissBtnText}>Done / Dismiss</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
                                 <TouchableOpacity
+                                    activeOpacity={0.7}
                                     onPress={handleSendBroadcast}
                                     disabled={broadcasting}
                                     style={[s.saveBtn, { backgroundColor: C.waDarkGreen, marginTop: 16 }]}
                                 >
                                     {broadcasting ? (
-                                        <ActivityIndicator color={C.white} size="small" />
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                            <ActivityIndicator color={C.white} size="small" style={{ marginRight: 8 }} />
+                                            <Text style={s.saveBtnText}>Broadcasting to WhatsApp...</Text>
+                                        </View>
                                     ) : (
                                         <>
                                             <Ionicons name="send" size={16} color={C.white} style={{ marginRight: 6 }} />
@@ -1274,6 +1399,7 @@ export default function WhatsAppBotAdmin() {
                                 </View>
 
                                 <TouchableOpacity
+                                    activeOpacity={0.7}
                                     onPress={handleSendTestMessage}
                                     disabled={testing}
                                     style={[s.saveBtn, { backgroundColor: C.navy, marginTop: 16 }]}
@@ -1299,6 +1425,77 @@ export default function WhatsAppBotAdmin() {
                     )}
                 </ScrollView>
             )}
+
+            {/* BROADCAST CONFIRMATION MODAL */}
+            <Modal
+                visible={showBroadcastConfirmModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                    if (!broadcasting) setShowBroadcastConfirmModal(false);
+                }}
+            >
+                <View style={s.modalBackdrop}>
+                    <View style={s.confirmModalCard}>
+                        <View style={s.confirmHeaderIcon}>
+                            <Ionicons name="logo-whatsapp" size={32} color={C.waDarkGreen} />
+                        </View>
+                        <Text style={s.confirmModalTitle}>Confirm WhatsApp Broadcast</Text>
+                        <Text style={s.confirmModalSub}>
+                            You are about to broadcast this WhatsApp announcement directly to customer chats.
+                        </Text>
+
+                        <View style={s.confirmAudienceBadge}>
+                            <Ionicons name="people" size={14} color={C.waDarkGreen} style={{ marginRight: 6 }} />
+                            <Text style={s.confirmAudienceText}>
+                                {broadcastAudienceLabel}: <Text style={{ fontWeight: '800' }}>{preparedRecipients.length} Recipient(s)</Text>
+                            </Text>
+                        </View>
+
+                        <Text style={s.confirmPreviewLabel}>Message to be sent:</Text>
+                        <ScrollView style={s.confirmPreviewBox} nestedScrollEnabled>
+                            <Text style={s.confirmPreviewText}>{broadcastMessage}</Text>
+                        </ScrollView>
+
+                        {broadcastError && (
+                            <View style={[s.broadcastErrorCard, { marginTop: 10, marginBottom: 0 }]}>
+                                <Ionicons name="alert-circle" size={16} color="#DC2626" style={{ marginRight: 6 }} />
+                                <Text style={[s.broadcastErrorText, { fontSize: 11 }]}>{broadcastError}</Text>
+                            </View>
+                        )}
+
+                        <View style={s.confirmBtnRow}>
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                disabled={broadcasting}
+                                onPress={() => setShowBroadcastConfirmModal(false)}
+                                style={s.confirmCancelBtn}
+                            >
+                                <Text style={s.confirmCancelBtnText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                disabled={broadcasting}
+                                onPress={executeBroadcast}
+                                style={s.confirmSendBtn}
+                            >
+                                {broadcasting ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <ActivityIndicator color={C.white} size="small" style={{ marginRight: 6 }} />
+                                        <Text style={s.confirmSendBtnText}>Sending...</Text>
+                                    </View>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="paper-plane" size={15} color={C.white} style={{ marginRight: 6 }} />
+                                        <Text style={s.confirmSendBtnText}>Send to {preparedRecipients.length} Users</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {/* CUSTOMER DETAIL & CHAT MODAL */}
             <Modal
@@ -2314,5 +2511,193 @@ const s = StyleSheet.create({
     docSub: {
         fontSize: 10,
         color: C.slate500,
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    confirmModalCard: {
+        backgroundColor: C.white,
+        borderRadius: 20,
+        padding: 22,
+        width: '100%',
+        maxWidth: 460,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    confirmHeaderIcon: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#E8F5E9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'center',
+        marginBottom: 12,
+    },
+    confirmModalTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: C.navyDark,
+        textAlign: 'center',
+    },
+    confirmModalSub: {
+        fontSize: 12,
+        color: C.slate500,
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 14,
+        lineHeight: 17,
+    },
+    confirmAudienceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#E8F5E9',
+        borderWidth: 1,
+        borderColor: '#C8E6C9',
+        borderRadius: 10,
+        paddingVertical: 7,
+        paddingHorizontal: 12,
+        marginBottom: 12,
+    },
+    confirmAudienceText: {
+        fontSize: 12,
+        color: C.waDarkGreen,
+        fontWeight: '600',
+    },
+    confirmPreviewLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: C.slate600,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+    },
+    confirmPreviewBox: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: C.slate200,
+        borderRadius: 10,
+        padding: 12,
+        maxHeight: 120,
+    },
+    confirmPreviewText: {
+        fontSize: 12,
+        color: C.slate800,
+        lineHeight: 17,
+    },
+    confirmBtnRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 18,
+    },
+    confirmCancelBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: C.slate100,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    confirmCancelBtnText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.slate600,
+    },
+    confirmSendBtn: {
+        flex: 2,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: C.waDarkGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    confirmSendBtnText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.white,
+    },
+    broadcastErrorCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        borderRadius: 10,
+        padding: 10,
+        marginTop: 12,
+    },
+    broadcastErrorText: {
+        flex: 1,
+        fontSize: 12,
+        color: '#B91C1C',
+        lineHeight: 16,
+        fontWeight: '500',
+    },
+    broadcastSuccessCard: {
+        backgroundColor: '#F0FDF4',
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        borderRadius: 12,
+        padding: 14,
+        marginTop: 14,
+    },
+    broadcastSuccessTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#15803D',
+    },
+    broadcastSuccessSub: {
+        fontSize: 12,
+        color: '#166534',
+        marginTop: 2,
+    },
+    broadcastStatsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 8,
+    },
+    statBadgeGreen: {
+        backgroundColor: '#DCFCE7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    statBadgeGreenText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#15803D',
+    },
+    statBadgeRed: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    statBadgeRedText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#B91C1C',
+    },
+    broadcastDismissBtn: {
+        marginTop: 10,
+        alignSelf: 'flex-start',
+        backgroundColor: '#15803D',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    broadcastDismissBtnText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: C.white,
     },
 });
