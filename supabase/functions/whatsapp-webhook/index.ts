@@ -268,6 +268,44 @@ Deno.serve(async (req: Request) => {
             });
         }
 
+        // ── Direct Media Streaming Proxy for Images & Documents/PDFs ──
+        const mediaIdParam = url.searchParams.get('media_id');
+        if (mediaIdParam && accessToken) {
+            try {
+                // 1. Resolve media URL from Meta Graph API
+                const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaIdParam}`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+
+                if (!metaRes.ok) {
+                    return new Response("Media not found or expired on Meta servers.", { status: 404 });
+                }
+
+                const metaData = await metaRes.json();
+                const downloadUrl = metaData.url;
+                const mimeType = metaData.mime_type || 'application/octet-stream';
+
+                // 2. Download binary content using Access Token
+                const fileRes = await fetch(downloadUrl, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+
+                const fileBytes = await fileRes.arrayBuffer();
+
+                return new Response(fileBytes, {
+                    headers: {
+                        ...corsHeaders,
+                        'Content-Type': mimeType,
+                        'Content-Disposition': mimeType.includes('pdf') ? 'inline; filename="document.pdf"' : 'inline',
+                        'Cache-Control': 'public, max-age=86400'
+                    },
+                    status: 200
+                });
+            } catch (err: any) {
+                return new Response("Error streaming media: " + err.message, { status: 500 });
+            }
+        }
+
         // Diagnostic mode
         if (!mode && !token) {
             let metaCheck: any = null;
@@ -404,7 +442,41 @@ Deno.serve(async (req: Request) => {
                     else if (clean.length === 10) clean = '234' + clean;
 
                     if (clean.length >= 10) {
-                        const sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                        let sent = false;
+                        const mediaUrl = body.media_url ? String(body.media_url).trim() : '';
+                        const mediaType = body.media_type || (mediaUrl.match(/\.(pdf|doc|docx)/i) ? 'document' : (mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'));
+
+                        if (mediaUrl && (mediaType === 'image' || mediaType === 'document')) {
+                            try {
+                                const payload: any = {
+                                    messaging_product: 'whatsapp',
+                                    recipient_type: 'individual',
+                                    to: clean,
+                                    type: mediaType
+                                };
+
+                                if (mediaType === 'image') {
+                                    payload.image = { link: mediaUrl, caption: msg || undefined };
+                                } else {
+                                    payload.document = { link: mediaUrl, filename: body.filename || 'Document.pdf', caption: msg || undefined };
+                                }
+
+                                const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${accessToken}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify(payload)
+                                });
+                                sent = res.ok;
+                            } catch (_) {
+                                sent = false;
+                            }
+                        } else {
+                            sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                        }
+
                         if (sent) {
                             successCount++;
                             results.push({ to: clean, status: 'sent' });
@@ -412,8 +484,14 @@ Deno.serve(async (req: Request) => {
                                 await supabaseAdmin.from('whatsapp_bot_logs').insert({
                                     phone_number: clean,
                                     direction: 'outgoing',
-                                    message_type: 'admin_broadcast',
-                                    content: msg
+                                    message_type: mediaType,
+                                    content: msg || (mediaType === 'image' ? '📷 [Image Sent]' : '📄 [Document Sent]'),
+                                    raw_payload: {
+                                        media_url: mediaUrl,
+                                        media_type: mediaType,
+                                        filename: body.filename,
+                                        caption: msg
+                                    }
                                 });
                             } catch (_) {}
                         } else {
@@ -449,19 +527,61 @@ Deno.serve(async (req: Request) => {
 
             const senderPhone = (message.from || '').toString().trim(); // E.164, e.g. 2348012345678
             const contactName = change?.contacts?.[0]?.profile?.name || 'Customer';
-            const rawText = (message.text?.body || message.interactive?.button_reply?.id || message.interactive?.list_reply?.id || '').toString().trim();
+
+            // Extract media details if message is image, document, audio, video
+            let mediaId = '';
+            let mediaMime = '';
+            let mediaFilename = '';
+            let mediaCaption = '';
+            let mediaUrl = '';
+
+            if (message.type === 'image' && message.image) {
+                mediaId = message.image.id || '';
+                mediaMime = message.image.mime_type || 'image/jpeg';
+                mediaCaption = message.image.caption || '';
+                if (mediaId) mediaUrl = `${supabaseUrl}/functions/v1/whatsapp-bot?media_id=${mediaId}`;
+            } else if (message.type === 'document' && message.document) {
+                mediaId = message.document.id || '';
+                mediaFilename = message.document.filename || 'document.pdf';
+                mediaMime = message.document.mime_type || 'application/pdf';
+                mediaCaption = message.document.caption || '';
+                if (mediaId) mediaUrl = `${supabaseUrl}/functions/v1/whatsapp-bot?media_id=${mediaId}`;
+            } else if ((message.type === 'audio' || message.type === 'voice') && (message.audio || message.voice)) {
+                mediaId = message.audio?.id || message.voice?.id || '';
+                mediaMime = message.audio?.mime_type || message.voice?.mime_type || 'audio/ogg';
+                if (mediaId) mediaUrl = `${supabaseUrl}/functions/v1/whatsapp-bot?media_id=${mediaId}`;
+            } else if (message.type === 'video' && message.video) {
+                mediaId = message.video.id || '';
+                mediaMime = message.video.mime_type || 'video/mp4';
+                mediaCaption = message.video.caption || '';
+                if (mediaId) mediaUrl = `${supabaseUrl}/functions/v1/whatsapp-bot?media_id=${mediaId}`;
+            }
+
+            let rawText = (message.text?.body || message.interactive?.button_reply?.id || message.interactive?.list_reply?.id || '').toString().trim();
+            if (!rawText && mediaCaption) rawText = mediaCaption;
+            if (!rawText && message.type === 'image') rawText = '📷 [Photo / Image]';
+            if (!rawText && message.type === 'document') rawText = `📄 [Document: ${mediaFilename}]`;
+            if (!rawText && (message.type === 'audio' || message.type === 'voice')) rawText = '🎤 [Voice Note]';
+
             const text = rawText.trim();
             const lowerText = text.toLowerCase();
 
-            console.log(`[WhatsApp Bot] Incoming from ${senderPhone} (${contactName}): "${text}"`);
+            console.log(`[WhatsApp Bot] Incoming from ${senderPhone} (${contactName}): "${text}" (Type: ${message.type})`);
 
-            // Background log
+            // Background log with rich media payload
             supabaseAdmin.from('whatsapp_bot_logs').insert({
                 phone_number: senderPhone,
                 direction: 'incoming',
                 message_type: message.type || 'text',
                 content: text,
-                raw_payload: body
+                raw_payload: {
+                    media_id: mediaId,
+                    media_url: mediaUrl,
+                    mime_type: mediaMime,
+                    filename: mediaFilename,
+                    caption: mediaCaption,
+                    body
+                }
             }).then(() => {}).catch(() => {});
 
             // Fetch or create session

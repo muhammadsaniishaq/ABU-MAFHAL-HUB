@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    View, Text, TextInput, ScrollView, TouchableOpacity, Image,
+    View, Text, TextInput, ScrollView, TouchableOpacity, Image, Linking,
     ActivityIndicator, Alert, StyleSheet, Platform, Switch, RefreshControl, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import { decode } from 'base64-arraybuffer';
 
 const C = {
     navyDark: '#060B18',
@@ -364,6 +368,151 @@ export default function WhatsAppBotAdmin() {
             }
         } catch (err: any) {
             Alert.alert('❌ Error', err.message || 'Network error');
+        } finally {
+            setSendingReply(false);
+        }
+    };
+
+    // Send Photo or Document/PDF from Admin to Customer
+    const handleSendMedia = async (type: 'image' | 'document') => {
+        if (!selectedCustomer) return;
+        const cleanTarget = selectedCustomer.clean_phone;
+
+        try {
+            if (type === 'image') {
+                const res = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['images'],
+                    allowsEditing: true,
+                    quality: 0.8,
+                    base64: true
+                });
+
+                if (res.canceled || !res.assets || res.assets.length === 0) return;
+                const asset = res.assets[0];
+                if (!asset.base64) return;
+
+                setSendingReply(true);
+                const filePath = `whatsapp_chat/${cleanTarget}/img_${Date.now()}.jpg`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('chat_images')
+                    .upload(filePath, decode(asset.base64), {
+                        contentType: asset.mimeType || 'image/jpeg',
+                        upsert: true
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: pubData } = supabase.storage.from('chat_images').getPublicUrl(filePath);
+                const publicUrl = pubData.publicUrl;
+
+                // Send via Meta Cloud API
+                const apiRes = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'admin_send',
+                        to: cleanTarget,
+                        media_type: 'image',
+                        media_url: publicUrl,
+                        message: replyText.trim() || undefined
+                    })
+                });
+
+                const data = await apiRes.json().catch(() => ({}));
+
+                if (apiRes.ok && data?.status === 'completed') {
+                    const newMsg = {
+                        id: `local_${Date.now()}`,
+                        phone_number: cleanTarget,
+                        direction: 'outgoing',
+                        message_type: 'image',
+                        content: replyText.trim() || '📷 [Photo Sent]',
+                        raw_payload: { media_url: publicUrl, mime_type: 'image/jpeg' },
+                        created_at: new Date().toISOString()
+                    };
+
+                    setSelectedCustomer(prev => prev ? ({
+                        ...prev,
+                        messages: [...prev.messages, newMsg],
+                        message_count: prev.message_count + 1
+                    }) : null);
+
+                    setReplyText('');
+                    Alert.alert('✅ Photo Sent', 'Image delivered successfully to customer on WhatsApp.');
+                    loadAll();
+                } else {
+                    Alert.alert('Send Notice', data?.error || 'Failed to deliver photo.');
+                }
+
+            } else {
+                // Document / PDF
+                const res = await DocumentPicker.getDocumentAsync({
+                    type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+                    copyToCacheDirectory: true
+                });
+
+                if (res.canceled || !res.assets || res.assets.length === 0) return;
+                const file = res.assets[0];
+
+                setSendingReply(true);
+                const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
+                const filePath = `whatsapp_chat/${cleanTarget}/${Date.now()}_${file.name}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('cac_documents')
+                    .upload(filePath, decode(base64), {
+                        contentType: file.mimeType || 'application/pdf',
+                        upsert: true
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: pubData } = supabase.storage.from('cac_documents').getPublicUrl(filePath);
+                const publicUrl = pubData.publicUrl;
+
+                // Send via Meta Cloud API
+                const apiRes = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'admin_send',
+                        to: cleanTarget,
+                        media_type: 'document',
+                        media_url: publicUrl,
+                        filename: file.name,
+                        message: replyText.trim() || undefined
+                    })
+                });
+
+                const data = await apiRes.json().catch(() => ({}));
+
+                if (apiRes.ok && data?.status === 'completed') {
+                    const newMsg = {
+                        id: `local_${Date.now()}`,
+                        phone_number: cleanTarget,
+                        direction: 'outgoing',
+                        message_type: 'document',
+                        content: replyText.trim() || `📄 [Document: ${file.name}]`,
+                        raw_payload: { media_url: publicUrl, filename: file.name, mime_type: 'application/pdf' },
+                        created_at: new Date().toISOString()
+                    };
+
+                    setSelectedCustomer(prev => prev ? ({
+                        ...prev,
+                        messages: [...prev.messages, newMsg],
+                        message_count: prev.message_count + 1
+                    }) : null);
+
+                    setReplyText('');
+                    Alert.alert('✅ Document Sent', `${file.name} delivered successfully to customer on WhatsApp.`);
+                    loadAll();
+                } else {
+                    Alert.alert('Send Notice', data?.error || 'Failed to deliver document.');
+                }
+            }
+        } catch (err: any) {
+            Alert.alert('❌ File Error', err.message || 'Failed to process file.');
         } finally {
             setSendingReply(false);
         }
@@ -1251,6 +1400,12 @@ export default function WhatsAppBotAdmin() {
                                     const isOut = msg.direction === 'outgoing';
                                     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+                                    const rawPayload = typeof msg.raw_payload === 'string' ? JSON.parse(msg.raw_payload || '{}') : (msg.raw_payload || {});
+                                    const mediaUrl = rawPayload?.media_url || (msg.content?.startsWith('http') ? msg.content : '');
+                                    const isImage = msg.message_type === 'image' || rawPayload?.mime_type?.includes('image') || (mediaUrl && mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i));
+                                    const isDocument = msg.message_type === 'document' || rawPayload?.mime_type?.includes('pdf') || (mediaUrl && mediaUrl.match(/\.(pdf|doc|docx)/i));
+                                    const docName = rawPayload?.filename || 'Official_Document.pdf';
+
                                     return (
                                         <View
                                             key={msg.id || i}
@@ -1260,9 +1415,46 @@ export default function WhatsAppBotAdmin() {
                                             ]}
                                         >
                                             <View style={[s.bubble, isOut ? s.bubbleOut : s.bubbleIn]}>
-                                                <Text style={[s.bubbleText, isOut && { color: '#111827' }]}>
-                                                    {msg.content}
-                                                </Text>
+                                                {/* Render Image if message is photo */}
+                                                {isImage && mediaUrl ? (
+                                                    <TouchableOpacity
+                                                        onPress={() => Linking.openURL(mediaUrl)}
+                                                        activeOpacity={0.85}
+                                                        style={s.chatImgBox}
+                                                    >
+                                                        <Image source={{ uri: mediaUrl }} style={s.chatBubbleImg} resizeMode="cover" />
+                                                        <View style={s.imgOverlayBadge}>
+                                                            <Ionicons name="expand" size={12} color={C.white} />
+                                                            <Text style={s.imgOverlayText}>Tap to View</Text>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                ) : null}
+
+                                                {/* Render Document / PDF Card */}
+                                                {isDocument && mediaUrl ? (
+                                                    <TouchableOpacity
+                                                        onPress={() => Linking.openURL(mediaUrl)}
+                                                        activeOpacity={0.8}
+                                                        style={s.docCard}
+                                                    >
+                                                        <View style={s.docIconBox}>
+                                                            <Ionicons name="document-text" size={24} color="#DC2626" />
+                                                        </View>
+                                                        <View style={{ flex: 1, marginLeft: 8 }}>
+                                                            <Text style={s.docTitle} numberOfLines={1}>{docName}</Text>
+                                                            <Text style={s.docSub}>PDF Document • Tap to Open</Text>
+                                                        </View>
+                                                        <Ionicons name="download-outline" size={18} color={C.navy} />
+                                                    </TouchableOpacity>
+                                                ) : null}
+
+                                                {/* Caption / Text */}
+                                                {msg.content && !msg.content.startsWith('http') ? (
+                                                    <Text style={[s.bubbleText, isOut && { color: '#111827' }]}>
+                                                        {msg.content}
+                                                    </Text>
+                                                ) : null}
+
                                                 <View style={s.bubbleMetaRow}>
                                                     <Text style={s.bubbleTime}>{time}</Text>
                                                     {isOut && (
@@ -1275,12 +1467,30 @@ export default function WhatsAppBotAdmin() {
                                 })}
                             </ScrollView>
 
-                            {/* Direct WhatsApp Reply Box */}
+                            {/* Direct WhatsApp Reply & Media Sender Box */}
                             <View style={s.replyBoxContainer}>
+                                <TouchableOpacity
+                                    onPress={() => handleSendMedia('image')}
+                                    disabled={sendingReply}
+                                    style={s.attachBtn}
+                                    title="Send Photo"
+                                >
+                                    <Ionicons name="camera" size={20} color={C.waDarkGreen} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => handleSendMedia('document')}
+                                    disabled={sendingReply}
+                                    style={s.attachBtn}
+                                    title="Send Document / PDF"
+                                >
+                                    <Ionicons name="document-attach" size={20} color="#DC2626" />
+                                </TouchableOpacity>
+
                                 <TextInput
                                     value={replyText}
                                     onChangeText={setReplyText}
-                                    placeholder="Type a WhatsApp reply to this customer..."
+                                    placeholder="Type reply or caption..."
                                     style={s.replyInput}
                                     multiline
                                 />
@@ -2037,5 +2247,71 @@ const s = StyleSheet.create({
         fontSize: 10,
         color: C.slate400,
         fontWeight: '500',
+    },
+    attachBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: C.slate100,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 6,
+    },
+    chatImgBox: {
+        position: 'relative',
+        borderRadius: 8,
+        overflow: 'hidden',
+        marginBottom: 4,
+    },
+    chatBubbleImg: {
+        width: 210,
+        height: 150,
+        borderRadius: 8,
+        backgroundColor: C.slate200,
+    },
+    imgOverlayBadge: {
+        position: 'absolute',
+        bottom: 6,
+        right: 6,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        gap: 3,
+    },
+    imgOverlayText: {
+        fontSize: 9,
+        color: C.white,
+        fontWeight: '600',
+    },
+    docCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: C.slate200,
+        borderRadius: 8,
+        padding: 8,
+        marginBottom: 4,
+        maxWidth: 220,
+    },
+    docIconBox: {
+        width: 34,
+        height: 34,
+        borderRadius: 6,
+        backgroundColor: '#FEF2F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    docTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: C.slate800,
+    },
+    docSub: {
+        fontSize: 10,
+        color: C.slate500,
     },
 });
