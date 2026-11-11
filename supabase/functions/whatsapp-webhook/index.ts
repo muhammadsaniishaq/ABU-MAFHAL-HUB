@@ -32,6 +32,109 @@ function cleanPlanName(rawName: string): string {
         .trim();
 }
 
+// Helper: Live NIN pricing directly from service_pricing table configured by Admin
+async function getLiveNINPricing(supabaseAdmin: any): Promise<{ verification: number; standard: number; premium: number }> {
+    const result = { verification: 180, standard: 180, premium: 200 };
+    try {
+        const { data } = await supabaseAdmin
+            .from('service_pricing')
+            .select('id, cost_price, markup_price')
+            .eq('service_category', 'nin');
+        if (data && Array.isArray(data)) {
+            data.forEach((r: any) => {
+                const total = Number(r.cost_price || 0) + Number(r.markup_price || 0);
+                if (total > 0) {
+                    if (r.id === 'nin_standard') {
+                        result.standard = total;
+                        result.verification = total;
+                    }
+                    if (r.id === 'nin_premium') result.premium = total;
+                    if (r.id === 'nin_verify' || r.id === 'nin_phone') result.verification = total;
+                }
+            });
+        }
+    } catch (_) {}
+    return result;
+}
+
+// Helper: Live BVN pricing directly from service_pricing table configured by Admin
+async function getLiveBVNPricing(supabaseAdmin: any): Promise<{ verification: number; slip: number }> {
+    const result = { verification: 200, slip: 200 };
+    try {
+        const { data } = await supabaseAdmin
+            .from('service_pricing')
+            .select('id, cost_price, markup_price')
+            .eq('service_category', 'bvn');
+        if (data && Array.isArray(data)) {
+            data.forEach((r: any) => {
+                const total = Number(r.cost_price || 0) + Number(r.markup_price || 0);
+                if (total > 0) {
+                    if (r.id === 'bvn_num_basic' || r.id === 'bvn_verification') result.verification = total;
+                    if (r.id === 'bvn_card' || r.id === 'bvn_premium_slip') result.slip = total;
+                }
+            });
+        }
+    } catch (_) {}
+    return result;
+}
+
+// Helper: Live CAC pricing directly from cac_pricing_configurations and cac_pricing configured by Admin
+async function getLiveCACPricing(supabaseAdmin: any): Promise<{ business_name: number; ltd: number; incorporated_trustee: number }> {
+    const result = { business_name: 38000, ltd: 80000, incorporated_trustee: 160000 };
+    try {
+        const { data: configs } = await supabaseAdmin
+            .from('cac_pricing_configurations')
+            .select('service_code, regular_price, promo_price, is_promo_active');
+        if (configs && Array.isArray(configs)) {
+            configs.forEach((c: any) => {
+                const price = (c.is_promo_active && c.promo_price) ? Number(c.promo_price) : Number(c.regular_price || 0);
+                if (price > 0) {
+                    if (c.service_code === 'business_name') result.business_name = price;
+                    else if (c.service_code === 'ltd') result.ltd = price;
+                    else if (c.service_code === 'incorporated_trustee') result.incorporated_trustee = price;
+                }
+            });
+        }
+        const { data: legacyPrices } = await supabaseAdmin
+            .from('cac_pricing')
+            .select('name, price');
+        if (legacyPrices && Array.isArray(legacyPrices)) {
+            legacyPrices.forEach((lp: any) => {
+                const n = (lp.name || '').toLowerCase();
+                const p = Number(lp.price || 0);
+                if (p > 0) {
+                    if (n.includes('business name') && !n.includes('partnership')) result.business_name = p;
+                    else if (n.includes('limited liability') || n.includes('ltd')) result.ltd = p;
+                    else if (n.includes('trustee') || n.includes('ngo') || n.includes('club')) result.incorporated_trustee = p;
+                }
+            });
+        }
+    } catch (_) {}
+    return result;
+}
+
+// Helper: Calculate data plan selling price ensuring profit (riba) is included
+function getSafePlanSellingPrice(plan: any, networkMarkup: number = 0, markupType: string = 'fixed'): number {
+    const cost = Number(plan.cost_price || plan.price || 0);
+    let sell = Number(plan.selling_price || 0);
+
+    // If selling price is missing or less than or equal to cost price, strictly add profit!
+    if (!sell || sell <= cost) {
+        if (markupType === 'percentage' && networkMarkup > 0) {
+            sell = Math.round(cost * (1 + networkMarkup / 100));
+        } else if (networkMarkup > 0) {
+            sell = cost + networkMarkup;
+        } else {
+            // Guarantee minimum profit margin so it is never sold at cost or a loss:
+            // 5% profit or minimum ₦30 profit
+            const minProfit = Math.max(30, Math.round(cost * 0.05));
+            sell = cost + minProfit;
+        }
+    }
+    return Math.round(sell);
+}
+
+
 // Helper: Send message back to user via WhatsApp Meta Cloud API
 async function sendWhatsAppMessage(
     toPhone: string,
@@ -734,24 +837,27 @@ Deno.serve(async (req: Request) => {
                     }
 
                     if (chosen.key === 'nin') {
+                        const ninPrices = await getLiveNINPricing(supabaseAdmin);
                         const ninPrompt = userLang === 'ha'
-                            ? `🪪 *Binciken NIN & Buga Takardar Slip*\n\nZaɓi aikin da kake buƙata:\n1️⃣ Binciken Lambar NIN (NIN Verification) - *₦150*\n2️⃣ Buga Standard NIN Slip - *₦250*\n3️⃣ Buga Premium Plastic Slip - *₦500*\n\n(Tura lamba 1-3, ko '0' don sokewa):`
-                            : `🪪 *NIN Verification & Slip Services*\n\nSelect service:\n1️⃣ NIN Verification & Details Lookup - *₦150*\n2️⃣ Standard NIN Slip Generation - *₦250*\n3️⃣ Premium Plastic Slip - *₦500*\n\n(Reply 1-3, or '0' to cancel):`;
-                        return reply(ninPrompt, 'NIN_SELECT_TYPE', { lang: userLang });
+                            ? `🪪 *Binciken NIN & Buga Takardar Slip*\n\nZaɓi aikin da kake buƙata:\n1️⃣ Binciken Lambar NIN (NIN Verification) - *₦${ninPrices.verification.toLocaleString()}*\n2️⃣ Buga Standard NIN Slip - *₦${ninPrices.standard.toLocaleString()}*\n3️⃣ Buga Premium Plastic Slip - *₦${ninPrices.premium.toLocaleString()}*\n\n(Tura lamba 1-3, ko '0' don sokewa):`
+                            : `🪪 *NIN Verification & Slip Services*\n\nSelect service:\n1️⃣ NIN Verification & Details Lookup - *₦${ninPrices.verification.toLocaleString()}*\n2️⃣ Standard NIN Slip Generation - *₦${ninPrices.standard.toLocaleString()}*\n3️⃣ Premium Plastic Slip - *₦${ninPrices.premium.toLocaleString()}*\n\n(Reply 1-3, or '0' to cancel):`;
+                        return reply(ninPrompt, 'NIN_SELECT_TYPE', { lang: userLang, nin_prices: ninPrices });
                     }
 
                     if (chosen.key === 'bvn') {
+                        const bvnPrices = await getLiveBVNPricing(supabaseAdmin);
                         const bvnPrompt = userLang === 'ha'
-                            ? `🔍 *Binciken Lambar BVN (BVN Verification)*\n\nZaɓi aikin da kake buƙata:\n1️⃣ Binciken BVN & Bayanai (BVN Verification) - *₦150*\n2️⃣ BVN Plastic Card Slip - *₦300*\n\n(Tura 1 ko 2, ko '0' don sokewa):`
-                            : `🔍 *BVN Verification & Card Services*\n\nSelect service:\n1️⃣ BVN Verification & Details - *₦150*\n2️⃣ BVN Premium Card Slip - *₦300*\n\n(Reply 1 or 2, or '0' to cancel):`;
-                        return reply(bvnPrompt, 'BVN_SELECT_TYPE', { lang: userLang });
+                            ? `🔍 *Binciken Lambar BVN (BVN Verification)*\n\nZaɓi aikin da kake buƙata:\n1️⃣ Binciken BVN & Bayanai (BVN Verification) - *₦${bvnPrices.verification.toLocaleString()}*\n2️⃣ BVN Plastic Card Slip - *₦${bvnPrices.slip.toLocaleString()}*\n\n(Tura 1 ko 2, ko '0' don sokewa):`
+                            : `🔍 *BVN Verification & Card Services*\n\nSelect service:\n1️⃣ BVN Verification & Details - *₦${bvnPrices.verification.toLocaleString()}*\n2️⃣ BVN Premium Card Slip - *₦${bvnPrices.slip.toLocaleString()}*\n\n(Reply 1 or 2, or '0' to cancel):`;
+                        return reply(bvnPrompt, 'BVN_SELECT_TYPE', { lang: userLang, bvn_prices: bvnPrices });
                     }
 
                     if (chosen.key === 'cac') {
+                        const cacPrices = await getLiveCACPricing(supabaseAdmin);
                         const cacPrompt = userLang === 'ha'
-                            ? `🏢 *Rijistar Kamfani da Kasuwanci (CAC Registration)*\n\nZaɓi nau'in rijistar da kake son yi a hukumar CAC:\n1️⃣ Business Name (Sunan Kasuwanci/Ventures) - *₦18,500*\n2️⃣ Limited Liability Company (LLC) - *₦45,000*\n3️⃣ NGO / Club / Mosque / Association - *₦65,000*\n\n(Tura lamba 1, 2, ko 3, ko '0' don sokewa):`
-                            : `🏢 *CAC Business & Company Registration*\n\nSelect the category to register with CAC:\n1️⃣ Business Name (Enterprise/Ventures) - *₦18,500*\n2️⃣ Limited Liability Company (LLC) - *₦45,000*\n3️⃣ Incorporated Trustee (NGO/Church/Association) - *₦65,000*\n\n(Reply 1, 2, or 3, or '0' to cancel):`;
-                        return reply(cacPrompt, 'CAC_SELECT_TYPE', { lang: userLang });
+                            ? `🏢 *Rijistar Kamfani da Kasuwanci (CAC Registration)*\n\nZaɓi nau'in rijistar da kake son yi a hukumar CAC:\n1️⃣ Business Name (Sunan Kasuwanci/Ventures) - *₦${cacPrices.business_name.toLocaleString()}*\n2️⃣ Limited Liability Company (LLC) - *₦${cacPrices.ltd.toLocaleString()}*\n3️⃣ NGO / Club / Mosque / Association - *₦${cacPrices.incorporated_trustee.toLocaleString()}*\n\n(Tura lamba 1, 2, ko 3, ko '0' don sokewa):`
+                            : `🏢 *CAC Business & Company Registration*\n\nSelect the category to register with CAC:\n1️⃣ Business Name (Enterprise/Ventures) - *₦${cacPrices.business_name.toLocaleString()}*\n2️⃣ Limited Liability Company (LLC) - *₦${cacPrices.ltd.toLocaleString()}*\n3️⃣ Incorporated Trustee (NGO/Church/Association) - *₦${cacPrices.incorporated_trustee.toLocaleString()}*\n\n(Reply 1, 2, or 3, or '0' to cancel):`;
+                        return reply(cacPrompt, 'CAC_SELECT_TYPE', { lang: userLang, cac_prices: cacPrices });
                     }
 
                     if (chosen.key === 'sim') {
@@ -945,6 +1051,27 @@ Deno.serve(async (req: Request) => {
                         : `⚠️ No active data bundles found for ${chosenNetwork.toUpperCase()} at the moment. Please try another network or reply '0'.`;
                     return reply(noPlans, 'IDLE', sessionData);
                 }
+
+                // Fetch admin network markup configuration to ensure profit (riba) is never omitted
+                let netMarkupVal = 0;
+                let netMarkupType = 'fixed';
+                try {
+                    const { data: netCfg } = await supabaseAdmin
+                        .from('data_network_configs')
+                        .select('markup_value, markup_type')
+                        .ilike('network', chosenNetwork)
+                        .maybeSingle();
+                    if (netCfg && netCfg.markup_value !== null) {
+                        netMarkupVal = Number(netCfg.markup_value) || 0;
+                        netMarkupType = netCfg.markup_type || 'fixed';
+                    }
+                } catch (_) {}
+
+                // Strictly ensure selling_price includes profit (riba)
+                activePlans = activePlans.map(p => ({
+                    ...p,
+                    selling_price: getSafePlanSellingPrice(p, netMarkupVal, netMarkupType)
+                }));
 
                 // Clean up plan display names (stripping vendor tags!)
                 let plansText = userLang === 'ha'
@@ -1657,30 +1784,31 @@ Deno.serve(async (req: Request) => {
             // -------------------------------------------------------------
             if (currentStep === 'NIN_SELECT_TYPE') {
                 const choice = text.trim();
-                let fee = 150;
+                const livePrices = sessionData.nin_prices || await getLiveNINPricing(supabaseAdmin);
+                let fee = livePrices.verification;
                 let serviceType = 'nin_verification';
                 let serviceLabelEn = 'NIN Verification & Lookup';
                 let serviceLabelHa = 'Binciken Lambar NIN';
 
                 if (choice === '1') {
-                    fee = 150;
+                    fee = livePrices.verification;
                     serviceType = 'nin_verification';
                     serviceLabelEn = 'NIN Verification & Lookup';
                     serviceLabelHa = 'Binciken Lambar NIN';
                 } else if (choice === '2') {
-                    fee = 250;
+                    fee = livePrices.standard;
                     serviceType = 'nin_standard_slip';
                     serviceLabelEn = 'Standard NIN Slip';
                     serviceLabelHa = 'Standard NIN Slip';
                 } else if (choice === '3') {
-                    fee = 500;
+                    fee = livePrices.premium;
                     serviceType = 'nin_premium_slip';
                     serviceLabelEn = 'Premium Plastic NIN Slip';
                     serviceLabelHa = 'Premium Plastic NIN Slip';
                 } else {
                     const inv = userLang === 'ha'
-                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Binciken NIN (₦150)\n2️⃣ Standard Slip (₦250)\n3️⃣ Premium Plastic Slip (₦500)\n\n(Tura 1-3 ko '0' don sokewa):`
-                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ NIN Verification (₦150)\n2️⃣ Standard Slip (₦250)\n3️⃣ Premium Plastic Slip (₦500)\n\n(Reply 1-3 or '0' to cancel):`;
+                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Binciken NIN (₦${livePrices.verification.toLocaleString()})\n2️⃣ Standard Slip (₦${livePrices.standard.toLocaleString()})\n3️⃣ Premium Plastic Slip (₦${livePrices.premium.toLocaleString()})\n\n(Tura 1-3 ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ NIN Verification (₦${livePrices.verification.toLocaleString()})\n2️⃣ Standard Slip (₦${livePrices.standard.toLocaleString()})\n3️⃣ Premium Plastic Slip (₦${livePrices.premium.toLocaleString()})\n\n(Reply 1-3 or '0' to cancel):`;
                     return reply(inv, 'NIN_SELECT_TYPE', sessionData);
                 }
 
@@ -1770,22 +1898,23 @@ Deno.serve(async (req: Request) => {
             // -------------------------------------------------------------
             if (currentStep === 'BVN_SELECT_TYPE') {
                 const choice = text.trim();
-                let fee = 150;
+                const liveBvnPrices = sessionData.bvn_prices || await getLiveBVNPricing(supabaseAdmin);
+                let fee = liveBvnPrices.verification;
                 let serviceLabelEn = 'BVN Validation & Details';
                 let serviceLabelHa = 'Binciken Lambar BVN';
 
                 if (choice === '1') {
-                    fee = 150;
+                    fee = liveBvnPrices.verification;
                     serviceLabelEn = 'BVN Validation & Details';
                     serviceLabelHa = 'Binciken Lambar BVN';
                 } else if (choice === '2') {
-                    fee = 300;
+                    fee = liveBvnPrices.slip;
                     serviceLabelEn = 'BVN Premium Plastic Slip';
                     serviceLabelHa = 'BVN Plastic Card Slip';
                 } else {
                     const inv = userLang === 'ha'
-                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Binciken BVN (₦150)\n2️⃣ BVN Plastic Card Slip (₦300)\n\n(Tura 1 ko 2, ko '0' don sokewa):`
-                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ BVN Verification (₦150)\n2️⃣ BVN Premium Card Slip (₦300)\n\n(Reply 1 or 2, or '0' to cancel):`;
+                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Binciken BVN (₦${liveBvnPrices.verification.toLocaleString()})\n2️⃣ BVN Plastic Card Slip (₦${liveBvnPrices.slip.toLocaleString()})\n\n(Tura 1 ko 2, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ BVN Verification (₦${liveBvnPrices.verification.toLocaleString()})\n2️⃣ BVN Premium Card Slip (₦${liveBvnPrices.slip.toLocaleString()})\n\n(Reply 1 or 2, or '0' to cancel):`;
                     return reply(inv, 'BVN_SELECT_TYPE', sessionData);
                 }
 
@@ -1861,30 +1990,31 @@ Deno.serve(async (req: Request) => {
             // -------------------------------------------------------------
             if (currentStep === 'CAC_SELECT_TYPE') {
                 const choice = text.trim();
-                let fee = 18500;
+                const liveCacPrices = sessionData.cac_prices || await getLiveCACPricing(supabaseAdmin);
+                let fee = liveCacPrices.business_name;
                 let typeKey = 'business_name';
                 let typeTitleEn = 'Business Name (Enterprise / Ventures)';
                 let typeTitleHa = 'Sunan Kasuwanci (Business Name / Ventures)';
 
                 if (choice === '1') {
-                    fee = 18500;
+                    fee = liveCacPrices.business_name;
                     typeKey = 'business_name';
                     typeTitleEn = 'Business Name (Enterprise / Ventures)';
                     typeTitleHa = 'Sunan Kasuwanci (Business Name / Ventures)';
                 } else if (choice === '2') {
-                    fee = 45000;
+                    fee = liveCacPrices.ltd;
                     typeKey = 'company_llc';
                     typeTitleEn = 'Limited Liability Company (LLC / LTD)';
                     typeTitleHa = 'Kamfani Mai Iyaka (Company LLC / LTD)';
                 } else if (choice === '3') {
-                    fee = 65000;
+                    fee = liveCacPrices.incorporated_trustee;
                     typeKey = 'ngo_trustee';
                     typeTitleEn = 'NGO / Incorporated Trustees / Association';
                     typeTitleHa = 'Ƙungiya / Masallaci / NGO (Incorporated Trustees)';
                 } else {
                     const inv = userLang === 'ha'
-                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Business Name (₦18,500)\n2️⃣ Company LLC (₦45,000)\n3️⃣ NGO / Association (₦65,000)\n\n(Tura 1, 2, ko 3, ko '0' don sokewa):`
-                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ Business Name (₦18,500)\n2️⃣ Company LLC (₦45,000)\n3️⃣ NGO / Association (₦65,000)\n\n(Reply 1, 2, or 3, or '0' to cancel):`;
+                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Business Name (₦${liveCacPrices.business_name.toLocaleString()})\n2️⃣ Company LLC (₦${liveCacPrices.ltd.toLocaleString()})\n3️⃣ NGO / Association (₦${liveCacPrices.incorporated_trustee.toLocaleString()})\n\n(Tura 1, 2, ko 3, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ Business Name (₦${liveCacPrices.business_name.toLocaleString()})\n2️⃣ Company LLC (₦${liveCacPrices.ltd.toLocaleString()})\n3️⃣ NGO / Association (₦${liveCacPrices.incorporated_trustee.toLocaleString()})\n\n(Reply 1, 2, or 3, or '0' to cancel):`;
                     return reply(inv, 'CAC_SELECT_TYPE', sessionData);
                 }
 
