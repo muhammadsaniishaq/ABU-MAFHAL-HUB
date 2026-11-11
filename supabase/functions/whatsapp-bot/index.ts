@@ -34,7 +34,7 @@ function cleanPlanName(rawName: string): string {
 
 // Helper: Live NIN pricing directly from service_pricing table configured by Admin
 async function getLiveNINPricing(supabaseAdmin: any): Promise<{ verification: number; standard: number; premium: number }> {
-    const result = { verification: 180, standard: 180, premium: 200 };
+    const result = { verification: 200, standard: 180, premium: 200 };
     try {
         const { data } = await supabaseAdmin
             .from('service_pricing')
@@ -44,12 +44,9 @@ async function getLiveNINPricing(supabaseAdmin: any): Promise<{ verification: nu
             data.forEach((r: any) => {
                 const total = Number(r.cost_price || 0) + Number(r.markup_price || 0);
                 if (total > 0) {
-                    if (r.id === 'nin_standard') {
-                        result.standard = total;
-                        result.verification = total;
-                    }
+                    if (r.id === 'nin_standard') result.standard = total;
                     if (r.id === 'nin_premium') result.premium = total;
-                    if (r.id === 'nin_verify' || r.id === 'nin_phone') result.verification = total;
+                    if (r.id === 'nin_phone' || r.id === 'nin_verify' || r.id === 'nin_demographic') result.verification = total;
                 }
             });
         }
@@ -78,7 +75,7 @@ async function getLiveBVNPricing(supabaseAdmin: any): Promise<{ verification: nu
     return result;
 }
 
-// Helper: Live CAC pricing directly from cac_pricing_configurations and cac_pricing configured by Admin
+// Helper: Live CAC pricing directly from cac_pricing_configurations (exact official App configuration)
 async function getLiveCACPricing(supabaseAdmin: any): Promise<{ business_name: number; ltd: number; incorporated_trustee: number }> {
     const result = { business_name: 38000, ltd: 80000, incorporated_trustee: 160000 };
     try {
@@ -92,20 +89,6 @@ async function getLiveCACPricing(supabaseAdmin: any): Promise<{ business_name: n
                     if (c.service_code === 'business_name') result.business_name = price;
                     else if (c.service_code === 'ltd') result.ltd = price;
                     else if (c.service_code === 'incorporated_trustee') result.incorporated_trustee = price;
-                }
-            });
-        }
-        const { data: legacyPrices } = await supabaseAdmin
-            .from('cac_pricing')
-            .select('name, price');
-        if (legacyPrices && Array.isArray(legacyPrices)) {
-            legacyPrices.forEach((lp: any) => {
-                const n = (lp.name || '').toLowerCase();
-                const p = Number(lp.price || 0);
-                if (p > 0) {
-                    if (n.includes('business name') && !n.includes('partnership')) result.business_name = p;
-                    else if (n.includes('limited liability') || n.includes('ltd')) result.ltd = p;
-                    else if (n.includes('trustee') || n.includes('ngo') || n.includes('club')) result.incorporated_trustee = p;
                 }
             });
         }
@@ -934,15 +917,15 @@ Deno.serve(async (req: Request) => {
 
                     if (chosen.key === 'data') {
                         const netMenu = userLang === 'ha'
-                            ? `📶 *Siyan Data (Buy Data Bundle)*\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Tura lamba 1-5 ko sunan network, ko '0' don sokewa)`
-                            : `📶 *Buy Data Bundle*\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Reply with 1-5 or network name, or '0' to cancel)`;
+                            ? `📶 *Siyan Data (Buy Data Bundle)*\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI 4G\n7️⃣ ALPHA 4G\n\n(Tura lamba 1-7 ko sunan network, ko '0' don sokewa)`
+                            : `📶 *Buy Data Bundle*\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI 4G\n7️⃣ ALPHA 4G\n\n(Reply with 1-7 or network name, or '0' to cancel)`;
                         return reply(netMenu, 'DATA_SELECT_NETWORK', { lang: userLang });
                     }
 
                     if (chosen.key === 'airtime') {
                         const netMenu = userLang === 'ha'
-                            ? `📲 *Siyan Airtime (Buy Airtime)*\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Tura lamba 1-4, ko '0' don sokewa)`
-                            : `📲 *Buy Airtime (VTU Recharge)*\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n\n(Reply with number 1-4, or '0' to cancel)`;
+                            ? `📲 *Siyan Airtime (Buy Airtime)*\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ VITEL (VITAL)\n\n(Tura lamba 1-5 ko sunan network, ko '0' don sokewa)`
+                            : `📲 *Buy Airtime (VTU Recharge)*\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ VITEL (VITAL)\n\n(Reply with number 1-5 or network name, or '0' to cancel)`;
                         return reply(netMenu, 'AIRTIME_SELECT_NETWORK', { lang: userLang });
                     }
 
@@ -1157,30 +1140,54 @@ Deno.serve(async (req: Request) => {
                 else if (netInput === '3' || netInput.includes('glo')) chosenNetwork = 'glo';
                 else if (netInput === '4' || netInput.includes('9mobile') || netInput.includes('etisalat') || netInput.includes('9mob')) chosenNetwork = '9mobile';
                 else if (netInput === '5' || netInput.includes('smile')) chosenNetwork = 'smile';
-                else if (netInput === '6' || netInput.includes('kirani') || netInput.includes('alpha')) chosenNetwork = 'kirani';
+                else if (netInput === '6' || netInput.includes('kirani')) chosenNetwork = 'kirani';
+                else if (netInput === '7' || netInput.includes('alpha')) chosenNetwork = 'alpha';
 
                 if (!chosenNetwork) {
                     const invNet = userLang === 'ha'
-                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI / ALPHA 4G\n\n(Tura lamba 1-6 ko sunan network, ko '0' don sokewa):`
-                        : `❌ Invalid choice.\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI / ALPHA 4G\n\n(Reply with 1-6 or network name, or '0' to cancel):`;
+                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI 4G\n7️⃣ ALPHA 4G\n\n(Tura lamba 1-7 ko sunan network, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI 4G\n7️⃣ ALPHA 4G\n\n(Reply with 1-7 or network name, or '0' to cancel):`;
                     return reply(invNet, 'DATA_SELECT_NETWORK', sessionData);
                 }
 
-                // Fallback built-in catalog for Smile / Kirani if not configured in database
+                // Exact match with Mobile App: Query active VTU vendor first from app_settings
+                let activeVendor = 'bilalsadasub';
+                try {
+                    const { data: vendorSetting } = await supabaseAdmin
+                        .from('app_settings')
+                        .select('value')
+                        .eq('key', 'vtu_vendor')
+                        .maybeSingle();
+                    if (vendorSetting?.value) {
+                        const v = typeof vendorSetting.value === 'object' ? vendorSetting.value.vendor || vendorSetting.value : vendorSetting.value;
+                        activeVendor = String(v).toLowerCase().trim().split(',')[0].trim() || 'bilalsadasub';
+                    }
+                } catch (_) {}
+
+                // Built-in catalog for Smile / Kirani / Alpha (100% identical to App data.tsx)
                 const smileFallback = [
-                    { id: 'smile_1.5gb', plan_id: 'smile_1gb', name: 'Smile 1.5GB (30 Days)', selling_price: 1200, validity: '30 Days' },
-                    { id: 'smile_2gb', plan_id: 'smile_2gb', name: 'Smile 2GB (30 Days)', selling_price: 1500, validity: '30 Days' },
-                    { id: 'smile_3gb', plan_id: 'smile_3gb', name: 'Smile 3GB (30 Days)', selling_price: 2000, validity: '30 Days' },
-                    { id: 'smile_5gb', plan_id: 'smile_5gb', name: 'Smile 5GB (30 Days)', selling_price: 3000, validity: '30 Days' },
-                    { id: 'smile_10gb', plan_id: 'smile_10gb', name: 'Smile 10GB (30 Days)', selling_price: 4500, validity: '30 Days' },
-                    { id: 'smile_20gb', plan_id: 'smile_20gb', name: 'Smile 20GB (30 Days)', selling_price: 8000, validity: '30 Days' }
+                    { id: 'smile_1.5gb', plan_id: 'smile_1gb', name: 'Smile 1.5GB Monthly', selling_price: 1200, validity: '30 Days' },
+                    { id: 'smile_2gb', plan_id: 'smile_2gb', name: 'Smile 2GB Monthly', selling_price: 1500, validity: '30 Days' },
+                    { id: 'smile_3gb', plan_id: 'smile_3gb', name: 'Smile 3GB Monthly', selling_price: 2000, validity: '30 Days' },
+                    { id: 'smile_5gb', plan_id: 'smile_5gb', name: 'Smile 5GB Monthly', selling_price: 3000, validity: '30 Days' },
+                    { id: 'smile_10gb', plan_id: 'smile_10gb', name: 'Smile 10GB Monthly', selling_price: 4500, validity: '30 Days' },
+                    { id: 'smile_20gb', plan_id: 'smile_20gb', name: 'Smile 20GB Monthly', selling_price: 7500, validity: '30 Days' },
+                    { id: 'smile_40gb', plan_id: 'smile_40gb', name: 'Smile 40GB Monthly', selling_price: 13000, validity: '30 Days' }
                 ];
                 const kiraniFallback = [
-                    { id: 'kirani_1gb', plan_id: 'kirani_1gb', name: 'Kirani 1GB 4G (30 Days)', selling_price: 280, validity: '30 Days' },
-                    { id: 'kirani_2gb', plan_id: 'kirani_2gb', name: 'Kirani 2GB 4G (30 Days)', selling_price: 560, validity: '30 Days' },
-                    { id: 'kirani_3gb', plan_id: 'kirani_3gb', name: 'Kirani 3GB 4G (30 Days)', selling_price: 840, validity: '30 Days' },
-                    { id: 'kirani_5gb', plan_id: 'kirani_5gb', name: 'Kirani 5GB 4G (30 Days)', selling_price: 1400, validity: '30 Days' },
-                    { id: 'kirani_10gb', plan_id: 'kirani_10gb', name: 'Kirani 10GB 4G (30 Days)', selling_price: 2800, validity: '30 Days' }
+                    { id: 'kirani_1gb', plan_id: 'kirani_1gb', name: 'Kirani 1GB Data', cost_price: 280, selling_price: 320, validity: '30 Days' },
+                    { id: 'kirani_2gb', plan_id: 'kirani_2gb', name: 'Kirani 2GB Data', cost_price: 560, selling_price: 640, validity: '30 Days' },
+                    { id: 'kirani_3gb', plan_id: 'kirani_3gb', name: 'Kirani 3GB Data', cost_price: 840, validity: '30 Days' },
+                    { id: 'kirani_5gb', plan_id: 'kirani_5gb', name: 'Kirani 5GB Data', cost_price: 1400, selling_price: 1600, validity: '30 Days' },
+                    { id: 'kirani_10gb', plan_id: 'kirani_10gb', name: 'Kirani 10GB Data', cost_price: 2800, selling_price: 3200, validity: '30 Days' }
+                ];
+                const alphaFallback = [
+                    { id: 'alpha_500mb', plan_id: 'alpha_500mb', name: 'Alpha 500MB Data', cost_price: 150, selling_price: 180, validity: '30 Days' },
+                    { id: 'alpha_1gb', plan_id: 'alpha_1gb', name: 'Alpha 1GB Data', cost_price: 260, selling_price: 300, validity: '30 Days' },
+                    { id: 'alpha_2gb', plan_id: 'alpha_2gb', name: 'Alpha 2GB Data', cost_price: 520, selling_price: 600, validity: '30 Days' },
+                    { id: 'alpha_3gb', plan_id: 'alpha_3gb', name: 'Alpha 3GB Data', cost_price: 780, selling_price: 900, validity: '30 Days' },
+                    { id: 'alpha_5gb', plan_id: 'alpha_5gb', name: 'Alpha 5GB Data', cost_price: 1300, selling_price: 1500, validity: '30 Days' },
+                    { id: 'alpha_10gb', plan_id: 'alpha_10gb', name: 'Alpha 10GB Data', cost_price: 2600, selling_price: 3000, validity: '30 Days' }
                 ];
 
                 let activePlans: any[] = [];
@@ -1198,38 +1205,81 @@ Deno.serve(async (req: Request) => {
                     const { data: dbKirani } = await supabaseAdmin
                         .from('data_plans')
                         .select('*')
-                        .or('network.ilike.%kirani%,network.ilike.%alpha%')
+                        .ilike('network', 'kirani')
                         .eq('is_active', true)
                         .order('selling_price', { ascending: true });
 
                     activePlans = (dbKirani && dbKirani.length > 0) ? dbKirani : kiraniFallback;
+                } else if (chosenNetwork === 'alpha') {
+                    const { data: dbAlpha } = await supabaseAdmin
+                        .from('data_plans')
+                        .select('*')
+                        .ilike('network', 'alpha')
+                        .eq('is_active', true)
+                        .order('selling_price', { ascending: true });
+
+                    activePlans = (dbAlpha && dbAlpha.length > 0) ? dbAlpha : alphaFallback;
                 } else {
-                    // Fetch all active plans for MTN, Airtel, Glo, 9mobile
-                    const { data: dbPlans } = await supabaseAdmin
+                    // Fetch plans matching active VTU vendor exactly as done by App services/api.ts
+                    let { data: dbPlans } = await supabaseAdmin
                         .from('data_plans')
                         .select('*')
                         .ilike('network', chosenNetwork)
+                        .eq('api_vendor', activeVendor)
                         .eq('is_active', true)
-                        .order('selling_price', { ascending: true })
-                        .limit(150);
+                        .order('cost_price', { ascending: true });
 
-                    if (dbPlans && dbPlans.length > 0) {
-                        // Deduplicate plans having virtually identical clean names and prices
-                        const seenKey = new Set<string>();
-                        const cleanPlans: any[] = [];
-
-                        for (const p of dbPlans) {
-                            const cName = cleanPlanName(p.name);
-                            const dedupeKey = `${cName.toLowerCase().replace(/\s+/g, '')}_${p.selling_price}`;
-                            if (!seenKey.has(dedupeKey)) {
-                                seenKey.add(dedupeKey);
-                                cleanPlans.push(p);
-                            }
-                        }
-
-                        // Provide up to 16 comprehensive plans (SME, Corporate Gifting, Direct)
-                        activePlans = cleanPlans.slice(0, 16);
+                    // Fallback to any active vendor plans if active vendor returns none
+                    if (!dbPlans || dbPlans.length === 0) {
+                        const { data: fbPlans } = await supabaseAdmin
+                            .from('data_plans')
+                            .select('*')
+                            .ilike('network', chosenNetwork)
+                            .eq('is_active', true)
+                            .order('cost_price', { ascending: true });
+                        dbPlans = fbPlans || [];
                     }
+
+                    // Exclude legacy hardcoded test/catalog plans
+                    const filtered = (dbPlans || []).filter((p: any) => {
+                        const pid = String(p.plan_id || '');
+                        return !pid.includes('_SME') && !pid.includes('_DATA') && !pid.includes('_CG') && !pid.includes('_VITAL');
+                    });
+
+                    // Parse, sort by 30-days/SME/CG first, then by volume (GB), matching App
+                    const parsed = filtered.map((p: any) => {
+                        const cName = cleanPlanName(p.name);
+                        const gb = parseVolumeInGB(p.name, p.volume);
+                        const is30Days = cName.toLowerCase().includes('30') || cName.toLowerCase().includes('month') || (!cName.toLowerCase().includes('day') && !cName.toLowerCase().includes('hour'));
+                        const isSmeOrCg = cName.toLowerCase().includes('sme') || cName.toLowerCase().includes('cooperate') || cName.toLowerCase().includes('cg');
+                        return {
+                            ...p,
+                            clean_name: cName,
+                            gb: gb,
+                            is30Days,
+                            isSmeOrCg,
+                            selling_price: Number(p.selling_price || 0)
+                        };
+                    }).sort((a: any, b: any) => {
+                        if (a.is30Days !== b.is30Days) return a.is30Days ? -1 : 1;
+                        if (a.isSmeOrCg !== b.isSmeOrCg) return a.isSmeOrCg ? -1 : 1;
+                        if (a.gb !== b.gb) return a.gb - b.gb;
+                        return a.selling_price - b.selling_price;
+                    });
+
+                    // Deduplicate plans having identical name and price
+                    const seenKey = new Set<string>();
+                    const cleanPlans: any[] = [];
+                    for (const p of parsed) {
+                        const dedupeKey = `${p.clean_name.toLowerCase().replace(/\s+/g, '')}_${p.selling_price}`;
+                        if (!seenKey.has(dedupeKey)) {
+                            seenKey.add(dedupeKey);
+                            cleanPlans.push(p);
+                        }
+                    }
+
+                    // Display up to 14 top curated plans
+                    activePlans = cleanPlans.slice(0, 14);
                 }
 
                 if (activePlans.length === 0) {
@@ -1422,17 +1472,18 @@ Deno.serve(async (req: Request) => {
                 else if (netInput === '2' || netInput.includes('airtel')) chosenNetwork = 'airtel';
                 else if (netInput === '3' || netInput.includes('glo')) chosenNetwork = 'glo';
                 else if (netInput === '4' || netInput.includes('9mobile') || netInput.includes('etisalat') || netInput.includes('9mob')) chosenNetwork = '9mobile';
+                else if (netInput === '5' || netInput.includes('vitel') || netInput.includes('vital') || netInput.includes('vit')) chosenNetwork = 'vitel';
 
                 if (!chosenNetwork) {
                     const invNet = userLang === 'ha'
-                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi:\n1 na MTN\n2 na AIRTEL\n3 na GLO\n4 na 9MOBILE\n(Ko tura '0' don sokewa):`
-                        : `❌ Invalid choice.\n\nSelect:\n1 for MTN\n2 for AIRTEL\n3 for GLO\n4 for 9MOBILE\n(Or reply '0' to cancel):`;
+                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ VITEL (VITAL)\n\n(Tura lamba 1-5 ko sunan network, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ VITEL (VITAL)\n\n(Reply with 1-5 or network name, or '0' to cancel):`;
                     return reply(invNet, 'AIRTIME_SELECT_NETWORK', sessionData);
                 }
 
                 const amtPrompt = userLang === 'ha'
-                    ? `💰 Sanya adadin katin kiran da kake so (₦50 zuwa ₦50,000):\n_(Misali: 500)_`
-                    : `💰 Enter the amount of airtime you wish to purchase (₦50 to ₦50,000):\n_(e.g. 500)_`;
+                    ? `💰 Sanya adadin katin kiran ${chosenNetwork.toUpperCase()} da kake so (₦50 zuwa ₦50,000):\n_(Misali: 500)_`
+                    : `💰 Enter the amount of ${chosenNetwork.toUpperCase()} airtime you wish to purchase (₦50 to ₦50,000):\n_(e.g. 500)_`;
 
                 return reply(amtPrompt, 'AIRTIME_ENTER_AMOUNT', {
                     ...sessionData,

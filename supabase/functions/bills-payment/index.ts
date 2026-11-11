@@ -274,7 +274,7 @@ Deno.serve(async (req: Request) => {
 
         const getNetworkCode = (net: string): '01' | '02' | '03' | '04' | string => {
             const canonical = resolveCanonicalNetwork(net);
-            const map: Record<string, '01' | '02' | '03' | '04'> = { 'mtn': '01', 'glo': '02', '9mobile': '03', 'airtel': '04' };
+            const map: Record<string, string> = { 'mtn': '01', 'glo': '02', '9mobile': '03', 'airtel': '04', 'vital': '05', 'vitel': '05' };
             return map[canonical] || canonical;
         };
         const networkCode = getNetworkCode(data.network);
@@ -383,7 +383,7 @@ Deno.serve(async (req: Request) => {
             if (amountToCharge < 50) throw new Error("Minimum Airtime is N50");
             if (amountToCharge > 50000) throw new Error("Maximum Airtime is N50,000 per transaction");
 
-            const netName = networkCode === '01' ? 'MTN' : networkCode === '02' ? 'GLO' : networkCode === '03' ? '9MOBILE' : 'AIRTEL';
+            const netName = networkCode === '01' ? 'MTN' : networkCode === '02' ? 'GLO' : networkCode === '03' ? '9MOBILE' : networkCode === '04' ? 'AIRTEL' : (networkCode === '05' || targetNetwork === 'vital' ? 'VITEL' : 'AIRTEL');
             let sellDiscount = 0;
 
             // 1. Check airtime_configs if available

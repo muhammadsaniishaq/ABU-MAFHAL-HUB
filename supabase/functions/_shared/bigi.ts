@@ -35,6 +35,7 @@ export class BigiClient {
         if (netLower.includes('glo') || netLower === '02' || netLower === '2') return 2;
         if (netLower.includes('airtel') || netLower === '04' || netLower === '3') return 3;
         if (netLower.includes('mobile') || netLower.includes('etisalat') || netLower === '03' || netLower === '4') return 4;
+        if (netLower.includes('vit') || netLower === '05' || netLower === '5') return 5;
         return 1;
     }
 

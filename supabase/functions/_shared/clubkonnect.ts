@@ -46,6 +46,7 @@ export class ClubKonnectClient {
     if (s === '02' || s.includes('glo')) return '02';
     if (s === '03' || s.includes('9mobile') || s.includes('etisalat') || s.includes('t2')) return '03';
     if (s === '04' || s.includes('airtel')) return '04';
+    if (s === '05' || s.includes('vit')) return '05';
     return s;
   }
 
