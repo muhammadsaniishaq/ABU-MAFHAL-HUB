@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View, Text, TextInput, ScrollView, TouchableOpacity,
-    ActivityIndicator, Alert, StyleSheet, Platform, Switch, RefreshControl
+    ActivityIndicator, Alert, StyleSheet, Platform, Switch, RefreshControl, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -18,11 +18,14 @@ const C = {
     navyLight: '#1E2D60',
     waGreen: '#25D366',
     waDarkGreen: '#128C7E',
+    waBubbleIn: '#FFFFFF',
+    waBubbleOut: '#DCF8C6',
     gold: '#F5A623',
     white: '#FFFFFF',
     slate50: '#F8FAFC',
     slate100: '#F1F5F9',
     slate200: '#E2E8F0',
+    slate300: '#CBD5E1',
     slate400: '#94A3B8',
     slate500: '#64748B',
     slate700: '#334155',
@@ -31,15 +34,28 @@ const C = {
     emerald: '#10B981',
 };
 
+interface CustomerChatThread {
+    phone_number: string;
+    clean_phone: string;
+    profile?: any;
+    user_id?: string;
+    current_step?: string;
+    last_interaction?: string;
+    message_count: number;
+    last_message?: string;
+    messages: any[];
+}
+
 export default function WhatsAppBotAdmin() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
+    const [broadcasting, setBroadcasting] = useState(false);
 
-    // Tab: 'overview' | 'logs' | 'sessions' | 'tester'
-    const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'sessions' | 'tester'>('overview');
+    // Tab: 'overview' | 'chats' | 'broadcast' | 'logs' | 'tester'
+    const [activeTab, setActiveTab] = useState<'overview' | 'chats' | 'broadcast' | 'logs' | 'tester'>('overview');
 
     // Bot Config State
     const [botEnabled, setBotEnabled] = useState(true);
@@ -48,17 +64,36 @@ export default function WhatsAppBotAdmin() {
     const [adminCallPhone, setAdminCallPhone] = useState('08145853539');
     const [defaultLang, setDefaultLang] = useState<'en' | 'ha'>('en');
 
+    // Group & Channel Links
+    const [groupLink, setGroupLink] = useState('https://chat.whatsapp.com/G5yAbuMafhalSub');
+    const [channelLink, setChannelLink] = useState('https://whatsapp.com/channel/0029VAbuMafhal');
+    const [playStoreUrl, setPlayStoreUrl] = useState('https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub');
+    const [webBaseUrl, setWebBaseUrl] = useState('https://abumafhal.com.ng');
+
     // Meta Diag Info
     const [metaDiag, setMetaDiag] = useState<any>(null);
     const [webhookUrl] = useState('https://uagcxrtdqttayulvgpwg.supabase.co/functions/v1/whatsapp-bot');
     const [verifyToken] = useState('abumafhal_wa_verify_2026');
 
-    // Logs & Sessions
+    // Logs & Sessions & Customer Threads
     const [logs, setLogs] = useState<any[]>([]);
     const [sessions, setSessions] = useState<any[]>([]);
+    const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
     const [logFilter, setLogFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
+    const [chatSearch, setChatSearch] = useState('');
 
-    // Test Sender Tool
+    // Selected Customer Conversation Modal
+    const [selectedCustomer, setSelectedCustomer] = useState<CustomerChatThread | null>(null);
+    const [replyText, setReplyText] = useState('');
+    const [sendingReply, setSendingReply] = useState(false);
+
+    // Broadcast Messenger Tool
+    const [broadcastAudience, setBroadcastAudience] = useState<'all' | 'active_7d' | 'custom'>('all');
+    const [customBroadcastPhones, setCustomBroadcastPhones] = useState('');
+    const [broadcastMessage, setBroadcastMessage] = useState('🌟 Sanarwa ta Musamman daga Abu Mafhal Sub!\n\nKuna iya samun sauƙin siyan Data, Airtime, NIN, BVN, da CAC a take a WhatsApp ko shafinmu na gizo.');
+    const [broadcastResult, setBroadcastResult] = useState<any>(null);
+
+    // Quick Test Sender Tool
     const [testPhone, setTestPhone] = useState('');
     const [testMessage, setTestMessage] = useState('Hello! This is a test message from Abu Mafhal Sub WhatsApp Bot Admin.');
     const [testResult, setTestResult] = useState<any>(null);
@@ -70,7 +105,20 @@ export default function WhatsAppBotAdmin() {
             const { data: settingsData } = await supabase
                 .from('app_settings')
                 .select('key, value')
-                .in('key', ['whatsapp_bot_enabled', 'maintenance_mode', 'whatsapp_bot_number', 'WHATSAPP_BOT_NUMBER', 'whatsapp_admin_call_phone', 'WHATSAPP_ADMIN_CALL_PHONE']);
+                .in('key', [
+                    'whatsapp_bot_enabled',
+                    'maintenance_mode',
+                    'whatsapp_bot_number',
+                    'WHATSAPP_BOT_NUMBER',
+                    'whatsapp_admin_call_phone',
+                    'WHATSAPP_ADMIN_CALL_PHONE',
+                    'whatsapp_group_link',
+                    'whatsapp_channel_link',
+                    'play_store_url',
+                    'site_url',
+                    'app_url',
+                    'website_url'
+                ]);
 
             if (settingsData) {
                 const map: Record<string, string> = {};
@@ -79,6 +127,10 @@ export default function WhatsAppBotAdmin() {
                 if (map['maintenance_mode'] !== undefined) setMaintenanceMode(map['maintenance_mode'] === 'true');
                 if (map['whatsapp_bot_number'] || map['WHATSAPP_BOT_NUMBER']) setBotPhone(map['whatsapp_bot_number'] || map['WHATSAPP_BOT_NUMBER']);
                 if (map['whatsapp_admin_call_phone'] || map['WHATSAPP_ADMIN_CALL_PHONE']) setAdminCallPhone(map['whatsapp_admin_call_phone'] || map['WHATSAPP_ADMIN_CALL_PHONE']);
+                if (map['whatsapp_group_link']) setGroupLink(map['whatsapp_group_link']);
+                if (map['whatsapp_channel_link']) setChannelLink(map['whatsapp_channel_link']);
+                if (map['play_store_url']) setPlayStoreUrl(map['play_store_url']);
+                if (map['site_url'] || map['website_url'] || map['app_url']) setWebBaseUrl(map['site_url'] || map['website_url'] || map['app_url']);
             }
 
             // 2. Fetch Meta Live Diag
@@ -90,21 +142,38 @@ export default function WhatsAppBotAdmin() {
                 }
             } catch (_) {}
 
-            // 3. Fetch recent WhatsApp bot logs
+            // 3. Fetch recent WhatsApp bot logs (last 300)
             const { data: logRows } = await supabase
                 .from('whatsapp_bot_logs')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(50);
+                .limit(300);
             if (logRows) setLogs(logRows);
 
-            // 4. Fetch WhatsApp Bot active sessions
+            // 4. Fetch WhatsApp Bot sessions
             const { data: sessionRows } = await supabase
                 .from('whatsapp_bot_sessions')
-                .select('id, phone_number, user_id, step, session_data, last_interaction, created_at')
+                .select('*')
                 .order('last_interaction', { ascending: false })
-                .limit(30);
+                .limit(100);
             if (sessionRows) setSessions(sessionRows);
+
+            // 5. Fetch profiles for linking
+            const userIds = Array.from(new Set([
+                ...(sessionRows?.map(s => s.user_id).filter(Boolean) || []),
+            ]));
+
+            if (userIds.length > 0) {
+                const { data: profs } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, phone, balance, role, created_at')
+                    .in('id', userIds);
+                if (profs) {
+                    const pMap: Record<string, any> = {};
+                    profs.forEach(p => { pMap[p.id] = p; });
+                    setProfilesMap(pMap);
+                }
+            }
 
         } catch (err: any) {
             console.error('Error loading WhatsApp Bot admin data:', err);
@@ -135,6 +204,8 @@ export default function WhatsAppBotAdmin() {
                 { key: 'support_whatsapp', value: botPhone.trim() },
                 { key: 'whatsapp_admin_call_phone', value: adminCallPhone.trim() },
                 { key: 'WHATSAPP_ADMIN_CALL_PHONE', value: adminCallPhone.trim() },
+                { key: 'whatsapp_group_link', value: groupLink.trim() },
+                { key: 'whatsapp_channel_link', value: channelLink.trim() },
             ];
 
             const { error } = await supabase.from('app_settings').upsert(updates, { onConflict: 'key' });
@@ -143,7 +214,7 @@ export default function WhatsAppBotAdmin() {
             if (Platform.OS !== 'web') {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
-            Alert.alert('✅ Saved', 'WhatsApp Bot settings updated successfully in production.');
+            Alert.alert('✅ Saved', 'WhatsApp Bot settings and official Group/Channel links updated successfully.');
         } catch (err: any) {
             Alert.alert('❌ Error', err.message || 'Failed to save settings.');
         } finally {
@@ -151,7 +222,208 @@ export default function WhatsAppBotAdmin() {
         }
     };
 
-    // Send Test Message
+    // Grouping all chats by Customer Phone Number
+    const customerThreads: CustomerChatThread[] = useMemo(() => {
+        const map: Record<string, CustomerChatThread> = {};
+
+        // 1. Register from sessions
+        sessions.forEach(sess => {
+            const rawPhone = sess.phone_number || '';
+            const clean = rawPhone.replace(/\D/g, '');
+            if (!clean) return;
+
+            map[clean] = {
+                phone_number: rawPhone,
+                clean_phone: clean,
+                user_id: sess.user_id,
+                profile: sess.user_id ? profilesMap[sess.user_id] : null,
+                current_step: sess.step || 'IDLE',
+                last_interaction: sess.last_interaction || sess.created_at,
+                message_count: 0,
+                last_message: '',
+                messages: []
+            };
+        });
+
+        // 2. Aggregate from logs
+        logs.forEach(log => {
+            const rawPhone = log.phone_number || '';
+            const clean = rawPhone.replace(/\D/g, '');
+            if (!clean) return;
+
+            if (!map[clean]) {
+                map[clean] = {
+                    phone_number: rawPhone,
+                    clean_phone: clean,
+                    current_step: 'IDLE',
+                    last_interaction: log.created_at,
+                    message_count: 0,
+                    last_message: '',
+                    messages: []
+                };
+            }
+
+            map[clean].messages.push(log);
+            map[clean].message_count++;
+
+            // Track latest message
+            if (!map[clean].last_message && log.content) {
+                map[clean].last_message = log.content;
+            }
+        });
+
+        // Sort each customer thread's messages chronologically (oldest to newest)
+        Object.values(map).forEach(th => {
+            th.messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        });
+
+        // Sort threads by most recent interaction first
+        return Object.values(map).sort((a, b) => {
+            const timeA = new Date(a.last_interaction || 0).getTime();
+            const timeB = new Date(b.last_interaction || 0).getTime();
+            return timeB - timeA;
+        });
+    }, [sessions, logs, profilesMap]);
+
+    // Filtered customer threads by search
+    const filteredCustomerThreads = useMemo(() => {
+        if (!chatSearch.trim()) return customerThreads;
+        const q = chatSearch.toLowerCase().trim();
+        return customerThreads.filter(c => {
+            const name = (c.profile?.full_name || '').toLowerCase();
+            const phone = c.clean_phone.toLowerCase();
+            const lastMsg = (c.last_message || '').toLowerCase();
+            return name.includes(q) || phone.includes(q) || lastMsg.includes(q);
+        });
+    }, [customerThreads, chatSearch]);
+
+    // Send Direct Reply to Selected Customer
+    const handleSendDirectReply = async () => {
+        if (!selectedCustomer || !replyText.trim()) return;
+
+        setSendingReply(true);
+        try {
+            const cleanTarget = selectedCustomer.clean_phone;
+            const res = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'admin_send',
+                    to: cleanTarget,
+                    message: replyText.trim()
+                })
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok && data?.status === 'completed' && data?.success_count > 0) {
+                // Add message to local conversation
+                const newMsg = {
+                    id: `local_${Date.now()}`,
+                    phone_number: cleanTarget,
+                    direction: 'outgoing',
+                    content: replyText.trim(),
+                    created_at: new Date().toISOString()
+                };
+
+                setSelectedCustomer(prev => prev ? ({
+                    ...prev,
+                    messages: [...prev.messages, newMsg],
+                    last_message: replyText.trim(),
+                    message_count: prev.message_count + 1
+                }) : null);
+
+                setReplyText('');
+                if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                Alert.alert('✅ Message Sent', `Delivered directly to +${cleanTarget} via WhatsApp.`);
+                loadAll();
+            } else {
+                Alert.alert('⚠️ Send Notice', data?.error || 'Unable to deliver message to this number. Check Meta Cloud API status.');
+            }
+        } catch (err: any) {
+            Alert.alert('❌ Error', err.message || 'Network error');
+        } finally {
+            setSendingReply(false);
+        }
+    };
+
+    // Send Bulk Broadcast
+    const handleSendBroadcast = async () => {
+        if (!broadcastMessage.trim()) {
+            Alert.alert('Required', 'Please enter a message to broadcast.');
+            return;
+        }
+
+        let recipients: string[] = [];
+
+        if (broadcastAudience === 'all') {
+            recipients = customerThreads.map(c => c.clean_phone).filter(Boolean);
+        } else if (broadcastAudience === 'active_7d') {
+            const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+            recipients = customerThreads
+                .filter(c => new Date(c.last_interaction || 0).getTime() >= sevenDaysAgo)
+                .map(c => c.clean_phone)
+                .filter(Boolean);
+        } else if (broadcastAudience === 'custom') {
+            recipients = customBroadcastPhones
+                .split(/[\n,;]+/)
+                .map(p => p.trim().replace(/\D/g, ''))
+                .filter(p => p.length >= 10);
+        }
+
+        recipients = Array.from(new Set(recipients));
+
+        if (recipients.length === 0) {
+            Alert.alert('No Recipients', 'No valid recipient phone numbers found for this audience.');
+            return;
+        }
+
+        Alert.alert(
+            'Confirm Broadcast',
+            `Are you sure you want to broadcast this WhatsApp message to ${recipients.length} customer(s)?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: `Send to ${recipients.length} Users`,
+                    style: 'default',
+                    onPress: async () => {
+                        setBroadcasting(true);
+                        setBroadcastResult(null);
+
+                        try {
+                            const res = await fetch(webhookUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    action: 'admin_broadcast',
+                                    recipients,
+                                    message: broadcastMessage.trim()
+                                })
+                            });
+
+                            const data = await res.json();
+                            setBroadcastResult(data);
+
+                            if (res.ok && data?.status === 'completed') {
+                                Alert.alert('🎉 Broadcast Complete', `Successfully sent to ${data.success_count} user(s). Failed: ${data.fail_count}`);
+                                loadAll();
+                            } else {
+                                Alert.alert('⚠️ Broadcast Notice', data?.error || 'Broadcast completed with notices.');
+                            }
+                        } catch (err: any) {
+                            Alert.alert('❌ Broadcast Failed', err.message || 'Network error');
+                        } finally {
+                            setBroadcasting(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    // Quick Send Test Message
     const handleSendTestMessage = async () => {
         if (!testPhone.trim()) {
             Alert.alert('Required', 'Please enter a recipient phone number (e.g. 08012345678)');
@@ -211,12 +483,6 @@ export default function WhatsAppBotAdmin() {
         Alert.alert('Copied', `${label} copied to clipboard!`);
     };
 
-    const filteredLogs = logs.filter(l => {
-        if (logFilter === 'incoming') return l.direction === 'incoming';
-        if (logFilter === 'outgoing') return l.direction === 'outgoing';
-        return true;
-    });
-
     const isConnected = metaDiag?.meta_check?.status === 200;
     const verifiedName = metaDiag?.meta_check?.body?.verified_name || 'Abu Mafhal Ltd';
     const displayPhone = metaDiag?.meta_check?.body?.display_phone_number || '+234 906 564 5747';
@@ -235,9 +501,9 @@ export default function WhatsAppBotAdmin() {
                     <View style={{ flex: 1, marginLeft: 12 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Ionicons name="logo-whatsapp" size={20} color={C.waGreen} style={{ marginRight: 6 }} />
-                            <Text style={s.headerTitle}>WhatsApp Bot Manager</Text>
+                            <Text style={s.headerTitle}>WhatsApp 24/7 Bot Hub</Text>
                         </View>
-                        <Text style={s.headerSub}>Meta Cloud API & Live Activity Monitor</Text>
+                        <Text style={s.headerSub}>Customer Chats, Group Invites & Broadcast Center</Text>
                     </View>
                     <TouchableOpacity onPress={onRefresh} style={s.refreshBtn}>
                         <Ionicons name="refresh" size={18} color={C.white} />
@@ -248,55 +514,83 @@ export default function WhatsAppBotAdmin() {
                 <View style={s.statusBar}>
                     <View style={s.statusPill}>
                         <View style={[s.statusDot, { backgroundColor: isConnected ? C.waGreen : C.rose }]} />
-                        <Text style={s.statusText}>{isConnected ? 'Meta API Connected' : 'Checking Connection...'}</Text>
+                        <Text style={s.statusText}>{isConnected ? 'Meta Cloud API Live' : 'Checking API Status'}</Text>
                     </View>
-                    <View style={s.phonePill}>
-                        <Text style={s.phonePillText}>📱 {displayPhone}</Text>
+                    <View style={s.statusPill}>
+                        <Ionicons name={botEnabled ? "checkmark-circle" : "pause-circle"} size={13} color={botEnabled ? C.emerald : C.gold} />
+                        <Text style={s.statusText}>{botEnabled ? '24/7 Bot Active' : 'Bot Paused'}</Text>
+                    </View>
+                    <View style={s.statusPill}>
+                        <Ionicons name="people-outline" size={13} color={C.white} />
+                        <Text style={s.statusText}>{customerThreads.length} Customers</Text>
                     </View>
                 </View>
 
-                {/* Tabs */}
-                <View style={s.tabRow}>
-                    {[
-                        { key: 'overview', label: 'Overview & Config', icon: 'settings-outline' },
-                        { key: 'logs', label: `Live Chats (${logs.length})`, icon: 'chatbubbles-outline' },
-                        { key: 'sessions', label: `Sessions (${sessions.length})`, icon: 'people-outline' },
-                        { key: 'tester', label: 'Send Test Msg', icon: 'paper-plane-outline' },
-                    ].map(t => (
-                        <TouchableOpacity
-                            key={t.key}
-                            onPress={() => {
-                                if (Platform.OS !== 'web') Haptics.selectionAsync();
-                                setActiveTab(t.key as any);
-                            }}
-                            style={[s.tabBtn, activeTab === t.key && s.tabBtnActive]}
-                        >
-                            <Ionicons name={t.icon as any} size={14} color={activeTab === t.key ? C.navy : C.slate400} />
-                            <Text style={[s.tabBtnText, activeTab === t.key && s.tabBtnTextActive]}>{t.label}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
+                {/* Navigation Tabs */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabScrollContent}>
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('overview')}
+                        style={[s.tabItem, activeTab === 'overview' && s.tabItemActive]}
+                    >
+                        <Ionicons name="speedometer-outline" size={15} color={activeTab === 'overview' ? C.navyDark : C.slate400} />
+                        <Text style={[s.tabItemText, activeTab === 'overview' && s.tabItemTextActive]}>Overview</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('chats')}
+                        style={[s.tabItem, activeTab === 'chats' && s.tabItemActive]}
+                    >
+                        <Ionicons name="chatbubbles" size={15} color={activeTab === 'chats' ? C.navyDark : C.waGreen} />
+                        <Text style={[s.tabItemText, activeTab === 'chats' && s.tabItemTextActive]}>
+                            Customer Chats ({customerThreads.length})
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('broadcast')}
+                        style={[s.tabItem, activeTab === 'broadcast' && s.tabItemActive]}
+                    >
+                        <Ionicons name="megaphone-outline" size={15} color={activeTab === 'broadcast' ? C.navyDark : C.gold} />
+                        <Text style={[s.tabItemText, activeTab === 'broadcast' && s.tabItemTextActive]}>Broadcast</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('logs')}
+                        style={[s.tabItem, activeTab === 'logs' && s.tabItemActive]}
+                    >
+                        <Ionicons name="list-outline" size={15} color={activeTab === 'logs' ? C.navyDark : C.slate400} />
+                        <Text style={[s.tabItemText, activeTab === 'logs' && s.tabItemTextActive]}>Live Logs ({logs.length})</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('tester')}
+                        style={[s.tabItem, activeTab === 'tester' && s.tabItemActive]}
+                    >
+                        <Ionicons name="paper-plane-outline" size={15} color={activeTab === 'tester' ? C.navyDark : C.slate400} />
+                        <Text style={[s.tabItemText, activeTab === 'tester' && s.tabItemTextActive]}>Tester</Text>
+                    </TouchableOpacity>
+                </ScrollView>
             </LinearGradient>
 
             {loading ? (
-                <View style={s.centerBox}>
-                    <ActivityIndicator size="large" color={C.waGreen} />
-                    <Text style={s.loadingText}>Loading WhatsApp Bot Status...</Text>
+                <View style={s.loaderBox}>
+                    <ActivityIndicator size="large" color={C.navy} />
+                    <Text style={s.loaderText}>Connecting to WhatsApp 24/7 Bot Hub...</Text>
                 </View>
             ) : (
                 <ScrollView
-                    style={s.content}
+                    style={s.body}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                     contentContainerStyle={{ paddingBottom: 60 }}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.waGreen} />}
                 >
-                    {/* TAB 1: OVERVIEW & CONFIG */}
+                    {/* TAB 1: OVERVIEW */}
                     {activeTab === 'overview' && (
                         <View style={s.tabContent}>
-                            {/* Meta Health Card */}
+                            {/* Meta Business Info Card */}
                             <View style={s.card}>
                                 <View style={s.cardHeader}>
                                     <View style={[s.iconBox, { backgroundColor: '#E8F5E9' }]}>
-                                        <Ionicons name="checkmark-circle" size={18} color={C.waDarkGreen} />
+                                        <Ionicons name="logo-whatsapp" size={18} color={C.waDarkGreen} />
                                     </View>
                                     <View style={{ flex: 1, marginLeft: 10 }}>
                                         <Text style={s.cardTitle}>Meta WhatsApp Business Profile</Text>
@@ -347,6 +641,41 @@ export default function WhatsAppBotAdmin() {
                                 </View>
                             </View>
 
+                            {/* Official Group & Channel Settings */}
+                            <View style={s.card}>
+                                <View style={s.cardHeader}>
+                                    <View style={[s.iconBox, { backgroundColor: '#FEF3C7' }]}>
+                                        <Ionicons name="people" size={18} color="#D97706" />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 10 }}>
+                                        <Text style={s.cardTitle}>Official Group & Channel Invites</Text>
+                                        <Text style={s.cardSub}>Links sent by Bot and in Broadcasts</Text>
+                                    </View>
+                                </View>
+
+                                <View style={{ marginTop: 10 }}>
+                                    <Text style={s.inputLabel}>Official WhatsApp Group Invite Link:</Text>
+                                    <TextInput
+                                        value={groupLink}
+                                        onChangeText={setGroupLink}
+                                        placeholder="https://chat.whatsapp.com/G5yAbuMafhalSub"
+                                        style={s.input}
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+
+                                <View style={{ marginTop: 12 }}>
+                                    <Text style={s.inputLabel}>Official WhatsApp Channel Link:</Text>
+                                    <TextInput
+                                        value={channelLink}
+                                        onChangeText={setChannelLink}
+                                        placeholder="https://whatsapp.com/channel/0029VAbuMafhal"
+                                        style={s.input}
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+                            </View>
+
                             {/* Bot Controls Card */}
                             <View style={s.card}>
                                 <View style={s.cardHeader}>
@@ -355,15 +684,15 @@ export default function WhatsAppBotAdmin() {
                                     </View>
                                     <View style={{ flex: 1, marginLeft: 10 }}>
                                         <Text style={s.cardTitle}>Master Bot Controls</Text>
-                                        <Text style={s.cardSub}>Toggle Bot Status & System Maintenance</Text>
+                                        <Text style={s.cardSub}>24/7 Availability & Maintenance Mode</Text>
                                     </View>
                                 </View>
 
                                 {/* Toggle Bot */}
                                 <View style={s.toggleRow}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={s.toggleLabel}>WhatsApp Bot Active</Text>
-                                        <Text style={s.toggleDesc}>When OFF, bot replies with temporary downtime notice</Text>
+                                        <Text style={s.toggleLabel}>WhatsApp Bot 24/7 Active</Text>
+                                        <Text style={s.toggleDesc}>When active, bot answers customer requests instantly around the clock</Text>
                                     </View>
                                     <Switch
                                         value={botEnabled}
@@ -389,7 +718,7 @@ export default function WhatsAppBotAdmin() {
 
                                 {/* Phone Inputs */}
                                 <View style={{ marginTop: 16 }}>
-                                    <Text style={s.inputLabel}>WhatsApp Bot Phone (Display & Links):</Text>
+                                    <Text style={s.inputLabel}>WhatsApp Bot Display Phone (09065645747):</Text>
                                     <TextInput
                                         value={botPhone}
                                         onChangeText={setBotPhone}
@@ -434,7 +763,7 @@ export default function WhatsAppBotAdmin() {
                                     ) : (
                                         <>
                                             <Ionicons name="save-outline" size={18} color={C.white} style={{ marginRight: 6 }} />
-                                            <Text style={s.saveBtnText}>Save WhatsApp Bot Settings</Text>
+                                            <Text style={s.saveBtnText}>Save WhatsApp Bot & Links Settings</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
@@ -442,7 +771,234 @@ export default function WhatsAppBotAdmin() {
                         </View>
                     )}
 
-                    {/* TAB 2: LIVE LOGS */}
+                    {/* TAB 2: CUSTOMER CHATS (GROUPED USER CONVERSATIONS) */}
+                    {activeTab === 'chats' && (
+                        <View style={s.tabContent}>
+                            {/* Search bar */}
+                            <View style={s.searchBox}>
+                                <Ionicons name="search" size={18} color={C.slate400} />
+                                <TextInput
+                                    value={chatSearch}
+                                    onChangeText={setChatSearch}
+                                    placeholder="Search customer by name or phone..."
+                                    style={s.searchInput}
+                                />
+                                {chatSearch ? (
+                                    <TouchableOpacity onPress={() => setChatSearch('')}>
+                                        <Ionicons name="close-circle" size={18} color={C.slate400} />
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+
+                            {filteredCustomerThreads.length === 0 ? (
+                                <View style={s.emptyState}>
+                                    <Ionicons name="chatbubbles-outline" size={48} color={C.slate300} />
+                                    <Text style={s.emptyTitle}>No Customer Chats Found</Text>
+                                    <Text style={s.emptySub}>Chats from WhatsApp users will appear here automatically grouped by user.</Text>
+                                </View>
+                            ) : (
+                                filteredCustomerThreads.map((thread) => {
+                                    const prof = thread.profile;
+                                    const name = prof?.full_name || 'WhatsApp Customer';
+                                    const isLinked = Boolean(thread.user_id);
+                                    const timeStr = thread.last_interaction ? new Date(thread.last_interaction).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                                    const dateStr = thread.last_interaction ? new Date(thread.last_interaction).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+
+                                    return (
+                                        <TouchableOpacity
+                                            key={thread.clean_phone}
+                                            style={s.chatThreadCard}
+                                            onPress={() => setSelectedCustomer(thread)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={s.avatarCircle}>
+                                                <Text style={s.avatarText}>
+                                                    {name ? name.slice(0, 2).toUpperCase() : 'WA'}
+                                                </Text>
+                                            </View>
+
+                                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                        <Text style={s.customerName} numberOfLines={1}>{name}</Text>
+                                                        {isLinked && (
+                                                            <View style={s.linkedBadge}>
+                                                                <Ionicons name="shield-checkmark" size={11} color={C.emerald} />
+                                                                <Text style={s.linkedText}>Linked</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    <Text style={s.timeText}>{dateStr} {timeStr}</Text>
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                                    <Ionicons name="call-outline" size={12} color={C.slate400} style={{ marginRight: 4 }} />
+                                                    <Text style={s.customerPhone}>+{thread.clean_phone}</Text>
+                                                    {prof?.balance !== undefined && (
+                                                        <Text style={s.balancePill}>₦{Number(prof.balance).toLocaleString()}</Text>
+                                                    )}
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                                                    <Text style={s.lastMsgPreview} numberOfLines={1}>
+                                                        {thread.last_message || 'No messages yet'}
+                                                    </Text>
+                                                    <View style={s.msgBadge}>
+                                                        <Text style={s.msgBadgeText}>{thread.message_count}</Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })
+                            )}
+                        </View>
+                    )}
+
+                    {/* TAB 3: BROADCAST & BULK MESSENGER */}
+                    {activeTab === 'broadcast' && (
+                        <View style={s.tabContent}>
+                            <View style={s.card}>
+                                <View style={s.cardHeader}>
+                                    <View style={[s.iconBox, { backgroundColor: '#FEF3C7' }]}>
+                                        <Ionicons name="megaphone" size={18} color="#D97706" />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 10 }}>
+                                        <Text style={s.cardTitle}>WhatsApp Broadcast Messenger</Text>
+                                        <Text style={s.cardSub}>Send announcements to all WhatsApp customers</Text>
+                                    </View>
+                                </View>
+
+                                {/* Audience Selector */}
+                                <Text style={s.inputLabel}>Target Audience:</Text>
+                                <View style={s.audienceRow}>
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastAudience('all')}
+                                        style={[s.audienceBtn, broadcastAudience === 'all' && s.audienceBtnActive]}
+                                    >
+                                        <Text style={[s.audienceBtnText, broadcastAudience === 'all' && s.audienceBtnTextActive]}>
+                                            All Customers ({customerThreads.length})
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastAudience('active_7d')}
+                                        style={[s.audienceBtn, broadcastAudience === 'active_7d' && s.audienceBtnActive]}
+                                    >
+                                        <Text style={[s.audienceBtnText, broadcastAudience === 'active_7d' && s.audienceBtnTextActive]}>
+                                            Active (7 Days)
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastAudience('custom')}
+                                        style={[s.audienceBtn, broadcastAudience === 'custom' && s.audienceBtnActive]}
+                                    >
+                                        <Text style={[s.audienceBtnText, broadcastAudience === 'custom' && s.audienceBtnTextActive]}>
+                                            Custom Numbers
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {broadcastAudience === 'custom' && (
+                                    <View style={{ marginTop: 10 }}>
+                                        <Text style={s.inputLabel}>Enter Phone Numbers (Comma or line separated):</Text>
+                                        <TextInput
+                                            value={customBroadcastPhones}
+                                            onChangeText={setCustomBroadcastPhones}
+                                            placeholder="08012345678, 09065645747, 08145853539"
+                                            style={[s.input, { height: 70 }]}
+                                            multiline
+                                        />
+                                    </View>
+                                )}
+
+                                {/* Message Composer */}
+                                <View style={{ marginTop: 14 }}>
+                                    <Text style={s.inputLabel}>Broadcast Message Body:</Text>
+                                    <TextInput
+                                        value={broadcastMessage}
+                                        onChangeText={setBroadcastMessage}
+                                        placeholder="Write your announcement or promo here..."
+                                        style={[s.input, { height: 110, textAlignVertical: 'top' }]}
+                                        multiline
+                                    />
+                                </View>
+
+                                {/* Quick Insert Buttons */}
+                                <Text style={[s.inputLabel, { marginTop: 10 }]}>Quick Insert Links:</Text>
+                                <View style={s.quickChipsRow}>
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastMessage(prev => prev + `\n\n💬 Official WhatsApp Group: ${groupLink}`)}
+                                        style={s.chip}
+                                    >
+                                        <Ionicons name="people" size={13} color={C.waDarkGreen} style={{ marginRight: 4 }} />
+                                        <Text style={s.chipText}>+ Group Link</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastMessage(prev => prev + `\n\n📢 Official WhatsApp Channel: ${channelLink}`)}
+                                        style={s.chip}
+                                    >
+                                        <Ionicons name="megaphone" size={13} color="#D97706" style={{ marginRight: 4 }} />
+                                        <Text style={s.chipText}>+ Channel Link</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastMessage(prev => prev + `\n\n📱 Android App: ${playStoreUrl}`)}
+                                        style={s.chip}
+                                    >
+                                        <Ionicons name="logo-google-playstore" size={13} color="#2563EB" style={{ marginRight: 4 }} />
+                                        <Text style={s.chipText}>+ Play Store</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastMessage(prev => prev + `\n\n🌐 Web: ${webBaseUrl}`)}
+                                        style={s.chip}
+                                    >
+                                        <Ionicons name="globe-outline" size={13} color={C.slate700} style={{ marginRight: 4 }} />
+                                        <Text style={s.chipText}>+ Website</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* WhatsApp Preview Box */}
+                                <Text style={[s.inputLabel, { marginTop: 14 }]}>WhatsApp Message Preview:</Text>
+                                <View style={s.previewCard}>
+                                    <View style={s.previewBubble}>
+                                        <Text style={s.previewText}>{broadcastMessage}</Text>
+                                        <View style={s.previewTimeRow}>
+                                            <Text style={s.previewTime}>12:00 PM</Text>
+                                            <Ionicons name="checkmark-done" size={13} color="#34B7F1" style={{ marginLeft: 3 }} />
+                                        </View>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={handleSendBroadcast}
+                                    disabled={broadcasting}
+                                    style={[s.saveBtn, { backgroundColor: C.waDarkGreen, marginTop: 16 }]}
+                                >
+                                    {broadcasting ? (
+                                        <ActivityIndicator color={C.white} size="small" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="send" size={16} color={C.white} style={{ marginRight: 6 }} />
+                                            <Text style={s.saveBtnText}>Send WhatsApp Broadcast Now</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+
+                                {broadcastResult && (
+                                    <View style={[s.diagResultBox, { marginTop: 12 }]}>
+                                        <Text style={s.diagResultTitle}>Broadcast Summary:</Text>
+                                        <Text style={s.metaValCode}>{JSON.stringify(broadcastResult, null, 2)}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* TAB 4: LIVE LOGS */}
                     {activeTab === 'logs' && (
                         <View style={s.tabContent}>
                             <View style={s.filterRow}>
@@ -459,98 +1015,56 @@ export default function WhatsAppBotAdmin() {
                                 ))}
                             </View>
 
-                            {filteredLogs.length === 0 ? (
-                                <View style={s.emptyBox}>
-                                    <Ionicons name="chatbubbles-outline" size={40} color={C.slate400} />
-                                    <Text style={s.emptyText}>No WhatsApp bot logs recorded yet.</Text>
+                            {logs.length === 0 ? (
+                                <View style={s.emptyState}>
+                                    <Ionicons name="document-text-outline" size={40} color={C.slate300} />
+                                    <Text style={s.emptyTitle}>No Activity Logs Yet</Text>
+                                    <Text style={s.emptySub}>Incoming messages and bot responses will display here in real time.</Text>
                                 </View>
                             ) : (
-                                filteredLogs.map(log => {
-                                    const isInc = log.direction === 'incoming';
-                                    const time = new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                    const date = new Date(log.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' });
-
-                                    return (
-                                        <View key={log.id} style={[s.logBubble, isInc ? s.logBubbleInc : s.logBubbleOut]}>
-                                            <View style={s.logTop}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <Ionicons
-                                                        name={isInc ? 'arrow-down-circle' : 'arrow-up-circle'}
-                                                        size={14}
-                                                        color={isInc ? C.waDarkGreen : '#2563EB'}
-                                                        style={{ marginRight: 4 }}
-                                                    />
-                                                    <Text style={s.logPhone}>{log.phone_number}</Text>
-                                                </View>
-                                                <Text style={s.logTime}>{date} {time}</Text>
+                                logs.map((l, idx) => (
+                                    <View key={l.id || idx} style={s.logItem}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Ionicons
+                                                    name={l.direction === 'incoming' ? "arrow-down-circle" : "arrow-up-circle"}
+                                                    size={16}
+                                                    color={l.direction === 'incoming' ? C.emerald : C.waDarkGreen}
+                                                    style={{ marginRight: 6 }}
+                                                />
+                                                <Text style={s.logPhone}>+{l.phone_number}</Text>
                                             </View>
-                                            <Text style={s.logText}>{log.content}</Text>
-                                        </View>
-                                    );
-                                })
-                            )}
-                        </View>
-                    )}
-
-                    {/* TAB 3: SESSIONS */}
-                    {activeTab === 'sessions' && (
-                        <View style={s.tabContent}>
-                            <Text style={s.sectionHeader}>Active WhatsApp Conversations & Linked Users</Text>
-                            {sessions.length === 0 ? (
-                                <View style={s.emptyBox}>
-                                    <Ionicons name="people-outline" size={40} color={C.slate400} />
-                                    <Text style={s.emptyText}>No active WhatsApp sessions.</Text>
-                                </View>
-                            ) : (
-                                sessions.map(sess => (
-                                    <View key={sess.id} style={s.sessionCard}>
-                                        <View style={s.sessionTop}>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={s.sessionPhone}>📱 {sess.phone_number}</Text>
-                                                <Text style={s.sessionStep}>Current Step: <Text style={{ fontWeight: '700', color: C.navy }}>{sess.step}</Text></Text>
-                                            </View>
-                                            <TouchableOpacity
-                                                onPress={() => handleResetSession(sess.id, sess.phone_number)}
-                                                style={s.resetBtn}
-                                            >
-                                                <Ionicons name="refresh" size={14} color={C.rose} style={{ marginRight: 4 }} />
-                                                <Text style={s.resetBtnText}>Reset</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                        <View style={s.sessionBottom}>
-                                            <Text style={s.sessionMeta}>
-                                                User ID: {sess.user_id ? sess.user_id.slice(0, 8) + '...' : 'Guest (Unlinked)'}
-                                            </Text>
-                                            <Text style={s.sessionMeta}>
-                                                Last Active: {new Date(sess.last_interaction || sess.created_at).toLocaleTimeString()}
+                                            <Text style={s.logTime}>
+                                                {new Date(l.created_at).toLocaleTimeString()}
                                             </Text>
                                         </View>
+                                        <Text style={s.logContent}>{l.content}</Text>
                                     </View>
                                 ))
                             )}
                         </View>
                     )}
 
-                    {/* TAB 4: TEST MESSAGE SENDER */}
+                    {/* TAB 5: TESTER */}
                     {activeTab === 'tester' && (
                         <View style={s.tabContent}>
                             <View style={s.card}>
                                 <View style={s.cardHeader}>
-                                    <View style={[s.iconBox, { backgroundColor: '#F0FDF4' }]}>
-                                        <Ionicons name="paper-plane" size={18} color={C.waDarkGreen} />
+                                    <View style={[s.iconBox, { backgroundColor: '#EFF6FF' }]}>
+                                        <Ionicons name="paper-plane" size={18} color="#2563EB" />
                                     </View>
                                     <View style={{ flex: 1, marginLeft: 10 }}>
-                                        <Text style={s.cardTitle}>Live Meta WhatsApp Message Tester</Text>
-                                        <Text style={s.cardSub}>Send test message directly through Meta Graph API</Text>
+                                        <Text style={s.cardTitle}>Live WhatsApp Message Tester</Text>
+                                        <Text style={s.cardSub}>Send direct test message to verify Meta Cloud API</Text>
                                     </View>
                                 </View>
 
-                                <View style={{ marginTop: 12 }}>
+                                <View style={{ marginTop: 10 }}>
                                     <Text style={s.inputLabel}>Recipient Phone Number:</Text>
                                     <TextInput
                                         value={testPhone}
                                         onChangeText={setTestPhone}
-                                        placeholder="08012345678 or 2348012345678"
+                                        placeholder="08012345678 or 2349065645747"
                                         style={s.input}
                                         keyboardType="phone-pad"
                                     />
@@ -561,31 +1075,31 @@ export default function WhatsAppBotAdmin() {
                                     <TextInput
                                         value={testMessage}
                                         onChangeText={setTestMessage}
+                                        placeholder="Message text..."
+                                        style={[s.input, { height: 80 }]}
                                         multiline
-                                        numberOfLines={4}
-                                        style={[s.input, { height: 90, textAlignVertical: 'top' }]}
                                     />
                                 </View>
 
                                 <TouchableOpacity
                                     onPress={handleSendTestMessage}
                                     disabled={testing}
-                                    style={[s.saveBtn, { backgroundColor: C.waDarkGreen }]}
+                                    style={[s.saveBtn, { backgroundColor: C.navy, marginTop: 16 }]}
                                 >
                                     {testing ? (
                                         <ActivityIndicator color={C.white} size="small" />
                                     ) : (
                                         <>
                                             <Ionicons name="send" size={16} color={C.white} style={{ marginRight: 6 }} />
-                                            <Text style={s.saveBtnText}>Send WhatsApp Test Message</Text>
+                                            <Text style={s.saveBtnText}>Send Test Message Via Cloud API</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
 
                                 {testResult && (
-                                    <View style={s.resultBox}>
-                                        <Text style={s.resultHeader}>Meta Graph API Response:</Text>
-                                        <Text style={s.resultCode}>{JSON.stringify(testResult, null, 2)}</Text>
+                                    <View style={[s.diagResultBox, { marginTop: 14 }]}>
+                                        <Text style={s.diagResultTitle}>Meta API Diagnostic Result:</Text>
+                                        <Text style={s.metaValCode}>{JSON.stringify(testResult, null, 2)}</Text>
                                     </View>
                                 )}
                             </View>
@@ -593,6 +1107,108 @@ export default function WhatsAppBotAdmin() {
                     )}
                 </ScrollView>
             )}
+
+            {/* CUSTOMER DETAIL & CHAT MODAL */}
+            <Modal
+                visible={Boolean(selectedCustomer)}
+                animationType="slide"
+                onRequestClose={() => setSelectedCustomer(null)}
+            >
+                <SafeAreaView style={s.modalSafe} edges={['top']}>
+                    {selectedCustomer && (
+                        <View style={{ flex: 1, backgroundColor: '#EFEAE2' }}>
+                            {/* Modal Header */}
+                            <View style={s.modalHeader}>
+                                <TouchableOpacity onPress={() => setSelectedCustomer(null)} style={s.modalBackBtn}>
+                                    <Ionicons name="arrow-back" size={22} color={C.white} />
+                                </TouchableOpacity>
+
+                                <View style={s.modalAvatarCircle}>
+                                    <Text style={s.modalAvatarText}>
+                                        {(selectedCustomer.profile?.full_name || 'WA').slice(0, 2).toUpperCase()}
+                                    </Text>
+                                </View>
+
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={s.modalCustomerName} numberOfLines={1}>
+                                        {selectedCustomer.profile?.full_name || 'WhatsApp Customer'}
+                                    </Text>
+                                    <Text style={s.modalCustomerPhone}>
+                                        +{selectedCustomer.clean_phone} • {selectedCustomer.current_step}
+                                    </Text>
+                                </View>
+
+                                {selectedCustomer.profile?.balance !== undefined && (
+                                    <View style={s.modalBalanceBadge}>
+                                        <Text style={s.modalBalanceText}>
+                                            ₦{Number(selectedCustomer.profile.balance).toLocaleString()}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Conversation Scroll */}
+                            <ScrollView
+                                style={{ flex: 1, padding: 12 }}
+                                contentContainerStyle={{ paddingBottom: 20 }}
+                            >
+                                <View style={s.chatDateDivider}>
+                                    <Text style={s.chatDateText}>Complete WhatsApp Activity & Messages</Text>
+                                </View>
+
+                                {selectedCustomer.messages.map((msg, i) => {
+                                    const isOut = msg.direction === 'outgoing';
+                                    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                                    return (
+                                        <View
+                                            key={msg.id || i}
+                                            style={[
+                                                s.bubbleRow,
+                                                isOut ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+                                            ]}
+                                        >
+                                            <View style={[s.bubble, isOut ? s.bubbleOut : s.bubbleIn]}>
+                                                <Text style={[s.bubbleText, isOut && { color: '#111827' }]}>
+                                                    {msg.content}
+                                                </Text>
+                                                <View style={s.bubbleMetaRow}>
+                                                    <Text style={s.bubbleTime}>{time}</Text>
+                                                    {isOut && (
+                                                        <Ionicons name="checkmark-done" size={13} color="#34B7F1" style={{ marginLeft: 3 }} />
+                                                    )}
+                                                </View>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+
+                            {/* Direct WhatsApp Reply Box */}
+                            <View style={s.replyBoxContainer}>
+                                <TextInput
+                                    value={replyText}
+                                    onChangeText={setReplyText}
+                                    placeholder="Type a WhatsApp reply to this customer..."
+                                    style={s.replyInput}
+                                    multiline
+                                />
+                                <TouchableOpacity
+                                    onPress={handleSendDirectReply}
+                                    disabled={sendingReply || !replyText.trim()}
+                                    style={[s.sendBtn, (!replyText.trim() || sendingReply) && { opacity: 0.5 }]}
+                                >
+                                    {sendingReply ? (
+                                        <ActivityIndicator color={C.white} size="small" />
+                                    ) : (
+                                        <Ionicons name="send" size={18} color={C.white} />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -606,131 +1222,124 @@ const s = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 8,
         paddingBottom: 14,
+        borderBottomLeftRadius: 18,
+        borderBottomRightRadius: 18,
     },
     headerTop: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
     },
     backBtn: {
         width: 36,
         height: 36,
         borderRadius: 18,
         backgroundColor: 'rgba(255,255,255,0.12)',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     refreshBtn: {
         width: 36,
         height: 36,
         borderRadius: 18,
         backgroundColor: 'rgba(255,255,255,0.12)',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
-        color: C.white,
         fontSize: 17,
-        fontWeight: '800',
+        fontWeight: '700',
+        color: C.white,
     },
     headerSub: {
-        color: C.slate400,
         fontSize: 12,
-        marginTop: 1,
+        color: C.slate400,
+        marginTop: 2,
     },
     statusBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         marginTop: 12,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+        gap: 8,
+        flexWrap: 'wrap',
     },
     statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
+        gap: 5,
     },
     statusDot: {
-        width: 8,
-        height: 8,
+        width: 7,
+        height: 7,
         borderRadius: 4,
-        marginRight: 6,
     },
     statusText: {
+        fontSize: 11,
         color: C.white,
-        fontSize: 12,
         fontWeight: '600',
     },
-    phonePill: {
-        backgroundColor: 'rgba(37,211,102,0.15)',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
+    tabScroll: {
+        marginTop: 14,
     },
-    phonePillText: {
-        color: C.waGreen,
-        fontSize: 11,
-        fontWeight: '700',
+    tabScrollContent: {
+        gap: 8,
     },
-    tabRow: {
-        flexDirection: 'row',
-        marginTop: 12,
-        backgroundColor: 'rgba(0,0,0,0.25)',
-        borderRadius: 8,
-        padding: 3,
-    },
-    tabBtn: {
-        flex: 1,
+    tabItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 14,
         paddingVertical: 8,
-        borderRadius: 6,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        gap: 6,
     },
-    tabBtnActive: {
+    tabItemActive: {
         backgroundColor: C.white,
     },
-    tabBtnText: {
-        color: C.slate400,
-        fontSize: 11,
+    tabItemText: {
+        fontSize: 12,
+        color: C.slate300,
         fontWeight: '600',
-        marginLeft: 4,
     },
-    tabBtnTextActive: {
-        color: C.navy,
+    tabItemTextActive: {
+        color: C.navyDark,
         fontWeight: '700',
     },
-    content: {
+    body: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: C.slate50,
+    },
+    loaderBox: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+        backgroundColor: C.slate50,
+    },
+    loaderText: {
+        marginTop: 12,
+        fontSize: 13,
+        color: C.slate500,
+        fontWeight: '500',
     },
     tabContent: {
         padding: 16,
     },
-    centerBox: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
-    },
-    loadingText: {
-        color: C.slate500,
-        fontSize: 13,
-        marginTop: 12,
-    },
     card: {
         backgroundColor: C.white,
-        borderRadius: 14,
+        borderRadius: 16,
         padding: 16,
         marginBottom: 16,
         borderWidth: 1,
         borderColor: C.slate200,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
         elevation: 2,
     },
     cardHeader: {
@@ -739,91 +1348,91 @@ const s = StyleSheet.create({
         marginBottom: 14,
     },
     iconBox: {
-        width: 34,
-        height: 34,
-        borderRadius: 8,
-        justifyContent: 'center',
+        width: 36,
+        height: 36,
+        borderRadius: 10,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     cardTitle: {
-        color: C.navy,
         fontSize: 15,
         fontWeight: '700',
+        color: C.slate800,
     },
     cardSub: {
+        fontSize: 11,
         color: C.slate500,
-        fontSize: 12,
         marginTop: 1,
     },
     badge: {
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 6,
+        borderRadius: 8,
     },
     badgeText: {
         fontSize: 10,
-        fontWeight: '800',
+        fontWeight: '700',
     },
     metaGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginTop: 4,
+    },
+    metaItem: {
+        width: '48%',
         backgroundColor: C.slate50,
         borderRadius: 10,
-        padding: 12,
+        padding: 10,
         borderWidth: 1,
         borderColor: C.slate200,
     },
-    metaItem: {
-        marginBottom: 8,
-    },
     metaLabel: {
-        color: C.slate500,
-        fontSize: 11,
+        fontSize: 10,
+        color: C.slate400,
         fontWeight: '600',
+        textTransform: 'uppercase',
     },
     metaVal: {
-        color: C.navy,
         fontSize: 13,
+        color: C.slate800,
         fontWeight: '700',
-        marginTop: 1,
+        marginTop: 2,
     },
     metaValCode: {
-        color: '#2563EB',
-        fontSize: 12,
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        fontSize: 11,
+        color: C.navyLight,
         fontWeight: '600',
-        marginTop: 1,
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        marginTop: 2,
     },
     webhookBox: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: C.slate50,
-        borderRadius: 8,
         padding: 10,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: C.slate200,
-        marginTop: 10,
+        marginTop: 12,
     },
     webhookLabel: {
-        color: C.slate500,
         fontSize: 10,
-        fontWeight: '700',
-        textTransform: 'uppercase',
+        color: C.slate500,
+        fontWeight: '600',
     },
     webhookUrl: {
+        fontSize: 11,
         color: C.navy,
-        fontSize: 12,
         fontWeight: '600',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
         marginTop: 2,
     },
     copyBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 6,
-        backgroundColor: C.white,
-        justifyContent: 'center',
-        alignItems: 'center',
+        padding: 8,
+        backgroundColor: C.slate200,
+        borderRadius: 8,
         marginLeft: 8,
-        borderWidth: 1,
-        borderColor: C.slate200,
     },
     toggleRow: {
         flexDirection: 'row',
@@ -831,31 +1440,30 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
     },
     toggleLabel: {
-        color: C.navy,
         fontSize: 14,
         fontWeight: '700',
+        color: C.slate800,
     },
     toggleDesc: {
+        fontSize: 11,
         color: C.slate500,
-        fontSize: 12,
         marginTop: 2,
-        paddingRight: 10,
     },
     inputLabel: {
-        color: C.slate700,
         fontSize: 12,
         fontWeight: '600',
-        marginBottom: 5,
+        color: C.slate700,
+        marginBottom: 6,
     },
     input: {
         backgroundColor: C.slate50,
-        borderRadius: 8,
         borderWidth: 1,
-        borderColor: C.slate200,
+        borderColor: C.slate300,
+        borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 10,
         fontSize: 13,
-        color: C.navy,
+        color: C.slate800,
     },
     langRow: {
         flexDirection: 'row',
@@ -863,20 +1471,20 @@ const s = StyleSheet.create({
     },
     langPill: {
         flex: 1,
-        paddingVertical: 9,
-        borderRadius: 8,
-        backgroundColor: C.slate100,
+        paddingVertical: 10,
         alignItems: 'center',
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: C.slate200,
+        borderColor: C.slate300,
+        backgroundColor: C.slate50,
     },
     langPillActive: {
         backgroundColor: C.navy,
         borderColor: C.navy,
     },
     langPillText: {
-        color: C.slate700,
         fontSize: 12,
+        color: C.slate700,
         fontWeight: '600',
     },
     langPillTextActive: {
@@ -884,18 +1492,188 @@ const s = StyleSheet.create({
         fontWeight: '700',
     },
     saveBtn: {
-        backgroundColor: C.navy,
-        borderRadius: 10,
-        paddingVertical: 12,
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: C.navy,
+        paddingVertical: 13,
+        borderRadius: 12,
         marginTop: 18,
     },
     saveBtnText: {
         color: C.white,
-        fontSize: 13,
         fontWeight: '700',
+        fontSize: 13,
+    },
+    searchBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: C.slate200,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginBottom: 12,
+    },
+    searchInput: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 13,
+        color: C.slate800,
+    },
+    chatThreadCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.white,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: C.slate200,
+    },
+    avatarCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: C.navy,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarText: {
+        color: C.white,
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    customerName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: C.slate800,
+    },
+    customerPhone: {
+        fontSize: 11,
+        color: C.slate500,
+    },
+    linkedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        marginLeft: 6,
+        gap: 3,
+    },
+    linkedText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: C.emerald,
+    },
+    balancePill: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: C.navyMid,
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 6,
+        marginLeft: 8,
+    },
+    timeText: {
+        fontSize: 10,
+        color: C.slate400,
+    },
+    lastMsgPreview: {
+        fontSize: 12,
+        color: C.slate500,
+        flex: 1,
+        marginRight: 8,
+    },
+    msgBadge: {
+        backgroundColor: C.waDarkGreen,
+        borderRadius: 10,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    msgBadgeText: {
+        color: C.white,
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    audienceRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 8,
+    },
+    audienceBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: C.slate200,
+        backgroundColor: C.slate50,
+    },
+    audienceBtnActive: {
+        backgroundColor: C.waDarkGreen,
+        borderColor: C.waDarkGreen,
+    },
+    audienceBtnText: {
+        fontSize: 11,
+        color: C.slate700,
+        fontWeight: '600',
+    },
+    audienceBtnTextActive: {
+        color: C.white,
+        fontWeight: '700',
+    },
+    quickChipsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.slate100,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: C.slate200,
+    },
+    chipText: {
+        fontSize: 11,
+        color: C.slate700,
+        fontWeight: '600',
+    },
+    previewCard: {
+        backgroundColor: '#E5DDD5',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 6,
+    },
+    previewBubble: {
+        backgroundColor: C.waBubbleOut,
+        borderRadius: 8,
+        padding: 10,
+        alignSelf: 'flex-end',
+        maxWidth: '90%',
+    },
+    previewText: {
+        fontSize: 13,
+        color: '#111827',
+        lineHeight: 18,
+    },
+    previewTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        marginTop: 4,
+    },
+    previewTime: {
+        fontSize: 9,
+        color: '#6B7280',
     },
     filterRow: {
         flexDirection: 'row',
@@ -905,138 +1683,199 @@ const s = StyleSheet.create({
     filterPill: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 20,
-        backgroundColor: C.slate200,
+        borderRadius: 8,
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: C.slate200,
     },
     filterPillActive: {
         backgroundColor: C.navy,
+        borderColor: C.navy,
     },
     filterPillText: {
-        color: C.slate700,
         fontSize: 11,
-        fontWeight: '700',
+        fontWeight: '600',
+        color: C.slate600,
     },
     filterPillTextActive: {
         color: C.white,
+        fontWeight: '700',
     },
-    logBubble: {
+    logItem: {
         backgroundColor: C.white,
         borderRadius: 10,
-        padding: 12,
-        marginBottom: 10,
+        padding: 10,
+        marginBottom: 8,
         borderWidth: 1,
         borderColor: C.slate200,
-    },
-    logBubbleInc: {
-        borderLeftWidth: 4,
-        borderLeftColor: C.waDarkGreen,
-    },
-    logBubbleOut: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#2563EB',
-    },
-    logTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 6,
     },
     logPhone: {
-        color: C.navy,
         fontSize: 12,
         fontWeight: '700',
+        color: C.slate800,
     },
     logTime: {
+        fontSize: 10,
         color: C.slate400,
-        fontSize: 11,
     },
-    logText: {
-        color: C.slate800,
-        fontSize: 13,
-        lineHeight: 18,
+    logContent: {
+        fontSize: 12,
+        color: C.slate600,
+        marginTop: 4,
     },
-    sectionHeader: {
-        color: C.navy,
-        fontSize: 14,
-        fontWeight: '700',
-        marginBottom: 12,
-    },
-    sessionCard: {
-        backgroundColor: C.white,
+    diagResultBox: {
+        backgroundColor: C.slate100,
         borderRadius: 10,
         padding: 12,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: C.slate200,
     },
-    sessionTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    sessionPhone: {
-        color: C.navy,
-        fontSize: 13,
-        fontWeight: '700',
-    },
-    sessionStep: {
-        color: C.slate500,
-        fontSize: 12,
-        marginTop: 2,
-    },
-    resetBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 6,
-        backgroundColor: '#FEF2F2',
-        borderWidth: 1,
-        borderColor: '#FCA5A5',
-    },
-    resetBtnText: {
-        color: C.rose,
+    diagResultTitle: {
         fontSize: 11,
         fontWeight: '700',
+        color: C.slate700,
+        marginBottom: 4,
     },
-    sessionBottom: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: C.slate100,
-        paddingTop: 6,
-    },
-    sessionMeta: {
-        color: C.slate400,
-        fontSize: 11,
-    },
-    resultBox: {
-        backgroundColor: '#0F172A',
-        borderRadius: 8,
-        padding: 12,
-        marginTop: 14,
-    },
-    resultHeader: {
-        color: C.gold,
-        fontSize: 11,
-        fontWeight: '700',
-        marginBottom: 6,
-    },
-    resultCode: {
-        color: '#A5F3FC',
-        fontSize: 11,
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    },
-    emptyBox: {
-        padding: 40,
+    emptyState: {
         alignItems: 'center',
         justifyContent: 'center',
+        padding: 40,
     },
-    emptyText: {
-        color: C.slate400,
-        fontSize: 13,
+    emptyTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: C.slate700,
         marginTop: 10,
     },
+    emptySub: {
+        fontSize: 12,
+        color: C.slate400,
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    modalSafe: {
+        flex: 1,
+        backgroundColor: C.navyDark,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.navyDark,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    modalBackBtn: {
+        padding: 6,
+    },
+    modalAvatarCircle: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: C.waDarkGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    modalAvatarText: {
+        color: C.white,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    modalCustomerName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: C.white,
+    },
+    modalCustomerPhone: {
+        fontSize: 11,
+        color: C.slate300,
+    },
+    modalBalanceBadge: {
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    modalBalanceText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: C.gold,
+    },
+    chatDateDivider: {
+        alignSelf: 'center',
+        backgroundColor: 'rgba(0,0,0,0.06)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    chatDateText: {
+        fontSize: 10,
+        color: C.slate600,
+        fontWeight: '600',
+    },
+    bubbleRow: {
+        flexDirection: 'row',
+        marginBottom: 8,
+    },
+    bubble: {
+        maxWidth: '82%',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 1,
+        elevation: 1,
+    },
+    bubbleIn: {
+        backgroundColor: C.waBubbleIn,
+        borderTopLeftRadius: 2,
+    },
+    bubbleOut: {
+        backgroundColor: C.waBubbleOut,
+        borderTopRightRadius: 2,
+    },
+    bubbleText: {
+        fontSize: 13,
+        color: '#1F2937',
+        lineHeight: 18,
+    },
+    bubbleMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        marginTop: 4,
+    },
+    bubbleTime: {
+        fontSize: 9,
+        color: '#6B7280',
+    },
+    replyBoxContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.white,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: C.slate200,
+    },
+    replyInput: {
+        flex: 1,
+        backgroundColor: C.slate100,
+        borderRadius: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: C.slate800,
+        maxHeight: 90,
+    },
+    sendBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: C.waDarkGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
 });
-

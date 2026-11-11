@@ -214,7 +214,9 @@ Deno.serve(async (req: Request) => {
             'site_url',
             'app_url',
             'website_url',
-            'referral_url'
+            'referral_url',
+            'whatsapp_group_link',
+            'whatsapp_channel_link'
         ]);
 
     const settingsMap: Record<string, string> = {};
@@ -377,6 +379,61 @@ Deno.serve(async (req: Request) => {
     if (req.method === 'POST') {
         try {
             const body = await req.json();
+
+            // ── Admin Direct Send / Broadcast Action ────────────
+            if (body?.action === 'admin_send' || body?.action === 'admin_broadcast') {
+                const recipients: string[] = Array.isArray(body.recipients) 
+                    ? body.recipients 
+                    : (body.to ? [String(body.to)] : []);
+                const msg = String(body.message || '').trim();
+
+                if (recipients.length === 0 || !msg) {
+                    return new Response(JSON.stringify({ error: "Missing recipients or message body" }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                        status: 400
+                    });
+                }
+
+                let successCount = 0;
+                let failCount = 0;
+                const results: any[] = [];
+
+                for (const rawTo of recipients) {
+                    let clean = String(rawTo).replace(/\D/g, '');
+                    if (clean.startsWith('0') && clean.length === 11) clean = '234' + clean.slice(1);
+                    else if (clean.length === 10) clean = '234' + clean;
+
+                    if (clean.length >= 10) {
+                        const sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                        if (sent) {
+                            successCount++;
+                            results.push({ to: clean, status: 'sent' });
+                            try {
+                                await supabaseAdmin.from('whatsapp_bot_logs').insert({
+                                    phone_number: clean,
+                                    direction: 'outgoing',
+                                    message_type: 'admin_broadcast',
+                                    content: msg
+                                });
+                            } catch (_) {}
+                        } else {
+                            failCount++;
+                            results.push({ to: clean, status: 'failed' });
+                        }
+                    }
+                }
+
+                return new Response(JSON.stringify({
+                    status: "completed",
+                    total: recipients.length,
+                    success_count: successCount,
+                    fail_count: failCount,
+                    results
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
 
             // Ignore delivery status updates or read receipts
             const entry = body?.entry?.[0];
@@ -645,6 +702,7 @@ Deno.serve(async (req: Request) => {
                 { key: 'cards',         icon: '💳', titleEn: 'Virtual Dollar & Naira Cards',                titleHa: 'Katin Virtual Card (Dollar & Naira)' },
                 { key: 'crypto',        icon: '🪙', titleEn: 'Crypto Exchange (USDT, BTC, Web3)',           titleHa: 'Harkokin Crypto (USDT, BTC)' },
                 { key: 'history',       icon: '📜', titleEn: 'Recent Transactions (History)',               titleHa: 'Tarihin Kwanan Nan (History)' },
+                { key: 'community',     icon: '👥', titleEn: 'Join WhatsApp Group & Channel',              titleHa: 'Shiga Group & Channel na WhatsApp' },
                 { key: 'support',       icon: '📞', titleEn: 'Customer Support / Call Admin',               titleHa: 'Tuntubi Admin / Kira da Magana' },
                 { key: 'language',      icon: '🌐', titleEn: 'Change Language (English / Hausa)',           titleHa: 'Sauya Yare (English / Hausa)' },
             ];
@@ -904,6 +962,15 @@ Deno.serve(async (req: Request) => {
                         });
                         txMsg += userLang === 'ha' ? `\n\n(Tura '0' don babban menu)` : `\n\n(Type '0' for main menu)`;
                         return reply(txMsg, 'IDLE', { lang: userLang });
+                    }
+
+                    if (chosen.key === 'community') {
+                        const groupLink = (settingsMap['whatsapp_group_link'] || 'https://chat.whatsapp.com/G5yAbuMafhalSub').trim();
+                        const channelLink = (settingsMap['whatsapp_channel_link'] || 'https://whatsapp.com/channel/0029VAbuMafhal').trim();
+                        const commMsg = userLang === 'ha'
+                            ? `👥 *Ƙungiyar WhatsApp ta Abu Mafhal Sub* 🎉\n\nKasance tare da dubban membobinmu a shafinmu na WhatsApp don samun sabbin labarai, garabasar data, da tallafi na musamman:\n\n💬 *Official WhatsApp Group:*\n${groupLink}\n\n📢 *Official WhatsApp Channel:*\n${channelLink}\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}\n\n(Tura '0' don komawa babban menu)`
+                            : `👥 *Abu Mafhal Sub Official WhatsApp Community* 🎉\n\nJoin our community group and channel for flash promos, instant data discounts, and 24/7 dedicated support:\n\n💬 *Official WhatsApp Group:*\n${groupLink}\n\n📢 *Official WhatsApp Channel:*\n${channelLink}\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}\n\n(Type '0' for main menu)`;
+                        return reply(commMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'support') {
