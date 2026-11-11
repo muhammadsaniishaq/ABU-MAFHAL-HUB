@@ -144,7 +144,7 @@ export const verificationHistory = {
   /**
    * Get all verification history for the logged-in user from Database + Local Cache
    */
-  getAll: async (category?: 'nin' | 'bvn' | 'ipe' | 'validation' | 'personalization') => {
+  getAll: async (category?: 'nin' | 'bvn' | 'ipe' | 'validation' | 'personalization' | 'tin' | 'all') => {
     try {
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id || 'guest_user';
@@ -303,7 +303,7 @@ export const verificationHistory = {
    * Get all tasks & historical verifications across ALL users for Executive Admin Panel
    * Combines Supabase verification_history, Supabase transactions, and all local AsyncStorage caches
    */
-  getAllForAdmin: async (category: 'nin' | 'bvn' | 'all') => {
+  getAllForAdmin: async (category: 'nin' | 'bvn' | 'tin' | 'all') => {
     const combinedTasks: any[] = [];
     const seenKeys = new Set<string>();
 

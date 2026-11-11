@@ -195,10 +195,10 @@ export default function SupportScreen() {
             colors={['#064e3b', '#065f46', '#047857']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={s.aiCardGrad}
+            style={s.aiCard}
           >
             <View style={s.aiCardLeft}>
-              <View style={[s.aiBadge, { backgroundColor: 'rgba(37, 211, 102, 0.2)', borderColor: '#25D366' }]}>
+              <View style={[s.aiBadgeRow, { backgroundColor: 'rgba(37, 211, 102, 0.2)', borderColor: '#25D366' }]}>
                 <Ionicons name="logo-whatsapp" size={11} color="#25D366" />
                 <Text style={[s.aiBadgeText, { color: '#4ade80' }]}>WHATSAPP BOT • 24/7</Text>
               </View>

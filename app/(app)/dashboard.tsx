@@ -477,6 +477,7 @@ export default function Dashboard() {
     '/bvn-services': 'feature_bvn',
     '/nin-services': 'feature_nin',
     '/cac-services': 'feature_cac',
+    '/tin-services': 'feature_tin',
     '/smile': 'feature_smile',
     '/social-boost': 'feature_social',
     '/bulk-sms': 'feature_bulk_sms'
@@ -496,6 +497,7 @@ export default function Dashboard() {
     'nin': 'feature_nin',
     'bvn': 'feature_bvn',
     'cac': 'feature_cac',
+    'tin': 'feature_tin',
     'cards': 'feature_cards',
     'esim': 'feature_esim',
     'crypto': 'feature_crypto',
@@ -555,6 +557,7 @@ export default function Dashboard() {
     { id: 'smile',        icon: 'globe-outline',          label: 'Smile',           color: '#ec4899', route: '/smile',          badge: null },
     { id: 'education',    icon: 'school-outline',         label: 'Education',       color: '#06b6d4', route: '/education',      badge: null },
     { id: 'cac',          icon: 'briefcase-outline',      label: 'CAC Reg',         color: '#8b5cf6', route: '/cac-services',   badge: 'POPULAR' },
+    { id: 'tin',          icon: 'document-text-outline',  label: 'TIN / Tax ID',    color: '#059669', route: '/tin-services',   badge: 'NEW' },
     { id: 'social',       icon: 'rocket-outline',         label: 'Social',          color: '#ec4899', route: '/social-boost',   badge: 'BOOST' },
     { id: 'reviews',      icon: 'star-outline',           label: 'Reviews',         color: '#f5a623', route: '/reviews',        badge: null },
     { id: 'cards',        icon: 'card-outline',           label: 'Cards',           color: '#8B5CF6', route: '/virtual-cards',  badge: null },

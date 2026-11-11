@@ -32,6 +32,7 @@ const C = {
     slate300: '#CBD5E1',
     slate400: '#94A3B8',
     slate500: '#64748B',
+    slate600: '#475569',
     slate700: '#334155',
     slate800: '#1E293B',
     rose: '#EF4444',
@@ -1473,7 +1474,7 @@ export default function WhatsAppBotAdmin() {
                                     onPress={() => handleSendMedia('image')}
                                     disabled={sendingReply}
                                     style={s.attachBtn}
-                                    title="Send Photo"
+                                    accessibilityLabel="Send Photo"
                                 >
                                     <Ionicons name="camera" size={20} color={C.waDarkGreen} />
                                 </TouchableOpacity>
@@ -1482,7 +1483,7 @@ export default function WhatsAppBotAdmin() {
                                     onPress={() => handleSendMedia('document')}
                                     disabled={sendingReply}
                                     style={s.attachBtn}
-                                    title="Send Document / PDF"
+                                    accessibilityLabel="Send Document / PDF"
                                 >
                                     <Ionicons name="document-attach" size={20} color="#DC2626" />
                                 </TouchableOpacity>

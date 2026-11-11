@@ -54,6 +54,7 @@ const ALL_MODULES = [
   { t: 'NIN Tasks', i: 'id-card-outline', r: '/manage/nin-tasks', c: '#0d1b3e', tag: 'Identity' },
   { t: 'BVN Tasks', i: 'finger-print', r: '/manage/bvn-tasks', c: '#f5a623', tag: 'Identity' },
   { t: 'CAC Management', i: 'briefcase', r: '/manage/cac', c: '#0d1b3e', tag: 'CAC' },
+  { t: 'TIN / Tax ID', i: 'document-text', r: '/manage/tin', c: '#059669', tag: 'Tax' },
   { t: 'NIN Pricing', i: 'pricetag', r: '/manage/nin-pricing', c: '#0d1b3e', tag: 'Pricing' },
   { t: 'BVN Pricing', i: 'pricetags', r: '/manage/bvn-pricing', c: '#f5a623', tag: 'Pricing' },
   { t: 'CAC Pricing', i: 'pricetag', r: '/manage/cac-pricing', c: '#f5a623', tag: 'Pricing' },

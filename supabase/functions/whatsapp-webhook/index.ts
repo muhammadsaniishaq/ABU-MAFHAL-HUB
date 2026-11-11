@@ -801,6 +801,7 @@ Deno.serve(async (req: Request) => {
                 { key: 'nin',           icon: '🪪', titleEn: 'NIN Verification & Slip Printing',            titleHa: 'Binciken NIN & Buga Slip' },
                 { key: 'bvn',           icon: '🔍', titleEn: 'BVN Verification Services',                   titleHa: 'Binciken BVN' },
                 { key: 'cac',           icon: '🏢', titleEn: 'CAC Business Registration',                   titleHa: 'Rijistar Kamfani (CAC)' },
+                { key: 'tin',           icon: '📜', titleEn: 'TIN & Tax ID Certificate (JTB / JRB)',        titleHa: 'Lambar TIN & Certificate (JTB)' },
                 { key: 'sim',           icon: '💳', titleEn: 'Buy SIM Cards (Kirani 4G SIM)',               titleHa: 'Siyan SIM Card' },
                 { key: 'cards',         icon: '💳', titleEn: 'Virtual Dollar & Naira Cards',                titleHa: 'Katin Virtual Card (Dollar & Naira)' },
                 { key: 'crypto',        icon: '🪙', titleEn: 'Crypto Exchange (USDT, BTC, Web3)',           titleHa: 'Harkokin Crypto (USDT, BTC)' },
@@ -1019,6 +1020,13 @@ Deno.serve(async (req: Request) => {
                             ? `🏢 *Rijistar Kamfani da Kasuwanci (CAC Registration)*\n\nZaɓi nau'in rijistar da kake son yi a hukumar CAC:\n1️⃣ Business Name (Sunan Kasuwanci/Ventures) - *₦${cacPrices.business_name.toLocaleString()}*\n2️⃣ Limited Liability Company (LLC) - *₦${cacPrices.ltd.toLocaleString()}*\n3️⃣ NGO / Club / Mosque / Association - *₦${cacPrices.incorporated_trustee.toLocaleString()}*\n\n(Tura lamba 1, 2, ko 3, ko '0' don sokewa):`
                             : `🏢 *CAC Business & Company Registration*\n\nSelect the category to register with CAC:\n1️⃣ Business Name (Enterprise/Ventures) - *₦${cacPrices.business_name.toLocaleString()}*\n2️⃣ Limited Liability Company (LLC) - *₦${cacPrices.ltd.toLocaleString()}*\n3️⃣ Incorporated Trustee (NGO/Church/Association) - *₦${cacPrices.incorporated_trustee.toLocaleString()}*\n\n(Reply 1, 2, or 3, or '0' to cancel):`;
                         return reply(cacPrompt, 'CAC_SELECT_TYPE', { lang: userLang, cac_prices: cacPrices });
+                    }
+
+                    if (chosen.key === 'tin') {
+                        const tinMsg = userLang === 'ha'
+                            ? `📜 *Lambar Haraji ta TIN & Certificate (JTB / Joint Tax Board)* 🇳🇬\n\nZa ku iya samun ko gyara lambar haraji ta TIN, ko saukar da official Tax ID Certificate kai tsaye a cikin manhajarmu:\n\n• *Bincike & Saukar da Tax ID Certificate (Individual / Non-Individual)*\n• *Rijistar Sabuwar Lambar Haraji ta TIN*\n\n📱 *Buɗe Manhaja don Samun TIN:* ${playStoreLink}\n🌐 *Shiga Shafin Gizo:* ${webBaseUrl}/tin-services\n\n💬 Ko kuma ku tuntuɓi wakilinmu kai tsaye a WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20neman%20TIN%20ko%20Tax%20Certificate\n\n(Tura '0' don babban menu)`
+                            : `📜 *TIN & Tax ID Certificate Portal (JTB / Joint Revenue Board)* 🇳🇬\n\nRetrieve your official Joint Tax Board Tax ID Certificate or register a brand-new TIN directly on our platform:\n\n• *Certificate Retrieval (Individual / Corporate / MDA / Cooperative)*\n• *New TIN Registration for Personal or Business*\n\n📱 *Open Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/tin-services\n\n💬 Direct Support / Enquiries on WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20need%20TIN%20or%20Tax%20Certificate%20assistance\n\n(Type '0' for main menu)`;
+                        return reply(tinMsg, 'IDLE', { lang: userLang });
                     }
 
                     if (chosen.key === 'sim') {
