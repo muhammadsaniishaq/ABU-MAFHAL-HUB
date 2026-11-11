@@ -268,6 +268,13 @@ export default function ManageTinScreen() {
           <Text style={styles.headerSubtitle}>JRB / JTB & FIRS Operations Control</Text>
         </View>
 
+        <TouchableOpacity 
+          style={[styles.refreshButton, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', marginRight: 6 }]} 
+          onPress={() => router.push('/manage/tin-pricing' as any)}
+        >
+          <Ionicons name="pricetag" size={16} color="#059669" />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.refreshButton} onPress={fetchTasks}>
           <Ionicons name="refresh" size={18} color={COLORS.navy} />
         </TouchableOpacity>

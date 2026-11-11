@@ -11,7 +11,8 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import { supabase } from '../services/supabase';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AIService } from '../services/ai';
 
 const { width: W } = Dimensions.get('window');
 
@@ -156,6 +157,7 @@ const QUICK_PROMPTS_BY_LANG: Record<Language, string[]> = {
 export default function CotexAIChat() {
   const router = useRouter(); 
   const navigation = useNavigation(); 
+  const insets = useSafeAreaInsets();
   const [userData, setUserData] = useState({ name: 'User', balance: '0.00' });
   const [language, setLanguage] = useState<Language>('hausa');
 
@@ -288,7 +290,7 @@ export default function CotexAIChat() {
     };
   };
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const msg = textToSend || inputText.trim();
     if (!msg) return;
 
@@ -306,27 +308,46 @@ export default function CotexAIChat() {
     setIsTyping(true);
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 50);
 
-    setTimeout(() => {
-      const resp = generateResponse(msg);
-      const botMsgId = (Date.now() + 1).toString();
+    try {
+      // 1. Fast local check for action prompts
+      const localResp = generateResponse(msg);
+      
+      // 2. Call dynamic Customer AI engine with full context
+      const aiResp = await AIService.askCustomerAI(msg, language, userData.name, userData.balance);
+      
+      const finalResp = {
+        text: aiResp.text || localResp.text,
+        action: aiResp.action || localResp.action
+      };
 
+      const botMsgId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, {
         id: botMsgId,
-        text: resp.text,
-        action: resp.action,
+        text: finalResp.text,
+        action: finalResp.action,
         sender: 'bot',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
-
+    } catch (err) {
+      const fallback = generateResponse(msg);
+      const botMsgId = (Date.now() + 1).toString();
+      setMessages(prev => [...prev, {
+        id: botMsgId,
+        text: fallback.text,
+        action: fallback.action,
+        sender: 'bot',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } finally {
       setIsTyping(false);
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 550);
+    }
   };
 
   const quickPrompts = QUICK_PROMPTS_BY_LANG[language];
 
   return (
-    <SafeAreaView style={s.safeArea} edges={['top']}>
+    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" />
 
       {/* COMPACT ROYAL HEADER */}
@@ -506,7 +527,7 @@ export default function CotexAIChat() {
         </View>
 
         {/* COMPACT WHITE INPUT BAR */}
-        <View style={s.inputContainer}>
+        <View style={[s.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) + (Platform.OS === 'ios' ? 4 : 8) }]}>
           <View style={s.inputWrapper}>
             <TextInput 
               style={s.textInput}

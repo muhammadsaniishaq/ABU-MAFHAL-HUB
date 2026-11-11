@@ -225,23 +225,33 @@ export const AIService = {
   askCortex: async (prompt: string, mode: string = 'general'): Promise<string> => {
     try {
       let openAiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY || "";
+      let geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
 
-      if (!openAiKey) {
+      if (!openAiKey || !geminiKey) {
         const { data: secretData } = await supabase
           .from('system_secrets')
-          .select('value')
-          .eq('key', 'OPENAI_API_KEY')
-          .maybeSingle();
-        if (secretData?.value) openAiKey = secretData.value;
+          .select('key, value')
+          .in('key', ['OPENAI_API_KEY', 'GEMINI_API_KEY']);
+        if (secretData) {
+          secretData.forEach((s: any) => {
+            if (s.key === 'OPENAI_API_KEY' && s.value) openAiKey = s.value;
+            if (s.key === 'GEMINI_API_KEY' && s.value) geminiKey = s.value;
+          });
+        }
       }
 
-      if (!openAiKey) {
+      if (!openAiKey || !geminiKey) {
         const { data: settingData } = await supabase
           .from('app_settings')
-          .select('value')
-          .eq('key', 'openai_api_key')
-          .maybeSingle();
-        if (settingData?.value) openAiKey = settingData.value;
+          .select('key, value')
+          .in('key', ['openai_api_key', 'gemini_api_key', 'cortex_ai_api_key']);
+        if (settingData) {
+          settingData.forEach((s: any) => {
+            if (s.key === 'openai_api_key' && s.value) openAiKey = s.value;
+            if (s.key === 'gemini_api_key' && s.value) geminiKey = s.value;
+            if (s.key === 'cortex_ai_api_key' && s.value && !openAiKey) openAiKey = s.value;
+          });
+        }
       }
 
       let systemPrompt = [
@@ -262,31 +272,55 @@ export const AIService = {
         systemPrompt += " Specialize in professional English copywriting for broadcasts, SMS campaigns, and customer email notices.";
       }
 
-      if (openAiKey && openAiKey.startsWith('sk-')) {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openAiKey}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.6,
-            max_tokens: 800
-          })
-        });
+      // Try OpenAI first if genuine key
+      if (openAiKey && openAiKey.startsWith('sk-') && !openAiKey.includes('123456')) {
+        try {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openAiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: prompt }
+              ],
+              temperature: 0.6,
+              max_tokens: 800
+            })
+          });
 
-        if (response.ok) {
-          const result = await response.json();
-          const answer = result.choices?.[0]?.message?.content;
-          if (answer) {
-            return cleanTextFormatting(answer);
+          if (response.ok) {
+            const result = await response.json();
+            const answer = result.choices?.[0]?.message?.content;
+            if (answer) {
+              return cleanTextFormatting(answer);
+            }
           }
-        }
+        } catch (_) {}
+      }
+
+      // Try Google Gemini if key available
+      if (geminiKey && geminiKey.length > 10) {
+        try {
+          const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+          const gResp = await fetch(gUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                { role: 'user', parts: [{ text: `${systemPrompt}\n\nAdministrative Instruction: ${prompt}` }] }
+              ]
+            })
+          });
+          if (gResp.ok) {
+            const gData = await gResp.json();
+            const gText = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (gText) return cleanTextFormatting(gText);
+          }
+        } catch (_) {}
       }
 
       // Offline Cortex Intelligence Engine (100% Reliable, Zero Errors, Fresh English)
@@ -298,6 +332,184 @@ export const AIService = {
       const fallbackResult = generateIntelligentCortexAnalysis(prompt, mode);
       return cleanTextFormatting(fallbackResult);
     }
+  },
+
+  /**
+   * Dedicated Customer AI for user-facing support chat (Hausa, English, Pidgin)
+   */
+  askCustomerAI: async (
+    prompt: string,
+    userLang: 'hausa' | 'english' | 'pidgin' = 'hausa',
+    userName: string = 'User',
+    userBal: string = '0.00'
+  ): Promise<{ text: string; action?: { label: string; route: string; icon?: string } }> => {
+    const p = prompt.toLowerCase().trim();
+
+    // 1. Try Live LLM (OpenAI or Gemini) if Admin configured key
+    try {
+      let openAiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY || "";
+      let geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+
+      const { data: settingData } = await supabase
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['openai_api_key', 'gemini_api_key']);
+      if (settingData) {
+        settingData.forEach((s: any) => {
+          if (s.key === 'openai_api_key' && s.value) openAiKey = s.value;
+          if (s.key === 'gemini_api_key' && s.value) geminiKey = s.value;
+        });
+      }
+
+      const sysInstruction = `You are Cotex AI, the smart customer support assistant for Abu Mafhal Sub in Nigeria.
+The customer's name is "${userName}" and their wallet balance is "${userBal}".
+Respond in ${userLang === 'hausa' ? 'fluent, polite Hausa' : userLang === 'pidgin' ? 'Nigerian Pidgin' : 'fluent English'}.
+Keep answers concise, direct, friendly, and helpful. Mention that services like Cheap Data (MTN, Airtel, Glo, Alpha, 9mobile), Airtime (MTN, Airtel, Glo, 9mobile, Vitel), Recharge PINs, Bills (PHCN/NEPA, DSTV, GOTV), TIN / Tax ID (JTB Certificate & Registration), CAC Registration, and NIN/BVN are instantly accessible in the app.`;
+
+      if (openAiKey && openAiKey.startsWith('sk-') && !openAiKey.includes('123456')) {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openAiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'system', content: sysInstruction }, { role: 'user', content: prompt }],
+            temperature: 0.6,
+            max_tokens: 350
+          })
+        });
+        if (resp.ok) {
+          const res = await resp.json();
+          const text = res.choices?.[0]?.message?.content;
+          if (text) return { text: cleanTextFormatting(text) };
+        }
+      }
+
+      if (geminiKey && geminiKey.length > 10) {
+        const gResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: `${sysInstruction}\n\nCustomer says: ${prompt}` }] }]
+          })
+        });
+        if (gResp.ok) {
+          const gData = await gResp.json();
+          const gText = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (gText) return { text: cleanTextFormatting(gText) };
+        }
+      }
+    } catch (_) {}
+
+    // 2. High-precision Built-in Knowledge Base for Abu Mafhal Sub
+    // TIN & Tax ID
+    if (p.includes('tin') || p.includes('tax') || p.includes('haraji') || p.includes('jtb') || p.includes('jrb') || p.includes('certificate')) {
+      if (userLang === 'hausa') {
+        return {
+          text: `Barka da zuwa ${userName}! 📜\nMuna bayar da sabis na **TIN (Tax ID Number)** da **Tax ID Certificate** na hukumar JTB / JRB kai tsaye a cikin manhaja:\n\n• **Bincike & Saukar da Tax ID Certificate (Individual / Corporate)**\n• **Rijistar Sabuwar Lambar Haraji ta TIN**\n\nDanna ƙasa domin shiga sabis ɗin TIN:`,
+          action: { label: "Buɗe TIN & Tax ID Portal", route: "/tin-services", icon: "document-text-outline" }
+        };
+      }
+      return {
+        text: `Hello ${userName}! 📜\nYou can retrieve your official Joint Tax Board (JTB) Tax ID Certificate or register for a brand-new TIN directly inside Abu Mafhal Sub:\n\n• **Certificate Retrieval (Individual & Corporate)**\n• **New TIN Registration**\n\nClick below to access TIN services:`,
+        action: { label: "Open TIN / Tax ID Portal", route: "/tin-services", icon: "document-text-outline" }
+      };
+    }
+
+    // Data Plans
+    if (p.includes('data') || p.includes('bundle') || p.includes('internet') || p.includes('megabyte') || p.includes('gigabyte') || p.includes('alpha') || p.includes('sme')) {
+      if (userLang === 'hausa') {
+        return {
+          text: `Muna da mafi sauƙin Data a Najeriya ga layukan MTN, Airtel, Glo, 9mobile, da kuma sabon Alpha 4G! 🌐\n\nKudin Wallet ɗinka na yanzu: **${userBal}**.\n\nDanna maɓallin da ke ƙasa don siyan Data nan take.`,
+          action: { label: "Siyan Data Yanzu", route: "/data", icon: "wifi-outline" }
+        };
+      }
+      return {
+        text: `We provide the cheapest, fastest automated data bundles for MTN, Airtel, Glo, 9mobile, and Alpha 4G! 🌐\n\nYour Current Balance: **${userBal}**.\n\nClick below to purchase instant data:`,
+        action: { label: "Buy Data Bundle", route: "/data", icon: "wifi-outline" }
+      };
+    }
+
+    // Airtime & Vitel
+    if (p.includes('airtime') || p.includes('kati') || p.includes('recharge') || p.includes('vtu') || p.includes('vitel') || p.includes('vital')) {
+      if (userLang === 'hausa') {
+        return {
+          text: `Kuna buƙatar Airtime VTU? Muna bayar da katin kira na MTN, Airtel, Glo, 9mobile, da Vitel VTU tare da ragi mai gamsarwa nan take! 📱`,
+          action: { label: "Siyan Kati Yanzu", route: "/airtime", icon: "phone-portrait-outline" }
+        };
+      }
+      return {
+        text: `Need instant Airtime top-up? We support MTN, Airtel, Glo, 9mobile, and Vitel VTU with instant automated delivery! 📱`,
+        action: { label: "Recharge Airtime", route: "/airtime", icon: "phone-portrait-outline" }
+      };
+    }
+
+    // Wallet & Funding
+    if (p.includes('fund') || p.includes('deposit') || p.includes('wallet') || p.includes('kudi') || p.includes('asusu') || p.includes('bank') || p.includes('payvessel') || p.includes('monnify')) {
+      if (userLang === 'hausa') {
+        return {
+          text: `Domin Sanya Kuɗi a Wallet:\n\n1️⃣ Shiga shafin **Wallet**.\n2️⃣ Kwafi lambar asusunka na musamman na bankin 9PSB ko PalmPay (Payvessel / Monnify).\n3️⃣ Tura kuɗin daga kowane bank app; wallet ɗinka za ta ƙaru nan take!\n\nKudin da kake da shi: **${userBal}**.`,
+          action: { label: "Bude Wallet / Saka Kuɗi", route: "/(app)/wallet", icon: "wallet-outline" }
+        };
+      }
+      return {
+        text: `To Fund Your Wallet:\n\n1️⃣ Navigate to the **Wallet** tab.\n2️⃣ Copy your dedicated Virtual Bank Account (9PSB, PalmPay, Monnify, or Payvessel).\n3️⃣ Transfer funds from any Nigerian bank app — your wallet will credit in seconds!\n\nYour Balance: **${userBal}**.`,
+        action: { label: "Go to Wallet", route: "/(app)/wallet", icon: "wallet-outline" }
+      };
+    }
+
+    // CAC Business Registration
+    if (p.includes('cac') || p.includes('kamfani') || p.includes('business name') || p.includes('ltd') || p.includes('company')) {
+      if (userLang === 'hausa') {
+        return {
+          text: `Muna taimaka muku yin rajistar kamfani da sunan kasuwanci a hukumar CAC (Business Name, LLC, Incorporated Trustee / NGO) cikin sauri tare da fitar da official Certificate da Status Report! 🏢`,
+          action: { label: "Rijistar CAC Yanzu", route: "/cac-services", icon: "briefcase-outline" }
+        };
+      }
+      return {
+        text: `Register your Business Name, Company (LLC), or NGO/Association with the Corporate Affairs Commission (CAC) seamlessly with certified legal processing! 🏢`,
+        action: { label: "Start CAC Registration", route: "/cac-services", icon: "briefcase-outline" }
+      };
+    }
+
+    // NIN & BVN
+    if (p.includes('nin') || p.includes('bvn') || p.includes('slip') || p.includes('id card') || p.includes('bincike')) {
+      if (userLang === 'hausa') {
+        return {
+          text: `Kuna iya binciken NIN, buga Premium Colour Slip, NIMC Regular Slip, ko binciken bayanan BVN kai tsaye a cikin manhajarmu! 🪪`,
+          action: { label: "Sabis ɗin NIN", route: "/nin-services", icon: "person-add-outline" }
+        };
+      }
+      return {
+        text: `Verify your National Identification Number (NIN), print official premium color ID slips, or conduct BVN lookups instantly! 🪪`,
+        action: { label: "NIN Verification", route: "/nin-services", icon: "person-add-outline" }
+      };
+    }
+
+    // Bills: Electricity & Cable
+    if (p.includes('nepa') || p.includes('wuta') || p.includes('phcn') || p.includes('electricity') || p.includes('cable') || p.includes('dstv') || p.includes('gotv') || p.includes('startimes')) {
+      if (userLang === 'hausa') {
+        return {
+          text: `Biya kuɗin wutar lantarki (NEPA / PHCN Token) da na tauraron ɗan adam (DSTV, GOTV, Startimes) tare da samun Token ɗinka take a screen! ⚡`,
+          action: { label: "Biya Bills & Utilities", route: "/bills", icon: "flash-outline" }
+        };
+      }
+      return {
+        text: `Pay your prepaid/postpaid electricity bills (PHCN tokens generated instantly) and renew DSTV, GOTV, and Startimes subscriptions! ⚡`,
+        action: { label: "Pay Utility Bills", route: "/bills", icon: "flash-outline" }
+      };
+    }
+
+    // Default Fallback with live support ticket
+    if (userLang === 'hausa') {
+      return {
+        text: `Sannu ${userName}! Na fahimci tambayarka game da "${prompt}".\n\nIdan kana buƙatar ƙarin bayani ko kuma kana da matsala da wani ciniki, danna maɓallin da ke ƙasa domin buɗe Support Ticket ga wakilanmu na Live Support nan take!`,
+        action: { label: "Bude Support Ticket", route: "/(app)/tickets", icon: "headset-outline" }
+      };
+    }
+    return {
+      text: `Hello ${userName}! I understand your question regarding "${prompt}".\n\nFor personalized resolution or if you have an enquiry regarding an active transaction, please click below to connect directly with our 24/7 Human Support Desk!`,
+      action: { label: "Open Support Ticket", route: "/(app)/tickets", icon: "headset-outline" }
+    };
   },
 
   /**

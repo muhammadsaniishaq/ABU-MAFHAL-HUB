@@ -58,6 +58,7 @@ const ALL_MODULES = [
   { t: 'NIN Pricing', i: 'pricetag', r: '/manage/nin-pricing', c: '#0d1b3e', tag: 'Pricing' },
   { t: 'BVN Pricing', i: 'pricetags', r: '/manage/bvn-pricing', c: '#f5a623', tag: 'Pricing' },
   { t: 'CAC Pricing', i: 'pricetag', r: '/manage/cac-pricing', c: '#f5a623', tag: 'Pricing' },
+  { t: 'TIN Pricing', i: 'pricetag', r: '/manage/tin-pricing', c: '#059669', tag: 'Pricing' },
 
   // Telecom & Utility
   { t: 'Data Plans', i: 'wifi', r: '/manage/data-plans', c: '#2563eb', tag: 'Telecom' },

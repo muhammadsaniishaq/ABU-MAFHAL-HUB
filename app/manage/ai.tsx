@@ -9,13 +9,16 @@ import {
     Platform, 
     Alert, 
     Share, 
-    StyleSheet 
+    StyleSheet,
+    Modal 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
 import { AIService, cleanTextFormatting } from '../../services/ai';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../../services/supabase';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import * as Haptics from 'expo-haptics';
@@ -104,10 +107,55 @@ const QUICK_PROMPTS: Record<AIMode, string[]> = {
 
 export default function AIInsights() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [query, setQuery] = useState('');
     const [selectedMode, setSelectedMode] = useState<AIMode>('general');
     const [loading, setLoading] = useState(false);
     const [speakingId, setSpeakingId] = useState<string | null>(null);
+
+    // AI API Key Management
+    const [showKeyModal, setShowKeyModal] = useState(false);
+    const [apiKey, setApiKey] = useState('');
+    const [keyType, setKeyType] = useState<'openai' | 'gemini'>('openai');
+    const [savingKey, setSavingKey] = useState(false);
+
+    useEffect(() => {
+        loadSavedKey();
+    }, [keyType]);
+
+    const loadSavedKey = async () => {
+        try {
+            const keyName = keyType === 'openai' ? 'openai_api_key' : 'gemini_api_key';
+            const { data } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', keyName)
+                .maybeSingle();
+            if (data?.value) setApiKey(data.value);
+            else setApiKey('');
+        } catch (_) {}
+    };
+
+    const handleSaveKey = async () => {
+        if (!apiKey.trim()) {
+            return Alert.alert('Required', 'Please enter a valid API key.');
+        }
+        setSavingKey(true);
+        try {
+            const keyName = keyType === 'openai' ? 'openai_api_key' : 'gemini_api_key';
+            await supabase.from('app_settings').upsert({
+                key: keyName,
+                value: apiKey.trim(),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+            Alert.alert('API Key Saved! 🎉', `${keyType.toUpperCase()} API key has been stored. Both Cortex AI and user support AI will now process with this live engine.`);
+            setShowKeyModal(false);
+        } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Failed to save API key.');
+        } finally {
+            setSavingKey(false);
+        }
+    };
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'init-1',
@@ -408,6 +456,16 @@ export default function AIInsights() {
 
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <TouchableOpacity 
+                            onPress={() => {
+                                triggerHaptic();
+                                setShowKeyModal(true);
+                            }} 
+                            style={[s.headerActionBtn, { borderColor: T.gold }]}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="key-outline" size={16} color={T.gold} />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
                             onPress={handleShareConversation} 
                             style={s.headerActionBtn}
                             activeOpacity={0.7}
@@ -626,7 +684,7 @@ export default function AIInsights() {
             )}
 
             {/* INPUT DOCK */}
-            <View style={s.inputDock}>
+            <View style={[s.inputDock, { paddingBottom: Math.max(insets.bottom, 12) + (Platform.OS === 'ios' ? 4 : 8) }]}>
                 <View style={s.inputWrapper}>
                     <TextInput
                         style={s.textInput}
@@ -661,6 +719,100 @@ export default function AIInsights() {
                     </TouchableOpacity>
                 </View>
             </View>
+
+            {/* AI ENGINE API KEY SETTINGS MODAL */}
+            <Modal
+                visible={showKeyModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowKeyModal(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: T.bgCard, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: T.borderLight }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="key" size={20} color={T.gold} />
+                                <Text style={{ color: T.textMain, fontSize: 16, fontWeight: '800' }}>AI Engine API Key</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowKeyModal(false)}>
+                                <Ionicons name="close" size={22} color={T.textSub} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ color: T.textSub, fontSize: 12, lineHeight: 18, marginBottom: 14 }}>
+                            Configure your OpenAI or Google Gemini API Key. When saved, all AI operations (Cortex Admin & Customer Support AI) will execute live against this model.
+                        </Text>
+
+                        {/* Model Selector */}
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                            <TouchableOpacity
+                                onPress={() => setKeyType('openai')}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 10,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: keyType === 'openai' ? T.gold : T.border,
+                                    backgroundColor: keyType === 'openai' ? T.goldBg : T.bgInput,
+                                    alignItems: 'center'
+                                }}
+                            >
+                                <Text style={{ color: keyType === 'openai' ? T.gold : T.textSub, fontWeight: '700', fontSize: 12 }}>OpenAI (ChatGPT)</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setKeyType('gemini')}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 10,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: keyType === 'gemini' ? T.gold : T.border,
+                                    backgroundColor: keyType === 'gemini' ? T.goldBg : T.bgInput,
+                                    alignItems: 'center'
+                                }}
+                            >
+                                <Text style={{ color: keyType === 'gemini' ? T.gold : T.textSub, fontWeight: '700', fontSize: 12 }}>Google Gemini</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Key Input */}
+                        <View style={{ backgroundColor: T.bgInput, borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16 }}>
+                            <TextInput
+                                style={{ color: T.textMain, fontSize: 13 }}
+                                placeholder={keyType === 'openai' ? "sk-proj-..." : "AIzaSy..."}
+                                placeholderTextColor={T.textMuted}
+                                value={apiKey}
+                                onChangeText={setApiKey}
+                                autoCapitalize="none"
+                                secureTextEntry
+                            />
+                        </View>
+
+                        {/* Actions */}
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity
+                                onPress={() => setShowKeyModal(false)}
+                                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: T.bgInput, alignItems: 'center' }}
+                            >
+                                <Text style={{ color: T.textSub, fontWeight: '700' }}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleSaveKey}
+                                disabled={savingKey}
+                                style={{ flex: 2, paddingVertical: 12, borderRadius: 10, backgroundColor: T.gold, alignItems: 'center' }}
+                            >
+                                {savingKey ? (
+                                    <ActivityIndicator size="small" color="#000000" />
+                                ) : (
+                                    <Text style={{ color: '#000000', fontWeight: '800' }}>Save API Key</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </KeyboardAvoidingView>
     );
 }

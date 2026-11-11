@@ -181,19 +181,61 @@ export default function TinServicesScreen() {
 
   const fetchPricing = async () => {
     try {
-      const { data } = await supabase
-        .from('service_pricing')
-        .select('id, cost_price, markup_price')
-        .in('id', ['tin_certificate', 'tin_registration']);
+      // 1. Check app_settings first (where Admin sets pricing)
+      const { data: settingsData } = await supabase
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['tin_pricing_controls', 'price_tin_certificate', 'price_tin_registration']);
 
-      if (data && Array.isArray(data)) {
-        data.forEach(p => {
-          const total = Number(p.cost_price || 0) + Number(p.markup_price || 0);
-          if (total > 0) {
-            if (p.id === 'tin_certificate') setRetrievalPrice(total);
-            if (p.id === 'tin_registration') setRegistrationPrice(total);
+      let foundInSettings = false;
+      if (settingsData && settingsData.length > 0) {
+        settingsData.forEach(item => {
+          if (item.key === 'tin_pricing_controls' && item.value) {
+            try {
+              const parsed = typeof item.value === 'string' ? JSON.parse(item.value) : item.value;
+              if (parsed?.tin_certificate?.selling_price) {
+                setRetrievalPrice(Number(parsed.tin_certificate.selling_price));
+                foundInSettings = true;
+              }
+              if (parsed?.tin_registration?.selling_price) {
+                setRegistrationPrice(Number(parsed.tin_registration.selling_price));
+                foundInSettings = true;
+              }
+            } catch (_) {}
+          }
+          if (item.key === 'price_tin_certificate' && item.value) {
+            const p = parseFloat(item.value);
+            if (!isNaN(p) && p > 0) {
+              setRetrievalPrice(p);
+              foundInSettings = true;
+            }
+          }
+          if (item.key === 'price_tin_registration' && item.value) {
+            const p = parseFloat(item.value);
+            if (!isNaN(p) && p > 0) {
+              setRegistrationPrice(p);
+              foundInSettings = true;
+            }
           }
         });
+      }
+
+      // 2. Fallback to service_pricing table
+      if (!foundInSettings) {
+        const { data } = await supabase
+          .from('service_pricing')
+          .select('id, cost_price, markup_price')
+          .in('id', ['tin_certificate', 'tin_registration']);
+
+        if (data && Array.isArray(data)) {
+          data.forEach(p => {
+            const total = Number(p.cost_price || 0) + Number(p.markup_price || 0);
+            if (total > 0) {
+              if (p.id === 'tin_certificate') setRetrievalPrice(total);
+              if (p.id === 'tin_registration') setRegistrationPrice(total);
+            }
+          });
+        }
       }
     } catch (_) {}
   };
@@ -292,13 +334,36 @@ export default function TinServicesScreen() {
               const userId = authData?.user?.id;
               if (!userId) throw new Error('Not authenticated');
 
-              // Deduct wallet balance
-              const newBal = currentBal - retrievalPrice;
-              const { error: balErr } = await supabase
+              // 1. Strict Live Database Balance Verification (Prevents race conditions & bypass)
+              const { data: liveProfile, error: profileErr } = await supabase
+                .from('profiles')
+                .select('balance')
+                .eq('id', userId)
+                .single();
+
+              if (profileErr || !liveProfile) {
+                throw new Error('Ba a iya tabbatar da kudin wallet ba. Da fatan a sake gwadawa.');
+              }
+
+              const liveBal = Number(liveProfile.balance || 0);
+              if (liveBal < retrievalPrice) {
+                setWalletBalance(liveBal);
+                throw new Error(`Kudin da ke wallet dinka bai isa ba. Kana da ₦${liveBal.toLocaleString()} ne kacal, yayin da kuɗin aikin ₦${retrievalPrice.toLocaleString()} ne. Da fatan a saka kudi a wallet.`);
+              }
+
+              // 2. Strict Atomic Debit with gte barrier
+              const newBal = liveBal - retrievalPrice;
+              const { data: updateRes, error: balErr } = await supabase
                 .from('profiles')
                 .update({ balance: newBal })
-                .eq('id', userId);
-              if (balErr) throw balErr;
+                .eq('id', userId)
+                .gte('balance', retrievalPrice)
+                .select();
+
+              if (balErr || !updateRes || updateRes.length === 0) {
+                throw new Error('Cire kudi ya faskara: Kudin wallet dinka bai isa ba ko an samu tsaiko. Da fatan a duba asusunka.');
+              }
+
               setWalletBalance(newBal);
 
               // Create transaction record
@@ -419,8 +484,36 @@ export default function TinServicesScreen() {
               const userId = authData?.user?.id;
               if (!userId) throw new Error('Not authenticated');
 
-              const newBal = currentBal - registrationPrice;
-              await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+              // 1. Strict Live Database Balance Verification (Prevents race conditions & bypass)
+              const { data: liveProfile, error: profileErr } = await supabase
+                .from('profiles')
+                .select('balance')
+                .eq('id', userId)
+                .single();
+
+              if (profileErr || !liveProfile) {
+                throw new Error('Ba a iya tabbatar da kudin wallet ba. Da fatan a sake gwadawa.');
+              }
+
+              const liveBal = Number(liveProfile.balance || 0);
+              if (liveBal < registrationPrice) {
+                setWalletBalance(liveBal);
+                throw new Error(`Kudin da ke wallet dinka bai isa ba. Kana da ₦${liveBal.toLocaleString()} ne kacal, yayin da kuɗin aikin ₦${registrationPrice.toLocaleString()} ne. Da fatan a saka kudi a wallet.`);
+              }
+
+              // 2. Strict Atomic Debit with gte barrier
+              const newBal = liveBal - registrationPrice;
+              const { data: updateRes, error: balErr } = await supabase
+                .from('profiles')
+                .update({ balance: newBal })
+                .eq('id', userId)
+                .gte('balance', registrationPrice)
+                .select();
+
+              if (balErr || !updateRes || updateRes.length === 0) {
+                throw new Error('Cire kudi ya faskara: Kudin wallet dinka bai isa ba ko an samu tsaiko. Da fatan a duba asusunka.');
+              }
+
               setWalletBalance(newBal);
 
               const txnRef = `TIN_REG_${Date.now()}`;
