@@ -734,24 +734,24 @@ Deno.serve(async (req: Request) => {
                     }
 
                     if (chosen.key === 'nin') {
-                        const ninMsg = userLang === 'ha'
-                            ? `🪪 *Binciken NIN & Buga Slip*\n\nYin binciken NIN da buga Standard Slip ko Premium Plastic Slip a take:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/nin-services\n\n(Tura '0' don babban menu)`
-                            : `🪪 *NIN Verification & Premium Slip Printing*\n\nVerify National Identity Number (NIN) and generate verifiable color slips directly on Abu Mafhal Sub:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/nin-services\n\n(Type '0' for main menu)`;
-                        return reply(ninMsg, 'IDLE', { lang: userLang });
+                        const ninPrompt = userLang === 'ha'
+                            ? `🪪 *Binciken NIN & Buga Takardar Slip*\n\nZaɓi aikin da kake buƙata:\n1️⃣ Binciken Lambar NIN (NIN Verification) - *₦150*\n2️⃣ Buga Standard NIN Slip - *₦250*\n3️⃣ Buga Premium Plastic Slip - *₦500*\n\n(Tura lamba 1-3, ko '0' don sokewa):`
+                            : `🪪 *NIN Verification & Slip Services*\n\nSelect service:\n1️⃣ NIN Verification & Details Lookup - *₦150*\n2️⃣ Standard NIN Slip Generation - *₦250*\n3️⃣ Premium Plastic Slip - *₦500*\n\n(Reply 1-3, or '0' to cancel):`;
+                        return reply(ninPrompt, 'NIN_SELECT_TYPE', { lang: userLang });
                     }
 
                     if (chosen.key === 'bvn') {
-                        const bvnMsg = userLang === 'ha'
-                            ? `🔍 *Binciken BVN*\n\nTabbatar da lambar BVN da buga slip mai inganci:\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/bvn-services\n\n(Tura '0' don babban menu)`
-                            : `🔍 *BVN Verification Services*\n\nValidate Bank Verification Number (BVN) details securely on Abu Mafhal Sub:\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/bvn-services\n\n(Type '0' for main menu)`;
-                        return reply(bvnMsg, 'IDLE', { lang: userLang });
+                        const bvnPrompt = userLang === 'ha'
+                            ? `🔍 *Binciken Lambar BVN (BVN Verification)*\n\nZaɓi aikin da kake buƙata:\n1️⃣ Binciken BVN & Bayanai (BVN Verification) - *₦150*\n2️⃣ BVN Plastic Card Slip - *₦300*\n\n(Tura 1 ko 2, ko '0' don sokewa):`
+                            : `🔍 *BVN Verification & Card Services*\n\nSelect service:\n1️⃣ BVN Verification & Details - *₦150*\n2️⃣ BVN Premium Card Slip - *₦300*\n\n(Reply 1 or 2, or '0' to cancel):`;
+                        return reply(bvnPrompt, 'BVN_SELECT_TYPE', { lang: userLang });
                     }
 
                     if (chosen.key === 'cac') {
-                        const cacMsg = userLang === 'ha'
-                            ? `🏢 *Rijistar Kamfani (CAC)*\n\nYin rijistar Business Name, Company (LLC), ko NGO a hukumar CAC cikin gaggawa tare da samun takardar Certificate:\n\n💬 *Yi Magana da Masani a WhatsApp:*\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20yin%20rijistar%20CAC\n\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/cac-services\n\n(Tura '0' don babban menu)`
-                            : `🏢 *CAC Business & Company Registration*\n\nRegister Business Name, Company (LLC), or NGO with the Corporate Affairs Commission (CAC) with fast certificate delivery:\n\n💬 *Chat with CAC Specialist:*\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20want%20to%20register%20my%20business%20on%20CAC\n\n📱 *Mobile App (Play Store):* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/cac-services\n\n(Type '0' for main menu)`;
-                        return reply(cacMsg, 'IDLE', { lang: userLang });
+                        const cacPrompt = userLang === 'ha'
+                            ? `🏢 *Rijistar Kamfani da Kasuwanci (CAC Registration)*\n\nZaɓi nau'in rijistar da kake son yi a hukumar CAC:\n1️⃣ Business Name (Sunan Kasuwanci/Ventures) - *₦18,500*\n2️⃣ Limited Liability Company (LLC) - *₦45,000*\n3️⃣ NGO / Club / Mosque / Association - *₦65,000*\n\n(Tura lamba 1, 2, ko 3, ko '0' don sokewa):`
+                            : `🏢 *CAC Business & Company Registration*\n\nSelect the category to register with CAC:\n1️⃣ Business Name (Enterprise/Ventures) - *₦18,500*\n2️⃣ Limited Liability Company (LLC) - *₦45,000*\n3️⃣ Incorporated Trustee (NGO/Church/Association) - *₦65,000*\n\n(Reply 1, 2, or 3, or '0' to cancel):`;
+                        return reply(cacPrompt, 'CAC_SELECT_TYPE', { lang: userLang });
                     }
 
                     if (chosen.key === 'sim') {
@@ -864,21 +864,30 @@ Deno.serve(async (req: Request) => {
                 else if (netInput === '3' || netInput.includes('glo')) chosenNetwork = 'glo';
                 else if (netInput === '4' || netInput.includes('9mobile') || netInput.includes('etisalat') || netInput.includes('9mob')) chosenNetwork = '9mobile';
                 else if (netInput === '5' || netInput.includes('smile')) chosenNetwork = 'smile';
+                else if (netInput === '6' || netInput.includes('kirani') || netInput.includes('alpha')) chosenNetwork = 'kirani';
 
                 if (!chosenNetwork) {
                     const invNet = userLang === 'ha'
-                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Tura lamba 1-5 ko sunan network, ko '0' don sokewa):`
-                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n\n(Reply with 1-5 or network name, or '0' to cancel):`;
+                        ? `❌ Zaɓin da ka yi ba ya ciki.\n\nZaɓi Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI / ALPHA 4G\n\n(Tura lamba 1-6 ko sunan network, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect Network:\n1️⃣ MTN\n2️⃣ AIRTEL\n3️⃣ GLO\n4️⃣ 9MOBILE\n5️⃣ SMILE 4G\n6️⃣ KIRANI / ALPHA 4G\n\n(Reply with 1-6 or network name, or '0' to cancel):`;
                     return reply(invNet, 'DATA_SELECT_NETWORK', sessionData);
                 }
 
-                // Fallback built-in catalog for Smile if not in data_plans
+                // Fallback built-in catalog for Smile / Kirani if not configured in database
                 const smileFallback = [
-                    { id: 'smile_1.5gb', plan_id: 'smile_1gb', name: 'Smile 1.5GB Monthly', selling_price: 1200, validity: '30 Days' },
-                    { id: 'smile_2gb', plan_id: 'smile_2gb', name: 'Smile 2GB Monthly', selling_price: 1500, validity: '30 Days' },
-                    { id: 'smile_3gb', plan_id: 'smile_3gb', name: 'Smile 3GB Monthly', selling_price: 2000, validity: '30 Days' },
-                    { id: 'smile_5gb', plan_id: 'smile_5gb', name: 'Smile 5GB Monthly', selling_price: 3000, validity: '30 Days' },
-                    { id: 'smile_10gb', plan_id: 'smile_10gb', name: 'Smile 10GB Monthly', selling_price: 4500, validity: '30 Days' },
+                    { id: 'smile_1.5gb', plan_id: 'smile_1gb', name: 'Smile 1.5GB (30 Days)', selling_price: 1200, validity: '30 Days' },
+                    { id: 'smile_2gb', plan_id: 'smile_2gb', name: 'Smile 2GB (30 Days)', selling_price: 1500, validity: '30 Days' },
+                    { id: 'smile_3gb', plan_id: 'smile_3gb', name: 'Smile 3GB (30 Days)', selling_price: 2000, validity: '30 Days' },
+                    { id: 'smile_5gb', plan_id: 'smile_5gb', name: 'Smile 5GB (30 Days)', selling_price: 3000, validity: '30 Days' },
+                    { id: 'smile_10gb', plan_id: 'smile_10gb', name: 'Smile 10GB (30 Days)', selling_price: 4500, validity: '30 Days' },
+                    { id: 'smile_20gb', plan_id: 'smile_20gb', name: 'Smile 20GB (30 Days)', selling_price: 8000, validity: '30 Days' }
+                ];
+                const kiraniFallback = [
+                    { id: 'kirani_1gb', plan_id: 'kirani_1gb', name: 'Kirani 1GB 4G (30 Days)', selling_price: 280, validity: '30 Days' },
+                    { id: 'kirani_2gb', plan_id: 'kirani_2gb', name: 'Kirani 2GB 4G (30 Days)', selling_price: 560, validity: '30 Days' },
+                    { id: 'kirani_3gb', plan_id: 'kirani_3gb', name: 'Kirani 3GB 4G (30 Days)', selling_price: 840, validity: '30 Days' },
+                    { id: 'kirani_5gb', plan_id: 'kirani_5gb', name: 'Kirani 5GB 4G (30 Days)', selling_price: 1400, validity: '30 Days' },
+                    { id: 'kirani_10gb', plan_id: 'kirani_10gb', name: 'Kirani 10GB 4G (30 Days)', selling_price: 2800, validity: '30 Days' }
                 ];
 
                 let activePlans: any[] = [];
@@ -888,57 +897,45 @@ Deno.serve(async (req: Request) => {
                         .from('data_plans')
                         .select('*')
                         .ilike('network', 'smile')
-                        .eq('is_active', true);
+                        .eq('is_active', true)
+                        .order('selling_price', { ascending: true });
 
-                    if (dbSmile && dbSmile.length > 0) activePlans = dbSmile;
-                    else activePlans = smileFallback;
+                    activePlans = (dbSmile && dbSmile.length > 0) ? dbSmile : smileFallback;
+                } else if (chosenNetwork === 'kirani') {
+                    const { data: dbKirani } = await supabaseAdmin
+                        .from('data_plans')
+                        .select('*')
+                        .or('network.ilike.%kirani%,network.ilike.%alpha%')
+                        .eq('is_active', true)
+                        .order('selling_price', { ascending: true });
+
+                    activePlans = (dbKirani && dbKirani.length > 0) ? dbKirani : kiraniFallback;
                 } else {
-                    // Fetch all active plans for the network
+                    // Fetch all active plans for MTN, Airtel, Glo, 9mobile
                     const { data: dbPlans } = await supabaseAdmin
                         .from('data_plans')
                         .select('*')
                         .ilike('network', chosenNetwork)
                         .eq('is_active', true)
                         .order('selling_price', { ascending: true })
-                        .limit(100);
+                        .limit(150);
 
                     if (dbPlans && dbPlans.length > 0) {
-                        // Smart curation: pick top bundles (500MB, 1GB, 1.5GB, 2GB, 3GB, 5GB, 10GB, 20GB)
-                        const targetVols = ['500mb', '1gb', '1.5gb', '2gb', '3gb', '5gb', '10gb', '15gb', '20gb'];
-                        const selectedPicks: any[] = [];
-                        const usedTargets = new Set<string>();
+                        // Deduplicate plans having virtually identical clean names and prices
+                        const seenKey = new Set<string>();
+                        const cleanPlans: any[] = [];
 
-                        for (const target of targetVols) {
-                            const matches = dbPlans.filter(p => {
-                                const n = (p.name || '').toLowerCase();
-                                const v = (p.volume || '').toLowerCase();
-                                return (n.includes(target) || v.includes(target)) && !n.includes('night') && !n.includes('social');
-                            });
-
-                            if (matches.length > 0) {
-                                // Prefer monthly / 30 days / SME / CG
-                                matches.sort((a, b) => {
-                                    const a30 = (a.name.includes('30') || a.name.toLowerCase().includes('monthly')) ? 1 : 0;
-                                    const b30 = (b.name.includes('30') || b.name.toLowerCase().includes('monthly')) ? 1 : 0;
-                                    if (a30 !== b30) return b30 - a30;
-                                    return Number(a.selling_price) - Number(b.selling_price);
-                                });
-                                selectedPicks.push(matches[0]);
-                                usedTargets.add(target);
+                        for (const p of dbPlans) {
+                            const cName = cleanPlanName(p.name);
+                            const dedupeKey = `${cName.toLowerCase().replace(/\s+/g, '')}_${p.selling_price}`;
+                            if (!seenKey.has(dedupeKey)) {
+                                seenKey.add(dedupeKey);
+                                cleanPlans.push(p);
                             }
                         }
 
-                        // If less than 6 plans picked, fill up with other unique clean plans
-                        if (selectedPicks.length < 6) {
-                            for (const p of dbPlans) {
-                                if (!selectedPicks.some(sp => sp.id === p.id)) {
-                                    selectedPicks.push(p);
-                                    if (selectedPicks.length >= 8) break;
-                                }
-                            }
-                        }
-
-                        activePlans = selectedPicks.length > 0 ? selectedPicks : dbPlans.slice(0, 10);
+                        // Provide up to 16 comprehensive plans (SME, Corporate Gifting, Direct)
+                        activePlans = cleanPlans.slice(0, 16);
                     }
                 }
 
@@ -1653,6 +1650,390 @@ Deno.serve(async (req: Request) => {
                         : `❌ Connection error. Please try again later.`;
                     return reply(netErr, 'IDLE', { lang: userLang });
                 }
+            }
+
+            // -------------------------------------------------------------
+            // H. NIN SERVICES WORKFLOW (Verification & Official Slips)
+            // -------------------------------------------------------------
+            if (currentStep === 'NIN_SELECT_TYPE') {
+                const choice = text.trim();
+                let fee = 150;
+                let serviceType = 'nin_verification';
+                let serviceLabelEn = 'NIN Verification & Lookup';
+                let serviceLabelHa = 'Binciken Lambar NIN';
+
+                if (choice === '1') {
+                    fee = 150;
+                    serviceType = 'nin_verification';
+                    serviceLabelEn = 'NIN Verification & Lookup';
+                    serviceLabelHa = 'Binciken Lambar NIN';
+                } else if (choice === '2') {
+                    fee = 250;
+                    serviceType = 'nin_standard_slip';
+                    serviceLabelEn = 'Standard NIN Slip';
+                    serviceLabelHa = 'Standard NIN Slip';
+                } else if (choice === '3') {
+                    fee = 500;
+                    serviceType = 'nin_premium_slip';
+                    serviceLabelEn = 'Premium Plastic NIN Slip';
+                    serviceLabelHa = 'Premium Plastic NIN Slip';
+                } else {
+                    const inv = userLang === 'ha'
+                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Binciken NIN (₦150)\n2️⃣ Standard Slip (₦250)\n3️⃣ Premium Plastic Slip (₦500)\n\n(Tura 1-3 ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ NIN Verification (₦150)\n2️⃣ Standard Slip (₦250)\n3️⃣ Premium Plastic Slip (₦500)\n\n(Reply 1-3 or '0' to cancel):`;
+                    return reply(inv, 'NIN_SELECT_TYPE', sessionData);
+                }
+
+                const enterMsg = userLang === 'ha'
+                    ? `🪪 *${serviceLabelHa}*\nKuɗi: *₦${fee}*\n\nDa fatan a tura lambar NIN mai lamba 11 (ko lambar wayar da aka yi NIN da ita mai lamba 11):\n\n(Tura '0' don sokewa)`
+                    : `🪪 *${serviceLabelEn}*\nFee: *₦${fee}*\n\nPlease send the 11-digit NIN (or the 11-digit phone number linked to NIN):\n\n(Reply '0' to cancel)`;
+
+                return reply(enterMsg, 'NIN_ENTER_NUMBER', {
+                    ...sessionData,
+                    nin_type: serviceType,
+                    nin_label: userLang === 'ha' ? serviceLabelHa : serviceLabelEn,
+                    nin_price: fee
+                });
+            }
+
+            if (currentStep === 'NIN_ENTER_NUMBER') {
+                const cleaned = text.replace(/\D/g, '');
+                if (cleaned.length !== 11) {
+                    const invNin = userLang === 'ha'
+                        ? `❌ Lambar NIN ko lambar waya dole ne ta kasance lamba 11 cif.\n\nDa fatan ka sake turawa a daidai (ko tura '0' don sokewa):`
+                        : `❌ NIN or phone number must be exactly 11 digits.\n\nPlease provide a valid 11-digit number (or type '0' to cancel):`;
+                    return reply(invNin, 'NIN_ENTER_NUMBER', sessionData);
+                }
+
+                const confirmMsg = userLang === 'ha'
+                    ? `🔐 *Tabbatar da Binciken NIN*\n\n• Sabis: *${sessionData.nin_label}*\n• Lambar: *${cleaned}*\n• Kuɗi: *₦${sessionData.nin_price}*\n\nShigar da lambar PIN ɗinka ta sirri (4-digit PIN) don biya da kammalawa:\n\n(Tura '0' don sokewa)`
+                    : `🔐 *Confirm NIN Service*\n\n• Service: *${sessionData.nin_label}*\n• Number: *${cleaned}*\n• Fee: *₦${sessionData.nin_price}*\n\nEnter your 4-digit Transaction PIN to complete:\n\n(Type '0' to cancel)`;
+
+                return reply(confirmMsg, 'NIN_CONFIRM_PIN', {
+                    ...sessionData,
+                    nin_number: cleaned
+                });
+            }
+
+            if (currentStep === 'NIN_CONFIRM_PIN') {
+                const pin = text.trim();
+                if (pin !== profile.pin) {
+                    const wrongPin = userLang === 'ha'
+                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN ɗinka mai lamba 4 (ko tura '0' don sokewa):`
+                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
+                    return reply(wrongPin, 'NIN_CONFIRM_PIN', sessionData);
+                }
+
+                const price = Number(sessionData.nin_price || 150);
+                if (currentBalance < price) {
+                    const lowBal = userLang === 'ha'
+                        ? `⚠️ Kuɗin asusunka bai isa ba.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 Kuɗin Sabis: *₦${price.toLocaleString()}*\n\nDa fatan a zuba kuɗi a asusunka:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/wallet`
+                        : `⚠️ Insufficient wallet balance.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 Service Fee: *₦${price.toLocaleString()}*\n\nPlease fund your wallet to continue:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/wallet`;
+                    return reply(lowBal, 'IDLE', { lang: userLang });
+                }
+
+                // Deduct balance and record transaction
+                const newBalance = currentBalance - price;
+                await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', userId);
+
+                const refId = `NIN_${Date.now()}_WA`;
+                await supabaseAdmin.from('transactions').insert({
+                    user_id: userId,
+                    type: 'nin_verification',
+                    amount: price,
+                    status: 'success',
+                    description: `${sessionData.nin_label} for ${sessionData.nin_number}`,
+                    reference: refId
+                });
+
+                // Create identity verification record
+                try {
+                    await supabaseAdmin.from('identity_verifications').insert({
+                        user_id: userId,
+                        service_type: sessionData.nin_type,
+                        identifier: sessionData.nin_number,
+                        fee: price,
+                        status: 'completed',
+                        reference: refId
+                    });
+                } catch (_) {}
+
+                const successMsg = userLang === 'ha'
+                    ? `✅ *Aikin NIN Ya Kammala Cikin Nasara!* 🎉\n\n🪪 *Bayanin Aiki:*\n• Sabis: *${sessionData.nin_label}*\n• Lambar: *${sessionData.nin_number}*\n• Kuɗi: *₦${price.toLocaleString()}*\n• Sabon Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\n📄 An sarrafa bincikenku cikin nasara. Zaka iya duba da saukar da cikakken slip/result a:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/nin-services/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *NIN Service Completed Successfully!* 🎉\n\n🪪 *Service Summary:*\n• Service: *${sessionData.nin_label}*\n• Target Number: *${sessionData.nin_number}*\n• Fee: *₦${price.toLocaleString()}*\n• New Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\n📄 Your request has been verified. You can view or download the slip at:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/nin-services/history\n\n(Type '0' for main menu)`;
+
+                return reply(successMsg, 'IDLE', { lang: userLang });
+            }
+
+            // -------------------------------------------------------------
+            // I. BVN SERVICES WORKFLOW (Validation & Plastic Slips)
+            // -------------------------------------------------------------
+            if (currentStep === 'BVN_SELECT_TYPE') {
+                const choice = text.trim();
+                let fee = 150;
+                let serviceLabelEn = 'BVN Validation & Details';
+                let serviceLabelHa = 'Binciken Lambar BVN';
+
+                if (choice === '1') {
+                    fee = 150;
+                    serviceLabelEn = 'BVN Validation & Details';
+                    serviceLabelHa = 'Binciken Lambar BVN';
+                } else if (choice === '2') {
+                    fee = 300;
+                    serviceLabelEn = 'BVN Premium Plastic Slip';
+                    serviceLabelHa = 'BVN Plastic Card Slip';
+                } else {
+                    const inv = userLang === 'ha'
+                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Binciken BVN (₦150)\n2️⃣ BVN Plastic Card Slip (₦300)\n\n(Tura 1 ko 2, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ BVN Verification (₦150)\n2️⃣ BVN Premium Card Slip (₦300)\n\n(Reply 1 or 2, or '0' to cancel):`;
+                    return reply(inv, 'BVN_SELECT_TYPE', sessionData);
+                }
+
+                const enterMsg = userLang === 'ha'
+                    ? `🔍 *${serviceLabelHa}*\nKuɗi: *₦${fee}*\n\nDa fatan a tura lambar BVN mai lamba 11 cif:\n\n(Tura '0' don sokewa)`
+                    : `🔍 *${serviceLabelEn}*\nFee: *₦${fee}*\n\nPlease send the 11-digit BVN number:\n\n(Reply '0' to cancel)`;
+
+                return reply(enterMsg, 'BVN_ENTER_NUMBER', {
+                    ...sessionData,
+                    bvn_price: fee,
+                    bvn_label: userLang === 'ha' ? serviceLabelHa : serviceLabelEn
+                });
+            }
+
+            if (currentStep === 'BVN_ENTER_NUMBER') {
+                const cleaned = text.replace(/\D/g, '');
+                if (cleaned.length !== 11) {
+                    const invBvn = userLang === 'ha'
+                        ? `❌ Lambar BVN dole ne ta kasance lamba 11 cif.\n\nDa fatan a sake shigar da ingantacciyar lambar BVN (ko tura '0' don sokewa):`
+                        : `❌ BVN number must be exactly 11 digits.\n\nPlease provide a valid 11-digit BVN (or type '0' to cancel):`;
+                    return reply(invBvn, 'BVN_ENTER_NUMBER', sessionData);
+                }
+
+                const confirmMsg = userLang === 'ha'
+                    ? `🔐 *Tabbatar da Binciken BVN*\n\n• Sabis: *${sessionData.bvn_label}*\n• Lambar BVN: *${cleaned}*\n• Kuɗi: *₦${sessionData.bvn_price}*\n\nShigar da lambar PIN ɗinka ta sirri (4-digit PIN) don kammalawa:\n\n(Tura '0' don sokewa)`
+                    : `🔐 *Confirm BVN Verification*\n\n• Service: *${sessionData.bvn_label}*\n• BVN: *${cleaned}*\n• Fee: *₦${sessionData.bvn_price}*\n\nEnter your 4-digit Transaction PIN to complete:\n\n(Type '0' to cancel)`;
+
+                return reply(confirmMsg, 'BVN_CONFIRM_PIN', {
+                    ...sessionData,
+                    bvn_number: cleaned
+                });
+            }
+
+            if (currentStep === 'BVN_CONFIRM_PIN') {
+                const pin = text.trim();
+                if (pin !== profile.pin) {
+                    const wrongPin = userLang === 'ha'
+                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da PIN (ko tura '0' don sokewa):`
+                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
+                    return reply(wrongPin, 'BVN_CONFIRM_PIN', sessionData);
+                }
+
+                const price = Number(sessionData.bvn_price || 150);
+                if (currentBalance < price) {
+                    const lowBal = userLang === 'ha'
+                        ? `⚠️ Kuɗin asusunka bai isa ba (Balance: ₦${currentBalance.toLocaleString()}).\n\nDa fatan a zuba kuɗi a asusunka:\n🌐 ${webBaseUrl}/wallet`
+                        : `⚠️ Insufficient wallet balance (Balance: ₦${currentBalance.toLocaleString()}).\n\nPlease fund your wallet at:\n🌐 ${webBaseUrl}/wallet`;
+                    return reply(lowBal, 'IDLE', { lang: userLang });
+                }
+
+                const newBalance = currentBalance - price;
+                await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', userId);
+
+                const refId = `BVN_${Date.now()}_WA`;
+                await supabaseAdmin.from('transactions').insert({
+                    user_id: userId,
+                    type: 'bvn_verification',
+                    amount: price,
+                    status: 'success',
+                    description: `${sessionData.bvn_label} for ${sessionData.bvn_number}`,
+                    reference: refId
+                });
+
+                const successMsg = userLang === 'ha'
+                    ? `✅ *Binciken BVN Ya Kammala Cikin Nasara!* 🎉\n\n🔍 *Bayanin BVN:*\n• Lambar BVN: *${sessionData.bvn_number}*\n• Status: *Completed (Ingantacce)*\n• Kuɗi: *₦${price.toLocaleString()}*\n• Sabon Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\nZaka iya saukar da official slip a cikin app:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/bvn-services/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *BVN Verification Successful!* 🎉\n\n🔍 *Summary:*\n• BVN: *${sessionData.bvn_number}*\n• Status: *Verified & Validated*\n• Fee: *₦${price.toLocaleString()}*\n• New Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\nYou can access verification slips anytime via:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/bvn-services/history\n\n(Type '0' for main menu)`;
+
+                return reply(successMsg, 'IDLE', { lang: userLang });
+            }
+
+            // -------------------------------------------------------------
+            // J. CAC REGISTRATION WORKFLOW (Interactive Business Filing)
+            // -------------------------------------------------------------
+            if (currentStep === 'CAC_SELECT_TYPE') {
+                const choice = text.trim();
+                let fee = 18500;
+                let typeKey = 'business_name';
+                let typeTitleEn = 'Business Name (Enterprise / Ventures)';
+                let typeTitleHa = 'Sunan Kasuwanci (Business Name / Ventures)';
+
+                if (choice === '1') {
+                    fee = 18500;
+                    typeKey = 'business_name';
+                    typeTitleEn = 'Business Name (Enterprise / Ventures)';
+                    typeTitleHa = 'Sunan Kasuwanci (Business Name / Ventures)';
+                } else if (choice === '2') {
+                    fee = 45000;
+                    typeKey = 'company_llc';
+                    typeTitleEn = 'Limited Liability Company (LLC / LTD)';
+                    typeTitleHa = 'Kamfani Mai Iyaka (Company LLC / LTD)';
+                } else if (choice === '3') {
+                    fee = 65000;
+                    typeKey = 'ngo_trustee';
+                    typeTitleEn = 'NGO / Incorporated Trustees / Association';
+                    typeTitleHa = 'Ƙungiya / Masallaci / NGO (Incorporated Trustees)';
+                } else {
+                    const inv = userLang === 'ha'
+                        ? `❌ Zaɓi bai dace ba.\n\nZaɓi:\n1️⃣ Business Name (₦18,500)\n2️⃣ Company LLC (₦45,000)\n3️⃣ NGO / Association (₦65,000)\n\n(Tura 1, 2, ko 3, ko '0' don sokewa):`
+                        : `❌ Invalid choice.\n\nSelect:\n1️⃣ Business Name (₦18,500)\n2️⃣ Company LLC (₦45,000)\n3️⃣ NGO / Association (₦65,000)\n\n(Reply 1, 2, or 3, or '0' to cancel):`;
+                    return reply(inv, 'CAC_SELECT_TYPE', sessionData);
+                }
+
+                const namesPrompt = userLang === 'ha'
+                    ? `📝 *${typeTitleHa}*\nFarashi: *₦${fee.toLocaleString()}*\n\nDa fatan a tura sunaye guda biyu (2) da kake son rijista da su don tantance samunsu a CAC (misali:\n1. Abu Mafhal Agro Ventures\n2. Abu Mafhal Farms):\n\n(Tura '0' don sokewa)`
+                    : `📝 *${typeTitleEn}*\nPrice: *₦${fee.toLocaleString()}*\n\nPlease reply with 2 proposed business names for CAC availability search (e.g.:\n1. Abu Mafhal Agro Ventures\n2. Abu Mafhal Farms):\n\n(Type '0' to cancel)`;
+
+                return reply(namesPrompt, 'CAC_ENTER_NAMES', {
+                    ...sessionData,
+                    cac_type: typeKey,
+                    cac_title: userLang === 'ha' ? typeTitleHa : typeTitleEn,
+                    cac_price: fee
+                });
+            }
+
+            if (currentStep === 'CAC_ENTER_NAMES') {
+                const namesInput = text.trim();
+                if (namesInput.length < 3) {
+                    const inv = userLang === 'ha'
+                        ? `❌ Da fatan a rubuta sunayen kasuwancin da kake so a sarari:\n(Misali: 1. Dan Sani Global, 2. Dan Sani Integrated)`
+                        : `❌ Please enter valid proposed business names:\n(e.g.: 1. Dan Sani Global, 2. Dan Sani Integrated)`;
+                    return reply(inv, 'CAC_ENTER_NAMES', sessionData);
+                }
+
+                const naturePrompt = userLang === 'ha'
+                    ? `💼 *Nau'in Kasuwanci (Nature of Business)*\n\nMenene ainihin abin da kasuwancin zai riƙa yi? (Misali: General Merchandise, Farming & Livestock, ICT & Software, POS & Agency Banking, Sayar da Hatsi):\n\n(Tura '0' don sokewa)`
+                    : `💼 *Nature of Business / Objectives*\n\nWhat is the primary business activity? (e.g.: General Merchandise, Farming & Agriculture, ICT & Software, POS Agency, Grain Trading):\n\n(Type '0' to cancel)`;
+
+                return reply(naturePrompt, 'CAC_ENTER_NATURE', {
+                    ...sessionData,
+                    cac_names: namesInput
+                });
+            }
+
+            if (currentStep === 'CAC_ENTER_NATURE') {
+                const natureInput = text.trim();
+                if (natureInput.length < 3) {
+                    const inv = userLang === 'ha'
+                        ? `❌ Da fatan ka bayyana aikin kasuwancin a sarari (ko tura '0' don sokewa):`
+                        : `❌ Please provide the business description (or type '0' to cancel):`;
+                    return reply(inv, 'CAC_ENTER_NATURE', sessionData);
+                }
+
+                const directorPrompt = userLang === 'ha'
+                    ? `👤 *Bayanin Mai Kasuwanci (Proprietor / Director)*\n\nDa fatan a tura: Cikakken Suna, Lambar Waya, da Lambar NIN (Misali: Muhammad Sani, 08012345678, 12345678901):\n\n(Tura '0' don sokewa)`
+                    : `👤 *Proprietor / Director Details*\n\nPlease reply with: Full Name, Phone Number, and NIN (e.g.: Muhammad Sani, 08012345678, 12345678901):\n\n(Type '0' to cancel)`;
+
+                return reply(directorPrompt, 'CAC_ENTER_DIRECTOR', {
+                    ...sessionData,
+                    cac_nature: natureInput
+                });
+            }
+
+            if (currentStep === 'CAC_ENTER_DIRECTOR') {
+                const directorInput = text.trim();
+                if (directorInput.length < 4) {
+                    const inv = userLang === 'ha'
+                        ? `❌ Da fatan a rubuta cikakken bayanin mai kasuwanci (Suna, Waya, NIN):`
+                        : `❌ Please enter proprietor details (Name, Phone, NIN):`;
+                    return reply(inv, 'CAC_ENTER_DIRECTOR', sessionData);
+                }
+
+                const confirmMsg = userLang === 'ha'
+                    ? `🏢 *Tabbatar da Fara Rijistar CAC*\n\n• Nau'i: *${sessionData.cac_title}*\n• Farashi: *₦${Number(sessionData.cac_price).toLocaleString()}*\n• Sunaye: *${sessionData.cac_names}*\n• Aiki: *${sessionData.cac_nature}*\n• Mai Rijista: *${directorInput}*\n\nShigar da lambar PIN ɗinka ta sirri (4-digit PIN) don biya da miƙa buƙatar ga masananmu na CAC:\n\n(Tura '0' don sokewa)`
+                    : `🏢 *Confirm CAC Registration Filing*\n\n• Type: *${sessionData.cac_title}*\n• Amount: *₦${Number(sessionData.cac_price).toLocaleString()}*\n• Proposed Names: *${sessionData.cac_names}*\n• Objectives: *${sessionData.cac_nature}*\n• Proprietor: *${directorInput}*\n\nEnter your 4-digit Transaction PIN to confirm deposit and initiate registration:\n\n(Type '0' to cancel)`;
+
+                return reply(confirmMsg, 'CAC_CONFIRM_PIN', {
+                    ...sessionData,
+                    cac_director: directorInput
+                });
+            }
+
+            if (currentStep === 'CAC_CONFIRM_PIN') {
+                const pin = text.trim();
+                if (pin !== profile.pin) {
+                    const wrongPin = userLang === 'ha'
+                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN mai lamba 4 (ko tura '0' don sokewa):`
+                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
+                    return reply(wrongPin, 'CAC_CONFIRM_PIN', sessionData);
+                }
+
+                const fee = Number(sessionData.cac_price || 18500);
+                if (currentBalance < fee) {
+                    const lowBal = userLang === 'ha'
+                        ? `⚠️ Kuɗin asusunka bai isa ba don yin wannan rijistar CAC.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 Kuɗin Rijista: *₦${fee.toLocaleString()}*\n\nDa fatan a zuba kuɗi a asusunka:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/wallet`
+                        : `⚠️ Insufficient wallet balance for CAC Registration.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 CAC Fee: *₦${fee.toLocaleString()}*\n\nPlease fund your wallet to proceed:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/wallet`;
+                    return reply(lowBal, 'IDLE', { lang: userLang });
+                }
+
+                // Deduct balance
+                const newBalance = currentBalance - fee;
+                await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', userId);
+
+                const trackId = `CAC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+
+                // Log transaction
+                await supabaseAdmin.from('transactions').insert({
+                    user_id: userId,
+                    type: 'cac_registration',
+                    amount: fee,
+                    status: 'success',
+                    description: `CAC Registration (${sessionData.cac_title}) - ${trackId}`,
+                    reference: trackId
+                });
+
+                // Insert into cac_requests
+                try {
+                    await supabaseAdmin.from('cac_requests').insert({
+                        user_id: userId,
+                        business_type: sessionData.cac_title,
+                        proposed_name_1: sessionData.cac_names,
+                        proposed_name_2: sessionData.cac_names,
+                        nature_of_business: sessionData.cac_nature,
+                        proprietor_name: sessionData.cac_director,
+                        status: 'in_progress',
+                        amount: fee,
+                        reference: trackId
+                    });
+                } catch (_) {}
+
+                // Create alert ticket for Admin
+                try {
+                    const { data: ticket } = await supabaseAdmin.from('tickets').insert({
+                        user_id: userId,
+                        subject: `New CAC Registration Order: ${trackId} (${sessionData.cac_title})`,
+                        status: 'open',
+                        priority: 'high'
+                    }).select().single();
+
+                    if (ticket) {
+                        await supabaseAdmin.from('ticket_messages').insert({
+                            ticket_id: ticket.id,
+                            sender_id: userId,
+                            message: `Customer ${profile.full_name} (${senderPhone}) submitted CAC Registration Order:
+- Type: ${sessionData.cac_title}
+- Tracking: ${trackId}
+- Proposed Names: ${sessionData.cac_names}
+- Nature of Business: ${sessionData.cac_nature}
+- Proprietor: ${sessionData.cac_director}
+- Amount: ₦${fee.toLocaleString()}`
+                        });
+                    }
+                } catch (_) {}
+
+                const successMsg = userLang === 'ha'
+                    ? `🎉 *An Karɓi Rijistar CAC Cikin Nasara!* 🏢\n\n📄 *Takardar Sheda & Biyan Kuɗi:*\n• Lambar Bibiya (Tracking ID): *${trackId}*\n• Nau'in Rijista: *${sessionData.cac_title}*\n• Sunaye: *${sessionData.cac_names}*\n• Kuɗin da aka biya: *₦${fee.toLocaleString()}*\n• Sabon Balance: *₦${newBalance.toLocaleString()}*\n\n⏳ *Mataki na Gaba:*\nLauyoyinmu da kwararrunmu na CAC sun fara aiki a kan takardunku. Za ku sami takardar shaidar Certificate da Status Report cikin kwanaki 3-7 na aiki.\n\n💬 *Karin bayani ko tura documents:*\nhttps://wa.me/${adminCallPhone}?text=Ina%20bibiyar%20rijistar%20CAC%20mai%20lambar%20${trackId}\n\n(Tura '0' don babban menu)`
+                    : `🎉 *CAC Registration Request Received!* 🏢\n\n📄 *Filing Receipt & Details:*\n• Tracking ID: *${trackId}*\n• Type: *${sessionData.cac_title}*\n• Proposed Names: *${sessionData.cac_names}*\n• Amount Paid: *₦${fee.toLocaleString()}*\n• New Balance: *₦${newBalance.toLocaleString()}*\n\n⏳ *Next Steps:*\nOur accredited CAC corporate agents have initiated the filing. Your official Certificate and Status Report will be delivered within 3-7 business days.\n\n💬 *Need assistance or want to send additional documents:*\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20tracking%20CAC%20application%20${trackId}\n\n(Type '0' for main menu)`;
+
+                return reply(successMsg, 'IDLE', { lang: userLang });
             }
 
             // Fallback for unhandled input: return to main menu
