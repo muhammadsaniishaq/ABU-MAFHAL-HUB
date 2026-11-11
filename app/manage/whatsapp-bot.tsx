@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    View, Text, TextInput, ScrollView, TouchableOpacity,
+    View, Text, TextInput, ScrollView, TouchableOpacity, Image,
     ActivityIndicator, Alert, StyleSheet, Platform, Switch, RefreshControl, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,6 +79,9 @@ export default function WhatsAppBotAdmin() {
     const [logs, setLogs] = useState<any[]>([]);
     const [sessions, setSessions] = useState<any[]>([]);
     const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
+    const [phoneToProfileMap, setPhoneToProfileMap] = useState<Record<string, any>>({});
+    const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
+    const [showProfileDossier, setShowProfileDossier] = useState(false);
     const [logFilter, setLogFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
     const [chatSearch, setChatSearch] = useState('');
 
@@ -87,8 +90,8 @@ export default function WhatsAppBotAdmin() {
     const [replyText, setReplyText] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
 
-    // Broadcast Messenger Tool
-    const [broadcastAudience, setBroadcastAudience] = useState<'all' | 'active_7d' | 'custom'>('all');
+    // Broadcast Messenger Tool: 'all_registered' | 'bot_chatters' | 'active_7d' | 'custom'
+    const [broadcastAudience, setBroadcastAudience] = useState<'all_registered' | 'bot_chatters' | 'active_7d' | 'custom'>('all_registered');
     const [customBroadcastPhones, setCustomBroadcastPhones] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('🌟 Sanarwa ta Musamman daga Abu Mafhal Sub!\n\nKuna iya samun sauƙin siyan Data, Airtime, NIN, BVN, da CAC a take a WhatsApp ko shafinmu na gizo.');
     const [broadcastResult, setBroadcastResult] = useState<any>(null);
@@ -158,21 +161,34 @@ export default function WhatsAppBotAdmin() {
                 .limit(100);
             if (sessionRows) setSessions(sessionRows);
 
-            // 5. Fetch profiles for linking
-            const userIds = Array.from(new Set([
-                ...(sessionRows?.map(s => s.user_id).filter(Boolean) || []),
-            ]));
+            // 5. Fetch ALL registered customers with phone numbers from profiles
+            const { data: allProfs } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, phone, username, custom_id, referral_code, avatar_url, kyc_tier, balance, created_at, role')
+                .not('phone', 'is', null)
+                .order('created_at', { ascending: false });
 
-            if (userIds.length > 0) {
-                const { data: profs } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, email, phone, balance, role, created_at')
-                    .in('id', userIds);
-                if (profs) {
-                    const pMap: Record<string, any> = {};
-                    profs.forEach(p => { pMap[p.id] = p; });
-                    setProfilesMap(pMap);
-                }
+            if (allProfs && allProfs.length > 0) {
+                setRegisteredUsers(allProfs);
+                const pMap: Record<string, any> = {};
+                const phoneMap: Record<string, any> = {};
+
+                allProfs.forEach(p => {
+                    pMap[p.id] = p;
+                    if (p.phone) {
+                        let clean = p.phone.replace(/\D/g, '');
+                        if (clean.startsWith('0') && clean.length === 11) clean = '234' + clean.slice(1);
+                        else if (clean.length === 10) clean = '234' + clean;
+
+                        phoneMap[clean] = p;
+                        if (clean.startsWith('234') && clean.length === 13) {
+                            phoneMap['0' + clean.slice(3)] = p;
+                            phoneMap[clean.slice(3)] = p;
+                        }
+                    }
+                });
+                setProfilesMap(pMap);
+                setPhoneToProfileMap(phoneMap);
             }
 
         } catch (err: any) {
@@ -232,11 +248,12 @@ export default function WhatsAppBotAdmin() {
             const clean = rawPhone.replace(/\D/g, '');
             if (!clean) return;
 
+            const matched = sess.user_id ? profilesMap[sess.user_id] : (phoneToProfileMap[clean] || null);
             map[clean] = {
                 phone_number: rawPhone,
                 clean_phone: clean,
-                user_id: sess.user_id,
-                profile: sess.user_id ? profilesMap[sess.user_id] : null,
+                user_id: sess.user_id || matched?.id,
+                profile: matched,
                 current_step: sess.step || 'IDLE',
                 last_interaction: sess.last_interaction || sess.created_at,
                 message_count: 0,
@@ -252,9 +269,12 @@ export default function WhatsAppBotAdmin() {
             if (!clean) return;
 
             if (!map[clean]) {
+                const matched = phoneToProfileMap[clean] || null;
                 map[clean] = {
                     phone_number: rawPhone,
                     clean_phone: clean,
+                    user_id: matched?.id,
+                    profile: matched,
                     current_step: 'IDLE',
                     last_interaction: log.created_at,
                     message_count: 0,
@@ -283,7 +303,7 @@ export default function WhatsAppBotAdmin() {
             const timeB = new Date(b.last_interaction || 0).getTime();
             return timeB - timeA;
         });
-    }, [sessions, logs, profilesMap]);
+    }, [sessions, logs, profilesMap, phoneToProfileMap]);
 
     // Filtered customer threads by search
     const filteredCustomerThreads = useMemo(() => {
@@ -358,7 +378,16 @@ export default function WhatsAppBotAdmin() {
 
         let recipients: string[] = [];
 
-        if (broadcastAudience === 'all') {
+        if (broadcastAudience === 'all_registered') {
+            recipients = registeredUsers
+                .map(u => {
+                    let c = (u.phone || '').replace(/\D/g, '');
+                    if (c.startsWith('0') && c.length === 11) c = '234' + c.slice(1);
+                    else if (c.length === 10) c = '234' + c;
+                    return c;
+                })
+                .filter(c => c.length >= 10);
+        } else if (broadcastAudience === 'bot_chatters') {
             recipients = customerThreads.map(c => c.clean_phone).filter(Boolean);
         } else if (broadcastAudience === 'active_7d') {
             const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
@@ -812,9 +841,13 @@ export default function WhatsAppBotAdmin() {
                                             activeOpacity={0.7}
                                         >
                                             <View style={s.avatarCircle}>
-                                                <Text style={s.avatarText}>
-                                                    {name ? name.slice(0, 2).toUpperCase() : 'WA'}
-                                                </Text>
+                                                {prof?.avatar_url && typeof prof.avatar_url === 'string' && prof.avatar_url.trim().length > 5 ? (
+                                                    <Image source={{ uri: prof.avatar_url }} style={s.avatarImg} />
+                                                ) : (
+                                                    <Text style={s.avatarText}>
+                                                        {name ? name.slice(0, 2).toUpperCase() : 'WA'}
+                                                    </Text>
+                                                )}
                                             </View>
 
                                             <View style={{ flex: 1, marginLeft: 12 }}>
@@ -873,11 +906,20 @@ export default function WhatsAppBotAdmin() {
                                 <Text style={s.inputLabel}>Target Audience:</Text>
                                 <View style={s.audienceRow}>
                                     <TouchableOpacity
-                                        onPress={() => setBroadcastAudience('all')}
-                                        style={[s.audienceBtn, broadcastAudience === 'all' && s.audienceBtnActive]}
+                                        onPress={() => setBroadcastAudience('all_registered')}
+                                        style={[s.audienceBtn, broadcastAudience === 'all_registered' && s.audienceBtnActive]}
                                     >
-                                        <Text style={[s.audienceBtnText, broadcastAudience === 'all' && s.audienceBtnTextActive]}>
-                                            All Customers ({customerThreads.length})
+                                        <Text style={[s.audienceBtnText, broadcastAudience === 'all_registered' && s.audienceBtnTextActive]}>
+                                            👥 All Registered ({registeredUsers.length})
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setBroadcastAudience('bot_chatters')}
+                                        style={[s.audienceBtn, broadcastAudience === 'bot_chatters' && s.audienceBtnActive]}
+                                    >
+                                        <Text style={[s.audienceBtnText, broadcastAudience === 'bot_chatters' && s.audienceBtnTextActive]}>
+                                            💬 Bot Users ({customerThreads.length})
                                         </Text>
                                     </TouchableOpacity>
 
@@ -886,7 +928,7 @@ export default function WhatsAppBotAdmin() {
                                         style={[s.audienceBtn, broadcastAudience === 'active_7d' && s.audienceBtnActive]}
                                     >
                                         <Text style={[s.audienceBtnText, broadcastAudience === 'active_7d' && s.audienceBtnTextActive]}>
-                                            Active (7 Days)
+                                            ⚡ Active (7d)
                                         </Text>
                                     </TouchableOpacity>
 
@@ -895,7 +937,7 @@ export default function WhatsAppBotAdmin() {
                                         style={[s.audienceBtn, broadcastAudience === 'custom' && s.audienceBtnActive]}
                                     >
                                         <Text style={[s.audienceBtnText, broadcastAudience === 'custom' && s.audienceBtnTextActive]}>
-                                            Custom Numbers
+                                            📝 Custom
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -1124,9 +1166,13 @@ export default function WhatsAppBotAdmin() {
                                 </TouchableOpacity>
 
                                 <View style={s.modalAvatarCircle}>
-                                    <Text style={s.modalAvatarText}>
-                                        {(selectedCustomer.profile?.full_name || 'WA').slice(0, 2).toUpperCase()}
-                                    </Text>
+                                    {selectedCustomer.profile?.avatar_url && typeof selectedCustomer.profile.avatar_url === 'string' && selectedCustomer.profile.avatar_url.trim().length > 5 ? (
+                                        <Image source={{ uri: selectedCustomer.profile.avatar_url }} style={s.modalAvatarImg} />
+                                    ) : (
+                                        <Text style={s.modalAvatarText}>
+                                            {(selectedCustomer.profile?.full_name || 'WA').slice(0, 2).toUpperCase()}
+                                        </Text>
+                                    )}
                                 </View>
 
                                 <View style={{ flex: 1, marginLeft: 10 }}>
@@ -1138,14 +1184,59 @@ export default function WhatsAppBotAdmin() {
                                     </Text>
                                 </View>
 
+                                <TouchableOpacity
+                                    onPress={() => setShowProfileDossier(prev => !prev)}
+                                    style={s.infoToggleBtn}
+                                >
+                                    <Ionicons name={showProfileDossier ? "close-circle" : "person-circle"} size={22} color={C.gold} />
+                                </TouchableOpacity>
+
                                 {selectedCustomer.profile?.balance !== undefined && (
-                                    <View style={s.modalBalanceBadge}>
+                                    <View style={[s.modalBalanceBadge, { marginLeft: 8 }]}>
                                         <Text style={s.modalBalanceText}>
                                             ₦{Number(selectedCustomer.profile.balance).toLocaleString()}
                                         </Text>
                                     </View>
                                 )}
                             </View>
+
+                            {/* Customer Complete Profile Dossier Card */}
+                            {selectedCustomer.profile && (
+                                <View style={s.dossierCard}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        {selectedCustomer.profile.avatar_url ? (
+                                            <Image source={{ uri: selectedCustomer.profile.avatar_url }} style={s.dossierAvatar} />
+                                        ) : (
+                                            <View style={[s.dossierAvatar, { backgroundColor: C.navyMid, alignItems: 'center', justifyContent: 'center' }]}>
+                                                <Ionicons name="person" size={24} color={C.white} />
+                                            </View>
+                                        )}
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={s.dossierName}>{selectedCustomer.profile.full_name || 'Customer'}</Text>
+                                            <Text style={s.dossierSub}>
+                                                {selectedCustomer.profile.email || 'No email registered'}
+                                                {selectedCustomer.profile.username ? ` • @${selectedCustomer.profile.username}` : ''}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                                                <View style={s.dossierTag}>
+                                                    <Text style={s.dossierTagText}>KYC: {selectedCustomer.profile.kyc_tier || 'Tier 1'}</Text>
+                                                </View>
+                                                <View style={[s.dossierTag, { backgroundColor: '#EFF6FF' }]}>
+                                                    <Text style={[s.dossierTagText, { color: '#2563EB' }]}>Role: {(selectedCustomer.profile.role || 'User').toUpperCase()}</Text>
+                                                </View>
+                                                <View style={[s.dossierTag, { backgroundColor: '#FEF3C7' }]}>
+                                                    <Text style={[s.dossierTagText, { color: '#B45309' }]}>Bal: ₦{Number(selectedCustomer.profile.balance || 0).toLocaleString()}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    </View>
+                                    <View style={s.dossierDivider} />
+                                    <View style={s.dossierRow}>
+                                        <Text style={s.dossierMeta}>ID: {selectedCustomer.profile.custom_id || selectedCustomer.profile.referral_code || selectedCustomer.profile.id?.slice(0, 8)}</Text>
+                                        <Text style={s.dossierMeta}>Joined: {new Date(selectedCustomer.profile.created_at || Date.now()).toLocaleDateString()}</Text>
+                                    </View>
+                                </View>
+                            )}
 
                             {/* Conversation Scroll */}
                             <ScrollView
@@ -1877,5 +1968,74 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginLeft: 8,
+    },
+    avatarImg: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+    },
+    modalAvatarImg: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+    },
+    infoToggleBtn: {
+        padding: 4,
+        marginLeft: 6,
+    },
+    dossierCard: {
+        backgroundColor: C.white,
+        padding: 12,
+        marginHorizontal: 10,
+        marginTop: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: C.slate200,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    dossierAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+    },
+    dossierName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: C.slate800,
+    },
+    dossierSub: {
+        fontSize: 11,
+        color: C.slate500,
+        marginTop: 1,
+    },
+    dossierTag: {
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    dossierTagText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: C.emerald,
+    },
+    dossierDivider: {
+        height: 1,
+        backgroundColor: C.slate100,
+        marginVertical: 8,
+    },
+    dossierRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    dossierMeta: {
+        fontSize: 10,
+        color: C.slate400,
+        fontWeight: '500',
     },
 });
