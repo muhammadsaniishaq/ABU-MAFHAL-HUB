@@ -11,6 +11,7 @@ import {
   Platform,
   StyleSheet,
   RefreshControl,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -655,14 +656,19 @@ export default function TinServicesScreen() {
       </View>
 
       {/* ── TAB CONTENT ── */}
-      <ScrollView
-        style={styles.contentScroll}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { fetchUserData(); fetchHistory(); }} />
-        }
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
+        <ScrollView
+          style={styles.contentScroll}
+          contentContainerStyle={{ paddingBottom: 160 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { fetchUserData(); fetchHistory(); }} />
+          }
+        >
         {/* ========================================================= */}
         {/* TAB 1: RETRIEVE TAX ID CERTIFICATE (taxidcert.jrb.gov.ng) */}
         {/* ========================================================= */}
@@ -1344,7 +1350,8 @@ export default function TinServicesScreen() {
             )}
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* ── MODAL: INDIVIDUAL CRITERIA SELECTOR ── */}
       <Modal visible={showCriteriaModal} transparent animationType="fade">
@@ -1715,15 +1722,19 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: COLORS.emerald,
-    borderRadius: 10,
-    height: 48,
+    borderRadius: 12,
+    minHeight: 52,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 18,
+    marginTop: 22,
+    marginBottom: 20,
     shadowColor: COLORS.emerald,
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   primaryButtonText: {
     fontSize: 14,

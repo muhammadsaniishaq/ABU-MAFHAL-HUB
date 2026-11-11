@@ -34,7 +34,7 @@ export default function AppLayout() {
     const fabBottom = tabBarBottom + 60 + 12;
 
     const isDesktopWeb = Platform.OS === 'web' && width >= 768;
-    const hideFab = isDesktopWeb || pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/') || pathname?.includes('esim');
+    const hideFab = isDesktopWeb || pathname?.includes('transfer') || pathname?.includes('crypto') || pathname?.includes('tickets/') || pathname?.includes('esim') || pathname?.includes('tin-services');
 
     useEffect(() => {
         // AI Button Pulse Animation
@@ -149,6 +149,7 @@ export default function AppLayout() {
             <Tabs.Screen name="beneficiaries" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="support" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="cac-services" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+            <Tabs.Screen name="tin-services" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="cac-history" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="bulk-sms" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             <Tabs.Screen name="recharge-pin" options={{ href: null, tabBarStyle: { display: 'none' } }} />
