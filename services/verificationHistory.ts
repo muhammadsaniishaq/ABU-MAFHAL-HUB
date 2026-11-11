@@ -100,6 +100,7 @@ export const verificationHistory = {
           const { data, error } = await supabase
             .from('verification_history')
             .insert({
+              id: payload.id,
               user_id: userId,
               service_category: item.service_category,
               service_type: item.service_type,
@@ -326,7 +327,7 @@ export const verificationHistory = {
             id,
             full_name,
             email,
-            phone_number,
+            phone,
             avatar_url
           )
         `)
@@ -336,16 +337,50 @@ export const verificationHistory = {
         q = q.eq('service_category', category);
       }
 
-      const { data: vhData, error: vhError } = await q;
+      let { data: vhData, error: vhError } = await q;
+
+      // Fallback: If PostgREST relationship fails or throws error, query table directly without join
+      if (vhError || !vhData) {
+        console.warn('Admin fetch verification_history join fallback:', vhError?.message);
+        let fbQuery = supabase
+          .from('verification_history')
+          .select('id, user_id, service_category, service_type, search_number, holder_name, layout, details, created_at, updated_at')
+          .order('created_at', { ascending: false });
+        if (category !== 'all') fbQuery = fbQuery.eq('service_category', category);
+        const fbRes = await fbQuery;
+        vhData = fbRes.data as any;
+        vhError = fbRes.error as any;
+      }
+
       if (!vhError && vhData) {
+        // Collect user_ids that lack profiles and fetch their profiles in batch
+        const missingUserIds = vhData
+          .filter((item: any) => !item.profiles && item.user_id && item.user_id !== 'guest_user')
+          .map((item: any) => item.user_id);
+
+        let userMap: Record<string, any> = {};
+        if (missingUserIds.length > 0) {
+          try {
+            const { data: profs } = await supabase
+              .from('profiles')
+              .select('id, full_name, email, phone, avatar_url')
+              .in('id', Array.from(new Set(missingUserIds)));
+            if (profs) {
+              for (const p of profs) userMap[p.id] = p;
+            }
+          } catch (_) {}
+        }
+
         for (const item of vhData) {
           const key = item.id || `${item.service_type}_${item.search_number}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             if (item.search_number) seenKeys.add(item.search_number);
+            const prof = item.profiles || userMap[item.user_id] || null;
             combinedTasks.push({
               ...item,
               holder_name: extractFullName(item.details, item.holder_name),
+              profiles: prof,
             });
           }
         }
@@ -356,7 +391,7 @@ export const verificationHistory = {
 
     // 2. Fetch from Supabase transactions table
     try {
-      const { data: txData, error: txError } = await supabase
+      let txQ = supabase
         .from('transactions')
         .select(`
           id,
@@ -371,12 +406,26 @@ export const verificationHistory = {
             id,
             full_name,
             email,
-            phone_number,
+            phone,
             avatar_url
           )
         `)
         .order('created_at', { ascending: false })
         .limit(300);
+
+      let { data: txData, error: txError } = await txQ;
+
+      // Fallback: If PostgREST relationship fails, query transactions directly
+      if (txError || !txData) {
+        console.warn('Admin fetch transactions join fallback:', txError?.message);
+        const fbTx = await supabase
+          .from('transactions')
+          .select('id, user_id, type, amount, status, reference, description, created_at')
+          .order('created_at', { ascending: false })
+          .limit(300);
+        txData = fbTx.data as any;
+        txError = fbTx.error as any;
+      }
 
       if (!txError && txData) {
         for (const tx of txData) {
@@ -387,8 +436,10 @@ export const verificationHistory = {
           const isNIN = typeLower.includes('nin') || typeLower.includes('ipe') || typeLower.includes('val') ||
                         typeLower.includes('pers') || descLower.includes('nin') || descLower.includes('ipe') ||
                         descLower.includes('validation') || descLower.includes('tracking');
+          const isTIN = typeLower.includes('tin') || descLower.includes('tin') || descLower.includes('tax') ||
+                        (tx as any).category === 'tin' || descLower.includes('tax id');
 
-          const itemCat = isBVN ? 'bvn' : isNIN ? 'nin' : null;
+          const itemCat = isBVN ? 'bvn' : isNIN ? 'nin' : isTIN ? 'tin' : null;
           if (!itemCat) continue;
           if (category !== 'all' && category !== itemCat) continue;
 
@@ -399,12 +450,17 @@ export const verificationHistory = {
             }
           } catch (_) {}
 
-          // Extract search number from reference or description
-          let extractedNum = parsedDetails.search_number || parsedDetails.bvn || parsedDetails.nin || parsedDetails.target || '';
+          // Extract search number and applicant name
+          let extractedNum = parsedDetails.search_number || parsedDetails.bvn || parsedDetails.nin || parsedDetails.taxId || parsedDetails.target || '';
           if (!extractedNum) {
             const numMatch = (tx.description || '').match(/\b\d{10,11}\b/);
-            if (numMatch) extractedNum = numMatch[0];
-            else extractedNum = tx.reference || 'RECORD';
+            if (numMatch) {
+              extractedNum = numMatch[0];
+            } else {
+              const parenMatch = (tx.description || '').match(/\(([^)]+)\)/);
+              if (parenMatch) extractedNum = parenMatch[1].trim();
+              else extractedNum = tx.reference || 'RECORD';
+            }
           }
 
           const refKey = tx.reference || tx.id;
@@ -415,8 +471,17 @@ export const verificationHistory = {
             seenKeys.add(tx.id);
             if (extractedNum && extractedNum !== 'RECORD') seenKeys.add(targetKey);
 
-            let serviceType = parsedDetails.service_type || tx.type || (itemCat === 'bvn' ? 'bvn_verification' : 'nin_standard');
-            const resolvedName = extractFullName(parsedDetails, parsedDetails.holder_name || (tx as any).profiles?.full_name || 'Applicant Record');
+            let serviceType = parsedDetails.service_type || tx.type || (itemCat === 'bvn' ? 'bvn_verification' : itemCat === 'tin' ? 'tin_certificate_retrieval' : 'nin_standard');
+            
+            // Extract applicant name for TIN if present
+            let tinApplicantName = '';
+            if (itemCat === 'tin') {
+              const matchName = (tx.description || '').match(/Tax ID Certificate Retrieval:\s*([^(]+)/i);
+              if (matchName) tinApplicantName = matchName[1].trim();
+            }
+
+            const fallbackName = parsedDetails.holder_name || tinApplicantName || (tx as any).profiles?.full_name || 'Applicant Record';
+            const resolvedName = extractFullName(parsedDetails, fallbackName);
 
             combinedTasks.push({
               id: tx.id,
@@ -425,13 +490,13 @@ export const verificationHistory = {
               service_type: serviceType,
               search_number: extractedNum,
               holder_name: resolvedName,
-              layout: parsedDetails.layout || 'standard',
+              layout: parsedDetails.layout || (itemCat === 'tin' ? 'jtb_tax_certificate' : 'standard'),
               details: {
                 ...parsedDetails,
                 amount: tx.amount,
                 reference: tx.reference,
                 description: tx.description,
-                status: tx.status === 'success' ? 'COMPLETED' : tx.status?.toUpperCase() || 'COMPLETED',
+                status: tx.status === 'success' ? 'PENDING' : tx.status?.toUpperCase() || 'PENDING',
                 source: 'transactions_history'
               },
               created_at: tx.created_at,

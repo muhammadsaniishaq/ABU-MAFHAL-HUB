@@ -79,7 +79,78 @@ export default function ManageTinScreen() {
     setLoading(true);
     try {
       const allTin = await verificationHistory.getAllForAdmin('tin');
-      setTasks(allTin || []);
+      const taskMap = new Map<string, any>();
+      (allTin || []).forEach((t: any) => taskMap.set(t.id, t));
+
+      // Direct safety query to verification_history in case of any schema/RLS difference
+      try {
+        const { data: directData } = await supabase
+          .from('verification_history')
+          .select('*')
+          .eq('service_category', 'tin')
+          .order('created_at', { ascending: false });
+
+        if (directData) {
+          for (const item of directData) {
+            if (!taskMap.has(item.id)) {
+              taskMap.set(item.id, {
+                ...item,
+                holder_name: item.holder_name || item.details?.firstName ? `${item.details?.firstName || ''} ${item.details?.lastName || ''}`.trim() : 'Tax Applicant',
+              });
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Direct safety query to transactions for any TIN / Tax ID records
+      try {
+        const { data: txTin } = await supabase
+          .from('transactions')
+          .select('*')
+          .or('category.eq.tin,description.ilike.%Tax ID%,description.ilike.%TIN%')
+          .order('created_at', { ascending: false })
+          .limit(150);
+
+        if (txTin) {
+          for (const tx of txTin) {
+            if (!taskMap.has(tx.id) && !taskMap.has(tx.reference)) {
+              let parsed: any = {};
+              try {
+                if (tx.description?.startsWith('{')) parsed = JSON.parse(tx.description);
+              } catch (_) {}
+
+              const matchName = tx.description?.match(/Tax ID Certificate Retrieval:\s*([^(]+)/i);
+              const matchNum = tx.description?.match(/\(([^)]+)\)/);
+              const applicantName = parsed.holder_name || (matchName ? matchName[1].trim() : 'Tax Applicant');
+              const searchNum = parsed.search_number || (matchNum ? matchNum[1].trim() : tx.reference || 'TIN-REF');
+
+              taskMap.set(tx.id, {
+                id: tx.id,
+                user_id: tx.user_id,
+                service_category: 'tin',
+                service_type: 'tin_certificate_retrieval',
+                search_number: searchNum,
+                holder_name: applicantName,
+                layout: 'jtb_tax_certificate',
+                details: {
+                  ...parsed,
+                  amount: tx.amount,
+                  reference: tx.reference,
+                  description: tx.description,
+                  status: tx.status === 'success' ? 'PENDING' : 'PENDING',
+                  source: 'transactions'
+                },
+                created_at: tx.created_at,
+              });
+            }
+          }
+        }
+      } catch (_) {}
+
+      const merged = Array.from(taskMap.values()).sort(
+        (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setTasks(merged);
     } catch (err) {
       console.warn('Failed to load TIN tasks:', err);
     } finally {
@@ -97,13 +168,13 @@ export default function ManageTinScreen() {
   const filteredTasks = tasks.filter(item => {
     const details = item.details || {};
     const status = (details.status || 'PENDING').toLowerCase();
-    const serviceType = item.service_type || '';
+    const serviceType = (item.service_type || '').toLowerCase();
 
     // Status filter
     if (statusFilter !== 'all' && status !== statusFilter) return false;
 
     // Type filter
-    if (typeFilter === 'retrieval' && !serviceType.includes('retrieval')) return false;
+    if (typeFilter === 'retrieval' && !serviceType.includes('retrieval') && !serviceType.includes('tin') && !serviceType.includes('tax') && !serviceType.includes('jtb')) return false;
     if (typeFilter === 'registration' && !serviceType.includes('registration')) return false;
 
     // Search query
@@ -111,7 +182,7 @@ export default function ManageTinScreen() {
       const q = searchQuery.toLowerCase().trim();
       const name = (item.holder_name || '').toLowerCase();
       const num = (item.search_number || '').toLowerCase();
-      const phone = (details.contactPhone || details.phone || item.profiles?.phone_number || '').toLowerCase();
+      const phone = (details.contactPhone || details.phone || item.profiles?.phone || item.profiles?.phone_number || '').toLowerCase();
       const tin = (details.generated_tin || details.retrieved_tin || details.taxId || '').toLowerCase();
       return name.includes(q) || num.includes(q) || phone.includes(q) || tin.includes(q);
     }
@@ -234,7 +305,7 @@ export default function ManageTinScreen() {
   // Direct Customer Contact Actions
   const handleContactCustomer = (type: 'whatsapp' | 'call' | 'email') => {
     const details = selectedTask?.details || {};
-    const phone = details.contactPhone || details.phone || selectedTask?.profiles?.phone_number;
+    const phone = details.contactPhone || details.phone || selectedTask?.profiles?.phone || selectedTask?.profiles?.phone_number;
     const email = details.contactEmail || details.email || selectedTask?.profiles?.email;
 
     if (type === 'whatsapp' && phone) {

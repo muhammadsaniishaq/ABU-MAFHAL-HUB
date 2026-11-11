@@ -117,6 +117,27 @@ function getSafePlanSellingPrice(plan: any, networkMarkup: number = 0, markupTyp
     return Math.round(sell);
 }
 
+// Helper: Accurately verify 4-digit Transaction PIN against database
+async function verifyUserPin(supabaseAdmin: any, userId: string, inputPin: string, fallbackPin?: any): Promise<boolean> {
+    const cleanInput = String(inputPin || '').replace(/\D/g, '').trim();
+    if (cleanInput.length !== 4) return false;
+
+    let dbPin = fallbackPin;
+    try {
+        const { data: freshProf } = await supabaseAdmin
+            .from('profiles')
+            .select('transaction_pin')
+            .eq('id', userId)
+            .single();
+        if (freshProf && freshProf.transaction_pin !== undefined && freshProf.transaction_pin !== null) {
+            dbPin = freshProf.transaction_pin;
+        }
+    } catch (_) {}
+
+    const cleanDbPin = String(dbPin ?? '').replace(/\D/g, '').trim();
+    return cleanDbPin.length === 4 && cleanInput === cleanDbPin;
+}
+
 
 // Helper: Send message back to user via WhatsApp Meta Cloud API
 async function sendWhatsAppMessage(
@@ -844,17 +865,23 @@ Deno.serve(async (req: Request) => {
 
                 if (currentStep === 'AWAITING_LINK_PIN') {
                     const { pending_user_id } = sessionData;
+                    const isPinValid = await verifyUserPin(supabaseAdmin, pending_user_id, text);
+
+                    if (!isPinValid) {
+                        const wrongPinMsg = userLang === 'ha'
+                            ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
+                            : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
+                        return reply(wrongPinMsg, 'AWAITING_LINK_PIN', sessionData);
+                    }
+
                     const { data: userProfile } = await supabaseAdmin
                         .from('profiles')
                         .select('id, full_name, transaction_pin, balance, phone')
                         .eq('id', pending_user_id)
                         .single();
 
-                    if (!userProfile || userProfile.transaction_pin !== text) {
-                        const wrongPinMsg = userLang === 'ha'
-                            ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                            : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                        return reply(wrongPinMsg, 'AWAITING_LINK_PIN', sessionData);
+                    if (!userProfile) {
+                        return reply("❌ User profile not found.", 'IDLE', { lang: userLang });
                     }
 
                     // Successfully Linked!
@@ -1400,9 +1427,9 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'DATA_CONFIRM_PIN') {
-                const userPin = text.trim();
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
-                if (!profile.transaction_pin || profile.transaction_pin !== userPin) {
+                if (!isPinValid) {
                     const badPin = userLang === 'ha'
                         ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan ka sake gwadawa daidai, ko ka tura '0' don soke cinikin:`
                         : `❌ *Incorrect Transaction PIN!*\n\nPlease enter the correct 4-digit PIN, or reply '0' to cancel:`;
@@ -1552,9 +1579,9 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'AIRTIME_CONFIRM_PIN') {
-                const userPin = text.trim();
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
-                if (!profile.transaction_pin || profile.transaction_pin !== userPin) {
+                if (!isPinValid) {
                     const badPin = userLang === 'ha'
                         ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan ka sake gwadawa daidai, ko ka tura '0' don sokewa:`
                         : `❌ *Incorrect Transaction PIN!*\n\nPlease try again with your correct 4-digit PIN, or reply '0' to cancel:`;
@@ -1683,7 +1710,8 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'EXAM_CONFIRM_PIN') {
-                if (!profile.transaction_pin || profile.transaction_pin !== text.trim()) {
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!isPinValid) {
                     const badPin = userLang === 'ha'
                         ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
                         : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
@@ -1812,7 +1840,8 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'ELECTRICITY_CONFIRM_PIN') {
-                if (!profile.transaction_pin || profile.transaction_pin !== text.trim()) {
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!isPinValid) {
                     const badPin = userLang === 'ha'
                         ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
                         : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
@@ -1972,7 +2001,8 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'CABLE_CONFIRM_PIN') {
-                if (!profile.transaction_pin || profile.transaction_pin !== text.trim()) {
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!isPinValid) {
                     const badPin = userLang === 'ha'
                         ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
                         : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
@@ -2090,8 +2120,8 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'NIN_CONFIRM_PIN') {
-                const pin = text.trim();
-                if (pin !== profile.pin) {
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!isPinValid) {
                     const wrongPin = userLang === 'ha'
                         ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN ɗinka mai lamba 4 (ko tura '0' don sokewa):`
                         : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
@@ -2195,8 +2225,8 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'BVN_CONFIRM_PIN') {
-                const pin = text.trim();
-                if (pin !== profile.pin) {
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!isPinValid) {
                     const wrongPin = userLang === 'ha'
                         ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da PIN (ko tura '0' don sokewa):`
                         : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
@@ -2334,8 +2364,8 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'CAC_CONFIRM_PIN') {
-                const pin = text.trim();
-                if (pin !== profile.pin) {
+                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!isPinValid) {
                     const wrongPin = userLang === 'ha'
                         ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN mai lamba 4 (ko tura '0' don sokewa):`
                         : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
