@@ -118,24 +118,49 @@ function getSafePlanSellingPrice(plan: any, networkMarkup: number = 0, markupTyp
 }
 
 // Helper: Accurately verify 4-digit Transaction PIN against database
-async function verifyUserPin(supabaseAdmin: any, userId: string, inputPin: string, fallbackPin?: any): Promise<boolean> {
+async function verifyUserPin(
+    supabaseAdmin: any, 
+    userId: string, 
+    inputPin: string, 
+    fallbackPin?: any
+): Promise<boolean> {
     const cleanInput = String(inputPin || '').replace(/\D/g, '').trim();
-    if (cleanInput.length !== 4) return false;
+    if (cleanInput.length !== 4) {
+        console.warn(`[WhatsApp Bot PIN] Input PIN must be 4 digits, got: "${inputPin}" (cleaned: "${cleanInput}")`);
+        return false;
+    }
 
     let dbPin = fallbackPin;
-    try {
-        const { data: freshProf } = await supabaseAdmin
-            .from('profiles')
-            .select('transaction_pin')
-            .eq('id', userId)
-            .single();
-        if (freshProf && freshProf.transaction_pin !== undefined && freshProf.transaction_pin !== null) {
-            dbPin = freshProf.transaction_pin;
+    if (userId) {
+        try {
+            const { data: freshProf, error: profErr } = await supabaseAdmin
+                .from('profiles')
+                .select('transaction_pin')
+                .eq('id', userId)
+                .maybeSingle();
+            if (!profErr && freshProf && freshProf.transaction_pin !== undefined && freshProf.transaction_pin !== null) {
+                dbPin = freshProf.transaction_pin;
+            }
+        } catch (fetchErr) {
+            console.error("[WhatsApp Bot PIN] Error fetching fresh profile PIN:", fetchErr);
         }
-    } catch (_) {}
+    }
 
-    const cleanDbPin = String(dbPin ?? '').replace(/\D/g, '').trim();
-    return cleanDbPin.length === 4 && cleanInput === cleanDbPin;
+    let cleanDbPin = String(dbPin ?? '').replace(/\D/g, '').trim();
+    if (cleanDbPin.toLowerCase() === 'null' || cleanDbPin.toLowerCase() === 'undefined') {
+        cleanDbPin = '';
+    }
+
+    // Default system transaction PIN in Abu Mafhal Sub when unset is strictly '1234'
+    if (!cleanDbPin || cleanDbPin.length === 0) {
+        cleanDbPin = '1234';
+    } else if (cleanDbPin.length > 0 && cleanDbPin.length < 4) {
+        cleanDbPin = cleanDbPin.padStart(4, '0');
+    }
+
+    const isMatch = (cleanInput === cleanDbPin);
+    console.log(`[WhatsApp Bot PIN] Validation: userId=${userId}, input=${cleanInput}, expected=${cleanDbPin}, matched=${isMatch}`);
+    return isMatch;
 }
 
 
@@ -686,25 +711,46 @@ Deno.serve(async (req: Request) => {
 
             // 3. Try resolving user profile if not already linked
             if (!userId) {
-                const cleanDigits = senderPhone.replace(/\D/g, '');
-                const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
-
                 try {
-                    const { data: matchedProfiles } = await supabaseAdmin
-                        .from('profiles')
-                        .select('id, full_name, email, balance, transaction_pin, phone')
-                        .or(`phone.eq.${senderPhone},phone.eq.0${last10},phone.eq.+234${last10},phone.eq.234${last10},phone.eq.${last10}`)
-                        .limit(1);
+                    // Step 3a: Dedicated database RPC with regex digit stripping (matches 080..., 234..., spaces, etc.)
+                    const { data: rpcUsers, error: rpcErr } = await supabaseAdmin
+                        .rpc('get_user_by_whatsapp_phone', { wa_phone: senderPhone });
 
-                    if (matchedProfiles && matchedProfiles.length > 0) {
-                        userId = matchedProfiles[0].id;
+                    if (!rpcErr && rpcUsers && rpcUsers.length > 0 && rpcUsers[0]?.id) {
+                        userId = rpcUsers[0].id;
                         await supabaseAdmin
                             .from('whatsapp_bot_sessions')
                             .update({ user_id: userId })
                             .eq('phone_number', senderPhone);
+                        console.log(`[WhatsApp Bot] Resolved user profile via RPC: ${userId} for ${senderPhone}`);
                     }
-                } catch (e) {
-                    console.error("[WhatsApp Bot] Profile resolution error:", e);
+                } catch (rpcEx) {
+                    console.warn("[WhatsApp Bot] RPC get_user_by_whatsapp_phone error:", rpcEx);
+                }
+
+                // Step 3b: Fallback variations query if RPC did not resolve
+                if (!userId) {
+                    const cleanDigits = senderPhone.replace(/\D/g, '');
+                    const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+
+                    try {
+                        const { data: matchedProfiles } = await supabaseAdmin
+                            .from('profiles')
+                            .select('id, full_name, email, balance, transaction_pin, phone')
+                            .or(`phone.eq.${senderPhone},phone.eq.0${last10},phone.eq.+234${last10},phone.eq.234${last10},phone.eq.${last10},phone.ilike.%${last10}%`)
+                            .limit(1);
+
+                        if (matchedProfiles && matchedProfiles.length > 0) {
+                            userId = matchedProfiles[0].id;
+                            await supabaseAdmin
+                                .from('whatsapp_bot_sessions')
+                                .update({ user_id: userId })
+                                .eq('phone_number', senderPhone);
+                            console.log(`[WhatsApp Bot] Resolved profile via phone fallback: ${userId} for ${senderPhone}`);
+                        }
+                    } catch (e) {
+                        console.error("[WhatsApp Bot] Profile resolution error:", e);
+                    }
                 }
             }
 
@@ -884,7 +930,7 @@ Deno.serve(async (req: Request) => {
                         .from('profiles')
                         .select('id, full_name, transaction_pin, balance, phone')
                         .eq('id', pending_user_id)
-                        .single();
+                        .maybeSingle();
 
                     if (!userProfile) {
                         return reply("❌ User profile not found.", 'IDLE', { lang: userLang });
@@ -897,7 +943,7 @@ Deno.serve(async (req: Request) => {
                         .eq('phone_number', senderPhone);
 
                     // Update profile phone if not set
-                    if (!userProfile.phone) {
+                    if (!userProfile.phone || userProfile.phone.trim() === '') {
                         const localPhone = formatToLocalPhone(senderPhone);
                         await supabaseAdmin.from('profiles').update({ phone: localPhone }).eq('id', userProfile.id);
                     }
@@ -916,11 +962,28 @@ Deno.serve(async (req: Request) => {
             }
 
             // Fetch Linked User Profile
-            const { data: profile } = await supabaseAdmin
+            let { data: profile } = await supabaseAdmin
                 .from('profiles')
                 .select('id, full_name, email, balance, transaction_pin, phone')
                 .eq('id', userId)
                 .maybeSingle();
+
+            // Self-healing: if session userId is stale or deleted, attempt resolving via senderPhone
+            if (!profile) {
+                try {
+                    const { data: rpcUsers } = await supabaseAdmin
+                        .rpc('get_user_by_whatsapp_phone', { wa_phone: senderPhone });
+                    if (rpcUsers && rpcUsers.length > 0 && rpcUsers[0]?.id) {
+                        profile = rpcUsers[0];
+                        userId = profile.id;
+                        await supabaseAdmin
+                            .from('whatsapp_bot_sessions')
+                            .update({ user_id: userId })
+                            .eq('phone_number', senderPhone);
+                        console.log(`[WhatsApp Bot] Recovered profile via phone RPC: ${userId} for ${senderPhone}`);
+                    }
+                } catch (_) {}
+            }
 
             if (!profile) {
                 await supabaseAdmin.from('whatsapp_bot_sessions').update({ user_id: null }).eq('phone_number', senderPhone);
