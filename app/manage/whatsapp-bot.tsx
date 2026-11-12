@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { safeLaunchPicker } from '../../services/systemPickerTracker';
 import { uploadMediaFile } from '../../services/mediaUpload';
@@ -51,6 +51,59 @@ interface CustomerChatThread {
     message_count: number;
     last_message?: string;
     messages: any[];
+}
+
+/**
+ * Universal Nigerian & International Phone Number Extractor
+ * Parses comma, newline, space, slash, or mixed-delimited lists.
+ * Normalizes 080... -> 23480..., strips internal spaces/characters.
+ */
+export function parseNigerianPhoneNumbers(rawInput: string): string[] {
+    if (!rawInput) return [];
+
+    // Normalize separators: newlines, commas, semicolons, slashes, pipes, tabs to spaces
+    const text = rawInput.replace(/[\r\n,;/\t|]+/g, ' ').trim();
+    if (!text) return [];
+
+    const tokens = text.split(/\s+/).filter(Boolean);
+    const cleanedSet = new Set<string>();
+
+    for (const token of tokens) {
+        let digits = token.replace(/\D/g, '');
+        if (!digits) continue;
+
+        // Nigerian 11 digits: 08012345678 -> 2348012345678
+        if (digits.startsWith('0') && digits.length === 11) {
+            digits = '234' + digits.slice(1);
+        }
+        // Nigerian 10 digits without leading 0: 8012345678 -> 2348012345678
+        else if (digits.length === 10 && /^[789]/.test(digits)) {
+            digits = '234' + digits;
+        }
+        // Multiple concatenated numbers stuck together (e.g. pasted without spaces)
+        else if (digits.length > 13) {
+            const matches = digits.match(/(?:234[789]\d{9}|0[789]\d{9}|[789]\d{9})/g);
+            if (matches && matches.length > 0) {
+                for (let m of matches) {
+                    if (m.startsWith('0') && m.length === 11) m = '234' + m.slice(1);
+                    else if (m.length === 10) m = '234' + m;
+                    if (m.length === 13 && m.startsWith('234')) {
+                        cleanedSet.add(m);
+                    }
+                }
+                continue;
+            }
+        }
+
+        // Validate final length: 13 digits for Nigeria (234...), or 10-15 for international
+        if (digits.length === 13 && digits.startsWith('234')) {
+            cleanedSet.add(digits);
+        } else if (digits.length >= 10 && digits.length <= 15) {
+            cleanedSet.add(digits);
+        }
+    }
+
+    return Array.from(cleanedSet);
 }
 
 export default function WhatsAppBotAdmin() {
@@ -100,6 +153,9 @@ export default function WhatsAppBotAdmin() {
     // Broadcast Messenger Tool: 'all_registered' | 'bot_chatters' | 'active_7d' | 'custom'
     const [broadcastAudience, setBroadcastAudience] = useState<'all_registered' | 'bot_chatters' | 'active_7d' | 'custom'>('all_registered');
     const [customBroadcastPhones, setCustomBroadcastPhones] = useState('');
+    const parsedCustomPhones = useMemo(() => {
+        return parseNigerianPhoneNumbers(customBroadcastPhones);
+    }, [customBroadcastPhones]);
     const [broadcastMessage, setBroadcastMessage] = useState('🌟 Sanarwa ta Musamman daga Abu Mafhal Sub!\n\nKuna iya samun sauƙin siyan Data, Airtime, NIN, BVN, da CAC a take a WhatsApp ko shafinmu na gizo.');
     const [broadcastMediaUrl, setBroadcastMediaUrl] = useState('');
     const [broadcastMediaType, setBroadcastMediaType] = useState<'image' | 'video' | null>(null);
@@ -468,20 +524,22 @@ export default function WhatsAppBotAdmin() {
                 const file = res.assets[0];
 
                 setSendingReply(true);
-                const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
                 const filePath = `whatsapp_chat/${cleanTarget}/${Date.now()}_${file.name}`;
 
-                const { error: uploadError } = await supabase.storage
-                    .from('cac_documents')
-                    .upload(filePath, decode(base64), {
-                        contentType: file.mimeType || 'application/pdf',
-                        upsert: true
-                    });
+                const uploadRes = await uploadMediaFile({
+                    uri: file.uri,
+                    file: (file as any).file || null,
+                    bucket: 'cac_documents',
+                    folder: `whatsapp_chat/${cleanTarget}`,
+                    fileName: filePath,
+                    mimeType: file.mimeType || 'application/pdf',
+                });
 
-                if (uploadError) throw uploadError;
+                if (!uploadRes.success || !uploadRes.publicUrl) {
+                    throw new Error(uploadRes.error || 'Failed to upload document');
+                }
 
-                const { data: pubData } = supabase.storage.from('cac_documents').getPublicUrl(filePath);
-                const publicUrl = pubData.publicUrl;
+                const publicUrl = uploadRes.publicUrl;
 
                 // Send via Meta Cloud API
                 const apiRes = await fetch(webhookUrl, {
@@ -670,15 +728,15 @@ export default function WhatsAppBotAdmin() {
                 .filter(Boolean);
         } else if (broadcastAudience === 'custom') {
             label = 'Custom Phone List';
-            recipients = customBroadcastPhones
-                .split(/[\n,;]+/)
-                .map(p => {
-                    let c = p.trim().replace(/\D/g, '');
-                    if (c.startsWith('0') && c.length === 11) c = '234' + c.slice(1);
-                    else if (c.length === 10) c = '234' + c;
-                    return c;
-                })
-                .filter(p => p.length >= 10);
+            if (!customBroadcastPhones.trim()) {
+                setBroadcastError('Please enter at least one recipient phone number in the custom phone input.');
+                return;
+            }
+            recipients = parseNigerianPhoneNumbers(customBroadcastPhones);
+            if (recipients.length === 0) {
+                setBroadcastError('No valid phone numbers recognized. Please enter numbers like 08012345678 or 2348012345678.');
+                return;
+            }
         }
 
         recipients = Array.from(new Set(recipients));
@@ -753,6 +811,12 @@ export default function WhatsAppBotAdmin() {
                     total: preparedRecipients.length
                 });
                 setShowBroadcastConfirmModal(false);
+
+                if (sCount === 0 && fCount > 0) {
+                    const sampleErr = data?.results?.find((r: any) => r.error)?.error;
+                    setBroadcastError(`Delivery failed for ${fCount} recipient(s)${sampleErr ? `: ${sampleErr}` : '. Please verify recipient phone numbers or Meta WhatsApp Cloud API credentials in settings.'}`);
+                }
+
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
@@ -1262,14 +1326,40 @@ export default function WhatsAppBotAdmin() {
 
                                 {broadcastAudience === 'custom' && (
                                     <View style={{ marginTop: 10 }}>
-                                        <Text style={s.inputLabel}>Enter Phone Numbers (Comma or line separated):</Text>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={s.inputLabel}>Enter Custom Phone Numbers:</Text>
+                                            {customBroadcastPhones.trim() ? (
+                                                <TouchableOpacity onPress={() => setCustomBroadcastPhones('')}>
+                                                    <Text style={{ fontSize: 11, color: C.rose, fontWeight: '700' }}>Clear List</Text>
+                                                </TouchableOpacity>
+                                            ) : null}
+                                        </View>
                                         <TextInput
                                             value={customBroadcastPhones}
                                             onChangeText={setCustomBroadcastPhones}
-                                            placeholder="08012345678, 09065645747, 08145853539"
-                                            style={[s.input, { height: 70 }]}
+                                            placeholder="Paste or type numbers separated by spaces, commas, or new lines...&#10;e.g. 08012345678, 09065645747, 2348145853539"
+                                            style={[s.input, { height: 80, textAlignVertical: 'top' }]}
                                             multiline
                                         />
+                                        {parsedCustomPhones.length > 0 ? (
+                                            <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: '#DCFCE7', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#86EFAC' }}>
+                                                <Ionicons name="checkmark-circle" size={15} color="#16A34A" style={{ marginRight: 6 }} />
+                                                <Text style={{ fontSize: 11, color: '#15803D', fontWeight: '700', flex: 1 }}>
+                                                    {parsedCustomPhones.length} valid recipient{parsedCustomPhones.length > 1 ? 's' : ''} detected: {parsedCustomPhones.slice(0, 3).join(', ')}{parsedCustomPhones.length > 3 ? ` (+${parsedCustomPhones.length - 3} more)` : ''}
+                                                </Text>
+                                            </View>
+                                        ) : customBroadcastPhones.trim() ? (
+                                            <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA' }}>
+                                                <Ionicons name="alert-circle" size={15} color="#DC2626" style={{ marginRight: 6 }} />
+                                                <Text style={{ fontSize: 11, color: '#B91C1C', fontWeight: '600', flex: 1 }}>
+                                                    No valid Nigerian phone numbers recognized. Enter 11-digit numbers (e.g. 08012345678) or 234...
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <Text style={{ fontSize: 10, color: C.slate500, marginTop: 4 }}>
+                                                💡 Paste lists directly from WhatsApp, Excel, or Contacts. Space, comma, and line breaks are all supported.
+                                            </Text>
+                                        )}
                                     </View>
                                 )}
 

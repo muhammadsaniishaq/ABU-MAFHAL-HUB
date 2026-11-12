@@ -21,6 +21,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { decode } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system/legacy';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 import { supabase } from '../../services/supabase';
 import { verificationHistory } from '../../services/verificationHistory';
@@ -115,14 +116,15 @@ export default function ManageTinScreen() {
         console.warn('Error querying verification_history directly:', vhErr);
       }
 
-      // 2. Only import orphaned transactions that have NO matching entry in verification_history (to eliminate duplicates)
+      // 2. Only check transactions strictly for TIN retrieval if they were not already captured in verification_history
       try {
         const { data: txTin } = await supabase
           .from('transactions')
           .select('*, profiles:user_id(id, full_name, email, phone)')
-          .or('category.eq.tin,type.ilike.%tin%,description.ilike.%Tax ID Certificate Retrieval%')
+          .eq('category', 'tin')
+          .ilike('description', 'Tax ID Certificate Retrieval%')
           .order('created_at', { ascending: false })
-          .limit(60);
+          .limit(30);
 
         if (txTin) {
           for (const tx of txTin) {
@@ -232,54 +234,22 @@ export default function ManageTinScreen() {
 
       const ext = file.name ? file.name.split('.').pop() || 'pdf' : 'pdf';
       const filepath = `tin_certificates/${selectedTask?.id || Date.now()}_${Date.now()}.${ext}`;
-
-      let uploadPayload: any = null;
-
-      if (Platform.OS === 'web') {
-        if ((file as any).file) {
-          uploadPayload = (file as any).file;
-        } else {
-          try {
-            const res = await fetch(file.uri);
-            uploadPayload = await res.blob();
-          } catch (fetchErr: any) {
-            throw new Error('Unable to read selected certificate file from browser.');
-          }
-        }
-      } else {
-        // Native (Android / iOS)
-        const base64 = await FileSystem.readAsStringAsync(file.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        uploadPayload = decode(base64);
-      }
-
       const mimeType = file.mimeType || (ext === 'pdf' ? 'application/pdf' : 'image/jpeg');
 
-      // Primary upload to chat_images (public & general storage)
-      const { data, error } = await supabase.storage
-        .from('chat_images')
-        .upload(filepath, uploadPayload, {
-          contentType: mimeType,
-          upsert: true,
-        });
+      const uploadRes = await uploadMediaFile({
+        uri: file.uri,
+        file: (file as any).file || null,
+        bucket: 'chat_images',
+        folder: 'tin_certificates',
+        fileName: filepath,
+        mimeType,
+      });
 
-      if (error) {
-        // Fallback to cac_documents
-        const { error: fbErr } = await supabase.storage
-          .from('cac_documents')
-          .upload(filepath, uploadPayload, {
-            contentType: mimeType,
-            upsert: true,
-          });
-        if (fbErr) throw fbErr;
-        const { data: pubData } = supabase.storage.from('cac_documents').getPublicUrl(filepath);
-        setCertificateUrl(pubData.publicUrl);
+      if (uploadRes.success && uploadRes.publicUrl) {
+        setCertificateUrl(uploadRes.publicUrl);
+        Alert.alert('Upload Succeeded 🎉', 'Official Tax ID Certificate PDF uploaded successfully.');
       } else {
-        const { data: publicUrlData } = supabase.storage
-          .from('chat_images')
-          .getPublicUrl(filepath);
-        setCertificateUrl(publicUrlData.publicUrl);
+        throw new Error(uploadRes.error || 'Failed to upload certificate');
       }
 
       Alert.alert('Upload Succeeded 🎉', 'Official Tax ID Certificate PDF uploaded successfully.');
@@ -383,9 +353,12 @@ export default function ManageTinScreen() {
         }
       }
 
-      // Also update local cache so admin and user stay in sync
+      // Also update database record
       try {
-        await verificationHistory.update(selectedTask.id, { details: updatedDetails });
+        await supabase
+          .from('verification_history')
+          .update({ details: updatedDetails, updated_at: new Date().toISOString() })
+          .eq('id', selectedTask.id);
       } catch (_) {}
 
       // Create in-app notification for the user

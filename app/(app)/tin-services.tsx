@@ -21,6 +21,8 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 import { supabase } from '../../services/supabase';
 import { verificationHistory } from '../../services/verificationHistory';
@@ -236,32 +238,70 @@ export default function TinServicesScreen() {
     }
   };
 
-  const handleDownloadCertificate = async (url: string, applicantName?: string) => {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadCertificate = async (url: string, applicantName?: string, itemId?: string) => {
     if (!url) {
       Alert.alert("Pending Processing", "Your certificate is currently being finalized by the tax desk. Please check back shortly.");
       return;
     }
 
+    if (itemId) setDownloadingId(itemId);
+
     try {
+      const safeName = (applicantName || 'document').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      const ext = url.includes('.jpg') || url.includes('.jpeg') ? 'jpg' : url.includes('.png') ? 'png' : 'pdf';
+      const filename = `TIN_Certificate_${safeName}.${ext}`;
+
       if (Platform.OS === 'web') {
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.download = `TIN_Certificate_${(applicantName || 'document').replace(/\s+/g, '_')}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        try {
+          // Direct browser Blob download guarantees real download without mobile popup blocker issues
+          const res = await fetch(url);
+          const blob = await res.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+          Alert.alert("Download Started 🎉", `Certificate "${filename}" has been saved to your downloads folder.`);
+        } catch (fetchErr) {
+          // Fallback to direct download anchor
+          const link = document.createElement('a');
+          link.href = url;
+          link.target = '_blank';
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
       } else {
-        await WebBrowser.openBrowserAsync(url);
+        // Native (Android / iOS): Stream download and open share/save dialog
+        const fileUri = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${filename}`;
+        const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(downloadRes.uri, {
+            mimeType: ext === 'pdf' ? 'application/pdf' : 'image/jpeg',
+            dialogTitle: 'Download & Save Tax ID Certificate',
+            UTI: ext === 'pdf' ? 'com.adobe.pdf' : 'public.jpeg',
+          });
+        } else {
+          await WebBrowser.openBrowserAsync(url);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.warn('Certificate download error:', err);
       try {
         await Linking.openURL(url);
       } catch (_) {
         await Clipboard.setStringAsync(url);
         Alert.alert("Link Copied 📋", "Certificate link has been copied to your clipboard. Paste it into your browser to view.");
       }
+    } finally {
+      if (itemId) setDownloadingId(null);
     }
   };
 
@@ -1045,67 +1085,147 @@ export default function TinServicesScreen() {
           ) : (
             filteredHistory.map((item, i) => {
               const details = item.details || {};
-              const status = (details.status || item.status || 'PENDING').toUpperCase();
-              const isDone = status === 'COMPLETED' || status === 'SUCCESS';
+              const rawStatus = (details.status || item.status || 'PENDING').toUpperCase();
+              const isDone = rawStatus === 'COMPLETED' || rawStatus === 'SUCCESS';
+              const isProcessing = rawStatus === 'PROCESSING';
+              const isRejected = rawStatus === 'REJECTED';
               const certUrl = details.certificate_url || details.file_url || details.download_url || details.document_url || details.certificateUrl || item.certificate_url || '';
               const assignedTin = details.generated_tin || details.retrieved_tin || details.taxId;
+              const isNonIndiv = details.category === 'non_individual';
+              const isDownloading = downloadingId === (item.id || String(i));
 
               return (
-                <View key={item.id || i} style={styles.historyCard}>
-                  <View style={styles.historyCardTop}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.historyName} numberOfLines={1}>
-                        {item.holder_name || 'Tax ID Applicant'}
-                      </Text>
-                      <Text style={styles.historyRef}>
-                        {details.category === 'non_individual' ? 'Non-Individual' : 'Individual'} • Ref: {item.search_number || 'N/A'}
-                      </Text>
+                <View key={item.id || i} style={styles.modernCard}>
+                  {/* Official Header Strip */}
+                  <View style={styles.modernCardHeader}>
+                    <View style={styles.jtbTag}>
+                      <Ionicons name="shield-checkmark" size={13} color={COLORS.jtbGreenDark} />
+                      <Text style={styles.jtbTagText}>JTB PORTAL</Text>
                     </View>
-
-                    <View style={[styles.badge, isDone ? styles.badgeDone : styles.badgePending]}>
-                      <Text style={[styles.badgeText, isDone ? styles.badgeTextDone : styles.badgeTextPending]}>
-                        {status}
+                    <View style={[
+                      styles.modernStatusBadge,
+                      isDone ? styles.statusDone : isProcessing ? styles.statusProcessing : isRejected ? styles.statusRejected : styles.statusPending
+                    ]}>
+                      <Ionicons
+                        name={isDone ? "checkmark-circle" : isProcessing ? "sync-outline" : isRejected ? "close-circle" : "time-outline"}
+                        size={12}
+                        color={isDone ? COLORS.success : isProcessing ? '#D97706' : isRejected ? COLORS.danger : '#2563EB'}
+                      />
+                      <Text style={[
+                        styles.modernStatusText,
+                        { color: isDone ? COLORS.success : isProcessing ? '#D97706' : isRejected ? COLORS.danger : '#2563EB' }
+                      ]}>
+                        {isDone ? 'READY' : isProcessing ? 'PROCESSING' : isRejected ? 'REJECTED' : 'PENDING'}
                       </Text>
                     </View>
                   </View>
 
-                  {assignedTin && (
-                    <View style={styles.tinRow}>
-                      <Text style={styles.tinLabel}>Assigned Tax ID: </Text>
-                      <TouchableOpacity
-                        onPress={() => copyText(assignedTin, 'Tax ID')}
-                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                      >
-                        <Text style={styles.tinValue}>{assignedTin}</Text>
-                        <Ionicons name="copy-outline" size={12} color={COLORS.jtbGreenDark} style={{ marginLeft: 4 }} />
-                      </TouchableOpacity>
+                  {/* Applicant Details */}
+                  <View style={styles.modernCardBody}>
+                    <View style={styles.applicantRow}>
+                      <View style={styles.applicantAvatar}>
+                        <Ionicons name={isNonIndiv ? "business" : "person"} size={18} color={COLORS.jtbGreenDark} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.modernApplicantName} numberOfLines={1}>
+                          {item.holder_name || 'Tax ID Applicant'}
+                        </Text>
+                        <View style={styles.applicantMetaRow}>
+                          <Text style={styles.applicantTypeBadge}>
+                            {isNonIndiv ? '🏢 Corporate' : '👤 Individual'}
+                          </Text>
+                          <Text style={styles.applicantRefText} numberOfLines={1}>
+                            • Ref: {item.search_number || details.nin || details.cacRegNumber || 'JTB-REF'}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                  )}
 
-                  <View style={styles.historyFooter}>
-                    <Text style={styles.historyDate}>
-                      {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Recent'}
-                    </Text>
-
-                    {certUrl ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {/* Tax ID Box (If Issued) */}
+                    {assignedTin ? (
+                      <View style={styles.modernTinBox}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.modernTinLabel}>TAX IDENTIFICATION NUMBER (TIN)</Text>
+                          <Text style={styles.modernTinValue} selectable>{assignedTin}</Text>
+                        </View>
                         <TouchableOpacity
-                          style={styles.downloadBtn}
-                          onPress={() => handleDownloadCertificate(certUrl, item.holder_name)}
+                          style={styles.modernCopyTinBtn}
+                          onPress={() => copyText(assignedTin, 'Tax ID (TIN)')}
+                          activeOpacity={0.7}
                         >
-                          <Ionicons name="download-outline" size={13} color={COLORS.white} style={{ marginRight: 4 }} />
-                          <Text style={styles.downloadBtnText}>Download PDF</Text>
+                          <Ionicons name="copy-outline" size={14} color={COLORS.jtbGreenDark} />
+                          <Text style={styles.modernCopyTinText}>Copy</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+
+                    {/* Info Grid (DOB / Incorporation / Date) */}
+                    <View style={styles.metaGrid}>
+                      {(details.dob || details.dateOfIncorp) && (
+                        <View style={styles.metaGridItem}>
+                          <Text style={styles.metaGridLabel}>{isNonIndiv ? 'Incorp. Date' : 'Date of Birth'}</Text>
+                          <Text style={styles.metaGridVal}>{details.dob || details.dateOfIncorp}</Text>
+                        </View>
+                      )}
+                      <View style={styles.metaGridItem}>
+                        <Text style={styles.metaGridLabel}>Submitted On</Text>
+                        <Text style={styles.metaGridVal}>
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Certificate Action Area */}
+                    {certUrl ? (
+                      <View style={styles.modernActionRow}>
+                        <TouchableOpacity
+                          style={styles.modernPrimaryDownloadBtn}
+                          onPress={() => handleDownloadCertificate(certUrl, item.holder_name, item.id || String(i))}
+                          disabled={isDownloading}
+                          activeOpacity={0.8}
+                        >
+                          {isDownloading ? (
+                            <ActivityIndicator size="small" color={COLORS.white} />
+                          ) : (
+                            <>
+                              <Ionicons name="cloud-download" size={17} color={COLORS.white} style={{ marginRight: 6 }} />
+                              <Text style={styles.modernPrimaryDownloadText}>Download Certificate</Text>
+                            </>
+                          )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.downloadBtn, { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#D1D5DB' }]}
-                          onPress={() => copyText(certUrl, 'Certificate Link')}
+                          style={styles.modernIconBtn}
+                          onPress={() => WebBrowser.openBrowserAsync(certUrl)}
+                          activeOpacity={0.7}
+                          accessibilityLabel="View Certificate Online"
                         >
-                          <Ionicons name="link-outline" size={13} color={COLORS.text} />
+                          <Ionicons name="eye-outline" size={16} color={COLORS.navyDark} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.modernIconBtn}
+                          onPress={() => copyText(certUrl, 'Certificate Download URL')}
+                          activeOpacity={0.7}
+                          accessibilityLabel="Copy Certificate Link"
+                        >
+                          <Ionicons name="link-outline" size={16} color={COLORS.navyDark} />
                         </TouchableOpacity>
                       </View>
                     ) : (
-                      <Text style={styles.pendingNote}>Processing Search</Text>
+                      <View style={styles.modernPendingNotice}>
+                        <Ionicons name="hourglass-outline" size={14} color="#D97706" style={{ marginRight: 6 }} />
+                        <Text style={styles.modernPendingText}>
+                          Processing with Tax Desk. Download button will appear as soon as certificate is ready.
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.modernRefreshBtn}
+                          onPress={loadData}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="refresh" size={12} color="#D97706" />
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
                 </View>
@@ -1685,6 +1805,227 @@ const styles = StyleSheet.create({
     color: COLORS.subText,
     marginTop: 2,
     textAlign: 'center',
+  },
+  modernCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  modernCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  jtbTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6F4EA',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+  },
+  jtbTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.jtbGreenDark,
+    letterSpacing: 0.5,
+  },
+  modernStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+  },
+  statusDone: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusProcessing: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusRejected: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusPending: {
+    backgroundColor: '#EFF6FF',
+  },
+  modernStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  modernCardBody: {
+    padding: 14,
+  },
+  applicantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  applicantAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#E6F4EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernApplicantName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.navyDark,
+  },
+  applicantMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  applicantTypeBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.subText,
+  },
+  applicantRefText: {
+    fontSize: 11,
+    color: COLORS.mutedText,
+    marginLeft: 4,
+    flexShrink: 1,
+  },
+  modernTinBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginTop: 12,
+  },
+  modernTinLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.jtbGreenDark,
+    letterSpacing: 0.5,
+  },
+  modernTinValue: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#065F46',
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  modernCopyTinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    gap: 4,
+  },
+  modernCopyTinText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.jtbGreenDark,
+  },
+  metaGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 10,
+    gap: 12,
+  },
+  metaGridItem: {
+    flex: 1,
+  },
+  metaGridLabel: {
+    fontSize: 10,
+    color: COLORS.mutedText,
+    fontWeight: '600',
+  },
+  metaGridVal: {
+    fontSize: 11,
+    color: COLORS.text,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  modernActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  modernPrimaryDownloadBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.jtbGreen,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    shadowColor: COLORS.jtbGreen,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  modernPrimaryDownloadText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.white,
+    letterSpacing: 0.2,
+  },
+  modernIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modernPendingNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  modernPendingText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400E',
+    lineHeight: 15,
+  },
+  modernRefreshBtn: {
+    padding: 4,
+    marginLeft: 6,
   },
   historyCard: {
     backgroundColor: COLORS.white,

@@ -465,19 +465,34 @@ Deno.serve(async (req: Request) => {
                 let failCount = 0;
                 const results: any[] = [];
 
+                // Clean, normalize and deduplicate recipients
+                const validRecipients: string[] = [];
                 for (const rawTo of recipients) {
                     let clean = String(rawTo).replace(/\D/g, '');
                     if (clean.startsWith('0') && clean.length === 11) clean = '234' + clean.slice(1);
-                    else if (clean.length === 10) clean = '234' + clean;
+                    else if (clean.length === 10 && /^[789]/.test(clean)) clean = '234' + clean;
 
-                    if (clean.length >= 10) {
+                    if (clean.length >= 10 && clean.length <= 15) {
+                        validRecipients.push(clean);
+                    }
+                }
+
+                const uniqueRecipients = Array.from(new Set(validRecipients));
+
+                const mediaUrl = body.media_url ? String(body.media_url).trim() : '';
+                const mediaType = body.media_type || (
+                    mediaUrl.match(/\.(mp4|3gp|mov|avi|mkv|webm)/i) ? 'video' :
+                    mediaUrl.match(/\.(pdf|doc|docx)/i) ? 'document' :
+                    mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'
+                );
+
+                // Concurrency control: batch in chunks of 4 concurrent requests to prevent edge function timeouts
+                const BATCH_SIZE = 4;
+                for (let i = 0; i < uniqueRecipients.length; i += BATCH_SIZE) {
+                    const chunk = uniqueRecipients.slice(i, i + BATCH_SIZE);
+                    await Promise.all(chunk.map(async (clean) => {
                         let sent = false;
-                        const mediaUrl = body.media_url ? String(body.media_url).trim() : '';
-                        const mediaType = body.media_type || (
-                            mediaUrl.match(/\.(mp4|3gp|mov|avi|mkv|webm)/i) ? 'video' :
-                            mediaUrl.match(/\.(pdf|doc|docx)/i) ? 'document' :
-                            mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'
-                        );
+                        let errorReason = '';
 
                         if (mediaUrl && (mediaType === 'image' || mediaType === 'video' || mediaType === 'document')) {
                             try {
@@ -507,13 +522,15 @@ Deno.serve(async (req: Request) => {
                                 sent = res.ok;
                                 if (!res.ok) {
                                     const errJson = await res.json().catch(() => ({}));
+                                    errorReason = errJson?.error?.message || `Meta Cloud API status ${res.status}`;
                                     console.error(`[WhatsApp Broadcast] Media send error to ${clean}:`, res.status, JSON.stringify(errJson));
                                     // If media attachment failed (e.g. meta link timeout) but text exists, fallback to sending message text
                                     if (msg) {
                                         sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
                                     }
                                 }
-                            } catch (metaEx) {
+                            } catch (metaEx: any) {
+                                errorReason = metaEx?.message || 'Network exception';
                                 console.error(`[WhatsApp Broadcast] Exception sending media to ${clean}:`, metaEx);
                                 if (msg) {
                                     sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
@@ -542,9 +559,9 @@ Deno.serve(async (req: Request) => {
                             } catch (_) {}
                         } else {
                             failCount++;
-                            results.push({ to: clean, status: 'failed' });
+                            results.push({ to: clean, status: 'failed', error: errorReason || 'Failed to deliver via Meta API' });
                         }
-                    }
+                    }));
                 }
 
                 return new Response(JSON.stringify({
