@@ -14,6 +14,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
+import { safeLaunchPicker } from '../../services/systemPickerTracker';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 const C = {
     navyDark: '#060B18',
@@ -535,62 +537,50 @@ export default function WhatsAppBotAdmin() {
             let res: any = null;
 
             if (type === 'image') {
-                res = await ImagePicker.launchImageLibraryAsync({
+                res = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ['images'],
                     allowsEditing: false,
                     quality: 0.85,
                     base64: true,
-                });
+                }));
             } else {
-                res = await ImagePicker.launchImageLibraryAsync({
+                res = await safeLaunchPicker(() => ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ['videos'],
                     allowsEditing: false,
-                    videoMaxDuration: 180,
-                });
+                    videoExportPreset: ImagePicker.VideoExportPreset.Passthrough,
+                    videoMaxDuration: 300,
+                }));
             }
 
             if (res.canceled || !res.assets || res.assets.length === 0) return;
             const asset = res.assets[0];
 
             setUploadingBroadcastMedia(true);
-            let base64Data = asset.base64;
-            if (!base64Data) {
-                base64Data = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
-            }
 
-            const ext = type === 'video' ? 'mp4' : (asset.mimeType?.includes('png') ? 'png' : 'jpg');
-            const mimeType = type === 'video' ? 'video/mp4' : (asset.mimeType || 'image/jpeg');
+            const isVideo = type === 'video';
+            const ext = isVideo ? 'mp4' : (asset.mimeType?.includes('png') ? 'png' : 'jpg');
+            const mimeType = isVideo ? 'video/mp4' : (asset.mimeType || 'image/jpeg');
             const fileName = `broadcast_${type}_${Date.now()}.${ext}`;
-            const filePath = `whatsapp_broadcast/${fileName}`;
-            const bucket = type === 'video' ? 'cac_documents' : 'chat_images';
 
-            const { error: uploadError } = await supabase.storage
-                .from(bucket)
-                .upload(filePath, decode(base64Data), {
-                    contentType: mimeType,
-                    upsert: true,
-                });
+            const uploadRes = await uploadMediaFile({
+                uri: asset.uri,
+                bucket: isVideo ? 'cac_documents' : 'chat_images',
+                folder: 'whatsapp_broadcast',
+                fileName: `whatsapp_broadcast/${fileName}`,
+                mimeType,
+                base64: asset.base64,
+                isVideo,
+            });
 
-            if (uploadError) {
-                const fallbackBucket = bucket === 'cac_documents' ? 'chat_images' : 'cac_documents';
-                const { error: fbErr } = await supabase.storage
-                    .from(fallbackBucket)
-                    .upload(filePath, decode(base64Data), {
-                        contentType: mimeType,
-                        upsert: true,
-                    });
-                if (fbErr) throw fbErr;
-                const { data: pubData } = supabase.storage.from(fallbackBucket).getPublicUrl(filePath);
-                setBroadcastMediaUrl(pubData.publicUrl);
+            if (uploadRes.success && uploadRes.publicUrl) {
+                setBroadcastMediaUrl(uploadRes.publicUrl);
+                setBroadcastMediaType(type);
+                setBroadcastMediaName(asset.fileName || fileName);
+                if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
             } else {
-                const { data: pubData } = supabase.storage.from(bucket).getPublicUrl(filePath);
-                setBroadcastMediaUrl(pubData.publicUrl);
-            }
-
-            setBroadcastMediaType(type);
-            setBroadcastMediaName(asset.fileName || fileName);
-            if (Platform.OS !== 'web') {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                throw new Error(uploadRes.error || `Failed to upload ${type}`);
             }
         } catch (err: any) {
             console.error('Failed to upload broadcast media:', err);
