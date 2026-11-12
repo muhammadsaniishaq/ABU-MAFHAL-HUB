@@ -429,8 +429,8 @@ Deno.serve(async (req: Request) => {
                     : (body.to ? [String(body.to)] : []);
                 const msg = String(body.message || '').trim();
 
-                if (recipients.length === 0 || !msg) {
-                    return new Response(JSON.stringify({ error: "Missing recipients or message body" }), {
+                if (recipients.length === 0 || (!msg && !body.media_url)) {
+                    return new Response(JSON.stringify({ error: "Missing recipients, message body, or media URL" }), {
                         headers: { ...corsHeaders, "Content-Type": "application/json" },
                         status: 400
                     });
@@ -448,9 +448,13 @@ Deno.serve(async (req: Request) => {
                     if (clean.length >= 10) {
                         let sent = false;
                         const mediaUrl = body.media_url ? String(body.media_url).trim() : '';
-                        const mediaType = body.media_type || (mediaUrl.match(/\.(pdf|doc|docx)/i) ? 'document' : (mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'));
+                        const mediaType = body.media_type || (
+                            mediaUrl.match(/\.(mp4|3gp|mov|avi|mkv|webm)/i) ? 'video' :
+                            mediaUrl.match(/\.(pdf|doc|docx)/i) ? 'document' :
+                            mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'
+                        );
 
-                        if (mediaUrl && (mediaType === 'image' || mediaType === 'document')) {
+                        if (mediaUrl && (mediaType === 'image' || mediaType === 'video' || mediaType === 'document')) {
                             try {
                                 const payload: any = {
                                     messaging_product: 'whatsapp',
@@ -461,6 +465,8 @@ Deno.serve(async (req: Request) => {
 
                                 if (mediaType === 'image') {
                                     payload.image = { link: mediaUrl, caption: msg || undefined };
+                                } else if (mediaType === 'video') {
+                                    payload.video = { link: mediaUrl, caption: msg || undefined };
                                 } else {
                                     payload.document = { link: mediaUrl, filename: body.filename || 'Document.pdf', caption: msg || undefined };
                                 }
@@ -488,8 +494,8 @@ Deno.serve(async (req: Request) => {
                                 await supabaseAdmin.from('whatsapp_bot_logs').insert({
                                     phone_number: clean,
                                     direction: 'outgoing',
-                                    message_type: mediaType,
-                                    content: msg || (mediaType === 'image' ? '📷 [Image Sent]' : '📄 [Document Sent]'),
+                                    message_type: mediaUrl ? mediaType : 'text',
+                                    content: msg || (mediaType === 'video' ? '🎥 [Video Sent]' : mediaType === 'image' ? '📷 [Image Sent]' : '📄 [Document Sent]'),
                                     raw_payload: {
                                         media_url: mediaUrl,
                                         media_type: mediaType,

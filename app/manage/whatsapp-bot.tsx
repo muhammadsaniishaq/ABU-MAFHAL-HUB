@@ -99,6 +99,10 @@ export default function WhatsAppBotAdmin() {
     const [broadcastAudience, setBroadcastAudience] = useState<'all_registered' | 'bot_chatters' | 'active_7d' | 'custom'>('all_registered');
     const [customBroadcastPhones, setCustomBroadcastPhones] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('🌟 Sanarwa ta Musamman daga Abu Mafhal Sub!\n\nKuna iya samun sauƙin siyan Data, Airtime, NIN, BVN, da CAC a take a WhatsApp ko shafinmu na gizo.');
+    const [broadcastMediaUrl, setBroadcastMediaUrl] = useState('');
+    const [broadcastMediaType, setBroadcastMediaType] = useState<'image' | 'video' | null>(null);
+    const [broadcastMediaName, setBroadcastMediaName] = useState('');
+    const [uploadingBroadcastMedia, setUploadingBroadcastMedia] = useState(false);
     const [broadcastResult, setBroadcastResult] = useState<any>(null);
     const [showBroadcastConfirmModal, setShowBroadcastConfirmModal] = useState(false);
     const [preparedRecipients, setPreparedRecipients] = useState<string[]>([]);
@@ -524,14 +528,92 @@ export default function WhatsAppBotAdmin() {
         }
     };
 
+    // Pick Broadcast Media (Image or Video)
+    const handlePickBroadcastMedia = async (type: 'image' | 'video') => {
+        try {
+            setBroadcastError(null);
+            let res: any = null;
+
+            if (type === 'image') {
+                res = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['images'],
+                    allowsEditing: false,
+                    quality: 0.85,
+                    base64: true,
+                });
+            } else {
+                res = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['videos'],
+                    allowsEditing: false,
+                    videoMaxDuration: 180,
+                });
+            }
+
+            if (res.canceled || !res.assets || res.assets.length === 0) return;
+            const asset = res.assets[0];
+
+            setUploadingBroadcastMedia(true);
+            let base64Data = asset.base64;
+            if (!base64Data) {
+                base64Data = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+            }
+
+            const ext = type === 'video' ? 'mp4' : (asset.mimeType?.includes('png') ? 'png' : 'jpg');
+            const mimeType = type === 'video' ? 'video/mp4' : (asset.mimeType || 'image/jpeg');
+            const fileName = `broadcast_${type}_${Date.now()}.${ext}`;
+            const filePath = `whatsapp_broadcast/${fileName}`;
+            const bucket = type === 'video' ? 'cac_documents' : 'chat_images';
+
+            const { error: uploadError } = await supabase.storage
+                .from(bucket)
+                .upload(filePath, decode(base64Data), {
+                    contentType: mimeType,
+                    upsert: true,
+                });
+
+            if (uploadError) {
+                const fallbackBucket = bucket === 'cac_documents' ? 'chat_images' : 'cac_documents';
+                const { error: fbErr } = await supabase.storage
+                    .from(fallbackBucket)
+                    .upload(filePath, decode(base64Data), {
+                        contentType: mimeType,
+                        upsert: true,
+                    });
+                if (fbErr) throw fbErr;
+                const { data: pubData } = supabase.storage.from(fallbackBucket).getPublicUrl(filePath);
+                setBroadcastMediaUrl(pubData.publicUrl);
+            } else {
+                const { data: pubData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+                setBroadcastMediaUrl(pubData.publicUrl);
+            }
+
+            setBroadcastMediaType(type);
+            setBroadcastMediaName(asset.fileName || fileName);
+            if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+        } catch (err: any) {
+            console.error('Failed to upload broadcast media:', err);
+            setBroadcastError(`Failed to attach ${type}: ${err.message || 'Upload error'}`);
+        } finally {
+            setUploadingBroadcastMedia(false);
+        }
+    };
+
+    const handleRemoveBroadcastMedia = () => {
+        setBroadcastMediaUrl('');
+        setBroadcastMediaType(null);
+        setBroadcastMediaName('');
+    };
+
     // Send Bulk Broadcast
     const handleSendBroadcast = async () => {
         setBroadcastError(null);
         setBroadcastResult(null);
         setBroadcastSuccessStats(null);
 
-        if (!broadcastMessage.trim()) {
-            setBroadcastError('Please enter a message to broadcast.');
+        if (!broadcastMessage.trim() && !broadcastMediaUrl.trim()) {
+            setBroadcastError('Please enter a message or attach an image/video to broadcast.');
             return;
         }
 
@@ -630,7 +712,9 @@ export default function WhatsAppBotAdmin() {
                     body: {
                         action: 'admin_broadcast',
                         recipients: preparedRecipients,
-                        message: broadcastMessage.trim()
+                        message: broadcastMessage.trim(),
+                        media_url: broadcastMediaUrl.trim() || undefined,
+                        media_type: broadcastMediaType || undefined,
                     }
                 });
 
@@ -651,7 +735,9 @@ export default function WhatsAppBotAdmin() {
                     body: JSON.stringify({
                         action: 'admin_broadcast',
                         recipients: preparedRecipients,
-                        message: broadcastMessage.trim()
+                        message: broadcastMessage.trim(),
+                        media_url: broadcastMediaUrl.trim() || undefined,
+                        media_type: broadcastMediaType || undefined,
                     })
                 });
                 data = await res.json();
@@ -1236,10 +1322,101 @@ export default function WhatsAppBotAdmin() {
                                     </TouchableOpacity>
                                 </View>
 
+                                {/* Media Attachment (Photo or Video) */}
+                                <View style={s.mediaAttachBox}>
+                                    <View style={s.mediaAttachHeader}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="images" size={16} color={C.waDarkGreen} style={{ marginRight: 6 }} />
+                                            <Text style={s.mediaAttachTitle}>Media Attachment (Photo or Video)</Text>
+                                        </View>
+                                        {broadcastMediaUrl ? (
+                                            <TouchableOpacity onPress={handleRemoveBroadcastMedia}>
+                                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Remove</Text>
+                                            </TouchableOpacity>
+                                        ) : null}
+                                    </View>
+
+                                    {!broadcastMediaUrl ? (
+                                        <>
+                                            <View style={s.mediaBtnRow}>
+                                                <TouchableOpacity
+                                                    activeOpacity={0.7}
+                                                    disabled={uploadingBroadcastMedia}
+                                                    onPress={() => handlePickBroadcastMedia('image')}
+                                                    style={s.mediaBtn}
+                                                >
+                                                    <Ionicons name="camera" size={16} color="#059669" />
+                                                    <Text style={s.mediaBtnText}>Attach Photo</Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    activeOpacity={0.7}
+                                                    disabled={uploadingBroadcastMedia}
+                                                    onPress={() => handlePickBroadcastMedia('video')}
+                                                    style={s.mediaBtn}
+                                                >
+                                                    <Ionicons name="videocam" size={16} color="#2563EB" />
+                                                    <Text style={s.mediaBtnText}>Attach Video</Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {uploadingBroadcastMedia && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10 }}>
+                                                    <ActivityIndicator size="small" color={C.waDarkGreen} style={{ marginRight: 8 }} />
+                                                    <Text style={{ fontSize: 12, color: C.slate600, fontWeight: '600' }}>
+                                                        Uploading media to cloud storage...
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <View style={s.mediaAttachedCard}>
+                                            {broadcastMediaType === 'image' ? (
+                                                <Image source={{ uri: broadcastMediaUrl }} style={s.mediaAttachedThumb} resizeMode="cover" />
+                                            ) : (
+                                                <View style={s.mediaAttachedIconBox}>
+                                                    <Ionicons name="videocam" size={24} color="#2563EB" />
+                                                </View>
+                                            )}
+
+                                            <View style={s.mediaAttachedInfo}>
+                                                <Text style={s.mediaAttachedTitle} numberOfLines={1}>
+                                                    {broadcastMediaType === 'image' ? '📷 Photo Attached' : '🎥 Video Attached (MP4)'}
+                                                </Text>
+                                                <Text style={s.mediaAttachedUrl} numberOfLines={1}>
+                                                    {broadcastMediaName || broadcastMediaUrl}
+                                                </Text>
+                                            </View>
+
+                                            <TouchableOpacity
+                                                activeOpacity={0.7}
+                                                onPress={handleRemoveBroadcastMedia}
+                                                style={s.mediaRemoveBtn}
+                                            >
+                                                <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+
                                 {/* WhatsApp Preview Box */}
                                 <Text style={[s.inputLabel, { marginTop: 14 }]}>WhatsApp Message Preview:</Text>
                                 <View style={s.previewCard}>
                                     <View style={s.previewBubble}>
+                                        {broadcastMediaUrl ? (
+                                            broadcastMediaType === 'image' ? (
+                                                <Image
+                                                    source={{ uri: broadcastMediaUrl }}
+                                                    style={{ width: '100%', height: 160, borderRadius: 8, marginBottom: 8 }}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <View style={{ width: '100%', height: 120, borderRadius: 8, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                                                    <Ionicons name="play-circle" size={44} color={C.white} />
+                                                    <Text style={{ color: C.white, fontSize: 11, fontWeight: '700', marginTop: 4 }}>Video Preview ({broadcastMediaName || 'Video.mp4'})</Text>
+                                                </View>
+                                            )
+                                        ) : null}
                                         <Text style={s.previewText}>{broadcastMessage}</Text>
                                         <View style={s.previewTimeRow}>
                                             <Text style={s.previewTime}>12:00 PM</Text>
@@ -1451,6 +1628,15 @@ export default function WhatsAppBotAdmin() {
                                 {broadcastAudienceLabel}: <Text style={{ fontWeight: '800' }}>{preparedRecipients.length} Recipient(s)</Text>
                             </Text>
                         </View>
+
+                        {broadcastMediaUrl ? (
+                            <View style={[s.confirmAudienceBadge, { backgroundColor: broadcastMediaType === 'image' ? '#EFF6FF' : '#FDF2F8', borderColor: broadcastMediaType === 'image' ? '#BFDBFE' : '#FBCFE8', marginBottom: 12 }]}>
+                                <Ionicons name={broadcastMediaType === 'image' ? "image" : "videocam"} size={14} color={broadcastMediaType === 'image' ? "#2563EB" : "#DB2777"} style={{ marginRight: 6 }} />
+                                <Text style={[s.confirmAudienceText, { color: broadcastMediaType === 'image' ? "#1D4ED8" : "#BE185D" }]}>
+                                    Attachment: <Text style={{ fontWeight: '800' }}>{broadcastMediaType === 'image' ? '📷 Photo Included' : '🎥 Video Included'}</Text>
+                                </Text>
+                            </View>
+                        ) : null}
 
                         <Text style={s.confirmPreviewLabel}>Message to be sent:</Text>
                         <ScrollView style={s.confirmPreviewBox} nestedScrollEnabled>
@@ -2699,5 +2885,90 @@ const s = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
         color: C.white,
+    },
+    mediaAttachBox: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: C.slate200,
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 12,
+    },
+    mediaAttachHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    mediaAttachTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: C.navyDark,
+    },
+    mediaBtnRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    mediaBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 9,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: C.slate300,
+        gap: 6,
+    },
+    mediaBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: C.slate700,
+    },
+    mediaAttachedCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: '#86EFAC',
+        borderRadius: 10,
+        padding: 10,
+        marginTop: 4,
+    },
+    mediaAttachedThumb: {
+        width: 50,
+        height: 50,
+        borderRadius: 8,
+        backgroundColor: '#E2E8F0',
+    },
+    mediaAttachedIconBox: {
+        width: 50,
+        height: 50,
+        borderRadius: 8,
+        backgroundColor: '#DCFCE7',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mediaAttachedInfo: {
+        flex: 1,
+        marginLeft: 10,
+    },
+    mediaAttachedTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: C.navyDark,
+    },
+    mediaAttachedUrl: {
+        fontSize: 10,
+        color: C.slate500,
+        marginTop: 2,
+    },
+    mediaRemoveBtn: {
+        padding: 6,
+        borderRadius: 8,
+        backgroundColor: '#FEE2E2',
     },
 });
