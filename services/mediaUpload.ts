@@ -11,6 +11,7 @@ export interface UploadMediaOptions {
   mimeType?: string;
   base64?: string | null;
   isVideo?: boolean;
+  file?: any;
 }
 
 export interface UploadMediaResult {
@@ -37,34 +38,52 @@ export async function uploadMediaFile(options: UploadMediaOptions): Promise<Uplo
   const ext = (uri.split('.').pop() || (isVideo ? 'mp4' : 'jpg')).split('?')[0];
   const finalFileName = options.fileName || `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
 
-  // 1. Web Environment: direct base64 ArrayBuffer or blob upload
+  // 1. Web Environment: direct base64 ArrayBuffer, File, or blob upload
   if (Platform.OS === 'web') {
     try {
-      let uploadPayload: any;
-      if (base64) {
-        const clean = base64.includes(',') ? base64.split(',')[1] : base64;
-        uploadPayload = decode(clean);
-      } else {
-        const response = await fetch(uri);
-        uploadPayload = await response.blob();
+      let uploadPayload: any = options.file || null;
+      if (!uploadPayload) {
+        if (base64) {
+          const clean = base64.includes(',') ? base64.split(',')[1] : base64;
+          uploadPayload = decode(clean);
+        } else {
+          try {
+            const response = await fetch(uri);
+            uploadPayload = await response.blob();
+          } catch (fetchErr: any) {
+            throw new Error('Unable to read selected media file. Please try selecting the file again.');
+          }
+        }
       }
+
+      // Size check: WhatsApp strictly limits videos to 16MB
+      if (uploadPayload && typeof uploadPayload.size === 'number') {
+        const sizeMb = uploadPayload.size / (1024 * 1024);
+        if (isVideo && sizeMb > 16) {
+          throw new Error(`Video file is too large (${sizeMb.toFixed(1)} MB). WhatsApp Cloud API only supports videos up to 16 MB. Please select a shorter or compressed video.`);
+        }
+      }
+
+      const targetBucket = bucket || (isVideo ? 'chat_images' : 'banners');
       const { error: uploadError } = await supabase.storage
-        .from(bucket)
+        .from(targetBucket)
         .upload(finalFileName, uploadPayload, { contentType: mimeType, upsert: true });
 
       if (uploadError) {
-        // Fallback to 'avatars' bucket
+        // Fallback to 'chat_images' or 'avatars' bucket
+        const altBucket = targetBucket === 'chat_images' ? 'avatars' : 'chat_images';
         const { error: fallbackError } = await supabase.storage
-          .from('avatars')
+          .from(altBucket)
           .upload(finalFileName, uploadPayload, { contentType: mimeType, upsert: true });
         if (fallbackError) throw fallbackError;
-        const { data } = supabase.storage.from('avatars').getPublicUrl(finalFileName);
+        const { data } = supabase.storage.from(altBucket).getPublicUrl(finalFileName);
         return { success: true, publicUrl: data.publicUrl };
       }
 
-      const { data } = supabase.storage.from(bucket).getPublicUrl(finalFileName);
+      const { data } = supabase.storage.from(targetBucket).getPublicUrl(finalFileName);
       return { success: true, publicUrl: data.publicUrl };
     } catch (err: any) {
+      console.error('Web upload error:', err);
       return { success: false, publicUrl: '', error: err.message || 'Web upload failed' };
     }
   }

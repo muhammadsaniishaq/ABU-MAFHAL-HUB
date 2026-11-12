@@ -555,6 +555,13 @@ export default function WhatsAppBotAdmin() {
             if (res.canceled || !res.assets || res.assets.length === 0) return;
             const asset = res.assets[0];
 
+            // Size validation: WhatsApp limits video to 16MB
+            if (asset.fileSize && isVideo && asset.fileSize > 16 * 1024 * 1024) {
+                const mb = (asset.fileSize / (1024 * 1024)).toFixed(1);
+                Alert.alert('Video Too Large', `Selected video is ${mb} MB. WhatsApp Cloud API supports videos up to 16 MB. Please select a shorter video.`);
+                return;
+            }
+
             setUploadingBroadcastMedia(true);
 
             const isVideo = type === 'video';
@@ -564,7 +571,8 @@ export default function WhatsAppBotAdmin() {
 
             const uploadRes = await uploadMediaFile({
                 uri: asset.uri,
-                bucket: isVideo ? 'cac_documents' : 'chat_images',
+                file: (asset as any).file || null,
+                bucket: 'chat_images',
                 folder: 'whatsapp_broadcast',
                 fileName: `whatsapp_broadcast/${fileName}`,
                 mimeType,

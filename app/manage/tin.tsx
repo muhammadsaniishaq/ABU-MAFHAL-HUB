@@ -107,12 +107,24 @@ export default function ManageTinScreen() {
         const { data: txTin } = await supabase
           .from('transactions')
           .select('*')
-          .or('category.eq.tin,description.ilike.%Tax ID%,description.ilike.%TIN%')
+          .or('category.eq.tin,type.ilike.%tin%,description.ilike.%Tax ID Certificate Retrieval%,description.ilike.%TIN Registration%')
           .order('created_at', { ascending: false })
-          .limit(150);
+          .limit(100);
 
         if (txTin) {
           for (const tx of txTin) {
+            const desc = (tx.description || '').toLowerCase();
+            const typeLower = (tx.type || '').toLowerCase();
+            const isRealTin = (tx as any).category === 'tin' ||
+                              typeLower.startsWith('tin') ||
+                              desc.includes('tax id') ||
+                              desc.includes('tax certificate') ||
+                              desc.includes('jtb') ||
+                              desc.includes('jrb') ||
+                              /\btin\b/i.test(tx.description || '');
+
+            if (!isRealTin) continue;
+
             if (!taskMap.has(tx.id) && !taskMap.has(tx.reference)) {
               let parsed: any = {};
               try {
@@ -121,23 +133,26 @@ export default function ManageTinScreen() {
 
               const matchName = tx.description?.match(/Tax ID Certificate Retrieval:\s*([^(]+)/i);
               const matchNum = tx.description?.match(/\(([^)]+)\)/);
-              const applicantName = parsed.holder_name || (matchName ? matchName[1].trim() : 'Tax Applicant');
-              const searchNum = parsed.search_number || (matchNum ? matchNum[1].trim() : tx.reference || 'TIN-REF');
+              const applicantName = parsed.holder_name || (matchName ? matchName[1].trim() : (parsed.firstName ? `${parsed.firstName} ${parsed.lastName || ''}`.trim() : ''));
+              const searchNum = parsed.search_number || parsed.nin || parsed.cacRegNumber || (matchNum ? matchNum[1].trim() : '');
+
+              // Don't add placeholder entries without valid name or search number
+              if (!applicantName && !searchNum && !parsed.nin) continue;
 
               taskMap.set(tx.id, {
                 id: tx.id,
                 user_id: tx.user_id,
                 service_category: 'tin',
-                service_type: 'tin_certificate_retrieval',
-                search_number: searchNum,
-                holder_name: applicantName,
+                service_type: parsed.service_type || 'tin_certificate_retrieval',
+                search_number: searchNum || tx.reference,
+                holder_name: applicantName || 'Tax Applicant',
                 layout: 'jtb_tax_certificate',
                 details: {
                   ...parsed,
                   amount: tx.amount,
                   reference: tx.reference,
                   description: tx.description,
-                  status: tx.status === 'success' ? 'PENDING' : 'PENDING',
+                  status: parsed.status || 'PENDING',
                   source: 'transactions'
                 },
                 created_at: tx.created_at,
@@ -206,7 +221,7 @@ export default function ManageTinScreen() {
     setAdminNotes(d.admin_notes || d.resolution_message || '');
   };
 
-  // Upload PDF certificate to Supabase Storage
+  // Upload PDF certificate to Supabase Storage (Safe for Web and Native)
   const handleUploadCertificate = async () => {
     try {
       const doc = await DocumentPicker.getDocumentAsync({
@@ -219,34 +234,91 @@ export default function ManageTinScreen() {
       const file = doc.assets[0];
       setUploadingPdf(true);
 
-      const base64 = await FileSystem.readAsStringAsync(file.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
       const ext = file.name ? file.name.split('.').pop() || 'pdf' : 'pdf';
-      const filepath = `tin_certificates/${selectedTask.id}_${Date.now()}.${ext}`;
+      const filepath = `tin_certificates/${selectedTask?.id || Date.now()}_${Date.now()}.${ext}`;
 
+      let uploadPayload: any = null;
+
+      if (Platform.OS === 'web') {
+        if ((file as any).file) {
+          uploadPayload = (file as any).file;
+        } else {
+          try {
+            const res = await fetch(file.uri);
+            uploadPayload = await res.blob();
+          } catch (fetchErr: any) {
+            throw new Error('Unable to read selected certificate file from browser.');
+          }
+        }
+      } else {
+        // Native (Android / iOS)
+        const base64 = await FileSystem.readAsStringAsync(file.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        uploadPayload = decode(base64);
+      }
+
+      const mimeType = file.mimeType || (ext === 'pdf' ? 'application/pdf' : 'image/jpeg');
+
+      // Primary upload to chat_images (public & general storage)
       const { data, error } = await supabase.storage
-        .from('cac_documents')
-        .upload(filepath, decode(base64), {
-          contentType: file.mimeType || 'application/pdf',
+        .from('chat_images')
+        .upload(filepath, uploadPayload, {
+          contentType: mimeType,
           upsert: true,
         });
 
-      if (error) throw error;
+      if (error) {
+        // Fallback to cac_documents
+        const { error: fbErr } = await supabase.storage
+          .from('cac_documents')
+          .upload(filepath, uploadPayload, {
+            contentType: mimeType,
+            upsert: true,
+          });
+        if (fbErr) throw fbErr;
+        const { data: pubData } = supabase.storage.from('cac_documents').getPublicUrl(filepath);
+        setCertificateUrl(pubData.publicUrl);
+      } else {
+        const { data: publicUrlData } = supabase.storage
+          .from('chat_images')
+          .getPublicUrl(filepath);
+        setCertificateUrl(publicUrlData.publicUrl);
+      }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('cac_documents')
-        .getPublicUrl(filepath);
-
-      const uploadedUrl = publicUrlData.publicUrl;
-      setCertificateUrl(uploadedUrl);
       Alert.alert('Upload Succeeded 🎉', 'Official Tax ID Certificate PDF uploaded successfully.');
     } catch (err: any) {
+      console.error('TIN certificate upload error:', err);
       Alert.alert('Upload Failed', err.message || 'Failed to upload certificate document.');
     } finally {
       setUploadingPdf(false);
     }
+  };
+
+  // Delete Request / Mockup
+  const handleDeleteTask = (task: any) => {
+    Alert.alert(
+      "Delete Request 🗑️",
+      `Are you sure you want to permanently delete this request for "${task?.holder_name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await verificationHistory.delete(task.id);
+              try { await supabase.from('verification_history').delete().eq('id', task.id); } catch (_) {}
+              Alert.alert("Deleted", "Request has been removed successfully.");
+              setSelectedTask(null);
+              fetchTasks();
+            } catch (delErr: any) {
+              Alert.alert("Delete Failed", delErr.message || "Could not delete request.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Save Resolution & Update Task
@@ -514,9 +586,20 @@ export default function ManageTinScreen() {
                   <Text style={styles.taskDate}>
                     {new Date(item.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={styles.actionInspectText}>Manage & Resolve</Text>
-                    <Ionicons name="chevron-forward" size={14} color={COLORS.info} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTask(item);
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={styles.actionInspectText}>Manage</Text>
+                      <Ionicons name="chevron-forward" size={14} color={COLORS.info} />
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -745,6 +828,27 @@ export default function ManageTinScreen() {
                   ) : (
                     <Text style={styles.saveBtnText}>Save Resolution & Deliver to User</Text>
                   )}
+                </TouchableOpacity>
+
+                {/* Delete Request / Mockup Button */}
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#FEE2E2',
+                    borderWidth: 1,
+                    borderColor: '#FCA5A5',
+                    borderRadius: 10,
+                    paddingVertical: 12,
+                    marginTop: 10,
+                    gap: 6
+                  }}
+                  onPress={() => handleDeleteTask(selectedTask)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Delete This Request / Mockup</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

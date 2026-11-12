@@ -505,8 +505,19 @@ Deno.serve(async (req: Request) => {
                                     body: JSON.stringify(payload)
                                 });
                                 sent = res.ok;
-                            } catch (_) {
-                                sent = false;
+                                if (!res.ok) {
+                                    const errJson = await res.json().catch(() => ({}));
+                                    console.error(`[WhatsApp Broadcast] Media send error to ${clean}:`, res.status, JSON.stringify(errJson));
+                                    // If media attachment failed (e.g. meta link timeout) but text exists, fallback to sending message text
+                                    if (msg) {
+                                        sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                    }
+                                }
+                            } catch (metaEx) {
+                                console.error(`[WhatsApp Broadcast] Exception sending media to ${clean}:`, metaEx);
+                                if (msg) {
+                                    sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                }
                             }
                         } else {
                             sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);

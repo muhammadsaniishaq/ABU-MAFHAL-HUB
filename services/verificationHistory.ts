@@ -436,8 +436,16 @@ export const verificationHistory = {
           const isNIN = typeLower.includes('nin') || typeLower.includes('ipe') || typeLower.includes('val') ||
                         typeLower.includes('pers') || descLower.includes('nin') || descLower.includes('ipe') ||
                         descLower.includes('validation') || descLower.includes('tracking');
-          const isTIN = typeLower.includes('tin') || descLower.includes('tin') || descLower.includes('tax') ||
-                        (tx as any).category === 'tin' || descLower.includes('tax id');
+          const isTIN = (tx as any).category === 'tin' ||
+                        typeLower === 'tin' ||
+                        typeLower.startsWith('tin_') ||
+                        typeLower === 'tax_id' ||
+                        descLower.includes('tax id') ||
+                        descLower.includes('tax certificate') ||
+                        descLower.includes('jtb') ||
+                        descLower.includes('jrb') ||
+                        /\btin\b/i.test(tx.description || '') ||
+                        /\btin\b/i.test(tx.type || '');
 
           const itemCat = isBVN ? 'bvn' : isNIN ? 'nin' : isTIN ? 'tin' : null;
           if (!itemCat) continue;
