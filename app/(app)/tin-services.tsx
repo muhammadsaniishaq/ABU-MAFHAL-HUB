@@ -212,10 +212,56 @@ export default function TinServicesScreen() {
         });
       }
 
-      const items = await verificationHistory.getAll('tin');
-      setHistoryList(items || []);
+      // Direct live fetch from Supabase to guarantee instant certificate updates
+      if (user) {
+        const { data: liveVh } = await supabase
+          .from('verification_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('service_category', 'tin')
+          .order('created_at', { ascending: false });
+
+        if (liveVh && liveVh.length > 0) {
+          setHistoryList(liveVh);
+        } else {
+          const items = await verificationHistory.getAll('tin');
+          setHistoryList(items || []);
+        }
+      } else {
+        const items = await verificationHistory.getAll('tin');
+        setHistoryList(items || []);
+      }
     } catch (e) {
       console.warn('Error loading JTB portal data:', e);
+    }
+  };
+
+  const handleDownloadCertificate = async (url: string, applicantName?: string) => {
+    if (!url) {
+      Alert.alert("Pending Processing", "Your certificate is currently being finalized by the tax desk. Please check back shortly.");
+      return;
+    }
+
+    try {
+      if (Platform.OS === 'web') {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.download = `TIN_Certificate_${(applicantName || 'document').replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        await WebBrowser.openBrowserAsync(url);
+      }
+    } catch (err) {
+      try {
+        await Linking.openURL(url);
+      } catch (_) {
+        await Clipboard.setStringAsync(url);
+        Alert.alert("Link Copied 📋", "Certificate link has been copied to your clipboard. Paste it into your browser to view.");
+      }
     }
   };
 
@@ -431,7 +477,10 @@ export default function TinServicesScreen() {
 
           <TouchableOpacity
             style={[styles.topTabBtn, activeTab === 'history' && styles.topTabBtnActive]}
-            onPress={() => setActiveTab('history')}
+            onPress={() => {
+              setActiveTab('history');
+              loadData();
+            }}
             activeOpacity={0.7}
           >
             <Text style={[styles.topTabBtnText, activeTab === 'history' && styles.topTabBtnTextActive]}>
@@ -998,7 +1047,7 @@ export default function TinServicesScreen() {
               const details = item.details || {};
               const status = (details.status || item.status || 'PENDING').toUpperCase();
               const isDone = status === 'COMPLETED' || status === 'SUCCESS';
-              const certUrl = details.certificate_url || details.download_url;
+              const certUrl = details.certificate_url || details.file_url || details.download_url || details.document_url || details.certificateUrl || item.certificate_url || '';
               const assignedTin = details.generated_tin || details.retrieved_tin || details.taxId;
 
               return (
@@ -1039,16 +1088,22 @@ export default function TinServicesScreen() {
                     </Text>
 
                     {certUrl ? (
-                      <TouchableOpacity
-                        style={styles.downloadBtn}
-                        onPress={() => {
-                          if (Platform.OS === 'web') window.open(certUrl, '_blank');
-                          else WebBrowser.openBrowserAsync(certUrl);
-                        }}
-                      >
-                        <Ionicons name="download-outline" size={13} color={COLORS.white} style={{ marginRight: 4 }} />
-                        <Text style={styles.downloadBtnText}>Download PDF</Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity
+                          style={styles.downloadBtn}
+                          onPress={() => handleDownloadCertificate(certUrl, item.holder_name)}
+                        >
+                          <Ionicons name="download-outline" size={13} color={COLORS.white} style={{ marginRight: 4 }} />
+                          <Text style={styles.downloadBtnText}>Download PDF</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.downloadBtn, { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#D1D5DB' }]}
+                          onPress={() => copyText(certUrl, 'Certificate Link')}
+                        >
+                          <Ionicons name="link-outline" size={13} color={COLORS.text} />
+                        </TouchableOpacity>
+                      </View>
                     ) : (
                       <Text style={styles.pendingNote}>Processing Search</Text>
                     )}

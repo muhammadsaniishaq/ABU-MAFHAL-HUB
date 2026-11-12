@@ -78,86 +78,82 @@ export default function ManageTinScreen() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const allTin = await verificationHistory.getAllForAdmin('tin');
       const taskMap = new Map<string, any>();
-      (allTin || []).forEach((t: any) => taskMap.set(t.id, t));
+      const existingRefs = new Set<string>();
+      const existingSearchNums = new Set<string>();
 
-      // Direct safety query to verification_history in case of any schema/RLS difference
+      // 1. Direct query to verification_history (Primary source of truth for TIN requests)
       try {
         const { data: directData } = await supabase
           .from('verification_history')
-          .select('*')
+          .select(`
+            *,
+            profiles:user_id (
+              id,
+              full_name,
+              email,
+              phone
+            )
+          `)
           .eq('service_category', 'tin')
           .order('created_at', { ascending: false });
 
-        if (directData) {
+        if (directData && directData.length > 0) {
           for (const item of directData) {
-            if (!taskMap.has(item.id)) {
-              taskMap.set(item.id, {
-                ...item,
-                holder_name: item.holder_name || item.details?.firstName ? `${item.details?.firstName || ''} ${item.details?.lastName || ''}`.trim() : 'Tax Applicant',
-              });
+            taskMap.set(item.id, {
+              ...item,
+              holder_name: item.holder_name || (item.details?.firstName ? `${item.details.firstName} ${item.details.lastName || ''}`.trim() : 'Tax Applicant'),
+            });
+            existingRefs.add(item.id);
+            if (item.details?.reference) existingRefs.add(item.details.reference);
+            if (item.search_number && item.search_number !== 'RECORD' && item.search_number !== 'TIN-REF') {
+              existingSearchNums.add(item.search_number);
             }
           }
         }
-      } catch (_) {}
+      } catch (vhErr) {
+        console.warn('Error querying verification_history directly:', vhErr);
+      }
 
-      // Direct safety query to transactions for any TIN / Tax ID records
+      // 2. Only import orphaned transactions that have NO matching entry in verification_history (to eliminate duplicates)
       try {
         const { data: txTin } = await supabase
           .from('transactions')
-          .select('*')
-          .or('category.eq.tin,type.ilike.%tin%,description.ilike.%Tax ID Certificate Retrieval%,description.ilike.%TIN Registration%')
+          .select('*, profiles:user_id(id, full_name, email, phone)')
+          .or('category.eq.tin,type.ilike.%tin%,description.ilike.%Tax ID Certificate Retrieval%')
           .order('created_at', { ascending: false })
-          .limit(100);
+          .limit(60);
 
         if (txTin) {
           for (const tx of txTin) {
-            const desc = (tx.description || '').toLowerCase();
-            const typeLower = (tx.type || '').toLowerCase();
-            const isRealTin = (tx as any).category === 'tin' ||
-                              typeLower.startsWith('tin') ||
-                              desc.includes('tax id') ||
-                              desc.includes('tax certificate') ||
-                              desc.includes('jtb') ||
-                              desc.includes('jrb') ||
-                              /\btin\b/i.test(tx.description || '');
+            // Deduplicate: if reference or ID exists in verification_history, SKIP!
+            if (existingRefs.has(tx.id) || (tx.reference && existingRefs.has(tx.reference))) continue;
 
-            if (!isRealTin) continue;
+            const matchNum = tx.description?.match(/\(([^)]+)\)/);
+            const searchNum = matchNum ? matchNum[1].trim() : '';
+            if (searchNum && existingSearchNums.has(searchNum)) continue; // SKIP duplicate!
 
-            if (!taskMap.has(tx.id) && !taskMap.has(tx.reference)) {
-              let parsed: any = {};
-              try {
-                if (tx.description?.startsWith('{')) parsed = JSON.parse(tx.description);
-              } catch (_) {}
+            const matchName = tx.description?.match(/Tax ID Certificate Retrieval:\s*([^(]+)/i);
+            const applicantName = matchName ? matchName[1].trim() : '';
+            if (!applicantName && !searchNum) continue; // Skip meaningless transactions
 
-              const matchName = tx.description?.match(/Tax ID Certificate Retrieval:\s*([^(]+)/i);
-              const matchNum = tx.description?.match(/\(([^)]+)\)/);
-              const applicantName = parsed.holder_name || (matchName ? matchName[1].trim() : (parsed.firstName ? `${parsed.firstName} ${parsed.lastName || ''}`.trim() : ''));
-              const searchNum = parsed.search_number || parsed.nin || parsed.cacRegNumber || (matchNum ? matchNum[1].trim() : '');
-
-              // Don't add placeholder entries without valid name or search number
-              if (!applicantName && !searchNum && !parsed.nin) continue;
-
-              taskMap.set(tx.id, {
-                id: tx.id,
-                user_id: tx.user_id,
-                service_category: 'tin',
-                service_type: parsed.service_type || 'tin_certificate_retrieval',
-                search_number: searchNum || tx.reference,
-                holder_name: applicantName || 'Tax Applicant',
-                layout: 'jtb_tax_certificate',
-                details: {
-                  ...parsed,
-                  amount: tx.amount,
-                  reference: tx.reference,
-                  description: tx.description,
-                  status: parsed.status || 'PENDING',
-                  source: 'transactions'
-                },
-                created_at: tx.created_at,
-              });
-            }
+            taskMap.set(tx.id, {
+              id: tx.id,
+              user_id: tx.user_id,
+              service_category: 'tin',
+              service_type: 'tin_certificate_retrieval',
+              search_number: searchNum || tx.reference,
+              holder_name: applicantName || 'Tax Applicant',
+              layout: 'jtb_tax_certificate',
+              profiles: tx.profiles,
+              details: {
+                reference: tx.reference,
+                description: tx.description,
+                status: 'PENDING',
+                source: 'transactions'
+              },
+              created_at: tx.created_at,
+            });
           }
         }
       } catch (_) {}
@@ -327,26 +323,70 @@ export default function ManageTinScreen() {
     setUpdating(true);
 
     try {
+      const cleanCertUrl = certificateUrl.trim();
+      const cleanTin = issuedTin.trim();
+      const cleanNotes = adminNotes.trim();
+
       const updatedDetails = {
         ...(selectedTask.details || {}),
         status: adminStatus,
-        generated_tin: issuedTin.trim() || selectedTask.details?.generated_tin,
-        retrieved_tin: issuedTin.trim() || selectedTask.details?.retrieved_tin,
-        certificate_url: certificateUrl.trim() || selectedTask.details?.certificate_url,
-        admin_notes: adminNotes.trim(),
-        resolution_message: adminNotes.trim(),
+        generated_tin: cleanTin || selectedTask.details?.generated_tin || '',
+        retrieved_tin: cleanTin || selectedTask.details?.retrieved_tin || '',
+        taxId: cleanTin || selectedTask.details?.taxId || '',
+        certificate_url: cleanCertUrl || selectedTask.details?.certificate_url || '',
+        file_url: cleanCertUrl || selectedTask.details?.file_url || '',
+        download_url: cleanCertUrl || selectedTask.details?.download_url || '',
+        document_url: cleanCertUrl || selectedTask.details?.document_url || '',
+        admin_notes: cleanNotes,
+        resolution_message: cleanNotes,
         resolved_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      // 1. Update in verification_history by ID
+      const { data: updatedRows, error } = await supabase
         .from('verification_history')
         .update({
           details: updatedDetails,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', selectedTask.id);
+        .eq('id', selectedTask.id)
+        .select();
 
-      if (error) throw error;
+      // 2. If no rows updated (e.g. task was initially tracked from transaction), match by search_number or insert
+      if (!updatedRows || updatedRows.length === 0) {
+        const searchNum = selectedTask.search_number || selectedTask.details?.search_number;
+        if (searchNum) {
+          const { data: numRows } = await supabase
+            .from('verification_history')
+            .update({
+              details: updatedDetails,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('search_number', searchNum)
+            .select();
+
+          // If still not existing, insert a new fulfilled record so user sees it in their history
+          if (!numRows || numRows.length === 0) {
+            await supabase.from('verification_history').insert({
+              id: selectedTask.id.startsWith('vh_') ? selectedTask.id : `vh_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+              user_id: selectedTask.user_id,
+              service_category: 'tin',
+              service_type: selectedTask.service_type || 'tin_certificate_retrieval',
+              search_number: searchNum,
+              holder_name: selectedTask.holder_name,
+              layout: 'jtb_tax_certificate',
+              details: updatedDetails,
+              created_at: selectedTask.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
+      // Also update local cache so admin and user stay in sync
+      try {
+        await verificationHistory.update(selectedTask.id, { details: updatedDetails });
+      } catch (_) {}
 
       // Create in-app notification for the user
       if (selectedTask.user_id && selectedTask.user_id !== 'guest_user') {
@@ -355,8 +395,8 @@ export default function ManageTinScreen() {
             user_id: selectedTask.user_id,
             title: adminStatus === 'COMPLETED' ? 'Tax ID / Certificate Ready! 📄' : 'TIN Request Status Update',
             message: adminStatus === 'COMPLETED'
-              ? `Your Tax ID (${issuedTin.trim() || 'Issued'}) and official certificate are ready for download.`
-              : `Your TIN request status has been updated to ${adminStatus}. ${adminNotes ? `Note: ${adminNotes}` : ''}`,
+              ? `Your Tax ID (${cleanTin || 'Issued'}) and official certificate are ready for download.`
+              : `Your TIN request status has been updated to ${adminStatus}. ${cleanNotes ? `Note: ${cleanNotes}` : ''}`,
             type: 'system',
             priority: 'high',
             is_read: false,
@@ -368,6 +408,7 @@ export default function ManageTinScreen() {
       setSelectedTask(null);
       fetchTasks();
     } catch (err: any) {
+      console.error('Update TIN resolution error:', err);
       Alert.alert('Update Failed', err.message || 'Failed to update TIN task.');
     } finally {
       setUpdating(false);
