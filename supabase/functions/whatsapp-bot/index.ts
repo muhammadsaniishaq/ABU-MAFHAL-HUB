@@ -277,7 +277,7 @@ async function sendWhatsAppMessage(
             return false;
         }
 
-        const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
         const res = await fetch(url, {
             method: 'POST',
             headers: {
@@ -402,7 +402,7 @@ Deno.serve(async (req: Request) => {
         if (mediaIdParam && accessToken) {
             try {
                 // 1. Resolve media URL from Meta Graph API
-                const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaIdParam}`, {
+                const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaIdParam}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
 
@@ -444,7 +444,7 @@ Deno.serve(async (req: Request) => {
             if (url.searchParams.get('diag') === '1') {
                 if (phoneNumberId && accessToken) {
                     try {
-                        const metaRes = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}`, {
+                        const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}`, {
                             headers: { 'Authorization': `Bearer ${accessToken}` }
                         });
                         metaCheck = {
@@ -489,7 +489,7 @@ Deno.serve(async (req: Request) => {
                 const testTo = url.searchParams.get('test_to');
                 if (testTo && phoneNumberId && accessToken) {
                     try {
-                        const sendRes = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+                        const sendRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,
@@ -586,12 +586,55 @@ Deno.serve(async (req: Request) => {
                     mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'
                 );
 
-                // Concurrency control: batch in chunks of 4 concurrent requests to prevent edge function timeouts
-                const BATCH_SIZE = 4;
+                // Safe WhatsApp caption truncation: Meta limits media captions to 1024 characters
+                const mediaCaption = msg ? (msg.length > 1024 ? msg.slice(0, 1020) + '...' : msg) : undefined;
+                const overflowText = (msg && msg.length > 1024) ? msg : null;
+
+                // Pre-upload optimization: If broadcasting media to multiple recipients,
+                // upload once to Meta Media API to obtain an instant, reusable media ID
+                let metaMediaId: string | null = null;
+                if (mediaUrl && (mediaType === 'video' || mediaType === 'image') && phoneNumberId && accessToken) {
+                    try {
+                        const mediaFetch = await fetch(mediaUrl);
+                        if (mediaFetch.ok) {
+                            const mediaBlob = await mediaFetch.blob();
+                            const formData = new FormData();
+                            formData.append('messaging_product', 'whatsapp');
+                            formData.append('type', mediaType === 'video' ? 'video/mp4' : (mediaUrl.match(/\.png/i) ? 'image/png' : 'image/jpeg'));
+                            formData.append('file', mediaBlob, mediaType === 'video' ? 'broadcast_video.mp4' : 'broadcast_image.jpg');
+
+                            const metaUploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${accessToken}`
+                                },
+                                body: formData
+                            });
+
+                            if (metaUploadRes.ok) {
+                                const uploadData = await metaUploadRes.json().catch(() => ({}));
+                                if (uploadData?.id) {
+                                    metaMediaId = String(uploadData.id);
+                                    console.log(`[WhatsApp Broadcast] Successfully pre-cached ${mediaType} on Meta Media API! Media ID: ${metaMediaId}`);
+                                }
+                            } else {
+                                const errTxt = await metaUploadRes.text().catch(() => '');
+                                console.warn(`[WhatsApp Broadcast] Meta /media upload notice (will fallback to direct link):`, errTxt);
+                            }
+                        }
+                    } catch (cacheErr: any) {
+                        console.warn(`[WhatsApp Broadcast] Could not pre-cache media on Meta (falling back to direct link):`, cacheErr?.message);
+                    }
+                }
+
+                // Concurrency control: batch in chunks of 5 concurrent requests
+                const BATCH_SIZE = 5;
                 for (let i = 0; i < uniqueRecipients.length; i += BATCH_SIZE) {
                     const chunk = uniqueRecipients.slice(i, i + BATCH_SIZE);
                     await Promise.all(chunk.map(async (clean) => {
                         let sent = false;
+                        let mediaSent = false;
+                        let textSent = false;
                         let errorReason = '';
 
                         if (mediaUrl && (mediaType === 'image' || mediaType === 'video' || mediaType === 'document')) {
@@ -604,14 +647,14 @@ Deno.serve(async (req: Request) => {
                                 };
 
                                 if (mediaType === 'image') {
-                                    payload.image = { link: mediaUrl, caption: msg || undefined };
+                                    payload.image = metaMediaId ? { id: metaMediaId, caption: mediaCaption } : { link: mediaUrl, caption: mediaCaption };
                                 } else if (mediaType === 'video') {
-                                    payload.video = { link: mediaUrl, caption: msg || undefined };
+                                    payload.video = metaMediaId ? { id: metaMediaId, caption: mediaCaption } : { link: mediaUrl, caption: mediaCaption };
                                 } else {
-                                    payload.document = { link: mediaUrl, filename: body.filename || 'Document.pdf', caption: msg || undefined };
+                                    payload.document = { link: mediaUrl, filename: body.filename || 'Document.pdf', caption: mediaCaption };
                                 }
 
-                                const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+                                const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
                                     method: 'POST',
                                     headers: {
                                         'Authorization': `Bearer ${accessToken}`,
@@ -619,41 +662,66 @@ Deno.serve(async (req: Request) => {
                                     },
                                     body: JSON.stringify(payload)
                                 });
+
+                                mediaSent = res.ok;
                                 sent = res.ok;
+
                                 if (!res.ok) {
                                     const errJson = await res.json().catch(() => ({}));
                                     errorReason = errJson?.error?.message || `Meta Cloud API status ${res.status}`;
                                     console.error(`[WhatsApp Broadcast] Media send error to ${clean}:`, res.status, JSON.stringify(errJson));
-                                    // If media attachment failed (e.g. meta link timeout) but text exists, fallback to sending message text
+
+                                    // Fallback to sending text if media attachment was rejected by Meta
                                     if (msg) {
-                                        sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                        textSent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                        sent = textSent;
+                                    }
+                                } else {
+                                    // If message exceeded 1024 characters, send full text as follow-up
+                                    if (overflowText) {
+                                        await sendWhatsAppMessage(clean, overflowText, phoneNumberId, accessToken).catch(() => {});
                                     }
                                 }
                             } catch (metaEx: any) {
                                 errorReason = metaEx?.message || 'Network exception';
                                 console.error(`[WhatsApp Broadcast] Exception sending media to ${clean}:`, metaEx);
                                 if (msg) {
-                                    sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                    textSent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                    sent = textSent;
                                 }
                             }
                         } else {
                             sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                            textSent = sent;
+                            if (!sent) {
+                                errorReason = 'Failed to deliver text message via Meta API';
+                            }
                         }
 
                         if (sent) {
                             successCount++;
-                            results.push({ to: clean, status: 'sent' });
+                            const deliveryStatus = mediaSent ? 'sent' : (textSent ? 'text_only' : 'sent');
+                            results.push({
+                                to: clean,
+                                status: deliveryStatus,
+                                media_delivered: mediaSent,
+                                ...(mediaSent ? { media: mediaType } : {}),
+                                ...(textSent && !mediaSent ? { warning: `Media failed (${errorReason}), text message delivered instead` } : {})
+                            });
+
                             try {
                                 await supabaseAdmin.from('whatsapp_bot_logs').insert({
                                     phone_number: clean,
                                     direction: 'outgoing',
-                                    message_type: mediaUrl ? mediaType : 'text',
+                                    message_type: mediaSent ? mediaType : 'text',
                                     content: msg || (mediaType === 'video' ? '🎥 [Video Sent]' : mediaType === 'image' ? '📷 [Image Sent]' : '📄 [Document Sent]'),
                                     raw_payload: {
                                         media_url: mediaUrl,
                                         media_type: mediaType,
+                                        media_id: metaMediaId || undefined,
                                         filename: body.filename,
-                                        caption: msg
+                                        caption: mediaCaption,
+                                        delivered_as: deliveryStatus
                                     }
                                 });
                             } catch (_) {}

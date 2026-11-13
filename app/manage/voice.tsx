@@ -445,9 +445,6 @@ export default function AudioVoiceControlHub() {
             setUploadingClip(false);
         }
     };
-            setUploadingClip(false);
-        }
-    };
 
     const handleDeleteCustomAudio = (clip: any) => {
         Alert.alert(

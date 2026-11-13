@@ -114,8 +114,9 @@ export async function uploadMediaFile(options: UploadMediaOptions): Promise<Uplo
         return { success: true, publicUrl };
       }
 
-      // Try fallback to 'avatars' bucket if primary bucket fails
-      const fallbackUrl = `${supabaseUrl}/storage/v1/object/avatars/${finalFileName}`;
+      // Try fallback to 'banners' or 'chat_images' bucket if primary bucket fails
+      const altBucket = bucket === 'banners' ? 'chat_images' : 'banners';
+      const fallbackUrl = `${supabaseUrl}/storage/v1/object/${altBucket}/${finalFileName}`;
       const resFallback = await FileSystem.uploadAsync(fallbackUrl, uri, {
         httpMethod: 'POST',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
@@ -123,7 +124,7 @@ export async function uploadMediaFile(options: UploadMediaOptions): Promise<Uplo
       });
 
       if (resFallback.status >= 200 && resFallback.status < 300) {
-        const publicUrl = `${supabaseUrl}/storage/v1/object/public/avatars/${finalFileName}`;
+        const publicUrl = `${supabaseUrl}/storage/v1/object/public/${altBucket}/${finalFileName}`;
         return { success: true, publicUrl };
       }
 

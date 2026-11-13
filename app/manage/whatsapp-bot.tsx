@@ -36,6 +36,7 @@ const C = {
     slate600: '#475569',
     slate700: '#334155',
     slate800: '#1E293B',
+    gray600: '#475569',
     rose: '#EF4444',
     emerald: '#10B981',
 };
@@ -166,6 +167,7 @@ export default function WhatsAppBotAdmin() {
     const [broadcastAudienceLabel, setBroadcastAudienceLabel] = useState('');
     const [broadcastError, setBroadcastError] = useState<string | null>(null);
     const [broadcastSuccessStats, setBroadcastSuccessStats] = useState<{ successCount: number; failCount: number; total: number } | null>(null);
+    const [showBroadcastDebugJson, setShowBroadcastDebugJson] = useState(false);
 
     // Quick Test Sender Tool
     const [testPhone, setTestPhone] = useState('');
@@ -630,7 +632,7 @@ export default function WhatsAppBotAdmin() {
             const uploadRes = await uploadMediaFile({
                 uri: asset.uri,
                 file: (asset as any).file || null,
-                bucket: 'chat_images',
+                bucket: 'banners',
                 folder: 'whatsapp_broadcast',
                 fileName: `whatsapp_broadcast/${fileName}`,
                 mimeType,
@@ -758,6 +760,7 @@ export default function WhatsAppBotAdmin() {
         setBroadcastResult(null);
         setBroadcastSuccessStats(null);
         setBroadcastError(null);
+        setShowBroadcastDebugJson(false);
 
         try {
             let data: any = null;
@@ -1523,34 +1526,6 @@ export default function WhatsAppBotAdmin() {
                                     </View>
                                 )}
 
-                                {broadcastSuccessStats && (
-                                    <View style={s.broadcastSuccessCard}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#16A34A" style={{ marginRight: 6 }} />
-                                            <Text style={s.broadcastSuccessTitle}>Broadcast Delivered Successfully!</Text>
-                                        </View>
-                                        <Text style={s.broadcastSuccessSub}>
-                                            WhatsApp messages dispatched to {broadcastSuccessStats.total} recipient(s).
-                                        </Text>
-                                        <View style={s.broadcastStatsRow}>
-                                            <View style={s.statBadgeGreen}>
-                                                <Text style={s.statBadgeGreenText}>✅ Sent: {broadcastSuccessStats.successCount}</Text>
-                                            </View>
-                                            {broadcastSuccessStats.failCount > 0 && (
-                                                <View style={s.statBadgeRed}>
-                                                    <Text style={s.statBadgeRedText}>⚠️ Failed: {broadcastSuccessStats.failCount}</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                        <TouchableOpacity
-                                            onPress={() => setBroadcastSuccessStats(null)}
-                                            style={s.broadcastDismissBtn}
-                                        >
-                                            <Text style={s.broadcastDismissBtnText}>Done / Dismiss</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
-
                                 <TouchableOpacity
                                     activeOpacity={0.7}
                                     onPress={handleSendBroadcast}
@@ -1570,12 +1545,165 @@ export default function WhatsAppBotAdmin() {
                                     )}
                                 </TouchableOpacity>
 
-                                {broadcastResult && (
-                                    <View style={[s.diagResultBox, { marginTop: 12 }]}>
-                                        <Text style={s.diagResultTitle}>Broadcast Summary:</Text>
-                                        <Text style={s.metaValCode}>{JSON.stringify(broadcastResult, null, 2)}</Text>
-                                    </View>
-                                )}
+                                {/* MODERN EXECUTIVE BROADCAST REPORT (ZERO RAW CODE BY DEFAULT) */}
+                                {(broadcastSuccessStats || broadcastResult) && (() => {
+                                    const bTotal = broadcastSuccessStats?.total || broadcastResult?.total || (Array.isArray(broadcastResult?.results) ? broadcastResult.results.length : 0);
+                                    const bSuccess = broadcastSuccessStats?.successCount ?? broadcastResult?.success_count ?? 0;
+                                    const bFailed = broadcastSuccessStats?.failCount ?? broadcastResult?.fail_count ?? 0;
+                                    const bResults: any[] = Array.isArray(broadcastResult?.results) ? broadcastResult.results : [];
+                                    const bIsAllSuccess = bFailed === 0 && bSuccess > 0;
+                                    const bIsPartial = bSuccess > 0 && bFailed > 0;
+
+                                    return (
+                                        <View style={[
+                                            s.broadcastReportCard,
+                                            bIsAllSuccess ? s.reportBorderGreen : (bIsPartial ? s.reportBorderAmber : s.reportBorderRed)
+                                        ]}>
+                                            {/* Report Header */}
+                                            <View style={s.reportHeader}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                    <View style={[
+                                                        s.reportIconWrap,
+                                                        bIsAllSuccess ? { backgroundColor: '#DCFCE7' } : (bIsPartial ? { backgroundColor: '#FEF3C7' } : { backgroundColor: '#FEE2E2' })
+                                                    ]}>
+                                                        <Ionicons
+                                                            name={bIsAllSuccess ? "checkmark-circle" : (bIsPartial ? "alert-circle" : "close-circle")}
+                                                            size={22}
+                                                            color={bIsAllSuccess ? "#16A34A" : (bIsPartial ? "#D97706" : "#DC2626")}
+                                                        />
+                                                    </View>
+                                                    <View style={{ marginLeft: 10, flex: 1 }}>
+                                                        <Text style={s.reportTitle}>
+                                                            {bIsAllSuccess ? "Sakamakon Sanarwa - An Tura Cikin Nasara! ✅" : (bIsPartial ? "Sakamakon Sanarwa - Wasu Sun Tafi ⚠️" : "Sakamakon Sanarwa - Ba a Sami Nasara Ba ❌")}
+                                                        </Text>
+                                                        <Text style={s.reportSubtitle}>
+                                                            {bIsAllSuccess
+                                                                ? `Dukkan saƙonnin ${bSuccess} sun isa ga masu karɓa akan WhatsApp.`
+                                                                : `An tura ${bSuccess} cikin ${bTotal || (bSuccess + bFailed)}, lambobi ${bFailed} ba su samu ba.`}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setBroadcastSuccessStats(null);
+                                                        setBroadcastResult(null);
+                                                        setShowBroadcastDebugJson(false);
+                                                    }}
+                                                    style={s.reportCloseBtn}
+                                                >
+                                                    <Ionicons name="close" size={18} color={C.gray600} />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {/* Stats Counters Grid */}
+                                            <View style={s.reportStatsGrid}>
+                                                <View style={s.reportStatCol}>
+                                                    <Text style={s.reportStatLabel}>Adadin Target</Text>
+                                                    <Text style={s.reportStatVal}>{bTotal || (bSuccess + bFailed)}</Text>
+                                                </View>
+                                                <View style={s.reportStatCol}>
+                                                    <Text style={[s.reportStatLabel, { color: '#15803D' }]}>An Tura ✅</Text>
+                                                    <Text style={[s.reportStatVal, { color: '#15803D' }]}>{bSuccess}</Text>
+                                                </View>
+                                                {bFailed > 0 && (
+                                                    <View style={s.reportStatCol}>
+                                                        <Text style={[s.reportStatLabel, { color: '#B91C1C' }]}>Kasa Tafi ⚠️</Text>
+                                                        <Text style={[s.reportStatVal, { color: '#B91C1C' }]}>{bFailed}</Text>
+                                                    </View>
+                                                )}
+                                                <View style={s.reportStatCol}>
+                                                    <Text style={s.reportStatLabel}>Irin Kayan</Text>
+                                                    <Text style={s.reportStatVal} numberOfLines={1}>
+                                                        {broadcastMediaType === 'video' ? '🎥 Bidiyo' : (broadcastMediaType === 'image' ? '📷 Hoto' : '📝 Rubutu')}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Detailed Recipients List Breakdown */}
+                                            {bResults.length > 0 && (
+                                                <View style={s.reportRecipientsBox}>
+                                                    <Text style={s.reportRecipientsTitle}>Bayanin Masu Karɓa ({bResults.length}):</Text>
+                                                    <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
+                                                        {bResults.map((r: any, idx: number) => {
+                                                            const isSent = r.status === 'sent';
+                                                            const isTextOnly = r.status === 'text_only';
+                                                            const isFail = r.status === 'failed';
+                                                            const phoneDisplay = String(r.to || '').startsWith('234')
+                                                                ? '0' + String(r.to).slice(3)
+                                                                : String(r.to || '');
+
+                                                            let friendlyErr = '';
+                                                            if (r.error?.includes('24 hours') || r.warning?.includes('24 hours')) {
+                                                                friendlyErr = 'Sama da awanni 24 ba a yi magana da user ba (WhatsApp 24h Policy)';
+                                                            } else if (r.error?.includes('not a valid WhatsApp') || r.error?.includes('100')) {
+                                                                friendlyErr = 'Lambar ba ta WhatsApp ba ce ko ba ta da inganci';
+                                                            } else if (r.warning) {
+                                                                friendlyErr = r.warning;
+                                                            } else if (r.error) {
+                                                                friendlyErr = r.error;
+                                                            }
+
+                                                            return (
+                                                                <View key={idx} style={s.recipientRow}>
+                                                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                                                        <Text style={s.recipientPhone}>📱 {phoneDisplay}</Text>
+                                                                        {(isFail || isTextOnly) && friendlyErr ? (
+                                                                            <Text style={[s.recipientError, isTextOnly ? { color: '#D97706' } : { color: '#DC2626' }]}>
+                                                                                {isTextOnly ? `⚠️ Rubutu kawai ya tafi: ${friendlyErr}` : `❌ ${friendlyErr}`}
+                                                                            </Text>
+                                                                        ) : null}
+                                                                    </View>
+                                                                    <View style={[
+                                                                        s.recipientBadge,
+                                                                        isSent ? s.badgeGreen : (isTextOnly ? s.badgeAmber : s.badgeRed)
+                                                                    ]}>
+                                                                        <Text style={[
+                                                                            s.recipientBadgeText,
+                                                                            isSent ? s.textGreen : (isTextOnly ? s.textAmber : s.textRed)
+                                                                        ]}>
+                                                                            {isSent ? 'An Tura ✅' : (isTextOnly ? 'Rubutu Kawai ⚠️' : 'Kasa Tafi ❌')}
+                                                                        </Text>
+                                                                    </View>
+                                                                </View>
+                                                            );
+                                                        })}
+                                                    </ScrollView>
+                                                </View>
+                                            )}
+
+                                            {/* Action Buttons */}
+                                            <View style={s.reportActionRow}>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setBroadcastSuccessStats(null);
+                                                        setBroadcastResult(null);
+                                                        setShowBroadcastDebugJson(false);
+                                                    }}
+                                                    style={s.reportDismissBtn}
+                                                >
+                                                    <Text style={s.reportDismissText}>Gama / Rufe Summary</Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    onPress={() => setShowBroadcastDebugJson(prev => !prev)}
+                                                    style={s.reportDebugToggle}
+                                                >
+                                                    <Ionicons name={showBroadcastDebugJson ? "chevron-up" : "code-slash-outline"} size={13} color={C.gray600} style={{ marginRight: 4 }} />
+                                                    <Text style={s.reportDebugText}>
+                                                        {showBroadcastDebugJson ? "Ɓoye Bayanan Fasaha" : "Bayanin Fasaha (Optional)"}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {/* Developer JSON collapsed by default */}
+                                            {showBroadcastDebugJson && (
+                                                <View style={s.developerJsonBox}>
+                                                    <Text style={s.developerJsonText}>{JSON.stringify(broadcastResult, null, 2)}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    );
+                                })()}
                             </View>
                         </View>
                     )}
@@ -2973,6 +3101,189 @@ const s = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
         color: C.white,
+    },
+    broadcastReportCard: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderRadius: 16,
+        padding: 16,
+        marginTop: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    reportBorderGreen: {
+        borderColor: '#86EFAC',
+        backgroundColor: '#F0FDF4',
+    },
+    reportBorderAmber: {
+        borderColor: '#FDE68A',
+        backgroundColor: '#FFFBEB',
+    },
+    reportBorderRed: {
+        borderColor: '#FECACA',
+        backgroundColor: '#FEF2F2',
+    },
+    reportHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.06)',
+    },
+    reportIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reportTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: C.navyDark,
+    },
+    reportSubtitle: {
+        fontSize: 11,
+        color: C.gray600,
+        marginTop: 2,
+    },
+    reportCloseBtn: {
+        padding: 6,
+        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.04)',
+    },
+    reportStatsGrid: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.06)',
+        gap: 8,
+    },
+    reportStatCol: {
+        flex: 1,
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.06)',
+    },
+    reportStatLabel: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: C.gray600,
+        textTransform: 'uppercase',
+    },
+    reportStatVal: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: C.navyDark,
+        marginTop: 2,
+    },
+    reportRecipientsBox: {
+        marginTop: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.06)',
+        padding: 10,
+    },
+    reportRecipientsTitle: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: C.navyDark,
+        marginBottom: 8,
+    },
+    recipientRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    recipientPhone: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: C.navyDark,
+    },
+    recipientError: {
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    recipientBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    badgeGreen: {
+        backgroundColor: '#DCFCE7',
+    },
+    badgeAmber: {
+        backgroundColor: '#FEF3C7',
+    },
+    badgeRed: {
+        backgroundColor: '#FEE2E2',
+    },
+    recipientBadgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    textGreen: {
+        color: '#15803D',
+    },
+    textAmber: {
+        color: '#B45309',
+    },
+    textRed: {
+        color: '#B91C1C',
+    },
+    reportActionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 12,
+    },
+    reportDismissBtn: {
+        backgroundColor: C.navy,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    reportDismissText: {
+        color: C.white,
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    reportDebugToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 8,
+    },
+    reportDebugText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: C.gray600,
+    },
+    developerJsonBox: {
+        backgroundColor: '#0F172A',
+        borderRadius: 8,
+        padding: 10,
+        marginTop: 10,
+    },
+    developerJsonText: {
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        fontSize: 10,
+        color: '#38BDF8',
     },
     mediaAttachBox: {
         backgroundColor: '#F8FAFC',
