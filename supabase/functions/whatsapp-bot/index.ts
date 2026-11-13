@@ -191,13 +191,14 @@ async function verifyUserPin(
     return isMatch ? { success: true } : { success: false, reason: 'mismatch' };
 }
 
-function getPinErrorResponse(userLang: string, reason?: string) {
+function getPinErrorResponse(userLang: string, reason?: string, playStoreUrl?: string) {
+    const appLink = (playStoreUrl || DEFAULT_PLAY_STORE_URL).trim();
     if (reason === 'not_set') {
         return {
             isNotSet: true,
             msg: userLang === 'ha'
-                ? `⚠️ *Baka saita Transaction PIN ba tukuna!*\n\nDon tsaron asusunka da kuɗinka, ba za ka iya yin wannan ciniki a WhatsApp ba har sai ka saita lambobin Transaction PIN guda 4 a manhajarmu ko shafin yanar gizo:\n\n🌐 *Saita a Yanar Gizo:* https://abumafhal.com.ng\n📱 *Ko a Manhajar Android:*\nhttps://play.google.com/store/apps/details?id=com.abumafhal.sub\n\nBayan ka saita PIN ɗinka a can, zaka iya dawowa nan ka ci gaba da cinikayya a sauƙaƙe.`
-                : `⚠️ *You have not set a Transaction PIN yet!*\n\nFor your account security, you cannot perform transactions on WhatsApp until you create a 4-digit Transaction PIN in the mobile app or website:\n\n🌐 *Set on Web:* https://abumafhal.com.ng\n📱 *Or on Mobile App:*\nhttps://play.google.com/store/apps/details?id=com.abumafhal.sub\n\nOnce created, return here to complete your purchases.`
+                ? `⚠️ *Baka saita Transaction PIN ba tukuna!*\n\nDon tsaron asusunka da kuɗinka, ba za ka iya yin wannan ciniki a WhatsApp ba har sai ka saita lambobin Transaction PIN guda 4 a manhajarmu ko shafin yanar gizo:\n\n🌐 *Saita a Yanar Gizo:* https://abumafhal.com.ng\n📱 *Sauke a Play Store:*\n${appLink}\n\nBayan ka saita PIN ɗinka a can, zaka iya dawowa nan ka ci gaba da cinikayya a sauƙaƙe.`
+                : `⚠️ *You have not set a Transaction PIN yet!*\n\nFor your account security, you cannot perform transactions on WhatsApp until you create a 4-digit Transaction PIN in the mobile app or website:\n\n🌐 *Set on Web:* https://abumafhal.com.ng\n📱 *Get on Play Store:*\n${appLink}\n\nOnce created, return here to complete your purchases.`
         };
     }
     return {
@@ -1015,7 +1016,7 @@ Deno.serve(async (req: Request) => {
                     const pinRes = await verifyUserPin(supabaseAdmin, pending_user_id, text);
 
                     if (!pinRes.success) {
-                        const err = getPinErrorResponse(userLang, pinRes.reason);
+                        const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                         if (err.isNotSet) {
                             return reply(err.msg, 'IDLE', { lang: userLang });
                         }
@@ -1592,7 +1593,7 @@ Deno.serve(async (req: Request) => {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
@@ -1745,7 +1746,7 @@ Deno.serve(async (req: Request) => {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
@@ -1876,7 +1877,7 @@ Deno.serve(async (req: Request) => {
             if (currentStep === 'EXAM_CONFIRM_PIN') {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
@@ -2007,7 +2008,7 @@ Deno.serve(async (req: Request) => {
             if (currentStep === 'ELECTRICITY_CONFIRM_PIN') {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
@@ -2169,7 +2170,7 @@ Deno.serve(async (req: Request) => {
             if (currentStep === 'CABLE_CONFIRM_PIN') {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
@@ -2289,7 +2290,7 @@ Deno.serve(async (req: Request) => {
             if (currentStep === 'NIN_CONFIRM_PIN') {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
@@ -2395,7 +2396,7 @@ Deno.serve(async (req: Request) => {
             if (currentStep === 'BVN_CONFIRM_PIN') {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
@@ -2535,7 +2536,7 @@ Deno.serve(async (req: Request) => {
             if (currentStep === 'CAC_CONFIRM_PIN') {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
                 if (!pinRes.success) {
-                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
                     if (err.isNotSet) {
                         return reply(err.msg, 'IDLE', { lang: userLang });
                     }
