@@ -117,37 +117,25 @@ function getSafePlanSellingPrice(plan: any, networkMarkup: number = 0, markupTyp
     return Math.round(sell);
 }
 
+interface VerifyPinResult {
+    success: boolean;
+    reason?: 'not_set' | 'invalid_input' | 'mismatch';
+}
+
 // Helper: Accurately extract and verify 4-digit Transaction PIN against database
+// STRICT USER REQUIREMENT: Absolutely NO default PINs!
+// If the user hasn't configured a transaction PIN in their profile,
+// they are required to go set it on the app/website first.
 async function verifyUserPin(
     supabaseAdmin: any, 
     userId: string, 
     inputPin: string, 
     fallbackPin?: any
-): Promise<boolean> {
+): Promise<VerifyPinResult> {
     const raw = String(inputPin || '').trim();
-    if (!raw) return false;
+    if (!raw) return { success: false, reason: 'invalid_input' };
 
-    // 1. Extract 4-digit PIN candidate
-    // Accepts "1234", " 1234 ", "1234.", "pin 1234", "1 2 3 4", "ga shi 1234"
-    let cleanInput = '';
-    const wordMatch = raw.match(/\b\d{4}\b/);
-    if (wordMatch) {
-        cleanInput = wordMatch[0];
-    } else {
-        const digitsOnly = raw.replace(/\D/g, '');
-        if (digitsOnly.length === 4) {
-            cleanInput = digitsOnly;
-        } else if (digitsOnly.length > 4) {
-            cleanInput = digitsOnly.slice(0, 4);
-        }
-    }
-
-    if (!cleanInput || cleanInput.length !== 4) {
-        console.warn(`[WhatsApp Bot PIN] Could not extract 4-digit PIN from input: "${raw}"`);
-        return false;
-    }
-
-    // 2. Query live PIN from profiles table for this user
+    // 1. Query live PIN from profiles table for this user
     let dbPin = fallbackPin;
     if (userId) {
         try {
@@ -170,15 +158,54 @@ async function verifyUserPin(
         cleanDbPin = '';
     }
 
-    // If user has a custom set PIN (>= 4 digits)
-    const hasConfiguredPin = cleanDbPin.length >= 4;
-    const expectedPin = hasConfiguredPin ? cleanDbPin.slice(-4) : '1234';
+    // STRICT: User must have set their own Transaction PIN (minimum 4 digits)
+    if (!cleanDbPin || cleanDbPin.length < 4) {
+        console.warn(`[WhatsApp Bot PIN] User ${userId} has not set a transaction_pin in profiles!`);
+        return { success: false, reason: 'not_set' };
+    }
 
-    // Match if cleanInput equals the configured PIN, or if unset, accepts '1234' or '0000'
-    const isMatch = (cleanInput === expectedPin) || (!hasConfiguredPin && (cleanInput === '1234' || cleanInput === '0000'));
+    // 2. Extract 4-digit PIN candidate
+    // Accepts "1234", " 1234 ", "1234.", "pin 1234", "1 2 3 4", "ga shi 1234"
+    let cleanInput = '';
+    const wordMatch = raw.match(/\b\d{4}\b/);
+    if (wordMatch) {
+        cleanInput = wordMatch[0];
+    } else {
+        const digitsOnly = raw.replace(/\D/g, '');
+        if (digitsOnly.length === 4) {
+            cleanInput = digitsOnly;
+        } else if (digitsOnly.length > 4) {
+            cleanInput = digitsOnly.slice(0, 4);
+        }
+    }
 
-    console.log(`[WhatsApp Bot PIN] Validation: userId=${userId}, inputRaw="${raw}", inputClean="${cleanInput}", expected="${expectedPin}", hasCustomPin=${hasConfiguredPin}, matched=${isMatch}`);
-    return isMatch;
+    if (!cleanInput || cleanInput.length !== 4) {
+        console.warn(`[WhatsApp Bot PIN] Could not extract 4-digit PIN from input: "${raw}"`);
+        return { success: false, reason: 'invalid_input' };
+    }
+
+    const expectedPin = cleanDbPin.slice(-4);
+    const isMatch = (cleanInput === expectedPin);
+
+    console.log(`[WhatsApp Bot PIN] Validation: userId=${userId}, inputRaw="${raw}", inputClean="${cleanInput}", expected="${expectedPin}", matched=${isMatch}`);
+    return isMatch ? { success: true } : { success: false, reason: 'mismatch' };
+}
+
+function getPinErrorResponse(userLang: string, reason?: string) {
+    if (reason === 'not_set') {
+        return {
+            isNotSet: true,
+            msg: userLang === 'ha'
+                ? `⚠️ *Baka saita Transaction PIN ba tukuna!*\n\nDon tsaron asusunka da kuɗinka, ba za ka iya yin wannan ciniki a WhatsApp ba har sai ka saita lambobin Transaction PIN guda 4 a manhajarmu ko shafin yanar gizo:\n\n🌐 *Saita a Yanar Gizo:* https://abumafhal.com.ng\n📱 *Ko a Manhajar Android:*\nhttps://play.google.com/store/apps/details?id=com.abumafhal.sub\n\nBayan ka saita PIN ɗinka a can, zaka iya dawowa nan ka ci gaba da cinikayya a sauƙaƙe.`
+                : `⚠️ *You have not set a Transaction PIN yet!*\n\nFor your account security, you cannot perform transactions on WhatsApp until you create a 4-digit Transaction PIN in the mobile app or website:\n\n🌐 *Set on Web:* https://abumafhal.com.ng\n📱 *Or on Mobile App:*\nhttps://play.google.com/store/apps/details?id=com.abumafhal.sub\n\nOnce created, return here to complete your purchases.`
+        };
+    }
+    return {
+        isNotSet: false,
+        msg: userLang === 'ha'
+            ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan a sake gwadawa daidai (ko tura '0' don sokewa):`
+            : `❌ *Incorrect Transaction PIN!*\n\nPlease try again with your correct 4-digit PIN (or reply '0' to cancel):`
+    };
 }
 
 // Helper: Robust multi-variant profile resolver for WhatsApp phone
@@ -985,13 +1012,14 @@ Deno.serve(async (req: Request) => {
 
                 if (currentStep === 'AWAITING_LINK_PIN') {
                     const { pending_user_id } = sessionData;
-                    const isPinValid = await verifyUserPin(supabaseAdmin, pending_user_id, text);
+                    const pinRes = await verifyUserPin(supabaseAdmin, pending_user_id, text);
 
-                    if (!isPinValid) {
-                        const wrongPinMsg = userLang === 'ha'
-                            ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan a sake gwadawa.\n💡 _(Idan baka saita PIN ba a manhajarmu, PIN ɗinka na asali shine: *1234*)_\n\nKo tura '0' don sokewa:`
-                            : `❌ *Incorrect Transaction PIN!*\n\nPlease try again.\n💡 _(If you haven't set a custom PIN on our app, your default PIN is: *1234*)_\n\nOr reply '0' to cancel:`;
-                        return reply(wrongPinMsg, 'AWAITING_LINK_PIN', sessionData);
+                    if (!pinRes.success) {
+                        const err = getPinErrorResponse(userLang, pinRes.reason);
+                        if (err.isNotSet) {
+                            return reply(err.msg, 'IDLE', { lang: userLang });
+                        }
+                        return reply(err.msg, 'AWAITING_LINK_PIN', sessionData);
                     }
 
                     const { data: userProfile } = await supabaseAdmin
@@ -1561,13 +1589,14 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'DATA_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
-                if (!isPinValid) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan ka sake gwadawa daidai, ko ka tura '0' don soke cinikin:`
-                        : `❌ *Incorrect Transaction PIN!*\n\nPlease enter the correct 4-digit PIN, or reply '0' to cancel:`;
-                    return reply(badPin, 'DATA_CONFIRM_PIN', sessionData);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'DATA_CONFIRM_PIN', sessionData);
                 }
 
                 const selectedPlan = sessionData.selected_plan;
@@ -1713,13 +1742,14 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'AIRTIME_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
-                if (!isPinValid) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan ka sake gwadawa daidai, ko ka tura '0' don sokewa:`
-                        : `❌ *Incorrect Transaction PIN!*\n\nPlease try again with your correct 4-digit PIN, or reply '0' to cancel:`;
-                    return reply(badPin, 'AIRTIME_CONFIRM_PIN', sessionData);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'AIRTIME_CONFIRM_PIN', sessionData);
                 }
 
                 const amount = sessionData.airtime_amount;
@@ -1844,12 +1874,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'EXAM_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
-                if (!isPinValid) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                        : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                    return reply(badPin, 'EXAM_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'EXAM_CONFIRM_PIN', sessionData);
                 }
 
                 const exam = sessionData.exam;
@@ -1974,12 +2005,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'ELECTRICITY_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
-                if (!isPinValid) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                        : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                    return reply(badPin, 'ELECTRICITY_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'ELECTRICITY_CONFIRM_PIN', sessionData);
                 }
 
                 const waitMsg = userLang === 'ha'
@@ -2135,12 +2167,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'CABLE_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
-                if (!isPinValid) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                        : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                    return reply(badPin, 'CABLE_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'CABLE_CONFIRM_PIN', sessionData);
                 }
 
                 const pkg = sessionData.selected_pkg;
@@ -2254,12 +2287,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'NIN_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
-                if (!isPinValid) {
-                    const wrongPin = userLang === 'ha'
-                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN ɗinka mai lamba 4 (ko tura '0' don sokewa):`
-                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
-                    return reply(wrongPin, 'NIN_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'NIN_CONFIRM_PIN', sessionData);
                 }
 
                 const price = Number(sessionData.nin_price || 150);
@@ -2359,12 +2393,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'BVN_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
-                if (!isPinValid) {
-                    const wrongPin = userLang === 'ha'
-                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da PIN (ko tura '0' don sokewa):`
-                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
-                    return reply(wrongPin, 'BVN_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'BVN_CONFIRM_PIN', sessionData);
                 }
 
                 const price = Number(sessionData.bvn_price || 150);
@@ -2498,12 +2533,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'CAC_CONFIRM_PIN') {
-                const isPinValid = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
-                if (!isPinValid) {
-                    const wrongPin = userLang === 'ha'
-                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN mai lamba 4 (ko tura '0' don sokewa):`
-                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
-                    return reply(wrongPin, 'CAC_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'CAC_CONFIRM_PIN', sessionData);
                 }
 
                 const fee = Number(sessionData.cac_price || 18500);
