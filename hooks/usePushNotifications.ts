@@ -7,14 +7,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import { useRouter } from 'expo-router';
 
-// Audio Catalog URLs for all devices and notifications
+// Audio Catalog URLs for all devices and notifications (hosted on official domain + GitHub CDN fallback)
 export const GLOBAL_RINGTONES: Record<string, string> = {
-  executive_bell: 'https://cdn.freesound.org/previews/264/264981_4486188-lq.mp3',
-  siren_alert: 'https://cdn.freesound.org/previews/456/456544_5121236-lq.mp3',
-  cash_register: 'https://cdn.freesound.org/previews/333/333404_4684427-lq.mp3',
-  military_horn: 'https://cdn.freesound.org/previews/387/387232_1474204-lq.mp3',
-  radar_ping: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
-  subtle_chime: 'https://cdn.freesound.org/previews/352/352661_4019029-lq.mp3',
+  executive_bell: 'https://abumafhal.com.ng/sounds/executive_bell.wav',
+  siren_alert: 'https://abumafhal.com.ng/sounds/siren_alert.wav',
+  cash_register: 'https://abumafhal.com.ng/sounds/cash_register.wav',
+  military_horn: 'https://abumafhal.com.ng/sounds/military_horn.wav',
+  radar_ping: 'https://abumafhal.com.ng/sounds/radar_ping.wav',
+  subtle_chime: 'https://abumafhal.com.ng/sounds/subtle_chime.wav',
 };
 
 // Play ringtone on the device using Audio.Sound (supports predefined key, direct URL, or dynamic app_settings sync)
@@ -22,7 +22,8 @@ export async function playDeviceAlertSound(toneKeyOrUri?: string) {
   try {
     let sourceUri = '';
 
-    if (toneKeyOrUri && (toneKeyOrUri.startsWith('http://') || toneKeyOrUri.startsWith('https://') || toneKeyOrUri.startsWith('file://'))) {
+    // Direct HTTP(S) URL
+    if (toneKeyOrUri && (toneKeyOrUri.startsWith('http://') || toneKeyOrUri.startsWith('https://'))) {
       sourceUri = toneKeyOrUri;
     } else {
       let key = toneKeyOrUri;
@@ -31,56 +32,79 @@ export async function playDeviceAlertSound(toneKeyOrUri?: string) {
       }
 
       // Check if stored key is a JSON string containing uri or id
-      if (key && key.startsWith('{')) {
+      if (key && typeof key === 'string' && key.startsWith('{')) {
         try {
           const parsed = JSON.parse(key);
-          if (parsed.uri) sourceUri = parsed.uri;
-          else if (parsed.id) key = parsed.id;
-        } catch (e) {}
+          if (parsed.uri && (parsed.uri.startsWith('http://') || parsed.uri.startsWith('https://'))) {
+            sourceUri = parsed.uri;
+          } else if (parsed.id) {
+            key = parsed.id;
+          }
+        } catch (_) {}
       }
 
-      if (!sourceUri) {
-        if (key && (key.startsWith('http://') || key.startsWith('https://') || key.startsWith('file://'))) {
+      if (!sourceUri && key) {
+        if (key.startsWith('http://') || key.startsWith('https://')) {
           sourceUri = key;
-        } else if (key && GLOBAL_RINGTONES[key]) {
+        } else if (GLOBAL_RINGTONES[key]) {
           sourceUri = GLOBAL_RINGTONES[key];
-        } else {
-          // If still unknown or custom, fetch real-time from Supabase app_settings
-          try {
-            const { data: dbTone } = await supabase
-              .from('app_settings')
-              .select('value')
-              .eq('key', 'global_notification_ringtone')
-              .maybeSingle();
+        }
+      }
 
-            if (dbTone?.value) {
-              if (typeof dbTone.value === 'object' && dbTone.value.uri) {
-                sourceUri = dbTone.value.uri;
-              } else if (typeof dbTone.value === 'string') {
-                if (dbTone.value.startsWith('http://') || dbTone.value.startsWith('https://')) {
-                  sourceUri = dbTone.value;
-                } else if (GLOBAL_RINGTONES[dbTone.value]) {
-                  sourceUri = GLOBAL_RINGTONES[dbTone.value];
-                }
+      // If still unknown or custom, fetch real-time from Supabase app_settings
+      if (!sourceUri) {
+        try {
+          const { data: dbTone } = await supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'global_notification_ringtone')
+            .maybeSingle();
+
+          if (dbTone?.value) {
+            let val = dbTone.value;
+            if (typeof val === 'string' && val.startsWith('{')) {
+              try { val = JSON.parse(val); } catch (_) {}
+            }
+
+            if (val && typeof val === 'object') {
+              if (val.uri && (val.uri.startsWith('http://') || val.uri.startsWith('https://'))) {
+                sourceUri = val.uri;
+              } else if (val.id && GLOBAL_RINGTONES[val.id]) {
+                sourceUri = GLOBAL_RINGTONES[val.id];
+              }
+            } else if (typeof val === 'string') {
+              if (val.startsWith('http://') || val.startsWith('https://')) {
+                sourceUri = val;
+              } else if (GLOBAL_RINGTONES[val]) {
+                sourceUri = GLOBAL_RINGTONES[val];
               }
             }
-          } catch (e) {}
-
-          if (!sourceUri) {
-            sourceUri = GLOBAL_RINGTONES['executive_bell'];
           }
-        }
+        } catch (_) {}
+      }
+
+      if (!sourceUri || (!sourceUri.startsWith('http://') && !sourceUri.startsWith('https://'))) {
+        sourceUri = GLOBAL_RINGTONES['executive_bell'];
       }
     }
 
     if (sourceUri) {
-      if (Platform.OS !== 'web') {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-        }).catch(() => {});
+      if (Platform.OS === 'web') {
+        try {
+          if (typeof window !== 'undefined' && (window as any).Audio) {
+            const webAudio = new (window as any).Audio(sourceUri);
+            webAudio.volume = 1.0;
+            webAudio.play().catch(() => {});
+            return;
+          }
+        } catch (_) {}
       }
+
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      }).catch(() => {});
 
       const { sound } = await Audio.Sound.createAsync(
         { uri: sourceUri },

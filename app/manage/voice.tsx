@@ -21,6 +21,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 // Official Royal Brand Color System
 const C = {
@@ -365,11 +366,14 @@ export default function AudioVoiceControlHub() {
             await AsyncStorage.setItem('global_notification_ringtone', clip.id);
             await AsyncStorage.setItem('admin_preferred_ringtone', clip.id);
 
-            await supabase.from('app_settings').upsert({
+            const { error: dbErr } = await supabase.from('app_settings').upsert({
                 key: 'global_notification_ringtone',
                 value: { id: clip.id, uri: clip.uri, name: clip.title || clip.name },
-                description: 'Global system notification ringtone sound configured from Admin Voice Hub'
+                description: 'Global system notification ringtone sound configured from Admin Voice Hub',
+                updated_at: new Date().toISOString()
             }, { onConflict: 'key' });
+
+            if (dbErr) throw new Error(dbErr.message || 'Failed to update database setting');
 
             Alert.alert('Sound Activated', `"${clip.title || clip.name}" has been set as the global alert sound for all devices.`);
         } catch (e: any) {
@@ -391,42 +395,25 @@ export default function AudioVoiceControlHub() {
             const file = res.assets[0];
             setUploadingClip(true);
 
-            let audioUri = file.uri;
-            const cleanFileName = `voice_hub_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            const ext = (file.name.split('.').pop() || 'mp3').toLowerCase();
+            const cleanFileName = `voice_hub_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+            const mimeType = file.mimeType || (ext === 'wav' ? 'audio/wav' : ext === 'm4a' ? 'audio/m4a' : 'audio/mpeg');
 
-            try {
-                let base64Data = '';
-                if (Platform.OS === 'web' && (file as any).file) {
-                    const reader = new FileReader();
-                    base64Data = await new Promise((resolve, reject) => {
-                        reader.onload = () => {
-                            const res = reader.result as string;
-                            resolve(res.includes(',') ? res.split(',')[1] : res);
-                        };
-                        reader.onerror = reject;
-                        reader.readAsDataURL((file as any).file);
-                    });
-                } else if (file.uri) {
-                    base64Data = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
-                }
+            // Upload directly to public Supabase Storage bucket 'banners' with fallback
+            const uploadRes = await uploadMediaFile({
+                uri: file.uri,
+                file: (file as any).file || null,
+                bucket: 'banners',
+                folder: 'ringtones',
+                fileName: `ringtones/${cleanFileName}`,
+                mimeType,
+            });
 
-                if (base64Data) {
-                    const { data: uploadRes, error: uploadErr } = await supabase.functions.invoke('admin-audit-logs', {
-                        body: {
-                            action: 'upload-ringtone',
-                            fileName: cleanFileName,
-                            base64Data: base64Data,
-                            contentType: file.mimeType || 'audio/mpeg'
-                        }
-                    });
-
-                    if (!uploadErr && uploadRes?.publicUrl) {
-                        audioUri = uploadRes.publicUrl;
-                    }
-                }
-            } catch (storageErr) {
-                console.log('[VoiceHubStorage] Upload fallback:', storageErr);
+            if (!uploadRes.success || !uploadRes.publicUrl || !uploadRes.publicUrl.startsWith('http')) {
+                throw new Error(uploadRes.error || 'Failed to upload audio to cloud storage. Please check connection and try again.');
             }
+
+            const cloudAudioUri = uploadRes.publicUrl;
 
             const newClip = {
                 id: `custom_${Date.now()}`,
@@ -435,24 +422,29 @@ export default function AudioVoiceControlHub() {
                 icon: 'musical-notes',
                 color: C.purple,
                 description: 'Custom uploaded audio for voice alerts and system prompts.',
-                uri: audioUri,
+                uri: cloudAudioUri,
                 is_custom: true,
             };
 
-            const updated = [...audioCatalog, newClip];
+            const updated = [...audioCatalog.filter(c => !c.is_custom || (c.uri && c.uri.startsWith('http'))), newClip];
             setAudioCatalog(updated);
 
-            const customs = updated.filter(c => c.is_custom);
+            const customs = updated.filter(c => c.is_custom && c.uri && c.uri.startsWith('http'));
             await supabase.from('app_settings').upsert({
                 key: 'admin_custom_ringtones_catalog',
                 value: customs,
-                description: 'Custom ringtones uploaded by Admin'
+                description: 'Custom ringtones uploaded by Admin',
+                updated_at: new Date().toISOString()
             }, { onConflict: 'key' });
 
             await setAsGlobalSound(newClip);
         } catch (err: any) {
+            console.error('Audio upload error:', err);
             Alert.alert('Upload Error', err.message || 'Could not upload audio.');
         } finally {
+            setUploadingClip(false);
+        }
+    };
             setUploadingClip(false);
         }
     };

@@ -23,8 +23,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../services/supabase';
-import { sendInstantNotification } from '../../hooks/usePushNotifications';
+import { sendInstantNotification, GLOBAL_RINGTONES } from '../../hooks/usePushNotifications';
 import { AIService } from '../../services/ai';
+import { uploadMediaFile } from '../../services/mediaUpload';
 
 const { width } = Dimensions.get('window');
 
@@ -102,42 +103,42 @@ export default function AdminPushNotificationsScreen() {
             name: 'Executive Crystal Bell',
             icon: 'notifications',
             color: C.gold,
-            uri: 'https://cdn.freesound.org/previews/264/264981_4486188-lq.mp3',
+            uri: 'https://abumafhal.com.ng/sounds/executive_bell.wav',
         },
         {
             id: 'siren_alert',
             name: 'Emergency Siren Alarm',
             icon: 'alert-circle',
             color: C.red,
-            uri: 'https://cdn.freesound.org/previews/456/456544_5121236-lq.mp3',
+            uri: 'https://abumafhal.com.ng/sounds/siren_alert.wav',
         },
         {
             id: 'cash_register',
             name: 'Money & Wealth Chime',
             icon: 'cash',
             color: C.green,
-            uri: 'https://cdn.freesound.org/previews/333/333404_4684427-lq.mp3',
+            uri: 'https://abumafhal.com.ng/sounds/cash_register.wav',
         },
         {
             id: 'military_horn',
             name: 'Staff Summoning Horn',
             icon: 'people',
             color: C.purple,
-            uri: 'https://cdn.freesound.org/previews/387/387232_1474204-lq.mp3',
+            uri: 'https://abumafhal.com.ng/sounds/military_horn.wav',
         },
         {
             id: 'radar_ping',
             name: 'Sonar Radar Ping',
             icon: 'radio',
             color: C.blue,
-            uri: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
+            uri: 'https://abumafhal.com.ng/sounds/radar_ping.wav',
         },
         {
             id: 'subtle_chime',
             name: 'Subtle Modern Pop',
             icon: 'sparkles',
             color: C.cyan,
-            uri: 'https://cdn.freesound.org/previews/352/352661_4019029-lq.mp3',
+            uri: 'https://abumafhal.com.ng/sounds/subtle_chime.wav',
         }
     ];
 
@@ -245,8 +246,10 @@ export default function AdminPushNotificationsScreen() {
                     try { parsedCustoms = JSON.parse(parsedCustoms); } catch (e) {}
                 }
                 if (Array.isArray(parsedCustoms)) {
+                    // Only accept valid cloud URLs (filter out corrupted local paths)
+                    const validCustoms = parsedCustoms.filter((t: any) => t && t.id && t.uri && (t.uri.startsWith('http://') || t.uri.startsWith('https://')));
                     const existingIds = new Set(mergedCatalog.map(m => m.id));
-                    const newTones = parsedCustoms.filter((t: any) => t && t.id && !existingIds.has(t.id));
+                    const newTones = validCustoms.filter((t: any) => !existingIds.has(t.id));
                     mergedCatalog = [...mergedCatalog, ...newTones];
                 }
             }
@@ -257,8 +260,9 @@ export default function AdminPushNotificationsScreen() {
                 try {
                     const parsed = JSON.parse(localCustoms);
                     if (Array.isArray(parsed)) {
+                        const validCustoms = parsed.filter((t: any) => t && t.id && t.uri && (t.uri.startsWith('http://') || t.uri.startsWith('https://')));
                         const existingIds = new Set(mergedCatalog.map(m => m.id));
-                        const newTones = parsed.filter((t: any) => t && t.id && !existingIds.has(t.id));
+                        const newTones = validCustoms.filter((t: any) => !existingIds.has(t.id));
                         mergedCatalog = [...mergedCatalog, ...newTones];
                     }
                 } catch (e) {}
@@ -317,77 +321,60 @@ export default function AdminPushNotificationsScreen() {
             const file = res.assets[0];
             setUploadingTone(true);
 
-            let audioUri = file.uri;
-            const cleanFileName = `ringtone_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            const ext = (file.name.split('.').pop() || 'mp3').toLowerCase();
+            const cleanFileName = `ringtone_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+            const mimeType = file.mimeType || (ext === 'wav' ? 'audio/wav' : ext === 'm4a' ? 'audio/m4a' : 'audio/mpeg');
 
-            // Read base64 data from file to upload via Edge Function (bypasses RLS)
-            try {
-                let base64Data = '';
-                if (Platform.OS === 'web' && file.file) {
-                    const reader = new FileReader();
-                    base64Data = await new Promise((resolve, reject) => {
-                        reader.onload = () => {
-                            const res = reader.result as string;
-                            resolve(res.includes(',') ? res.split(',')[1] : res);
-                        };
-                        reader.onerror = reject;
-                        reader.readAsDataURL(file.file as any);
-                    });
-                } else if (file.uri) {
-                    base64Data = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
-                }
+            // Direct streaming/blob upload to Supabase Storage ('banners' bucket with fallback)
+            const uploadRes = await uploadMediaFile({
+                uri: file.uri,
+                file: (file as any).file || null,
+                bucket: 'banners',
+                folder: 'ringtones',
+                fileName: `ringtones/${cleanFileName}`,
+                mimeType,
+            });
 
-                if (base64Data) {
-                    const { data: uploadRes, error: uploadErr } = await supabase.functions.invoke('admin-audit-logs', {
-                        body: {
-                            action: 'upload-ringtone',
-                            fileName: cleanFileName,
-                            base64Data: base64Data,
-                            contentType: file.mimeType || 'audio/mpeg'
-                        }
-                    });
-
-                    if (!uploadErr && uploadRes?.publicUrl) {
-                        audioUri = uploadRes.publicUrl;
-                    }
-                }
-            } catch (storageErr) {
-                console.log('[RingtoneStorage] Upload note:', storageErr);
+            if (!uploadRes.success || !uploadRes.publicUrl || !uploadRes.publicUrl.startsWith('http')) {
+                throw new Error(uploadRes.error || 'Failed to upload audio to cloud storage.');
             }
+
+            const cloudAudioUri = uploadRes.publicUrl;
 
             const newToneItem = {
                 id: `custom_${Date.now()}`,
                 name: file.name.replace(/\.[^/.]+$/, ''),
                 icon: 'cloud-upload',
                 color: C.purple,
-                uri: audioUri,
+                uri: cloudAudioUri,
                 is_custom: true
             };
 
-            const updatedCatalog = [...ringtoneCatalog, newToneItem];
+            const updatedCatalog = [...ringtoneCatalog.filter(t => !t.is_custom || (t.uri && t.uri.startsWith('http'))), newToneItem];
             setRingtoneCatalog(updatedCatalog);
 
             // Save to AsyncStorage
-            const customsOnly = updatedCatalog.filter(t => t.is_custom);
+            const customsOnly = updatedCatalog.filter(t => t.is_custom && t.uri && t.uri.startsWith('http'));
             await AsyncStorage.setItem('admin_custom_uploaded_tones', JSON.stringify(customsOnly));
 
             // Persist to Supabase app_settings so all devices get the new ringtone
-            try {
-                await supabase.from('app_settings').upsert({
-                    key: 'admin_custom_ringtones_catalog',
-                    value: customsOnly,
-                    description: 'Custom ringtones uploaded by Admin'
-                }, { onConflict: 'key' });
-            } catch (e) {}
+            const { error: catErr } = await supabase.from('app_settings').upsert({
+                key: 'admin_custom_ringtones_catalog',
+                value: customsOnly,
+                description: 'Custom ringtones uploaded by Admin',
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+            if (catErr) console.warn('[Ringtone] Catalog upsert note:', catErr);
 
             // Auto-select and save this newly uploaded ringtone globally
             await handleSaveAdminRingtone(newToneItem.id, updatedCatalog);
 
             Alert.alert(
                 'Upload Successful',
-                `"${newToneItem.name}" has been uploaded and set as the active ringtone for all devices.`
+                `"${newToneItem.name}" has been uploaded to cloud storage and set as the active ringtone for all devices.`
             );
         } catch (err: any) {
+            console.error('Ringtone upload error:', err);
             Alert.alert('Upload Failed', err.message || 'Could not upload audio file.');
         } finally {
             setUploadingTone(false);
@@ -402,26 +389,31 @@ export default function AdminPushNotificationsScreen() {
             await AsyncStorage.setItem('global_notification_ringtone', toneId);
 
             const activeCat = customCatalog || ringtoneCatalog;
-            const chosenTone = activeCat.find(r => r.id === toneId);
+            const chosenTone = activeCat.find((r: any) => r.id === toneId);
+
+            const soundUri = chosenTone?.uri || (GLOBAL_RINGTONES as any)[toneId] || '';
+            const soundName = chosenTone?.name || toneId;
 
             // Persist globally into app_settings so ALL users and devices ring with this sound
-            try {
-                await supabase.from('app_settings').upsert({
-                    key: 'global_notification_ringtone',
-                    value: { id: toneId, uri: chosenTone?.uri, name: chosenTone?.name },
-                    description: 'Global system notification ringtone sound configured from Admin Panel'
-                }, { onConflict: 'key' });
-            } catch (dbErr) {
-                console.log('[Ringtone] DB sync note:', dbErr);
+            const { error: dbErr } = await supabase.from('app_settings').upsert({
+                key: 'global_notification_ringtone',
+                value: { id: toneId, uri: soundUri, name: soundName },
+                description: 'Global system notification ringtone sound configured from Admin Panel',
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            if (dbErr) {
+                console.error('[Ringtone] DB sync error:', dbErr);
+                throw new Error(dbErr.message || 'Failed to update database setting.');
             }
 
             playPreviewSound(toneId, activeCat);
             Alert.alert(
                 'Ringtone Saved',
-                `"${chosenTone?.name || toneId}" is now set as the active alert sound on all devices.`
+                `"${soundName}" is now active and set as the notification alert sound on all user devices.`
             );
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            Alert.alert('Save Error', e.message || 'Could not save ringtone.');
         }
     };
 
@@ -1424,21 +1416,32 @@ export default function AdminPushNotificationsScreen() {
                     {/* 4. Notification Ringtone / Chime Selection */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 8 }}>
                         <Text style={[s.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>4. ALERT RINGTONE</Text>
-                        <TouchableOpacity
-                            onPress={handleUploadCustomRingtone}
-                            disabled={uploadingTone}
-                            style={s.uploadToneMiniBtn}
-                            activeOpacity={0.8}
-                        >
-                            {uploadingTone ? (
-                                <ActivityIndicator size="small" color={C.gold} />
-                            ) : (
-                                <>
-                                    <Ionicons name="cloud-upload" size={13} color={C.gold} />
-                                    <Text style={s.uploadToneMiniBtnText}>Upload Audio</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <TouchableOpacity
+                                onPress={() => handleSaveAdminRingtone(selectedRingtoneForPush)}
+                                style={[s.uploadToneMiniBtn, { borderColor: C.gold, backgroundColor: C.goldBg }]}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="checkmark-circle" size={13} color={C.gold} />
+                                <Text style={[s.uploadToneMiniBtnText, { color: C.navy, fontWeight: '700' }]}>Set As App Default</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleUploadCustomRingtone}
+                                disabled={uploadingTone}
+                                style={s.uploadToneMiniBtn}
+                                activeOpacity={0.8}
+                            >
+                                {uploadingTone ? (
+                                    <ActivityIndicator size="small" color={C.gold} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="cloud-upload" size={13} color={C.gold} />
+                                        <Text style={s.uploadToneMiniBtnText}>Upload Audio</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                     <View style={s.ringtoneSelectorBox}>
                         <View style={s.ringtoneListGrid}>
