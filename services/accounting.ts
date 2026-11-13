@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Alert, Platform } from 'react-native';
 import { ABU_MAFHAL_LOGO_B64 } from '../assets/images/logoB64';
 

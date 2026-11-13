@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { supabase } from '../../services/supabase';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const BIGIHUB_API_URL = Platform.OS === 'web' 
     ? 'https://corsproxy.io/?' + encodeURIComponent(process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/')

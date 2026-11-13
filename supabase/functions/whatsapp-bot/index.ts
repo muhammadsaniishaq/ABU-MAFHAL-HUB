@@ -117,19 +117,37 @@ function getSafePlanSellingPrice(plan: any, networkMarkup: number = 0, markupTyp
     return Math.round(sell);
 }
 
-// Helper: Accurately verify 4-digit Transaction PIN against database
+// Helper: Accurately extract and verify 4-digit Transaction PIN against database
 async function verifyUserPin(
     supabaseAdmin: any, 
     userId: string, 
     inputPin: string, 
     fallbackPin?: any
 ): Promise<boolean> {
-    const cleanInput = String(inputPin || '').replace(/\D/g, '').trim();
-    if (cleanInput.length !== 4) {
-        console.warn(`[WhatsApp Bot PIN] Input PIN must be 4 digits, got: "${inputPin}" (cleaned: "${cleanInput}")`);
+    const raw = String(inputPin || '').trim();
+    if (!raw) return false;
+
+    // 1. Extract 4-digit PIN candidate
+    // Accepts "1234", " 1234 ", "1234.", "pin 1234", "1 2 3 4", "ga shi 1234"
+    let cleanInput = '';
+    const wordMatch = raw.match(/\b\d{4}\b/);
+    if (wordMatch) {
+        cleanInput = wordMatch[0];
+    } else {
+        const digitsOnly = raw.replace(/\D/g, '');
+        if (digitsOnly.length === 4) {
+            cleanInput = digitsOnly;
+        } else if (digitsOnly.length > 4) {
+            cleanInput = digitsOnly.slice(0, 4);
+        }
+    }
+
+    if (!cleanInput || cleanInput.length !== 4) {
+        console.warn(`[WhatsApp Bot PIN] Could not extract 4-digit PIN from input: "${raw}"`);
         return false;
     }
 
+    // 2. Query live PIN from profiles table for this user
     let dbPin = fallbackPin;
     if (userId) {
         try {
@@ -138,6 +156,7 @@ async function verifyUserPin(
                 .select('transaction_pin')
                 .eq('id', userId)
                 .maybeSingle();
+
             if (!profErr && freshProf && freshProf.transaction_pin !== undefined && freshProf.transaction_pin !== null) {
                 dbPin = freshProf.transaction_pin;
             }
@@ -151,16 +170,69 @@ async function verifyUserPin(
         cleanDbPin = '';
     }
 
-    // Default system transaction PIN in Abu Mafhal Sub when unset is strictly '1234'
-    if (!cleanDbPin || cleanDbPin.length === 0) {
-        cleanDbPin = '1234';
-    } else if (cleanDbPin.length > 0 && cleanDbPin.length < 4) {
-        cleanDbPin = cleanDbPin.padStart(4, '0');
-    }
+    // If user has a custom set PIN (>= 4 digits)
+    const hasConfiguredPin = cleanDbPin.length >= 4;
+    const expectedPin = hasConfiguredPin ? cleanDbPin.slice(-4) : '1234';
 
-    const isMatch = (cleanInput === cleanDbPin);
-    console.log(`[WhatsApp Bot PIN] Validation: userId=${userId}, input=${cleanInput}, expected=${cleanDbPin}, matched=${isMatch}`);
+    // Match if cleanInput equals the configured PIN, or if unset, accepts '1234' or '0000'
+    const isMatch = (cleanInput === expectedPin) || (!hasConfiguredPin && (cleanInput === '1234' || cleanInput === '0000'));
+
+    console.log(`[WhatsApp Bot PIN] Validation: userId=${userId}, inputRaw="${raw}", inputClean="${cleanInput}", expected="${expectedPin}", hasCustomPin=${hasConfiguredPin}, matched=${isMatch}`);
     return isMatch;
+}
+
+// Helper: Robust multi-variant profile resolver for WhatsApp phone
+async function findUserProfileByPhone(supabaseAdmin: any, waPhone: string): Promise<any | null> {
+    if (!waPhone) return null;
+    const cleanDigits = String(waPhone).replace(/\D/g, '');
+    if (cleanDigits.length < 8) return null;
+
+    const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    const local11 = '0' + last10;
+    const int13 = '234' + last10;
+    const plus14 = '+234' + last10;
+
+    // 1. Direct equality match on canonical phone representations
+    try {
+        const { data: directMatch } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, email, balance, transaction_pin, phone')
+            .or(`phone.eq.${local11},phone.eq.${int13},phone.eq.${plus14},phone.eq.${last10},phone.eq.${cleanDigits},phone.eq.${waPhone}`)
+            .limit(1);
+
+        if (directMatch && directMatch.length > 0) {
+            return directMatch[0];
+        }
+    } catch (_) {}
+
+    // 2. Database RPC function (with role casting fix)
+    try {
+        const { data: rpcUsers } = await supabaseAdmin
+            .rpc('get_user_by_whatsapp_phone', { wa_phone: waPhone });
+        if (rpcUsers && rpcUsers.length > 0 && rpcUsers[0]?.id) {
+            return rpcUsers[0];
+        }
+    } catch (_) {}
+
+    // 3. Fuzzy search for phone numbers with spaces, brackets or dashes (e.g. 0801 234 5678)
+    try {
+        const last8 = last10.slice(-8);
+        const { data: candidates } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, email, balance, transaction_pin, phone')
+            .ilike('phone', `%${last8}%`)
+            .limit(15);
+
+        if (candidates && candidates.length > 0) {
+            const matched = candidates.find((c: any) => {
+                const cDigits = String(c.phone || '').replace(/\D/g, '');
+                return cDigits.endsWith(last10);
+            });
+            if (matched) return matched;
+        }
+    } catch (_) {}
+
+    return null;
 }
 
 
@@ -739,46 +811,14 @@ Deno.serve(async (req: Request) => {
 
             // 3. Try resolving user profile if not already linked
             if (!userId) {
-                try {
-                    // Step 3a: Dedicated database RPC with regex digit stripping (matches 080..., 234..., spaces, etc.)
-                    const { data: rpcUsers, error: rpcErr } = await supabaseAdmin
-                        .rpc('get_user_by_whatsapp_phone', { wa_phone: senderPhone });
-
-                    if (!rpcErr && rpcUsers && rpcUsers.length > 0 && rpcUsers[0]?.id) {
-                        userId = rpcUsers[0].id;
-                        await supabaseAdmin
-                            .from('whatsapp_bot_sessions')
-                            .update({ user_id: userId })
-                            .eq('phone_number', senderPhone);
-                        console.log(`[WhatsApp Bot] Resolved user profile via RPC: ${userId} for ${senderPhone}`);
-                    }
-                } catch (rpcEx) {
-                    console.warn("[WhatsApp Bot] RPC get_user_by_whatsapp_phone error:", rpcEx);
-                }
-
-                // Step 3b: Fallback variations query if RPC did not resolve
-                if (!userId) {
-                    const cleanDigits = senderPhone.replace(/\D/g, '');
-                    const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
-
-                    try {
-                        const { data: matchedProfiles } = await supabaseAdmin
-                            .from('profiles')
-                            .select('id, full_name, email, balance, transaction_pin, phone')
-                            .or(`phone.eq.${senderPhone},phone.eq.0${last10},phone.eq.+234${last10},phone.eq.234${last10},phone.eq.${last10},phone.ilike.%${last10}%`)
-                            .limit(1);
-
-                        if (matchedProfiles && matchedProfiles.length > 0) {
-                            userId = matchedProfiles[0].id;
-                            await supabaseAdmin
-                                .from('whatsapp_bot_sessions')
-                                .update({ user_id: userId })
-                                .eq('phone_number', senderPhone);
-                            console.log(`[WhatsApp Bot] Resolved profile via phone fallback: ${userId} for ${senderPhone}`);
-                        }
-                    } catch (e) {
-                        console.error("[WhatsApp Bot] Profile resolution error:", e);
-                    }
+                const foundProf = await findUserProfileByPhone(supabaseAdmin, senderPhone);
+                if (foundProf?.id) {
+                    userId = foundProf.id;
+                    await supabaseAdmin
+                        .from('whatsapp_bot_sessions')
+                        .update({ user_id: userId })
+                        .eq('phone_number', senderPhone);
+                    console.log(`[WhatsApp Bot] Resolved profile via phone lookup: ${userId} (${foundProf.full_name}) for ${senderPhone}`);
                 }
             }
 
@@ -949,8 +989,8 @@ Deno.serve(async (req: Request) => {
 
                     if (!isPinValid) {
                         const wrongPinMsg = userLang === 'ha'
-                            ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                            : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
+                            ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan a sake gwadawa.\n💡 _(Idan baka saita PIN ba a manhajarmu, PIN ɗinka na asali shine: *1234*)_\n\nKo tura '0' don sokewa:`
+                            : `❌ *Incorrect Transaction PIN!*\n\nPlease try again.\n💡 _(If you haven't set a custom PIN on our app, your default PIN is: *1234*)_\n\nOr reply '0' to cancel:`;
                         return reply(wrongPinMsg, 'AWAITING_LINK_PIN', sessionData);
                     }
 
@@ -998,19 +1038,16 @@ Deno.serve(async (req: Request) => {
 
             // Self-healing: if session userId is stale or deleted, attempt resolving via senderPhone
             if (!profile) {
-                try {
-                    const { data: rpcUsers } = await supabaseAdmin
-                        .rpc('get_user_by_whatsapp_phone', { wa_phone: senderPhone });
-                    if (rpcUsers && rpcUsers.length > 0 && rpcUsers[0]?.id) {
-                        profile = rpcUsers[0];
-                        userId = profile.id;
-                        await supabaseAdmin
-                            .from('whatsapp_bot_sessions')
-                            .update({ user_id: userId })
-                            .eq('phone_number', senderPhone);
-                        console.log(`[WhatsApp Bot] Recovered profile via phone RPC: ${userId} for ${senderPhone}`);
-                    }
-                } catch (_) {}
+                const recovered = await findUserProfileByPhone(supabaseAdmin, senderPhone);
+                if (recovered?.id) {
+                    profile = recovered;
+                    userId = profile.id;
+                    await supabaseAdmin
+                        .from('whatsapp_bot_sessions')
+                        .update({ user_id: userId })
+                        .eq('phone_number', senderPhone);
+                    console.log(`[WhatsApp Bot] Recovered profile via phone lookup: ${userId} (${profile.full_name}) for ${senderPhone}`);
+                }
             }
 
             if (!profile) {

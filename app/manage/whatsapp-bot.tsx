@@ -12,7 +12,6 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { safeLaunchPicker } from '../../services/systemPickerTracker';
 import { uploadMediaFile } from '../../services/mediaUpload';
