@@ -385,6 +385,48 @@ export default function DataScreen() {
     const [planTypeFilter, setPlanTypeFilter] = useState<string>('All');
     const [showPlanTypeModal, setShowPlanTypeModal] = useState(false);
 
+    // Brand Theme (Navy, White & Gold) & Vendor Filtering State
+    const [vendorFilter, setVendorFilter] = useState<string>('All');
+    const [cardTheme, setCardTheme] = useState<{
+        show_vendor_badge: boolean;
+        primary_navy: string;
+        accent_gold: string;
+        card_white: string;
+        vendor_labels: Record<string, string>;
+    }>({
+        show_vendor_badge: true,
+        primary_navy: '#0A192F',
+        accent_gold: '#F59E0B',
+        card_white: '#FFFFFF',
+        vendor_labels: {
+            bilalsadasub: 'BilalSub',
+            bigi: 'BigiSub',
+            clubkonnect: 'ClubKonnect',
+            ketawancy: 'Ketawancy'
+        }
+    });
+
+    const fetchCardTheme = async () => {
+        try {
+            const { data } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'DATA_CARD_BRAND_THEME')
+                .maybeSingle();
+            if (data?.value) {
+                const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                setCardTheme(prev => ({
+                    ...prev,
+                    ...parsed,
+                    vendor_labels: {
+                        ...prev.vendor_labels,
+                        ...(parsed.vendor_labels || {})
+                    }
+                }));
+            }
+        } catch (_) {}
+    };
+
     // Contact Picker State
     const [deviceContacts, setDeviceContacts] = useState<any[]>([]);
     const [showContactModal, setShowContactModal] = useState(false);
@@ -400,7 +442,8 @@ export default function DataScreen() {
             fetchUserData(),
             fetchBeneficiaries(),
             fetchLastTransaction(),
-            loadFavorites()
+            loadFavorites(),
+            fetchCardTheme()
         ]).catch(e => console.warn('Data init error:', e));
     }, []);
 
@@ -830,6 +873,7 @@ export default function DataScreen() {
             setSelectedPlan(null); // Reset selection
             setPlanTypeFilter('All'); // Reset plan type filter on network change
             setPlanFilter('All'); // Reset duration filter too
+            setVendorFilter('All'); // Reset vendor filter too
         } else {
             setPlans([]);
         }
@@ -846,11 +890,84 @@ export default function DataScreen() {
         }
     }, [purchaseMode, userPhone, detectNetwork]);
 
+    // Dynamic count of plans per vendor for active network
+    const availableVendors = useMemo(() => {
+        const counts: Record<string, number> = {};
+        plans.forEach(p => {
+            const v = String(p.apiVendor || (p as any).api_vendor || 'bilalsadasub').toLowerCase();
+            let key = 'bilalsadasub';
+            if (v.includes('bigi')) key = 'bigi';
+            else if (v.includes('clubkonnect') || v.includes('ck')) key = 'clubkonnect';
+            else if (v.includes('ketawancy')) key = 'ketawancy';
+            else key = 'bilalsadasub';
+            counts[key] = (counts[key] || 0) + 1;
+        });
+        return counts;
+    }, [plans]);
+
+    // Vendor styling & metadata in Navy, White, and Gold brand
+    const getVendorCardMeta = useCallback((vendorStr: string) => {
+        const v = (vendorStr || '').toLowerCase();
+        const labels = cardTheme.vendor_labels || {};
+        if (v.includes('bigi')) {
+            return {
+                key: 'bigi',
+                badgeLabel: labels.bigi || 'BigiSub',
+                badgeBg: '#1E1B4B',
+                badgeBorder: '#818CF8',
+                badgeTextColor: '#C7D2FE',
+                dotColor: '#A78BFA',
+                accentBorder: '#6366F1'
+            };
+        }
+        if (v.includes('clubkonnect') || v.includes('ck')) {
+            return {
+                key: 'clubkonnect',
+                badgeLabel: labels.clubkonnect || 'ClubKonnect',
+                badgeBg: '#0B192C',
+                badgeBorder: '#38BDF8',
+                badgeTextColor: '#BAE6FD',
+                dotColor: '#38BDF8',
+                accentBorder: '#0284C7'
+            };
+        }
+        if (v.includes('ketawancy')) {
+            return {
+                key: 'ketawancy',
+                badgeLabel: labels.ketawancy || 'Ketawancy',
+                badgeBg: '#18181B',
+                badgeBorder: '#F59E0B',
+                badgeTextColor: '#FDE047',
+                dotColor: '#F59E0B',
+                accentBorder: '#D97706'
+            };
+        }
+        // Default: BilalSadaSub
+        return {
+            key: 'bilalsadasub',
+            badgeLabel: labels.bilalsadasub || 'BilalSub',
+            badgeBg: '#0A192F',
+            badgeBorder: '#F59E0B',
+            badgeTextColor: '#FDE047',
+            dotColor: '#10B981',
+            accentBorder: '#F59E0B'
+        };
+    }, [cardTheme]);
+
     // Derived State: Filtered Plans
     const filteredPlans = plans.filter(p => {
         // Search Filter
         if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) {
             return false;
+        }
+
+        // Vendor Filter
+        if (vendorFilter !== 'All') {
+            const pVendor = String(p.apiVendor || (p as any).api_vendor || '').toLowerCase();
+            const filterLower = vendorFilter.toLowerCase();
+            if (!pVendor.includes(filterLower)) {
+                return false;
+            }
         }
 
         // Min Volume Filter (from Data Usage Estimator)
@@ -2587,6 +2704,92 @@ export default function DataScreen() {
                                         </View>
                                     )}
 
+                                    {/* Brand Theme Vendor Selector Bar (Navy, White & Gold) */}
+                                    {Object.keys(availableVendors).length > 1 && (
+                                        <View style={{ marginBottom: 14 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 2 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <Ionicons name="business" size={13} color="#0A192F" style={{ marginRight: 5 }} />
+                                                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#0A192F', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                        Masu Kawo Data (Providers)
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '700' }}>
+                                                    {Object.keys(availableVendors).length} Providers Active
+                                                </Text>
+                                            </View>
+                                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                                                <TouchableOpacity
+                                                    onPress={() => setVendorFilter('All')}
+                                                    style={{
+                                                        backgroundColor: vendorFilter === 'All' ? '#0A192F' : '#FFFFFF',
+                                                        borderWidth: 1.5,
+                                                        borderColor: vendorFilter === 'All' ? '#F59E0B' : '#E2E8F0',
+                                                        borderRadius: 12,
+                                                        paddingHorizontal: 12,
+                                                        paddingVertical: 7,
+                                                        marginRight: 8,
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        shadowColor: '#0A192F',
+                                                        shadowOffset: { width: 0, height: 1 },
+                                                        shadowOpacity: vendorFilter === 'All' ? 0.15 : 0.03,
+                                                        shadowRadius: 3,
+                                                        elevation: vendorFilter === 'All' ? 2 : 1
+                                                    }}
+                                                >
+                                                    <Text style={{ color: vendorFilter === 'All' ? '#FDE047' : '#0F172A', fontSize: 11, fontWeight: '900' }}>
+                                                        Duk Masu Kawo Data
+                                                    </Text>
+                                                    <View style={{ backgroundColor: vendorFilter === 'All' ? '#F59E0B' : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
+                                                        <Text style={{ color: vendorFilter === 'All' ? '#0A192F' : '#64748B', fontSize: 9.5, fontWeight: '900' }}>
+                                                            {plans.length}
+                                                        </Text>
+                                                    </View>
+                                                </TouchableOpacity>
+
+                                                {Object.entries(availableVendors).map(([vKey, count]) => {
+                                                    const meta = getVendorCardMeta(vKey);
+                                                    const isSelected = vendorFilter.toLowerCase() === vKey;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={vKey}
+                                                            onPress={() => setVendorFilter(isSelected ? 'All' : vKey)}
+                                                            style={{
+                                                                backgroundColor: isSelected ? '#0A192F' : '#FFFFFF',
+                                                                borderWidth: 1.5,
+                                                                borderColor: isSelected ? meta.accentBorder : '#E2E8F0',
+                                                                borderRadius: 12,
+                                                                paddingHorizontal: 12,
+                                                                paddingVertical: 7,
+                                                                marginRight: 8,
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                gap: 6,
+                                                                shadowColor: '#0A192F',
+                                                                shadowOffset: { width: 0, height: 1 },
+                                                                shadowOpacity: isSelected ? 0.15 : 0.03,
+                                                                shadowRadius: 3,
+                                                                elevation: isSelected ? 2 : 1
+                                                            }}
+                                                        >
+                                                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: meta.dotColor }} />
+                                                            <Text style={{ color: isSelected ? '#FFFFFF' : '#0F172A', fontSize: 11, fontWeight: '900' }}>
+                                                                {meta.badgeLabel}
+                                                            </Text>
+                                                            <View style={{ backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.25)' : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
+                                                                <Text style={{ color: isSelected ? '#FDE047' : '#64748B', fontSize: 9.5, fontWeight: '900' }}>
+                                                                    {count}
+                                                                </Text>
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </ScrollView>
+                                        </View>
+                                    )}
+
                                     {filteredPlans.map((plan) => {
                                         const isSelected = selectedPlan?.id === plan.id;
                                         const isFav = favorites.includes(plan.id);
@@ -2595,6 +2798,7 @@ export default function DataScreen() {
                                         const isMega = plan.name.toLowerCase().includes('mega');
                                         const isGBPlan = planInfo.volumeInGB >= 1;
                                         const costPerGB = isGBPlan ? Math.round(plan.price / planInfo.volumeInGB) : null;
+                                        const vendorMeta = getVendorCardMeta(plan.apiVendor || (plan as any).api_vendor || '');
                                         
                                         return (
                                         <TouchableOpacity
@@ -2605,117 +2809,151 @@ export default function DataScreen() {
                                                 }
                                                 setSelectedPlan(plan);
                                             }}
-                                            style={[s.planListCard, isSelected && s.planListCardSelected]}
+                                            style={[
+                                                s.planListCard, 
+                                                isSelected && s.planListCardSelected,
+                                                !isSelected && {
+                                                    borderLeftWidth: 4,
+                                                    borderLeftColor: vendorMeta.accentBorder || '#F59E0B'
+                                                }
+                                            ]}
                                             activeOpacity={0.7}
                                         >
                                             <LinearGradient
-                                                colors={isSelected ? ['#102258', '#0b163a'] : ['#ffffff', '#ffffff']}
+                                                colors={isSelected ? ['#0A192F', '#0F172A', '#1E293B'] : ['#FFFFFF', '#FFFFFF']}
                                                 style={s.planListCardGradient}
                                             >
-                                                {/* Left: Volume Badge */}
-                                                <View style={[s.planVolumeBadge, isSelected && s.planVolumeBadgeSelected]}>
-                                                    <Text style={[s.planVolumeValue, isSelected && { color: '#ffffff' }]}>
+                                                {/* Left: Volume Badge (Brand Navy & Gold) */}
+                                                <View style={[
+                                                    s.planVolumeBadge, 
+                                                    isSelected ? {
+                                                        backgroundColor: '#F59E0B',
+                                                        borderColor: '#D97706'
+                                                    } : {
+                                                        backgroundColor: '#0A192F',
+                                                        borderColor: '#F59E0B'
+                                                    }
+                                                ]}>
+                                                    <Text style={[
+                                                        s.planVolumeValue, 
+                                                        isSelected ? { color: '#0A192F' } : { color: '#F59E0B' }
+                                                    ]}>
                                                         {planInfo.volumeVal || 'Data'}
                                                     </Text>
-                                                    <Text style={[s.planVolumeUnit, isSelected && { color: 'rgba(255,255,255,0.8)' }]}>
+                                                    <Text style={[
+                                                        s.planVolumeUnit, 
+                                                        isSelected ? { color: '#0A192F' } : { color: '#FFFFFF' }
+                                                    ]}>
                                                         {planInfo.volumeUnit}
                                                     </Text>
                                                 </View>
                                                 
                                                 {/* Middle: Details */}
                                                 <View style={s.planDetailsMid}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3, flexWrap: 'wrap', gap: 4 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
                                                         <Text style={[s.planListName, isSelected && s.planListNameSelected]} numberOfLines={2}>
                                                             {plan.name}
                                                         </Text>
                                                         {isBestValue && (
-                                                            <View style={[s.tinyBadge, { backgroundColor: '#f97316' }]}>
-                                                                <Text style={s.tinyBadgeText}>BEST VALUE</Text>
+                                                            <View style={[s.tinyBadge, { backgroundColor: '#F59E0B' }]}>
+                                                                <Text style={[s.tinyBadgeText, { color: '#0A192F' }]}>★ BEST VALUE</Text>
                                                             </View>
                                                         )}
                                                         {isMega && (
-                                                            <View style={[s.tinyBadge, { backgroundColor: '#8b5cf6' }]}>
+                                                            <View style={[s.tinyBadge, { backgroundColor: '#8B5CF6' }]}>
                                                                 <Text style={s.tinyBadgeText}>MEGA</Text>
                                                             </View>
                                                         )}
                                                     </View>
+
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                                                        {/* Vendor Badge ("Wata alama da za a gane duk suna zuwa") */}
+                                                        {cardTheme.show_vendor_badge !== false && (
+                                                            <View style={{
+                                                                backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.2)' : vendorMeta.badgeBg,
+                                                                borderColor: isSelected ? '#F59E0B' : vendorMeta.badgeBorder,
+                                                                borderWidth: 1,
+                                                                paddingHorizontal: 7,
+                                                                paddingVertical: 1.5,
+                                                                borderRadius: 6,
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                gap: 3
+                                                            }}>
+                                                                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: vendorMeta.dotColor }} />
+                                                                <Text style={{
+                                                                    fontSize: 9,
+                                                                    fontWeight: '800',
+                                                                    color: isSelected ? '#FDE047' : vendorMeta.badgeTextColor,
+                                                                    letterSpacing: 0.3
+                                                                }}>
+                                                                    {vendorMeta.badgeLabel}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+
                                                         <View style={s.planListValidityContainer}>
-                                                            <Ionicons name="time-outline" size={10} color={isSelected ? '#fde047' : '#64748b'} style={{ marginRight: 3 }} />
+                                                            <Ionicons name="time-outline" size={10} color={isSelected ? '#FDE047' : '#64748B'} style={{ marginRight: 3 }} />
                                                             <Text style={[s.planListValidity, isSelected && s.planListValiditySelected]}>
                                                                 {planInfo.validity}
                                                             </Text>
                                                         </View>
 
-                                                        {/* Plan Type Badge (SME, CG, GIFTING, DIRECT) */}
+                                                        {/* Plan Type Badge (SME, CG, GIFTING, DIRECT) in Gold Tint */}
                                                         {plan.plan_type ? (
                                                             <View style={{
-                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : (plan.plan_type === 'SME' ? '#ecfdf5' : plan.plan_type === 'CG' ? '#eff6ff' : '#fef3c7'),
-                                                                borderColor: isSelected ? 'rgba(255,255,255,0.3)' : (plan.plan_type === 'SME' ? '#a7f3d0' : plan.plan_type === 'CG' ? '#bfdbfe' : '#fde68a'),
+                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#FEF3C7',
+                                                                borderColor: isSelected ? 'rgba(255,255,255,0.3)' : '#FDE68A',
                                                                 borderWidth: 1,
                                                                 paddingHorizontal: 6,
                                                                 paddingVertical: 1,
-                                                                borderRadius: 8,
+                                                                borderRadius: 6,
                                                             }}>
                                                                 <Text style={{
                                                                     fontSize: 9,
-                                                                    fontWeight: '700',
-                                                                    color: isSelected ? '#ffffff' : (plan.plan_type === 'SME' ? '#047857' : plan.plan_type === 'CG' ? '#1d4ed8' : '#b45309'),
+                                                                    fontWeight: '800',
+                                                                    color: isSelected ? '#FFFFFF' : '#B45309',
                                                                 }}>
                                                                     {plan.plan_type}
                                                                 </Text>
                                                             </View>
                                                         ) : null}
 
-                                                        {/* Cost Badge for GB plans or Quick Pass for MB plans */}
+                                                        {/* Cost Badge for GB plans */}
                                                         {costPerGB !== null ? (
                                                             <View style={{
-                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#f0fdf4',
-                                                                borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#bbf7d0',
+                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#F0FDF4',
+                                                                borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#BBF7D0',
                                                                 borderWidth: 1,
                                                                 paddingHorizontal: 6,
                                                                 paddingVertical: 1,
-                                                                borderRadius: 8,
+                                                                borderRadius: 6,
                                                             }}>
                                                                 <Text style={{
                                                                     fontSize: 9,
                                                                     fontWeight: '700',
-                                                                    color: isSelected ? '#4ade80' : '#15803d',
+                                                                    color: isSelected ? '#4ADE80' : '#15803D',
                                                                 }}>
                                                                     ₦{costPerGB}/GB
                                                                 </Text>
                                                             </View>
-                                                        ) : (
-                                                            <View style={{
-                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#eff6ff',
-                                                                borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#bfdbfe',
-                                                                borderWidth: 1,
-                                                                paddingHorizontal: 6,
-                                                                paddingVertical: 1,
-                                                                borderRadius: 8,
-                                                            }}>
-                                                                <Text style={{
-                                                                    fontSize: 9,
-                                                                    fontWeight: '700',
-                                                                    color: isSelected ? '#93c5fd' : '#1d4ed8',
-                                                                }}>
-                                                                    ⚡ Quick Pass
-                                                                </Text>
-                                                            </View>
-                                                        )}
+                                                        ) : null}
                                                     </View>
                                                 </View>
 
                                                 {/* Right: Price & Fav */}
                                                 <View style={s.planRightSide}>
-                                                    <Text style={[s.planListPrice, isSelected && s.planListPriceSelected]}>
+                                                    <Text style={[
+                                                        s.planListPrice, 
+                                                        isSelected ? { color: '#FDE047' } : { color: '#0F172A' }
+                                                    ]}>
                                                         ₦{plan.price.toLocaleString()}
                                                     </Text>
                                                     <TouchableOpacity onPress={() => toggleFavorite(plan.id)} style={{ padding: 4 }}>
                                                         <Ionicons 
                                                             name={isFav ? "heart" : "heart-outline"} 
                                                             size={18} 
-                                                            color={isFav ? (isSelected ? "#f87171" : "#ef4444") : (isSelected ? "rgba(255,255,255,0.4)" : "#94a3b8")} 
+                                                            color={isFav ? "#EF4444" : (isSelected ? "#F59E0B" : "#94A3B8")} 
                                                         />
                                                     </TouchableOpacity>
                                                 </View>

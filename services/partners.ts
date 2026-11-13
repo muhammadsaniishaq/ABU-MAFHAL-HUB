@@ -23,6 +23,8 @@ export interface DataPlan {
     volume?: string;
     network?: string;
     plan_type?: string;
+    apiVendor?: string;
+    api_vendor?: string;
 }
 
 export interface DataProvider {

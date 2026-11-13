@@ -54,6 +54,7 @@ export class BilalsadasubClient {
                 network: networkId,
                 phone: formattedPhone,
                 amount: amount,
+                plan_type: "VTU",
                 airtime_type: "VTU",
                 "request-id": requestId
             })
@@ -67,6 +68,7 @@ export class BilalsadasubClient {
                     network: networkId,
                     phone: formattedPhone,
                     amount: amount,
+                    plan_type: "VTU",
                     airtime_type: "VTU",
                     "request-id": requestId
                 })

@@ -341,13 +341,16 @@ Deno.serve(async (req: Request) => {
 
             // 3. Fallback: Check if client provided the table UUID (id)
             if (!matchingPlans || matchingPlans.length === 0) {
-                const { data: uuidPlan } = await rpcClient
-                    .from('data_plans')
-                    .select('*')
-                    .eq('id', rawPlanId)
-                    .maybeSingle();
-                if (uuidPlan) {
-                    matchingPlans = [uuidPlan];
+                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawPlanId);
+                if (isUuid) {
+                    const { data: uuidPlan } = await rpcClient
+                        .from('data_plans')
+                        .select('*')
+                        .eq('id', rawPlanId)
+                        .maybeSingle();
+                    if (uuidPlan) {
+                        matchingPlans = [uuidPlan];
+                    }
                 }
             }
 

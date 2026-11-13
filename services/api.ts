@@ -137,8 +137,8 @@ export const api = {
                     return _dataPlanMemoryCache[netLower].data;
                 }
 
-                // Check active VTU vendor from app_settings
-                let activeVendor = 'bilalsadasub';
+                // Check active VTU vendors from app_settings (e.g. 'bilalsadasub,bigi,clubkonnect')
+                let activeVendors: string[] = ['bilalsadasub', 'bigi', 'clubkonnect'];
                 try {
                     const { data: vendorSetting } = await supabase
                         .from('app_settings')
@@ -148,7 +148,10 @@ export const api = {
                     if (vendorSetting?.value) {
                         const v = typeof vendorSetting.value === 'object' ? vendorSetting.value.vendor || vendorSetting.value : vendorSetting.value;
                         const vStr = String(v).toLowerCase().trim();
-                        activeVendor = vStr.split(',')[0].trim() || 'bilalsadasub';
+                        const parsed = vStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+                        if (parsed.length > 0) {
+                            activeVendors = parsed;
+                        }
                     }
                 } catch (_) {}
 
@@ -164,10 +167,14 @@ export const api = {
                     query = query.ilike('network', netLower);
                 }
 
-                // Strictly fetch plans for the active primary vendor first to prevent cross-vendor pricing discrepancies
-                let { data: plans, error } = await query.eq('api_vendor', activeVendor);
+                // Fetch active plans from all configured vendors
+                if (activeVendors.length > 0 && !activeVendors.includes('all')) {
+                    query = query.in('api_vendor', activeVendors);
+                }
 
-                // If activeVendor has no plans for this network, fallback to any active plans
+                let { data: plans, error } = await query;
+
+                // If active vendors returned no plans for this network, fallback to any active plans
                 if (!plans || plans.length === 0) {
                     let fallbackQuery = supabase
                         .from('data_plans')
@@ -201,7 +208,7 @@ export const api = {
                     validity: p.validity || '30 Days',
                     volume: p.volume || '',
                     network: p.network,
-                    apiVendor: p.api_vendor || activeVendor,
+                    apiVendor: p.api_vendor || activeVendors[0] || 'bilalsadasub',
                     plan_type: p.plan_type || (() => {
                         const n = (p.name || '').toLowerCase();
                         if (n.includes('corporate') || n.includes('cg') || n.includes('c-g')) return 'CG';

@@ -1416,8 +1416,8 @@ Deno.serve(async (req: Request) => {
                     return reply(invNet, 'DATA_SELECT_NETWORK', sessionData);
                 }
 
-                // Exact match with Mobile App: Query active VTU vendor first from app_settings
-                let activeVendor = 'bilalsadasub';
+                // Exact match with Mobile App: Query active VTU vendors from app_settings
+                let activeVendors: string[] = ['bilalsadasub', 'bigi', 'clubkonnect'];
                 try {
                     const { data: vendorSetting } = await supabaseAdmin
                         .from('app_settings')
@@ -1426,7 +1426,11 @@ Deno.serve(async (req: Request) => {
                         .maybeSingle();
                     if (vendorSetting?.value) {
                         const v = typeof vendorSetting.value === 'object' ? vendorSetting.value.vendor || vendorSetting.value : vendorSetting.value;
-                        activeVendor = String(v).toLowerCase().trim().split(',')[0].trim() || 'bilalsadasub';
+                        const vStr = String(v).toLowerCase().trim();
+                        const parsed = vStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+                        if (parsed.length > 0) {
+                            activeVendors = parsed;
+                        }
                     }
                 } catch (_) {}
 
@@ -1486,16 +1490,21 @@ Deno.serve(async (req: Request) => {
 
                     activePlans = (dbAlpha && dbAlpha.length > 0) ? dbAlpha : alphaFallback;
                 } else {
-                    // Fetch plans matching active VTU vendor exactly as done by App services/api.ts
-                    let { data: dbPlans } = await supabaseAdmin
+                    // Fetch plans matching active VTU vendors exactly as done by App services/api.ts
+                    let plansQuery = supabaseAdmin
                         .from('data_plans')
                         .select('*')
                         .ilike('network', chosenNetwork)
-                        .eq('api_vendor', activeVendor)
                         .eq('is_active', true)
                         .order('cost_price', { ascending: true });
 
-                    // Fallback to any active vendor plans if active vendor returns none
+                    if (activeVendors.length > 0 && !activeVendors.includes('all')) {
+                        plansQuery = plansQuery.in('api_vendor', activeVendors);
+                    }
+
+                    let { data: dbPlans } = await plansQuery;
+
+                    // Fallback to any active vendor plans if configured vendors return none
                     if (!dbPlans || dbPlans.length === 0) {
                         const { data: fbPlans } = await supabaseAdmin
                             .from('data_plans')

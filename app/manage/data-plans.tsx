@@ -78,6 +78,17 @@ export default function ManageDataPlans() {
     const [customTypeInput, setCustomTypeInput] = useState('');
     const [activeVendor, setActiveVendor] = useState('clubkonnect');
 
+    // Card Brand Theme (Navy, White & Gold) State
+    const [showThemePanel, setShowThemePanel] = useState(false);
+    const [showVendorBadges, setShowVendorBadges] = useState(true);
+    const [vendorLabels, setVendorLabels] = useState<Record<string, string>>({
+        bilalsadasub: 'BilalSub',
+        bigi: 'BigiSub',
+        clubkonnect: 'ClubKonnect',
+        ketawancy: 'Ketawancy'
+    });
+    const [savingTheme, setSavingTheme] = useState(false);
+
     // Alert Modal State
     const [alertModal, setAlertModal] = useState<{ visible: boolean; title: string; message: string; type: 'success' | 'error' }>({
         visible: false,
@@ -179,6 +190,18 @@ export default function ManageDataPlans() {
                 .order('network', { ascending: true });
             if (error) throw error;
             if (data) setConfigs(data);
+
+            // 4. Fetch Brand & Vendor Card Theme (Navy, White & Gold)
+            const { data: themeData } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'DATA_CARD_BRAND_THEME')
+                .maybeSingle();
+            if (themeData?.value) {
+                const parsed = typeof themeData.value === 'string' ? JSON.parse(themeData.value) : themeData.value;
+                if (parsed.show_vendor_badge !== undefined) setShowVendorBadges(parsed.show_vendor_badge);
+                if (parsed.vendor_labels) setVendorLabels(prev => ({ ...prev, ...parsed.vendor_labels }));
+            }
         } catch (e: any) {
             console.error("Error fetching configs:", e.message);
         }
@@ -447,6 +470,32 @@ export default function ManageDataPlans() {
             showAlert('API Provider Updated! ⚡', `System primary VTU Provider is now set to ${vendorId.toUpperCase()}.`);
         } catch (e: any) {
             showAlert('Error', e.message || 'Failed updating primary vendor.', 'error');
+        }
+    };
+
+    const handleSaveBrandTheme = async () => {
+        setSavingTheme(true);
+        try {
+            const payload = {
+                show_vendor_badge: showVendorBadges,
+                theme_preset: 'navy_gold',
+                primary_navy: '#0A192F',
+                card_white: '#FFFFFF',
+                accent_gold: '#F59E0B',
+                vendor_labels: vendorLabels
+            };
+            const { error } = await supabase
+                .from('app_settings')
+                .upsert({
+                    key: 'DATA_CARD_BRAND_THEME',
+                    value: payload
+                });
+            if (error) throw error;
+            showAlert('An Ajiye Tsarin Card! 🎨', 'An yi nasarar sabunta tsarin kalar Navy, White da Gold da sunayen masu kawo data (Vendors).');
+        } catch (e: any) {
+            showAlert('Kuskure', e.message || 'An kasa ajiye tsarin card', 'error');
+        } finally {
+            setSavingTheme(false);
         }
     };
 
@@ -837,6 +886,191 @@ export default function ManageDataPlans() {
                             );
                         })}
                     </ScrollView>
+                </View>
+
+                {/* Brand & Vendor Card Theme Settings (Navy, White & Gold) */}
+                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder, padding: 14, marginHorizontal: 12, marginBottom: 12, elevation: 1 }}>
+                    <TouchableOpacity 
+                        onPress={() => setShowThemePanel(!showThemePanel)}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                        activeOpacity={0.8}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#0A192F', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}>
+                                <Ionicons name="color-palette" size={16} color={L.gold} />
+                            </View>
+                            <View>
+                                <Text style={{ color: L.navyHeader, fontSize: 12.5, fontWeight: '900' }}>
+                                    Tsarin Kalar Cards (Navy, White & Gold)
+                                </Text>
+                                <Text style={{ color: L.textMuted, fontSize: 10, fontWeight: '600' }}>
+                                    Kula da alamomin masu kawo data (Vendors) da launukan cards
+                                </Text>
+                            </View>
+                        </View>
+                        <Ionicons name={showThemePanel ? "chevron-up" : "chevron-down"} size={18} color={L.navyHeader} />
+                    </TouchableOpacity>
+
+                    {showThemePanel && (
+                        <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: L.inputBorder }}>
+                            {/* Toggle Show Vendor Badge */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, backgroundColor: L.bg, padding: 10, borderRadius: 12 }}>
+                                <View style={{ flex: 1, marginRight: 10 }}>
+                                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: L.navyHeader }}>
+                                        Nunawa Jama'a Alamar Provider a Card
+                                    </Text>
+                                    <Text style={{ fontSize: 10, color: L.textMuted, marginTop: 2 }}>
+                                        Yana sanya alamar [BilalSub], [BigiSub], ko [ClubKonnect] a kan kowanne card na user
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={showVendorBadges}
+                                    onValueChange={setShowVendorBadges}
+                                    trackColor={{ false: '#cbd5e1', true: L.gold }}
+                                    thumbColor={showVendorBadges ? L.navyHeader : '#f8fafc'}
+                                />
+                            </View>
+
+                            {/* Vendor Labels Inputs */}
+                            <Text style={{ fontSize: 11, fontWeight: '900', color: L.navyHeader, marginBottom: 8, textTransform: 'uppercase' }}>
+                                Sunayen Masu Kawo Data (Vendor Badges):
+                            </Text>
+
+                            <View style={{ gap: 8, marginBottom: 14 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' }} />
+                                    <Text style={{ width: 90, fontSize: 11, fontWeight: '800', color: L.textPrimary }}>BilalSadaSub:</Text>
+                                    <TextInput
+                                        value={vendorLabels.bilalsadasub || ''}
+                                        onChangeText={val => setVendorLabels(prev => ({ ...prev, bilalsadasub: val }))}
+                                        style={{ flex: 1, backgroundColor: L.inputBg, borderWidth: 1, borderColor: L.inputBorder, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: '700', color: L.navyHeader }}
+                                        placeholder="Misali: BilalSub"
+                                    />
+                                </View>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#6366F1' }} />
+                                    <Text style={{ width: 90, fontSize: 11, fontWeight: '800', color: L.textPrimary }}>Bigi VTU:</Text>
+                                    <TextInput
+                                        value={vendorLabels.bigi || ''}
+                                        onChangeText={val => setVendorLabels(prev => ({ ...prev, bigi: val }))}
+                                        style={{ flex: 1, backgroundColor: L.inputBg, borderWidth: 1, borderColor: L.inputBorder, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: '700', color: L.navyHeader }}
+                                        placeholder="Misali: BigiSub"
+                                    />
+                                </View>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#0284C7' }} />
+                                    <Text style={{ width: 90, fontSize: 11, fontWeight: '800', color: L.textPrimary }}>ClubKonnect:</Text>
+                                    <TextInput
+                                        value={vendorLabels.clubkonnect || ''}
+                                        onChangeText={val => setVendorLabels(prev => ({ ...prev, clubkonnect: val }))}
+                                        style={{ flex: 1, backgroundColor: L.inputBg, borderWidth: 1, borderColor: L.inputBorder, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: '700', color: L.navyHeader }}
+                                        placeholder="Misali: ClubKonnect"
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Live Card Preview in Brand Colors */}
+                            <Text style={{ fontSize: 10.5, fontWeight: '800', color: L.textMuted, marginBottom: 6, textTransform: 'uppercase' }}>
+                                Samfurin Card a Manhajar User (Live Preview):
+                            </Text>
+
+                            <View style={{
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                borderColor: '#E2E8F0',
+                                borderLeftWidth: 4,
+                                borderLeftColor: L.gold,
+                                padding: 12,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginBottom: 14,
+                                shadowColor: '#0F172A',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 6,
+                                elevation: 2
+                            }}>
+                                <View style={{
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: 12,
+                                    backgroundColor: '#0A192F',
+                                    borderWidth: 1.5,
+                                    borderColor: L.gold,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 10
+                                }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '900', color: L.gold }}>1</Text>
+                                    <Text style={{ fontSize: 8.5, fontWeight: '800', color: '#FFFFFF' }}>GB</Text>
+                                </View>
+
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>
+                                        1GB (SME) - 30days
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        {showVendorBadges && (
+                                            <View style={{
+                                                backgroundColor: '#0A192F',
+                                                borderColor: L.gold,
+                                                borderWidth: 1,
+                                                paddingHorizontal: 6,
+                                                paddingVertical: 1.5,
+                                                borderRadius: 6,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 3
+                                            }}>
+                                                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#10B981' }} />
+                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#FDE047' }}>
+                                                    {vendorLabels.bilalsadasub || 'BilalSub'}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#B45309' }}>SME</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>
+                                    ₦557
+                                </Text>
+                            </View>
+
+                            {/* Save Button */}
+                            <TouchableOpacity
+                                onPress={handleSaveBrandTheme}
+                                disabled={savingTheme}
+                                style={{
+                                    backgroundColor: '#0A192F',
+                                    borderWidth: 1.5,
+                                    borderColor: L.gold,
+                                    borderRadius: 10,
+                                    paddingVertical: 10,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexDirection: 'row',
+                                    gap: 6
+                                }}
+                            >
+                                {savingTheme ? (
+                                    <ActivityIndicator size="small" color={L.gold} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="checkmark-circle" size={16} color={L.gold} />
+                                        <Text style={{ color: L.gold, fontSize: 12, fontWeight: '900' }}>
+                                            Ajiye Tsarin Kalar Cards (Save Brand Theme)
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
 
                 {/* Plan Type Creator & Selector Card */}
