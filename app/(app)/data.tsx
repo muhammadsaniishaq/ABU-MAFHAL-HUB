@@ -365,9 +365,12 @@ export default function DataScreen() {
     
     // Premium features states
     const [autoRenew, setAutoRenew] = useState(false);
+    const [renewalFrequency, setRenewalFrequency] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
     const [isGift, setIsGift] = useState(false);
     const [recipientName, setRecipientName] = useState('');
+    const [giftNote, setGiftNote] = useState('');
     const [isSaveBeneficiary, setIsSaveBeneficiary] = useState(false);
+    const [beneficiaryNickname, setBeneficiaryNickname] = useState('');
     const [showEstimator, setShowEstimator] = useState(false);
     const [socialHours, setSocialHours] = useState(0);
     const [streamingHours, setStreamingHours] = useState(0);
@@ -1327,37 +1330,76 @@ export default function DataScreen() {
             }
 
             if (result.success) {
-                // Save Beneficiary if requested
+                // 1. Save Beneficiary if requested ("Save as Beneficiary")
                 if (isSaveBeneficiary && phoneNumber) {
-                    const benName = recipientName.trim() || `Beneficiary (${phoneNumber.slice(-4)})`;
+                    const benName = beneficiaryNickname.trim() || recipientName.trim() || `${NETWORKS_DATA.find(n => n.id === network)?.name || network.toUpperCase()} (${phoneNumber.slice(-4)})`;
                     const netName = NETWORKS_DATA.find(n => n.id === network)?.name || network.toUpperCase();
-                    await supabase.from('beneficiaries').insert({
-                        user_id: user.id,
-                        account_number: phoneNumber,
-                        phone_number: phoneNumber,
-                        name: benName,
-                        bank_name: netName,
-                        type: 'data'
-                    }).then(({ data, error }: any) => {
-                        if (!error) {
+                    try {
+                        const { data: benData, error: benErr } = await supabase.from('beneficiaries').insert({
+                            user_id: user.id,
+                            account_number: phoneNumber,
+                            phone_number: phoneNumber,
+                            name: benName,
+                            bank_name: netName,
+                            type: 'data'
+                        }).select().single();
+
+                        if (!benErr) {
                             const newBen = {
-                                id: data?.id ? String(data.id) : `local-${Date.now()}`,
+                                id: benData?.id ? String(benData.id) : `local-${Date.now()}`,
                                 name: benName,
                                 phone: phoneNumber,
                                 network: network
                             };
                             const updated = [newBen, ...beneficiaries.filter((b: any) => b.phone !== phoneNumber)];
                             setBeneficiaries(updated);
-                            AsyncStorage.setItem(`@data_beneficiaries_${user.id}`, JSON.stringify(updated)).catch(() => {});
+                            await AsyncStorage.setItem(`@data_beneficiaries_${user.id}`, JSON.stringify(updated)).catch(() => {});
                         }
-                    });
+                    } catch (benErr) {
+                        console.warn("Beneficiary save note:", benErr);
+                    }
                 }
 
-                // Send Notification
+                // 2. Schedule Auto-Renewal if enabled ("Auto-Renew Bundle")
+                if (autoRenew && selectedPlan) {
+                    try {
+                        let nextIntervalDays = 30;
+                        if (renewalFrequency === 'daily') nextIntervalDays = 1;
+                        else if (renewalFrequency === 'weekly') nextIntervalDays = 7;
+                        else if (renewalFrequency === 'monthly') nextIntervalDays = 30;
+
+                        const nextRunDate = new Date();
+                        nextRunDate.setDate(nextRunDate.getDate() + nextIntervalDays);
+
+                        await supabase.from('auto_renewals').insert({
+                            user_id: user.id,
+                            service_type: 'data',
+                            network: network,
+                            phone: phoneNumber,
+                            amount: selectedPlan.price,
+                            frequency: renewalFrequency,
+                            status: 'active',
+                            next_run: nextRunDate.toISOString(),
+                        });
+                    } catch (schedErr) {
+                        console.warn("Auto renewal registration note:", schedErr);
+                    }
+                }
+
+                // 3. Send Notification & Push (Send as a Gift vs Standard vs Auto-Renew)
+                const notifTitle = isGift 
+                    ? "Kyautar Data Ta Tafi Cikin Nasara! 🎁" 
+                    : (autoRenew ? "Data Purchase & Auto-Renew Active ⚡" : "Data Purchase Successful");
+                
+                let notifBody = `You have successfully purchased ${planNameString} for ${phoneNumber}. Amount: ₦${selectedPlan.price}.`;
+                if (isGift && (recipientName || phoneNumber)) {
+                    notifBody = `Kayi nasarar tura kyautar data ta ${selectedPlan.name} zuwa ga ${recipientName ? `${recipientName} (${phoneNumber})` : phoneNumber}.${giftNote ? ' Note: "' + giftNote + '"' : ''} Adadi: ₦${selectedPlan.price}.`;
+                }
+
                 await createAppNotification(
                     user.id,
-                    "Data Purchase Successful",
-                    `You have successfully purchased ${planNameString} for ${phoneNumber}. Amount: ₦${selectedPlan.price}.`,
+                    notifTitle,
+                    notifBody,
                     "data",
                     "normal",
                     { route: "/(app)/history" }
@@ -1367,7 +1409,7 @@ export default function DataScreen() {
                     pathname: '/success',
                     params: {
                         amount: `₦${selectedPlan.price}`,
-                        type: 'Data Bundle',
+                        type: isGift ? `Data Gift (${recipientName || phoneNumber})` : (autoRenew ? `Data (${renewalFrequency} Auto-Renew)` : 'Data Bundle'),
                         reference: result.reference
                     }
                 });
@@ -2036,129 +2078,268 @@ export default function DataScreen() {
                         shadowRadius: 4,
                         elevation: 1,
                     }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    {/* Modern Executive Purchase Preferences (Auto-Renew, Send as a Gift, Save Beneficiary) */}
+                    <View style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 16,
+                        borderWidth: 1.5,
+                        borderColor: '#E2E8F0',
+                        padding: 14,
+                        marginBottom: 12,
+                        shadowColor: '#0A192F',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.04,
+                        shadowRadius: 6,
+                        elevation: 1.5,
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 8 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-                                    <Ionicons name="sparkles" size={13} color="#0056D2" />
+                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#0A192F', alignItems: 'center', justifyContent: 'center', marginRight: 8, borderWidth: 1, borderColor: '#F59E0B' }}>
+                                    <Ionicons name="sparkles" size={14} color="#F59E0B" />
                                 </View>
-                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0d1b3e' }}>Purchase Preferences</Text>
+                                <View>
+                                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#0A192F' }}>Zabubbukan Musamman (Preferences)</Text>
+                                    <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>Sabuntawa, Kyauta & Ajiye Lambar</Text>
+                                </View>
                             </View>
                             {(autoRenew || isGift || isSaveBeneficiary) && (
-                                <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0' }}>
-                                    <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#16a34a' }}>Active</Text>
+                                <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                    <Text style={{ fontSize: 9.5, fontWeight: '900', color: '#B45309' }}>
+                                        {[autoRenew, isGift, isSaveBeneficiary].filter(Boolean).length} Active
+                                    </Text>
                                 </View>
                             )}
                         </View>
 
-                        {/* Auto-Renew Bundle */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
-                            <View style={{ flex: 1, paddingRight: 12 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="repeat" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0d1b3e' }}>Auto-Renew Bundle</Text>
-                                </View>
-                                <Text style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>Automatically renews this plan upon expiry</Text>
-                            </View>
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    Haptics.selectionAsync();
-                                    setAutoRenew(!autoRenew);
-                                }}
-                                style={[s.customSwitch, autoRenew ? s.customSwitchOn : s.customSwitchOff]}
-                                activeOpacity={0.8}
-                            >
-                                <View style={[s.customSwitchThumb, autoRenew ? s.customSwitchThumbOn : s.customSwitchThumbOff]} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Send as a Gift */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 7, borderTopWidth: 1, borderTopColor: '#f1f5f9', marginTop: 3 }}>
-                            <View style={{ flex: 1, paddingRight: 12 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="gift-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0d1b3e' }}>Send as a Gift</Text>
-                                </View>
-                                <Text style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>Deliver as a personalized gift to recipient</Text>
-                            </View>
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    Haptics.selectionAsync();
-                                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                                    setIsGift(!isGift);
-                                    if (isGift) setRecipientName('');
-                                }}
-                                style={[s.customSwitch, isGift ? s.customSwitchOn : s.customSwitchOff]}
-                                activeOpacity={0.8}
-                            >
-                                <View style={[s.customSwitchThumb, isGift ? s.customSwitchThumbOn : s.customSwitchThumbOff]} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Recipient Name Input when Send as Gift is toggled on */}
-                        {isGift && (
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: '#f8fafc',
-                                borderWidth: 1.5,
-                                borderColor: '#cbd5e1',
-                                borderRadius: 12,
-                                paddingHorizontal: 12,
-                                height: 42,
-                                marginTop: 6,
-                                marginBottom: 4,
-                            }}>
-                                <Ionicons name="heart" size={15} color="#f43f5e" style={{ marginRight: 8 }} />
-                                <TextInput 
-                                    style={{ flex: 1, fontSize: 12.5, fontWeight: '600', color: '#0d1b3e' }}
-                                    placeholder="Recipient's Name (e.g. Sani Sadiq)"
-                                    placeholderTextColor="#94a3b8"
-                                    value={recipientName}
-                                    onChangeText={setRecipientName}
-                                />
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        setGiftingBeneficiaryActive(true);
-                                        handleOpenContactModal();
-                                    }}
-                                    style={{
-                                        paddingHorizontal: 8,
-                                        paddingVertical: 4,
-                                        borderRadius: 8,
-                                        backgroundColor: '#eff6ff',
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                    }}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="people" size={13} color="#0056D2" style={{ marginRight: 4 }} />
-                                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#0056D2' }}>Contacts</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {/* Save as Beneficiary (when buying for others) */}
-                        {purchaseMode === 'others' && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 7, borderTopWidth: 1, borderTopColor: '#f1f5f9', marginTop: 3 }}>
+                        {/* 1. Auto-Renew Bundle */}
+                        <View style={{ paddingVertical: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <View style={{ flex: 1, paddingRight: 12 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Ionicons name="person-add-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0d1b3e' }}>Save as Beneficiary</Text>
+                                        <Ionicons name="repeat" size={15} color="#0A192F" style={{ marginRight: 6 }} />
+                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Auto-Renew Bundle (Sabunta Kai-tsaye)</Text>
                                     </View>
-                                    <Text style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>Save this number for easy 1-tap top-ups</Text>
+                                    <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
+                                        Za a rika sake sayen wannan data da kanta idan ta kare
+                                    </Text>
                                 </View>
                                 <TouchableOpacity 
                                     onPress={() => {
-                                        Haptics.selectionAsync();
-                                        setIsSaveBeneficiary(!isSaveBeneficiary);
+                                        try { Haptics.selectionAsync(); } catch {}
+                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                        setAutoRenew(!autoRenew);
                                     }}
-                                    style={[s.customSwitch, isSaveBeneficiary ? s.customSwitchOn : s.customSwitchOff]}
+                                    style={[s.customSwitch, autoRenew ? { backgroundColor: '#0A192F', borderColor: '#F59E0B' } : s.customSwitchOff]}
                                     activeOpacity={0.8}
                                 >
-                                    <View style={[s.customSwitchThumb, isSaveBeneficiary ? s.customSwitchThumbOn : s.customSwitchThumbOff]} />
+                                    <View style={[s.customSwitchThumb, autoRenew ? { transform: [{ translateX: 18 }], backgroundColor: '#F59E0B' } : s.customSwitchThumbOff]} />
                                 </TouchableOpacity>
                             </View>
-                        )}
+
+                            {/* Auto-Renew Frequency Chips */}
+                            {autoRenew && (
+                                <View style={{ marginTop: 10, backgroundColor: '#F8FAFC', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                                    <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#0A192F', marginBottom: 6, textTransform: 'uppercase' }}>
+                                        Lokacin Sabuntawa (Renewal Frequency):
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                                        {[
+                                            { id: 'monthly', label: 'Wata-wata (Monthly)', tip: 'Recommended' },
+                                            { id: 'weekly', label: 'Mako-mako (Weekly)' },
+                                            { id: 'daily', label: 'Kullum (Daily)' },
+                                        ].map(f => {
+                                            const isSelected = renewalFrequency === f.id;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={f.id}
+                                                    onPress={() => {
+                                                        try { Haptics.selectionAsync(); } catch {}
+                                                        setRenewalFrequency(f.id as any);
+                                                    }}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: isSelected ? '#0A192F' : '#FFFFFF',
+                                                        borderWidth: 1.5,
+                                                        borderColor: isSelected ? '#F59E0B' : '#E2E8F0',
+                                                        paddingVertical: 6,
+                                                        paddingHorizontal: 4,
+                                                        borderRadius: 8,
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 10, fontWeight: '800', color: isSelected ? '#FDE047' : '#334155', textAlign: 'center' }}>
+                                                        {f.label.split(' ')[0]}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 8.5, color: isSelected ? '#E2E8F0' : '#64748B' }}>
+                                                        {f.label.split(' ')[1] || ''}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                                        <Ionicons name="shield-checkmark" size={11} color="#059669" style={{ marginRight: 4 }} />
+                                        <Text style={{ fontSize: 9.5, color: '#059669', fontWeight: '700' }}>
+                                            Kariyar Hasara: Ba za a caje ka ba idan wallet ba ta da kudi.
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* 2. Send as a Gift */}
+                        <View style={{ paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1, paddingRight: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="gift-outline" size={15} color="#0A192F" style={{ marginRight: 6 }} />
+                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Send as a Gift (Tura a Matsayin Kyauta 🎁)</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
+                                        Tura wa dangi ko aboki tare da sakon fatan alheri
+                                    </Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        try { Haptics.selectionAsync(); } catch {}
+                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                        setIsGift(!isGift);
+                                        if (isGift) {
+                                            setRecipientName('');
+                                            setGiftNote('');
+                                        }
+                                    }}
+                                    style={[s.customSwitch, isGift ? { backgroundColor: '#0A192F', borderColor: '#F59E0B' } : s.customSwitchOff]}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.customSwitchThumb, isGift ? { transform: [{ translateX: 18 }], backgroundColor: '#F59E0B' } : s.customSwitchThumbOff]} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Gift Details Panel */}
+                            {isGift && (
+                                <View style={{ marginTop: 10, backgroundColor: '#FFFBEB', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                    <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#B45309', marginBottom: 6 }}>
+                                        BAYANAN WANDA ZA A BAWA KYAUTA:
+                                    </Text>
+
+                                    {/* Recipient Name Input */}
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: '#FFFFFF',
+                                        borderWidth: 1.5,
+                                        borderColor: '#FDE68A',
+                                        borderRadius: 10,
+                                        paddingHorizontal: 10,
+                                        height: 40,
+                                        marginBottom: 8
+                                    }}>
+                                        <Ionicons name="person" size={14} color="#D97706" style={{ marginRight: 6 }} />
+                                        <TextInput 
+                                            style={{ flex: 1, fontSize: 12, fontWeight: '700', color: '#0A192F' }}
+                                            placeholder="Sunan Wanda Za A Ba Kyauta (Misali: Abubakar Sani)"
+                                            placeholderTextColor="#94A3B8"
+                                            value={recipientName}
+                                            onChangeText={setRecipientName}
+                                        />
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                setGiftingBeneficiaryActive(true);
+                                                handleOpenContactModal();
+                                            }}
+                                            style={{
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 4,
+                                                borderRadius: 6,
+                                                backgroundColor: '#0A192F',
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 3
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="people" size={12} color="#F59E0B" />
+                                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#FDE047' }}>Contacts</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Personalized Gift Message */}
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: '#FFFFFF',
+                                        borderWidth: 1.5,
+                                        borderColor: '#FDE68A',
+                                        borderRadius: 10,
+                                        paddingHorizontal: 10,
+                                        height: 40,
+                                    }}>
+                                        <Ionicons name="chatbubble-ellipses" size={14} color="#D97706" style={{ marginRight: 6 }} />
+                                        <TextInput 
+                                            style={{ flex: 1, fontSize: 12, fontWeight: '600', color: '#0A192F' }}
+                                            placeholder="Sakon Fatan Alheri (Misali: Kyauta ce daga Aminu 🎉)"
+                                            placeholderTextColor="#94A3B8"
+                                            value={giftNote}
+                                            onChangeText={setGiftNote}
+                                        />
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* 3. Save as Beneficiary */}
+                        <View style={{ paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 1, paddingRight: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="bookmark-outline" size={15} color="#0A192F" style={{ marginRight: 6 }} />
+                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Save as Beneficiary (Ajiye Lambar a Wayarka)</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
+                                        Ajiye wannan lambar a cikin jerin masoyanka don saye a take nan gaba
+                                    </Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        try { Haptics.selectionAsync(); } catch {}
+                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                        setIsSaveBeneficiary(!isSaveBeneficiary);
+                                        if (isSaveBeneficiary) setBeneficiaryNickname('');
+                                    }}
+                                    style={[s.customSwitch, isSaveBeneficiary ? { backgroundColor: '#0A192F', borderColor: '#F59E0B' } : s.customSwitchOff]}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.customSwitchThumb, isSaveBeneficiary ? { transform: [{ translateX: 18 }], backgroundColor: '#F59E0B' } : s.customSwitchThumbOff]} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Beneficiary Nickname Input */}
+                            {isSaveBeneficiary && (
+                                <View style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: '#F0FDF4',
+                                    borderWidth: 1.5,
+                                    borderColor: '#BBF7D0',
+                                    borderRadius: 10,
+                                    paddingHorizontal: 10,
+                                    height: 40,
+                                    marginTop: 10
+                                }}>
+                                    <Ionicons name="pricetag" size={14} color="#15803D" style={{ marginRight: 6 }} />
+                                    <TextInput 
+                                        style={{ flex: 1, fontSize: 12, fontWeight: '700', color: '#0A192F' }}
+                                        placeholder="Sunan Lakabi (Misali: Mahaifiya, Aboki Sani, Kani)"
+                                        placeholderTextColor="#94A3B8"
+                                        value={beneficiaryNickname}
+                                        onChangeText={setBeneficiaryNickname}
+                                    />
+                                </View>
+                            )}
+                        </View>
+                    </View>
                     </View>
 
                     {/* Modern Smart Utilities Bar */}
@@ -2704,92 +2885,6 @@ export default function DataScreen() {
                                         </View>
                                     )}
 
-                                    {/* Brand Theme Vendor Selector Bar (Navy, White & Gold) */}
-                                    {Object.keys(availableVendors).length > 1 && (
-                                        <View style={{ marginBottom: 14 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 2 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <Ionicons name="business" size={13} color="#0A192F" style={{ marginRight: 5 }} />
-                                                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#0A192F', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                        Masu Kawo Data (Providers)
-                                                    </Text>
-                                                </View>
-                                                <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '700' }}>
-                                                    {Object.keys(availableVendors).length} Providers Active
-                                                </Text>
-                                            </View>
-                                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                                                <TouchableOpacity
-                                                    onPress={() => setVendorFilter('All')}
-                                                    style={{
-                                                        backgroundColor: vendorFilter === 'All' ? '#0A192F' : '#FFFFFF',
-                                                        borderWidth: 1.5,
-                                                        borderColor: vendorFilter === 'All' ? '#F59E0B' : '#E2E8F0',
-                                                        borderRadius: 12,
-                                                        paddingHorizontal: 12,
-                                                        paddingVertical: 7,
-                                                        marginRight: 8,
-                                                        flexDirection: 'row',
-                                                        alignItems: 'center',
-                                                        gap: 6,
-                                                        shadowColor: '#0A192F',
-                                                        shadowOffset: { width: 0, height: 1 },
-                                                        shadowOpacity: vendorFilter === 'All' ? 0.15 : 0.03,
-                                                        shadowRadius: 3,
-                                                        elevation: vendorFilter === 'All' ? 2 : 1
-                                                    }}
-                                                >
-                                                    <Text style={{ color: vendorFilter === 'All' ? '#FDE047' : '#0F172A', fontSize: 11, fontWeight: '900' }}>
-                                                        Duk Masu Kawo Data
-                                                    </Text>
-                                                    <View style={{ backgroundColor: vendorFilter === 'All' ? '#F59E0B' : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
-                                                        <Text style={{ color: vendorFilter === 'All' ? '#0A192F' : '#64748B', fontSize: 9.5, fontWeight: '900' }}>
-                                                            {plans.length}
-                                                        </Text>
-                                                    </View>
-                                                </TouchableOpacity>
-
-                                                {Object.entries(availableVendors).map(([vKey, count]) => {
-                                                    const meta = getVendorCardMeta(vKey);
-                                                    const isSelected = vendorFilter.toLowerCase() === vKey;
-                                                    return (
-                                                        <TouchableOpacity
-                                                            key={vKey}
-                                                            onPress={() => setVendorFilter(isSelected ? 'All' : vKey)}
-                                                            style={{
-                                                                backgroundColor: isSelected ? '#0A192F' : '#FFFFFF',
-                                                                borderWidth: 1.5,
-                                                                borderColor: isSelected ? meta.accentBorder : '#E2E8F0',
-                                                                borderRadius: 12,
-                                                                paddingHorizontal: 12,
-                                                                paddingVertical: 7,
-                                                                marginRight: 8,
-                                                                flexDirection: 'row',
-                                                                alignItems: 'center',
-                                                                gap: 6,
-                                                                shadowColor: '#0A192F',
-                                                                shadowOffset: { width: 0, height: 1 },
-                                                                shadowOpacity: isSelected ? 0.15 : 0.03,
-                                                                shadowRadius: 3,
-                                                                elevation: isSelected ? 2 : 1
-                                                            }}
-                                                        >
-                                                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: meta.dotColor }} />
-                                                            <Text style={{ color: isSelected ? '#FFFFFF' : '#0F172A', fontSize: 11, fontWeight: '900' }}>
-                                                                {meta.badgeLabel}
-                                                            </Text>
-                                                            <View style={{ backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.25)' : '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
-                                                                <Text style={{ color: isSelected ? '#FDE047' : '#64748B', fontSize: 9.5, fontWeight: '900' }}>
-                                                                    {count}
-                                                                </Text>
-                                                            </View>
-                                                        </TouchableOpacity>
-                                                    );
-                                                })}
-                                            </ScrollView>
-                                        </View>
-                                    )}
-
                                     {filteredPlans.map((plan) => {
                                         const isSelected = selectedPlan?.id === plan.id;
                                         const isFav = favorites.includes(plan.id);
@@ -2811,11 +2906,11 @@ export default function DataScreen() {
                                             }}
                                             style={[
                                                 s.planListCard, 
-                                                isSelected && s.planListCardSelected,
-                                                !isSelected && {
-                                                    borderLeftWidth: 4,
+                                                {
+                                                    borderLeftWidth: 4.5,
                                                     borderLeftColor: vendorMeta.accentBorder || '#F59E0B'
-                                                }
+                                                },
+                                                isSelected && s.planListCardSelected
                                             ]}
                                             activeOpacity={0.7}
                                         >
@@ -2867,31 +2962,6 @@ export default function DataScreen() {
                                                     </View>
 
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                                                        {/* Vendor Badge ("Wata alama da za a gane duk suna zuwa") */}
-                                                        {cardTheme.show_vendor_badge !== false && (
-                                                            <View style={{
-                                                                backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.2)' : vendorMeta.badgeBg,
-                                                                borderColor: isSelected ? '#F59E0B' : vendorMeta.badgeBorder,
-                                                                borderWidth: 1,
-                                                                paddingHorizontal: 7,
-                                                                paddingVertical: 1.5,
-                                                                borderRadius: 6,
-                                                                flexDirection: 'row',
-                                                                alignItems: 'center',
-                                                                gap: 3
-                                                            }}>
-                                                                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: vendorMeta.dotColor }} />
-                                                                <Text style={{
-                                                                    fontSize: 9,
-                                                                    fontWeight: '800',
-                                                                    color: isSelected ? '#FDE047' : vendorMeta.badgeTextColor,
-                                                                    letterSpacing: 0.3
-                                                                }}>
-                                                                    {vendorMeta.badgeLabel}
-                                                                </Text>
-                                                            </View>
-                                                        )}
-
                                                         <View style={s.planListValidityContainer}>
                                                             <Ionicons name="time-outline" size={10} color={isSelected ? '#FDE047' : '#64748B'} style={{ marginRight: 3 }} />
                                                             <Text style={[s.planListValidity, isSelected && s.planListValiditySelected]}>
@@ -3124,13 +3194,15 @@ export default function DataScreen() {
                 title="Confirm Data Purchase"
                 network={network}
                 details={[
-                    { label: 'Transaction Type', value: 'Data Bundle' },
+                    { label: 'Transaction Type', value: isGift ? 'Data Gift 🎁' : 'Data Bundle' },
                     { label: 'Network', value: NETWORKS_DATA.find(n => n.id === network)?.name || network },
                     { label: 'Phone Number', value: phoneNumber },
                     { label: 'Data Plan', value: selectedPlan?.name || '-' },
                     { label: 'Validity', value: selectedPlan?.validity || '-' },
-                    ...(autoRenew ? [{ label: 'Auto-Renew', value: 'Enabled (Every ' + (selectedPlan?.validity || 'month') + ')' }] : []),
-                    ...(isGift ? [{ label: 'Gifting To', value: recipientName || 'Anonymous' }] : []),
+                    ...(autoRenew ? [{ label: 'Auto-Renew', value: `Active (${renewalFrequency.toUpperCase()})` }] : []),
+                    ...(isGift ? [{ label: 'Gifting To', value: recipientName ? `${recipientName} (${phoneNumber})` : phoneNumber }] : []),
+                    ...(isGift && giftNote ? [{ label: 'Gift Message', value: giftNote }] : []),
+                    ...(isSaveBeneficiary ? [{ label: 'Save Beneficiary', value: beneficiaryNickname ? `Yes (${beneficiaryNickname})` : 'Yes' }] : []),
                     { label: 'Original Price', value: `₦${selectedPlan?.price?.toLocaleString() || '0'}`, isAmount: true },
                     { label: 'Total To Pay', value: `₦${selectedPlan?.price?.toLocaleString() || '0'}`, isTotal: true },
                 ]}
