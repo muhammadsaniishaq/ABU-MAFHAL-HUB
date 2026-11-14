@@ -1,6 +1,14 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { notifyCryptoUser } from '../_shared/crypto-notifier.ts';
+import {
+    validateUserSecurity,
+    checkCryptoMaintenance,
+    validateAsset,
+    validateAmount,
+    getAuthoritativeCryptoRates,
+    computeSafeSwapOutput
+} from '../_shared/crypto-security.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -21,43 +29,47 @@ serve(async (req: Request) => {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-        if (userError || !user) throw new Error('Invalid token');
+        if (userError || !user) throw new Error('Zaman ku ya kare ko ba ku da izini. Da fatan a sake shiga.');
 
-        const { fromAsset, toAsset, amountIn, expectedAmountOut, feePercent } = await req.json();
+        // 🛡️ 1. Security Shields: User Profile Ban/Suspension & Global Maintenance Mode
+        await validateUserSecurity(supabaseAdmin, user.id);
+        await checkCryptoMaintenance(supabaseAdmin);
 
-        const normFrom = (fromAsset || '').toLowerCase().trim();
-        const normTo = (toAsset || '').toLowerCase().trim();
-        const inAmt = parseFloat(amountIn);
-        let outAmt = parseFloat(expectedAmountOut);
+        const body = await req.json();
+        const { fromAsset, toAsset, amountIn } = body;
 
-        if (!normFrom || !normTo || isNaN(inAmt) || inAmt <= 0) {
-            throw new Error('Invalid swap parameters');
-        }
+        // 🛡️ 2. Asset & Amount Validation
+        const normFrom = validateAsset(fromAsset);
+        const normTo = validateAsset(toAsset);
+        const inAmt = validateAmount(amountIn, 0.00000001, 1_000_000);
 
         if (normFrom === normTo) {
-            throw new Error('Cannot swap an asset for itself');
+            throw new Error('Ba za ka iya canza kudi zuwa kansa ba (Cannot swap an asset for itself).');
         }
 
-        // Fetch platform swap fee percentage (guaranteed profit margin)
-        let activeFeePercent = 1.5; // default 1.5% profit fee
-        try {
-            const { data: swapSetting } = await supabaseAdmin
-                .from('app_settings')
-                .select('value')
-                .eq('key', 'crypto_swap_fee_percent')
-                .maybeSingle();
+        // 🛡️ 3. Authoritative Server-Side Output Calculation (Completely Ignores Client-Supplied Out Amount)
+        const authoritativeRates = await getAuthoritativeCryptoRates(supabaseAdmin);
+        const { safeAmountOut, feePercent, grossUsdValue, feeUsd, netUsdValue } = computeSafeSwapOutput(
+            normFrom,
+            normTo,
+            inAmt,
+            authoritativeRates
+        );
 
-            if (swapSetting?.value) {
-                const parsed = parseFloat(swapSetting.value);
-                if (!isNaN(parsed) && parsed > 0) activeFeePercent = parsed;
-            }
-        } catch (_) {}
+        // 🛡️ 4. Server-Side Balance Verification
+        const { data: balRecord, error: balErr } = await supabaseAdmin
+            .from('crypto_balances')
+            .select('balance')
+            .eq('user_id', user.id)
+            .eq('asset', normFrom)
+            .maybeSingle();
 
-        if (isNaN(outAmt) || outAmt <= 0) {
-            throw new Error('Invalid output amount for swap');
+        const curBal = Number(balRecord?.balance || 0);
+        if (balErr || curBal < inAmt) {
+            throw new Error(`Kudin da ke asusunka bai isa ba. Ana buƙatar: ${inAmt} ${normFrom.toUpperCase()}, amma kana da: ${curBal} ${normFrom.toUpperCase()}`);
         }
 
-        // 1. Verify and Deduct fromAsset atomically
+        // 🛡️ 5. Atomically Deduct fromAsset
         const { data: deductionResult, error: deductError } = await supabaseAdmin.rpc('deduct_crypto_balance', {
             user_id: user.id,
             asset: normFrom,
@@ -66,73 +78,81 @@ serve(async (req: Request) => {
 
         if (deductError || !deductionResult?.success) {
             console.error('[Crypto Swap] Deduction error:', deductError || deductionResult);
-            throw new Error(deductionResult?.error || `Insufficient balance for ${normFrom.toUpperCase()}`);
+            throw new Error(deductionResult?.error || `Kudin ${normFrom.toUpperCase()} bai isa a asusunka ba.`);
         }
 
-        // 2. Credit toAsset atomically
+        // 🛡️ 6. Atomically Credit toAsset with Fail-Safe Rollback
         const { data: creditResult, error: creditError } = await supabaseAdmin.rpc('credit_crypto_balance', {
             user_id: user.id,
             asset: normTo,
-            amount: outAmt
+            amount: safeAmountOut
         });
 
         if (creditError || !creditResult?.success) {
             console.error('[Crypto Swap] Credit error, rolling back:', creditError || creditResult);
-            // 100% GUARANTEED REFUND ROLLBACK
+            // GUARANTEED ROLLBACK
             await supabaseAdmin.rpc('credit_crypto_balance', {
                 user_id: user.id,
                 asset: normFrom,
                 amount: inAmt
             });
-            throw new Error(`Failed to credit ${normTo.toUpperCase()}. Your ${inAmt} ${normFrom.toUpperCase()} has been 100% refunded.`);
+            throw new Error(`Kasa saka ${normTo.toUpperCase()}. An dawo maka da ${inAmt} ${normFrom.toUpperCase()} a asusunka 100%.`);
         }
 
-        // 3. Record Transaction
+        // 🛡️ 7. Transaction Audit Logging & Notifications
         const refId = `swap_${Date.now()}_${user.id.slice(0, 6)}`;
-        const swapDesc = `Swapped ${inAmt} ${normFrom.toUpperCase()} for ${outAmt} ${normTo.toUpperCase()}`;
+        const swapDesc = `Swapped ${inAmt} ${normFrom.toUpperCase()} for ${safeAmountOut} ${normTo.toUpperCase()}`;
 
         await Promise.allSettled([
             supabaseAdmin.from('transactions').insert({
                 user_id: user.id,
                 type: 'crypto_swap',
-                amount: outAmt,
+                amount: safeAmountOut,
                 status: 'success',
                 reference: refId,
                 description: swapDesc
             }),
-            // Multi-channel notification (Push, Email, In-App)
             notifyCryptoUser({
                 supabaseAdmin,
                 userId: user.id,
                 type: 'crypto_swap',
                 title: 'Crypto Swap Completed 🔄',
-                body: `You successfully swapped ${inAmt} ${normFrom.toUpperCase()} into ${outAmt} ${normTo.toUpperCase()}!`,
-                amount: outAmt,
+                body: `You successfully swapped ${inAmt} ${normFrom.toUpperCase()} into ${safeAmountOut} ${normTo.toUpperCase()}!`,
+                amount: safeAmountOut,
                 asset: normTo,
                 reference: refId,
-                fee: `${feePercent}% (Included in exchange rate)`,
+                fee: `${feePercent}% Platform fee ($${feeUsd})`,
                 extraData: {
                     fromAsset: normFrom,
                     toAsset: normTo,
                     amountIn: inAmt,
-                    amountOut: outAmt
+                    amountOut: safeAmountOut,
+                    grossUsdValue,
+                    netUsdValue
                 }
             })
         ]);
 
         return new Response(JSON.stringify({ 
             success: true, 
-            message: swapDesc,
-            data: { fromAsset: normFrom, toAsset: normTo, amountIn: inAmt, expectedAmountOut: outAmt }
+            message: `An yi nasarar canza ${inAmt} ${normFrom.toUpperCase()} zuwa ${safeAmountOut} ${normTo.toUpperCase()}!`,
+            data: {
+                fromAsset: normFrom,
+                toAsset: normTo,
+                amountIn: inAmt,
+                amountOut: safeAmountOut,
+                feePercent
+            }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
         });
 
     } catch (error: any) {
         console.error('[Crypto Swap Error]:', error);
         return new Response(JSON.stringify({ 
             success: false, 
-            error: error.message || 'Crypto swap failed' 
+            error: error.message || 'Canjin crypto ya gaza' 
         }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

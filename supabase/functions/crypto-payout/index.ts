@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+    validateUserSecurity,
+    checkCryptoMaintenance
+} from '../_shared/crypto-security.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? 'https://uagcxrtdqttayulvgpwg.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -23,7 +27,7 @@ serve(async (req) => {
     try {
         const body = await req.json();
         const { gasType, walletAddress, amountGas } = body;
-        paymentMethod = body.paymentMethod || 'NGN';
+        paymentMethod = String(body.paymentMethod || 'NGN').toUpperCase().trim();
         amountPayment = Number(body.amountPayment) || 0;
 
         // ── Input Validation ───────────────────────────────────────────────────
@@ -32,6 +36,17 @@ serve(async (req) => {
         }
         if (amountGas <= 0) {
             throw new Error("Gas amount must be greater than zero.");
+        }
+
+        // Whitelist payment method strictly
+        if (paymentMethod !== 'NGN' && paymentMethod !== 'USDT') {
+            throw new Error("Invalid payment method. Only NGN and USDT are accepted.");
+        }
+
+        const cleanGasType = String(gasType).toLowerCase().trim();
+        const ALLOWED_GAS = ['trx', 'bnb', 'eth', 'sol', 'matic', 'ton'];
+        if (!ALLOWED_GAS.includes(cleanGasType)) {
+            throw new Error(`Invalid gas type '${cleanGasType}'.`);
         }
 
         // ── 1. Authenticate user from JWT ──────────────────────────────────────
@@ -46,6 +61,10 @@ serve(async (req) => {
             throw new Error("Session expired or unauthorized. Please re-login.");
         }
         user = userData.user;
+
+        // 🛡️ Security Shields: User Profile Ban/Suspension & Global Maintenance Mode
+        await validateUserSecurity(supabaseAdmin, user.id);
+        await checkCryptoMaintenance(supabaseAdmin);
 
         // ── 2. Load provider credentials & hot wallet keys from system_secrets ──
         let NOWPAYMENTS_API_KEY = Deno.env.get('NOWPAYMENTS_API_KEY');

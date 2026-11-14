@@ -1,6 +1,14 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { notifyCryptoUser } from '../_shared/crypto-notifier.ts';
+import {
+    validateUserSecurity,
+    checkCryptoMaintenance,
+    validateAsset,
+    validateAmount,
+    getAuthoritativeCryptoRates,
+    TRANSACTION_LIMITS
+} from '../_shared/crypto-security.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -21,75 +29,42 @@ serve(async (req: Request) => {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-        if (userError || !user) throw new Error('Invalid authentication token');
+        if (userError || !user) throw new Error('Zaman ku ya kare ko ba ku da izini. Da fatan a sake shiga.');
 
-        const { asset, amountNgn, amountCrypto, rate } = await req.json();
+        // 🛡️ 1. Security Shields: User Profile Ban/Suspension & Global Maintenance Mode
+        const profile = await validateUserSecurity(supabaseAdmin, user.id);
+        await checkCryptoMaintenance(supabaseAdmin);
 
-        const costNgn = parseFloat(amountNgn);
-        let cryptoReceived = parseFloat(amountCrypto);
-        const normAsset = (asset || 'usdt').toLowerCase().trim();
+        const body = await req.json();
+        const { asset, amountNgn } = body;
 
-        if (!normAsset || isNaN(costNgn) || costNgn <= 0) {
-            throw new Error('Invalid buy parameters. Please provide valid amounts.');
-        }
+        // 🛡️ 2. Asset & Amount Validation
+        const normAsset = validateAsset(asset);
+        const costNgn = validateAmount(amountNgn, TRANSACTION_LIMITS.MIN_NGN_BUY, TRANSACTION_LIMITS.MAX_NGN_BUY);
 
-        // Fetch official platform rates from app_settings to guarantee rate accuracy & profit
-        let effectiveRate = parseFloat(rate) || 1480;
-        try {
-            const { data: rateSettings } = await supabaseAdmin
-                .from('app_settings')
-                .select('key, value')
-                .in('key', [
-                    `crypto_rate_${normAsset}_buy`,
-                    'crypto_rate_usdt_buy'
-                ]);
+        // 🛡️ 3. Authoritative Rate Enforcement (Zero Client Trust)
+        const authoritativeRates = await getAuthoritativeCryptoRates(supabaseAdmin);
+        const effectiveRate = authoritativeRates.getBuyRateNgn(normAsset);
 
-            if (rateSettings && rateSettings.length > 0) {
-                const assetRateSetting = rateSettings.find(s => s.key === `crypto_rate_${normAsset}_buy`);
-                const usdtRateSetting = rateSettings.find(s => s.key === 'crypto_rate_usdt_buy');
-
-                if (assetRateSetting?.value) {
-                    const parsed = parseFloat(assetRateSetting.value);
-                    if (!isNaN(parsed) && parsed > 0) effectiveRate = parsed;
-                } else if (usdtRateSetting?.value && normAsset === 'usdt') {
-                    const parsed = parseFloat(usdtRateSetting.value);
-                    if (!isNaN(parsed) && parsed > 0) effectiveRate = parsed;
-                }
-            }
-        } catch (_) {}
-
-        // Calculate exact legitimate crypto amount with precision
-        if (effectiveRate > 0) {
-            cryptoReceived = Number((costNgn / effectiveRate).toFixed(normAsset === 'btc' ? 8 : normAsset === 'eth' ? 6 : 4));
-        }
+        const precision = normAsset === 'btc' ? 8 : normAsset === 'eth' ? 6 : normAsset === 'sol' || normAsset === 'bnb' ? 5 : 4;
+        const cryptoReceived = Number((costNgn / effectiveRate).toFixed(precision));
 
         if (cryptoReceived <= 0) {
-            throw new Error('Amount too small for crypto purchase at current rate.');
+            throw new Error('Adadin kudin ya yi kadan don siyan wannan kudin a farashin yanzu.');
         }
 
-        // 1. Verify Naira Balance
-        const { data: profile, error: profErr } = await supabaseAdmin
-            .from('profiles')
-            .select('balance')
-            .eq('id', user.id)
-            .single();
-
-        if (profErr || !profile) {
-            throw new Error('Could not fetch user profile balance');
-        }
-
+        // 🛡️ 4. Server-Side Balance Verification
         const currentNgn = Number(profile.balance || 0);
         if (currentNgn < costNgn) {
-            throw new Error(`Insufficient Naira balance. Required: ₦${costNgn.toLocaleString()}, Available: ₦${currentNgn.toLocaleString()}`);
+            throw new Error(`Kudin da ke asusunka bai isa ba. Ana buƙatar ₦${costNgn.toLocaleString()}, amma kana da ₦${currentNgn.toLocaleString()}`);
         }
 
-        // 2. Atomically Deduct Naira via deduct_balance RPC
+        // 🛡️ 5. Atomic Naira Deduction
         const { data: deductData, error: deductErr } = await supabaseAdmin.rpc('deduct_balance', {
             user_id: user.id,
             amount: costNgn
         });
 
-        // In Postgres, deduct_balance returns numeric (the updated balance) or jsonb
         const deductSuccess = !deductErr && (
             typeof deductData === 'number' ||
             !isNaN(Number(deductData)) ||
@@ -98,10 +73,10 @@ serve(async (req: Request) => {
         );
         if (deductErr || !deductSuccess) {
             console.error('[Crypto Buy] Naira deduction failed:', deductErr || deductData);
-            throw new Error(deductData?.error || 'Failed to deduct Naira balance. Transaction aborted.');
+            throw new Error('Kasa cire kudi daga asusun Naira. An dakatar da cinikin.');
         }
 
-        // 3. Atomically Credit Crypto Balance
+        // 🛡️ 6. Atomic Crypto Credit with Fail-Safe Rollback
         const { data: creditData, error: creditErr } = await supabaseAdmin.rpc('credit_crypto_balance', {
             user_id: user.id,
             asset: normAsset,
@@ -110,15 +85,15 @@ serve(async (req: Request) => {
 
         if (creditErr || !creditData?.success) {
             console.error('[Crypto Buy] Crypto credit failed, rolling back Naira:', creditErr || creditData);
-            // GUARANTEED ROLLBACK: 100% refund of Naira to user
+            // GUARANTEED ROLLBACK
             await supabaseAdmin.rpc('credit_balance', {
                 user_id: user.id,
                 amount: costNgn
             });
-            throw new Error('Failed to credit crypto balance. Your ₦' + costNgn.toLocaleString() + ' has been 100% refunded.');
+            throw new Error(`An samu matsala wajen saka crypto. An dawo maka da ₦${costNgn.toLocaleString()} a asusunka 100%.`);
         }
 
-        // 4. Record Transaction
+        // 🛡️ 7. Transaction Audit Logging & Notifications
         const formattedCrypto = `${cryptoReceived} ${normAsset.toUpperCase()}`;
         const refId = `buy_${Date.now()}_${user.id.slice(0, 6)}`;
 
@@ -129,9 +104,8 @@ serve(async (req: Request) => {
                 amount: costNgn,
                 status: 'success',
                 reference: refId,
-                description: `Bought ${formattedCrypto} for ₦${costNgn.toLocaleString()}`
+                description: `Siyan ${formattedCrypto} akan ₦${costNgn.toLocaleString()}`
             }),
-            // Dispatch Realtime In-App, Push, and Email notifications
             notifyCryptoUser({
                 supabaseAdmin,
                 userId: user.id,
@@ -144,26 +118,28 @@ serve(async (req: Request) => {
                 fee: '₦0 (Included in rate)',
                 extraData: {
                     costNgn,
-                    rate: rate || undefined
+                    rate: effectiveRate
                 }
             })
         ]);
 
         return new Response(JSON.stringify({ 
             success: true, 
-            message: `Successfully purchased ${formattedCrypto}!`,
+            message: `An yi nasarar siyan ${formattedCrypto}!`,
             credited: cryptoReceived,
             debitedNgn: costNgn,
-            asset: normAsset
+            asset: normAsset,
+            rate: effectiveRate
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
         });
 
     } catch (error: any) {
         console.error('[Crypto Buy Error]:', error);
         return new Response(JSON.stringify({ 
             success: false, 
-            error: error.message || 'Crypto purchase failed' 
+            error: error.message || 'Cinikin crypto ya gaza' 
         }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

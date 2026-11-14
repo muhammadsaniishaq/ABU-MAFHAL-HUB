@@ -1,6 +1,13 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { notifyCryptoUser } from '../_shared/crypto-notifier.ts';
+import {
+    validateUserSecurity,
+    checkCryptoMaintenance,
+    validateAsset,
+    validateAmount,
+    getAuthoritativeCryptoRates
+} from '../_shared/crypto-security.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -21,52 +28,29 @@ serve(async (req: Request) => {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-        if (userError || !user) throw new Error('Invalid authentication token');
+        if (userError || !user) throw new Error('Zaman ku ya kare ko ba ku da izini. Da fatan a sake shiga.');
 
-        const { asset, amountCrypto, expectedNgn, rate } = await req.json();
+        // 🛡️ 1. Security Shields: User Profile Ban/Suspension & Global Maintenance Mode
+        await validateUserSecurity(supabaseAdmin, user.id);
+        await checkCryptoMaintenance(supabaseAdmin);
 
-        const cryptoToSell = parseFloat(amountCrypto);
-        let ngnToReceive = parseFloat(expectedNgn);
-        const normAsset = (asset || 'usdt').toLowerCase().trim();
+        const body = await req.json();
+        const { asset, amountCrypto } = body;
 
-        if (!normAsset || isNaN(cryptoToSell) || cryptoToSell <= 0) {
-            throw new Error('Invalid sell parameters. Please specify valid amounts.');
+        // 🛡️ 2. Asset & Amount Validation
+        const normAsset = validateAsset(asset);
+        const cryptoToSell = validateAmount(amountCrypto, 0.00000001, 1_000_000);
+
+        // 🛡️ 3. Authoritative Sell Rate Enforcement (Server-Enforced Only)
+        const authoritativeRates = await getAuthoritativeCryptoRates(supabaseAdmin);
+        const effectiveSellRate = authoritativeRates.getSellRateNgn(normAsset);
+
+        const ngnToReceive = Math.floor(cryptoToSell * effectiveSellRate);
+        if (ngnToReceive < 100) {
+            throw new Error('Adadin crypto da kake son sayarwa ya yi kadan don biyan Naira.');
         }
 
-        // Fetch official platform sell rates to guarantee platform profit
-        let effectiveSellRate = parseFloat(rate) || 1460;
-        try {
-            const { data: rateSettings } = await supabaseAdmin
-                .from('app_settings')
-                .select('key, value')
-                .in('key', [
-                    `crypto_rate_${normAsset}_sell`,
-                    'crypto_rate_usdt_sell'
-                ]);
-
-            if (rateSettings && rateSettings.length > 0) {
-                const assetSellSetting = rateSettings.find(s => s.key === `crypto_rate_${normAsset}_sell`);
-                const usdtSellSetting = rateSettings.find(s => s.key === 'crypto_rate_usdt_sell');
-
-                if (assetSellSetting?.value) {
-                    const parsed = parseFloat(assetSellSetting.value);
-                    if (!isNaN(parsed) && parsed > 0) effectiveSellRate = parsed;
-                } else if (usdtSellSetting?.value && normAsset === 'usdt') {
-                    const parsed = parseFloat(usdtSellSetting.value);
-                    if (!isNaN(parsed) && parsed > 0) effectiveSellRate = parsed;
-                }
-            }
-        } catch (_) {}
-
-        if (effectiveSellRate > 0) {
-            ngnToReceive = Math.floor(cryptoToSell * effectiveSellRate);
-        }
-
-        if (ngnToReceive <= 0) {
-            throw new Error('Sell amount too small to generate Naira payout.');
-        }
-
-        // 1. Verify Crypto Balance
+        // 🛡️ 4. Server-Side Crypto Balance Verification
         const { data: balRecord, error: balErr } = await supabaseAdmin
             .from('crypto_balances')
             .select('balance')
@@ -76,10 +60,10 @@ serve(async (req: Request) => {
 
         const currentCryptoBal = Number(balRecord?.balance || 0);
         if (balErr || currentCryptoBal < cryptoToSell) {
-            throw new Error(`Insufficient ${normAsset.toUpperCase()} balance. Required: ${cryptoToSell}, Available: ${currentCryptoBal}`);
+            throw new Error(`Crypto din da ke asusunka bai isa ba. Ana buƙatar: ${cryptoToSell} ${normAsset.toUpperCase()}, amma kana da: ${currentCryptoBal} ${normAsset.toUpperCase()}`);
         }
 
-        // 2. Atomically Deduct Crypto Balance
+        // 🛡️ 5. Atomic Crypto Deduction
         const { data: deductData, error: deductErr } = await supabaseAdmin.rpc('deduct_crypto_balance', {
             user_id: user.id,
             asset: normAsset,
@@ -88,16 +72,15 @@ serve(async (req: Request) => {
 
         if (deductErr || !deductData?.success) {
             console.error('[Crypto Sell] Crypto deduction error:', deductErr || deductData);
-            throw new Error(deductData?.error || 'Failed to safely reserve crypto for sale. Transaction aborted.');
+            throw new Error(deductData?.error || 'Kasa cire crypto daga asusunka. An dakatar da cinikin.');
         }
 
-        // 3. Atomically Credit Naira via credit_balance RPC
+        // 🛡️ 6. Atomic Naira Crediting with Fail-Safe Rollback
         const { data: creditNgnData, error: creditNgnErr } = await supabaseAdmin.rpc('credit_balance', {
             user_id: user.id,
             amount: ngnToReceive
         });
 
-        // In Postgres, credit_balance returns numeric (the updated balance) or jsonb
         const creditSuccess = !creditNgnErr && (
             typeof creditNgnData === 'number' ||
             !isNaN(Number(creditNgnData)) ||
@@ -107,16 +90,16 @@ serve(async (req: Request) => {
 
         if (creditNgnErr || !creditSuccess) {
             console.error('[Crypto Sell] Naira credit failed, rolling back crypto:', creditNgnErr || creditNgnData);
-            // GUARANTEED ROLLBACK: refund crypto to user only if Naira was NOT credited
+            // GUARANTEED ROLLBACK
             await supabaseAdmin.rpc('credit_crypto_balance', {
                 user_id: user.id,
                 asset: normAsset,
                 amount: cryptoToSell
             });
-            throw new Error('Failed to credit Naira balance. Your ' + cryptoToSell + ' ' + normAsset.toUpperCase() + ' has been 100% refunded.');
+            throw new Error(`Kasa saka Naira a asusunka. An dawo maka da ${cryptoToSell} ${normAsset.toUpperCase()} 100%.`);
         }
 
-        // 4. Record Transaction
+        // 🛡️ 7. Transaction Audit Logging & Notifications
         const formattedCrypto = `${cryptoToSell} ${normAsset.toUpperCase()}`;
         const refId = `sell_${Date.now()}_${user.id.slice(0, 6)}`;
 
@@ -127,9 +110,8 @@ serve(async (req: Request) => {
                 amount: ngnToReceive,
                 status: 'success',
                 reference: refId,
-                description: `Sold ${formattedCrypto} for ₦${ngnToReceive.toLocaleString()}`
+                description: `Sayar da ${formattedCrypto} akan ₦${ngnToReceive.toLocaleString()}`
             }),
-            // Dispatch Realtime In-App, Push, and Email notifications
             notifyCryptoUser({
                 supabaseAdmin,
                 userId: user.id,
@@ -142,26 +124,28 @@ serve(async (req: Request) => {
                 extraData: {
                     cryptoSold: cryptoToSell,
                     asset: normAsset,
-                    rate: rate || undefined
+                    rate: effectiveSellRate
                 }
             })
         ]);
 
         return new Response(JSON.stringify({ 
             success: true, 
-            message: `Successfully sold ${formattedCrypto} for ₦${ngnToReceive.toLocaleString()}!`,
+            message: `An yi nasarar sayar da ${formattedCrypto} akan ₦${ngnToReceive.toLocaleString()}!`,
             debitedCrypto: cryptoToSell,
             creditedNgn: ngnToReceive,
-            asset: normAsset
+            asset: normAsset,
+            rate: effectiveSellRate
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
         });
 
     } catch (error: any) {
         console.error('[Crypto Sell Error]:', error);
         return new Response(JSON.stringify({ 
             success: false, 
-            error: error.message || 'Crypto sale failed' 
+            error: error.message || 'Sayar da crypto ya gaza' 
         }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

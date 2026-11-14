@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateUserSecurity, checkCryptoMaintenance } from '../_shared/crypto-security.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,10 @@ serve(async (req: Request) => {
         // Verify the user
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
         if (userError || !user) throw new Error('Invalid token');
+
+        // 🛡️ Security Check: Ensure user is active, unbanned, and system is not under maintenance
+        await validateUserSecurity(supabaseAdmin, user.id);
+        await checkCryptoMaintenance(supabaseAdmin);
 
         const { network, currency, regenerate, amountUsd } = await req.json();
 
