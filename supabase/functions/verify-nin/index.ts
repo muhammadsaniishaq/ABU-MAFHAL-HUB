@@ -32,6 +32,8 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const requestData = await req.json().catch(() => ({}));
+
     // Extract JWT from Authorization header
     const authHeader = req.headers.get('Authorization') ?? '';
     const jwt = authHeader.replace('Bearer ', '').trim();
@@ -40,16 +42,23 @@ serve(async (req: Request) => {
       return jsonOk({ error: 'No auth token provided. Please log in and try again.' });
     }
 
-    // Verify JWT
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    let user: any = null;
 
-    if (authError || !user) {
-      return jsonOk({ error: `Auth failed: ${authError?.message || 'Invalid token'}. Please log in again.` });
+    if (serviceRoleKey && jwt === serviceRoleKey && (requestData.user_id || requestData.userId)) {
+      userId = requestData.user_id || requestData.userId;
+      user = { id: userId };
+    } else {
+      // Verify JWT
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+
+      if (authError || !authData?.user) {
+        return jsonOk({ error: `Auth failed: ${authError?.message || 'Invalid token'}. Please log in again.` });
+      }
+
+      user = authData.user;
+      userId = user.id;
     }
-
-    userId = user.id;
-
-    const requestData = await req.json();
     const { type, value, firstname, lastname, dob, gender } = requestData;
 
     const searchType = String(requestData.searchType || type || '').trim();
@@ -886,6 +895,26 @@ serve(async (req: Request) => {
       slip_url: String(slipDoc).startsWith('http') ? slipDoc : null,
       transaction_id: skbData.transaction_id || `TXN-${Date.now()}`,
     };
+
+    // 🛡️ Permanent Record: Save directly to verification_history table
+    try {
+      const resolvedName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim().toUpperCase() || rawPerson.name || 'BVN / NIN Holder';
+      const isBVN = searchType.toLowerCase().startsWith('bvn');
+      const cat = isBVN ? 'bvn' : 'nin';
+      await supabaseAdmin.from('verification_history').insert({
+        id: `vh_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        user_id: user.id,
+        service_category: cat,
+        service_type: searchType,
+        search_number: ninNum || bvnNum || searchValue,
+        holder_name: resolvedName,
+        layout: slipType.toLowerCase() || 'standard',
+        details: normalized,
+        created_at: new Date().toISOString(),
+      });
+    } catch (vhErr: any) {
+      console.warn('verification_history auto-save notice in verify-nin:', vhErr?.message);
+    }
 
     return jsonOk({
       data: {

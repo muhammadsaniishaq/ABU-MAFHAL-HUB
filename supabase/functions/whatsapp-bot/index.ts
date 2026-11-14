@@ -309,6 +309,47 @@ async function sendWhatsAppMessage(
     }
 }
 
+// Helper: Send document or image back to user via WhatsApp Meta Cloud API
+async function sendWhatsAppMedia(
+    toPhone: string,
+    mediaUrl: string,
+    caption: string,
+    filename: string,
+    mediaType: 'document' | 'image',
+    phoneNumberId: string,
+    accessToken: string
+): Promise<boolean> {
+    try {
+        if (!phoneNumberId || !accessToken || !mediaUrl) return false;
+        const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
+        const bodyObj: any = {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: toPhone,
+            type: mediaType
+        };
+        if (mediaType === 'image') {
+            bodyObj.image = { link: mediaUrl, caption };
+        } else {
+            bodyObj.document = { link: mediaUrl, filename, caption };
+        }
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(bodyObj)
+        });
+
+        return res.ok;
+    } catch (err) {
+        console.warn("[WhatsApp Bot] Media send note:", err);
+        return false;
+    }
+}
+
 Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
 
@@ -2374,43 +2415,76 @@ Deno.serve(async (req: Request) => {
                     return reply(err.msg, 'NIN_CONFIRM_PIN', sessionData);
                 }
 
-                const price = Number(sessionData.nin_price || 150);
-                if (currentBalance < price) {
-                    const lowBal = userLang === 'ha'
-                        ? `⚠️ Kuɗin asusunka bai isa ba.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 Kuɗin Sabis: *₦${price.toLocaleString()}*\n\nDa fatan a zuba kuɗi a asusunka:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/wallet`
-                        : `⚠️ Insufficient wallet balance.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 Service Fee: *₦${price.toLocaleString()}*\n\nPlease fund your wallet to continue:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/wallet`;
-                    return reply(lowBal, 'IDLE', { lang: userLang });
+                // Map requested service to SKB searchType and slipType
+                let searchType = 'nin-standard';
+                let slipType = 'STANDARD';
+                if (sessionData.nin_type === 'nin_premium_slip') {
+                    searchType = 'nin-premium';
+                    slipType = 'PREMIUM';
+                } else if (sessionData.nin_type === 'nin_verification') {
+                    searchType = 'nin';
+                    slipType = 'BASIC';
                 }
 
-                // Deduct balance and record transaction
-                const newBalance = currentBalance - price;
-                await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', userId);
-
-                const refId = `NIN_${Date.now()}_WA`;
-                await supabaseAdmin.from('transactions').insert({
-                    user_id: userId,
-                    type: 'nin_verification',
-                    amount: price,
-                    status: 'success',
-                    description: `${sessionData.nin_label} for ${sessionData.nin_number}`,
-                    reference: refId
+                // Invoke verify-nin edge function with service role & userId
+                const { data: verResult, error: verFuncError } = await supabaseAdmin.functions.invoke('verify-nin', {
+                    body: {
+                        searchType,
+                        searchValue: sessionData.nin_number,
+                        slip_type: slipType,
+                        user_id: userId
+                    }
                 });
 
-                // Create identity verification record
+                if (verFuncError || verResult?.error || !verResult?.data) {
+                    const errReason = verFuncError?.message || verResult?.error || 'Ba a sami bayanin wannan lambar NIN ɗin ba.';
+                    const failMsg = userLang === 'ha'
+                        ? `❌ *Binciken NIN Bai Yi Nasara Ba*\n\nDalili: *${errReason}*\n\nKada ka damu, ba a caje kuɗin asusunka ba.\n\n(Tura '0' don komawa babban menu)`
+                        : `❌ *NIN Verification Failed*\n\nReason: *${errReason}*\n\nYour wallet balance was not charged.\n\n(Type '0' for main menu)`;
+                    return reply(failMsg, 'IDLE', { lang: userLang });
+                }
+
+                const person = verResult.data?.data || verResult.data || {};
+                const fn = person.firstname || person.first_name || person.firstName || '';
+                const mn = person.middlename || person.middle_name || person.middleName || '';
+                const ln = person.surname || person.lastname || person.lastName || '';
+                const fullName = [fn, mn, ln].filter(Boolean).join(' ').trim().toUpperCase() || person.name || person.holder_name || 'NIN HOLDER';
+                const ninNum = person.nin || person.number || sessionData.nin_number;
+                const dob = person.dob || person.birthdate || person.dateOfBirth || person.birth_date || 'N/A';
+                const gender = String(person.gender || person.sex || '').toUpperCase() === 'M' ? 'Namiji (Male)' : (String(person.gender || person.sex || '').toUpperCase() === 'F' ? 'Mace (Female)' : (person.gender || 'N/A'));
+                const phone = person.phone || person.telephoneno || person.phone_number || 'N/A';
+                const state = person.state || person.residence_state || person.birthstate || person.origin_state || 'N/A';
+                const lga = person.lga || person.residence_lga || person.birthlga || person.origin_lga || 'N/A';
+                const trackingId = person.tracking_id || person.trackingId || person.trackingID || 'N/A';
+                const slipUrl = verResult.data?.slip_url || person.slip_url || (String(person.slip || '').startsWith('http') ? person.slip : '');
+
+                // Fetch updated wallet balance
+                const { data: upProfile } = await supabaseAdmin.from('profiles').select('balance').eq('id', userId).maybeSingle();
+                const newBalance = upProfile?.balance ?? currentBalance;
+
+                // Permanent record in verification_history (for app history & admin tasks)
                 try {
-                    await supabaseAdmin.from('identity_verifications').insert({
+                    await supabaseAdmin.from('verification_history').insert({
+                        id: `vh_${Date.now()}_${Math.random().toString(36).substring(7)}`,
                         user_id: userId,
-                        service_type: sessionData.nin_type,
-                        identifier: sessionData.nin_number,
-                        fee: price,
-                        status: 'completed',
-                        reference: refId
+                        service_category: 'nin',
+                        service_type: sessionData.nin_type || 'nin_verify',
+                        search_number: ninNum,
+                        holder_name: fullName,
+                        layout: slipType.toLowerCase(),
+                        details: person,
+                        created_at: new Date().toISOString()
                     });
                 } catch (_) {}
 
                 const successMsg = userLang === 'ha'
-                    ? `✅ *Aikin NIN Ya Kammala Cikin Nasara!* 🎉\n\n🪪 *Bayanin Aiki:*\n• Sabis: *${sessionData.nin_label}*\n• Lambar: *${sessionData.nin_number}*\n• Kuɗi: *₦${price.toLocaleString()}*\n• Sabon Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\n📄 An sarrafa bincikenku cikin nasara. Zaka iya duba da saukar da cikakken slip/result a:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/nin-services/history\n\n(Tura '0' don babban menu)`
-                    : `✅ *NIN Service Completed Successfully!* 🎉\n\n🪪 *Service Summary:*\n• Service: *${sessionData.nin_label}*\n• Target Number: *${sessionData.nin_number}*\n• Fee: *₦${price.toLocaleString()}*\n• New Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\n📄 Your request has been verified. You can view or download the slip at:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/nin-services/history\n\n(Type '0' for main menu)`;
+                    ? `✅ *Aikin NIN Ya Kammala Cikin Nasara!* 🎉\n\n🪪 *BAYANAN SLIP (NIN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar NIN: *${ninNum}*\n• Ranar Haihuwa: *${dob}*\n• Jinsi: *${gender}*\n• Lambar Waya: *${phone}*\n• Jiha & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken Slip:*\n${slipUrl}\n\n` : ''}📱 *Duba / Buga Cikakken Slip a Cikin Manhaja:*\n${webBaseUrl}/nin-services/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *NIN Service Completed Successfully!* 🎉\n\n🪪 *NIN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• NIN Number: *${ninNum}*\n• Date of Birth: *${dob}*\n• Gender: *${gender}*\n• Phone: *${phone}*\n• State & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official Slip:*\n${slipUrl}\n\n` : ''}📱 *View & Print in App:*\n${webBaseUrl}/nin-services/history\n\n(Type '0' for main menu)`;
+
+                // Also send direct document if slipUrl is available
+                if (slipUrl && phoneNumberId && accessToken) {
+                    sendWhatsAppMedia(fromPhone, slipUrl, `Official NIN Slip - ${fullName}`, `NIN_Slip_${ninNum}.pdf`, 'document', phoneNumberId, accessToken).catch(() => {});
+                }
 
                 return reply(successMsg, 'IDLE', { lang: userLang });
             }
@@ -2480,30 +2554,67 @@ Deno.serve(async (req: Request) => {
                     return reply(err.msg, 'BVN_CONFIRM_PIN', sessionData);
                 }
 
-                const price = Number(sessionData.bvn_price || 150);
-                if (currentBalance < price) {
-                    const lowBal = userLang === 'ha'
-                        ? `⚠️ Kuɗin asusunka bai isa ba (Balance: ₦${currentBalance.toLocaleString()}).\n\nDa fatan a zuba kuɗi a asusunka:\n🌐 ${webBaseUrl}/wallet`
-                        : `⚠️ Insufficient wallet balance (Balance: ₦${currentBalance.toLocaleString()}).\n\nPlease fund your wallet at:\n🌐 ${webBaseUrl}/wallet`;
-                    return reply(lowBal, 'IDLE', { lang: userLang });
-                }
+                const isPremiumSlip = String(sessionData.bvn_label || '').toLowerCase().includes('card') || String(sessionData.bvn_label || '').toLowerCase().includes('slip');
+                const searchType = isPremiumSlip ? 'bvn-slip' : 'bvn';
+                const slipType = isPremiumSlip ? 'PREMIUM' : 'STANDARD';
 
-                const newBalance = currentBalance - price;
-                await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', userId);
-
-                const refId = `BVN_${Date.now()}_WA`;
-                await supabaseAdmin.from('transactions').insert({
-                    user_id: userId,
-                    type: 'bvn_verification',
-                    amount: price,
-                    status: 'success',
-                    description: `${sessionData.bvn_label} for ${sessionData.bvn_number}`,
-                    reference: refId
+                // Invoke verify-nin edge function with service role & userId
+                const { data: bvnResult, error: bvnFuncError } = await supabaseAdmin.functions.invoke('verify-nin', {
+                    body: {
+                        searchType,
+                        searchValue: sessionData.bvn_number,
+                        slip_type: slipType,
+                        user_id: userId
+                    }
                 });
 
+                if (bvnFuncError || bvnResult?.error || !bvnResult?.data) {
+                    const errReason = bvnFuncError?.message || bvnResult?.error || 'Ba a sami bayanin wannan lambar BVN ɗin ba.';
+                    const failMsg = userLang === 'ha'
+                        ? `❌ *Binciken BVN Bai Yi Nasara Ba*\n\nDalili: *${errReason}*\n\nKada ka damu, ba a caje kuɗin asusunka ba.\n\n(Tura '0' don komawa babban menu)`
+                        : `❌ *BVN Verification Failed*\n\nReason: *${errReason}*\n\nYour wallet balance was not charged.\n\n(Type '0' for main menu)`;
+                    return reply(failMsg, 'IDLE', { lang: userLang });
+                }
+
+                const bvnPerson = bvnResult.data?.data || bvnResult.data || {};
+                const fn = bvnPerson.firstname || bvnPerson.first_name || bvnPerson.firstName || '';
+                const mn = bvnPerson.middlename || bvnPerson.middle_name || bvnPerson.middleName || '';
+                const ln = bvnPerson.surname || bvnPerson.lastname || bvnPerson.lastName || '';
+                const fullName = [fn, mn, ln].filter(Boolean).join(' ').trim().toUpperCase() || bvnPerson.name || bvnPerson.holder_name || 'BVN HOLDER';
+                const bvnNum = bvnPerson.bvn || sessionData.bvn_number;
+                const dob = bvnPerson.dob || bvnPerson.birthdate || bvnPerson.dateOfBirth || 'N/A';
+                const phone = bvnPerson.phone || bvnPerson.phoneNumber || bvnPerson.mobile || 'N/A';
+                const gender = String(bvnPerson.gender || '').toUpperCase() === 'M' ? 'Namiji (Male)' : (String(bvnPerson.gender || '').toUpperCase() === 'F' ? 'Mace (Female)' : (bvnPerson.gender || 'N/A'));
+                const bank = bvnPerson.registration_date || bvnPerson.enrollment_bank || bvnPerson.bank || 'N/A';
+                const slipUrl = bvnResult.data?.slip_url || bvnPerson.slip_url || (String(bvnPerson.slip || '').startsWith('http') ? bvnPerson.slip : '');
+
+                // Fetch latest wallet balance
+                const { data: upProfile } = await supabaseAdmin.from('profiles').select('balance').eq('id', userId).maybeSingle();
+                const newBalance = upProfile?.balance ?? currentBalance;
+
+                // Permanent record in verification_history (for app history & admin tasks)
+                try {
+                    await supabaseAdmin.from('verification_history').insert({
+                        id: `vh_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+                        user_id: userId,
+                        service_category: 'bvn',
+                        service_type: isPremiumSlip ? 'bvn_card' : 'bvn_verification',
+                        search_number: bvnNum,
+                        holder_name: fullName,
+                        layout: slipType.toLowerCase(),
+                        details: bvnPerson,
+                        created_at: new Date().toISOString()
+                    });
+                } catch (_) {}
+
                 const successMsg = userLang === 'ha'
-                    ? `✅ *Binciken BVN Ya Kammala Cikin Nasara!* 🎉\n\n🔍 *Bayanin BVN:*\n• Lambar BVN: *${sessionData.bvn_number}*\n• Status: *Completed (Ingantacce)*\n• Kuɗi: *₦${price.toLocaleString()}*\n• Sabon Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\nZaka iya saukar da official slip a cikin app:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/bvn-services/history\n\n(Tura '0' don babban menu)`
-                    : `✅ *BVN Verification Successful!* 🎉\n\n🔍 *Summary:*\n• BVN: *${sessionData.bvn_number}*\n• Status: *Verified & Validated*\n• Fee: *₦${price.toLocaleString()}*\n• New Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\nYou can access verification slips anytime via:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/bvn-services/history\n\n(Type '0' for main menu)`;
+                    ? `✅ *Binciken BVN Ya Kammala Cikin Nasara!* 🎉\n\n🔍 *BAYANAN BVN (BVN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar BVN: *${bvnNum}*\n• Ranar Haihuwa: *${dob}*\n• Lambar Waya: *${phone}*\n• Jinsi: *${gender}*\n• Banki / Ranar Rijista: *${bank}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken BVN Slip:*\n${slipUrl}\n\n` : ''}📱 *Duba / Buga a Cikin Manhaja:*\n${webBaseUrl}/bvn-services/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *BVN Verification Successful!* 🎉\n\n🔍 *BVN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• BVN Number: *${bvnNum}*\n• Date of Birth: *${dob}*\n• Phone Number: *${phone}*\n• Gender: *${gender}*\n• Bank / Enrollment: *${bank}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official BVN Slip:*\n${slipUrl}\n\n` : ''}📱 *View & Print in App:*\n${webBaseUrl}/bvn-services/history\n\n(Type '0' for main menu)`;
+
+                // Also send direct document if slipUrl is available
+                if (slipUrl && phoneNumberId && accessToken) {
+                    sendWhatsAppMedia(fromPhone, slipUrl, `Official BVN Slip - ${fullName}`, `BVN_Slip_${bvnNum}.pdf`, 'document', phoneNumberId, accessToken).catch(() => {});
+                }
 
                 return reply(successMsg, 'IDLE', { lang: userLang });
             }
