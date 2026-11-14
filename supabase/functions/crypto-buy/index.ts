@@ -89,7 +89,13 @@ serve(async (req: Request) => {
             amount: costNgn
         });
 
-        const deductSuccess = deductData && (deductData.success === true || deductData === true);
+        // In Postgres, deduct_balance returns numeric (the updated balance) or jsonb
+        const deductSuccess = !deductErr && (
+            typeof deductData === 'number' ||
+            !isNaN(Number(deductData)) ||
+            (typeof deductData === 'object' && deductData !== null && deductData.success === true) ||
+            deductData === true
+        );
         if (deductErr || !deductSuccess) {
             console.error('[Crypto Buy] Naira deduction failed:', deductErr || deductData);
             throw new Error(deductData?.error || 'Failed to deduct Naira balance. Transaction aborted.');

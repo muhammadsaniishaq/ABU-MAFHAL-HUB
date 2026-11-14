@@ -1512,63 +1512,26 @@ export default function CryptoScreen() {
         if (!userId) return;
         setWithdrawing(true);
         try {
-            // 1. Deduct sender
-            const { data: deductData, error: deductErr } = await supabase.rpc('deduct_crypto_balance', {
-                user_id: userId,
+            const res = await api.crypto.transfer({
+                recipientId: targetUserId,
                 asset: withdrawAsset.toLowerCase(),
                 amount: amt
             });
-            if (deductErr || !deductData?.success) {
-                throw new Error(deductErr?.message || deductData?.error || "Failed to deduct crypto balance.");
+
+            if (res && res.success) {
+                if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                Alert.alert("Transfer Complete 🎉", `Successfully sent ${amt} ${withdrawAsset} with ZERO gas fees!`);
+                setActiveModal(null);
+                setWithdrawAmount('');
+                setTransferRecipientInput('');
+                setTransferResolvedRecipient(null);
+                fetchUserBalances(userId);
+                fetchCryptoTransactions(userId);
+            } else {
+                throw new Error(res?.error || "Transfer failed");
             }
-
-            // 2. Credit recipient
-            const { data: creditData, error: creditErr } = await supabase.rpc('credit_crypto_balance', {
-                user_id: targetUserId,
-                asset: withdrawAsset.toLowerCase(),
-                amount: amt
-            });
-            if (creditErr || !creditData?.success) {
-                // Rollback
-                await supabase.rpc('credit_crypto_balance', {
-                    user_id: userId,
-                    asset: withdrawAsset.toLowerCase(),
-                    amount: amt
-                });
-                throw new Error(creditErr?.message || creditData?.error || "Failed to credit recipient balance.");
-            }
-
-            // 3. Transactions
-            const assetPriceUsd = getAssetPriceUsd(withdrawAsset);
-            const ngnVal = Math.floor(amt * assetPriceUsd * getUsdtToNgnRate('sell'));
-
-            await Promise.all([
-                supabase.from('transactions').insert({
-                    user_id: userId,
-                    type: 'crypto_transfer_out',
-                    amount: ngnVal,
-                    status: 'success',
-                    description: `Sent: ${amt} ${withdrawAsset} to ${transferResolvedRecipient?.full_name || transferResolvedRecipient?.phone}`
-                }),
-                supabase.from('transactions').insert({
-                    user_id: targetUserId,
-                    type: 'crypto_transfer_in',
-                    amount: ngnVal,
-                    status: 'success',
-                    description: `Received: ${amt} ${withdrawAsset} from ${currentUserPhone || 'Abu Mafhal User'}`
-                })
-            ]);
-
-            if (Platform.OS !== 'web') {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            }
-            Alert.alert("Transfer Complete 🎉", `Successfully sent ${amt} ${withdrawAsset} with ZERO gas fees!`);
-            setActiveModal(null);
-            setWithdrawAmount('');
-            setTransferRecipientInput('');
-            setTransferResolvedRecipient(null);
-            fetchUserBalances(userId);
-            fetchCryptoTransactions(userId);
         } catch (err: any) {
             Alert.alert("Transfer Failed", err.message || "Could not complete internal transfer.");
         } finally {

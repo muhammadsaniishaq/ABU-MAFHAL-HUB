@@ -84,6 +84,66 @@ serve(async (req) => {
         const cleanGasType = gasType.toLowerCase().trim();
         const cleanAddress = walletAddress.trim();
 
+        // 🛡️ CRITICAL PRE-FLIGHT BALANCE CHECK & ATOMIC DEDUCTION
+        // Never attempt on-chain or gateway broadcast without reserving user funds first!
+        if (paymentMethod === 'NGN') {
+            const { data: prof, error: profErr } = await supabaseAdmin.from('profiles').select('balance').eq('id', user.id).single();
+            const curBal = Number(prof?.balance || 0);
+            if (profErr || curBal < amountPayment) {
+                throw new Error(`Insufficient Naira balance. Required: ₦${amountPayment.toLocaleString()}, Available: ₦${curBal.toLocaleString()}`);
+            }
+
+            const { data: deductResult, error: deductErr } = await supabaseAdmin.rpc('deduct_balance', {
+                user_id: user.id,
+                amount: amountPayment
+            });
+            const isSuccess = !deductErr && (
+                typeof deductResult === 'number' ||
+                !isNaN(Number(deductResult)) ||
+                (typeof deductResult === 'object' && deductResult !== null && deductResult.success === true) ||
+                deductResult === true
+            );
+            if (!isSuccess) {
+                throw new Error("Failed to deduct Naira balance. Gas order aborted.");
+            }
+            balanceDeducted = true;
+        } else if (paymentMethod === 'USDT') {
+            const { data: cBal, error: cBalErr } = await supabaseAdmin.from('crypto_balances').select('balance').eq('user_id', user.id).eq('asset', 'usdt').maybeSingle();
+            const curUsdt = Number(cBal?.balance || 0);
+            if (cBalErr || curUsdt < amountPayment) {
+                throw new Error(`Insufficient USDT balance. Required: ${amountPayment} USDT, Available: ${curUsdt} USDT`);
+            }
+
+            const { data: deductResult, error: deductErr } = await supabaseAdmin.rpc('deduct_crypto_balance', {
+                user_id: user.id,
+                asset: 'usdt',
+                amount: amountPayment
+            });
+            const isSuccess = !deductErr && (
+                typeof deductResult === 'number' ||
+                (typeof deductResult === 'object' && deductResult !== null && deductResult.success === true)
+            );
+            if (!isSuccess) {
+                throw new Error("Failed to deduct USDT balance. Gas order aborted.");
+            }
+            balanceDeducted = true;
+        }
+
+        const rollbackGasFunds = async (reason: string) => {
+            if (!balanceDeducted) return;
+            console.warn(`[Gas Payout Rollback] Refunding user ${user.id} ${amountPayment} ${paymentMethod}. Reason: ${reason}`);
+            try {
+                if (paymentMethod === 'NGN') {
+                    await supabaseAdmin.rpc('credit_balance', { user_id: user.id, amount: amountPayment });
+                } else {
+                    await supabaseAdmin.rpc('credit_crypto_balance', { user_id: user.id, asset: 'usdt', amount: amountPayment });
+                }
+            } catch (rbErr) {
+                console.error("[Gas Rollback Error]:", rbErr);
+            }
+            balanceDeducted = false;
+        };
+
         // ── 3. Engine 1: Direct On-Chain Dispatch via Hot Wallet ───────────────
         // For TRON (TRX): Instant on-chain broadcast via TronWeb
         if (cleanGasType === 'trx' && TRON_PRIVATE_KEY) {
@@ -201,47 +261,8 @@ serve(async (req) => {
 
         // ── 5. Validate that Gas was ACTUALLY dispatched ───────────────────────
         if (!txId) {
-            // Neither hot wallet nor NowPayments could fulfill the order
-            throw new Error("Unable to dispatch gas: No payout provider or hot wallet is currently configured. Your wallet balance has NOT been deducted.");
-        }
-
-        // ── 6. Gas DISPATCH CONFIRMED — Deduct user balance now ────────────────
-        if (paymentMethod === 'NGN') {
-            const { data: deductResult, error: deductErr } = await supabaseAdmin.rpc('deduct_balance', {
-                user_id: user.id,
-                amount: amountPayment
-            });
-            // Support both numeric return (new balance) and jsonb return ({ success: true })
-            const isSuccess = !deductErr && (
-                typeof deductResult === 'number' ||
-                (typeof deductResult === 'object' && deductResult !== null && deductResult.success === true)
-            );
-            if (!isSuccess) {
-                console.error("CRITICAL: Gas dispatched but NGN deduction failed:", {
-                    userId: user.id, txId, deductErr, deductResult
-                });
-                balanceDeducted = false;
-            } else {
-                balanceDeducted = true;
-            }
-        } else if (paymentMethod === 'USDT') {
-            const { data: deductResult, error: deductErr } = await supabaseAdmin.rpc('deduct_crypto_balance', {
-                user_id: user.id,
-                asset: 'usdt',
-                amount: amountPayment
-            });
-            const isSuccess = !deductErr && (
-                typeof deductResult === 'number' ||
-                (typeof deductResult === 'object' && deductResult !== null && deductResult.success === true)
-            );
-            if (!isSuccess) {
-                console.error("CRITICAL: Gas dispatched but USDT deduction failed:", {
-                    userId: user.id, txId, deductErr, deductResult
-                });
-                balanceDeducted = false;
-            } else {
-                balanceDeducted = true;
-            }
+            await rollbackGasFunds("No payout provider or hot wallet succeeded");
+            throw new Error("Unable to dispatch gas: No payout provider or hot wallet is currently configured. Your balance has been 100% refunded.");
         }
 
         // ── 7. Record the completed order in crypto_gas_orders ─────────────────
@@ -292,6 +313,19 @@ serve(async (req) => {
 
     } catch (error: any) {
         console.error("crypto-payout error:", error?.message || error);
+
+        // Guarantee user's balance is safely rolled back if any error threw after deduction
+        if (balanceDeducted && user?.id && amountPayment > 0) {
+            try {
+                if (paymentMethod === 'NGN') {
+                    await supabaseAdmin.rpc('credit_balance', { user_id: user.id, amount: amountPayment });
+                } else {
+                    await supabaseAdmin.rpc('credit_crypto_balance', { user_id: user.id, asset: 'usdt', amount: amountPayment });
+                }
+            } catch (rbErr) {
+                console.error("[Gas Catch Rollback Error]:", rbErr);
+            }
+        }
 
         // Strict guarantee: User is NEVER charged if payout did not succeed
         return new Response(JSON.stringify({ 

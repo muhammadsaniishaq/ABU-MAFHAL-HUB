@@ -97,10 +97,17 @@ serve(async (req: Request) => {
             amount: ngnToReceive
         });
 
-        const creditSuccess = creditNgnData && (creditNgnData.success === true || creditNgnData === true);
+        // In Postgres, credit_balance returns numeric (the updated balance) or jsonb
+        const creditSuccess = !creditNgnErr && (
+            typeof creditNgnData === 'number' ||
+            !isNaN(Number(creditNgnData)) ||
+            (typeof creditNgnData === 'object' && creditNgnData !== null && creditNgnData.success === true) ||
+            creditNgnData === true
+        );
+
         if (creditNgnErr || !creditSuccess) {
             console.error('[Crypto Sell] Naira credit failed, rolling back crypto:', creditNgnErr || creditNgnData);
-            // GUARANTEED ROLLBACK: 100% refund of crypto to user
+            // GUARANTEED ROLLBACK: refund crypto to user only if Naira was NOT credited
             await supabaseAdmin.rpc('credit_crypto_balance', {
                 user_id: user.id,
                 asset: normAsset,

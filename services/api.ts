@@ -1038,6 +1038,23 @@ export const api = {
 
             return data; // { success: true, data: {...} }
         },
+        transfer: async (params: { recipientId: string, asset: string, amount: number }) => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Not authenticated");
+
+            const { data, error } = await supabase.functions.invoke('crypto-transfer', {
+                body: params,
+            });
+
+            if (error) {
+                throw new Error(`Transfer Failed: ${error.message}`);
+            }
+            if (data?.error) {
+                throw new Error(data.error);
+            }
+
+            return data;
+        },
         buyGas: async (params: { gasType: string, walletAddress: string, paymentMethod: 'NGN' | 'USDT', amountPayment: number, amountGas: number }) => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Not authenticated. Please log in.");

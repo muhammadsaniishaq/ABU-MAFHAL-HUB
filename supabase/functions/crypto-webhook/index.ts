@@ -76,8 +76,13 @@ serve(async (req: Request) => {
             }
         }
 
-        // 2. Signature Verification (if IPN secret configured)
-        if (ipnSecret && signature) {
+        // 2. Signature Verification (Mandatory when IPN secret configured)
+        if (ipnSecret) {
+            if (!signature) {
+                console.error("[Crypto Webhook] Rejected: Missing x-nowpayments-sig header.");
+                return new Response("Missing signature header", { status: 401, headers: corsHeaders });
+            }
+
             const sortedData = sortObject(eventData);
             const signString = JSON.stringify(sortedData);
 
@@ -99,12 +104,9 @@ serve(async (req: Request) => {
 
             if (signature.toLowerCase() !== expectedSignature.toLowerCase()) {
                 console.error("[Crypto Webhook] Signature mismatch! Check NOWPAYMENTS_IPN_SECRET.");
-                // If signature fails in production, abort
                 return new Response("Invalid signature", { status: 401, headers: corsHeaders });
             }
             console.log("[Crypto Webhook] Signature verified successfully.");
-        } else if (!signature) {
-            console.warn("[Crypto Webhook] Warning: x-nowpayments-sig header missing from request.");
         }
 
         // 3. Status Handling: Finished, Confirmed, or Partially Paid
@@ -121,11 +123,17 @@ serve(async (req: Request) => {
         }
 
         const paymentId = String(eventData.payment_id);
-        const amountReceived = parseFloat(eventData.actually_paid || eventData.pay_amount || eventData.outcome_amount || '0');
+        // 🛡️ CRITICAL PROFIT & BALANCE SHIELD:
+        // NEVER read pay_amount! Only credit actually confirmed funds via actually_paid!
+        const rawPaid = eventData.actually_paid !== undefined && eventData.actually_paid !== null
+            ? parseFloat(String(eventData.actually_paid))
+            : 0;
+
+        const amountReceived = isNaN(rawPaid) ? 0 : rawPaid;
         const assetName = normalizeAsset(eventData.pay_currency || eventData.outcome_currency || 'usdt');
 
-        if (isNaN(amountReceived) || amountReceived <= 0) {
-            console.warn(`[Crypto Webhook] Received status ${eventData.payment_status} but actually_paid is ${amountReceived}.`);
+        if (amountReceived <= 0) {
+            console.warn(`[Crypto Webhook] Received status ${eventData.payment_status} but actually_paid is ${amountReceived}. No funds credited.`);
             return new Response("Amount zero or invalid", { status: 200, headers: corsHeaders });
         }
 

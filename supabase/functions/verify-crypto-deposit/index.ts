@@ -84,6 +84,23 @@ serve(async (req: Request) => {
             });
         }
 
+        // 🛡️ CRITICAL SECURITY SHIELD: Verify ownership of this payment_id to current user
+        const { data: userAddr } = await supabaseAdmin
+            .from('crypto_addresses')
+            .select('id, user_id, payment_id')
+            .eq('user_id', user.id)
+            .eq('payment_id', String(payment_id))
+            .maybeSingle();
+
+        if (!userAddr) {
+            return new Response(JSON.stringify({ 
+                success: false, 
+                message: "Unauthorized: Deposit payment ID does not belong to your account." 
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
         // Fetch NowPayments API Key (env → system_secrets → app_settings)
         let NOWPAYMENTS_API_KEY = Deno.env.get('NOWPAYMENTS_API_KEY') || Deno.env.get('NOWPAYMENTS_KEY');
         if (!NOWPAYMENTS_API_KEY) {
@@ -134,10 +151,18 @@ serve(async (req: Request) => {
 
         const validStatuses = ['finished', 'confirmed', 'partially_paid'];
         const isFunded = validStatuses.includes(payment.payment_status);
-        const amountReceived = parseFloat(payment.actually_paid || payment.pay_amount || payment.outcome_amount || '0');
+
+        // 🛡️ CRITICAL PROFIT & BALANCE SHIELD:
+        // NEVER FALL BACK TO pay_amount! pay_amount is the INVOICE target price, NOT received money!
+        // We MUST ONLY read actually_paid!
+        const rawPaid = payment.actually_paid !== undefined && payment.actually_paid !== null
+            ? parseFloat(String(payment.actually_paid))
+            : 0;
+
+        const amountReceived = isNaN(rawPaid) ? 0 : rawPaid;
         const assetName = normalizeAsset(payment.pay_currency || payment.outcome_currency || 'usdt');
 
-        if (!isFunded || isNaN(amountReceived) || amountReceived <= 0) {
+        if (!isFunded || amountReceived <= 0) {
             return new Response(JSON.stringify({
                 success: false,
                 pending: true,
@@ -147,6 +172,8 @@ serve(async (req: Request) => {
                     ? "Awaiting your payment on the blockchain. If you just sent it, please wait a minute for block confirmations."
                     : payment.payment_status === 'confirming'
                     ? "Payment detected on blockchain! Confirming blocks..."
+                    : payment.payment_status === 'partially_paid' && amountReceived <= 0
+                    ? "Zero confirmed blockchain balance has cleared for this transaction."
                     : payment.payment_status === 'expired'
                     ? "This invoice has expired on the payment gateway. Please tap 'Generate Fresh Address' to get an active address."
                     : payment.payment_status === 'failed'
