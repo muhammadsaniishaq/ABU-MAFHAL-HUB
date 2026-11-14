@@ -1388,12 +1388,12 @@ export default function DataScreen() {
 
                 // 3. Send Notification & Push (Send as a Gift vs Standard vs Auto-Renew)
                 const notifTitle = isGift 
-                    ? "Kyautar Data Ta Tafi Cikin Nasara! 🎁" 
+                    ? "Data Gift Sent Successfully! 🎁" 
                     : (autoRenew ? "Data Purchase & Auto-Renew Active ⚡" : "Data Purchase Successful");
                 
                 let notifBody = `You have successfully purchased ${planNameString} for ${phoneNumber}. Amount: ₦${selectedPlan.price}.`;
                 if (isGift && (recipientName || phoneNumber)) {
-                    notifBody = `Kayi nasarar tura kyautar data ta ${selectedPlan.name} zuwa ga ${recipientName ? `${recipientName} (${phoneNumber})` : phoneNumber}.${giftNote ? ' Note: "' + giftNote + '"' : ''} Adadi: ₦${selectedPlan.price}.`;
+                    notifBody = `You have successfully gifted ${selectedPlan.name} to ${recipientName ? `${recipientName} (${phoneNumber})` : phoneNumber}.${giftNote ? ' Note: "' + giftNote + '"' : ''} Amount: ₦${selectedPlan.price}.`;
                 }
 
                 await createAppNotification(
@@ -2098,8 +2098,8 @@ export default function DataScreen() {
                                     <Ionicons name="sparkles" size={14} color="#F59E0B" />
                                 </View>
                                 <View>
-                                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#0A192F' }}>Zabubbukan Musamman (Preferences)</Text>
-                                    <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>Sabuntawa, Kyauta & Ajiye Lambar</Text>
+                                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#0A192F' }}>Purchase Preferences</Text>
+                                    <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>Auto-Renew • Gift • Beneficiary</Text>
                                 </View>
                             </View>
                             {(autoRenew || isGift || isSaveBeneficiary) && (
@@ -2117,10 +2117,10 @@ export default function DataScreen() {
                                 <View style={{ flex: 1, paddingRight: 12 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <Ionicons name="repeat" size={15} color="#0A192F" style={{ marginRight: 6 }} />
-                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Auto-Renew Bundle (Sabunta Kai-tsaye)</Text>
+                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Auto-Renew Bundle</Text>
                                     </View>
                                     <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
-                                        Za a rika sake sayen wannan data da kanta idan ta kare
+                                        Automatically renew this bundle upon expiration
                                     </Text>
                                 </View>
                                 <TouchableOpacity 
@@ -2140,13 +2140,13 @@ export default function DataScreen() {
                             {autoRenew && (
                                 <View style={{ marginTop: 10, backgroundColor: '#F8FAFC', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                                     <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#0A192F', marginBottom: 6, textTransform: 'uppercase' }}>
-                                        Lokacin Sabuntawa (Renewal Frequency):
+                                        Renewal Frequency:
                                     </Text>
                                     <View style={{ flexDirection: 'row', gap: 6 }}>
                                         {[
-                                            { id: 'monthly', label: 'Wata-wata (Monthly)', tip: 'Recommended' },
-                                            { id: 'weekly', label: 'Mako-mako (Weekly)' },
-                                            { id: 'daily', label: 'Kullum (Daily)' },
+                                            { id: 'monthly', title: 'Monthly', sub: 'Recommended' },
+                                            { id: 'weekly', title: 'Weekly', sub: 'Every 7 Days' },
+                                            { id: 'daily', title: 'Daily', sub: 'Every 24h' },
                                         ].map(f => {
                                             const isSelected = renewalFrequency === f.id;
                                             return (
@@ -2169,10 +2169,10 @@ export default function DataScreen() {
                                                     }}
                                                 >
                                                     <Text style={{ fontSize: 10, fontWeight: '800', color: isSelected ? '#FDE047' : '#334155', textAlign: 'center' }}>
-                                                        {f.label.split(' ')[0]}
+                                                        {f.title}
                                                     </Text>
                                                     <Text style={{ fontSize: 8.5, color: isSelected ? '#E2E8F0' : '#64748B' }}>
-                                                        {f.label.split(' ')[1] || ''}
+                                                        {f.sub}
                                                     </Text>
                                                 </TouchableOpacity>
                                             );
@@ -2181,7 +2181,7 @@ export default function DataScreen() {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                                         <Ionicons name="shield-checkmark" size={11} color="#059669" style={{ marginRight: 4 }} />
                                         <Text style={{ fontSize: 9.5, color: '#059669', fontWeight: '700' }}>
-                                            Kariyar Hasara: Ba za a caje ka ba idan wallet ba ta da kudi.
+                                            Protected: Charges only when wallet balance is sufficient.
                                         </Text>
                                     </View>
                                 </View>
@@ -2194,10 +2194,10 @@ export default function DataScreen() {
                                 <View style={{ flex: 1, paddingRight: 12 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <Ionicons name="gift-outline" size={15} color="#0A192F" style={{ marginRight: 6 }} />
-                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Send as a Gift (Tura a Matsayin Kyauta 🎁)</Text>
+                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Send as a Gift 🎁</Text>
                                     </View>
                                     <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
-                                        Tura wa dangi ko aboki tare da sakon fatan alheri
+                                        Send this bundle to friends or family with a customized note
                                     </Text>
                                 </View>
                                 <TouchableOpacity 
@@ -2221,7 +2221,7 @@ export default function DataScreen() {
                             {isGift && (
                                 <View style={{ marginTop: 10, backgroundColor: '#FFFBEB', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A' }}>
                                     <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#B45309', marginBottom: 6 }}>
-                                        BAYANAN WANDA ZA A BAWA KYAUTA:
+                                        RECIPIENT GIFT DETAILS:
                                     </Text>
 
                                     {/* Recipient Name Input */}
@@ -2239,7 +2239,7 @@ export default function DataScreen() {
                                         <Ionicons name="person" size={14} color="#D97706" style={{ marginRight: 6 }} />
                                         <TextInput 
                                             style={{ flex: 1, fontSize: 12, fontWeight: '700', color: '#0A192F' }}
-                                            placeholder="Sunan Wanda Za A Ba Kyauta (Misali: Abubakar Sani)"
+                                            placeholder="Recipient Name (e.g. John Doe)"
                                             placeholderTextColor="#94A3B8"
                                             value={recipientName}
                                             onChangeText={setRecipientName}
@@ -2279,7 +2279,7 @@ export default function DataScreen() {
                                         <Ionicons name="chatbubble-ellipses" size={14} color="#D97706" style={{ marginRight: 6 }} />
                                         <TextInput 
                                             style={{ flex: 1, fontSize: 12, fontWeight: '600', color: '#0A192F' }}
-                                            placeholder="Sakon Fatan Alheri (Misali: Kyauta ce daga Aminu 🎉)"
+                                            placeholder="Gift Message (e.g. Enjoy this data bundle! 🎉)"
                                             placeholderTextColor="#94A3B8"
                                             value={giftNote}
                                             onChangeText={setGiftNote}
@@ -2295,10 +2295,10 @@ export default function DataScreen() {
                                 <View style={{ flex: 1, paddingRight: 12 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <Ionicons name="bookmark-outline" size={15} color="#0A192F" style={{ marginRight: 6 }} />
-                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Save as Beneficiary (Ajiye Lambar a Wayarka)</Text>
+                                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0A192F' }}>Save as Beneficiary</Text>
                                     </View>
                                     <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
-                                        Ajiye wannan lambar a cikin jerin masoyanka don saye a take nan gaba
+                                        Save this phone number for instant 1-tap reorders
                                     </Text>
                                 </View>
                                 <TouchableOpacity 
@@ -2331,7 +2331,7 @@ export default function DataScreen() {
                                     <Ionicons name="pricetag" size={14} color="#15803D" style={{ marginRight: 6 }} />
                                     <TextInput 
                                         style={{ flex: 1, fontSize: 12, fontWeight: '700', color: '#0A192F' }}
-                                        placeholder="Sunan Lakabi (Misali: Mahaifiya, Aboki Sani, Kani)"
+                                        placeholder="Beneficiary Nickname (e.g. Mom, Brother, Office)"
                                         placeholderTextColor="#94A3B8"
                                         value={beneficiaryNickname}
                                         onChangeText={setBeneficiaryNickname}
@@ -3680,7 +3680,7 @@ export default function DataScreen() {
                                         <Ionicons name="person-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
                                         <TextInput
                                             style={{ flex: 1, fontSize: 14, color: '#0f172a', fontWeight: '600' }}
-                                            placeholder="e.g. Mum MTN, Brother Sani, WiFi"
+                                            placeholder="e.g. Mom MTN, Office Line, Home WiFi"
                                             placeholderTextColor="#94a3b8"
                                             value={newBenName}
                                             onChangeText={setNewBenName}
