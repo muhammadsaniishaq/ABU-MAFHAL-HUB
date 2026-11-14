@@ -837,8 +837,28 @@ Deno.serve(async (req: Request) => {
 
             const text = rawText.trim();
             const lowerText = text.toLowerCase();
+            const messageId = String(message?.id || '').trim();
 
-            console.log(`[WhatsApp Bot] Incoming from ${senderPhone} (${contactName}): "${text}" (Type: ${message.type})`);
+            console.log(`[WhatsApp Bot] Incoming from ${senderPhone} (${contactName}): "${text}" (Type: ${message.type}, ID: ${messageId})`);
+
+            // 🛡️ Webhook Deduplication: Ignore identical retried deliveries from Meta
+            if (messageId) {
+                const { data: dupLogs } = await supabaseAdmin
+                    .from('whatsapp_bot_logs')
+                    .select('id')
+                    .eq('phone_number', senderPhone)
+                    .eq('direction', 'incoming')
+                    .contains('raw_payload', { message_id: messageId })
+                    .limit(1);
+
+                if (dupLogs && dupLogs.length > 0) {
+                    console.log(`[WhatsApp Bot] Duplicate webhook message ignored: ${messageId}`);
+                    return new Response(JSON.stringify({ status: "ignored_duplicate" }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                        status: 200
+                    });
+                }
+            }
 
             // Background log with rich media payload
             supabaseAdmin.from('whatsapp_bot_logs').insert({
@@ -847,6 +867,7 @@ Deno.serve(async (req: Request) => {
                 message_type: message.type || 'text',
                 content: text,
                 raw_payload: {
+                    message_id: messageId,
                     media_id: mediaId,
                     media_url: mediaUrl,
                     mime_type: mediaMime,
@@ -2405,6 +2426,14 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
+            if (currentStep === 'NIN_PROCESSING' || currentStep === 'BVN_PROCESSING') {
+                console.log(`[WhatsApp Bot] Request already in progress for ${senderPhone}. Ignoring concurrent retry.`);
+                return new Response(JSON.stringify({ status: "processing_in_progress" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
+
             if (currentStep === 'NIN_CONFIRM_PIN') {
                 const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
                 if (!pinRes.success) {
@@ -2414,6 +2443,15 @@ Deno.serve(async (req: Request) => {
                     }
                     return reply(err.msg, 'NIN_CONFIRM_PIN', sessionData);
                 }
+
+                // 🛡️ ATOMIC LOCK: Immediately update step to NIN_PROCESSING so Meta retry cannot execute double
+                await supabaseAdmin
+                    .from('whatsapp_bot_sessions')
+                    .update({
+                        step: 'NIN_PROCESSING',
+                        last_interaction: new Date().toISOString()
+                    })
+                    .eq('phone_number', senderPhone);
 
                 // Map requested service to SKB searchType and slipType
                 let searchType = 'nin-standard';
@@ -2456,34 +2494,19 @@ Deno.serve(async (req: Request) => {
                 const state = person.state || person.residence_state || person.birthstate || person.origin_state || 'N/A';
                 const lga = person.lga || person.residence_lga || person.birthlga || person.origin_lga || 'N/A';
                 const trackingId = person.tracking_id || person.trackingId || person.trackingID || 'N/A';
-                const slipUrl = verResult.data?.slip_url || person.slip_url || (String(person.slip || '').startsWith('http') ? person.slip : '');
+                const slipUrl = verResult.data?.slip_url || verResult.data?.download_url || person.slip_url || (String(person.slip || '').startsWith('http') ? person.slip : '');
 
                 // Fetch updated wallet balance
                 const { data: upProfile } = await supabaseAdmin.from('profiles').select('balance').eq('id', userId).maybeSingle();
                 const newBalance = upProfile?.balance ?? currentBalance;
 
-                // Permanent record in verification_history (for app history & admin tasks)
-                try {
-                    await supabaseAdmin.from('verification_history').insert({
-                        id: `vh_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-                        user_id: userId,
-                        service_category: 'nin',
-                        service_type: sessionData.nin_type || 'nin_verify',
-                        search_number: ninNum,
-                        holder_name: fullName,
-                        layout: slipType.toLowerCase(),
-                        details: person,
-                        created_at: new Date().toISOString()
-                    });
-                } catch (_) {}
-
                 const successMsg = userLang === 'ha'
-                    ? `✅ *Aikin NIN Ya Kammala Cikin Nasara!* 🎉\n\n🪪 *BAYANAN SLIP (NIN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar NIN: *${ninNum}*\n• Ranar Haihuwa: *${dob}*\n• Jinsi: *${gender}*\n• Lambar Waya: *${phone}*\n• Jiha & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken Slip:*\n${slipUrl}\n\n` : ''}📱 *Duba / Buga Cikakken Slip a Cikin Manhaja:*\n${webBaseUrl}/nin-services/history\n\n(Tura '0' don babban menu)`
-                    : `✅ *NIN Service Completed Successfully!* 🎉\n\n🪪 *NIN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• NIN Number: *${ninNum}*\n• Date of Birth: *${dob}*\n• Gender: *${gender}*\n• Phone: *${phone}*\n• State & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official Slip:*\n${slipUrl}\n\n` : ''}📱 *View & Print in App:*\n${webBaseUrl}/nin-services/history\n\n(Type '0' for main menu)`;
+                    ? `✅ *Aikin NIN Ya Kammala Cikin Nasara!* 🎉\n\n🪪 *BAYANAN SLIP (NIN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar NIN: *${ninNum}*\n• Ranar Haihuwa: *${dob}*\n• Jinsi: *${gender}*\n• Lambar Waya: *${phone}*\n• Jiha & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *Duba dukkan bayanai a History:*\n${webBaseUrl}/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *NIN Service Completed Successfully!* 🎉\n\n🪪 *NIN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• NIN Number: *${ninNum}*\n• Date of Birth: *${dob}*\n• Gender: *${gender}*\n• Phone: *${phone}*\n• State & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *View All in History:*\n${webBaseUrl}/history\n\n(Type '0' for main menu)`;
 
-                // Also send direct document if slipUrl is available
+                // 🚀 Send official PDF Document directly to WhatsApp (Fixed senderPhone)
                 if (slipUrl && phoneNumberId && accessToken) {
-                    sendWhatsAppMedia(fromPhone, slipUrl, `Official NIN Slip - ${fullName}`, `NIN_Slip_${ninNum}.pdf`, 'document', phoneNumberId, accessToken).catch(() => {});
+                    await sendWhatsAppMedia(senderPhone, slipUrl, `Official NIN Slip - ${fullName}`, `NIN_Slip_${ninNum}.pdf`, 'document', phoneNumberId, accessToken).catch((e) => console.warn('WA document send error:', e));
                 }
 
                 return reply(successMsg, 'IDLE', { lang: userLang });
@@ -2554,6 +2577,15 @@ Deno.serve(async (req: Request) => {
                     return reply(err.msg, 'BVN_CONFIRM_PIN', sessionData);
                 }
 
+                // 🛡️ ATOMIC LOCK: Immediately update step to BVN_PROCESSING so Meta retry cannot execute double
+                await supabaseAdmin
+                    .from('whatsapp_bot_sessions')
+                    .update({
+                        step: 'BVN_PROCESSING',
+                        last_interaction: new Date().toISOString()
+                    })
+                    .eq('phone_number', senderPhone);
+
                 const isPremiumSlip = String(sessionData.bvn_label || '').toLowerCase().includes('card') || String(sessionData.bvn_label || '').toLowerCase().includes('slip');
                 const searchType = isPremiumSlip ? 'bvn-slip' : 'bvn';
                 const slipType = isPremiumSlip ? 'PREMIUM' : 'STANDARD';
@@ -2586,34 +2618,19 @@ Deno.serve(async (req: Request) => {
                 const phone = bvnPerson.phone || bvnPerson.phoneNumber || bvnPerson.mobile || 'N/A';
                 const gender = String(bvnPerson.gender || '').toUpperCase() === 'M' ? 'Namiji (Male)' : (String(bvnPerson.gender || '').toUpperCase() === 'F' ? 'Mace (Female)' : (bvnPerson.gender || 'N/A'));
                 const bank = bvnPerson.registration_date || bvnPerson.enrollment_bank || bvnPerson.bank || 'N/A';
-                const slipUrl = bvnResult.data?.slip_url || bvnPerson.slip_url || (String(bvnPerson.slip || '').startsWith('http') ? bvnPerson.slip : '');
+                const slipUrl = bvnResult.data?.slip_url || bvnResult.data?.download_url || bvnPerson.slip_url || (String(bvnPerson.slip || '').startsWith('http') ? bvnPerson.slip : '');
 
                 // Fetch latest wallet balance
                 const { data: upProfile } = await supabaseAdmin.from('profiles').select('balance').eq('id', userId).maybeSingle();
                 const newBalance = upProfile?.balance ?? currentBalance;
 
-                // Permanent record in verification_history (for app history & admin tasks)
-                try {
-                    await supabaseAdmin.from('verification_history').insert({
-                        id: `vh_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-                        user_id: userId,
-                        service_category: 'bvn',
-                        service_type: isPremiumSlip ? 'bvn_card' : 'bvn_verification',
-                        search_number: bvnNum,
-                        holder_name: fullName,
-                        layout: slipType.toLowerCase(),
-                        details: bvnPerson,
-                        created_at: new Date().toISOString()
-                    });
-                } catch (_) {}
-
                 const successMsg = userLang === 'ha'
-                    ? `✅ *Binciken BVN Ya Kammala Cikin Nasara!* 🎉\n\n🔍 *BAYANAN BVN (BVN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar BVN: *${bvnNum}*\n• Ranar Haihuwa: *${dob}*\n• Lambar Waya: *${phone}*\n• Jinsi: *${gender}*\n• Banki / Ranar Rijista: *${bank}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken BVN Slip:*\n${slipUrl}\n\n` : ''}📱 *Duba / Buga a Cikin Manhaja:*\n${webBaseUrl}/bvn-services/history\n\n(Tura '0' don babban menu)`
-                    : `✅ *BVN Verification Successful!* 🎉\n\n🔍 *BVN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• BVN Number: *${bvnNum}*\n• Date of Birth: *${dob}*\n• Phone Number: *${phone}*\n• Gender: *${gender}*\n• Bank / Enrollment: *${bank}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official BVN Slip:*\n${slipUrl}\n\n` : ''}📱 *View & Print in App:*\n${webBaseUrl}/bvn-services/history\n\n(Type '0' for main menu)`;
+                    ? `✅ *Binciken BVN Ya Kammala Cikin Nasara!* 🎉\n\n🔍 *BAYANAN BVN (BVN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar BVN: *${bvnNum}*\n• Ranar Haihuwa: *${dob}*\n• Lambar Waya: *${phone}*\n• Jinsi: *${gender}*\n• Banki / Ranar Rijista: *${bank}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken BVN Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *Duba dukkan bayanai a History:*\n${webBaseUrl}/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *BVN Verification Successful!* 🎉\n\n🔍 *BVN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• BVN Number: *${bvnNum}*\n• Date of Birth: *${dob}*\n• Phone Number: *${phone}*\n• Gender: *${gender}*\n• Bank / Enrollment: *${bank}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official BVN Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *View All in History:*\n${webBaseUrl}/history\n\n(Type '0' for main menu)`;
 
-                // Also send direct document if slipUrl is available
+                // 🚀 Send official PDF Document directly to WhatsApp (Fixed senderPhone)
                 if (slipUrl && phoneNumberId && accessToken) {
-                    sendWhatsAppMedia(fromPhone, slipUrl, `Official BVN Slip - ${fullName}`, `BVN_Slip_${bvnNum}.pdf`, 'document', phoneNumberId, accessToken).catch(() => {});
+                    await sendWhatsAppMedia(senderPhone, slipUrl, `Official BVN Slip - ${fullName}`, `BVN_Slip_${bvnNum}.pdf`, 'document', phoneNumberId, accessToken).catch((e) => console.warn('WA document send error:', e));
                 }
 
                 return reply(successMsg, 'IDLE', { lang: userLang });

@@ -846,6 +846,58 @@ serve(async (req: Request) => {
     const addressVal = rawPerson.residence_adressline1 || rawPerson.residence_address || rawPerson.address || rawPerson.address_line_1 || rawPerson.residenceAddress || '';
     const issueDateVal = rawPerson.issueDate || rawPerson.issue_date || rawPerson.issuance_date || '';
 
+    // 📄 Upload Base64 Slip to Storage for Permanent Public Download URL
+    let resolvedSlipUrl: string | null = null;
+    if (typeof slipDoc === 'string' && slipDoc.trim()) {
+      const trimmedSlip = slipDoc.trim();
+      if (trimmedSlip.startsWith('http://') || trimmedSlip.startsWith('https://')) {
+        resolvedSlipUrl = trimmedSlip;
+      } else {
+        try {
+          let cleanBase64 = trimmedSlip;
+          let contentType = 'application/pdf';
+          let ext = 'pdf';
+
+          if (cleanBase64.startsWith('data:')) {
+            const m = cleanBase64.match(/^data:([^;]+);base64,(.+)$/);
+            if (m) {
+              contentType = m[1];
+              cleanBase64 = m[2];
+              if (contentType.includes('image/png')) ext = 'png';
+              else if (contentType.includes('image/jpeg')) ext = 'jpg';
+            }
+          } else if (cleanBase64.startsWith('iVBORw0KGgo')) {
+            contentType = 'image/png';
+            ext = 'png';
+          } else if (cleanBase64.startsWith('/9j/')) {
+            contentType = 'image/jpeg';
+            ext = 'jpg';
+          }
+
+          const binStr = atob(cleanBase64);
+          const buf = new Uint8Array(binStr.length);
+          for (let i = 0; i < binStr.length; i++) {
+            buf[i] = binStr.charCodeAt(i);
+          }
+
+          const slipIdentifier = ninNum || bvnNum || searchValue || 'doc';
+          const fileKey = `slips/${searchType.toUpperCase()}_${slipIdentifier}_${Date.now()}.${ext}`;
+          const { error: upErr } = await supabaseAdmin.storage
+            .from('chat_images')
+            .upload(fileKey, buf, { contentType, upsert: true });
+
+          if (!upErr) {
+            const { data: pubData } = supabaseAdmin.storage
+              .from('chat_images')
+              .getPublicUrl(fileKey);
+            resolvedSlipUrl = pubData?.publicUrl || null;
+          }
+        } catch (upEx: any) {
+          console.warn('[verify-nin] Base64 slip upload error:', upEx?.message);
+        }
+      }
+    }
+
     const normalized: any = {
       ...rawPerson,
       firstname: firstName,
@@ -891,8 +943,9 @@ serve(async (req: Request) => {
       issue_date: issueDateVal,
       issueDate: issueDateVal,
       pdf_base64: slipDoc,
-      slip: slipDoc,
-      slip_url: String(slipDoc).startsWith('http') ? slipDoc : null,
+      slip: resolvedSlipUrl || slipDoc,
+      slip_url: resolvedSlipUrl,
+      download_url: resolvedSlipUrl,
       transaction_id: skbData.transaction_id || `TXN-${Date.now()}`,
     };
 
@@ -922,7 +975,8 @@ serve(async (req: Request) => {
         message: skbData.message || 'Verification Successful',
         data: normalized,
         pdf_base64: slipDoc,
-        slip_url: String(slipDoc).startsWith('http') ? slipDoc : null,
+        slip_url: resolvedSlipUrl,
+        download_url: resolvedSlipUrl,
         transaction_id: skbData.transaction_id,
       }
     });

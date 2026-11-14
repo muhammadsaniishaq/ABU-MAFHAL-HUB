@@ -117,6 +117,152 @@ function getSafePlanSellingPrice(plan: any, networkMarkup: number = 0, markupTyp
     return Math.round(sell);
 }
 
+interface VerifyPinResult {
+    success: boolean;
+    reason?: 'not_set' | 'invalid_input' | 'mismatch';
+}
+
+// Helper: Accurately extract and verify 4-digit Transaction PIN against database
+// STRICT USER REQUIREMENT: Absolutely NO default PINs!
+// If the user hasn't configured a transaction PIN in their profile,
+// they are required to go set it on the app/website first.
+async function verifyUserPin(
+    supabaseAdmin: any, 
+    userId: string, 
+    inputPin: string, 
+    fallbackPin?: any
+): Promise<VerifyPinResult> {
+    const raw = String(inputPin || '').trim();
+    if (!raw) return { success: false, reason: 'invalid_input' };
+
+    // 1. Query live PIN from profiles table for this user
+    let dbPin = fallbackPin;
+    if (userId) {
+        try {
+            const { data: freshProf, error: profErr } = await supabaseAdmin
+                .from('profiles')
+                .select('transaction_pin')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (!profErr && freshProf && freshProf.transaction_pin !== undefined && freshProf.transaction_pin !== null) {
+                dbPin = freshProf.transaction_pin;
+            }
+        } catch (fetchErr) {
+            console.error("[WhatsApp Bot PIN] Error fetching fresh profile PIN:", fetchErr);
+        }
+    }
+
+    let cleanDbPin = String(dbPin ?? '').replace(/\D/g, '').trim();
+    if (cleanDbPin.toLowerCase() === 'null' || cleanDbPin.toLowerCase() === 'undefined') {
+        cleanDbPin = '';
+    }
+
+    // STRICT: User must have set their own Transaction PIN (minimum 4 digits)
+    if (!cleanDbPin || cleanDbPin.length < 4) {
+        console.warn(`[WhatsApp Bot PIN] User ${userId} has not set a transaction_pin in profiles!`);
+        return { success: false, reason: 'not_set' };
+    }
+
+    // 2. Extract 4-digit PIN candidate
+    // Accepts "1234", " 1234 ", "1234.", "pin 1234", "1 2 3 4", "ga shi 1234"
+    let cleanInput = '';
+    const wordMatch = raw.match(/\b\d{4}\b/);
+    if (wordMatch) {
+        cleanInput = wordMatch[0];
+    } else {
+        const digitsOnly = raw.replace(/\D/g, '');
+        if (digitsOnly.length === 4) {
+            cleanInput = digitsOnly;
+        } else if (digitsOnly.length > 4) {
+            cleanInput = digitsOnly.slice(0, 4);
+        }
+    }
+
+    if (!cleanInput || cleanInput.length !== 4) {
+        console.warn(`[WhatsApp Bot PIN] Could not extract 4-digit PIN from input: "${raw}"`);
+        return { success: false, reason: 'invalid_input' };
+    }
+
+    const expectedPin = cleanDbPin.slice(-4);
+    const isMatch = (cleanInput === expectedPin);
+
+    console.log(`[WhatsApp Bot PIN] Validation: userId=${userId}, inputRaw="${raw}", inputClean="${cleanInput}", expected="${expectedPin}", matched=${isMatch}`);
+    return isMatch ? { success: true } : { success: false, reason: 'mismatch' };
+}
+
+function getPinErrorResponse(userLang: string, reason?: string, playStoreUrl?: string) {
+    const appLink = (playStoreUrl || DEFAULT_PLAY_STORE_URL).trim();
+    if (reason === 'not_set') {
+        return {
+            isNotSet: true,
+            msg: userLang === 'ha'
+                ? `⚠️ *Baka saita Transaction PIN ba tukuna!*\n\nDon tsaron asusunka da kuɗinka, ba za ka iya yin wannan ciniki a WhatsApp ba har sai ka saita lambobin Transaction PIN guda 4 a manhajarmu ko shafin yanar gizo:\n\n🌐 *Saita a Yanar Gizo:* https://abumafhal.com.ng\n📱 *Sauke a Play Store:*\n${appLink}\n\nBayan ka saita PIN ɗinka a can, zaka iya dawowa nan ka ci gaba da cinikayya a sauƙaƙe.`
+                : `⚠️ *You have not set a Transaction PIN yet!*\n\nFor your account security, you cannot perform transactions on WhatsApp until you create a 4-digit Transaction PIN in the mobile app or website:\n\n🌐 *Set on Web:* https://abumafhal.com.ng\n📱 *Get on Play Store:*\n${appLink}\n\nOnce created, return here to complete your purchases.`
+        };
+    }
+    return {
+        isNotSet: false,
+        msg: userLang === 'ha'
+            ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan a sake gwadawa daidai (ko tura '0' don sokewa):`
+            : `❌ *Incorrect Transaction PIN!*\n\nPlease try again with your correct 4-digit PIN (or reply '0' to cancel):`
+    };
+}
+
+// Helper: Robust multi-variant profile resolver for WhatsApp phone
+async function findUserProfileByPhone(supabaseAdmin: any, waPhone: string): Promise<any | null> {
+    if (!waPhone) return null;
+    const cleanDigits = String(waPhone).replace(/\D/g, '');
+    if (cleanDigits.length < 8) return null;
+
+    const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    const local11 = '0' + last10;
+    const int13 = '234' + last10;
+    const plus14 = '+234' + last10;
+
+    // 1. Direct equality match on canonical phone representations
+    try {
+        const { data: directMatch } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, email, balance, transaction_pin, phone')
+            .or(`phone.eq.${local11},phone.eq.${int13},phone.eq.${plus14},phone.eq.${last10},phone.eq.${cleanDigits},phone.eq.${waPhone}`)
+            .limit(1);
+
+        if (directMatch && directMatch.length > 0) {
+            return directMatch[0];
+        }
+    } catch (_) {}
+
+    // 2. Database RPC function (with role casting fix)
+    try {
+        const { data: rpcUsers } = await supabaseAdmin
+            .rpc('get_user_by_whatsapp_phone', { wa_phone: waPhone });
+        if (rpcUsers && rpcUsers.length > 0 && rpcUsers[0]?.id) {
+            return rpcUsers[0];
+        }
+    } catch (_) {}
+
+    // 3. Fuzzy search for phone numbers with spaces, brackets or dashes (e.g. 0801 234 5678)
+    try {
+        const last8 = last10.slice(-8);
+        const { data: candidates } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, email, balance, transaction_pin, phone')
+            .ilike('phone', `%${last8}%`)
+            .limit(15);
+
+        if (candidates && candidates.length > 0) {
+            const matched = candidates.find((c: any) => {
+                const cDigits = String(c.phone || '').replace(/\D/g, '');
+                return cDigits.endsWith(last10);
+            });
+            if (matched) return matched;
+        }
+    } catch (_) {}
+
+    return null;
+}
+
 
 // Helper: Send message back to user via WhatsApp Meta Cloud API
 async function sendWhatsAppMessage(
@@ -131,7 +277,7 @@ async function sendWhatsAppMessage(
             return false;
         }
 
-        const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
         const res = await fetch(url, {
             method: 'POST',
             headers: {
@@ -159,6 +305,47 @@ async function sendWhatsAppMessage(
         return true;
     } catch (err) {
         console.error("[WhatsApp Bot] Exception in sendWhatsAppMessage:", err);
+        return false;
+    }
+}
+
+// Helper: Send document or image back to user via WhatsApp Meta Cloud API
+async function sendWhatsAppMedia(
+    toPhone: string,
+    mediaUrl: string,
+    caption: string,
+    filename: string,
+    mediaType: 'document' | 'image',
+    phoneNumberId: string,
+    accessToken: string
+): Promise<boolean> {
+    try {
+        if (!phoneNumberId || !accessToken || !mediaUrl) return false;
+        const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
+        const bodyObj: any = {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: toPhone,
+            type: mediaType
+        };
+        if (mediaType === 'image') {
+            bodyObj.image = { link: mediaUrl, caption };
+        } else {
+            bodyObj.document = { link: mediaUrl, filename, caption };
+        }
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(bodyObj)
+        });
+
+        return res.ok;
+    } catch (err) {
+        console.warn("[WhatsApp Bot] Media send note:", err);
         return false;
     }
 }
@@ -256,7 +443,7 @@ Deno.serve(async (req: Request) => {
         if (mediaIdParam && accessToken) {
             try {
                 // 1. Resolve media URL from Meta Graph API
-                const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaIdParam}`, {
+                const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaIdParam}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
 
@@ -298,7 +485,7 @@ Deno.serve(async (req: Request) => {
             if (url.searchParams.get('diag') === '1') {
                 if (phoneNumberId && accessToken) {
                     try {
-                        const metaRes = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}`, {
+                        const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}`, {
                             headers: { 'Authorization': `Bearer ${accessToken}` }
                         });
                         metaCheck = {
@@ -343,7 +530,7 @@ Deno.serve(async (req: Request) => {
                 const testTo = url.searchParams.get('test_to');
                 if (testTo && phoneNumberId && accessToken) {
                     try {
-                        const sendRes = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+                        const sendRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,
@@ -408,8 +595,8 @@ Deno.serve(async (req: Request) => {
                     : (body.to ? [String(body.to)] : []);
                 const msg = String(body.message || '').trim();
 
-                if (recipients.length === 0 || !msg) {
-                    return new Response(JSON.stringify({ error: "Missing recipients or message body" }), {
+                if (recipients.length === 0 || (!msg && !body.media_url)) {
+                    return new Response(JSON.stringify({ error: "Missing recipients, message body, or media URL" }), {
                         headers: { ...corsHeaders, "Content-Type": "application/json" },
                         status: 400
                     });
@@ -419,17 +606,79 @@ Deno.serve(async (req: Request) => {
                 let failCount = 0;
                 const results: any[] = [];
 
+                // Clean, normalize and deduplicate recipients
+                const validRecipients: string[] = [];
                 for (const rawTo of recipients) {
                     let clean = String(rawTo).replace(/\D/g, '');
                     if (clean.startsWith('0') && clean.length === 11) clean = '234' + clean.slice(1);
-                    else if (clean.length === 10) clean = '234' + clean;
+                    else if (clean.length === 10 && /^[789]/.test(clean)) clean = '234' + clean;
 
-                    if (clean.length >= 10) {
+                    if (clean.length >= 10 && clean.length <= 15) {
+                        validRecipients.push(clean);
+                    }
+                }
+
+                const uniqueRecipients = Array.from(new Set(validRecipients));
+
+                const mediaUrl = body.media_url ? String(body.media_url).trim() : '';
+                const mediaType = body.media_type || (
+                    mediaUrl.match(/\.(mp4|3gp|mov|avi|mkv|webm)/i) ? 'video' :
+                    mediaUrl.match(/\.(pdf|doc|docx)/i) ? 'document' :
+                    mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'
+                );
+
+                // Safe WhatsApp caption truncation: Meta limits media captions to 1024 characters
+                const mediaCaption = msg ? (msg.length > 1024 ? msg.slice(0, 1020) + '...' : msg) : undefined;
+                const overflowText = (msg && msg.length > 1024) ? msg : null;
+
+                // Pre-upload optimization: If broadcasting media to multiple recipients,
+                // upload once to Meta Media API to obtain an instant, reusable media ID
+                let metaMediaId: string | null = null;
+                if (mediaUrl && (mediaType === 'video' || mediaType === 'image') && phoneNumberId && accessToken) {
+                    try {
+                        const mediaFetch = await fetch(mediaUrl);
+                        if (mediaFetch.ok) {
+                            const mediaBlob = await mediaFetch.blob();
+                            const formData = new FormData();
+                            formData.append('messaging_product', 'whatsapp');
+                            formData.append('type', mediaType === 'video' ? 'video/mp4' : (mediaUrl.match(/\.png/i) ? 'image/png' : 'image/jpeg'));
+                            formData.append('file', mediaBlob, mediaType === 'video' ? 'broadcast_video.mp4' : 'broadcast_image.jpg');
+
+                            const metaUploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${accessToken}`
+                                },
+                                body: formData
+                            });
+
+                            if (metaUploadRes.ok) {
+                                const uploadData = await metaUploadRes.json().catch(() => ({}));
+                                if (uploadData?.id) {
+                                    metaMediaId = String(uploadData.id);
+                                    console.log(`[WhatsApp Broadcast] Successfully pre-cached ${mediaType} on Meta Media API! Media ID: ${metaMediaId}`);
+                                }
+                            } else {
+                                const errTxt = await metaUploadRes.text().catch(() => '');
+                                console.warn(`[WhatsApp Broadcast] Meta /media upload notice (will fallback to direct link):`, errTxt);
+                            }
+                        }
+                    } catch (cacheErr: any) {
+                        console.warn(`[WhatsApp Broadcast] Could not pre-cache media on Meta (falling back to direct link):`, cacheErr?.message);
+                    }
+                }
+
+                // Concurrency control: batch in chunks of 5 concurrent requests
+                const BATCH_SIZE = 5;
+                for (let i = 0; i < uniqueRecipients.length; i += BATCH_SIZE) {
+                    const chunk = uniqueRecipients.slice(i, i + BATCH_SIZE);
+                    await Promise.all(chunk.map(async (clean) => {
                         let sent = false;
-                        const mediaUrl = body.media_url ? String(body.media_url).trim() : '';
-                        const mediaType = body.media_type || (mediaUrl.match(/\.(pdf|doc|docx)/i) ? 'document' : (mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? 'image' : 'text'));
+                        let mediaSent = false;
+                        let textSent = false;
+                        let errorReason = '';
 
-                        if (mediaUrl && (mediaType === 'image' || mediaType === 'document')) {
+                        if (mediaUrl && (mediaType === 'image' || mediaType === 'video' || mediaType === 'document')) {
                             try {
                                 const payload: any = {
                                     messaging_product: 'whatsapp',
@@ -439,12 +688,14 @@ Deno.serve(async (req: Request) => {
                                 };
 
                                 if (mediaType === 'image') {
-                                    payload.image = { link: mediaUrl, caption: msg || undefined };
+                                    payload.image = metaMediaId ? { id: metaMediaId, caption: mediaCaption } : { link: mediaUrl, caption: mediaCaption };
+                                } else if (mediaType === 'video') {
+                                    payload.video = metaMediaId ? { id: metaMediaId, caption: mediaCaption } : { link: mediaUrl, caption: mediaCaption };
                                 } else {
-                                    payload.document = { link: mediaUrl, filename: body.filename || 'Document.pdf', caption: msg || undefined };
+                                    payload.document = { link: mediaUrl, filename: body.filename || 'Document.pdf', caption: mediaCaption };
                                 }
 
-                                const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+                                const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
                                     method: 'POST',
                                     headers: {
                                         'Authorization': `Bearer ${accessToken}`,
@@ -452,36 +703,74 @@ Deno.serve(async (req: Request) => {
                                     },
                                     body: JSON.stringify(payload)
                                 });
+
+                                mediaSent = res.ok;
                                 sent = res.ok;
-                            } catch (_) {
-                                sent = false;
+
+                                if (!res.ok) {
+                                    const errJson = await res.json().catch(() => ({}));
+                                    errorReason = errJson?.error?.message || `Meta Cloud API status ${res.status}`;
+                                    console.error(`[WhatsApp Broadcast] Media send error to ${clean}:`, res.status, JSON.stringify(errJson));
+
+                                    // Fallback to sending text if media attachment was rejected by Meta
+                                    if (msg) {
+                                        textSent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                        sent = textSent;
+                                    }
+                                } else {
+                                    // If message exceeded 1024 characters, send full text as follow-up
+                                    if (overflowText) {
+                                        await sendWhatsAppMessage(clean, overflowText, phoneNumberId, accessToken).catch(() => {});
+                                    }
+                                }
+                            } catch (metaEx: any) {
+                                errorReason = metaEx?.message || 'Network exception';
+                                console.error(`[WhatsApp Broadcast] Exception sending media to ${clean}:`, metaEx);
+                                if (msg) {
+                                    textSent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                                    sent = textSent;
+                                }
                             }
                         } else {
                             sent = await sendWhatsAppMessage(clean, msg, phoneNumberId, accessToken);
+                            textSent = sent;
+                            if (!sent) {
+                                errorReason = 'Failed to deliver text message via Meta API';
+                            }
                         }
 
                         if (sent) {
                             successCount++;
-                            results.push({ to: clean, status: 'sent' });
+                            const deliveryStatus = mediaSent ? 'sent' : (textSent ? 'text_only' : 'sent');
+                            results.push({
+                                to: clean,
+                                status: deliveryStatus,
+                                media_delivered: mediaSent,
+                                ...(mediaSent ? { media: mediaType } : {}),
+                                ...(textSent && !mediaSent ? { warning: `Media failed (${errorReason}), text message delivered instead` } : {})
+                            });
+
                             try {
                                 await supabaseAdmin.from('whatsapp_bot_logs').insert({
                                     phone_number: clean,
                                     direction: 'outgoing',
-                                    message_type: mediaType,
-                                    content: msg || (mediaType === 'image' ? '📷 [Image Sent]' : '📄 [Document Sent]'),
+                                    message_type: mediaSent ? mediaType : 'text',
+                                    content: msg || (mediaType === 'video' ? '🎥 [Video Sent]' : mediaType === 'image' ? '📷 [Image Sent]' : '📄 [Document Sent]'),
                                     raw_payload: {
                                         media_url: mediaUrl,
                                         media_type: mediaType,
+                                        media_id: metaMediaId || undefined,
                                         filename: body.filename,
-                                        caption: msg
+                                        caption: mediaCaption,
+                                        delivered_as: deliveryStatus
                                     }
                                 });
                             } catch (_) {}
                         } else {
                             failCount++;
-                            results.push({ to: clean, status: 'failed' });
+                            results.push({ to: clean, status: 'failed', error: errorReason || 'Failed to deliver via Meta API' });
                         }
-                    }
+                    }));
                 }
 
                 return new Response(JSON.stringify({
@@ -548,8 +837,28 @@ Deno.serve(async (req: Request) => {
 
             const text = rawText.trim();
             const lowerText = text.toLowerCase();
+            const messageId = String(message?.id || '').trim();
 
-            console.log(`[WhatsApp Bot] Incoming from ${senderPhone} (${contactName}): "${text}" (Type: ${message.type})`);
+            console.log(`[WhatsApp Bot] Incoming from ${senderPhone} (${contactName}): "${text}" (Type: ${message.type}, ID: ${messageId})`);
+
+            // 🛡️ Webhook Deduplication: Ignore identical retried deliveries from Meta
+            if (messageId) {
+                const { data: dupLogs } = await supabaseAdmin
+                    .from('whatsapp_bot_logs')
+                    .select('id')
+                    .eq('phone_number', senderPhone)
+                    .eq('direction', 'incoming')
+                    .contains('raw_payload', { message_id: messageId })
+                    .limit(1);
+
+                if (dupLogs && dupLogs.length > 0) {
+                    console.log(`[WhatsApp Bot] Duplicate webhook message ignored: ${messageId}`);
+                    return new Response(JSON.stringify({ status: "ignored_duplicate" }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                        status: 200
+                    });
+                }
+            }
 
             // Background log with rich media payload
             supabaseAdmin.from('whatsapp_bot_logs').insert({
@@ -558,6 +867,7 @@ Deno.serve(async (req: Request) => {
                 message_type: message.type || 'text',
                 content: text,
                 raw_payload: {
+                    message_id: messageId,
                     media_id: mediaId,
                     media_url: mediaUrl,
                     mime_type: mediaMime,
@@ -659,25 +969,14 @@ Deno.serve(async (req: Request) => {
 
             // 3. Try resolving user profile if not already linked
             if (!userId) {
-                const cleanDigits = senderPhone.replace(/\D/g, '');
-                const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
-
-                try {
-                    const { data: matchedProfiles } = await supabaseAdmin
-                        .from('profiles')
-                        .select('id, full_name, email, balance, transaction_pin, phone')
-                        .or(`phone.eq.${senderPhone},phone.eq.0${last10},phone.eq.+234${last10},phone.eq.234${last10},phone.eq.${last10}`)
-                        .limit(1);
-
-                    if (matchedProfiles && matchedProfiles.length > 0) {
-                        userId = matchedProfiles[0].id;
-                        await supabaseAdmin
-                            .from('whatsapp_bot_sessions')
-                            .update({ user_id: userId })
-                            .eq('phone_number', senderPhone);
-                    }
-                } catch (e) {
-                    console.error("[WhatsApp Bot] Profile resolution error:", e);
+                const foundProf = await findUserProfileByPhone(supabaseAdmin, senderPhone);
+                if (foundProf?.id) {
+                    userId = foundProf.id;
+                    await supabaseAdmin
+                        .from('whatsapp_bot_sessions')
+                        .update({ user_id: userId })
+                        .eq('phone_number', senderPhone);
+                    console.log(`[WhatsApp Bot] Resolved profile via phone lookup: ${userId} (${foundProf.full_name}) for ${senderPhone}`);
                 }
             }
 
@@ -844,17 +1143,24 @@ Deno.serve(async (req: Request) => {
 
                 if (currentStep === 'AWAITING_LINK_PIN') {
                     const { pending_user_id } = sessionData;
+                    const pinRes = await verifyUserPin(supabaseAdmin, pending_user_id, text);
+
+                    if (!pinRes.success) {
+                        const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                        if (err.isNotSet) {
+                            return reply(err.msg, 'IDLE', { lang: userLang });
+                        }
+                        return reply(err.msg, 'AWAITING_LINK_PIN', sessionData);
+                    }
+
                     const { data: userProfile } = await supabaseAdmin
                         .from('profiles')
                         .select('id, full_name, transaction_pin, balance, phone')
                         .eq('id', pending_user_id)
-                        .single();
+                        .maybeSingle();
 
-                    if (!userProfile || userProfile.transaction_pin !== text) {
-                        const wrongPinMsg = userLang === 'ha'
-                            ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                            : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                        return reply(wrongPinMsg, 'AWAITING_LINK_PIN', sessionData);
+                    if (!userProfile) {
+                        return reply("❌ User profile not found.", 'IDLE', { lang: userLang });
                     }
 
                     // Successfully Linked!
@@ -864,7 +1170,7 @@ Deno.serve(async (req: Request) => {
                         .eq('phone_number', senderPhone);
 
                     // Update profile phone if not set
-                    if (!userProfile.phone) {
+                    if (!userProfile.phone || userProfile.phone.trim() === '') {
                         const localPhone = formatToLocalPhone(senderPhone);
                         await supabaseAdmin.from('profiles').update({ phone: localPhone }).eq('id', userProfile.id);
                     }
@@ -883,11 +1189,25 @@ Deno.serve(async (req: Request) => {
             }
 
             // Fetch Linked User Profile
-            const { data: profile } = await supabaseAdmin
+            let { data: profile } = await supabaseAdmin
                 .from('profiles')
                 .select('id, full_name, email, balance, transaction_pin, phone')
                 .eq('id', userId)
                 .maybeSingle();
+
+            // Self-healing: if session userId is stale or deleted, attempt resolving via senderPhone
+            if (!profile) {
+                const recovered = await findUserProfileByPhone(supabaseAdmin, senderPhone);
+                if (recovered?.id) {
+                    profile = recovered;
+                    userId = profile.id;
+                    await supabaseAdmin
+                        .from('whatsapp_bot_sessions')
+                        .update({ user_id: userId })
+                        .eq('phone_number', senderPhone);
+                    console.log(`[WhatsApp Bot] Recovered profile via phone lookup: ${userId} (${profile.full_name}) for ${senderPhone}`);
+                }
+            }
 
             if (!profile) {
                 await supabaseAdmin.from('whatsapp_bot_sessions').update({ user_id: null }).eq('phone_number', senderPhone);
@@ -1024,7 +1344,7 @@ Deno.serve(async (req: Request) => {
 
                     if (chosen.key === 'tin') {
                         const tinMsg = userLang === 'ha'
-                            ? `📜 *Lambar Haraji ta TIN & Certificate (JTB / Joint Tax Board)* 🇳🇬\n\nZa ku iya samun ko gyara lambar haraji ta TIN, ko saukar da official Tax ID Certificate kai tsaye a cikin manhajarmu:\n\n• *Bincike & Saukar da Tax ID Certificate (Individual / Non-Individual)*\n• *Rijistar Sabuwar Lambar Haraji ta TIN*\n\n📱 *Buɗe Manhaja don Samun TIN:* ${playStoreLink}\n🌐 *Shiga Shafin Gizo:* ${webBaseUrl}/tin-services\n\n💬 Ko kuma ku tuntuɓi wakilinmu kai tsaye a WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20neman%20TIN%20ko%20Tax%20Certificate\n\n(Tura '0' don babban menu)`
+                            ? `📜 *Lambar Haraji ta TIN & Certificate (JTB / Joint Tax Board)* 🇳🇬\n\nZa ku iya samun ko gyara lambar haraji ta TIN, ko saukar da official Tax ID Certificate kai tsaye a cikin manhajarmu:\n\n• *Bincike & Saukar da Tax ID Certificate (Individual / Corporate / MDA / Cooperative)*\n• *Rijistar Sabuwar Lambar Haraji ta TIN*\n\n📱 *Buɗe Manhaja don Samun TIN:* ${playStoreLink}\n🌐 *Shiga Shafin Gizo:* ${webBaseUrl}/tin-services\n\n💬 Ko kuma ku tuntuɓi wakilinmu kai tsaye a WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Ina%20son%20neman%20TIN%20ko%20Tax%20Certificate\n\n(Tura '0' don babban menu)`
                             : `📜 *TIN & Tax ID Certificate Portal (JTB / Joint Revenue Board)* 🇳🇬\n\nRetrieve your official Joint Tax Board Tax ID Certificate or register a brand-new TIN directly on our platform:\n\n• *Certificate Retrieval (Individual / Corporate / MDA / Cooperative)*\n• *New TIN Registration for Personal or Business*\n\n📱 *Open Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/tin-services\n\n💬 Direct Support / Enquiries on WhatsApp:\nhttps://wa.me/${adminCallPhone}?text=Hello%20Admin,%20I%20need%20TIN%20or%20Tax%20Certificate%20assistance\n\n(Type '0' for main menu)`;
                         return reply(tinMsg, 'IDLE', { lang: userLang });
                     }
@@ -1158,8 +1478,8 @@ Deno.serve(async (req: Request) => {
                     return reply(invNet, 'DATA_SELECT_NETWORK', sessionData);
                 }
 
-                // Exact match with Mobile App: Query active VTU vendor first from app_settings
-                let activeVendor = 'bilalsadasub';
+                // Exact match with Mobile App: Query active VTU vendors from app_settings
+                let activeVendors: string[] = ['bilalsadasub', 'bigi', 'clubkonnect'];
                 try {
                     const { data: vendorSetting } = await supabaseAdmin
                         .from('app_settings')
@@ -1168,7 +1488,11 @@ Deno.serve(async (req: Request) => {
                         .maybeSingle();
                     if (vendorSetting?.value) {
                         const v = typeof vendorSetting.value === 'object' ? vendorSetting.value.vendor || vendorSetting.value : vendorSetting.value;
-                        activeVendor = String(v).toLowerCase().trim().split(',')[0].trim() || 'bilalsadasub';
+                        const vStr = String(v).toLowerCase().trim();
+                        const parsed = vStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+                        if (parsed.length > 0) {
+                            activeVendors = parsed;
+                        }
                     }
                 } catch (_) {}
 
@@ -1228,16 +1552,21 @@ Deno.serve(async (req: Request) => {
 
                     activePlans = (dbAlpha && dbAlpha.length > 0) ? dbAlpha : alphaFallback;
                 } else {
-                    // Fetch plans matching active VTU vendor exactly as done by App services/api.ts
-                    let { data: dbPlans } = await supabaseAdmin
+                    // Fetch plans matching active VTU vendors exactly as done by App services/api.ts
+                    let plansQuery = supabaseAdmin
                         .from('data_plans')
                         .select('*')
                         .ilike('network', chosenNetwork)
-                        .eq('api_vendor', activeVendor)
                         .eq('is_active', true)
                         .order('cost_price', { ascending: true });
 
-                    // Fallback to any active vendor plans if active vendor returns none
+                    if (activeVendors.length > 0 && !activeVendors.includes('all')) {
+                        plansQuery = plansQuery.in('api_vendor', activeVendors);
+                    }
+
+                    let { data: dbPlans } = await plansQuery;
+
+                    // Fallback to any active vendor plans if configured vendors return none
                     if (!dbPlans || dbPlans.length === 0) {
                         const { data: fbPlans } = await supabaseAdmin
                             .from('data_plans')
@@ -1400,13 +1729,14 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'DATA_CONFIRM_PIN') {
-                const userPin = text.trim();
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
-                if (!profile.transaction_pin || profile.transaction_pin !== userPin) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan ka sake gwadawa daidai, ko ka tura '0' don soke cinikin:`
-                        : `❌ *Incorrect Transaction PIN!*\n\nPlease enter the correct 4-digit PIN, or reply '0' to cancel:`;
-                    return reply(badPin, 'DATA_CONFIRM_PIN', sessionData);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'DATA_CONFIRM_PIN', sessionData);
                 }
 
                 const selectedPlan = sessionData.selected_plan;
@@ -1552,13 +1882,14 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'AIRTIME_CONFIRM_PIN') {
-                const userPin = text.trim();
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
 
-                if (!profile.transaction_pin || profile.transaction_pin !== userPin) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ *Transaction PIN ba daidai ba ne!*\n\nDa fatan ka sake gwadawa daidai, ko ka tura '0' don sokewa:`
-                        : `❌ *Incorrect Transaction PIN!*\n\nPlease try again with your correct 4-digit PIN, or reply '0' to cancel:`;
-                    return reply(badPin, 'AIRTIME_CONFIRM_PIN', sessionData);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'AIRTIME_CONFIRM_PIN', sessionData);
                 }
 
                 const amount = sessionData.airtime_amount;
@@ -1683,11 +2014,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'EXAM_CONFIRM_PIN') {
-                if (!profile.transaction_pin || profile.transaction_pin !== text.trim()) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                        : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                    return reply(badPin, 'EXAM_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'EXAM_CONFIRM_PIN', sessionData);
                 }
 
                 const exam = sessionData.exam;
@@ -1812,11 +2145,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'ELECTRICITY_CONFIRM_PIN') {
-                if (!profile.transaction_pin || profile.transaction_pin !== text.trim()) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                        : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                    return reply(badPin, 'ELECTRICITY_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'ELECTRICITY_CONFIRM_PIN', sessionData);
                 }
 
                 const waitMsg = userLang === 'ha'
@@ -1972,11 +2307,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'CABLE_CONFIRM_PIN') {
-                if (!profile.transaction_pin || profile.transaction_pin !== text.trim()) {
-                    const badPin = userLang === 'ha'
-                        ? `❌ Transaction PIN ba daidai ba ne! Sake gwadawa (ko tura '0' don sokewa):`
-                        : `❌ Incorrect Transaction PIN! Please try again (or reply '0' to cancel):`;
-                    return reply(badPin, 'CABLE_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'CABLE_CONFIRM_PIN', sessionData);
                 }
 
                 const pkg = sessionData.selected_pkg;
@@ -2089,52 +2426,88 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
+            if (currentStep === 'NIN_PROCESSING' || currentStep === 'BVN_PROCESSING') {
+                console.log(`[WhatsApp Bot] Request already in progress for ${senderPhone}. Ignoring concurrent retry.`);
+                return new Response(JSON.stringify({ status: "processing_in_progress" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
+
             if (currentStep === 'NIN_CONFIRM_PIN') {
-                const pin = text.trim();
-                if (pin !== profile.pin) {
-                    const wrongPin = userLang === 'ha'
-                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN ɗinka mai lamba 4 (ko tura '0' don sokewa):`
-                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
-                    return reply(wrongPin, 'NIN_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'NIN_CONFIRM_PIN', sessionData);
                 }
 
-                const price = Number(sessionData.nin_price || 150);
-                if (currentBalance < price) {
-                    const lowBal = userLang === 'ha'
-                        ? `⚠️ Kuɗin asusunka bai isa ba.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 Kuɗin Sabis: *₦${price.toLocaleString()}*\n\nDa fatan a zuba kuɗi a asusunka:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/wallet`
-                        : `⚠️ Insufficient wallet balance.\n\n💳 Balance: *₦${currentBalance.toLocaleString()}*\n💵 Service Fee: *₦${price.toLocaleString()}*\n\nPlease fund your wallet to continue:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/wallet`;
-                    return reply(lowBal, 'IDLE', { lang: userLang });
+                // 🛡️ ATOMIC LOCK: Immediately update step to NIN_PROCESSING so Meta retry cannot execute double
+                await supabaseAdmin
+                    .from('whatsapp_bot_sessions')
+                    .update({
+                        step: 'NIN_PROCESSING',
+                        last_interaction: new Date().toISOString()
+                    })
+                    .eq('phone_number', senderPhone);
+
+                // Map requested service to SKB searchType and slipType
+                let searchType = 'nin-standard';
+                let slipType = 'STANDARD';
+                if (sessionData.nin_type === 'nin_premium_slip') {
+                    searchType = 'nin-premium';
+                    slipType = 'PREMIUM';
+                } else if (sessionData.nin_type === 'nin_verification') {
+                    searchType = 'nin';
+                    slipType = 'BASIC';
                 }
 
-                // Deduct balance and record transaction
-                const newBalance = currentBalance - price;
-                await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', userId);
-
-                const refId = `NIN_${Date.now()}_WA`;
-                await supabaseAdmin.from('transactions').insert({
-                    user_id: userId,
-                    type: 'nin_verification',
-                    amount: price,
-                    status: 'success',
-                    description: `${sessionData.nin_label} for ${sessionData.nin_number}`,
-                    reference: refId
+                // Invoke verify-nin edge function with service role & userId
+                const { data: verResult, error: verFuncError } = await supabaseAdmin.functions.invoke('verify-nin', {
+                    body: {
+                        searchType,
+                        searchValue: sessionData.nin_number,
+                        slip_type: slipType,
+                        user_id: userId
+                    }
                 });
 
-                // Create identity verification record
-                try {
-                    await supabaseAdmin.from('identity_verifications').insert({
-                        user_id: userId,
-                        service_type: sessionData.nin_type,
-                        identifier: sessionData.nin_number,
-                        fee: price,
-                        status: 'completed',
-                        reference: refId
-                    });
-                } catch (_) {}
+                if (verFuncError || verResult?.error || !verResult?.data) {
+                    const errReason = verFuncError?.message || verResult?.error || 'Ba a sami bayanin wannan lambar NIN ɗin ba.';
+                    const failMsg = userLang === 'ha'
+                        ? `❌ *Binciken NIN Bai Yi Nasara Ba*\n\nDalili: *${errReason}*\n\nKada ka damu, ba a caje kuɗin asusunka ba.\n\n(Tura '0' don komawa babban menu)`
+                        : `❌ *NIN Verification Failed*\n\nReason: *${errReason}*\n\nYour wallet balance was not charged.\n\n(Type '0' for main menu)`;
+                    return reply(failMsg, 'IDLE', { lang: userLang });
+                }
+
+                const person = verResult.data?.data || verResult.data || {};
+                const fn = person.firstname || person.first_name || person.firstName || '';
+                const mn = person.middlename || person.middle_name || person.middleName || '';
+                const ln = person.surname || person.lastname || person.lastName || '';
+                const fullName = [fn, mn, ln].filter(Boolean).join(' ').trim().toUpperCase() || person.name || person.holder_name || 'NIN HOLDER';
+                const ninNum = person.nin || person.number || sessionData.nin_number;
+                const dob = person.dob || person.birthdate || person.dateOfBirth || person.birth_date || 'N/A';
+                const gender = String(person.gender || person.sex || '').toUpperCase() === 'M' ? 'Namiji (Male)' : (String(person.gender || person.sex || '').toUpperCase() === 'F' ? 'Mace (Female)' : (person.gender || 'N/A'));
+                const phone = person.phone || person.telephoneno || person.phone_number || 'N/A';
+                const state = person.state || person.residence_state || person.birthstate || person.origin_state || 'N/A';
+                const lga = person.lga || person.residence_lga || person.birthlga || person.origin_lga || 'N/A';
+                const trackingId = person.tracking_id || person.trackingId || person.trackingID || 'N/A';
+                const slipUrl = verResult.data?.slip_url || verResult.data?.download_url || person.slip_url || (String(person.slip || '').startsWith('http') ? person.slip : '');
+
+                // Fetch updated wallet balance
+                const { data: upProfile } = await supabaseAdmin.from('profiles').select('balance').eq('id', userId).maybeSingle();
+                const newBalance = upProfile?.balance ?? currentBalance;
 
                 const successMsg = userLang === 'ha'
-                    ? `✅ *Aikin NIN Ya Kammala Cikin Nasara!* 🎉\n\n🪪 *Bayanin Aiki:*\n• Sabis: *${sessionData.nin_label}*\n• Lambar: *${sessionData.nin_number}*\n• Kuɗi: *₦${price.toLocaleString()}*\n• Sabon Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\n📄 An sarrafa bincikenku cikin nasara. Zaka iya duba da saukar da cikakken slip/result a:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/nin-services/history\n\n(Tura '0' don babban menu)`
-                    : `✅ *NIN Service Completed Successfully!* 🎉\n\n🪪 *Service Summary:*\n• Service: *${sessionData.nin_label}*\n• Target Number: *${sessionData.nin_number}*\n• Fee: *₦${price.toLocaleString()}*\n• New Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\n📄 Your request has been verified. You can view or download the slip at:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/nin-services/history\n\n(Type '0' for main menu)`;
+                    ? `✅ *Aikin NIN Ya Kammala Cikin Nasara!* 🎉\n\n🪪 *BAYANAN SLIP (NIN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar NIN: *${ninNum}*\n• Ranar Haihuwa: *${dob}*\n• Jinsi: *${gender}*\n• Lambar Waya: *${phone}*\n• Jiha & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *Duba dukkan bayanai a History:*\n${webBaseUrl}/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *NIN Service Completed Successfully!* 🎉\n\n🪪 *NIN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• NIN Number: *${ninNum}*\n• Date of Birth: *${dob}*\n• Gender: *${gender}*\n• Phone: *${phone}*\n• State & LGA: *${state} / ${lga}*\n• Tracking ID: *${trackingId}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *View All in History:*\n${webBaseUrl}/history\n\n(Type '0' for main menu)`;
+
+                // 🚀 Send official PDF Document directly to WhatsApp (Fixed senderPhone)
+                if (slipUrl && phoneNumberId && accessToken) {
+                    await sendWhatsAppMedia(senderPhone, slipUrl, `Official NIN Slip - ${fullName}`, `NIN_Slip_${ninNum}.pdf`, 'document', phoneNumberId, accessToken).catch((e) => console.warn('WA document send error:', e));
+                }
 
                 return reply(successMsg, 'IDLE', { lang: userLang });
             }
@@ -2195,38 +2568,70 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'BVN_CONFIRM_PIN') {
-                const pin = text.trim();
-                if (pin !== profile.pin) {
-                    const wrongPin = userLang === 'ha'
-                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da PIN (ko tura '0' don sokewa):`
-                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
-                    return reply(wrongPin, 'BVN_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'BVN_CONFIRM_PIN', sessionData);
                 }
 
-                const price = Number(sessionData.bvn_price || 150);
-                if (currentBalance < price) {
-                    const lowBal = userLang === 'ha'
-                        ? `⚠️ Kuɗin asusunka bai isa ba (Balance: ₦${currentBalance.toLocaleString()}).\n\nDa fatan a zuba kuɗi a asusunka:\n🌐 ${webBaseUrl}/wallet`
-                        : `⚠️ Insufficient wallet balance (Balance: ₦${currentBalance.toLocaleString()}).\n\nPlease fund your wallet at:\n🌐 ${webBaseUrl}/wallet`;
-                    return reply(lowBal, 'IDLE', { lang: userLang });
-                }
+                // 🛡️ ATOMIC LOCK: Immediately update step to BVN_PROCESSING so Meta retry cannot execute double
+                await supabaseAdmin
+                    .from('whatsapp_bot_sessions')
+                    .update({
+                        step: 'BVN_PROCESSING',
+                        last_interaction: new Date().toISOString()
+                    })
+                    .eq('phone_number', senderPhone);
 
-                const newBalance = currentBalance - price;
-                await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', userId);
+                const isPremiumSlip = String(sessionData.bvn_label || '').toLowerCase().includes('card') || String(sessionData.bvn_label || '').toLowerCase().includes('slip');
+                const searchType = isPremiumSlip ? 'bvn-slip' : 'bvn';
+                const slipType = isPremiumSlip ? 'PREMIUM' : 'STANDARD';
 
-                const refId = `BVN_${Date.now()}_WA`;
-                await supabaseAdmin.from('transactions').insert({
-                    user_id: userId,
-                    type: 'bvn_verification',
-                    amount: price,
-                    status: 'success',
-                    description: `${sessionData.bvn_label} for ${sessionData.bvn_number}`,
-                    reference: refId
+                // Invoke verify-nin edge function with service role & userId
+                const { data: bvnResult, error: bvnFuncError } = await supabaseAdmin.functions.invoke('verify-nin', {
+                    body: {
+                        searchType,
+                        searchValue: sessionData.bvn_number,
+                        slip_type: slipType,
+                        user_id: userId
+                    }
                 });
 
+                if (bvnFuncError || bvnResult?.error || !bvnResult?.data) {
+                    const errReason = bvnFuncError?.message || bvnResult?.error || 'Ba a sami bayanin wannan lambar BVN ɗin ba.';
+                    const failMsg = userLang === 'ha'
+                        ? `❌ *Binciken BVN Bai Yi Nasara Ba*\n\nDalili: *${errReason}*\n\nKada ka damu, ba a caje kuɗin asusunka ba.\n\n(Tura '0' don komawa babban menu)`
+                        : `❌ *BVN Verification Failed*\n\nReason: *${errReason}*\n\nYour wallet balance was not charged.\n\n(Type '0' for main menu)`;
+                    return reply(failMsg, 'IDLE', { lang: userLang });
+                }
+
+                const bvnPerson = bvnResult.data?.data || bvnResult.data || {};
+                const fn = bvnPerson.firstname || bvnPerson.first_name || bvnPerson.firstName || '';
+                const mn = bvnPerson.middlename || bvnPerson.middle_name || bvnPerson.middleName || '';
+                const ln = bvnPerson.surname || bvnPerson.lastname || bvnPerson.lastName || '';
+                const fullName = [fn, mn, ln].filter(Boolean).join(' ').trim().toUpperCase() || bvnPerson.name || bvnPerson.holder_name || 'BVN HOLDER';
+                const bvnNum = bvnPerson.bvn || sessionData.bvn_number;
+                const dob = bvnPerson.dob || bvnPerson.birthdate || bvnPerson.dateOfBirth || 'N/A';
+                const phone = bvnPerson.phone || bvnPerson.phoneNumber || bvnPerson.mobile || 'N/A';
+                const gender = String(bvnPerson.gender || '').toUpperCase() === 'M' ? 'Namiji (Male)' : (String(bvnPerson.gender || '').toUpperCase() === 'F' ? 'Mace (Female)' : (bvnPerson.gender || 'N/A'));
+                const bank = bvnPerson.registration_date || bvnPerson.enrollment_bank || bvnPerson.bank || 'N/A';
+                const slipUrl = bvnResult.data?.slip_url || bvnResult.data?.download_url || bvnPerson.slip_url || (String(bvnPerson.slip || '').startsWith('http') ? bvnPerson.slip : '');
+
+                // Fetch latest wallet balance
+                const { data: upProfile } = await supabaseAdmin.from('profiles').select('balance').eq('id', userId).maybeSingle();
+                const newBalance = upProfile?.balance ?? currentBalance;
+
                 const successMsg = userLang === 'ha'
-                    ? `✅ *Binciken BVN Ya Kammala Cikin Nasara!* 🎉\n\n🔍 *Bayanin BVN:*\n• Lambar BVN: *${sessionData.bvn_number}*\n• Status: *Completed (Ingantacce)*\n• Kuɗi: *₦${price.toLocaleString()}*\n• Sabon Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\nZaka iya saukar da official slip a cikin app:\n📱 *Manhajar Android:* ${playStoreLink}\n🌐 *Shafin Gizo:* ${webBaseUrl}/bvn-services/history\n\n(Tura '0' don babban menu)`
-                    : `✅ *BVN Verification Successful!* 🎉\n\n🔍 *Summary:*\n• BVN: *${sessionData.bvn_number}*\n• Status: *Verified & Validated*\n• Fee: *₦${price.toLocaleString()}*\n• New Balance: *₦${newBalance.toLocaleString()}*\n• Reference ID: *${refId}*\n\nYou can access verification slips anytime via:\n📱 *Mobile App:* ${playStoreLink}\n🌐 *Web Portal:* ${webBaseUrl}/bvn-services/history\n\n(Type '0' for main menu)`;
+                    ? `✅ *Binciken BVN Ya Kammala Cikin Nasara!* 🎉\n\n🔍 *BAYANAN BVN (BVN SLIP DETAILS):*\n• Cikakken Suna: *${fullName}*\n• Lambar BVN: *${bvnNum}*\n• Ranar Haihuwa: *${dob}*\n• Lambar Waya: *${phone}*\n• Jinsi: *${gender}*\n• Banki / Ranar Rijista: *${bank}*\n\n💳 *Bayanin Kuɗi:*\n• Sabon Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Saukar da Cikakken BVN Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *Duba dukkan bayanai a History:*\n${webBaseUrl}/history\n\n(Tura '0' don babban menu)`
+                    : `✅ *BVN Verification Successful!* 🎉\n\n🔍 *BVN SLIP DETAILS:*\n• Full Name: *${fullName}*\n• BVN Number: *${bvnNum}*\n• Date of Birth: *${dob}*\n• Phone Number: *${phone}*\n• Gender: *${gender}*\n• Bank / Enrollment: *${bank}*\n\n💳 *Account Status:*\n• New Balance: *₦${Number(newBalance).toLocaleString()}*\n\n${slipUrl ? `📄 *Download Official BVN Slip (PDF):*\n${slipUrl}\n\n` : ''}📱 *View All in History:*\n${webBaseUrl}/history\n\n(Type '0' for main menu)`;
+
+                // 🚀 Send official PDF Document directly to WhatsApp (Fixed senderPhone)
+                if (slipUrl && phoneNumberId && accessToken) {
+                    await sendWhatsAppMedia(senderPhone, slipUrl, `Official BVN Slip - ${fullName}`, `BVN_Slip_${bvnNum}.pdf`, 'document', phoneNumberId, accessToken).catch((e) => console.warn('WA document send error:', e));
+                }
 
                 return reply(successMsg, 'IDLE', { lang: userLang });
             }
@@ -2334,12 +2739,13 @@ Deno.serve(async (req: Request) => {
             }
 
             if (currentStep === 'CAC_CONFIRM_PIN') {
-                const pin = text.trim();
-                if (pin !== profile.pin) {
-                    const wrongPin = userLang === 'ha'
-                        ? `❌ Lambar PIN ba ta yi daidai ba.\n\nDa fatan a sake shigar da lambar PIN mai lamba 4 (ko tura '0' don sokewa):`
-                        : `❌ Incorrect PIN.\n\nPlease enter your correct 4-digit transaction PIN (or type '0' to cancel):`;
-                    return reply(wrongPin, 'CAC_CONFIRM_PIN', sessionData);
+                const pinRes = await verifyUserPin(supabaseAdmin, userId, text, profile.transaction_pin);
+                if (!pinRes.success) {
+                    const err = getPinErrorResponse(userLang, pinRes.reason, playStoreLink);
+                    if (err.isNotSet) {
+                        return reply(err.msg, 'IDLE', { lang: userLang });
+                    }
+                    return reply(err.msg, 'CAC_CONFIRM_PIN', sessionData);
                 }
 
                 const fee = Number(sessionData.cac_price || 18500);
