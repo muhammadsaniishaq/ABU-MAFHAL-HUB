@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendEmail } from '../_shared/email.ts';
 import { renderAbuMafhalEmailTemplate } from '../_shared/email-template.ts';
+import { verifyAdminCaller } from '../_shared/admin-auth.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -119,9 +120,17 @@ serve(async (req) => {
         }
 
         // ════════════════════════════════════════════════════════════════
-        // ACTION: GET BUSINESS WALLET BALANCE (PayVessel Portal Balance)
+        // ACTION: GET BUSINESS WALLET BALANCE (Admin Only)
         // ════════════════════════════════════════════════════════════════
         if (action === 'get_business_balance') {
+            const adminCheck = await verifyAdminCaller(req, supabase);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ status: false, error: 'Forbidden: Admin access required.' }), {
+                    status: 403,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
             if (!apiKey || !apiSecret) {
                 return new Response(JSON.stringify({ status: false, error: 'PayVessel API keys not configured.' }), {
                     status: 200,
@@ -151,9 +160,16 @@ serve(async (req) => {
         }
 
         // ════════════════════════════════════════════════════════════════
-        // ACTION: TEST API CONNECTION (Diagnostics)
+        // ACTION: TEST API CONNECTION (Admin Only)
         // ════════════════════════════════════════════════════════════════
         if (action === 'test_connection') {
+            const adminCheck = await verifyAdminCaller(req, supabase);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ status: false, error: 'Forbidden: Admin access required.' }), {
+                    status: 403,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
             if (!apiKey || !apiSecret) {
                 return new Response(JSON.stringify({
                     status: false,
@@ -235,10 +251,17 @@ serve(async (req) => {
             const fundingNGN = fundingAmount * usdExchangeRate;
             const totalRequiredNGN = creationFeeNGN + fundingNGN;
 
-            if (currentBalance < totalRequiredNGN) {
+            // 🛡️ Atomic Balance Pre-Deduction (Zero Race Condition / Double Spend)
+            const { data: deductRes, error: deductErr } = await supabase.rpc('deduct_balance', {
+                user_id: user.id,
+                amount: totalRequiredNGN
+            });
+
+            if (deductErr || (deductRes && deductRes.success === false)) {
+                const errMsg = deductErr?.message || deductRes?.error || `Insufficient wallet balance. Required: ₦${Math.ceil(totalRequiredNGN).toLocaleString()}`;
                 return new Response(JSON.stringify({
                     status: false,
-                    error: `Insufficient wallet balance. Required: ₦${Math.ceil(totalRequiredNGN).toLocaleString()} (Creation Fee $${creationFeeUSD.toFixed(2)} + Pre-fund $${fundingAmount.toFixed(2)}). Current Balance: ₦${Math.floor(currentBalance).toLocaleString()}`
+                    error: errMsg
                 }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
@@ -353,16 +376,33 @@ serve(async (req) => {
                 Boolean(payvesselResult?.data?.card_id || payvesselResult?.data?.id);
 
             if (!isApiSuccess) {
+                // 🛡️ Fail-Safe Auto-Refund: PayVessel card creation failed, refund pre-deducted funds immediately
+                await supabase.rpc('credit_balance', {
+                    user_id: user.id,
+                    amount: totalRequiredNGN
+                });
+
+                await supabase.from('transactions').insert({
+                    user_id: user.id,
+                    title: `Virtual Card Refund`,
+                    description: `Auto-Refund: Card issuance failed at provider`,
+                    amount: totalRequiredNGN,
+                    status: 'completed',
+                    category: 'refund',
+                    reference: `REF_CARD_${Date.now()}`,
+                    created_at: new Date().toISOString()
+                });
+
                 let errMsg = payvesselResult?.message || payvesselResult?.error || '';
                 if (!errMsg && Array.isArray(payvesselResult?.details)) {
                     errMsg = payvesselResult.details.map((d: any) => d.detail || d.message).join(', ');
                 }
                 if (!errMsg) {
-                    errMsg = `Card issuance failed (HTTP ${pvStatus}). Please check PayVessel portal balance or KYC.`;
+                    errMsg = `Card issuance failed (HTTP ${pvStatus}). Your wallet has been refunded 100%.`;
                 }
 
                 if (errMsg.toLowerCase().includes('insufficient') && errMsg.toLowerCase().includes('wallet')) {
-                    errMsg = 'PayVessel Error: Insufficient USD balance in your PayVessel merchant wallet. Please fund your PayVessel USD wallet on the PayVessel portal to issue virtual cards.';
+                    errMsg = 'PayVessel Error: Insufficient USD balance in merchant wallet. Your wallet has been refunded 100%.';
                 }
 
                 return new Response(JSON.stringify({
@@ -407,9 +447,8 @@ serve(async (req) => {
             const expiryYear = String(cardData.expiry_year || cardData.expiry?.split('/')?.[1] || (new Date().getFullYear() + 3)).slice(-2);
             const cardStatus = (cardData.status || 'active').toLowerCase();
 
-            // 5. Deduct User Main Wallet Balance only upon 100% verified API success
-            const newWalletBalance = currentBalance - totalRequiredNGN;
-            await supabase.from('profiles').update({ balance: newWalletBalance }).eq('id', user.id);
+            // 5. User balance was already securely pre-deducted atomically
+            const newWalletBalance = Math.max(0, currentBalance - totalRequiredNGN);
 
             // 6. Record Wallet Audit Transaction
             await supabase.from('transactions').insert({
@@ -646,22 +685,38 @@ serve(async (req) => {
                 });
             }
 
-            const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-            const requiredNGN = fundUSD * usdExchangeRate;
-            if ((Number(profile?.balance) || 0) < requiredNGN) {
-                return new Response(JSON.stringify({
-                    status: false,
-                    error: `Insufficient wallet balance. Required: ₦${Math.ceil(requiredNGN).toLocaleString()} ($${fundUSD.toFixed(2)} USD). Current Balance: ₦${Math.floor(Number(profile?.balance) || 0).toLocaleString()}`
-                }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-            }
-
+            // 🛡️ Card Ownership Check: User can only fund their own card
             const { data: localCard } = await supabase
                 .from('user_virtual_cards')
                 .select('*')
                 .or(`id.eq.${card_id},card_id.eq.${card_id}`)
+                .eq('user_id', user.id)
                 .maybeSingle();
 
-            const remoteCardId = localCard?.card_id || card_id;
+            if (!localCard) {
+                return new Response(JSON.stringify({ status: false, error: 'Card not found or unauthorized.' }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const requiredNGN = fundUSD * usdExchangeRate;
+
+            // 🛡️ Atomic Balance Pre-Deduction (Prevents Double-Spending)
+            const { data: deductRes, error: deductErr } = await supabase.rpc('deduct_balance', {
+                user_id: user.id,
+                amount: requiredNGN
+            });
+
+            if (deductErr || (deductRes && deductRes.success === false)) {
+                const errMsg = deductErr?.message || deductRes?.error || `Insufficient wallet balance. Required: ₦${Math.ceil(requiredNGN).toLocaleString()}`;
+                return new Response(JSON.stringify({ status: false, error: errMsg }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const remoteCardId = localCard.card_id || card_id;
             let apiFundSuccess = false;
             let apiFundMsg = '';
 
@@ -692,25 +747,36 @@ serve(async (req) => {
                 }
             }
 
-            if (!apiFundSuccess && apiFundMsg) {
+            if (!apiFundSuccess) {
+                // 🛡️ Fail-Safe Auto-Refund: Provider failed, refund balance immediately
+                await supabase.rpc('credit_balance', {
+                    user_id: user.id,
+                    amount: requiredNGN
+                });
+
+                await supabase.from('transactions').insert({
+                    user_id: user.id,
+                    title: 'Card Top-up Refund',
+                    description: `Auto-Refund: Card funding failed at provider ($${fundUSD.toFixed(2)})`,
+                    amount: requiredNGN,
+                    status: 'completed',
+                    category: 'refund',
+                    reference: `REF_CFUND_${Date.now()}`
+                });
+
                 return new Response(JSON.stringify({
                     status: false,
-                    error: `Funding failed: ${apiFundMsg}`
+                    error: `Funding failed: ${apiFundMsg || 'Provider error'}. Your wallet has been refunded 100%.`
                 }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
-            const newCardBalance = (Number(localCard?.balance) || 0) + fundUSD;
-            const newWallet = Number(profile.balance) - requiredNGN;
-
-            await supabase.from('profiles').update({ balance: newWallet }).eq('id', user.id);
-            if (localCard) {
-                await supabase.from('user_virtual_cards').update({ balance: newCardBalance }).eq('id', localCard.id);
-            }
+            const newCardBalance = (Number(localCard.balance) || 0) + fundUSD;
+            await supabase.from('user_virtual_cards').update({ balance: newCardBalance }).eq('id', localCard.id);
 
             await supabase.from('transactions').insert({
                 user_id: user.id,
                 title: 'Virtual Card Top-up',
-                description: `Funded $${fundUSD.toFixed(2)} into ${localCard?.card_name || 'USD Virtual Card'}`,
+                description: `Funded $${fundUSD.toFixed(2)} into ${localCard.card_name || 'USD Virtual Card'}`,
                 amount: -requiredNGN,
                 status: 'completed',
                 category: 'card_funding',
@@ -720,8 +786,7 @@ serve(async (req) => {
             return new Response(JSON.stringify({
                 status: true,
                 message: `Successfully topped up $${fundUSD.toFixed(2)}!`,
-                new_card_balance: newCardBalance,
-                new_wallet_balance: newWallet
+                new_card_balance: newCardBalance
             }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 

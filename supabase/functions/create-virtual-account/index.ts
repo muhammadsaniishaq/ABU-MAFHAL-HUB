@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { createPayvesselDVA } from "../_shared/payvessel.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -38,9 +39,19 @@ Deno.serve(async (req) => {
         } = requestBody;
 
         // ----------------------------------------------------
-        // ACTION 1: LIST ALL VIRTUAL ACCOUNTS (ADMIN / REFRESH)
+        // ACTION 1: LIST ALL VIRTUAL ACCOUNTS (ADMIN ONLY)
         // ----------------------------------------------------
         if (action === 'list_all') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ 
+                    error: `Forbidden: Admin access required (${adminCheck.error})` 
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 403,
+                });
+            }
+
             const { data: allAccounts, error: vaErr } = await supabaseAdmin
                 .from('virtual_accounts')
                 .select('id, user_id, provider, bank_name, account_number, account_name, currency, created_at')
@@ -59,9 +70,19 @@ Deno.serve(async (req) => {
         }
 
         // ----------------------------------------------------
-        // ACTION 2: MANUAL ASSIGN / OVERRIDE BY ADMIN
+        // ACTION 2: MANUAL ASSIGN / OVERRIDE BY ADMIN ONLY
         // ----------------------------------------------------
         if (action === 'assign_manual') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ 
+                    error: `Forbidden: Admin access required (${adminCheck.error})` 
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 403,
+                });
+            }
+
             let targetUserId = reqUserId;
             if (!targetUserId && reqEmail) {
                 const { data: pByEmail } = await supabaseAdmin
@@ -153,6 +174,29 @@ Deno.serve(async (req) => {
         // ----------------------------------------------------
         // ACTION 3: STANDARD CREATE / REFRESH VIRTUAL ACCOUNT
         // ----------------------------------------------------
+        // 🛡️ Authenticate caller & verify user ownership
+        const authHeader = req.headers.get('Authorization') ?? '';
+        const token = authHeader.replace('Bearer ', '').trim();
+        const isInternalService = token === supabaseServiceRoleKey;
+        let callerUser: any = null;
+
+        if (!isInternalService) {
+            if (!token) {
+                return new Response(JSON.stringify({ error: "Unauthorized: Missing authentication token" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 401,
+                });
+            }
+            const { data: authData, error: authErr } = await supabaseAdmin.auth.getUser(token);
+            if (authErr || !authData?.user) {
+                return new Response(JSON.stringify({ error: "Unauthorized: Session invalid or expired" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 401,
+                });
+            }
+            callerUser = authData.user;
+        }
+
         let userId = reqUserId;
         if (!userId && reqEmail) {
             const { data: p } = await supabaseAdmin
@@ -164,7 +208,29 @@ Deno.serve(async (req) => {
         }
 
         if (!userId) {
+            userId = callerUser?.id;
+        }
+
+        if (!userId) {
             throw new Error("Missing User ID or Email");
+        }
+
+        // Enforce user ownership: Regular users cannot query or generate accounts for other users
+        if (callerUser && callerUser.id !== userId) {
+            const { data: callerProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('role')
+                .eq('id', callerUser.id)
+                .maybeSingle();
+
+            if (callerProfile?.role !== 'admin' && callerProfile?.role !== 'super_admin') {
+                return new Response(JSON.stringify({ 
+                    error: "Forbidden: You are not authorized to access or modify another user's accounts" 
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 403,
+                });
+            }
         }
 
         const safeBvn = bvn ? String(bvn).trim() : undefined;

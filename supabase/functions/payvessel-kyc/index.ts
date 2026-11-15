@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -149,9 +150,18 @@ Deno.serve(async (req: Request) => {
         const formattedDob = normalizeDob(dob);
 
         // ----------------------------------------------------
-        // ACTION: TEST CONNECTION / DIAGNOSTIC
+        // ACTION: TEST CONNECTION / DIAGNOSTIC (Admin Only)
         // ----------------------------------------------------
         if (action === 'test_connection') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return jsonResponse({
+                    success: false,
+                    configured: false,
+                    message: `Forbidden: Admin access required (${adminCheck.error})`
+                }, 403);
+            }
+
             if (!apiKey || !apiSecret) {
                 return jsonResponse({
                     success: false,
@@ -215,6 +225,31 @@ Deno.serve(async (req: Request) => {
                 providerCost: 70,
                 profitMargin: Math.max(0, kycFee - 70),
             });
+        }
+
+        // 🛡️ Authenticate caller & verify ownership for all KYC operations
+        const authHeader = req.headers.get('Authorization') ?? '';
+        const token = authHeader.replace('Bearer ', '').trim();
+        const isInternalService = token === supabaseServiceRoleKey;
+        let callerUser: any = null;
+
+        if (!isInternalService) {
+            if (!token) {
+                return jsonResponse({ success: false, verified: false, message: 'Authentication required. Please log in.' }, 401);
+            }
+            const { data: authData, error: authErr } = await supabaseAdmin.auth.getUser(token);
+            if (authErr || !authData?.user) {
+                return jsonResponse({ success: false, verified: false, message: 'Session expired or invalid. Please log in again.' }, 401);
+            }
+            callerUser = authData.user;
+        }
+
+        const targetUserId = userId || callerUser?.id;
+        if (callerUser && targetUserId && callerUser.id !== targetUserId) {
+            const { data: prof } = await supabaseAdmin.from('profiles').select('role').eq('id', callerUser.id).maybeSingle();
+            if (prof?.role !== 'admin' && prof?.role !== 'super_admin') {
+                return jsonResponse({ success: false, verified: false, message: 'Forbidden: You cannot perform KYC operations on another account.' }, 403);
+            }
         }
 
         // ----------------------------------------------------

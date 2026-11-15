@@ -84,15 +84,12 @@ export const payvesselCardService = {
             }
         } catch (_) {}
 
-        // Fallback to client-side database query
+        // Fallback to client-side public app_settings query
         try {
             const { data: keysData } = await supabase
                 .from('app_settings')
                 .select('key, value')
                 .in('key', [
-                    'payvessel_api_key', 'PAYVESSEL_API_KEY',
-                    'payvessel_secret_key', 'payvessel_api_secret', 'PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET_KEY',
-                    'payvessel_business_id', 'PAYVESSEL_BUSINESS_ID',
                     'virtual_card_profit_margin_usd', 'virtual_card_profit_margin_ngn',
                     'usd_exchange_rate'
                 ]);
@@ -110,9 +107,6 @@ export const payvesselCardService = {
                 map[row.key] = v;
             });
 
-            const apiKey = String(map['PAYVESSEL_API_KEY'] || map['payvessel_api_key'] || '').trim();
-            const secretKey = String(map['PAYVESSEL_API_SECRET'] || map['payvessel_secret_key'] || map['payvessel_api_secret'] || map['PAYVESSEL_SECRET_KEY'] || '').trim();
-            const businessId = String(map['PAYVESSEL_BUSINESS_ID'] || map['payvessel_business_id'] || '').trim();
             const liveUsdRate = Number(map['usd_exchange_rate']) || 1600;
 
             const wholesaleUsd = 1.50;
@@ -121,9 +115,9 @@ export const payvesselCardService = {
             const retailFeeNGN = retailFeeUSD * liveUsdRate;
 
             return {
-                apiKey,
-                secretKey,
-                businessId,
+                apiKey: '',
+                secretKey: '',
+                businessId: '',
                 wholesaleUsd,
                 wholesaleNgn: 500,
                 adminProfitUSD,

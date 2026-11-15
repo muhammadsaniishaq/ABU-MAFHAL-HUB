@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createPayvesselDVA } from "../_shared/payvessel.ts";
 import { sendEmail } from "../_shared/email.ts";
 import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 interface VirtualAccountData {
     user_id: string;
@@ -18,14 +19,28 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 Deno.serve(async (req) => {
-    // 1. Log Request for Debugging
-    console.log("Assign-DVA Invoked");
-    
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } });
     }
 
     try {
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+        // 🛡️ Webhook / Caller Authentication (Requires Service Role or Admin Caller)
+        const authHeader = req.headers.get('Authorization') ?? '';
+        const isInternalService = authHeader.includes(supabaseServiceRoleKey) || 
+                                  req.headers.get('x-internal-service') === supabaseServiceRoleKey;
+
+        if (!isInternalService) {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ error: "Forbidden: Internal service or Admin required" }), {
+                    headers: { "Content-Type": "application/json" },
+                    status: 403,
+                });
+            }
+        }
+
         const payload = await req.json();
         console.log("Payload:", JSON.stringify(payload));
         
@@ -48,9 +63,6 @@ Deno.serve(async (req) => {
 
         const userId = record.user_id;
         console.log(`Processing DVA for User ID: ${userId}`);
-
-        // Initialize Supabase Admin Client
-        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         // 2. Fetch User Profile
         const { data: profile, error: profileError } = await supabaseAdmin
