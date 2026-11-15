@@ -12,6 +12,7 @@ const SUPER_ADMIN_EMAILS = [
     'sale.abumafhal@gmail.com',
     'abumafhal@gmail.com',
     'admin@abumafhal.com',
+    'muhammadsaniisyaku3@gmail.com',
 ];
 
 export function isEmailAdmin(rawEmail: string): boolean {
@@ -76,7 +77,7 @@ export async function verifyAdminCaller(
         }
 
         const role = String(profile.role || '').toLowerCase();
-        const hasAdminRole = role === 'admin' || role === 'super_admin';
+        const hasAdminRole = role === 'admin' || role === 'super_admin' || role === 'owner';
         const hasAdminEmail = isEmailAdmin(userEmail) || isEmailAdmin(profile.email || '');
 
         if (hasAdminRole || hasAdminEmail) {
