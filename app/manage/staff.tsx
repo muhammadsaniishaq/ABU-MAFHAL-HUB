@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import { AdminPromotionService, AdminPromotionRequest } from '../../services/adminPromotion';
 
 const { width: W } = Dimensions.get('window');
 
@@ -138,14 +139,39 @@ export default function StaffManager() {
     const [activeCategory, setActiveCategory] = useState('All');
     const [individualHiddenModules, setIndividualHiddenModules] = useState<string[]>([]);
 
+    // 24-Hour Timelock Admin Promotion Requests State
+    const [pendingPromotions, setPendingPromotions] = useState<AdminPromotionRequest[]>([]);
+    const [loadingPromotions, setLoadingPromotions] = useState(false);
+    const [clockTick, setClockTick] = useState(Date.now());
+
     useEffect(() => {
         fetchStaff();
+        fetchPendingPromotions();
         checkCurrentRole();
+
+        // 1-Second Timer for Live Real-Time 24-Hour Countdown
+        const intervalId = setInterval(() => {
+            setClockTick(Date.now());
+        }, 1000);
+
+        return () => clearInterval(intervalId);
     }, []);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchStaff().finally(() => setRefreshing(false));
+        Promise.all([fetchStaff(), fetchPendingPromotions()]).finally(() => setRefreshing(false));
+    };
+
+    const fetchPendingPromotions = async () => {
+        try {
+            setLoadingPromotions(true);
+            const data = await AdminPromotionService.listPending();
+            setPendingPromotions(data.filter(p => p.status === 'pending'));
+        } catch (e: any) {
+            console.warn('[staff] Failed to fetch pending promotions:', e);
+        } finally {
+            setLoadingPromotions(false);
+        }
     };
 
     const checkCurrentRole = async () => {
@@ -209,24 +235,108 @@ export default function StaffManager() {
             return Alert.alert('Selection Required', 'Please select a user to promote to staff.');
         }
 
-        setPromoting(true);
-        try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ role: promoteRole, updated_at: new Date().toISOString() })
-                .eq('id', selectedUserToPromote.id);
+        const candidateName = selectedUserToPromote.full_name || selectedUserToPromote.email;
 
-            if (error) throw error;
+        Alert.alert(
+            '🔒 24-Hour Security Timelock',
+            `Domin tabbatar da tsaro da kariya, canza ${candidateName} zuwa ${promoteRole.toUpperCase()} yana bukatar kidayar lokaci na awanni 24 (24-Hour Countdown) kafin a iya amincewa (approve).\n\nKana son fara kidayar awanni 24 yanzu?`,
+            [
+                { text: 'A fasa (Cancel)', style: 'cancel' },
+                {
+                    text: 'Fara Kidayar 24h (Start Timelock)',
+                    onPress: async () => {
+                        setPromoting(true);
+                        try {
+                            const res = await AdminPromotionService.requestPromotion(
+                                selectedUserToPromote.id,
+                                promoteRole,
+                                `Initiated by super admin`
+                            );
 
-            Alert.alert('Promotion Success 🎉', `${selectedUserToPromote.full_name || selectedUserToPromote.email} is now an official ${promoteRole.toUpperCase().replace('_', ' ')}.`);
-            setShowAddStaffModal(false);
-            setSelectedUserToPromote(null);
-            fetchStaff();
-        } catch (e: any) {
-            Alert.alert('Promotion Failed', e.message || 'Could not update role.');
-        } finally {
-            setPromoting(false);
+                            Alert.alert(
+                                '⏳ Kidayar Awanni 24 Ta Fara!',
+                                res.message || `An fara kidayar awanni 24 (timelock countdown). Da zaran awanni 24 sun cika, maballin 'Approve Promotion' zai kunna a shafin nan.`
+                            );
+                            setShowAddStaffModal(false);
+                            setSelectedUserToPromote(null);
+                            fetchPendingPromotions();
+                            fetchStaff();
+                        } catch (e: any) {
+                            Alert.alert('Kuskure Wajen Fara Timelock', e.message || 'Could not initiate timelock.');
+                        } finally {
+                            setPromoting(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleApprovePromotion = async (item: AdminPromotionRequest) => {
+        const diff = Math.max(0, new Date(item.effective_after).getTime() - Date.now());
+        const candidateName = item.target?.full_name || item.target?.email || 'User';
+
+        if (diff > 0) {
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            return Alert.alert(
+                '⏳ Kidayar Lokaci Ba Ta Cika Ba Tukuna!',
+                `Tsarin tsaro na 24-Hour Timelock yana aiki. Ba za a iya amincewa ba har sai kidayar awanni 24 ta cika.\n\nRagowar lokaci: ${h}h ${m}m ${secs}s.`
+            );
         }
+
+        Alert.alert(
+            'Amincewa Da Matsayin Admin 👑',
+            `Awanni 24 sun cika! Kana so ka amince a maida ${candidateName} a matsayin ${item.target_role.toUpperCase()} a yanzu?`,
+            [
+                { text: "A'a (Cancel)", style: 'cancel' },
+                {
+                    text: 'Eh, Amince (Approve Now)',
+                    onPress: async () => {
+                        try {
+                            setActionLoading(true);
+                            const res = await AdminPromotionService.approvePromotion(item.id);
+                            Alert.alert('🎉 An Amince Da Nasara!', res.message || `${candidateName} yanzu ya zama ${item.target_role.toUpperCase()}`);
+                            fetchStaff();
+                            fetchPendingPromotions();
+                        } catch (e: any) {
+                            Alert.alert('Kuskure', e.message);
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleCancelPromotion = async (item: AdminPromotionRequest) => {
+        const candidateName = item.target?.full_name || item.target?.email || 'User';
+
+        Alert.alert(
+            'Soke Neman Admin 🚫',
+            `Kana da tabbacin kana son soke neman zama ${item.target_role.toUpperCase()} na ${candidateName}?`,
+            [
+                { text: 'A bar shi (Keep)', style: 'cancel' },
+                {
+                    text: 'Soke Neman (Cancel Request)',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setActionLoading(true);
+                            await AdminPromotionService.cancelPromotion(item.id, 'Cancelled by Admin');
+                            Alert.alert('Nasara', 'An soke neman zama admin din cikin nasara.');
+                            fetchPendingPromotions();
+                        } catch (e: any) {
+                            Alert.alert('Kuskure', e.message);
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleToggleAdminStatus = async (admin: any) => {
@@ -274,26 +384,52 @@ export default function StaffManager() {
             return Alert.alert('Access Denied 🔒', 'Only Super Admin can change admin roles.');
         }
 
+        const candidateName = admin.full_name || admin.email || 'this admin';
+
+        if (newRole === 'user') {
+            // Immediate demotion for security safety
+            Alert.alert(
+                'Sauke Daga Admin Zuwa User 🛡️',
+                `Kana son sauke ${candidateName} daga admin ya koma USER nan take?`,
+                [
+                    { text: 'A fasa (Cancel)', style: 'cancel' },
+                    {
+                        text: 'Sauke Shi (Revoke Privileges)',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                setActionLoading(true);
+                                await AdminPromotionService.demoteUser(admin.id, 'Demoted by Super Admin');
+                                setSelectedAdmin((prev: any) => prev ? { ...prev, role: 'user' } : null);
+                                fetchStaff();
+                                fetchPendingPromotions();
+                                Alert.alert('Nasara', 'An sauke matsayin admin din nan take.');
+                            } catch (e: any) {
+                                Alert.alert('Error', e.message);
+                            } finally {
+                                setActionLoading(false);
+                            }
+                        }
+                    }
+                ]
+            );
+            return;
+        }
+
+        // Escalation to super_admin or admin requires 24h timelock
         Alert.alert(
-            'Change Role',
-            `Change ${admin.full_name || 'this admin'}'s role to ${newRole.toUpperCase()}?`,
+            '🔒 24-Hour Security Timelock',
+            `Sauya ${candidateName} zuwa ${newRole.toUpperCase()} yana bukatar kidayar lokaci na awanni 24 (24-Hour Countdown) kafin a iya amincewa.\n\nKana son fara kidayar awanni 24 yanzu?`,
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: 'A fasa (Cancel)', style: 'cancel' },
                 {
-                    text: 'Confirm Change',
+                    text: 'Fara Kidayar 24h (Start Timelock)',
                     onPress: async () => {
                         try {
                             setActionLoading(true);
-                            const { error } = await supabase
-                                .from('profiles')
-                                .update({ role: newRole })
-                                .eq('id', admin.id);
-
-                            if (error) throw error;
-
-                            setSelectedAdmin((prev: any) => prev ? { ...prev, role: newRole } : null);
-                            fetchStaff();
-                            Alert.alert('Success 🎉', `Role updated to ${newRole.toUpperCase()}`);
+                            const res = await AdminPromotionService.requestPromotion(admin.id, newRole as 'admin' | 'super_admin');
+                            fetchPendingPromotions();
+                            Alert.alert('⏳ Kidayar 24h Ta Fara', res.message || 'Kidayar awanni 24 ta fara. Da zaran ta cika, zaka iya danna Approve.');
                         } catch (e: any) {
                             Alert.alert('Error', e.message);
                         } finally {
@@ -509,6 +645,101 @@ export default function StaffManager() {
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* 2b. 24-HOUR TIMELOCK PROMOTION COUNTDOWN SECTION */}
+                {pendingPromotions.length > 0 && (
+                    <View style={s.timelockSection}>
+                        <View style={s.timelockHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={s.timelockIconCircle}>
+                                    <Ionicons name="hourglass" size={16} color={C.gold} />
+                                </View>
+                                <View>
+                                    <Text style={s.timelockTitle}>Pending Admin Promotions (24h Timelock)</Text>
+                                    <Text style={s.timelockSub}>Awanni 24 na kidayar lokaci kafin amincewa da matsayin Admin</Text>
+                                </View>
+                            </View>
+                            <View style={s.timelockCountBadge}>
+                                <Text style={s.timelockCountText}>{pendingPromotions.length}</Text>
+                            </View>
+                        </View>
+
+                        {pendingPromotions.map((p) => {
+                            const diff = Math.max(0, new Date(p.effective_after).getTime() - clockTick);
+                            const isReady = diff === 0;
+                            const h = Math.floor(diff / 3600000);
+                            const m = Math.floor((diff % 3600000) / 60000);
+                            const secs = Math.floor((diff % 60000) / 1000);
+                            const countdownStr = `${h.toString().padStart(2, '0')}h : ${m.toString().padStart(2, '0')}m : ${secs.toString().padStart(2, '0')}s`;
+
+                            const candidate: any = p.target || {};
+                            const candidateName = candidate.full_name || candidate.email || 'User';
+
+                            return (
+                                <View key={p.id} style={s.timelockCard}>
+                                    <View style={s.timelockCardTop}>
+                                        <View style={s.timelockAvatar}>
+                                            <Text style={s.timelockAvatarText}>{candidateName[0]?.toUpperCase() || 'U'}</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <Text style={s.timelockCandidateName} numberOfLines={1}>{candidateName}</Text>
+                                                <View style={[s.timelockRoleBadge, { backgroundColor: p.target_role === 'super_admin' ? C.goldLight : C.blueLight }]}>
+                                                    <Text style={[s.timelockRoleText, { color: p.target_role === 'super_admin' ? C.gold : C.blue }]}>
+                                                        {p.target_role === 'super_admin' ? 'SUPER ADMIN' : 'STAFF ADMIN'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={s.timelockCandidateEmail}>{candidate.email}</Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Real-time Countdown Clock Banner */}
+                                    <View style={[s.countdownBanner, isReady ? s.countdownBannerReady : s.countdownBannerLocked]}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name={isReady ? "checkmark-circle" : "time"} size={16} color={isReady ? C.green : C.gold} />
+                                            <Text style={[s.countdownStatusText, { color: isReady ? C.green : C.gold }]}>
+                                                {isReady ? "COOLDOWN FINISHED - READY FOR APPROVAL" : "TIMELOCK COUNTDOWN ACTIVE"}
+                                            </Text>
+                                        </View>
+                                        <Text style={[s.countdownTimerText, { color: isReady ? C.green : C.gold }]}>
+                                            {isReady ? "00h : 00m : 00s" : countdownStr}
+                                        </Text>
+                                    </View>
+
+                                    <View style={s.timelockMetaRow}>
+                                        <Text style={s.timelockMetaText}>Requested: {new Date(p.requested_at).toLocaleDateString()} by {p.requested_by_email || 'Admin'}</Text>
+                                    </View>
+
+                                    {/* Action Buttons */}
+                                    <View style={s.timelockActionRow}>
+                                        <TouchableOpacity
+                                            onPress={() => handleCancelPromotion(p)}
+                                            style={s.timelockCancelBtn}
+                                            disabled={actionLoading}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Ionicons name="close-circle-outline" size={14} color={C.red} />
+                                            <Text style={s.timelockCancelBtnText}>Soke Neman (Cancel)</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            onPress={() => handleApprovePromotion(p)}
+                                            style={[s.timelockApproveBtn, isReady ? s.timelockApproveBtnActive : s.timelockApproveBtnLocked]}
+                                            disabled={actionLoading}
+                                            activeOpacity={isReady ? 0.85 : 1}
+                                        >
+                                            <Ionicons name={isReady ? "shield-checkmark" : "lock-closed"} size={14} color={isReady ? "#FFFFFF" : "#94A3B8"} />
+                                            <Text style={[s.timelockApproveBtnText, { color: isReady ? "#FFFFFF" : "#94A3B8" }]}>
+                                                {isReady ? "Amince (Approve Promotion 👑)" : `Kulle 🔒 (${h}h ${m}m)`}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
 
                 {/* 3. Staff Roster List */}
                 <View style={s.rosterCard}>
@@ -1559,5 +1790,184 @@ const s = StyleSheet.create({
         fontSize: 13,
         fontWeight: '800',
         color: '#FFFFFF',
+    },
+    // 24-Hour Timelock Styles
+    timelockSection: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    timelockHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#FEF3C7',
+    },
+    timelockIconCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FFFBEB',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    timelockTitle: {
+        fontSize: 13.5,
+        fontWeight: '900',
+        color: '#0F172A',
+    },
+    timelockSub: {
+        fontSize: 10.5,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    timelockCountBadge: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    timelockCountText: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: '#D97706',
+    },
+    timelockCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    timelockCardTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 10,
+    },
+    timelockAvatar: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#FEF3C7',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    timelockAvatarText: {
+        fontSize: 15,
+        fontWeight: '900',
+        color: '#D97706',
+    },
+    timelockCandidateName: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#0F172A',
+        maxWidth: W * 0.45,
+    },
+    timelockCandidateEmail: {
+        fontSize: 11,
+        color: '#64748B',
+    },
+    timelockRoleBadge: {
+        paddingHorizontal: 7,
+        paddingVertical: 2.5,
+        borderRadius: 6,
+    },
+    timelockRoleText: {
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+    countdownBanner: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        marginBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+    },
+    countdownBannerLocked: {
+        backgroundColor: '#FFFBEB',
+        borderColor: '#FDE68A',
+    },
+    countdownBannerReady: {
+        backgroundColor: '#ECFDF5',
+        borderColor: '#A7F3D0',
+    },
+    countdownStatusText: {
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.3,
+    },
+    countdownTimerText: {
+        fontSize: 12.5,
+        fontWeight: '900',
+        fontVariant: ['tabular-nums'],
+    },
+    timelockMetaRow: {
+        marginBottom: 10,
+    },
+    timelockMetaText: {
+        fontSize: 10,
+        color: '#94A3B8',
+    },
+    timelockActionRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    timelockCancelBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: 9,
+        borderRadius: 8,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    timelockCancelBtnText: {
+        fontSize: 11.5,
+        fontWeight: '700',
+        color: '#EF4444',
+    },
+    timelockApproveBtn: {
+        flex: 1.4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        paddingVertical: 9,
+        borderRadius: 8,
+    },
+    timelockApproveBtnActive: {
+        backgroundColor: '#059669',
+    },
+    timelockApproveBtnLocked: {
+        backgroundColor: '#E2E8F0',
+    },
+    timelockApproveBtnText: {
+        fontSize: 11.5,
+        fontWeight: '800',
     },
 });

@@ -4,6 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Stack, useRouter } from 'expo-router';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
+import { AdminPromotionService } from '../../services/adminPromotion';
 import SecurityModal from '../../components/SecurityModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -1599,11 +1600,23 @@ export default function UserManagement() {
             }
             else if (pendingAction.type === 'promote') {
                 const targetRole = pendingAction.role || (selectedUser.role === 'super_admin' ? 'admin' : selectedUser.role === 'admin' ? 'user' : 'admin');
-                const { error } = await supabase.from('profiles').update({ role: targetRole }).eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("Role Changed 👑", `User role is now ${targetRole.toUpperCase()}`);
-                setSelectedUser({ ...selectedUser, role: targetRole });
-                fetchUsers();
+                if (targetRole === 'user') {
+                    await AdminPromotionService.demoteUser(selectedUser.id, 'Demoted via User Management');
+                    Alert.alert("Privileges Revoked 🛡️", "User has been reverted to regular USER role.");
+                    setSelectedUser({ ...selectedUser, role: 'user' });
+                    fetchUsers();
+                } else {
+                    const res = await AdminPromotionService.requestPromotion(
+                        selectedUser.id,
+                        targetRole as 'admin' | 'super_admin',
+                        `Initiated via User Management`
+                    );
+                    Alert.alert(
+                        "⏳ 24-Hour Timelock Started",
+                        res.message || `An fara kidayar awanni 24. Da zaran kidayar ta cika, za a iya amincewa (approve) a sashen Staff & Roles.`
+                    );
+                    fetchUsers();
+                }
             }
             else if (pendingAction.type === 'toggle_crypto') {
                 const newStatus = !(selectedUser.crypto_enabled ?? true);

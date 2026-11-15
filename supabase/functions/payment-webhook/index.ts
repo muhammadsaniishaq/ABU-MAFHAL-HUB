@@ -338,6 +338,31 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 0d. 24-HOUR TIMELOCK ADMIN PROMOTION REQUESTS TABLE
+CREATE TABLE IF NOT EXISTS public.admin_promotion_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    target_user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    target_role TEXT NOT NULL CHECK (target_role IN ('admin', 'super_admin')),
+    requested_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    requested_by_email TEXT,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    effective_after TIMESTAMPTZ NOT NULL DEFAULT (timezone('utc'::text, now()) + interval '24 hours'),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+    approved_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    approved_by_email TEXT,
+    approved_at TIMESTAMPTZ,
+    cancelled_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    cancelled_by_email TEXT,
+    cancelled_at TIMESTAMPTZ,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_promotion_target ON public.admin_promotion_requests(target_user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_promotion_status ON public.admin_promotion_requests(status);
+CREATE INDEX IF NOT EXISTS idx_admin_promotion_effective_after ON public.admin_promotion_requests(effective_after);
+
 ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS body text;
 ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS message text;
 ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS massage text;
@@ -366,15 +391,23 @@ BEFORE INSERT OR UPDATE ON public.notifications
 FOR EACH ROW
 EXECUTE FUNCTION public.sync_notifications_content();
 
--- 1. UPDATE TRIGGER FUNCTION (With robust service_role and bypass detection)
+-- 1. UPDATE TRIGGER FUNCTION (With robust service_role and 24h Timelock Protection)
 CREATE OR REPLACE FUNCTION public.prevent_unauthorized_profile_updates()
 RETURNS TRIGGER AS $$
 BEGIN
     IF current_setting('app.bypass_profile_lock', true) = 'true'
        OR coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb->>'role', '') = 'service_role'
        OR coalesce(auth.role(), '') = 'service_role'
-       OR current_user in ('service_role', 'postgres')
-       OR public.is_admin() THEN
+       OR current_user in ('service_role', 'postgres') THEN
+        RETURN NEW;
+    END IF;
+
+    -- Admins can update profile fields, BUT direct promotion to admin/super_admin
+    -- must go through the 24-hour timelock approval system (service_role)
+    IF public.is_admin() THEN
+        IF NEW.role IS DISTINCT FROM OLD.role AND NEW.role IN ('admin', 'super_admin') THEN
+            NEW.role := OLD.role;
+        END IF;
         RETURN NEW;
     END IF;
 
