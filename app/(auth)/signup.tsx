@@ -755,6 +755,20 @@ export default function SignupScreen() {
                     await AsyncStorage.setItem('pending_referral_code', referralCode.trim());
                 }
 
+                // Dispatch OTP via reliable multi-channel engine (Zoho / Resend)
+                try {
+                    supabase.functions.invoke('send-otp', {
+                        body: {
+                            action: 'send',
+                            identifier: cleanEmailLower,
+                            channel: 'email',
+                            purpose: 'signup',
+                            userId: data.user.id,
+                            name: cleanFullName
+                        }
+                    }).catch(err => console.log('send-otp signup notice:', err));
+                } catch (_) {}
+
                 // 4. Show success & Navigate to OTP Screen
                 setShowSuccessModal(true);
                 setTimeout(() => {

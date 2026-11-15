@@ -376,7 +376,7 @@ export default function RootLayout() {
         if (!authChecked) return;
 
         const currentScreen = segments[segments.length - 1] || 'index';
-        const authScreens = ['login', 'signup', 'pin', 'pin-setup', 'otp', 'reset-password'];
+        const authScreens = ['login', 'signup', 'pin', 'pin-setup', 'otp', 'reset-password', 'complete-profile'];
         const isAuthGroup = segments.includes('(auth)') || authScreens.includes(currentScreen);
         const isManagementGroup = segments.includes('manage') || segments[0] === 'manage' || segments[0] === '(manage)';
         const publicScreens = ['index', 'onboarding', 'privacy', 'terms', 'signup', 'login'];
@@ -389,7 +389,29 @@ export default function RootLayout() {
                 const userId = session.user.id;
                 const storedUnlocked = await AsyncStorage.getItem('app_unlocked');
                 const unlocked = Platform.OS === 'web' ? 'true' : storedUnlocked;
-                
+
+                // 1. Fetch user profile to verify required contact info (Phone & WhatsApp) and PIN
+                let profileData: any = null;
+                try {
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('phone, whatsapp_number, transaction_pin')
+                        .eq('id', userId)
+                        .maybeSingle();
+                    profileData = data;
+                } catch (e) {}
+
+                // 2. Mandatory Gate: Missing Phone or WhatsApp -> Must Complete Profile first
+                const hasPhone = profileData?.phone && profileData.phone.trim().length >= 10;
+                const hasWhatsapp = profileData?.whatsapp_number && profileData.whatsapp_number.trim().length >= 10;
+                if (!hasPhone || !hasWhatsapp) {
+                    if (currentScreen !== 'complete-profile' && currentScreen !== 'otp' && currentScreen !== 'login') {
+                        router.replace('/(auth)/complete-profile' as any);
+                    }
+                    return;
+                }
+
+                // 3. User has contact info, now check 4-digit Transaction PIN
                 let localPin: string | null = null;
                 if (Platform.OS === 'web') {
                     if (typeof window !== 'undefined' && window.sessionStorage) {
@@ -402,46 +424,35 @@ export default function RootLayout() {
                     localPin = await SecureStore.getItemAsync(`user_transaction_pin_${userId}`) || await SecureStore.getItemAsync('user_transaction_pin');
                 }
 
-                // 1. User has NO PIN configured -> Must complete PIN Setup
-                if (!localPin) {
-                    (async () => {
-                        try {
-                            const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', userId).maybeSingle();
-                            if (data?.transaction_pin) {
-                                const validPin = String(data.transaction_pin);
-                                if (Platform.OS === 'web') {
-                                    if (typeof window !== 'undefined') {
-                                        if (window.sessionStorage) window.sessionStorage.setItem(`user_transaction_pin_${userId}`, validPin);
-                                        try {
-                                            window.localStorage.removeItem(`user_transaction_pin_${userId}`);
-                                            window.localStorage.removeItem('user_transaction_pin');
-                                        } catch {}
-                                    }
-                                } else {
-                                    await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
-                                }
-                                if (unlocked !== 'true') router.replace('/(auth)/pin' as any);
-                                else router.replace('/dashboard' as any);
-                            } else {
-                                if (currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
-                                    router.replace('/(auth)/pin-setup' as any);
-                                }
-                            }
-                        } catch (err) {}
-                    })();
+                if (!localPin && profileData?.transaction_pin) {
+                    localPin = String(profileData.transaction_pin);
+                    if (Platform.OS === 'web') {
+                        if (typeof window !== 'undefined' && window.sessionStorage) {
+                            window.sessionStorage.setItem(`user_transaction_pin_${userId}`, localPin);
+                        }
+                    } else {
+                        await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, localPin);
+                    }
+                }
+
+                // 4. Missing PIN -> Must complete PIN Setup
+                if (!localPin && !profileData?.transaction_pin) {
+                    if (currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'complete-profile') {
+                        router.replace('/(auth)/pin-setup' as any);
+                    }
                     return;
                 }
 
-                // 2. User has PIN, but app is LOCKED -> Prompt PIN unlock
+                // 5. User has PIN, but app is LOCKED -> Prompt PIN unlock
                 if (unlocked !== 'true') {
-                    if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'login') {
+                    if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'complete-profile' && currentScreen !== 'login') {
                         router.replace('/(auth)/pin' as any);
                     }
                     return;
                 }
 
-                // 3. User HAS PIN and app IS UNLOCKED -> Route to Dashboard
-                if (isAuthGroup && !['otp', 'pin-setup', 'pin'].includes(currentScreen)) {
+                // 6. User HAS PIN and app IS UNLOCKED -> Route to Dashboard
+                if (isAuthGroup && !['otp', 'pin-setup', 'pin', 'complete-profile'].includes(currentScreen)) {
                     router.replace('/dashboard' as any);
                 } else if (isManagementGroup && !isAdmin) {
                     router.replace('/dashboard' as any);

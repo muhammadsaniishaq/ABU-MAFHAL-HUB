@@ -5,9 +5,11 @@ export default function AuthLayout() {
         <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="signup" options={{ headerShown: false }} />
+            <Stack.Screen name="complete-profile" options={{ headerShown: false }} />
             <Stack.Screen name="otp" options={{ headerShown: false }} />
             <Stack.Screen name="pin-setup" options={{ headerShown: false }} />
             <Stack.Screen name="pin" options={{ headerShown: false }} />
+            <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         </Stack>
     );
 }

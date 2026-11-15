@@ -27,6 +27,7 @@ export default function OTP() {
     const { settings } = useAppSettings();
     const params = useLocalSearchParams<{
         email?: string;
+        phone?: string;
         mode?: string;
         type?: string;
         factorId?: string;
@@ -120,13 +121,28 @@ export default function OTP() {
             const isSignup = params.mode === 'signup' || params.type === 'signup' || params.source === 'registration' || params.source === 'login_unconfirmed';
 
             if (isSignup) {
-                // Official Supabase signup verification code resend (Single official email)
-                const { error: resendErr } = await supabase.auth.resend({
-                    type: 'signup',
-                    email: cleanEmailLower,
-                });
-                if (resendErr) {
+                // 1. Supabase native resend
+                try {
+                    await supabase.auth.resend({
+                        type: 'signup',
+                        email: cleanEmailLower,
+                    });
+                } catch (resendErr) {
                     console.log('Supabase signup resend note:', resendErr);
+                }
+
+                // 2. Multi-channel send-otp edge function dispatch via Zoho SMTP / Resend
+                try {
+                    await supabase.functions.invoke('send-otp', {
+                        body: {
+                            action: 'send',
+                            identifier: cleanEmailLower,
+                            channel: 'email',
+                            purpose: 'signup',
+                        }
+                    });
+                } catch (edgeOtpErr) {
+                    console.log('send-otp edge dispatch note:', edgeOtpErr);
                 }
             } else {
                 // Password reset or recovery
@@ -197,6 +213,50 @@ export default function OTP() {
             else Alert.alert('Code Sent ✉️', successNotice);
         } catch (error: any) {
             Alert.alert('Resend Failed', error.message || 'Could not send verification code email.');
+        } finally {
+            setResending(false);
+        }
+    };
+
+    const handleSendWhatsappOtp = async () => {
+        let phoneToUse = params.phone || params.tempPhone;
+        if (!phoneToUse) {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user?.id) {
+                    const { data: prof } = await supabase.from('profiles').select('phone, whatsapp_number').eq('id', user.id).maybeSingle();
+                    phoneToUse = prof?.whatsapp_number || prof?.phone;
+                }
+            } catch (_) {}
+        }
+
+        if (!phoneToUse) {
+            Alert.alert('Phone Number Not Found', 'Could not locate your phone number. Please check your email for the code or sign up again.');
+            return;
+        }
+
+        setResending(true);
+        try {
+            const isSignup = params.mode === 'signup' || params.type === 'signup' || params.source === 'registration' || params.source === 'login_unconfirmed';
+            const { data, error } = await supabase.functions.invoke('send-otp', {
+                body: {
+                    action: 'send',
+                    identifier: phoneToUse,
+                    channel: 'whatsapp',
+                    purpose: isSignup ? 'signup' : 'recovery',
+                }
+            });
+
+            if (error || data?.success === false) {
+                throw new Error(data?.message || 'Failed to dispatch WhatsApp OTP.');
+            }
+
+            setCounter(60);
+            const msg = `Your 6-digit verification code has been sent directly to your WhatsApp on ${phoneToUse}!`;
+            if (Platform.OS === 'web') alert(msg);
+            else Alert.alert('WhatsApp Code Sent 🟢', msg);
+        } catch (e: any) {
+            Alert.alert('Notice', e.message || 'Unable to deliver WhatsApp code at this time.');
         } finally {
             setResending(false);
         }
@@ -366,8 +426,42 @@ export default function OTP() {
                 }
             }
 
+            // Check multi-channel send-otp edge function (Email & WhatsApp)
             if (!isCodeValid && !nativeVerifySuccess) {
-                throw new Error('Invalid or expired 6-digit code. Please check your email and try again.');
+                try {
+                    const { data: edgeVerifyData } = await supabase.functions.invoke('send-otp', {
+                        body: {
+                            action: 'verify',
+                            identifier: normalizedEmail,
+                            code: inputCode,
+                            purpose: isResetPassword ? 'recovery' : 'signup',
+                        }
+                    });
+                    if (edgeVerifyData?.success) {
+                        isCodeValid = true;
+                    }
+                } catch (_) {}
+
+                const fallbackPhone = params.phone || params.tempPhone;
+                if (!isCodeValid && fallbackPhone) {
+                    try {
+                        const { data: phoneVerifyData } = await supabase.functions.invoke('send-otp', {
+                            body: {
+                                action: 'verify',
+                                identifier: fallbackPhone,
+                                code: inputCode,
+                                purpose: isResetPassword ? 'recovery' : 'signup',
+                            }
+                        });
+                        if (phoneVerifyData?.success) {
+                            isCodeValid = true;
+                        }
+                    } catch (_) {}
+                }
+            }
+
+            if (!isCodeValid && !nativeVerifySuccess) {
+                throw new Error('Invalid or expired 6-digit code. Please check your email or WhatsApp and try again.');
             }
 
             // Mark email as verified locally
@@ -713,27 +807,41 @@ export default function OTP() {
                         ) : (
                             <View style={s.resendContainer}>
                                 <Text style={s.resendLabel}>Didn't receive the email?</Text>
-                                <TouchableOpacity
-                                    disabled={counter > 0 || resending}
-                                    onPress={handleResend}
-                                    style={s.resendBtn}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text
-                                        style={[
-                                            s.resendBtnText,
-                                            counter > 0 ? s.resendBtnDisabled : s.resendBtnActive,
-                                        ]}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                                    <TouchableOpacity
+                                        disabled={counter > 0 || resending}
+                                        onPress={handleResend}
+                                        style={s.resendBtn}
+                                        activeOpacity={0.7}
                                     >
-                                        Resend Code
-                                    </Text>
-                                    {counter > 0 && (
-                                        <View style={s.counterBadge}>
-                                            <Text style={s.counterText}>{counter}s</Text>
-                                        </View>
-                                    )}
-                                    {resending && <ActivityIndicator size="small" color="#D97706" style={{ marginLeft: 6 }} />}
-                                </TouchableOpacity>
+                                        <Text
+                                            style={[
+                                                s.resendBtnText,
+                                                counter > 0 ? s.resendBtnDisabled : s.resendBtnActive,
+                                            ]}
+                                        >
+                                            Resend Email
+                                        </Text>
+                                        {counter > 0 && (
+                                            <View style={s.counterBadge}>
+                                                <Text style={s.counterText}>{counter}s</Text>
+                                            </View>
+                                        )}
+                                        {resending && <ActivityIndicator size="small" color="#D97706" style={{ marginLeft: 6 }} />}
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        disabled={counter > 0 || resending}
+                                        onPress={handleSendWhatsappOtp}
+                                        style={s.whatsappResendBtn}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="logo-whatsapp" size={14} color={counter > 0 ? "#94A3B8" : "#25D366"} style={{ marginRight: 4 }} />
+                                        <Text style={[s.whatsappResendText, counter > 0 && { color: '#94A3B8' }]}>
+                                            WhatsApp OTP
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         )}
                     </View>
@@ -1082,6 +1190,21 @@ const s = StyleSheet.create({
         color: '#D97706',
         fontSize: 10,
         fontWeight: '900',
+    },
+    whatsappResendBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    whatsappResendText: {
+        fontSize: 11.5,
+        fontWeight: '700',
+        color: '#059669',
     },
 });
 
