@@ -291,14 +291,41 @@ serve(async (req) => {
 
             const matchedOtp = activeOtps[0];
 
-            // Anti-Brute Force Protection: Constant-Time verification check
+            // 🛡️ Anti-Brute Force Protection: 5 Attempts Max Limit
             const isMatch = matchedOtp.code.trim() === cleanCode;
 
             if (!isMatch) {
-                // If wrong, check if older than max attempts
+                const attempts = (Number(matchedOtp.attempts) || 0) + 1;
+                if (attempts >= 5) {
+                    // Burn the OTP to neutralize brute-force guessing
+                    await supabaseAdmin
+                        .from('user_otps')
+                        .update({ 
+                            attempts: attempts,
+                            expires_at: new Date(0).toISOString() // Expire immediately
+                        })
+                        .eq('id', matchedOtp.id);
+
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        message: 'Too many incorrect attempts. This verification code has been invalidated for security. Please request a new code.' 
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        status: 400
+                    });
+                }
+
+                // Increment failed attempt counter
+                try {
+                    await supabaseAdmin
+                        .from('user_otps')
+                        .update({ attempts: attempts })
+                        .eq('id', matchedOtp.id);
+                } catch (_) {}
+
                 return new Response(JSON.stringify({ 
                     success: false, 
-                    message: 'Invalid verification code. Please check the 6-digit code and try again.' 
+                    message: `Invalid verification code. (Attempt ${attempts} of 5). Please check and try again.` 
                 }), {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                     status: 400

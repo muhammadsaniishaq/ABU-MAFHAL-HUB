@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_CLUBKONNECT_USER_ID, DEFAULT_CLUBKONNECT_API_KEY as _CLUBKONNECT_API_KEY } from "../_shared/clubkonnect.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 interface ClubKonnectPlan {
     PRODUCT?: ClubKonnectPlan | ClubKonnectPlan[];
@@ -72,6 +73,17 @@ Deno.serve(async (req) => {
 
     try {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+        // 🛡️ Admin Verification: Only authorized administrators can trigger catalog synchronization
+        const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+        if (!adminCheck.isAdmin) {
+            return new Response(JSON.stringify({ 
+                error: `Forbidden: Admin access required (${adminCheck.error})` 
+            }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
         // Ensure api_vendor column exists in data_plans table
         try {

@@ -24,6 +24,55 @@ serve(async (req: Request) => {
     }
 
     try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+        // 🛡️ Webhook Authentication & Signature Verification
+        const reqSignature = req.headers.get('x-bigisub-signature') || req.headers.get('x-signature') || '';
+        const authHeader = req.headers.get('Authorization') || '';
+        const urlSecret = new URL(req.url).searchParams.get('secret') || '';
+
+        const { data: secrets } = await supabase
+            .from('system_secrets')
+            .select('key, value')
+            .in('key', ['BIGI_API_TOKEN', 'BIGISUB_WEBHOOK_SECRET', 'BIGI_API_PIN']);
+
+        const secretMap = new Map(secrets?.map((s: any) => [s.key, s.value]) || []);
+        const expectedToken = secretMap.get('BIGISUB_WEBHOOK_SECRET') || secretMap.get('BIGI_API_TOKEN') || Deno.env.get('BIGI_API_TOKEN') || '';
+
+        // If secret is configured in system_secrets or environment, strictly verify caller
+        if (expectedToken) {
+            const isTokenMatch = authHeader.includes(expectedToken) || 
+                                reqSignature === expectedToken || 
+                                urlSecret === expectedToken ||
+                                authHeader.replace('Token ', '').replace('Bearer ', '').trim() === expectedToken;
+
+            if (!isTokenMatch && reqSignature) {
+                // Check HMAC if sent as signature
+                try {
+                    const key = await crypto.subtle.importKey(
+                        "raw",
+                        new TextEncoder().encode(expectedToken),
+                        { name: "HMAC", hash: "SHA-256" },
+                        false,
+                        ["verify"]
+                    );
+                    const bodyBytes = new TextEncoder().encode(await req.clone().text());
+                    const sigBytes = new Uint8Array(reqSignature.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
+                    const isValidHmac = await crypto.subtle.verify("HMAC", key, sigBytes, bodyBytes);
+                    if (!isValidHmac) {
+                        console.error('[BigiSub Webhook] HMAC Signature Verification Failed!');
+                        return new Response(JSON.stringify({ error: "Unauthorized signature" }), { status: 401, headers: corsHeaders });
+                    }
+                } catch (_) {
+                    console.error('[BigiSub Webhook] Authentication token mismatch!');
+                    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+                }
+            } else if (!isTokenMatch && !authHeader.includes(supabaseServiceKey)) {
+                console.warn('[BigiSub Webhook] Unauthorized request without matching token or signature!');
+                return new Response(JSON.stringify({ error: "Unauthorized request" }), { status: 401, headers: corsHeaders });
+            }
+        }
+
         const bodyText = await req.text();
         let payload: any = {};
         try {
@@ -33,8 +82,6 @@ serve(async (req: Request) => {
         }
 
         console.log('[BigiSub Webhook] Received Event:', JSON.stringify(payload));
-
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
         const event = payload?.event || payload?.type || 'unknown';
         const data = payload?.data || payload;
@@ -80,29 +127,32 @@ serve(async (req: Request) => {
                             .eq('id', tx.id);
                         console.log(`[BigiSub Webhook] Transaction ${tx.id} marked as completed.`);
                     } else if (isFailed && tx.status !== 'failed' && tx.status !== 'reversed') {
-                        // If transaction failed at BigiSub and user balance was charged, refund them safely
-                        await supabase
+                        // 🛡️ Atomic Auto-Refund: Prevent duplicate replay refunds
+                        const { data: existingRefund } = await supabase
                             .from('transactions')
-                            .update({
-                                status: 'failed',
-                                updated_at: new Date().toISOString(),
-                                metadata: { ...(tx.metadata || {}), bigisub_settled: payload, failure_reason: rawStatus }
-                            })
-                            .eq('id', tx.id);
+                            .select('id')
+                            .eq('user_id', tx.user_id)
+                            .eq('type', 'refund')
+                            .ilike('reference', `%${ref}%`)
+                            .maybeSingle();
 
-                        if (tx.user_id && tx.amount && Number(tx.amount) > 0 && tx.type === 'payment') {
-                            const { data: prof } = await supabase
-                                .from('profiles')
-                                .select('balance')
-                                .eq('id', tx.user_id)
-                                .maybeSingle();
+                        if (existingRefund) {
+                            console.log(`[BigiSub Webhook] Refund already processed for ref ${ref}. Skipping.`);
+                        } else {
+                            await supabase
+                                .from('transactions')
+                                .update({
+                                    status: 'reversed',
+                                    updated_at: new Date().toISOString(),
+                                    metadata: { ...(tx.metadata || {}), bigisub_settled: payload, failure_reason: rawStatus }
+                                })
+                                .eq('id', tx.id);
 
-                            if (prof) {
-                                const newBal = Number(prof.balance || 0) + Number(tx.amount);
-                                await supabase
-                                    .from('profiles')
-                                    .update({ balance: newBal })
-                                    .eq('id', tx.user_id);
+                            if (tx.user_id && tx.amount && Number(tx.amount) > 0) {
+                                await supabase.rpc('credit_balance', {
+                                    user_id: tx.user_id,
+                                    amount: Number(tx.amount)
+                                });
 
                                 // Insert refund transaction record
                                 await supabase
@@ -115,7 +165,7 @@ serve(async (req: Request) => {
                                         reference: `REF_${ref}_${Date.now()}`,
                                         description: `Auto-Refund for failed BigiSub transaction (${ref})`
                                     });
-                                console.log(`[BigiSub Webhook] Refunded ₦${tx.amount} to user ${tx.user_id}`);
+                                console.log(`[BigiSub Webhook] Atomically Refunded ₦${tx.amount} to user ${tx.user_id}`);
                             }
                         }
                     }

@@ -119,58 +119,76 @@ Deno.serve(async (req) => {
             const markup = await getMarkup();
             const costRate = parseFloat(targetService.rate);
             const userRate = costRate + (costRate * (markup / 100));
-            const totalUserPrice = (userRate / 1000) * q;
+            const calculatedUserPrice = (userRate / 1000) * q;
             const totalCostPrice = (costRate / 1000) * q;
 
-            // Calculate authoritative price on server
-            const finalPrice = (expectedPrice && parseFloat(expectedPrice) > 0) ? parseFloat(expectedPrice) : totalUserPrice;
+            // 🛡️ Security Guard: Authoritative server price calculation. Never trust client-submitted expectedPrice.
+            const finalPrice = Math.max(0.01, Math.round(calculatedUserPrice * 100) / 100);
 
-            // 2. Check User Balance
-            const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', user.id).maybeSingle();
-            const rawBal = profile?.balance ?? profile?.credit_balance ?? profile?.wallet_balance ?? 0;
-            const userBalance = parseFloat(String(rawBal)) || 0;
+            // 2. Atomic Wallet Balance Deduction (Prevents Concurrency Double-Spending)
+            const { data: deductResult, error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+                user_id: user.id,
+                amount: finalPrice
+            });
 
-            if (!profile || userBalance < finalPrice) {
-                return new Response(JSON.stringify({ error: `Insufficient wallet balance. Total cost is ₦${finalPrice.toLocaleString()}, but your balance is ₦${userBalance.toLocaleString()}.` }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            if (deductError || (deductResult && deductResult.success === false)) {
+                const errMsg = deductError?.message || deductResult?.error || 'Insufficient wallet balance.';
+                return new Response(JSON.stringify({ error: errMsg }), { 
+                    status: 200, 
+                    headers: { ...corsHeaders, "Content-Type": "application/json" } 
+                });
             }
 
             // 3. Place Order with API
-            const orderData = new URLSearchParams();
-            orderData.append('key', API_KEY);
-            orderData.append('action', 'add');
-            orderData.append('service', String(serviceId));
-            orderData.append('link', link);
-            orderData.append('quantity', String(q));
-            
-            const orderRes = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: orderData.toString()
-            });
-            const orderResult = await orderRes.json();
+            let orderResult: any = null;
+            try {
+                const orderData = new URLSearchParams();
+                orderData.append('key', API_KEY);
+                orderData.append('action', 'add');
+                orderData.append('service', String(serviceId));
+                orderData.append('link', link);
+                orderData.append('quantity', String(q));
+                
+                const orderRes = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: orderData.toString()
+                });
+                orderResult = await orderRes.json();
+            } catch (fetchErr: any) {
+                console.error("[smm-api] Order dispatch exception:", fetchErr);
+                orderResult = { error: fetchErr.message || "Failed to reach SMM provider" };
+            }
 
-            if (orderResult.error) {
-                let errorMsg = orderResult.error;
+            if (!orderResult || orderResult.error) {
+                // 🛡️ Fail-Safe Auto-Refund: Provider failed, refund balance immediately
+                await supabaseAdmin.rpc('credit_balance', {
+                    user_id: user.id,
+                    amount: finalPrice
+                });
+
+                await supabaseAdmin.from('transactions').insert({
+                    user_id: user.id,
+                    type: 'refund',
+                    amount: finalPrice,
+                    status: 'success',
+                    reference: `REF-SMM-${Date.now()}`,
+                    description: `Auto-Refund: Social Boost Order Failed (${targetService.name})`
+                });
+
+                let errorMsg = orderResult?.error || "We are temporarily unable to process this order. Please try again later.";
                 const lowerError = String(errorMsg).toLowerCase();
                 
                 if (lowerError.includes('insufficient balance') || lowerError.includes('balance') || lowerError.includes('funds') || lowerError.includes('child panel')) {
                     errorMsg = "Service is currently undergoing maintenance. Please try again later.";
                 } else if (lowerError.includes('invalid') || lowerError.includes('link')) {
                     errorMsg = "The link you provided seems to be invalid. Please check and try again.";
-                } else {
-                    errorMsg = "We are temporarily unable to process this order. Please try again later.";
                 }
 
                 return new Response(JSON.stringify({ error: errorMsg }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
 
-            // 4. Deduct Balance & Log Transaction
-            const newBalance = Math.max(0, userBalance - finalPrice);
-            await supabaseAdmin.from('profiles').update({ 
-                balance: newBalance,
-                credit_balance: newBalance 
-            }).eq('id', user.id);
-
+            // 4. Log Successful Transaction
             const txRef = `SMM-${orderResult.order}-${Date.now()}`;
             await supabaseAdmin.from('transactions').insert({
                 user_id: user.id,

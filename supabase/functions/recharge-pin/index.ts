@@ -110,49 +110,69 @@ Deno.serve(async (req) => {
             const unitPrice = parseFloat(targetPlan.regular_price || targetPlan.corporate_price || targetPlan.size || '98.9');
             const totalCost = unitPrice * qty;
 
-            // Fetch User Profile and check balance
-            const { data: profile, error: profErr } = await supabaseAdmin
-                .from('profiles')
-                .select('balance, full_name')
-                .eq('id', user.id)
-                .single();
+            // 🛡️ Atomic Balance Deduction (Banking-grade protection against concurrency double-spending)
+            const { data: deductResult, error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+                user_id: user.id,
+                amount: totalCost
+            });
 
-            if (profErr || !profile) {
-                throw new Error('User profile not found');
-            }
-
-            const currentBalance = parseFloat(profile.balance || 0);
-            if (currentBalance < totalCost) {
-                throw new Error(`Insufficient wallet balance. Total cost is ₦${totalCost.toFixed(2)}, but your balance is ₦${currentBalance.toFixed(2)}.`);
+            if (deductError || (deductResult && deductResult.success === false)) {
+                const errMsg = deductError?.message || deductResult?.error || 'Insufficient wallet balance.';
+                throw new Error(errMsg);
             }
 
             // Execute Live Purchase via Bigi API
-            const purchaseRes = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${bigiToken.trim()}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    plan: planId,
-                    quantity: qty,
-                    business_name: businessName || 'ABU MAFHAL VTU',
-                    pin: bigiPin.trim()
-                })
-            });
-
-            const purchaseJson = await purchaseRes.json();
-
-            if (!purchaseRes.ok || purchaseJson.success === false) {
-                throw new Error(purchaseJson.message || purchaseJson.detail || purchaseJson.error || 'Recharge pin purchase failed at provider');
+            let purchaseJson: any = null;
+            let purchaseRes: any = null;
+            try {
+                purchaseRes = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Token ${bigiToken.trim()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        plan: planId,
+                        quantity: qty,
+                        business_name: businessName || 'ABU MAFHAL VTU',
+                        pin: bigiPin.trim()
+                    })
+                });
+                purchaseJson = await purchaseRes.json();
+            } catch (fetchErr: any) {
+                console.error("[recharge-pin] Bigi API dispatch error:", fetchErr);
+                purchaseJson = { success: false, message: fetchErr.message || 'Network error reaching provider' };
             }
 
-            // Deduct User Balance
-            const newBalance = currentBalance - totalCost;
-            await supabaseAdmin
-                .from('profiles')
-                .update({ balance: newBalance })
-                .eq('id', user.id);
+            if (!purchaseRes || !purchaseRes.ok || purchaseJson.success === false) {
+                // 🛡️ Fail-Safe Auto-Refund: Provider failed, refund user wallet atomically
+                await supabaseAdmin.rpc('credit_balance', {
+                    user_id: user.id,
+                    amount: totalCost
+                });
+
+                await supabaseAdmin.from('transactions').insert({
+                    user_id: user.id,
+                    type: 'refund',
+                    amount: totalCost,
+                    status: 'success',
+                    reference: `REF-RCP-${Date.now()}`,
+                    description: `Auto-Refund: Failed Recharge PIN Purchase`
+                });
+
+                throw new Error(purchaseJson?.message || purchaseJson?.detail || purchaseJson?.error || 'Recharge pin purchase failed at provider. Your wallet has been refunded 100%.');
+            }
+
+            // Log successful payment transaction
+            const txId = 'RCP' + Date.now().toString(36).toUpperCase();
+            await supabaseAdmin.from('transactions').insert({
+                user_id: user.id,
+                type: 'payment',
+                amount: totalCost,
+                status: 'success',
+                reference: txId,
+                description: `Purchased ${targetPlan.network_name || 'MTN'} ₦${targetPlan.size || '100'} Recharge PIN x${qty}`
+            });
 
             const pData = purchaseJson.data || purchaseJson;
             const pinsList = pData.pins || (pData.pin ? [{ pin: pData.pin, serial: pData.serial || '1' }] : []);

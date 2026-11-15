@@ -468,9 +468,9 @@ Deno.serve(async (req: Request) => {
 
         console.log(`[Bills] Required Charge: ₦${amountToCharge} for ${type} to ${data.phone || 'N/A'}`);
 
-        // 3. Pre-Flight Balance Verification (DO NOT DEDUCT YET)
-        // User balance is only verified here. Deduction strictly happens AFTER provider confirms delivery.
-        if (type !== 'get_plans' && type !== 'recharge_pin_plans') {
+        // 3. 🛡️ Atomic Balance Deduction (Banking-Grade Anti-Race-Condition Protection)
+        let hasDeducted = false;
+        if (type !== 'get_plans' && type !== 'recharge_pin_plans' && !type.startsWith('cash_') && type !== 'verify_meter' && type !== 'verify_tv') {
             if (!amountToCharge || isNaN(amountToCharge) || amountToCharge <= 0) {
                 return new Response(JSON.stringify({ success: false, error: "Invalid transaction amount" }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -478,29 +478,25 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
-            const { data: profile, error: profError } = await rpcClient
-                .from('profiles')
-                .select('balance')
-                .eq('id', userId)
-                .single();
+            const { data: deductResult, error: deductError } = await rpcClient.rpc('deduct_balance', {
+                user_id: userId,
+                amount: amountToCharge
+            });
 
-            if (profError || !profile) {
-                return new Response(JSON.stringify({ success: false, error: "User account profile not found" }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 200
-                });
-            }
-
-            const currentBalance = Number(profile.balance || 0);
-            if (currentBalance < amountToCharge) {
+            if (deductError || deductResult?.success === false) {
+                const errMsg = deductError?.message || deductResult?.error || 'Insufficient wallet balance.';
+                console.warn(`[Bills] Pre-deduction blocked for user ${userId}: ${errMsg}`);
                 return new Response(JSON.stringify({ 
                     success: false, 
-                    error: `Insufficient balance. Available: ₦${currentBalance.toLocaleString()}, Required: ₦${amountToCharge.toLocaleString()}` 
+                    error: errMsg 
                 }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" }, 
                     status: 200
                 });
             }
+
+            hasDeducted = true;
+            console.log(`[Bills] Balance Atomically Deducted for user ${userId}. Amount: ₦${amountToCharge}`);
         }
 
         // 4. Call Provider (BigiSub, Bilalsadasub, or ClubKonnect)
@@ -796,30 +792,8 @@ Deno.serve(async (req: Request) => {
             );
 
             if (isSuccess) {
-                // 5. Provider confirmed success — DEDUCT BALANCE NOW
-                if (type !== 'get_plans' && type !== 'recharge_pin_plans') {
-                    const { data: deductResult, error: deductError } = await rpcClient.rpc('deduct_balance', {
-                        user_id: userId,
-                        amount: amountToCharge
-                    });
-
-                    if (deductError || deductResult?.success === false) {
-                        console.error("[Bills] Critical: deduct_balance RPC failed:", deductError?.message || deductResult?.error);
-                        try {
-                            // Direct service-role deduction fallback to guarantee no financial loss
-                            const { data: prof } = await rpcClient.from('profiles').select('balance').eq('id', userId).single();
-                            if (prof) {
-                                const newBal = Math.max(0, Number(prof.balance || 0) - amountToCharge);
-                                await rpcClient.from('profiles').update({ balance: newBal }).eq('id', userId);
-                                console.log(`[Bills] Fallback balance deduction applied for user ${userId}: ${prof.balance} -> ${newBal}`);
-                            }
-                        } catch (fallbackErr: any) {
-                            console.error("[Bills] Fallback deduction error:", fallbackErr.message);
-                        }
-                    } else {
-                        console.log(`[Bills] Balance Deducted successfully for user ${userId}. Amount: ₦${amountToCharge}`);
-                    }
-                }
+                // 5. Provider confirmed success (Balance was already securely pre-deducted atomically)
+                console.log(`[Bills] Transaction succeeded at provider for user ${userId}. Reference: ${requestId}`);
 
                 // Recharge PIN specific table updates
                 if (type === 'recharge_pin_purchase') {
@@ -935,6 +909,28 @@ Deno.serve(async (req: Request) => {
         } catch (error) {
             let errorMessage = error instanceof Error ? error.message : "Provider transaction failed";
             console.error("[Bills] Execution Failed:", errorMessage);
+
+            // 🛡️ Fail-Safe Auto-Refund: If wallet was pre-deducted and provider failed, refund 100% immediately
+            if (hasDeducted && amountToCharge > 0) {
+                try {
+                    await rpcClient.rpc('credit_balance', {
+                        user_id: userId,
+                        amount: amountToCharge
+                    });
+
+                    await rpcClient.from('transactions').insert({
+                        user_id: userId,
+                        type: 'refund',
+                        amount: amountToCharge,
+                        status: 'success',
+                        reference: `REF_${requestId}`,
+                        description: `Auto-Refund: Failed ${type.toUpperCase()} transaction at provider network`
+                    });
+                    console.log(`[Bills] Auto-refund of ₦${amountToCharge} issued to user ${userId} for ref ${requestId}`);
+                } catch (refundErr: any) {
+                    console.error("[Bills] Auto-refund execution error:", refundErr.message);
+                }
+            }
             
             // Mask vendor name from error
             if (errorMessage.toLowerCase().includes('clubkonnect') || errorMessage.toLowerCase().includes('bilalsadasub') || errorMessage.toLowerCase().includes('bigi')) {
@@ -946,10 +942,11 @@ Deno.serve(async (req: Request) => {
                 errorMessage = "Service is temporarily unavailable. Please try again later or contact support";
             }
             
-            // Strict guarantee: User balance was NEVER deducted because deduction only happens after provider confirmation
             return new Response(JSON.stringify({ 
                 success: false, 
-                error: `${errorMessage}. Your wallet balance has NOT been deducted.` 
+                error: hasDeducted 
+                    ? `${errorMessage}. Your wallet has been automatically refunded 100%.` 
+                    : `${errorMessage}. Your wallet balance has NOT been deducted.` 
             }), { 
                 headers: { ...corsHeaders, "Content-Type": "application/json" }, 
                 status: 200 

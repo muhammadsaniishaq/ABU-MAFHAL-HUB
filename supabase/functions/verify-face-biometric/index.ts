@@ -45,11 +45,39 @@ serve(async (req: Request) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
+        // 🛡️ Authentication Shield: Enforce User JWT and ownership check
+        const authHeader = req.headers.get('Authorization') ?? '';
+        const token = authHeader.replace('Bearer ', '').trim();
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+        if (!token) {
+            return jsonResponse({ success: false, error: 'Authentication required. Missing authorization header.' }, 401);
+        }
+
+        const isInternalService = token === serviceRoleKey;
+        let callerUser: any = null;
+
+        if (!isInternalService) {
+            const { data: authData, error: authErr } = await supabaseAdmin.auth.getUser(token);
+            if (authErr || !authData?.user) {
+                return jsonResponse({ success: false, error: 'Session expired or invalid. Please log in again.' }, 401);
+            }
+            callerUser = authData.user;
+        }
+
         const body = await req.json();
         const { userId, photoUrl, imageBase64, idType, idNumber } = body;
 
         if (!userId || (!photoUrl && !imageBase64)) {
             return jsonResponse({ success: false, error: 'Missing userId or image payload' }, 400);
+        }
+
+        // Prevent unauthorized user ID impersonation
+        if (callerUser && callerUser.id !== userId) {
+            const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', callerUser.id).maybeSingle();
+            if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
+                return jsonResponse({ success: false, error: 'Access denied: You can only perform biometric verification on your own account.' }, 403);
+            }
         }
 
         // 1. Fetch Smile ID credentials from system_secrets table

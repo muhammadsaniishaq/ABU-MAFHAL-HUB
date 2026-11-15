@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { verifyAdminCaller } from "../_shared/admin-auth.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,29 +24,12 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Verify Super Admin Auth JWT
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const jwt = authHeader.replace('Bearer ', '').trim()
-
-    if (!jwt) {
-      return jsonOk({ error: 'No authorization token provided' })
+    // 🛡️ Verify Super Admin Auth JWT with strict role & email checks
+    const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+    if (!adminCheck.isAdmin) {
+      return jsonOk({ error: `Access denied: Admin privileges required (${adminCheck.error})` });
     }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
-    if (authError || !user) {
-      return jsonOk({ error: 'Authentication failed' })
-    }
-
-    // Verify admin role
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
-      return jsonOk({ error: 'Access denied: Admin privileges required' })
-    }
+    const user = { id: adminCheck.userId || 'admin' };
 
     const body = await req.json()
     const { action, providerId, amount, bankCode, accountNumber, accountName, reason } = body

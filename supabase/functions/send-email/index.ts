@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 import { sendEmail } from "../_shared/email.ts";
 import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -24,6 +25,37 @@ Deno.serve(async (req) => {
 
         const body = await req.json();
         const { to, from = 'admin@abumafhal.com.ng', subject, text, html, userName, headlineBadge } = body;
+
+        // 🛡️ Security Guard: Differentiate Admin / System vs Public OTP Calls
+        const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+        const isSystemOrAdmin = adminCheck.isAdmin;
+
+        if (!isSystemOrAdmin) {
+            // For non-admin calls, only allow legitimate OTP/verification emails
+            const isOtpEmail = (subject && (subject.toLowerCase().includes('otp') || subject.toLowerCase().includes('verification') || subject.toLowerCase().includes('code'))) ||
+                              (headlineBadge && headlineBadge.toLowerCase().includes('verification'));
+
+            if (!isOtpEmail) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    error: "Forbidden: Custom email broadcasts require Administrative privileges." 
+                }), {
+                    status: 403,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+
+            // Disallow arbitrary raw HTML injection from unauthenticated callers
+            if (html && !html.includes('Abu Mafhal') && !html.includes('Verification')) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    error: "Forbidden: Unsanitized custom email payload rejected." 
+                }), {
+                    status: 403,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+        }
 
         if (!to || !subject || (!text && !html)) {
             return new Response(JSON.stringify({ error: "Missing required fields (to, subject, text/html)" }), {
