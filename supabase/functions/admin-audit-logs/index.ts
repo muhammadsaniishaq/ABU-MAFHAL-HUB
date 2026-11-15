@@ -1,12 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
 import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
 
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -23,6 +23,20 @@ Deno.serve(async (req) => {
 
         // Service Role client bypasses RLS
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+        // 🛡️ CRITICAL SECURITY SHIELD: Verify Admin Caller
+        const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+        if (!adminCheck.isAdmin) {
+            console.warn(`[admin-audit-logs] Unauthorized access attempt blocked: ${adminCheck.error}`);
+            return new Response(JSON.stringify({ 
+                success: false, 
+                error: adminCheck.error || "Access denied: Administrator privileges required." 
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 403,
+            });
+        }
+
         const body = await req.json().catch(() => ({}));
         const { action = 'list', limit = 200, logData } = body;
 

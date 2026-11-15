@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
 import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -211,6 +212,15 @@ Deno.serve(async (req: Request) => {
 
         // --- ACTION: ADMIN PERMANENT DELETE USER ---
         if (parsedPayload && parsedPayload.action === 'admin_delete_user') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                console.warn(`[AdminDelete] Unauthorized delete attempt blocked: ${adminCheck.error}`);
+                return new Response(JSON.stringify({ success: false, error: "Access denied: Super Admin authorization required." }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
             const targetId = parsedPayload.userId;
             const targetEmail = parsedPayload.email;
 
@@ -280,6 +290,15 @@ Deno.serve(async (req: Request) => {
 
         // --- ACTION: APPLY WALLET DATABASE RPC & TRIGGER FIX ---
         if (parsedPayload && parsedPayload.action === 'apply_wallet_db_fix') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                console.warn(`[apply_wallet_db_fix] Unauthorized DDL attempt blocked: ${adminCheck.error}`);
+                return new Response(JSON.stringify({ success: false, error: "Access denied: Super Admin authorization required." }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
             const dbUrl = Deno.env.get('SUPABASE_DB_URL');
             if (!dbUrl) {
                 return new Response(JSON.stringify({ success: false, error: "SUPABASE_DB_URL not set in secrets" }), {
@@ -769,6 +788,13 @@ $$ language plpgsql security definer;
 
         // --- ACTION: GET RECENT PAYMENT DEBUG LOGS ---
         if (parsedPayload && parsedPayload.action === 'get_debug_logs') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ success: false, error: "Access denied" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
             const { data: events, error: evErr } = await supabaseAdmin
                 .from('payment_events')
                 .select('*')
@@ -781,6 +807,13 @@ $$ language plpgsql security definer;
 
         // --- ACTION: REPROCESS ORPHANED PAYMENTS ---
         if (parsedPayload && parsedPayload.action === 'reprocess_orphaned') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ success: false, error: "Access denied" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
             const { data: orphanedEvents } = await supabaseAdmin
                 .from('payment_events')
                 .select('*')
@@ -985,6 +1018,13 @@ $$ language plpgsql security definer;
 
         // --- ACTION: CHECK PAYSTACK BALANCE & CAPABILITIES ---
         if (parsedPayload && parsedPayload.action === 'check_paystack_balance') {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ success: false, error: "Access denied: Admin privileges required." }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
             try {
                 const paystackSecret = await getPaystackSecret(supabaseAdmin);
                 if (!paystackSecret) {
@@ -1023,6 +1063,13 @@ $$ language plpgsql security definer;
 
         // --- ACTION: CHECK FLUTTERWAVE BALANCE & CAPABILITIES ---
         if (parsedPayload && (parsedPayload.action === 'check_flutterwave_balance' || parsedPayload.action === 'check_flw_balance' || parsedPayload.action === 'check_transfer_balance')) {
+            const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+            if (!adminCheck.isAdmin) {
+                return new Response(JSON.stringify({ success: false, error: "Access denied: Admin privileges required." }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
             try {
                 const flwSecret = await getFlutterwaveSecret(supabaseAdmin);
                 if (!flwSecret) {
@@ -2100,13 +2147,27 @@ $$ language plpgsql security definer;
                     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
                     if (hashHex.toLowerCase() !== payvesselSignature.toLowerCase()) {
-                        console.warn("[Payvessel Webhook] Signature mismatch. Received:", payvesselSignature, "Computed:", hashHex, ". Proceeding with account number validation.");
+                        console.error("[Payvessel Webhook] Security Alert: Signature mismatch! Received:", payvesselSignature, "Computed:", hashHex);
+                        return new Response(JSON.stringify({ error: "Invalid Payvessel signature" }), {
+                            status: 401,
+                            headers: { "Content-Type": "application/json", ...corsHeaders }
+                        });
                     } else {
                         console.log("[Payvessel Webhook] Signature verified successfully.");
                     }
                 } catch (sigErr) {
-                    console.warn("[Payvessel Webhook] Signature verification error, proceeding with payload validation:", sigErr);
+                    console.error("[Payvessel Webhook] Signature verification error:", sigErr);
+                    return new Response(JSON.stringify({ error: "Signature verification failed" }), {
+                        status: 401,
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
                 }
+            } else if (PAYVESSEL_API_SECRET && !payvesselSignature) {
+                console.error("[Payvessel Webhook] Security Alert: Missing required Payvessel signature header.");
+                return new Response(JSON.stringify({ error: "Missing Payvessel signature header" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
             }
 
             const eventData = parsedPayload || JSON.parse(bodyText);
@@ -2276,7 +2337,11 @@ $$ language plpgsql security definer;
             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
             if (hashHex.toLowerCase() !== paystackSignature.toLowerCase().trim()) {
-                console.warn("[Paystack Webhook] Signature notice. Computed:", hashHex, "Received:", paystackSignature, ". Proceeding with charge verification.");
+                console.error("[Paystack Webhook] Security Alert: Signature mismatch! Computed:", hashHex, "Received:", paystackSignature);
+                return new Response(JSON.stringify({ error: "Invalid Paystack signature" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
             }
 
             const event = JSON.parse(body);
@@ -2324,7 +2389,11 @@ $$ language plpgsql security definer;
 
             const secretHash = Deno.env.get('FLUTTERWAVE_SECRET_HASH');
             if (secretHash && flwSignature !== secretHash) {
-                console.warn("[Flutterwave Webhook] Hash signature notice, continuing with verification");
+                console.error("[Flutterwave Webhook] Security Alert: Secret hash mismatch.");
+                return new Response(JSON.stringify({ error: "Invalid Flutterwave secret hash" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
             }
 
             if (event.event === 'charge.completed' || (event['event.type'] === 'BANK_TRANSFER_TRANSACTION')) {
@@ -2464,7 +2533,7 @@ async function handleFundWallet(
 ) {
     console.log(`[FundWallet] Init: Ref=${reference}, Prov=${provider}, Amt=${amount}, UserID=${explicitUserId || 'none'}`);
 
-    // 1. Check Idempotency
+    // 1. Check Idempotency & Concurrency Lock
     const { data: existing, error: checkError } = await supabaseAdmin
         .from('payment_events')
         .select('reference, status')
@@ -2476,12 +2545,12 @@ async function handleFundWallet(
         return new Response("Internal Error Checking Duplicate", { status: 500, headers: corsHeaders });
     }
 
-    if (existing && existing.status === 'completed') {
-        console.log(`[FundWallet] Duplicate Event Ignored: ${reference} (Already completed)`);
+    if (existing && (existing.status === 'completed' || existing.status === 'processing')) {
+        console.log(`[FundWallet] Duplicate Event Ignored: ${reference} (Status: ${existing.status})`);
         if (isDirectClientVerification) {
             return new Response(JSON.stringify({
                 success: true,
-                message: "Transaction has already been credited",
+                message: "Transaction has already been credited or is currently processing",
                 reference: reference
             }), { 
                 status: 200, 
@@ -2489,6 +2558,23 @@ async function handleFundWallet(
             });
         }
         return new Response("Duplicate event ignored", { status: 200, headers: corsHeaders });
+    }
+
+    // Atomic lock: Reserve the reference in payment_events immediately to eliminate race conditions
+    const { error: lockErr } = await supabaseAdmin
+        .from('payment_events')
+        .insert({
+            reference: reference,
+            amount: amount,
+            provider: provider,
+            currency: currency,
+            status: 'processing',
+            metadata: { metadata: data || {} }
+        });
+
+    if (lockErr) {
+        console.warn(`[FundWallet] Race Condition Blocked: Reference ${reference} already claimed by another request: ${lockErr.message}`);
+        return new Response("Concurrent event ignored", { status: 200, headers: corsHeaders });
     }
 
     // 2. Find User
@@ -2730,18 +2816,18 @@ async function handleFundWallet(
     const notifTitle = `💰 Wallet Credited: ₦${formattedAmount}`;
     const notifBody = `Successfully credited ₦${formattedAmount} to your wallet. New Balance: ₦${formattedBalance}`;
 
-    // 4. Parallel Ultra-Fast Database Inserts (Transactions, Events & In-App Notification)
+    // 4. Parallel Ultra-Fast Database Inserts & Updates (Transactions, Events & In-App Notification)
     try {
         await Promise.all([
             supabaseAdmin.from('transactions').insert(transactionsToInsert),
-            supabaseAdmin.from('payment_events').insert({
+            supabaseAdmin.from('payment_events').upsert({
                 reference: reference,
                 amount: amount,
                 provider: provider,
                 currency: currency,
                 status: 'completed',
                 metadata: { metadata: metadata }
-            }),
+            }, { onConflict: 'reference' }),
             supabaseAdmin.from('notifications').insert({
                 user_id: profile.id,
                 title: notifTitle,

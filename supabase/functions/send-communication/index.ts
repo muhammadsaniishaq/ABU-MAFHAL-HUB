@@ -3,6 +3,7 @@ import { serve } from "std/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
 import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +19,24 @@ serve(async (req) => {
     const payload = await req.json();
     const { type, recipient, recipient_mode, subject, body, actionRoute, priority } = payload;
     const mode = recipient_mode || 'single';
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 🛡️ CRITICAL SECURITY SHIELD: Restrict Broadcast/All Mode to Authenticated Admin
+    if (mode === 'all' || mode === 'admins' || mode === 'broadcast') {
+        const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+        if (!adminCheck.isAdmin) {
+            console.warn(`[send-communication] Unauthorized broadcast attempt blocked: ${adminCheck.error}`);
+            return new Response(JSON.stringify({ 
+                error: adminCheck.error || "Access denied: Admin privileges required for broadcast messaging." 
+            }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+    }
 
     if (type !== 'email' && type !== 'sms' && type !== 'push') {
          return new Response(JSON.stringify({ message: `Channel ${type} not supported yet` }), {

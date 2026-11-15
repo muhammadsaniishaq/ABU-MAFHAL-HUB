@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { sendEmail } from "../_shared/email.ts"
 import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts"
+import { verifyAdminCaller } from "../_shared/admin-auth.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -89,6 +90,18 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // 🛡️ CRITICAL SECURITY SHIELD: Restrict Provider Balances to Authenticated Admin
+    const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+    if (!adminCheck.isAdmin) {
+      console.warn(`[check-provider-balances] Unauthorized balance access attempt blocked: ${adminCheck.error}`);
+      return new Response(JSON.stringify({ 
+        error: adminCheck.error || 'Access denied: Admin privileges required to view provider balances' 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const reqData = await req.json().catch(() => ({}))
     const customKeys = reqData?.customKeys || {}

@@ -12,20 +12,50 @@ serve(async (req) => {
   }
 
   try {
-    const { payload, BIGIHUB_API_URL } = await req.json();
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 🛡️ CRITICAL SECURITY SHIELD: Verify authenticated caller
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization') || '';
+    const internalHeader = req.headers.get('x-internal-service') || '';
+    const isInternal = (supabaseServiceKey && (internalHeader === supabaseServiceKey || authHeader === `Bearer ${supabaseServiceKey}`));
+
+    if (!isInternal) {
+        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+        if (!token) {
+            return new Response(JSON.stringify({ success: false, error: "Authentication required to access SMS gateway." }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 401,
+            });
+        }
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+        if (userError || !user) {
+            return new Response(JSON.stringify({ success: false, error: "Invalid or expired session." }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 401,
+            });
+        }
+    }
+
+    const { payload } = await req.json();
+
+    if (!payload || !payload.recipient || !payload.message) {
+        return new Response(JSON.stringify({ success: false, error: "Recipient and message are required." }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+        });
+    }
 
     // 1. Fetch Tokens securely from system_secrets using Admin Privileges
     const { data: secretData, error: secretError } = await supabaseAdmin
         .from('system_secrets')
         .select('key, value')
-        .in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN']);
+        .in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN', 'BIGIHUB_BASE_URL']);
 
     const tokenObj = secretData?.find(s => s.key === 'BIGI_API_TOKEN');
     const pinObj = secretData?.find(s => s.key === 'BIGI_API_PIN');
+    const urlObj = secretData?.find(s => s.key === 'BIGIHUB_BASE_URL');
 
     if (secretError || !tokenObj?.value) {
         throw new Error('BIGI_API_TOKEN not found in API Vault.');
@@ -35,8 +65,11 @@ serve(async (req) => {
     payload.pin = pinObj?.value || '1234';
     payload.pin_code = pinObj?.value || '1234';
 
+    // 🛡️ SSRF Prevention: Enforce trusted BigiSub endpoint
+    const targetUrl = (urlObj?.value?.trim() || 'https://bigisub.com/api').replace(/\/+$/, '') + '/sms/';
+
     // 2. Make Request to Bigisub
-    const response = await fetch(BIGIHUB_API_URL, {
+    const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
 import { renderAbuMafhalEmailTemplate } from "../_shared/email-template.ts";
+import { verifyAdminCaller } from "../_shared/admin-auth.ts";
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -16,6 +17,21 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+        // 🛡️ CRITICAL SECURITY SHIELD: Verify Super Admin Caller
+        const adminCheck = await verifyAdminCaller(req, supabaseAdmin);
+        if (!adminCheck.isAdmin) {
+            console.warn(`[admin-reset-password] Unauthorized access attempt blocked: ${adminCheck.error}`);
+            return new Response(JSON.stringify({ 
+                success: false, 
+                error: adminCheck.error || "Access denied: Administrator privileges required." 
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 403,
+            });
+        }
+
         const body = await req.json();
         const { action = 'update', userId, email, newPassword, sendEmailNotification = true, adminEmail } = body;
 
@@ -25,8 +41,6 @@ Deno.serve(async (req: Request) => {
                 status: 400,
             });
         }
-
-        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         // Resolve User ID if only email provided
         let targetUserId = userId;
