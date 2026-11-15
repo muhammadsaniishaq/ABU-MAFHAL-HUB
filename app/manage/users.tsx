@@ -2166,6 +2166,160 @@ Metadata:
         setUnmaskedCardIds(prev => ({ ...prev, [cardId]: !prev[cardId] }));
     };
 
+    // Modern Luxury Form Field for Profile Editing
+    const ModernFormField = ({
+        label,
+        icon,
+        value,
+        onChangeText,
+        placeholder,
+        keyboardType,
+        maxLength,
+        copyable,
+        autoCapitalize,
+        multiline,
+        numberOfLines,
+    }: {
+        label: string;
+        icon: any;
+        value?: string;
+        onChangeText: (text: string) => void;
+        placeholder?: string;
+        keyboardType?: any;
+        maxLength?: number;
+        copyable?: boolean;
+        autoCapitalize?: any;
+        multiline?: boolean;
+        numberOfLines?: number;
+    }) => (
+        <View style={{ marginBottom: 13 }}>
+            <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+                {label}
+            </Text>
+            <View style={{
+                flexDirection: 'row',
+                alignItems: multiline ? 'flex-start' : 'center',
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1.2,
+                borderColor: '#E2E8F0',
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: multiline ? 10 : 0,
+                minHeight: multiline ? (numberOfLines ? numberOfLines * 22 + 24 : 80) : 46,
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 3,
+                elevation: 1,
+            }}>
+                <View style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 8,
+                    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 10,
+                    marginTop: multiline ? 2 : 0,
+                }}>
+                    <Ionicons name={icon} size={15} color="#B8952B" />
+                </View>
+                <TextInput
+                    style={{
+                        flex: 1,
+                        fontSize: 13.5,
+                        fontWeight: '600',
+                        color: '#0F172A',
+                        paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+                        textAlignVertical: multiline ? 'top' : 'center',
+                    }}
+                    value={value || ''}
+                    onChangeText={onChangeText}
+                    placeholder={placeholder}
+                    placeholderTextColor="#94A3B8"
+                    keyboardType={keyboardType}
+                    maxLength={maxLength}
+                    autoCapitalize={autoCapitalize}
+                    multiline={multiline}
+                    numberOfLines={numberOfLines}
+                />
+                {!!value && !multiline && (
+                    <TouchableOpacity onPress={() => onChangeText('')} style={{ padding: 4 }} activeOpacity={0.7}>
+                        <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                )}
+                {copyable && !!value && (
+                    <TouchableOpacity 
+                        onPress={() => {
+                            Clipboard.setStringAsync(value);
+                            Alert.alert("Copied 📋", `${label} copied to clipboard.`);
+                        }} 
+                        style={{ padding: 4, marginLeft: 4 }}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="copy-outline" size={16} color="#D4AF37" />
+                    </TouchableOpacity>
+                )}
+            </View>
+        </View>
+    );
+
+    // Modern Luxury Toggle Card
+    const ModernToggleCard = ({
+        icon,
+        title,
+        subtitle,
+        value,
+        onValueChange
+    }: {
+        icon: any;
+        title: string;
+        subtitle: string;
+        value?: boolean;
+        onValueChange: (val: boolean) => void;
+    }) => (
+        <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1.2,
+            borderColor: '#E2E8F0',
+            borderRadius: 12,
+            padding: 12,
+            marginBottom: 10,
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 3,
+            elevation: 1,
+        }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+                <View style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: value ? 'rgba(212, 175, 55, 0.15)' : '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 10,
+                }}>
+                    <Ionicons name={icon} size={18} color={value ? '#B8952B' : '#94A3B8'} />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>{title}</Text>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{subtitle}</Text>
+                </View>
+            </View>
+            <Switch
+                value={!!value}
+                onValueChange={onValueChange}
+                trackColor={{ false: '#CBD5E1', true: '#D4AF37' }}
+                thumbColor="#FFFFFF"
+            />
+        </View>
+    );
+
     // Executive Light Mode Command Center Modal
     const renderUserModal = () => (
         <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
@@ -2407,6 +2561,75 @@ Metadata:
                                 <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FFFFFF' }}>Copy Dossier</Text>
                             </TouchableOpacity>
                         </View>
+
+                        {/* Tier 4: Account Security & Trust Health Meter */}
+                        {(() => {
+                            const phoneOk = !!selectedUser?.phone;
+                            const emailOk = !!selectedUser?.email;
+                            const kycOk = !!selectedUser?.kyc_verified || (Number(selectedUser?.kyc_tier || 1) > 1);
+                            const bvnOk = !!selectedUser?.bvn;
+                            const ninOk = !!selectedUser?.nin;
+                            const dvaOk = !!selectedUser?.account_number;
+                            let trustScore = 20;
+                            if (phoneOk) trustScore += 20;
+                            if (emailOk) trustScore += 20;
+                            if (kycOk) trustScore += 20;
+                            if (bvnOk || ninOk) trustScore += 10;
+                            if (dvaOk) trustScore += 10;
+                            const trustColor = trustScore >= 80 ? '#10B981' : trustScore >= 60 ? '#F59E0B' : '#EF4444';
+
+                            return (
+                                <View style={{ marginTop: 12, backgroundColor: 'rgba(10, 18, 40, 0.75)', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)' }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Ionicons name="shield-checkmark" size={13} color={trustColor} />
+                                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>
+                                                Security Trust Health: <Text style={{ color: trustColor, fontWeight: '900' }}>{trustScore}%</Text>
+                                            </Text>
+                                        </View>
+                                        <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#94A3B8' }}>
+                                            {trustScore >= 80 ? 'High Trust Verified' : trustScore >= 60 ? 'Standard Profile' : 'Pending Verification'}
+                                        </Text>
+                                    </View>
+
+                                    {/* Progress Bar */}
+                                    <View style={{ height: 4, backgroundColor: 'rgba(255, 255, 255, 0.12)', borderRadius: 2, overflow: 'hidden', marginBottom: 8 }}>
+                                        <View style={{ width: `${trustScore}%`, height: '100%', backgroundColor: trustColor, borderRadius: 2 }} />
+                                    </View>
+
+                                    {/* Verification Checklist Pills */}
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
+                                        {[
+                                            { label: 'Phone', ok: phoneOk },
+                                            { label: 'Email', ok: emailOk },
+                                            { label: 'BVN', ok: bvnOk },
+                                            { label: 'NIN', ok: ninOk },
+                                            { label: 'Virtual Acc', ok: dvaOk },
+                                        ].map((chk, idx) => (
+                                            <View 
+                                                key={idx}
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 3,
+                                                    paddingHorizontal: 7,
+                                                    paddingVertical: 3,
+                                                    borderRadius: 6,
+                                                    backgroundColor: chk.ok ? 'rgba(16, 185, 129, 0.18)' : 'rgba(239, 68, 68, 0.18)',
+                                                    borderWidth: 1,
+                                                    borderColor: chk.ok ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+                                                }}
+                                            >
+                                                <Ionicons name={chk.ok ? "checkmark-circle" : "alert-circle"} size={10} color={chk.ok ? '#10B981' : '#EF4444'} />
+                                                <Text style={{ fontSize: 9.5, fontWeight: '800', color: chk.ok ? '#10B981' : '#F87171' }}>
+                                                    {chk.label}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            );
+                        })()}
                     </LinearGradient>
 
                     {/* Navigation Tabs (Height 48 for comfortable touch and zero overlap) */}
@@ -2434,7 +2657,7 @@ Metadata:
                     </ScrollView>
 
                     <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-                        {/* TAB: EDIT USER INFORMATION (GYARA BAYANAI) */}
+                        {/* TAB: EDIT USER INFORMATION */}
                         {modalTab === 'edit' && (
                             <View style={{ padding: 14 }}>
                                 {/* Header Card */}
@@ -2445,301 +2668,351 @@ Metadata:
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ fontSize: 15, fontWeight: '900', color: '#FFFFFF' }}>Edit User Profile & Settings</Text>
-                                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Edit personal details, BVN, NIN, KYC tier, status, banking & limits</Text>
+                                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Update personal details, KYC, limits, bank data & account status</Text>
                                         </View>
                                     </View>
                                 </View>
 
                                 {/* SECTION 1: PERSONAL DETAILS */}
                                 <View style={s.subFormCard}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                                        <Ionicons name="person-outline" size={16} color={T.navyDark} />
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>1. Personal Profile</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="person" size={15} color={T.goldDark} />
+                                        </View>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                            1. Personal Identity
+                                        </Text>
                                     </View>
 
-                                    <Text style={s.inputLabel}>Full Name</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Full Name"
+                                        icon="person-outline"
                                         value={editForm.full_name}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, full_name: v }))}
                                         placeholder="Full Name"
-                                        placeholderTextColor={T.textSub}
                                     />
 
-                                    <Text style={s.inputLabel}>Phone Number</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Phone Number"
+                                        icon="call-outline"
                                         value={editForm.phone}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, phone: v }))}
                                         placeholder="Phone Number (e.g. 08012345678)"
                                         keyboardType="phone-pad"
-                                        placeholderTextColor={T.textSub}
                                     />
 
-                                    <Text style={s.inputLabel}>Username</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Username"
+                                        icon="at-outline"
                                         value={editForm.username}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, username: v }))}
                                         placeholder="Username"
                                         autoCapitalize="none"
-                                        placeholderTextColor={T.textSub}
                                     />
 
-                                    <Text style={s.inputLabel}>Date of Birth (YYYY-MM-DD)</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Date of Birth (YYYY-MM-DD)"
+                                        icon="calendar-outline"
                                         value={editForm.dob}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, dob: v }))}
                                         placeholder="YYYY-MM-DD"
-                                        placeholderTextColor={T.textSub}
                                     />
 
-                                    <Text style={s.inputLabel}>Gender</Text>
-                                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-                                        {['male', 'female'].map(g => (
-                                            <TouchableOpacity
-                                                key={g}
-                                                onPress={() => setEditForm(prev => ({ ...prev, gender: g }))}
-                                                style={{
-                                                    flex: 1,
-                                                    paddingVertical: 9,
-                                                    borderRadius: 8,
-                                                    alignItems: 'center',
-                                                    borderWidth: 1.5,
-                                                    borderColor: editForm.gender?.toLowerCase() === g ? T.gold : T.border,
-                                                    backgroundColor: editForm.gender?.toLowerCase() === g ? T.goldBg : '#F8FAFC'
-                                                }}
-                                            >
-                                                <Text style={{ fontSize: 12, fontWeight: '800', color: editForm.gender?.toLowerCase() === g ? T.navyDark : T.textSub, textTransform: 'uppercase' }}>
-                                                    {g}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                    {/* Gender Segmented Card Picker */}
+                                    <View style={{ marginBottom: 13 }}>
+                                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+                                            Gender
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            {[
+                                                { id: 'male', label: 'Male', icon: 'man-outline' },
+                                                { id: 'female', label: 'Female', icon: 'woman-outline' }
+                                            ].map(g => {
+                                                const isSel = editForm.gender?.toLowerCase() === g.id;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={g.id}
+                                                        onPress={() => setEditForm(prev => ({ ...prev, gender: g.id }))}
+                                                        style={{
+                                                            flex: 1,
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: 8,
+                                                            height: 44,
+                                                            borderRadius: 12,
+                                                            borderWidth: 1.5,
+                                                            borderColor: isSel ? '#D4AF37' : '#E2E8F0',
+                                                            backgroundColor: isSel ? 'rgba(212, 175, 55, 0.12)' : '#FFFFFF',
+                                                        }}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <Ionicons name={g.icon as any} size={16} color={isSel ? '#B8952B' : '#64748B'} />
+                                                        <Text style={{ fontSize: 13, fontWeight: isSel ? '800' : '600', color: isSel ? '#0F172A' : '#64748B' }}>
+                                                            {g.label}
+                                                        </Text>
+                                                        {isSel && <Ionicons name="checkmark-circle" size={14} color="#D4AF37" />}
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
                                     </View>
 
-                                    <Text style={s.inputLabel}>Residential Address</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Residential Address"
+                                        icon="home-outline"
                                         value={editForm.address}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, address: v }))}
                                         placeholder="Home Address"
-                                        placeholderTextColor={T.textSub}
                                     />
 
-                                    <Text style={s.inputLabel}>State / Region</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="State / Region"
+                                        icon="location-outline"
                                         value={editForm.state}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, state: v }))}
-                                        placeholder="e.g. Kano, Abuja, Kaduna"
-                                        placeholderTextColor={T.textSub}
+                                        placeholder="e.g. Kano, Abuja, Kaduna, Lagos"
                                     />
                                 </View>
 
                                 {/* SECTION 2: IDENTITY & KYC VERIFICATION */}
                                 <View style={s.subFormCard}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                                        <Ionicons name="shield-checkmark-outline" size={16} color={T.navyDark} />
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>2. Identity & KYC Verification</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="shield-checkmark" size={15} color={T.goldDark} />
+                                        </View>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                            2. Identity & KYC Verification
+                                        </Text>
                                     </View>
 
-                                    <Text style={s.inputLabel}>BVN (11 Digits)</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="BVN (11 Digits)"
+                                        icon="card-outline"
                                         value={editForm.bvn}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, bvn: v }))}
                                         placeholder="Bank Verification Number"
                                         keyboardType="numeric"
                                         maxLength={11}
-                                        placeholderTextColor={T.textSub}
+                                        copyable
                                     />
 
-                                    <Text style={s.inputLabel}>NIN (11 Digits)</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="NIN (11 Digits)"
+                                        icon="finger-print-outline"
                                         value={editForm.nin}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, nin: v }))}
                                         placeholder="National Identity Number"
                                         keyboardType="numeric"
                                         maxLength={11}
-                                        placeholderTextColor={T.textSub}
+                                        copyable
                                     />
 
-                                    <Text style={s.inputLabel}>KYC Tier Level</Text>
-                                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-                                        {['1', '2', '3'].map(tier => (
-                                            <TouchableOpacity
-                                                key={tier}
-                                                onPress={() => setEditForm(prev => ({ ...prev, kyc_tier: tier, kyc_verified: tier !== '1' }))}
-                                                style={{
-                                                    flex: 1,
-                                                    paddingVertical: 9,
-                                                    borderRadius: 8,
-                                                    alignItems: 'center',
-                                                    borderWidth: 1.5,
-                                                    borderColor: editForm.kyc_tier === tier ? T.gold : T.border,
-                                                    backgroundColor: editForm.kyc_tier === tier ? T.goldBg : '#F8FAFC'
-                                                }}
-                                            >
-                                                <Text style={{ fontSize: 12, fontWeight: '900', color: editForm.kyc_tier === tier ? T.navyDark : T.textSub }}>
-                                                    Tier {tier}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 4 }}>
-                                        <View>
-                                            <Text style={{ fontSize: 12, fontWeight: '800', color: T.navyDark }}>KYC Verified Badge</Text>
-                                            <Text style={{ fontSize: 10, color: T.textSub }}>Mark account as fully identity verified</Text>
+                                    {/* KYC Tier Level Segmented Cards */}
+                                    <View style={{ marginBottom: 13 }}>
+                                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+                                            KYC Tier Level
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                                            {[
+                                                { tier: '1', title: 'Tier 1', sub: 'Starter' },
+                                                { tier: '2', title: 'Tier 2', sub: 'Verified' },
+                                                { tier: '3', title: 'Tier 3', sub: 'Unlimited' }
+                                            ].map(t => {
+                                                const isSel = String(editForm.kyc_tier) === t.tier;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={t.tier}
+                                                        onPress={() => setEditForm(prev => ({ ...prev, kyc_tier: t.tier, kyc_verified: t.tier !== '1' }))}
+                                                        style={{
+                                                            flex: 1,
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            paddingVertical: 10,
+                                                            borderRadius: 12,
+                                                            borderWidth: 1.5,
+                                                            borderColor: isSel ? '#D4AF37' : '#E2E8F0',
+                                                            backgroundColor: isSel ? 'rgba(212, 175, 55, 0.12)' : '#FFFFFF',
+                                                        }}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                            <Ionicons name="shield-checkmark" size={14} color={isSel ? '#D4AF37' : '#94A3B8'} />
+                                                            <Text style={{ fontSize: 13, fontWeight: isSel ? '900' : '700', color: isSel ? '#0F172A' : '#64748B' }}>
+                                                                {t.title}
+                                                            </Text>
+                                                        </View>
+                                                        <Text style={{ fontSize: 10, fontWeight: '600', color: isSel ? '#B8952B' : '#94A3B8', marginTop: 2 }}>
+                                                            {t.sub}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
                                         </View>
-                                        <Switch
-                                            value={editForm.kyc_verified}
-                                            onValueChange={(val) => setEditForm(prev => ({ ...prev, kyc_verified: val }))}
-                                            trackColor={{ false: '#CBD5E1', true: T.gold }}
-                                            thumbColor="#FFFFFF"
-                                        />
                                     </View>
 
-                                    <Text style={[s.inputLabel, { marginTop: 10 }]}>Custom User ID</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernToggleCard
+                                        icon="shield-checkmark-outline"
+                                        title="KYC Verified Badge"
+                                        subtitle="Mark account as officially identity verified"
+                                        value={editForm.kyc_verified}
+                                        onValueChange={(val) => setEditForm(prev => ({ ...prev, kyc_verified: val }))}
+                                    />
+
+                                    <ModernFormField
+                                        label="Custom User ID"
+                                        icon="key-outline"
                                         value={editForm.custom_id}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, custom_id: v }))}
                                         placeholder="e.g. ABU-00123"
-                                        placeholderTextColor={T.textSub}
+                                        copyable
                                     />
 
-                                    <Text style={s.inputLabel}>CAC / Business RC Number</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="CAC / Business RC Number"
+                                        icon="business-outline"
                                         value={editForm.cac_rc_number}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, cac_rc_number: v }))}
                                         placeholder="RC Registration Number"
-                                        placeholderTextColor={T.textSub}
+                                        copyable
                                     />
                                 </View>
 
                                 {/* SECTION 3: BANKING & LIMITS */}
                                 <View style={s.subFormCard}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                                        <Ionicons name="card-outline" size={16} color={T.navyDark} />
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>3. Banking & Daily Limits</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="wallet" size={15} color={T.goldDark} />
+                                        </View>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                            3. Banking & Daily Limits
+                                        </Text>
                                     </View>
 
-                                    <Text style={s.inputLabel}>Assigned Virtual Account Number</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Assigned Virtual Account Number"
+                                        icon="card-outline"
                                         value={editForm.account_number}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, account_number: v }))}
                                         placeholder="Virtual Account Number"
                                         keyboardType="numeric"
-                                        placeholderTextColor={T.textSub}
+                                        copyable
                                     />
 
-                                    <Text style={s.inputLabel}>Daily Transfer Limit (NGN)</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Daily Transfer Limit (NGN)"
+                                        icon="cash-outline"
                                         value={editForm.transfer_limit}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, transfer_limit: v }))}
                                         placeholder="e.g. 500000"
                                         keyboardType="numeric"
-                                        placeholderTextColor={T.textSub}
                                     />
                                 </View>
 
                                 {/* SECTION 4: NEXT OF KIN */}
                                 <View style={s.subFormCard}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                                        <Ionicons name="people-outline" size={16} color={T.navyDark} />
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>4. Next of Kin Details</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="people" size={15} color={T.goldDark} />
+                                        </View>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                            4. Next of Kin Details
+                                        </Text>
                                     </View>
 
-                                    <Text style={s.inputLabel}>Next of Kin Full Name</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Next of Kin Full Name"
+                                        icon="person-outline"
                                         value={editForm.next_of_kin_name}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, next_of_kin_name: v }))}
                                         placeholder="Full Name"
-                                        placeholderTextColor={T.textSub}
                                     />
 
-                                    <Text style={s.inputLabel}>Next of Kin Phone</Text>
-                                    <TextInput
-                                        style={s.subFormInput}
+                                    <ModernFormField
+                                        label="Next of Kin Phone"
+                                        icon="call-outline"
                                         value={editForm.next_of_kin_phone}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, next_of_kin_phone: v }))}
                                         placeholder="Phone Number"
                                         keyboardType="phone-pad"
-                                        placeholderTextColor={T.textSub}
                                     />
                                 </View>
 
                                 {/* SECTION 5: ACCOUNT STATUS & ACCESS */}
                                 <View style={s.subFormCard}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                                        <Ionicons name="lock-closed-outline" size={16} color={T.navyDark} />
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>5. Account Status & Access Permissions</Text>
-                                    </View>
-
-                                    <Text style={s.inputLabel}>Account Status</Text>
-                                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-                                        {['active', 'suspended', 'banned'].map(st => (
-                                            <TouchableOpacity
-                                                key={st}
-                                                onPress={() => setEditForm(prev => ({ ...prev, status: st }))}
-                                                style={{
-                                                    flex: 1,
-                                                    paddingVertical: 9,
-                                                    borderRadius: 8,
-                                                    alignItems: 'center',
-                                                    borderWidth: 1.5,
-                                                    borderColor: editForm.status === st ? (st === 'active' ? T.success : T.danger) : T.border,
-                                                    backgroundColor: editForm.status === st ? (st === 'active' ? T.successBg : T.dangerBg) : '#F8FAFC'
-                                                }}
-                                            >
-                                                <Text style={{ fontSize: 11, fontWeight: '900', color: editForm.status === st ? (st === 'active' ? T.success : T.danger) : T.textSub, textTransform: 'uppercase' }}>
-                                                    {st}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                                        <View>
-                                            <Text style={{ fontSize: 12, fontWeight: '800', color: T.navyDark }}>Crypto Trading Access</Text>
-                                            <Text style={{ fontSize: 10, color: T.textSub }}>Allow user to trade cryptocurrency</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="lock-closed" size={15} color={T.goldDark} />
                                         </View>
-                                        <Switch
-                                            value={editForm.crypto_enabled}
-                                            onValueChange={(val) => setEditForm(prev => ({ ...prev, crypto_enabled: val }))}
-                                            trackColor={{ false: '#CBD5E1', true: T.gold }}
-                                            thumbColor="#FFFFFF"
-                                        />
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                            5. Account Standing & Access Permissions
+                                        </Text>
                                     </View>
 
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                                        <View>
-                                            <Text style={{ fontSize: 12, fontWeight: '800', color: T.navyDark }}>Virtual Cards Access</Text>
-                                            <Text style={{ fontSize: 10, color: T.textSub }}>Allow user to generate Dollar & Naira cards</Text>
+                                    {/* Account Status Segmented Cards */}
+                                    <View style={{ marginBottom: 13 }}>
+                                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+                                            Account Standing
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                                            {[
+                                                { id: 'active', label: 'Active', icon: 'checkmark-circle-outline', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)' },
+                                                { id: 'suspended', label: 'Frozen', icon: 'snow-outline', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)' },
+                                                { id: 'banned', label: 'Banned', icon: 'close-circle-outline', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.12)' }
+                                            ].map(st => {
+                                                const isSel = editForm.status === st.id;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={st.id}
+                                                        onPress={() => setEditForm(prev => ({ ...prev, status: st.id }))}
+                                                        style={{
+                                                            flex: 1,
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            paddingVertical: 10,
+                                                            borderRadius: 12,
+                                                            borderWidth: 1.5,
+                                                            borderColor: isSel ? st.color : '#E2E8F0',
+                                                            backgroundColor: isSel ? st.bg : '#FFFFFF',
+                                                        }}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                            <Ionicons name={st.icon as any} size={14} color={isSel ? st.color : '#94A3B8'} />
+                                                            <Text style={{ fontSize: 12, fontWeight: isSel ? '900' : '700', color: isSel ? st.color : '#64748B' }}>
+                                                                {st.label}
+                                                            </Text>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
                                         </View>
-                                        <Switch
-                                            value={editForm.virtual_cards_enabled}
-                                            onValueChange={(val) => setEditForm(prev => ({ ...prev, virtual_cards_enabled: val }))}
-                                            trackColor={{ false: '#CBD5E1', true: T.gold }}
-                                            thumbColor="#FFFFFF"
-                                        />
                                     </View>
 
-                                    <Text style={[s.inputLabel, { marginTop: 10 }]}>Admin Confidential Notes</Text>
-                                    <TextInput
-                                        style={[s.subFormInput, { height: 75, textAlignVertical: 'top' }]}
+                                    <ModernToggleCard
+                                        icon="logo-bitcoin"
+                                        title="Crypto Trading Access"
+                                        subtitle="Allow user to trade cryptocurrency on-chain"
+                                        value={editForm.crypto_enabled}
+                                        onValueChange={(val) => setEditForm(prev => ({ ...prev, crypto_enabled: val }))}
+                                    />
+
+                                    <ModernToggleCard
+                                        icon="card-outline"
+                                        title="Virtual Cards Access"
+                                        subtitle="Allow user to generate Dollar & Naira cards"
+                                        value={editForm.virtual_cards_enabled}
+                                        onValueChange={(val) => setEditForm(prev => ({ ...prev, virtual_cards_enabled: val }))}
+                                    />
+
+                                    <ModernFormField
+                                        label="Admin Confidential Notes"
+                                        icon="document-text-outline"
                                         value={editForm.admin_notes}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, admin_notes: v }))}
                                         placeholder="Internal confidential notes about this account..."
                                         multiline
-                                        placeholderTextColor={T.textSub}
+                                        numberOfLines={3}
                                     />
                                 </View>
 
@@ -2749,16 +3022,21 @@ Metadata:
                                     disabled={savingProfile}
                                     style={{
                                         backgroundColor: '#0F172A',
-                                        borderRadius: 12,
+                                        borderRadius: 14,
                                         paddingVertical: 14,
                                         flexDirection: 'row',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: 8,
-                                        marginTop: 6,
-                                        marginBottom: 26,
+                                        marginTop: 8,
+                                        marginBottom: 28,
                                         borderWidth: 1.5,
-                                        borderColor: T.gold
+                                        borderColor: T.gold,
+                                        shadowColor: '#D4AF37',
+                                        shadowOffset: { width: 0, height: 3 },
+                                        shadowOpacity: 0.25,
+                                        shadowRadius: 6,
+                                        elevation: 3,
                                     }}
                                     activeOpacity={0.85}
                                 >
@@ -5456,41 +5734,16 @@ Metadata:
                         </View>
                     )}
 
-                    {/* Action Buttons Cluster */}
+                    {/* Top Row Right Actions: Refresh and + User */}
                     <View style={s.headerActionCluster}>
                         {!isSelectionMode && (
-                            <>
-                                <TouchableOpacity 
-                                    onPress={() => setShowBatchModal(true)} 
-                                    style={[
-                                        s.headerGhostBtn, 
-                                        stats.missingAccounts > 0 && s.headerGhostBtnAlert, 
-                                        { paddingHorizontal: 9, width: 'auto', flexDirection: 'row', gap: 5 }
-                                    ]}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="flash" size={13} color={stats.missingAccounts > 0 ? "#F59E0B" : "#D4AF37"} />
-                                    <Text style={{ color: stats.missingAccounts > 0 ? "#FCD34D" : "#D4AF37", fontSize: 11, fontWeight: '800' }}>
-                                        Auto Gen VA{stats.missingAccounts > 0 ? ` (${stats.missingAccounts})` : ''}
-                                    </Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    onPress={onRefresh} 
-                                    style={s.headerGhostBtn}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="refresh" size={16} color="#D4AF37" />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    onPress={handleExportFilteredUsersCSV} 
-                                    style={s.headerGhostBtn}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="download-outline" size={16} color="#D4AF37" />
-                                </TouchableOpacity>
-                            </>
+                            <TouchableOpacity 
+                                onPress={onRefresh} 
+                                style={s.headerGhostBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="refresh" size={16} color="#D4AF37" />
+                            </TouchableOpacity>
                         )}
 
                         <TouchableOpacity 
@@ -5511,35 +5764,58 @@ Metadata:
                     </View>
                 </View>
 
-                {/* Mobile-First Header Dropdown Bar: Shows live balances and toggle button */}
+                {/* Sub-Header Executive Command Ribbon (Auto Gen VA, Export CSV, Live Vault Telemetry & Stats) */}
                 {!isSelectionMode && (
                     <View style={s.dropdownToggleBar}>
-                        <View style={s.dropdownTelemetryPill}>
-                            <Ionicons name="wallet-outline" size={12} color="#D4AF37" />
-                            <Text style={s.dropdownTelemetryText}>
-                                ₦{stats.totalBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                            </Text>
-                            <View style={s.dropdownTelemetryDivider} />
-                            <MaterialCommunityIcons name="ethereum" size={12} color="#60A5FA" />
-                            <Text style={[s.dropdownTelemetryText, { color: '#FCD34D' }]}>
-                                ${stats.totalCryptoUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                            </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <TouchableOpacity 
+                                onPress={() => setShowBatchModal(true)} 
+                                style={[
+                                    s.headerGhostBtn, 
+                                    stats.missingAccounts > 0 && s.headerGhostBtnAlert, 
+                                    { paddingHorizontal: 9, width: 'auto', height: 30, flexDirection: 'row', gap: 4 }
+                                ]}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="flash" size={12} color={stats.missingAccounts > 0 ? "#F59E0B" : "#D4AF37"} />
+                                <Text style={{ color: stats.missingAccounts > 0 ? "#FCD34D" : "#D4AF37", fontSize: 10.5, fontWeight: '800' }}>
+                                    Auto Gen VA{stats.missingAccounts > 0 ? ` (${stats.missingAccounts})` : ''}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={handleExportFilteredUsersCSV} 
+                                style={[s.headerGhostBtn, { paddingHorizontal: 8, width: 'auto', height: 30, flexDirection: 'row', gap: 4 }]}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="download-outline" size={13} color="#D4AF37" />
+                                <Text style={{ color: "#D4AF37", fontSize: 10.5, fontWeight: '800' }}>CSV</Text>
+                            </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity 
-                            onPress={() => setIsHeaderStatsOpen(!isHeaderStatsOpen)}
-                            style={[s.dropdownHeaderBtn, isHeaderStatsOpen && s.dropdownHeaderBtnActive]}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons 
-                                name={isHeaderStatsOpen ? "chevron-up" : "chevron-down"} 
-                                size={12} 
-                                color={isHeaderStatsOpen ? "#0A1128" : "#D4AF37"} 
-                            />
-                            <Text style={[s.dropdownHeaderBtnText, isHeaderStatsOpen && { color: '#0A1128' }]}>
-                                {isHeaderStatsOpen ? "Close Overview ▲" : "Vault & Stats ▾"}
-                            </Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={s.dropdownTelemetryPill}>
+                                <Ionicons name="wallet-outline" size={11} color="#D4AF37" />
+                                <Text style={s.dropdownTelemetryText}>
+                                    ₦{stats.totalBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity 
+                                onPress={() => setIsHeaderStatsOpen(!isHeaderStatsOpen)}
+                                style={[s.dropdownHeaderBtn, isHeaderStatsOpen && s.dropdownHeaderBtnActive, { height: 30, paddingVertical: 0 }]}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons 
+                                    name={isHeaderStatsOpen ? "chevron-up" : "chevron-down"} 
+                                    size={12} 
+                                    color={isHeaderStatsOpen ? "#0A1128" : "#D4AF37"} 
+                                />
+                                <Text style={[s.dropdownHeaderBtnText, isHeaderStatsOpen && { color: '#0A1128' }]}>
+                                    {isHeaderStatsOpen ? "Close ▲" : "Stats ▾"}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
 
@@ -7154,9 +7430,9 @@ const s = StyleSheet.create({
         borderColor: T.border,
     },
     modalHeroBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        paddingHorizontal: 16,
         paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: T.border,
@@ -7515,30 +7791,38 @@ const s = StyleSheet.create({
         color: T.textMain,
     },
     subFormCard: {
-        backgroundColor: T.card,
-        padding: 12,
-        borderRadius: 14,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: T.border,
-        marginBottom: 10,
+        borderColor: '#E2E8F0',
+        marginBottom: 14,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2,
     },
     inputLabel: {
         fontSize: 11,
         fontWeight: '800',
-        color: T.navyDark,
-        marginBottom: 4,
+        color: '#475569',
+        marginBottom: 6,
         marginTop: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     subFormInput: {
-        backgroundColor: T.bg,
-        borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        fontSize: 12,
-        color: T.textMain,
-        marginBottom: 8,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.2,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#0F172A',
+        marginBottom: 10,
     },
     subFormSubmitBtn: {
         backgroundColor: T.navyDark,
