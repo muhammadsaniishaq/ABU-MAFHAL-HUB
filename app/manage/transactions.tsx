@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
 
@@ -31,6 +31,8 @@ const T = {
   orangeL: '#FFF7ED',
   indigo:  '#4F46E5',
   indigoL: '#EEF2FF',
+  purple:  '#7C3AED',
+  purpleL: '#F5F3FF',
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -51,6 +53,13 @@ type Transaction = {
   reference: string | null;
   created_at: string;
   user_id: string;
+  category?: string | null;
+  fee?: number | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  session_id?: string | null;
+  details?: any;
+  metadata?: any;
   profile?: Profile | null;
 };
 
@@ -62,33 +71,106 @@ type StatsType = {
   failed: number;
 };
 
-const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
-  success:   { color: T.green,  bg: T.greenL,  icon: 'checkmark-circle' },
-  pending:   { color: T.orange, bg: T.orangeL, icon: 'time' },
-  failed:    { color: T.red,    bg: T.redL,    icon: 'close-circle' },
-  cancelled: { color: T.textSub,bg: '#F1F5F9', icon: 'ban' },
-};
+// ─── Status Classification ────────────────────────────────────────────────────
+export function isSuccessStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  return ['success', 'successful', 'completed', 'approved', 'paid', 'delivered'].includes(s);
+}
+
+export function isPendingStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  return ['pending', 'processing', 'in_progress', 'in-progress', 'queued', 'submitted', 'initiated'].includes(s);
+}
+
+export function isFailedStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  return ['failed', 'declined', 'rejected', 'error', 'cancelled', 'canceled'].includes(s);
+}
+
+export function isRefundStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  return ['refund', 'refunded', 'reversed'].includes(s);
+}
+
+function getStatusConfig(status: string | null | undefined) {
+  if (isSuccessStatus(status)) {
+    return { color: T.green, bg: T.greenL, icon: 'checkmark-circle' as const, label: 'Success' };
+  }
+  if (isPendingStatus(status)) {
+    return { color: T.orange, bg: T.orangeL, icon: 'time' as const, label: 'Pending' };
+  }
+  if (isFailedStatus(status)) {
+    return { color: T.red, bg: T.redL, icon: 'close-circle' as const, label: 'Failed' };
+  }
+  if (isRefundStatus(status)) {
+    return { color: T.indigo, bg: T.indigoL, icon: 'refresh-circle' as const, label: 'Refunded' };
+  }
+  return { color: T.textSub, bg: '#F1F5F9', icon: 'ellipse' as const, label: status || 'Unknown' };
+}
 
 const TYPE_CONFIG: Record<string, { color: string; bg: string; icon: string; label: string }> = {
-  deposit:    { color: T.green,  bg: T.greenL,  icon: 'arrow-down',   label: 'Deposit' },
-  withdrawal: { color: T.red,    bg: T.redL,    icon: 'arrow-up',     label: 'Withdrawal' },
-  transfer:   { color: T.indigo, bg: T.indigoL, icon: 'swap-horizontal', label: 'Transfer' },
-  data:       { color: T.gold,   bg: T.goldL,   icon: 'cellular',     label: 'Data' },
-  airtime:    { color: '#7C3AED',bg: '#F5F3FF', icon: 'call',         label: 'Airtime' },
-  bills:      { color: T.navy,   bg: '#F1F5F9', icon: 'receipt',      label: 'Bills' },
+  deposit:      { color: T.green,  bg: T.greenL,  icon: 'arrow-down',        label: 'Deposit' },
+  withdrawal:   { color: T.red,    bg: T.redL,    icon: 'arrow-up',          label: 'Withdrawal' },
+  transfer:     { color: T.indigo, bg: T.indigoL, icon: 'swap-horizontal',   label: 'Transfer' },
+  payment:      { color: T.navy,   bg: '#F1F5F9', icon: 'wallet',            label: 'Payment' },
+  verification: { color: T.gold,   bg: T.goldL,   icon: 'shield-checkmark',  label: 'Verification' },
+  data:         { color: T.gold,   bg: T.goldL,   icon: 'cellular',          label: 'Data' },
+  airtime:      { color: T.purple, bg: T.purpleL, icon: 'call',              label: 'Airtime' },
+  bills:        { color: T.navy,   bg: '#F1F5F9', icon: 'receipt',           label: 'Bills' },
+  refund:       { color: T.indigo, bg: T.indigoL, icon: 'refresh',           label: 'Refund' },
 };
 
 function getTypeConfig(type: string) {
   return TYPE_CONFIG[type?.toLowerCase()] ?? { color: T.textSub, bg: '#F1F5F9', icon: 'card', label: type || 'Transaction' };
-}
-function getStatusConfig(status: string) {
-  return STATUS_CONFIG[status?.toLowerCase()] ?? { color: T.textSub, bg: '#F1F5F9', icon: 'ellipse' };
 }
 
 function avatarText(name: string | null) {
   if (!name) return '?';
   const parts = name.trim().split(' ');
   return parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : name[0].toUpperCase();
+}
+
+// ─── Extract Root Cause ("Asalin Matsala") ─────────────────────────────────────
+function extractFailureReason(tx: Transaction): string | null {
+  if (!isFailedStatus(tx.status)) return null;
+
+  // 1. Details object
+  if (tx.details) {
+    if (typeof tx.details === 'string') return tx.details;
+    if (tx.details.error) return String(tx.details.error);
+    if (tx.details.failure_reason) return String(tx.details.failure_reason);
+    if (tx.details.message) return String(tx.details.message);
+    if (tx.details.provider_response?.message) return String(tx.details.provider_response.message);
+    if (tx.details.provider_response?.error) return String(tx.details.provider_response.error);
+  }
+
+  // 2. Metadata object
+  if (tx.metadata) {
+    if (typeof tx.metadata === 'string') return tx.metadata;
+    if (tx.metadata.reason) return String(tx.metadata.reason);
+    if (tx.metadata.error) return String(tx.metadata.error);
+    if (tx.metadata.failure_reason) return String(tx.metadata.failure_reason);
+    if (tx.metadata.message) return String(tx.metadata.message);
+  }
+
+  // 3. Description hints
+  if (tx.description) {
+    const desc = tx.description;
+    const lower = desc.toLowerCase();
+    if (lower.includes('failed:') || lower.includes('error:') || lower.includes('reason:')) {
+      const match = desc.match(/(?:failed|error|reason):\s*(.*)/i);
+      if (match && match[1]) return match[1].trim();
+    }
+    if (lower.includes('timed out') || lower.includes('insufficient') || lower.includes('declined') || lower.includes('rejected')) {
+      return desc;
+    }
+  }
+
+  return 'Transaction failed at provider or banking network gateway.';
 }
 
 // ─── Avatar component ─────────────────────────────────────────────────────────
@@ -120,7 +202,7 @@ function StatCard({ label, value, sub, iconName, iconColor, iconBg }: {
   return (
     <View style={s.statCard}>
       <View style={[s.statIcon, { backgroundColor: iconBg }]}>
-        <Ionicons name={iconName as any} size={16} color={iconColor} />
+        <Ionicons name={iconName as any} size={15} color={iconColor} />
       </View>
       <Text style={s.statVal}>{value}</Text>
       <Text style={s.statLbl}>{label}</Text>
@@ -134,9 +216,11 @@ function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
   const tc = getTypeConfig(tx.type);
   const sc = getStatusConfig(tx.status);
   const amount = parseFloat(String(tx.amount || 0));
-  const isCredit = tx.type === 'deposit';
+  const isCredit = tx.type === 'deposit' || tx.type === 'refund';
+  const hasError = isFailedStatus(tx.status);
+
   return (
-    <TouchableOpacity style={s.txRow} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity style={[s.txRow, hasError && { borderColor: '#FECACA' }]} onPress={onPress} activeOpacity={0.75}>
       {/* Left: type icon */}
       <View style={[s.txIconBox, { backgroundColor: tc.bg }]}>
         <Ionicons name={tc.icon as any} size={18} color={tc.color} />
@@ -145,7 +229,7 @@ function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
       {/* Middle: user + description */}
       <View style={{ flex: 1, marginHorizontal: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <UserAvatar profile={tx.profile} size={22} />
+          <UserAvatar profile={tx.profile} size={20} />
           <Text style={s.txUser} numberOfLines={1}>
             {tx.profile?.full_name || 'Unknown User'}
           </Text>
@@ -162,17 +246,206 @@ function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
           {isCredit ? '+' : '-'}₦{amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </Text>
         <View style={[s.statusBadge, { backgroundColor: sc.bg }]}>
-          <Ionicons name={sc.icon as any} size={9} color={sc.color} />
-          <Text style={[s.statusTxt, { color: sc.color }]}>{tx.status}</Text>
+          <Ionicons name={sc.icon} size={9} color={sc.color} />
+          <Text style={[s.statusTxt, { color: sc.color }]}>{sc.label}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 }
 
+// ─── Detailed Transaction Modal ("Asalin Matsala" & Root Cause) ──────────────
+function TransactionDetailModal({
+  tx,
+  visible,
+  onClose,
+  onOpenUserHistory,
+}: {
+  tx: Transaction | null;
+  visible: boolean;
+  onClose: () => void;
+  onOpenUserHistory: (userId: string, profile?: Profile | null) => void;
+}) {
+  const [showRawJson, setShowRawJson] = useState(false);
+  if (!tx) return null;
+
+  const tc = getTypeConfig(tx.type);
+  const sc = getStatusConfig(tx.status);
+  const amount = parseFloat(String(tx.amount || 0));
+  const fee = parseFloat(String(tx.fee || 0));
+  const isCredit = tx.type === 'deposit' || tx.type === 'refund';
+  const failureReason = extractFailureReason(tx);
+  const isFailed = isFailedStatus(tx.status);
+  const isSuccess = isSuccessStatus(tx.status);
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
+        {/* Header */}
+        <LinearGradient colors={[T.navy, T.navyMid]} style={s.modalDetailHeader}>
+          <TouchableOpacity onPress={onClose} style={s.modalClose} activeOpacity={0.75}>
+            <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <View style={{ alignItems: 'center', paddingHorizontal: 20 }}>
+            {/* Status Pill */}
+            <View style={[s.detailStatusBadge, { backgroundColor: sc.bg }]}>
+              <Ionicons name={sc.icon} size={14} color={sc.color} />
+              <Text style={[s.detailStatusText, { color: sc.color }]}>{sc.label.toUpperCase()}</Text>
+            </View>
+
+            {/* Amount */}
+            <Text style={s.detailAmount}>
+              {isCredit ? '+' : '-'}₦{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            <Text style={s.detailType}>{tc.label.toUpperCase()}{tx.category ? ` · ${tx.category.toUpperCase()}` : ''}</Text>
+          </View>
+        </LinearGradient>
+
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+
+          {/* 🔴 ASALIN MATSALA / ROOT CAUSE CARD (Prominently displayed if failed) */}
+          {isFailed && (
+            <View style={s.rootCauseCard}>
+              <View style={s.rootCauseHeader}>
+                <Ionicons name="alert-circle" size={20} color={T.red} />
+                <Text style={s.rootCauseTitle}>Asalin Matsala (Failure Root Cause)</Text>
+              </View>
+              <Text style={s.rootCauseBody}>
+                {failureReason || 'Provider returned an unsuccessful response.'}
+              </Text>
+              {tx.details?.provider_response && (
+                <View style={s.rootCauseProviderBox}>
+                  <Text style={s.rootCauseProviderLabel}>Provider Diagnostics:</Text>
+                  <Text style={s.rootCauseProviderText} numberOfLines={4}>
+                    {JSON.stringify(tx.details.provider_response, null, 2)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* 🟢 SUCCESS CONFIRMATION BANNER */}
+          {isSuccess && (
+            <View style={s.successBannerCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="checkmark-done-circle" size={22} color={T.green} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.successBannerTitle}>Transaction Successful</Text>
+                  <Text style={s.successBannerSub}>Verified and settled on the system without error.</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Transaction Metadata Card */}
+          <View style={s.cardSection}>
+            <Text style={s.cardSectionTitle}>Bayanan Transaction (Details)</Text>
+
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>Reference</Text>
+              <Text style={[s.metaValue, { fontWeight: '800' }]} selectable>{tx.reference || tx.id}</Text>
+            </View>
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>Kwanan Wata (Date & Time)</Text>
+              <Text style={s.metaValue}>
+                {new Date(tx.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+              </Text>
+            </View>
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>Description</Text>
+              <Text style={s.metaValue}>{tx.description || 'N/A'}</Text>
+            </View>
+            {fee > 0 && (
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Service Fee</Text>
+                <Text style={s.metaValue}>₦{fee.toLocaleString()}</Text>
+              </View>
+            )}
+            {tx.bank_name && (
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Bank Name</Text>
+                <Text style={s.metaValue}>{tx.bank_name}</Text>
+              </View>
+            )}
+            {tx.account_number && (
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Account Number</Text>
+                <Text style={s.metaValue}>{tx.account_number}</Text>
+              </View>
+            )}
+            {tx.session_id && (
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Session ID</Text>
+                <Text style={[s.metaValue, { fontSize: 11 }]} selectable>{tx.session_id}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* User Information Card */}
+          <View style={s.cardSection}>
+            <Text style={s.cardSectionTitle}>Bayanan Mai Aiki (User Profile)</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 8 }}>
+              <UserAvatar profile={tx.profile} size={48} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.userNameText}>{tx.profile?.full_name || 'Babu Suna (Unnamed)'}</Text>
+                {tx.profile?.email ? <Text style={s.userContactText}>{tx.profile.email}</Text> : null}
+                {tx.profile?.phone ? <Text style={s.userContactText}>{tx.profile.phone}</Text> : null}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={s.userHistoryBtn}
+              onPress={() => {
+                onClose();
+                onOpenUserHistory(tx.user_id, tx.profile);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="time" size={16} color={T.navy} />
+              <Text style={s.userHistoryBtnText}>Duba Sauran Tarihin Wannan User</Text>
+              <Ionicons name="chevron-forward" size={16} color={T.navy} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Raw JSON Toggle for Deep Technical Inspection */}
+          {(tx.details || tx.metadata) && (
+            <View style={s.cardSection}>
+              <TouchableOpacity
+                onPress={() => setShowRawJson(!showRawJson)}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="code-slash" size={16} color={T.textSub} />
+                  <Text style={s.cardSectionTitle}>Duba Raw JSON Data</Text>
+                </View>
+                <Ionicons name={showRawJson ? 'chevron-up' : 'chevron-down'} size={18} color={T.textSub} />
+              </TouchableOpacity>
+
+              {showRawJson && (
+                <View style={s.rawJsonBox}>
+                  <Text style={s.rawJsonText} selectable>
+                    {JSON.stringify({ details: tx.details, metadata: tx.metadata }, null, 2)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── User Detail Modal ────────────────────────────────────────────────────────
-function UserTxModal({ userId, profile, visible, onClose }: {
-  userId: string; profile?: Profile | null; visible: boolean; onClose: () => void;
+function UserTxModal({ userId, profile, visible, onClose, onSelectTx }: {
+  userId: string;
+  profile?: Profile | null;
+  visible: boolean;
+  onClose: () => void;
+  onSelectTx: (tx: Transaction) => void;
 }) {
   const [txList, setTxList] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,20 +456,28 @@ function UserTxModal({ userId, profile, visible, onClose }: {
     setLoading(true);
     supabase
       .from('transactions')
-      .select('*')
+      .select(`
+        id, type, amount, status, description, reference, created_at, user_id,
+        category, fee, bank_name, account_number, session_id, details, metadata
+      `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(100)
       .then(({ data }) => {
         if (data) {
-          setTxList(data);
-          const vol = data.reduce((s, t) => s + parseFloat(String(t.amount || 0)), 0);
-          const suc = data.filter(t => t.status === 'success').length;
-          setUserStats({ total: data.length, volume: vol, success: suc });
+          const list: Transaction[] = data.map((d: any) => ({ ...d, profile }));
+          setTxList(list);
+
+          // 🛡️ ACCURATE MATH: Only count successful transactions toward volume
+          const vol = list
+            .filter(t => isSuccessStatus(t.status))
+            .reduce((s, t) => s + parseFloat(String(t.amount || 0)), 0);
+          const suc = list.filter(t => isSuccessStatus(t.status)).length;
+          setUserStats({ total: list.length, volume: vol, success: suc });
         }
         setLoading(false);
       });
-  }, [visible, userId]);
+  }, [visible, userId, profile]);
 
   const name = profile?.full_name || 'Unknown User';
   const email = profile?.email || '';
@@ -223,7 +504,7 @@ function UserTxModal({ userId, profile, visible, onClose }: {
             </View>
             <View style={[s.modalStatItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }]}>
               <Text style={s.modalStatVal}>₦{(userStats.volume / 1000).toFixed(1)}k</Text>
-              <Text style={s.modalStatLbl}>Volume</Text>
+              <Text style={s.modalStatLbl}>Success Volume</Text>
             </View>
             <View style={s.modalStatItem}>
               <Text style={s.modalStatVal}>{userStats.total > 0 ? ((userStats.success / userStats.total) * 100).toFixed(0) : 0}%</Text>
@@ -252,9 +533,16 @@ function UserTxModal({ userId, profile, visible, onClose }: {
               const tc = getTypeConfig(item.type);
               const sc = getStatusConfig(item.status);
               const amount = parseFloat(String(item.amount || 0));
-              const isCredit = item.type === 'deposit';
+              const isCredit = item.type === 'deposit' || item.type === 'refund';
               return (
-                <View style={s.modalTxCard}>
+                <TouchableOpacity
+                  style={s.modalTxCard}
+                  onPress={() => {
+                    onClose();
+                    onSelectTx(item);
+                  }}
+                  activeOpacity={0.75}
+                >
                   <View style={[s.txIconBox, { backgroundColor: tc.bg }]}>
                     <Ionicons name={tc.icon as any} size={16} color={tc.color} />
                   </View>
@@ -269,11 +557,11 @@ function UserTxModal({ userId, profile, visible, onClose }: {
                       {isCredit ? '+' : '-'}₦{amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </Text>
                     <View style={[s.statusBadge, { backgroundColor: sc.bg }]}>
-                      <Ionicons name={sc.icon as any} size={9} color={sc.color} />
-                      <Text style={[s.statusTxt, { color: sc.color }]}>{item.status}</Text>
+                      <Ionicons name={sc.icon} size={9} color={sc.color} />
+                      <Text style={[s.statusTxt, { color: sc.color }]}>{sc.label}</Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             }}
           />
@@ -298,7 +586,10 @@ export default function TransactionHistory() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 40;
 
-  // Modal state
+  // Selected Transaction Modal
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+
+  // User History Modal
   const [modalUserId, setModalUserId] = useState<string | null>(null);
   const [modalProfile, setModalProfile] = useState<Profile | null>(null);
 
@@ -314,6 +605,7 @@ export default function TransactionHistory() {
         .from('transactions')
         .select(`
           id, type, amount, status, description, reference, created_at, user_id,
+          category, fee, bank_name, account_number, session_id, details, metadata,
           profiles:user_id ( id, full_name, avatar_url, email, phone )
         `)
         .order('created_at', { ascending: false })
@@ -333,11 +625,14 @@ export default function TransactionHistory() {
       }
 
       if (isRefresh || page === 0) {
-        // Calculate stats from current page (approximate)
-        const vol = mapped.reduce((s, t) => s + parseFloat(String(t.amount || 0)), 0);
-        const suc = mapped.filter(t => t.status === 'success').length;
-        const pen = mapped.filter(t => t.status === 'pending').length;
-        const fai = mapped.filter(t => t.status === 'failed').length;
+        // 🛡️ ACCURATE FINANCIAL METRICS:
+        // Volume ONLY accumulates successful transactions. Failed/pending are excluded from volume.
+        const vol = mapped
+          .filter(t => isSuccessStatus(t.status))
+          .reduce((s, t) => s + parseFloat(String(t.amount || 0)), 0);
+        const suc = mapped.filter(t => isSuccessStatus(t.status)).length;
+        const pen = mapped.filter(t => isPendingStatus(t.status)).length;
+        const fai = mapped.filter(t => isFailedStatus(t.status)).length;
         setStats({ total: mapped.length, volume: vol, success: suc, pending: pen, failed: fai });
       }
     } catch (e: any) {
@@ -353,14 +648,24 @@ export default function TransactionHistory() {
   // Filter logic
   useEffect(() => {
     let list = transactions;
-    if (activeFilter !== 'all') list = list.filter(t => t.status === activeFilter);
+
+    if (activeFilter === 'success') {
+      list = list.filter(t => isSuccessStatus(t.status));
+    } else if (activeFilter === 'pending') {
+      list = list.filter(t => isPendingStatus(t.status));
+    } else if (activeFilter === 'failed') {
+      list = list.filter(t => isFailedStatus(t.status));
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(t =>
         t.profile?.full_name?.toLowerCase().includes(q) ||
         t.description?.toLowerCase().includes(q) ||
         t.reference?.toLowerCase().includes(q) ||
-        t.type?.toLowerCase().includes(q)
+        t.type?.toLowerCase().includes(q) ||
+        (t.bank_name && t.bank_name.toLowerCase().includes(q)) ||
+        (t.account_number && t.account_number.includes(q))
       );
     }
     setFiltered(list);
@@ -385,7 +690,7 @@ export default function TransactionHistory() {
           </TouchableOpacity>
           <View style={{ flex: 1, alignItems: 'center' }}>
             <Text style={s.headerTitle}>Transaction History</Text>
-            <Text style={s.headerSub}>All Platform Transactions</Text>
+            <Text style={s.headerSub}>All Platform Transactions & Audits</Text>
           </View>
           <TouchableOpacity onPress={() => fetchTransactions(true)} style={s.backBtn} activeOpacity={0.75}>
             <Ionicons name="refresh" size={16} color="#FFFFFF" />
@@ -399,7 +704,7 @@ export default function TransactionHistory() {
             style={s.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by name, type, reference…"
+            placeholder="Search by name, reference, bank, type…"
             placeholderTextColor="#94A3B8"
             returnKeyType="search"
           />
@@ -427,7 +732,7 @@ export default function TransactionHistory() {
       {/* ── Stats strip ── */}
       <View style={s.statsStrip}>
         <StatCard label="Transactions" value={String(stats.total)} iconName="receipt" iconColor={T.navy} iconBg="#F1F5F9" />
-        <StatCard label="Volume" value={`₦${(stats.volume / 1000).toFixed(1)}k`} iconName="trending-up" iconColor={T.green} iconBg={T.greenL} />
+        <StatCard label="Success Volume" value={`₦${(stats.volume / 1000).toFixed(1)}k`} iconName="trending-up" iconColor={T.green} iconBg={T.greenL} />
         <StatCard label="Success" value={String(stats.success)} iconName="checkmark-circle" iconColor={T.green} iconBg={T.greenL} />
         <StatCard label="Pending" value={String(stats.pending)} iconName="time" iconColor={T.orange} iconBg={T.orangeL} />
         <StatCard label="Failed" value={String(stats.failed)} iconName="close-circle" iconColor={T.red} iconBg={T.redL} />
@@ -460,14 +765,10 @@ export default function TransactionHistory() {
           renderItem={({ item }) => (
             <TxRow
               tx={item}
-              onPress={() => {
-                setModalUserId(item.user_id);
-                setModalProfile(item.profile ?? null);
-              }}
+              onPress={() => setSelectedTx(item)}
             />
           )}
           onEndReached={() => {
-            // Load more
             if (filtered.length >= PAGE_SIZE) {
               setPage(p => p + 1);
             }
@@ -476,7 +777,18 @@ export default function TransactionHistory() {
         />
       )}
 
-      {/* ── User Transactions Modal ── */}
+      {/* ── Individual Transaction Detail Modal ("Asalin Matsala" Inspection) ── */}
+      <TransactionDetailModal
+        tx={selectedTx}
+        visible={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        onOpenUserHistory={(uid, prof) => {
+          setModalUserId(uid);
+          setModalProfile(prof ?? null);
+        }}
+      />
+
+      {/* ── User Full Transactions History Modal ── */}
       {modalUserId && (
         <UserTxModal
           visible={!!modalUserId}
@@ -486,6 +798,7 @@ export default function TransactionHistory() {
             setModalUserId(null);
             setModalProfile(null);
           }}
+          onSelectTx={(tx) => setSelectedTx(tx)}
         />
       )}
     </View>
@@ -564,7 +877,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 8,
+    gap: 6,
   },
   statCard: {
     flex: 1,
@@ -581,7 +894,7 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   statIcon: {
-    width: 28, height: 28, borderRadius: 8,
+    width: 26, height: 26, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 4,
   },
@@ -619,10 +932,10 @@ const s = StyleSheet.create({
   },
   statusTxt: { fontSize: 8.5, fontWeight: '800', textTransform: 'uppercase' },
 
-  // Modal
-  modalHeader: {
+  // Detail Modal Header
+  modalDetailHeader: {
     paddingTop: Platform.OS === 'android' ? 28 : 50,
-    paddingBottom: 0,
+    paddingBottom: 24,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
@@ -631,7 +944,189 @@ const s = StyleSheet.create({
     width: 44, height: 28, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  detailStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  detailStatusText: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  detailAmount: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  detailType: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: T.goldB,
+    marginTop: 4,
+    letterSpacing: 1,
+  },
+
+  // Cards
+  cardSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: T.border,
+    marginTop: 12,
+  },
+  cardSectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: T.navy,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: T.textSub,
+  },
+  metaValue: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: T.navy,
+    maxWidth: W * 0.55,
+    textAlign: 'right',
+  },
+
+  // 🔴 Asalin Matsala Box
+  rootCauseCard: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#F87171',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+  },
+  rootCauseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  rootCauseTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: T.red,
+  },
+  rootCauseBody: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#991B1B',
+    lineHeight: 18,
+  },
+  rootCauseProviderBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  rootCauseProviderLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: T.red,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  rootCauseProviderText: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#7F1D1D',
+  },
+
+  // 🟢 Success Banner
+  successBannerCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+  },
+  successBannerTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: T.green,
+  },
+  successBannerSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#166534',
+    marginTop: 2,
+  },
+
+  // User Profile in Modal
+  userNameText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: T.navy,
+  },
+  userContactText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: T.textSub,
+    marginTop: 2,
+  },
+  userHistoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  userHistoryBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: T.navy,
+  },
+
+  // Raw JSON Box
+  rawJsonBox: {
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+  },
+  rawJsonText: {
+    fontSize: 9.5,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#38BDF8',
+  },
+
+  // Modal Header
+  modalHeader: {
+    paddingTop: Platform.OS === 'android' ? 28 : 50,
+    paddingBottom: 0,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   modalName: { fontSize: 18, fontWeight: '900', color: '#FFFFFF', marginTop: 10 },
   modalEmail: { fontSize: 11, color: T.goldB, fontWeight: '700', marginTop: 2 },

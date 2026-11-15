@@ -261,32 +261,10 @@ serve(async (req: Request) => {
         });
       }
 
-      // 🛡️ Atomic Balance Deduction: RPC verify success strictly
-      const { data: deductResult, error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
-        user_id: user.id,
-        amount: FEE_AMOUNT
-      });
-
-      if (deductError || (deductResult && deductResult.success === false)) {
-        const errMsg = deductError?.message || deductResult?.error || 'Insufficient wallet balance.';
-        return jsonOk({ error: errMsg });
-      }
-
-      if (!deductResult || deductResult.success !== true) {
-        return jsonOk({ error: 'Failed to process wallet payment. Please try again.' });
-      }
-
-      hasDeducted = true;
-
-      // Record payment transaction
-      await supabaseAdmin.from('transactions').insert({
-        user_id: user.id,
-        amount: FEE_AMOUNT,
-        type: 'payment',
-        status: 'success',
-        reference: `id_${searchType}_${Date.now()}`,
-        description: description
-      });
+      // 🛡️ SECURITY POLICY ("Aiki sai ya yi kafin a cire wa user kudi"):
+      // Balance is NOT deducted upfront. The provider call MUST succeed first with valid data/job submission
+      // before balance is deducted. This eliminates false refunds and ensures zero financial loss.
+      hasDeducted = false;
     }
 
     // ── Retrieve SKBTECH API Key ─────────────────────────────────────────────
@@ -596,11 +574,26 @@ serve(async (req: Request) => {
       clearTimeout(timeoutId);
     } catch (netErr: any) {
       clearTimeout(timeoutId);
-      if (hasDeducted) {
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Provider request timed out');
-        hasDeducted = false;
-      }
-      return jsonOk({ error: `Connection to identity provider timed out or failed (${netErr.message || 'Timeout'}). Your wallet balance has been refunded. Please try again.` });
+      // 🛡️ Record failed attempt in transactions for admin observability ("asalin matsala")
+      try {
+        await supabaseAdmin.from('transactions').insert({
+          user_id: user.id,
+          amount: FEE_AMOUNT,
+          type: 'verification',
+          status: 'failed',
+          reference: `fail_net_${searchType}_${Date.now()}`,
+          description: `${description} (Network Timeout)`,
+          details: {
+            error: 'Provider connection timed out',
+            failure_reason: netErr?.message || 'Connection timed out',
+            search_type: searchType,
+            search_value: searchValue,
+            charged: false,
+          }
+        });
+      } catch (_) {}
+
+      return jsonOk({ error: `Connection to identity provider timed out (${netErr.message || 'Timeout'}). No funds were deducted from your wallet. Please try again.` });
     }
 
     const rawResponseText = await skbRes.text();
@@ -609,11 +602,25 @@ serve(async (req: Request) => {
     try {
       skbData = JSON.parse(rawResponseText);
     } catch (_) {
-      if (hasDeducted) {
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, 'Refund: Provider invalid response');
-        hasDeducted = false;
-      }
-      return jsonOk({ error: 'Identity provider returned an unreadable response. Your wallet has been refunded.' });
+      try {
+        await supabaseAdmin.from('transactions').insert({
+          user_id: user.id,
+          amount: FEE_AMOUNT,
+          type: 'verification',
+          status: 'failed',
+          reference: `fail_parse_${searchType}_${Date.now()}`,
+          description: `${description} (Invalid Response)`,
+          details: {
+            error: 'Identity provider returned unreadable response',
+            failure_reason: rawResponseText.substring(0, 300),
+            search_type: searchType,
+            search_value: searchValue,
+            charged: false,
+          }
+        });
+      } catch (_) {}
+
+      return jsonOk({ error: 'Identity provider returned an unreadable response. No funds were deducted from your wallet. Please try again.' });
     }
 
     // ── Handle Provider Error or Failure ─────────────────────────────────────
@@ -648,11 +655,28 @@ serve(async (req: Request) => {
         friendlyError = 'Identity verification gateway is momentarily unavailable. Please try again shortly.';
       }
 
-      if (hasDeducted) {
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: ${errMsg}`);
-        hasDeducted = false;
-      }
+      // 🛡️ Record failed transaction with exact root cause for Admin inspection ("asalin matsala")
+      try {
+        await supabaseAdmin.from('transactions').insert({
+          user_id: user.id,
+          amount: FEE_AMOUNT,
+          type: 'verification',
+          status: 'failed',
+          reference: `fail_${searchType}_${Date.now()}`,
+          description: `${description} (Failed: ${friendlyError})`,
+          details: {
+            error: friendlyError,
+            failure_reason: errMsg,
+            provider_response: skbData,
+            search_type: searchType,
+            search_value: searchValue,
+            charged: false,
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (_) {}
 
+      // 🛡️ ZERO FALSE REFUNDS: No balance was deducted, so zero refund is needed!
       return jsonOk({ error: friendlyError, raw: skbData });
     }
 
@@ -710,6 +734,35 @@ serve(async (req: Request) => {
 
     // ── Handle Initial Submission of Async Requests ──────────────────────────
     if (skbData.request_status === 'pending' || skbData.request_status === 'processing') {
+      // 🛡️ Deduct balance ONLY now that provider confirmed acceptance of request
+      if (FEE_AMOUNT > 0 && !hasDeducted) {
+        const { error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+          user_id: user.id,
+          amount: FEE_AMOUNT
+        });
+        if (deductError) {
+          return jsonOk({ error: 'Failed to process service fee: ' + (deductError.message || 'Payment error') });
+        }
+        hasDeducted = true;
+
+        await supabaseAdmin.from('transactions').insert({
+          user_id: user.id,
+          amount: FEE_AMOUNT,
+          type: 'payment',
+          status: 'pending',
+          reference: `id_${searchType}_${Date.now()}`,
+          description: description,
+          details: {
+            search_type: searchType,
+            search_value: searchValue,
+            status: skbData.request_status,
+            reference: skbData.reference || skbData.transaction_id,
+            provider_response: skbData,
+            charged: true,
+          }
+        });
+      }
+
       return jsonOk({
         data: {
           status: skbData.request_status,
@@ -948,6 +1001,41 @@ serve(async (req: Request) => {
       download_url: resolvedSlipUrl,
       transaction_id: skbData.transaction_id || `TXN-${Date.now()}`,
     };
+
+    // 🛡️ SECURITY POLICY ("Aiki sai ya yi kafin a cire wa user kudi"):
+    // Deduct balance ONLY now that provider successfully returned citizen data and slip
+    if (FEE_AMOUNT > 0 && !hasDeducted) {
+      const { error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+        user_id: user.id,
+        amount: FEE_AMOUNT
+      });
+
+      if (deductError) {
+        return jsonOk({
+          error: 'Wallet payment deduction error: ' + (deductError.message || 'Insufficient wallet balance to complete request.')
+        });
+      }
+      hasDeducted = true;
+
+      // Record successful payment transaction
+      await supabaseAdmin.from('transactions').insert({
+        user_id: user.id,
+        amount: FEE_AMOUNT,
+        type: 'payment',
+        status: 'success',
+        reference: `id_${searchType}_${Date.now()}`,
+        description: description,
+        details: {
+          search_type: searchType,
+          search_value: searchValue,
+          slip_url: resolvedSlipUrl,
+          provider_transaction_id: skbData.transaction_id,
+          citizen_name: [firstName, middleName, lastName].filter(Boolean).join(' ').trim(),
+          charged: true,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
 
     // 🛡️ Permanent Record: Save directly to verification_history table
     try {
