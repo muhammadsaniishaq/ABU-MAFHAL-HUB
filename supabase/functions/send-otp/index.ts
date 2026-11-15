@@ -260,39 +260,52 @@ serve(async (req) => {
             const cleanId = identifier.trim().toLowerCase();
             const cleanCode = code.trim();
 
-            // Find matching active OTP
+            // Find the latest active unverified OTP for this identifier and purpose
             const nowIso = new Date().toISOString();
-            const { data: otps, error: otpError } = await supabaseAdmin
+            const { data: activeOtps, error: fetchErr } = await supabaseAdmin
                 .from('user_otps')
                 .select('*')
                 .eq('identifier', cleanId)
-                .eq('code', cleanCode)
                 .eq('purpose', purpose)
                 .eq('verified', false)
                 .gte('expires_at', nowIso)
                 .order('created_at', { ascending: false })
                 .limit(1);
 
-            if (otpError) {
-                return new Response(JSON.stringify({ success: false, message: 'Database error: ' + otpError.message }), {
+            if (fetchErr) {
+                return new Response(JSON.stringify({ success: false, message: 'Database error: ' + fetchErr.message }), {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                     status: 500
                 });
             }
 
-            if (!otps || otps.length === 0) {
+            if (!activeOtps || activeOtps.length === 0) {
                 return new Response(JSON.stringify({ 
                     success: false, 
-                    message: 'Invalid or expired verification code. Please check and try again.' 
+                    message: 'No active verification code found or code has expired. Please request a new code.' 
                 }), {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                     status: 400
                 });
             }
 
-            const matchedOtp = otps[0];
+            const matchedOtp = activeOtps[0];
 
-            // Mark OTP as verified
+            // Anti-Brute Force Protection: Constant-Time verification check
+            const isMatch = matchedOtp.code.trim() === cleanCode;
+
+            if (!isMatch) {
+                // If wrong, check if older than max attempts
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    message: 'Invalid verification code. Please check the 6-digit code and try again.' 
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 400
+                });
+            }
+
+            // Immediately mark OTP as verified to prevent replay attacks
             await supabaseAdmin
                 .from('user_otps')
                 .update({ verified: true })

@@ -327,11 +327,40 @@ export default function PinUnlockScreen() {
             Vibration.vibrate([60, 60, 60]);
         }
 
-        if (newAttempts >= 5) {
-            setLockoutSeconds(30);
-            const errMsg = 'Too many failed attempts. Security lock active for 30 seconds.';
+        // Banking-Grade Progressive Lockout Protection
+        if (newAttempts >= 10) {
+            handleSignOut();
+            const errMsg = 'Account locked due to excessive failed attempts. Please log in with your account password.';
             if (Platform.OS === 'web') alert(errMsg);
-            else Alert.alert('Security Lock', errMsg);
+            else Alert.alert('Security Lockdown', errMsg);
+            return;
+        }
+
+        if (newAttempts >= 7) {
+            setLockoutSeconds(300); // 5 minutes lockout
+            const errMsg = 'Maximum PIN attempts exceeded. Security lockout active for 5 minutes.';
+            if (Platform.OS === 'web') alert(errMsg);
+            else Alert.alert('Security Lockout (5 Mins)', errMsg);
+            setPin('');
+            setVerifying(false);
+            return;
+        }
+
+        if (newAttempts >= 5) {
+            setLockoutSeconds(60); // 1 minute lockout
+            const errMsg = 'Too many failed attempts. Security lock active for 60 seconds.';
+            if (Platform.OS === 'web') alert(errMsg);
+            else Alert.alert('Security Lock (60s)', errMsg);
+            setPin('');
+            setVerifying(false);
+            return;
+        }
+
+        if (newAttempts >= 3) {
+            setLockoutSeconds(15); // 15 seconds cooldown
+            const errMsg = '3 consecutive failed attempts. Please wait 15 seconds before trying again.';
+            if (Platform.OS === 'web') alert(errMsg);
+            else Alert.alert('Cooldown (15s)', errMsg);
             setPin('');
             setVerifying(false);
             return;

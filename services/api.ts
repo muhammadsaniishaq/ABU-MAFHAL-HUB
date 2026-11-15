@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseUrl } from './supabase';
 import {
     AirtimeProvider, MockAirtimeProvider, FlutterwaveAirtimeProvider,
     DataProvider, MockDataProvider, FlutterwaveDataProvider,
@@ -1059,7 +1059,6 @@ export const api = {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Not authenticated. Please log in.");
             const token = session.access_token || '';
-            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uagcxrtdqttayulvgpwg.supabase.co';
 
             let edgeData: any = null;
 
@@ -1242,7 +1241,6 @@ export const api = {
         invoke: async (body: any) => {
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uagcxrtdqttayulvgpwg.supabase.co';
 
             let resData: any = null;
 
