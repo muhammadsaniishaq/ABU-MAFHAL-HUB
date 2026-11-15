@@ -304,12 +304,12 @@ function TransactionDetailModal({
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-          {/* 🔴 ASALIN MATSALA / ROOT CAUSE CARD (Prominently displayed if failed) */}
+          {/* 🔴 FAILURE ROOT CAUSE CARD (Prominently displayed if failed) */}
           {isFailed && (
             <View style={s.rootCauseCard}>
               <View style={s.rootCauseHeader}>
                 <Ionicons name="alert-circle" size={20} color={T.red} />
-                <Text style={s.rootCauseTitle}>Asalin Matsala (Failure Root Cause)</Text>
+                <Text style={s.rootCauseTitle}>Failure Root Cause</Text>
               </View>
               <Text style={s.rootCauseBody}>
                 {failureReason || 'Provider returned an unsuccessful response.'}
@@ -340,14 +340,14 @@ function TransactionDetailModal({
 
           {/* Transaction Metadata Card */}
           <View style={s.cardSection}>
-            <Text style={s.cardSectionTitle}>Bayanan Transaction (Details)</Text>
+            <Text style={s.cardSectionTitle}>Transaction Details</Text>
 
             <View style={s.metaRow}>
               <Text style={s.metaLabel}>Reference</Text>
               <Text style={[s.metaValue, { fontWeight: '800' }]} selectable>{tx.reference || tx.id}</Text>
             </View>
             <View style={s.metaRow}>
-              <Text style={s.metaLabel}>Kwanan Wata (Date & Time)</Text>
+              <Text style={s.metaLabel}>Date & Time</Text>
               <Text style={s.metaValue}>
                 {new Date(tx.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
               </Text>
@@ -384,11 +384,11 @@ function TransactionDetailModal({
 
           {/* User Information Card */}
           <View style={s.cardSection}>
-            <Text style={s.cardSectionTitle}>Bayanan Mai Aiki (User Profile)</Text>
+            <Text style={s.cardSectionTitle}>Customer Profile</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 8 }}>
               <UserAvatar profile={tx.profile} size={48} />
               <View style={{ flex: 1 }}>
-                <Text style={s.userNameText}>{tx.profile?.full_name || 'Babu Suna (Unnamed)'}</Text>
+                <Text style={s.userNameText}>{tx.profile?.full_name || 'Unnamed User'}</Text>
                 {tx.profile?.email ? <Text style={s.userContactText}>{tx.profile.email}</Text> : null}
                 {tx.profile?.phone ? <Text style={s.userContactText}>{tx.profile.phone}</Text> : null}
               </View>
@@ -403,7 +403,7 @@ function TransactionDetailModal({
               activeOpacity={0.8}
             >
               <Ionicons name="time" size={16} color={T.navy} />
-              <Text style={s.userHistoryBtnText}>Duba Sauran Tarihin Wannan User</Text>
+              <Text style={s.userHistoryBtnText}>View Full User History</Text>
               <Ionicons name="chevron-forward" size={16} color={T.navy} />
             </TouchableOpacity>
           </View>
@@ -418,7 +418,7 @@ function TransactionDetailModal({
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="code-slash" size={16} color={T.textSub} />
-                  <Text style={s.cardSectionTitle}>Duba Raw JSON Data</Text>
+                  <Text style={s.cardSectionTitle}>View Raw JSON Payload</Text>
                 </View>
                 <Ionicons name={showRawJson ? 'chevron-up' : 'chevron-down'} size={18} color={T.textSub} />
               </TouchableOpacity>

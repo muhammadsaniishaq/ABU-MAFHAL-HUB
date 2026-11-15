@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl, StyleSheet, useWindowDimensions, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Stack, useRouter } from 'expo-router';
@@ -143,6 +144,7 @@ interface Transaction {
     gateway_reference?: string;
     channel?: string;
     fee?: number;
+    details?: any;
     metadata?: any;
 }
 
@@ -156,6 +158,7 @@ interface LoginLog {
 
 export default function UserManagement() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
     const isTabletWeb = Platform.OS === 'web' && width >= 768 && width < 1024;
@@ -1594,10 +1597,10 @@ export default function UserManagement() {
 
             setSelectedUser({ ...selectedUser, ...updatePayload });
             fetchUsers();
-            Alert.alert("Nasara 🎉", "An sabunta dukkan bayanan mai amfani cikin nasara (User Profile Updated Successfully)!");
+            Alert.alert("Success 🎉", "User profile and permissions updated successfully!");
         } catch (e: any) {
             console.error("Save profile error:", e);
-            Alert.alert("Kuskure Wajen Ajiye Bayanai", e.message || "Failed to update user profile.");
+            Alert.alert("Error Saving Profile", e.message || "Failed to update user profile.");
         } finally {
             setSavingProfile(false);
         }
@@ -2166,7 +2169,7 @@ Metadata:
     // Executive Light Mode Command Center Modal
     const renderUserModal = () => (
         <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
-            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="light" style={s.modalOverlay}>
+            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="light" style={[s.modalOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <View style={s.modalCard}>
                     
                     {/* Modal Header Bar */}
@@ -2262,6 +2265,148 @@ Metadata:
                                 </View>
                             )}
                         </View>
+
+                        {/* Tier 3: Executive Fast Actions Toolbar (1-Tap Direct Operations) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setQuickFundTargetUser(selectedUser);
+                                    setShowQuickFundModal(true);
+                                }}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    backgroundColor: 'rgba(212, 175, 55, 0.18)',
+                                    borderWidth: 1,
+                                    borderColor: '#D4AF37',
+                                    paddingHorizontal: 9,
+                                    paddingVertical: 5,
+                                    borderRadius: 8,
+                                }}
+                                activeOpacity={0.75}
+                            >
+                                <Ionicons name="flash" size={12} color="#D4AF37" />
+                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#D4AF37' }}>Fund / Debit</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (!selectedUser) return;
+                                    const isSuspended = selectedUser.status === 'suspended';
+                                    Alert.alert(
+                                        isSuspended ? "Reactivate User" : "Freeze Account",
+                                        isSuspended 
+                                            ? `Are you sure you want to reactivate ${selectedUser.full_name}?` 
+                                            : `Are you sure you want to suspend and freeze ${selectedUser.full_name}?`,
+                                        [
+                                            { text: "Cancel", style: "cancel" },
+                                            { 
+                                                text: isSuspended ? "Reactivate" : "Freeze Now", 
+                                                style: isSuspended ? "default" : "destructive",
+                                                onPress: async () => {
+                                                    const newStatus = isSuspended ? 'active' : 'suspended';
+                                                    await supabase.from('profiles').update({ status: newStatus }).eq('id', selectedUser.id);
+                                                    setSelectedUser({ ...selectedUser, status: newStatus });
+                                                    fetchUsers();
+                                                    Alert.alert("Success", `Account status changed to ${newStatus}.`);
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    backgroundColor: selectedUser?.status === 'active' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                    borderWidth: 1,
+                                    borderColor: selectedUser?.status === 'active' ? '#EF4444' : '#10B981',
+                                    paddingHorizontal: 9,
+                                    paddingVertical: 5,
+                                    borderRadius: 8,
+                                }}
+                                activeOpacity={0.75}
+                            >
+                                <Ionicons name={selectedUser?.status === 'active' ? "snow-outline" : "checkmark-circle-outline"} size={12} color={selectedUser?.status === 'active' ? '#EF4444' : '#10B981'} />
+                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: selectedUser?.status === 'active' ? '#EF4444' : '#10B981' }}>
+                                    {selectedUser?.status === 'active' ? 'Freeze' : 'Unfreeze'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (!selectedUser) return;
+                                    const currentTier = selectedUser.kyc_tier || 1;
+                                    const nextTier = currentTier >= 3 ? 1 : currentTier + 1;
+                                    Alert.alert(
+                                        "Change KYC Tier",
+                                        `Switch ${selectedUser.full_name} from Tier ${currentTier} to Tier ${nextTier}?`,
+                                        [
+                                            { text: "Cancel", style: "cancel" },
+                                            {
+                                                text: `Set to Tier ${nextTier}`,
+                                                onPress: async () => {
+                                                    await supabase.from('profiles').update({ kyc_tier: nextTier, kyc_verified: nextTier > 1 }).eq('id', selectedUser.id);
+                                                    setSelectedUser({ ...selectedUser, kyc_tier: nextTier, kyc_verified: nextTier > 1 });
+                                                    fetchUsers();
+                                                    Alert.alert("Success", `User tier updated to Tier ${nextTier}.`);
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    backgroundColor: 'rgba(2, 132, 199, 0.15)',
+                                    borderWidth: 1,
+                                    borderColor: '#0284C7',
+                                    paddingHorizontal: 9,
+                                    paddingVertical: 5,
+                                    borderRadius: 8,
+                                }}
+                                activeOpacity={0.75}
+                            >
+                                <Ionicons name="shield-outline" size={12} color="#0284C7" />
+                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#0284C7' }}>Tier {selectedUser?.kyc_tier || 1} ⚡</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (!selectedUser) return;
+                                    const summary = [
+                                        `👤 User Dossier: ${selectedUser.full_name}`,
+                                        `🆔 ID: ${selectedUser.id}`,
+                                        `📧 Email: ${selectedUser.email}`,
+                                        `📱 Phone: ${selectedUser.phone || 'N/A'}`,
+                                        `💰 Balance: ₦${Number(selectedUser.balance || 0).toLocaleString()}`,
+                                        `💳 Account: ${selectedUser.account_number || 'N/A'} (${selectedUser.bank_name || 'N/A'})`,
+                                        `🛡️ KYC Tier: ${selectedUser.kyc_tier || 1} (${selectedUser.kyc_verified ? 'Verified' : 'Unverified'})`,
+                                        `🪪 BVN: ${selectedUser.bvn || 'N/A'} | NIN: ${selectedUser.nin || 'N/A'}`,
+                                        `🚦 Status: ${selectedUser.status?.toUpperCase()}`
+                                    ].join('\n');
+                                    Clipboard.setStringAsync(summary);
+                                    Alert.alert("Copied 📋", "Complete user profile dossier copied to clipboard.");
+                                }}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                                    paddingHorizontal: 9,
+                                    paddingVertical: 5,
+                                    borderRadius: 8,
+                                }}
+                                activeOpacity={0.75}
+                            >
+                                <Ionicons name="copy-outline" size={12} color="#FFFFFF" />
+                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FFFFFF' }}>Copy Dossier</Text>
+                            </TouchableOpacity>
+                        </View>
                     </LinearGradient>
 
                     {/* Navigation Tabs (Height 48 for comfortable touch and zero overlap) */}
@@ -2299,7 +2444,7 @@ Metadata:
                                             <Ionicons name="create" size={20} color={T.gold} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 15, fontWeight: '900', color: '#FFFFFF' }}>Edit User Information (Gyara Bayanai)</Text>
+                                            <Text style={{ fontSize: 15, fontWeight: '900', color: '#FFFFFF' }}>Edit User Profile & Settings</Text>
                                             <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Edit personal details, BVN, NIN, KYC tier, status, banking & limits</Text>
                                         </View>
                                     </View>
@@ -2309,7 +2454,7 @@ Metadata:
                                 <View style={s.subFormCard}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                                         <Ionicons name="person-outline" size={16} color={T.navyDark} />
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>1. Personal Details (Bayanai na Kai)</Text>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>1. Personal Profile</Text>
                                     </View>
 
                                     <Text style={s.inputLabel}>Full Name</Text>
@@ -2508,7 +2653,7 @@ Metadata:
                                 <View style={s.subFormCard}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                                         <Ionicons name="people-outline" size={16} color={T.navyDark} />
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>4. Next of Kin (Wanda za a Tuntuba)</Text>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase' }}>4. Next of Kin Details</Text>
                                     </View>
 
                                     <Text style={s.inputLabel}>Next of Kin Full Name</Text>
@@ -2623,7 +2768,7 @@ Metadata:
                                         <>
                                             <Ionicons name="save-outline" size={18} color={T.gold} />
                                             <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                Save All Changes (Ajiye Gyare-gyare) 💾
+                                                Save Profile & Settings 💾
                                             </Text>
                                         </>
                                     )}
@@ -3219,7 +3364,22 @@ Metadata:
                         )}
 
                         {/* TAB: TRANSACTIONS (Ledger, Search, Filters, Detail Inspector) */}
-                        {modalTab === 'transactions' && (
+                        {modalTab === 'transactions' && (() => {
+                            const isSuccessTx = (t: any) => ['success', 'successful', 'completed', 'approved', 'paid', 'delivered'].includes((t.status || 'completed').toLowerCase());
+                            const isCreditTx = (t: any) => t.type?.toLowerCase().includes('topup') || t.type?.toLowerCase().includes('fund') || t.type?.toLowerCase().includes('credit') || t.type?.toLowerCase().includes('deposit');
+
+                            const totalInflow = userTransactions
+                                .filter(t => isSuccessTx(t) && isCreditTx(t))
+                                .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+                            const totalOutflow = userTransactions
+                                .filter(t => isSuccessTx(t) && !isCreditTx(t))
+                                .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+                            const successCount = userTransactions.filter(isSuccessTx).length;
+                            const successRate = userTransactions.length > 0 ? Math.round((successCount / userTransactions.length) * 100) : 100;
+
+                            return (
                             <View style={{ padding: 14 }}>
                                 {/* Ledger KPI Stats Strip */}
                                 <View style={s.txKpiRow}>
@@ -3228,21 +3388,29 @@ Metadata:
                                         <Text style={s.txKpiVal}>{userTransactions.length}</Text>
                                     </View>
                                     <View style={s.txKpiCard}>
-                                        <Text style={[s.txKpiLabel, { color: T.success }]}>TOTAL INFLOW (+)</Text>
+                                        <Text style={[s.txKpiLabel, { color: T.success }]}>SETTLED INFLOW (+)</Text>
                                         <Text style={[s.txKpiVal, { color: T.success }]}>
-                                            ₦{userTransactions
-                                                .filter(t => t.type?.toLowerCase().includes('topup') || t.type?.toLowerCase().includes('fund') || t.type?.toLowerCase().includes('credit'))
-                                                .reduce((sum, t) => sum + Number(t.amount || 0), 0)
-                                                .toLocaleString()}
+                                            ₦{totalInflow.toLocaleString()}
                                         </Text>
                                     </View>
                                     <View style={s.txKpiCard}>
-                                        <Text style={[s.txKpiLabel, { color: T.danger }]}>TOTAL OUTFLOW (-)</Text>
+                                        <Text style={[s.txKpiLabel, { color: T.danger }]}>SETTLED OUTFLOW (-)</Text>
                                         <Text style={[s.txKpiVal, { color: T.danger }]}>
-                                            ₦{userTransactions
-                                                .filter(t => !t.type?.toLowerCase().includes('topup') && !t.type?.toLowerCase().includes('fund') && !t.type?.toLowerCase().includes('credit'))
-                                                .reduce((sum, t) => sum + Number(t.amount || 0), 0)
-                                                .toLocaleString()}
+                                            ₦{totalOutflow.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Mini Metrics Row */}
+                                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                                    <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
+                                        <Text style={{ fontSize: 9.5, fontWeight: '700', color: T.textSub }}>SUCCESS RATE</Text>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: successRate >= 80 ? T.success : T.warning }}>{successRate}%</Text>
+                                    </View>
+                                    <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
+                                        <Text style={{ fontSize: 9.5, fontWeight: '700', color: T.textSub }}>NET FLOW</Text>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: totalInflow >= totalOutflow ? T.success : T.navyDark }}>
+                                            ₦{(totalInflow - totalOutflow).toLocaleString()}
                                         </Text>
                                     </View>
                                 </View>
@@ -3300,9 +3468,12 @@ Metadata:
                                 ) : (
                                     <View style={{ gap: 8 }}>
                                         {getFilteredTransactions().map((tx) => {
-                                            const isCredit = tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('fund') || tx.type?.toLowerCase().includes('credit');
+                                            const isCredit = tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('fund') || tx.type?.toLowerCase().includes('credit') || tx.type?.toLowerCase().includes('deposit');
                                             const isCrypto = tx.type?.toLowerCase().includes('crypto') || tx.description?.toLowerCase().includes('crypto');
                                             const status = (tx.status || 'completed').toLowerCase();
+                                            const isSuccess = ['success', 'successful', 'completed', 'approved', 'paid', 'delivered'].includes(status);
+                                            const isPending = ['pending', 'processing', 'in_progress', 'queued', 'submitted'].includes(status);
+                                            const isFailed = ['failed', 'declined', 'rejected', 'error', 'cancelled'].includes(status);
 
                                             return (
                                                 <TouchableOpacity
@@ -3344,17 +3515,17 @@ Metadata:
                                                             </Text>
                                                             <View style={[
                                                                 s.txStatusPill,
-                                                                status === 'completed' || status === 'successful' 
+                                                                isSuccess 
                                                                     ? s.txStatusCompleted 
-                                                                    : status === 'pending' 
+                                                                    : isPending 
                                                                     ? s.txStatusPending 
                                                                     : s.txStatusFailed
                                                             ]}>
                                                                 <Text style={[
                                                                     s.txStatusPillText,
-                                                                    status === 'completed' || status === 'successful' 
+                                                                    isSuccess 
                                                                         ? { color: T.success } 
-                                                                        : status === 'pending' 
+                                                                        : isPending 
                                                                         ? { color: T.warning } 
                                                                         : { color: T.danger }
                                                                 ]}>
@@ -3375,7 +3546,8 @@ Metadata:
                                     </View>
                                 )}
                             </View>
-                        )}
+                            );
+                        })()}
 
                         {/* TAB: FINANCIAL AUDIT & OFFICIAL STATEMENT */}
                         {modalTab === 'statement' && (
@@ -3789,7 +3961,7 @@ Metadata:
                                         <Ionicons name="create-outline" size={18} color={T.gold} />
                                         <View>
                                             <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900' }}>Edit Full User Profile & Records</Text>
-                                            <Text style={{ color: '#94A3B8', fontSize: 10.5 }}>Gyara BVN, NIN, Suna, Lamba, Adireshi, da Matsayin KYC</Text>
+                                            <Text style={{ color: '#94A3B8', fontSize: 10.5 }}>Edit BVN, NIN, Identity, Limits, and KYC Status</Text>
                                         </View>
                                     </View>
                                     <Ionicons name="chevron-forward" size={16} color={T.gold} />
@@ -4262,8 +4434,11 @@ Metadata:
     const renderTransactionDetailsModal = () => {
         if (!selectedTransactionDetails) return null;
         const tx = selectedTransactionDetails;
-        const isCredit = tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('fund') || tx.type?.toLowerCase().includes('credit');
+        const isCredit = tx.type?.toLowerCase().includes('topup') || tx.type?.toLowerCase().includes('fund') || tx.type?.toLowerCase().includes('credit') || tx.type?.toLowerCase().includes('deposit');
         const status = (tx.status || 'completed').toLowerCase();
+        const isSuccess = ['success', 'successful', 'completed', 'approved', 'paid', 'delivered'].includes(status);
+        const isPending = ['pending', 'processing', 'in_progress', 'queued', 'submitted'].includes(status);
+        const isFailed = ['failed', 'declined', 'rejected', 'error', 'cancelled'].includes(status);
 
         return (
             <Modal
@@ -4272,7 +4447,7 @@ Metadata:
                 animationType="slide"
                 onRequestClose={() => setSelectedTransactionDetails(null)}
             >
-                <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
+                <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={[s.modalOverlay, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) }]}>
                     <View style={s.txDetailModalCard}>
                         <View style={s.txDetailHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -4287,27 +4462,40 @@ Metadata:
                         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                             <View style={[
                                 s.receiptStatusBanner,
-                                status === 'completed' || status === 'successful' 
+                                isSuccess 
                                     ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
-                                    : status === 'pending'
+                                    : isPending
                                     ? { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }
                                     : { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }
                             ]}>
                                 <Ionicons 
-                                    name={status === 'completed' || status === 'successful' ? "checkmark-circle" : status === 'pending' ? "hourglass" : "alert-circle"} 
+                                    name={isSuccess ? "checkmark-circle" : isPending ? "hourglass" : "alert-circle"} 
                                     size={30} 
-                                    color={status === 'completed' || status === 'successful' ? T.success : status === 'pending' ? T.warning : T.danger} 
+                                    color={isSuccess ? T.success : isPending ? T.warning : T.danger} 
                                 />
                                 <Text style={s.receiptAmountText}>
                                     {isCredit ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
                                 </Text>
                                 <Text style={[
                                     s.receiptStatusLabel,
-                                    { color: status === 'completed' || status === 'successful' ? T.success : status === 'pending' ? T.warning : T.danger }
+                                    { color: isSuccess ? T.success : isPending ? T.warning : T.danger }
                                 ]}>
                                     {status.toUpperCase()}
                                 </Text>
                             </View>
+
+                            {/* Failure Root Cause Box */}
+                            {isFailed && (
+                                <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1.5, borderColor: '#F87171', borderRadius: 12, padding: 12, marginVertical: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <Ionicons name="alert-circle" size={18} color={T.danger} />
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.danger }}>Failure Root Cause</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#991B1B', lineHeight: 18 }}>
+                                        {tx.details?.error || tx.details?.failure_reason || tx.details?.message || tx.metadata?.reason || tx.description || 'Transaction declined by provider gateway or bank network.'}
+                                    </Text>
+                                </View>
+                            )}
 
                             <View style={s.receiptTable}>
                                 <View style={s.receiptRow}>
@@ -5223,7 +5411,10 @@ Metadata:
                 colors={['#050B18', '#0A1226', '#0F1B3B']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={s.headerContainer}
+                style={[
+                    s.headerContainer,
+                    { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 44) }
+                ]}
             >
                 {/* 24K Royal Gold Micro Top Accent Strip */}
                 <LinearGradient
@@ -6922,6 +7113,8 @@ const s = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 8,
+        paddingTop: Platform.OS === 'ios' ? 48 : (Platform.OS === 'android' ? 36 : 16),
+        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     },
     modalCard: {
         backgroundColor: T.bg,
