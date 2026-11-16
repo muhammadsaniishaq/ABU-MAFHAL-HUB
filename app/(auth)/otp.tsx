@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     StyleSheet,
     Image,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
@@ -46,6 +47,7 @@ export default function OTP() {
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
     const [counter, setCounter] = useState(60);
+    const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
     const [userName, setUserName] = useState<string>('');
     const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -251,10 +253,29 @@ export default function OTP() {
                 throw new Error(data?.message || 'Failed to dispatch WhatsApp OTP.');
             }
 
+            if (data?.whatsapp_url) {
+                setWhatsappUrl(data.whatsapp_url);
+            }
+
             setCounter(60);
             const msg = `Your 6-digit verification code has been sent directly to your WhatsApp on ${phoneToUse}!`;
-            if (Platform.OS === 'web') alert(msg);
-            else Alert.alert('WhatsApp Code Sent 🟢', msg);
+            if (Platform.OS === 'web') {
+                alert(msg);
+                if (data?.whatsapp_url && typeof window !== 'undefined') {
+                    window.open(data.whatsapp_url, '_blank');
+                }
+            } else {
+                Alert.alert('WhatsApp Code Sent 🟢', msg, [
+                    {
+                        text: 'Open WhatsApp',
+                        onPress: () => {
+                            const url = data?.whatsapp_url || `https://wa.me/2349065645747`;
+                            Linking.openURL(url).catch(() => {});
+                        }
+                    },
+                    { text: 'Enter Code', style: 'cancel' }
+                ]);
+            }
         } catch (e: any) {
             Alert.alert('Notice', e.message || 'Unable to deliver WhatsApp code at this time.');
         } finally {
@@ -744,6 +765,18 @@ export default function OTP() {
                             </View>
                         </TouchableOpacity>
 
+                        {/* 1-Tap Open WhatsApp Button */}
+                        {whatsappUrl && (
+                            <TouchableOpacity
+                                onPress={() => Linking.openURL(whatsappUrl).catch(() => {})}
+                                style={s.openWhatsappPill}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
+                                <Text style={s.openWhatsappText}>Open WhatsApp App 🟢</Text>
+                            </TouchableOpacity>
+                        )}
+
                         {/* 6-Digit OTP Box Row */}
                         <View style={s.otpRow}>
                             {otp.map((digit, index) => (
@@ -1073,6 +1106,24 @@ const s = StyleSheet.create({
         color: '#F5A623',
         fontSize: 9,
         fontWeight: '900',
+    },
+    openWhatsappPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: '#ECFDF5',
+        borderColor: '#10B981',
+        borderWidth: 1.5,
+        borderRadius: 20,
+        paddingVertical: 5.5,
+        paddingHorizontal: 12,
+        marginBottom: 14,
+    },
+    openWhatsappText: {
+        color: '#059669',
+        fontSize: 11.5,
+        fontWeight: '800',
     },
     otpRow: {
         flexDirection: 'row',
