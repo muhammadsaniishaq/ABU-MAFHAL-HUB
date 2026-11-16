@@ -1,9 +1,9 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl, StyleSheet, useWindowDimensions, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl, StyleSheet, useWindowDimensions, StatusBar, KeyboardAvoidingView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Stack, useRouter } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { AdminPromotionService } from '../../services/adminPromotion';
 import SecurityModal from '../../components/SecurityModal';
@@ -48,6 +48,9 @@ interface UserProfile {
     status: string;
     balance: number;
     phone?: string;
+    whatsapp_number?: string;
+    phone_verified?: boolean;
+    whatsapp_verified?: boolean;
     created_at?: string;
     last_login?: string;
     kyc_verified?: boolean;
@@ -156,6 +159,165 @@ interface LoginLog {
     location: string;
 }
 
+// -------------------------------------------------------------
+// STANDALONE MEMOIZED FORM COMPONENTS (Prevents Unmount/Focus Loss)
+// -------------------------------------------------------------
+interface ModernFormFieldProps {
+    label: string;
+    icon: any;
+    value?: string;
+    onChangeText: (text: string) => void;
+    placeholder?: string;
+    keyboardType?: any;
+    maxLength?: number;
+    copyable?: boolean;
+    autoCapitalize?: any;
+    multiline?: boolean;
+    numberOfLines?: number;
+}
+
+const ModernFormField = React.memo(({
+    label,
+    icon,
+    value,
+    onChangeText,
+    placeholder,
+    keyboardType,
+    maxLength,
+    copyable,
+    autoCapitalize,
+    multiline,
+    numberOfLines,
+}: ModernFormFieldProps) => (
+    <View style={{ marginBottom: 12 }}>
+        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+            {label}
+        </Text>
+        <View style={{
+            flexDirection: 'row',
+            alignItems: multiline ? 'flex-start' : 'center',
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1.2,
+            borderColor: '#E2E8F0',
+            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: multiline ? 10 : 0,
+            minHeight: multiline ? (numberOfLines ? numberOfLines * 22 + 24 : 80) : 46,
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 3,
+            elevation: 1,
+        }}>
+            <View style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                backgroundColor: 'rgba(212, 175, 55, 0.12)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 10,
+                marginTop: multiline ? 2 : 0,
+            }}>
+                <Ionicons name={icon} size={15} color="#B8952B" />
+            </View>
+            <TextInput
+                style={{
+                    flex: 1,
+                    fontSize: 13.5,
+                    fontWeight: '600',
+                    color: '#0F172A',
+                    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+                    textAlignVertical: multiline ? 'top' : 'center',
+                }}
+                value={value ?? ''}
+                onChangeText={onChangeText}
+                placeholder={placeholder}
+                placeholderTextColor="#94A3B8"
+                keyboardType={keyboardType}
+                maxLength={maxLength}
+                autoCapitalize={autoCapitalize}
+                multiline={multiline}
+                numberOfLines={numberOfLines}
+            />
+            {!!value && !multiline && (
+                <TouchableOpacity onPress={() => onChangeText('')} style={{ padding: 4 }} activeOpacity={0.7}>
+                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+            )}
+            {copyable && !!value && (
+                <TouchableOpacity 
+                    onPress={() => {
+                        Clipboard.setStringAsync(value);
+                        Alert.alert("Copied 📋", `${label} copied to clipboard.`);
+                    }} 
+                    style={{ padding: 4, marginLeft: 4 }}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="copy-outline" size={16} color="#D4AF37" />
+                </TouchableOpacity>
+            )}
+        </View>
+    </View>
+));
+
+interface ModernToggleCardProps {
+    icon: any;
+    title: string;
+    subtitle: string;
+    value?: boolean;
+    onValueChange: (val: boolean) => void;
+}
+
+const ModernToggleCard = React.memo(({
+    icon,
+    title,
+    subtitle,
+    value,
+    onValueChange
+}: ModernToggleCardProps) => (
+    <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.2,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+            <View style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                backgroundColor: value ? 'rgba(212, 175, 55, 0.15)' : '#F1F5F9',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 10,
+            }}>
+                <Ionicons name={icon} size={18} color={value ? '#B8952B' : '#94A3B8'} />
+            </View>
+            <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>{title}</Text>
+                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{subtitle}</Text>
+            </View>
+        </View>
+        <Switch
+            value={!!value}
+            onValueChange={onValueChange}
+            trackColor={{ false: '#CBD5E1', true: '#D4AF37' }}
+            thumbColor="#FFFFFF"
+        />
+    </View>
+));
+
 export default function UserManagement() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -236,6 +398,9 @@ export default function UserManagement() {
     const [editForm, setEditForm] = useState({ 
         full_name: '', 
         phone: '', 
+        whatsapp_number: '',
+        phone_verified: false,
+        whatsapp_verified: false,
         email: '',
         username: '',
         gender: 'male',
@@ -246,11 +411,13 @@ export default function UserManagement() {
         next_of_kin_phone: '',
         custom_id: '',
         account_number: '',
+        bank_name: '',
         bvn: '',
         nin: '',
         kyc_tier: '1',
         kyc_verified: false,
         status: 'active',
+        role: 'user',
         transfer_limit: '500000',
         cac_rc_number: '',
         admin_notes: '',
@@ -1188,41 +1355,55 @@ export default function UserManagement() {
         }
     };
 
+    const lastLoadedUserIdRef = useRef<string | null>(null);
+
     useEffect(() => {
         if (selectedUser) {
-            fetchUserHistory(selectedUser.id);
-            generateForensics(selectedUser.id);
-            setModalTab('overview');
-            setEditForm({
-                full_name: selectedUser.full_name || '',
-                phone: selectedUser.phone || '',
-                email: selectedUser.email || '',
-                username: selectedUser.username || '',
-                gender: selectedUser.gender || 'male',
-                dob: selectedUser.dob || '',
-                address: selectedUser.address || '',
-                state: selectedUser.state || '',
-                next_of_kin_name: selectedUser.next_of_kin_name || '',
-                next_of_kin_phone: selectedUser.next_of_kin_phone || '',
-                custom_id: selectedUser.custom_id || '',
-                account_number: selectedUser.account_number || '',
-                bvn: selectedUser.bvn || '',
-                nin: selectedUser.nin || '',
-                kyc_tier: (selectedUser.kyc_tier || 1).toString(),
-                kyc_verified: selectedUser.kyc_verified ?? false,
-                status: selectedUser.status || 'active',
-                transfer_limit: (selectedUser.transfer_limit || selectedUser.daily_limit || 500000).toString(),
-                cac_rc_number: selectedUser.cac_rc_number || '',
-                admin_notes: selectedUser.admin_notes || '',
-                crypto_enabled: selectedUser.crypto_enabled ?? true,
-                virtual_cards_enabled: selectedUser.virtual_cards_enabled ?? true
-            });
-            setLimitInput(selectedUser.transfer_limit?.toString() || '');
-            setAdminNotes(selectedUser.admin_notes || '');
-            setRcInput(selectedUser.cac_rc_number || '');
-            setIsEditing(false);
+            const isDifferentUser = lastLoadedUserIdRef.current !== selectedUser.id;
+            lastLoadedUserIdRef.current = selectedUser.id;
+
+            if (isDifferentUser) {
+                fetchUserHistory(selectedUser.id);
+                generateForensics(selectedUser.id);
+                setModalTab('overview');
+                setEditForm({
+                    full_name: selectedUser.full_name || '',
+                    phone: selectedUser.phone || '',
+                    whatsapp_number: selectedUser.whatsapp_number || selectedUser.phone || '',
+                    phone_verified: selectedUser.phone_verified ?? false,
+                    whatsapp_verified: selectedUser.whatsapp_verified ?? false,
+                    bank_name: selectedUser.bank_name || '',
+                    role: selectedUser.role || 'user',
+                    email: selectedUser.email || '',
+                    username: selectedUser.username || '',
+                    gender: selectedUser.gender || 'male',
+                    dob: selectedUser.dob || '',
+                    address: selectedUser.address || '',
+                    state: selectedUser.state || '',
+                    next_of_kin_name: selectedUser.next_of_kin_name || '',
+                    next_of_kin_phone: selectedUser.next_of_kin_phone || '',
+                    custom_id: selectedUser.custom_id || '',
+                    account_number: selectedUser.account_number || '',
+                    bvn: selectedUser.bvn || '',
+                    nin: selectedUser.nin || '',
+                    kyc_tier: (selectedUser.kyc_tier || 1).toString(),
+                    kyc_verified: selectedUser.kyc_verified ?? false,
+                    status: selectedUser.status || 'active',
+                    transfer_limit: (selectedUser.transfer_limit || selectedUser.daily_limit || 500000).toString(),
+                    cac_rc_number: selectedUser.cac_rc_number || '',
+                    admin_notes: selectedUser.admin_notes || '',
+                    crypto_enabled: selectedUser.crypto_enabled ?? true,
+                    virtual_cards_enabled: selectedUser.virtual_cards_enabled ?? true
+                });
+                setLimitInput(selectedUser.transfer_limit?.toString() || '');
+                setAdminNotes(selectedUser.admin_notes || '');
+                setRcInput(selectedUser.cac_rc_number || '');
+                setIsEditing(false);
+            }
+        } else {
+            lastLoadedUserIdRef.current = null;
         }
-    }, [selectedUser]);
+    }, [selectedUser?.id]);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -1547,6 +1728,9 @@ export default function UserManagement() {
             const updatePayload: any = {
                 full_name: editForm.full_name.trim(),
                 phone: editForm.phone.trim(),
+                whatsapp_number: editForm.whatsapp_number ? editForm.whatsapp_number.trim() : null,
+                phone_verified: !!editForm.phone_verified,
+                whatsapp_verified: !!editForm.whatsapp_verified,
                 username: editForm.username.trim() || null,
                 gender: editForm.gender,
                 dob: editForm.dob.trim() || null,
@@ -1556,11 +1740,13 @@ export default function UserManagement() {
                 next_of_kin_phone: editForm.next_of_kin_phone.trim() || null,
                 custom_id: editForm.custom_id.trim() || null,
                 account_number: editForm.account_number.trim() || null,
+                bank_name: editForm.bank_name ? editForm.bank_name.trim() : null,
                 bvn: editForm.bvn.trim() || null,
                 nin: editForm.nin.trim() || null,
                 kyc_tier: parseInt(editForm.kyc_tier) || 1,
                 kyc_verified: editForm.kyc_verified,
                 status: editForm.status,
+                role: editForm.role || selectedUser.role || 'user',
                 transfer_limit: parseFloat(editForm.transfer_limit) || 500000,
                 daily_limit: parseFloat(editForm.transfer_limit) || 500000,
                 cac_rc_number: editForm.cac_rc_number.trim() || null,
@@ -1597,13 +1783,69 @@ export default function UserManagement() {
 
             setSelectedUser({ ...selectedUser, ...updatePayload });
             fetchUsers();
-            Alert.alert("Success 🎉", "User profile and permissions updated successfully!");
+            Alert.alert("Profile Saved 🎉", "User profile, permissions and limits updated successfully!");
         } catch (e: any) {
             console.error("Save profile error:", e);
             Alert.alert("Error Saving Profile", e.message || "Failed to update user profile.");
         } finally {
             setSavingProfile(false);
         }
+    };
+
+    const handleResetTxPin = (targetPin: string = '1234') => {
+        if (!selectedUser) return;
+        Alert.alert(
+            "Reset Transaction PIN 🔑",
+            `Are you sure you want to reset the 4-digit Transaction PIN for ${selectedUser.full_name || selectedUser.email} to '${targetPin}'?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: `Reset to ${targetPin}`,
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('profiles')
+                                .update({ transaction_pin: targetPin, updated_at: new Date().toISOString() })
+                                .eq('id', selectedUser.id);
+                            if (error) throw error;
+                            setSelectedUser(prev => prev ? { ...prev, transaction_pin: targetPin } : null);
+                            Alert.alert("PIN Reset Success 🎉", `Transaction PIN successfully set to ${targetPin}. Please inform the user to update it after signing in.`);
+                        } catch (err: any) {
+                            Alert.alert("Error", err.message || "Failed to reset PIN.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleClearTxPin = () => {
+        if (!selectedUser) return;
+        Alert.alert(
+            "Clear Transaction PIN 🚫",
+            `Remove the transaction PIN completely for ${selectedUser.full_name || selectedUser.email}? User will be prompted to set a new PIN on next login.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Clear PIN",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('profiles')
+                                .update({ transaction_pin: null, updated_at: new Date().toISOString() })
+                                .eq('id', selectedUser.id);
+                            if (error) throw error;
+                            setSelectedUser(prev => prev ? { ...prev, transaction_pin: undefined } : null);
+                            Alert.alert("PIN Cleared 🗑️", "Transaction PIN has been removed.");
+                        } catch (err: any) {
+                            Alert.alert("Error", err.message || "Failed to clear PIN.");
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const executeAction = async () => {
@@ -2166,165 +2408,15 @@ Metadata:
         setUnmaskedCardIds(prev => ({ ...prev, [cardId]: !prev[cardId] }));
     };
 
-    // Modern Luxury Form Field for Profile Editing
-    const ModernFormField = ({
-        label,
-        icon,
-        value,
-        onChangeText,
-        placeholder,
-        keyboardType,
-        maxLength,
-        copyable,
-        autoCapitalize,
-        multiline,
-        numberOfLines,
-    }: {
-        label: string;
-        icon: any;
-        value?: string;
-        onChangeText: (text: string) => void;
-        placeholder?: string;
-        keyboardType?: any;
-        maxLength?: number;
-        copyable?: boolean;
-        autoCapitalize?: any;
-        multiline?: boolean;
-        numberOfLines?: number;
-    }) => (
-        <View style={{ marginBottom: 13 }}>
-            <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
-                {label}
-            </Text>
-            <View style={{
-                flexDirection: 'row',
-                alignItems: multiline ? 'flex-start' : 'center',
-                backgroundColor: '#FFFFFF',
-                borderWidth: 1.2,
-                borderColor: '#E2E8F0',
-                borderRadius: 12,
-                paddingHorizontal: 12,
-                paddingVertical: multiline ? 10 : 0,
-                minHeight: multiline ? (numberOfLines ? numberOfLines * 22 + 24 : 80) : 46,
-                shadowColor: '#0F172A',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                elevation: 1,
-            }}>
-                <View style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 8,
-                    backgroundColor: 'rgba(212, 175, 55, 0.12)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 10,
-                    marginTop: multiline ? 2 : 0,
-                }}>
-                    <Ionicons name={icon} size={15} color="#B8952B" />
-                </View>
-                <TextInput
-                    style={{
-                        flex: 1,
-                        fontSize: 13.5,
-                        fontWeight: '600',
-                        color: '#0F172A',
-                        paddingVertical: Platform.OS === 'ios' ? 8 : 4,
-                        textAlignVertical: multiline ? 'top' : 'center',
-                    }}
-                    value={value || ''}
-                    onChangeText={onChangeText}
-                    placeholder={placeholder}
-                    placeholderTextColor="#94A3B8"
-                    keyboardType={keyboardType}
-                    maxLength={maxLength}
-                    autoCapitalize={autoCapitalize}
-                    multiline={multiline}
-                    numberOfLines={numberOfLines}
-                />
-                {!!value && !multiline && (
-                    <TouchableOpacity onPress={() => onChangeText('')} style={{ padding: 4 }} activeOpacity={0.7}>
-                        <Ionicons name="close-circle" size={16} color="#94A3B8" />
-                    </TouchableOpacity>
-                )}
-                {copyable && !!value && (
-                    <TouchableOpacity 
-                        onPress={() => {
-                            Clipboard.setStringAsync(value);
-                            Alert.alert("Copied 📋", `${label} copied to clipboard.`);
-                        }} 
-                        style={{ padding: 4, marginLeft: 4 }}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="copy-outline" size={16} color="#D4AF37" />
-                    </TouchableOpacity>
-                )}
-            </View>
-        </View>
-    );
-
-    // Modern Luxury Toggle Card
-    const ModernToggleCard = ({
-        icon,
-        title,
-        subtitle,
-        value,
-        onValueChange
-    }: {
-        icon: any;
-        title: string;
-        subtitle: string;
-        value?: boolean;
-        onValueChange: (val: boolean) => void;
-    }) => (
-        <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: '#FFFFFF',
-            borderWidth: 1.2,
-            borderColor: '#E2E8F0',
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 10,
-            shadowColor: '#0F172A',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.04,
-            shadowRadius: 3,
-            elevation: 1,
-        }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
-                <View style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: value ? 'rgba(212, 175, 55, 0.15)' : '#F1F5F9',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 10,
-                }}>
-                    <Ionicons name={icon} size={18} color={value ? '#B8952B' : '#94A3B8'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>{title}</Text>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{subtitle}</Text>
-                </View>
-            </View>
-            <Switch
-                value={!!value}
-                onValueChange={onValueChange}
-                trackColor={{ false: '#CBD5E1', true: '#D4AF37' }}
-                thumbColor="#FFFFFF"
-            />
-        </View>
-    );
-
     // Executive Light Mode Command Center Modal
     const renderUserModal = () => (
         <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
             <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="light" style={[s.modalOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16) }]}>
-                <View style={s.modalCard}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}
+                >
+                    <View style={s.modalCard}>
                     
                     {/* Modal Header Bar */}
                     <View style={s.modalHeader}>
@@ -2656,32 +2748,48 @@ Metadata:
                         ))}
                     </ScrollView>
 
-                    <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+                    <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                         {/* TAB: EDIT USER INFORMATION */}
                         {modalTab === 'edit' && (
                             <View style={{ padding: 14 }}>
-                                {/* Header Card */}
-                                <View style={{ backgroundColor: '#0F172A', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1.5, borderColor: '#D4AF37' }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                        <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(212, 175, 55, 0.15)', borderWidth: 1.2, borderColor: '#D4AF37', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name="create" size={20} color={T.gold} />
+                                {/* Modern Executive Header Card */}
+                                <LinearGradient
+                                    colors={['#0F172A', '#1E293B']}
+                                    style={{ borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1.5, borderColor: '#D4AF37', shadowColor: '#D4AF37', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3 }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(212, 175, 55, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.4)' }}>
+                                            <Ionicons name="shield-checkmark" size={12} color="#D4AF37" />
+                                            <Text style={{ fontSize: 10, fontWeight: '900', color: '#D4AF37', letterSpacing: 0.5 }}>EXECUTIVE USER MANAGER</Text>
                                         </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 15, fontWeight: '900', color: '#FFFFFF' }}>Edit User Profile & Settings</Text>
-                                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Update personal details, KYC, limits, bank data & account status</Text>
+                                        <View style={{ backgroundColor: selectedUser?.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }}>
+                                            <Text style={{ fontSize: 10, fontWeight: '900', color: selectedUser?.status === 'active' ? '#10B981' : '#EF4444', textTransform: 'uppercase' }}>
+                                                {selectedUser?.status || 'ACTIVE'}
+                                            </Text>
                                         </View>
                                     </View>
-                                </View>
-
-                                {/* SECTION 1: PERSONAL DETAILS */}
-                                <View style={s.subFormCard}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name="person" size={15} color={T.goldDark} />
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(212, 175, 55, 0.2)', borderWidth: 1.5, borderColor: '#D4AF37', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="create" size={22} color={T.gold} />
                                         </View>
-                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                            1. Personal Identity
-                                        </Text>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 16, fontWeight: '900', color: '#FFFFFF' }}>Edit User Profile & Authority</Text>
+                                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Update contact, KYC, bank accounts, daily limits, PIN and permissions</Text>
+                                        </View>
+                                    </View>
+                                </LinearGradient>
+
+                                {/* SECTION 1: PERSONAL IDENTITY & CONTACT */}
+                                <View style={s.subFormCard}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Ionicons name="person" size={15} color={T.goldDark} />
+                                            </View>
+                                            <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                1. Personal & Contact Details
+                                            </Text>
+                                        </View>
                                     </View>
 
                                     <ModernFormField
@@ -2689,7 +2797,7 @@ Metadata:
                                         icon="person-outline"
                                         value={editForm.full_name}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, full_name: v }))}
-                                        placeholder="Full Name"
+                                        placeholder="Full Legal Name"
                                     />
 
                                     <ModernFormField
@@ -2702,10 +2810,41 @@ Metadata:
                                     />
 
                                     <ModernFormField
+                                        label="WhatsApp Number"
+                                        icon="logo-whatsapp"
+                                        value={editForm.whatsapp_number}
+                                        onChangeText={(v) => setEditForm(prev => ({ ...prev, whatsapp_number: v }))}
+                                        placeholder="WhatsApp Number (e.g. 08012345678)"
+                                        keyboardType="phone-pad"
+                                    />
+
+                                    {/* Verification Badges Toggles */}
+                                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                                        <View style={{ flex: 1 }}>
+                                            <ModernToggleCard
+                                                icon="call"
+                                                title="Phone Verified"
+                                                subtitle="SMS / Call Confirmed"
+                                                value={editForm.phone_verified}
+                                                onValueChange={(val) => setEditForm(prev => ({ ...prev, phone_verified: val }))}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <ModernToggleCard
+                                                icon="logo-whatsapp"
+                                                title="WhatsApp Verified"
+                                                subtitle="WhatsApp OTP Confirmed"
+                                                value={editForm.whatsapp_verified}
+                                                onValueChange={(val) => setEditForm(prev => ({ ...prev, whatsapp_verified: val }))}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <ModernFormField
                                         label="Username"
                                         icon="at-outline"
                                         value={editForm.username}
-                                        onChangeText={(v) => setEditForm(prev => ({ ...prev, username: v }))}
+                                        onChangeText={(v) => setEditForm(prev => ({ ...prev, username: v.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
                                         placeholder="Username"
                                         autoCapitalize="none"
                                     />
@@ -2719,7 +2858,7 @@ Metadata:
                                     />
 
                                     {/* Gender Segmented Card Picker */}
-                                    <View style={{ marginBottom: 13 }}>
+                                    <View style={{ marginBottom: 12 }}>
                                         <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
                                             Gender
                                         </Text>
@@ -2763,7 +2902,7 @@ Metadata:
                                         icon="home-outline"
                                         value={editForm.address}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, address: v }))}
-                                        placeholder="Home Address"
+                                        placeholder="Full Residential Address"
                                     />
 
                                     <ModernFormField
@@ -2809,7 +2948,7 @@ Metadata:
                                     />
 
                                     {/* KYC Tier Level Segmented Cards */}
-                                    <View style={{ marginBottom: 13 }}>
+                                    <View style={{ marginBottom: 12 }}>
                                         <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
                                             KYC Tier Level
                                         </Text>
@@ -2854,7 +2993,7 @@ Metadata:
                                     <ModernToggleCard
                                         icon="shield-checkmark-outline"
                                         title="KYC Verified Badge"
-                                        subtitle="Mark account as officially identity verified"
+                                        subtitle="Mark account as officially verified in system"
                                         value={editForm.kyc_verified}
                                         onValueChange={(val) => setEditForm(prev => ({ ...prev, kyc_verified: val }))}
                                     />
@@ -2878,14 +3017,14 @@ Metadata:
                                     />
                                 </View>
 
-                                {/* SECTION 3: BANKING & LIMITS */}
+                                {/* SECTION 3: BANKING & DAILY LIMITS */}
                                 <View style={s.subFormCard}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
                                         <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
                                             <Ionicons name="wallet" size={15} color={T.goldDark} />
                                         </View>
                                         <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                            3. Banking & Daily Limits
+                                            3. Dedicated Banking & Limits
                                         </Text>
                                     </View>
 
@@ -2894,9 +3033,17 @@ Metadata:
                                         icon="card-outline"
                                         value={editForm.account_number}
                                         onChangeText={(v) => setEditForm(prev => ({ ...prev, account_number: v }))}
-                                        placeholder="Virtual Account Number"
+                                        placeholder="Dedicated Virtual Account Number"
                                         keyboardType="numeric"
                                         copyable
+                                    />
+
+                                    <ModernFormField
+                                        label="Bank Name"
+                                        icon="business-outline"
+                                        value={editForm.bank_name}
+                                        onChangeText={(v) => setEditForm(prev => ({ ...prev, bank_name: v }))}
+                                        placeholder="e.g. Wema Bank, Moniepoint, PalmPay, Sterling Bank"
                                     />
 
                                     <ModernFormField
@@ -2907,16 +3054,139 @@ Metadata:
                                         placeholder="e.g. 500000"
                                         keyboardType="numeric"
                                     />
+
+                                    {/* 1-Tap Quick Limit Preset Pills */}
+                                    <View style={{ marginBottom: 12 }}>
+                                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                                            ⚡ QUICK PRESET LIMITS:
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                            {[
+                                                { label: '₦100K', value: '100000' },
+                                                { label: '₦500K', value: '500000' },
+                                                { label: '₦1M', value: '1000000' },
+                                                { label: '₦5M', value: '5000000' },
+                                                { label: '₦10M', value: '10000000' },
+                                                { label: '₦50M', value: '50000000' },
+                                            ].map(item => {
+                                                const isCurrent = editForm.transfer_limit === item.value;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={item.value}
+                                                        onPress={() => setEditForm(prev => ({ ...prev, transfer_limit: item.value }))}
+                                                        style={{
+                                                            paddingHorizontal: 10,
+                                                            paddingVertical: 5,
+                                                            borderRadius: 8,
+                                                            borderWidth: 1,
+                                                            borderColor: isCurrent ? '#D4AF37' : '#E2E8F0',
+                                                            backgroundColor: isCurrent ? 'rgba(212, 175, 55, 0.15)' : '#F8FAFC',
+                                                        }}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        <Text style={{ fontSize: 11, fontWeight: isCurrent ? '900' : '600', color: isCurrent ? '#B8952B' : '#475569' }}>
+                                                            {item.label}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                    </View>
                                 </View>
 
-                                {/* SECTION 4: NEXT OF KIN */}
+                                {/* SECTION 4: SECURITY & PIN MANAGEMENT (NEW FEATURE) */}
+                                <View style={s.subFormCard}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(245, 158, 11, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="key" size={15} color="#D97706" />
+                                        </View>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                            4. Security & PIN Authority
+                                        </Text>
+                                    </View>
+
+                                    {/* PIN Status Card */}
+                                    <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <View>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>Transaction PIN Status</Text>
+                                                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                                                    {selectedUser?.transaction_pin ? 'Configured & Active (••••)' : 'Not Set / Cleared'}
+                                                </Text>
+                                            </View>
+                                            <View style={{ backgroundColor: selectedUser?.transaction_pin ? '#ECFDF5' : '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                                                <Text style={{ fontSize: 10, fontWeight: '800', color: selectedUser?.transaction_pin ? '#059669' : '#D97706' }}>
+                                                    {selectedUser?.transaction_pin ? 'ACTIVE' : 'NO PIN'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Action buttons */}
+                                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                                            <TouchableOpacity
+                                                onPress={() => handleResetTxPin('1234')}
+                                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF3C7', borderColor: '#F59E0B', borderWidth: 1, paddingVertical: 8, borderRadius: 10 }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="refresh-circle-outline" size={16} color="#D97706" />
+                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#B45309' }}>Reset to 1234 🔑</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                onPress={handleClearTxPin}
+                                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF2F2', borderColor: '#EF4444', borderWidth: 1, paddingVertical: 8, borderRadius: 10 }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="trash-outline" size={15} color="#DC2626" />
+                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#DC2626' }}>Clear PIN 🚫</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+
+                                    {/* Password Management Card */}
+                                    <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <View>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>Password Authority</Text>
+                                                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>Change password directly or send reset email</Text>
+                                            </View>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    setNewPasswordInput('');
+                                                    setShowPasswordPlaintext(false);
+                                                    setShowChangePasswordModal(true);
+                                                }}
+                                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0F172A', paddingVertical: 8, borderRadius: 10 }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="key" size={14} color="#D4AF37" />
+                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#FFFFFF' }}>Change Password 🔐</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    setPendingAction({ type: 'reset_pin' });
+                                                }}
+                                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderColor: '#CBD5E1', borderWidth: 1, paddingVertical: 8, borderRadius: 10 }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="mail-outline" size={14} color="#475569" />
+                                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#334155' }}>Send Reset Email ✉️</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* SECTION 5: NEXT OF KIN */}
                                 <View style={s.subFormCard}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
                                         <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
                                             <Ionicons name="people" size={15} color={T.goldDark} />
                                         </View>
                                         <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                            4. Next of Kin Details
+                                            5. Next of Kin Details
                                         </Text>
                                     </View>
 
@@ -2938,19 +3208,19 @@ Metadata:
                                     />
                                 </View>
 
-                                {/* SECTION 5: ACCOUNT STATUS & ACCESS */}
+                                {/* SECTION 6: ACCOUNT STANDING & ACCESS */}
                                 <View style={s.subFormCard}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
                                         <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(212, 175, 55, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
                                             <Ionicons name="lock-closed" size={15} color={T.goldDark} />
                                         </View>
                                         <Text style={{ fontSize: 13, fontWeight: '900', color: T.navyDark, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                            5. Account Standing & Access Permissions
+                                            6. Standing, Role & Access
                                         </Text>
                                     </View>
 
                                     {/* Account Status Segmented Cards */}
-                                    <View style={{ marginBottom: 13 }}>
+                                    <View style={{ marginBottom: 12 }}>
                                         <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
                                             Account Standing
                                         </Text>
@@ -2989,6 +3259,46 @@ Metadata:
                                         </View>
                                     </View>
 
+                                    {/* Account Role Selector */}
+                                    <View style={{ marginBottom: 12 }}>
+                                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+                                            Account Role / Tier
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                                            {[
+                                                { id: 'user', label: 'Customer', icon: 'person-outline' },
+                                                { id: 'agent', label: 'VTU Agent', icon: 'briefcase-outline' },
+                                                { id: 'admin', label: 'Admin', icon: 'shield-outline' }
+                                            ].map(r => {
+                                                const isSel = (editForm.role || 'user') === r.id;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={r.id}
+                                                        onPress={() => setEditForm(prev => ({ ...prev, role: r.id }))}
+                                                        style={{
+                                                            flex: 1,
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: 5,
+                                                            paddingVertical: 9,
+                                                            borderRadius: 10,
+                                                            borderWidth: 1.5,
+                                                            borderColor: isSel ? '#D4AF37' : '#E2E8F0',
+                                                            backgroundColor: isSel ? 'rgba(212, 175, 55, 0.12)' : '#FFFFFF',
+                                                        }}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <Ionicons name={r.icon as any} size={14} color={isSel ? '#B8952B' : '#64748B'} />
+                                                        <Text style={{ fontSize: 11.5, fontWeight: isSel ? '900' : '600', color: isSel ? '#0F172A' : '#64748B' }}>
+                                                            {r.label}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                    </View>
+
                                     <ModernToggleCard
                                         icon="logo-bitcoin"
                                         title="Crypto Trading Access"
@@ -3016,41 +3326,91 @@ Metadata:
                                     />
                                 </View>
 
-                                {/* SAVE BUTTON */}
-                                <TouchableOpacity
-                                    onPress={handleSaveUserProfile}
-                                    disabled={savingProfile}
-                                    style={{
-                                        backgroundColor: '#0F172A',
-                                        borderRadius: 14,
-                                        paddingVertical: 14,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: 8,
-                                        marginTop: 8,
-                                        marginBottom: 28,
-                                        borderWidth: 1.5,
-                                        borderColor: T.gold,
-                                        shadowColor: '#D4AF37',
-                                        shadowOffset: { width: 0, height: 3 },
-                                        shadowOpacity: 0.25,
-                                        shadowRadius: 6,
-                                        elevation: 3,
-                                    }}
-                                    activeOpacity={0.85}
-                                >
-                                    {savingProfile ? (
-                                        <ActivityIndicator color="#FFFFFF" size="small" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="save-outline" size={18} color={T.gold} />
-                                            <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                Save Profile & Settings 💾
-                                            </Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
+                                {/* ACTION BUTTONS: SAVE & REVERT */}
+                                <View style={{ gap: 10, marginTop: 4, marginBottom: 28 }}>
+                                    <TouchableOpacity
+                                        onPress={handleSaveUserProfile}
+                                        disabled={savingProfile}
+                                        style={{
+                                            backgroundColor: '#0F172A',
+                                            borderRadius: 14,
+                                            paddingVertical: 14,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 8,
+                                            borderWidth: 1.5,
+                                            borderColor: T.gold,
+                                            shadowColor: '#D4AF37',
+                                            shadowOffset: { width: 0, height: 3 },
+                                            shadowOpacity: 0.25,
+                                            shadowRadius: 6,
+                                            elevation: 3,
+                                        }}
+                                        activeOpacity={0.85}
+                                    >
+                                        {savingProfile ? (
+                                            <ActivityIndicator color="#FFFFFF" size="small" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="save-outline" size={18} color={T.gold} />
+                                                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                    Save Profile & Settings 💾
+                                                </Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            if (!selectedUser) return;
+                                            setEditForm({
+                                                full_name: selectedUser.full_name || '',
+                                                phone: selectedUser.phone || '',
+                                                whatsapp_number: selectedUser.whatsapp_number || selectedUser.phone || '',
+                                                phone_verified: selectedUser.phone_verified ?? false,
+                                                whatsapp_verified: selectedUser.whatsapp_verified ?? false,
+                                                bank_name: selectedUser.bank_name || '',
+                                                role: selectedUser.role || 'user',
+                                                email: selectedUser.email || '',
+                                                username: selectedUser.username || '',
+                                                gender: selectedUser.gender || 'male',
+                                                dob: selectedUser.dob || '',
+                                                address: selectedUser.address || '',
+                                                state: selectedUser.state || '',
+                                                next_of_kin_name: selectedUser.next_of_kin_name || '',
+                                                next_of_kin_phone: selectedUser.next_of_kin_phone || '',
+                                                custom_id: selectedUser.custom_id || '',
+                                                account_number: selectedUser.account_number || '',
+                                                bvn: selectedUser.bvn || '',
+                                                nin: selectedUser.nin || '',
+                                                kyc_tier: (selectedUser.kyc_tier || 1).toString(),
+                                                kyc_verified: selectedUser.kyc_verified ?? false,
+                                                status: selectedUser.status || 'active',
+                                                transfer_limit: (selectedUser.transfer_limit || selectedUser.daily_limit || 500000).toString(),
+                                                cac_rc_number: selectedUser.cac_rc_number || '',
+                                                admin_notes: selectedUser.admin_notes || '',
+                                                crypto_enabled: selectedUser.crypto_enabled ?? true,
+                                                virtual_cards_enabled: selectedUser.virtual_cards_enabled ?? true
+                                            });
+                                            Alert.alert("Reverted ↩️", "Form has been reset to saved profile values.");
+                                        }}
+                                        style={{
+                                            borderRadius: 12,
+                                            paddingVertical: 10,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderWidth: 1,
+                                            borderColor: '#CBD5E1',
+                                            backgroundColor: '#F8FAFC',
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={{ color: '#64748B', fontSize: 12.5, fontWeight: '700' }}>
+                                            Revert Changes ↩️
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         )}
 
@@ -4384,6 +4744,7 @@ Metadata:
                         )}
                     </ScrollView>
                 </View>
+                </KeyboardAvoidingView>
             </BlurView>
         </Modal>
     );
