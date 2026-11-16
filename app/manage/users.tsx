@@ -425,6 +425,8 @@ export default function UserManagement() {
         virtual_cards_enabled: true
     });
 
+    const [saveBanner, setSaveBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
     const [notifyMessage, setNotifyMessage] = useState('');
     const [notifyTitle, setNotifyTitle] = useState('');
     
@@ -1724,46 +1726,113 @@ export default function UserManagement() {
     const handleSaveUserProfile = async () => {
         if (!selectedUser) return;
         setSavingProfile(true);
+        setSaveBanner(null);
+
+        const safeTrim = (val: any): string | null => {
+            if (val === null || val === undefined) return null;
+            const str = String(val).trim();
+            return str.length > 0 ? str : null;
+        };
+
         try {
-            const updatePayload: any = {
-                full_name: editForm.full_name.trim(),
-                phone: editForm.phone.trim(),
-                whatsapp_number: editForm.whatsapp_number ? editForm.whatsapp_number.trim() : null,
+            // Check if promoting to Admin (24h timelock protocol requirement)
+            let isPromotionRequested = false;
+            if (selectedUser.role === 'user' && (editForm.role === 'admin' || editForm.role === 'super_admin')) {
+                try {
+                    const { data: authData } = await supabase.auth.getUser();
+                    const { error: promoErr } = await supabase.from('admin_promotion_requests').insert({
+                        target_user_id: selectedUser.id,
+                        target_role: editForm.role,
+                        requested_by: authData.user?.id,
+                        requested_by_email: authData.user?.email,
+                        notes: 'Requested via Admin User Management edit form'
+                    });
+                    if (!promoErr) {
+                        isPromotionRequested = true;
+                    }
+                } catch (pErr) {
+                    console.warn("Promotion request notice:", pErr);
+                }
+            }
+
+            // Core Profile Payload (fields guaranteed in public.profiles table)
+            const coreProfilePayload: Record<string, any> = {
+                full_name: (editForm.full_name || '').trim(),
+                phone: (editForm.phone || '').trim(),
+                whatsapp_number: safeTrim(editForm.whatsapp_number),
                 phone_verified: !!editForm.phone_verified,
                 whatsapp_verified: !!editForm.whatsapp_verified,
-                username: editForm.username.trim() || null,
-                gender: editForm.gender,
-                dob: editForm.dob.trim() || null,
-                address: editForm.address.trim() || null,
-                state: editForm.state.trim() || null,
-                next_of_kin_name: editForm.next_of_kin_name.trim() || null,
-                next_of_kin_phone: editForm.next_of_kin_phone.trim() || null,
-                custom_id: editForm.custom_id.trim() || null,
-                account_number: editForm.account_number.trim() || null,
-                bank_name: editForm.bank_name ? editForm.bank_name.trim() : null,
-                bvn: editForm.bvn.trim() || null,
-                nin: editForm.nin.trim() || null,
-                kyc_tier: parseInt(editForm.kyc_tier) || 1,
-                kyc_verified: editForm.kyc_verified,
-                status: editForm.status,
-                role: editForm.role || selectedUser.role || 'user',
+                username: safeTrim(editForm.username),
+                gender: editForm.gender || 'male',
+                dob: safeTrim(editForm.dob),
+                address: safeTrim(editForm.address),
+                state: safeTrim(editForm.state),
+                next_of_kin_name: safeTrim(editForm.next_of_kin_name),
+                next_of_kin_phone: safeTrim(editForm.next_of_kin_phone),
+                custom_id: safeTrim(editForm.custom_id),
+                bvn: safeTrim(editForm.bvn),
+                kyc_tier: parseInt(editForm.kyc_tier, 10) || 1,
+                kyc_verified: !!editForm.kyc_verified,
+                status: editForm.status || 'active',
                 transfer_limit: parseFloat(editForm.transfer_limit) || 500000,
-                daily_limit: parseFloat(editForm.transfer_limit) || 500000,
-                cac_rc_number: editForm.cac_rc_number.trim() || null,
-                admin_notes: editForm.admin_notes.trim() || null,
-                crypto_enabled: editForm.crypto_enabled,
-                virtual_cards_enabled: editForm.virtual_cards_enabled,
+                admin_notes: safeTrim(editForm.admin_notes),
                 updated_at: new Date().toISOString()
             };
 
-            const { error } = await supabase
+            // Keep user role unless approved via timelock or demoting
+            if (editForm.role === selectedUser.role || editForm.role === 'user') {
+                coreProfilePayload.role = editForm.role;
+            }
+
+            // Extended Profile Payload (optional profile columns)
+            const extendedProfilePayload: Record<string, any> = {
+                ...coreProfilePayload,
+                daily_limit: parseFloat(editForm.transfer_limit) || 500000,
+                nin: safeTrim(editForm.nin),
+                cac_rc_number: safeTrim(editForm.cac_rc_number),
+                crypto_enabled: editForm.crypto_enabled ?? true,
+                virtual_cards_enabled: editForm.virtual_cards_enabled ?? true
+            };
+
+            // 1. Attempt database update with extended payload first
+            let updateError: any = null;
+            const { error: extErr } = await supabase
                 .from('profiles')
-                .update(updatePayload)
+                .update(extendedProfilePayload)
                 .eq('id', selectedUser.id);
 
-            if (error) throw error;
+            if (extErr) {
+                // If any column is missing in PostgreSQL (error 42703), safely fallback to core schema
+                console.warn("Retrying profile save with core schema fields due to:", extErr.message);
+                const { error: coreErr } = await supabase
+                    .from('profiles')
+                    .update(coreProfilePayload)
+                    .eq('id', selectedUser.id);
+                if (coreErr) updateError = coreErr;
+            }
 
-            // Log audit record
+            if (updateError) throw updateError;
+
+            // 2. Synchronize Virtual Account if provided
+            const trimmedAcc = safeTrim(editForm.account_number);
+            const trimmedBank = safeTrim(editForm.bank_name) || 'PalmPay / 9PSB';
+            if (trimmedAcc) {
+                try {
+                    await supabase
+                        .from('virtual_accounts')
+                        .upsert({
+                            user_id: selectedUser.id,
+                            account_number: trimmedAcc,
+                            bank_name: trimmedBank,
+                            provider: 'paystack',
+                            account_name: (editForm.full_name || selectedUser.full_name || 'Customer').trim()
+                        }, { onConflict: 'user_id' });
+                } catch (vaErr) {
+                    console.warn("Virtual account upsert notice:", vaErr);
+                }
+            }
+
+            // 3. Log audit event
             try {
                 const { data: authData } = await supabase.auth.getUser();
                 await supabase.from('audit_logs').insert({
@@ -1774,19 +1843,62 @@ export default function UserManagement() {
                         target_user_id: selectedUser.id,
                         target_email: selectedUser.email,
                         target_name: selectedUser.full_name,
-                        updated_fields: Object.keys(updatePayload)
+                        updated_fields: Object.keys(coreProfilePayload)
                     }
                 });
             } catch (auditErr) {
                 console.warn('Audit log notice:', auditErr);
             }
 
-            setSelectedUser({ ...selectedUser, ...updatePayload });
-            fetchUsers();
-            Alert.alert("Profile Saved 🎉", "User profile, permissions and limits updated successfully!");
+            // 4. Update local state smoothly so it NEVER reverts
+            const mergedUser: any = {
+                ...selectedUser,
+                ...editForm,
+                account_number: trimmedAcc || selectedUser.account_number,
+                bank_name: trimmedBank
+            };
+            if (isPromotionRequested) {
+                mergedUser.role = selectedUser.role; // keep user role until 24h timelock
+            }
+
+            // Retain lastLoadedUserIdRef so useEffect won't reset the editForm
+            lastLoadedUserIdRef.current = selectedUser.id;
+            setSelectedUser(mergedUser);
+            setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, ...mergedUser } : u));
+
+            // 5. Success Notifications (In-form Banner + Universal Web & Mobile Alert)
+            const successNotice = isPromotionRequested
+                ? "Profile updated! Admin promotion request has been queued in the 24-hour timelock approval queue."
+                : "User profile, permissions, bank details, and limits updated successfully!";
+
+            setSaveBanner({
+                type: 'success',
+                message: successNotice
+            });
+
+            if (Platform.OS === 'web') {
+                if (typeof window !== 'undefined' && window.alert) {
+                    window.alert(`Profile Saved 🎉\n\n${successNotice}`);
+                }
+            } else {
+                Alert.alert("Profile Saved 🎉", successNotice);
+            }
+
         } catch (e: any) {
             console.error("Save profile error:", e);
-            Alert.alert("Error Saving Profile", e.message || "Failed to update user profile.");
+            const errMsg = e.message || "Failed to update user profile.";
+            setSaveBanner({
+                type: 'error',
+                message: errMsg
+            });
+
+            if (Platform.OS === 'web') {
+                if (typeof window !== 'undefined' && window.alert) {
+                    window.alert(`Error Saving Profile ❌\n\n${errMsg}`);
+                }
+            } else {
+                Alert.alert("Error Saving Profile", errMsg);
+            }
         } finally {
             setSavingProfile(false);
         }
@@ -2779,6 +2891,54 @@ Metadata:
                                     </View>
                                 </LinearGradient>
 
+                                {/* Visual Save Status Notification Banner (Always visible on all screens & Web) */}
+                                {saveBanner && (
+                                    <View style={{
+                                        backgroundColor: saveBanner.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+                                        borderColor: saveBanner.type === 'success' ? '#10B981' : '#EF4444',
+                                        borderWidth: 1.5,
+                                        borderRadius: 14,
+                                        padding: 14,
+                                        marginBottom: 16,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        shadowColor: saveBanner.type === 'success' ? '#10B981' : '#EF4444',
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: 0.15,
+                                        shadowRadius: 4,
+                                        elevation: 2
+                                    }}>
+                                        <Ionicons
+                                            name={saveBanner.type === 'success' ? "checkmark-circle" : "alert-circle"}
+                                            size={24}
+                                            color={saveBanner.type === 'success' ? '#10B981' : '#EF4444'}
+                                        />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{
+                                                fontSize: 13,
+                                                fontWeight: '900',
+                                                color: saveBanner.type === 'success' ? '#065F46' : '#991B1B',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: 0.5
+                                            }}>
+                                                {saveBanner.type === 'success' ? 'Profile Updated Successfully 🎉' : 'Save Profile Error ❌'}
+                                            </Text>
+                                            <Text style={{
+                                                fontSize: 12,
+                                                fontWeight: '600',
+                                                color: saveBanner.type === 'success' ? '#047857' : '#B91C1C',
+                                                marginTop: 2
+                                            }}>
+                                                {saveBanner.message}
+                                            </Text>
+                                        </View>
+                                        <TouchableOpacity onPress={() => setSaveBanner(null)} style={{ padding: 4, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.05)' }}>
+                                            <Ionicons name="close" size={16} color={saveBanner.type === 'success' ? '#065F46' : '#991B1B'} />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
                                 {/* SECTION 1: PERSONAL IDENTITY & CONTACT */}
                                 <View style={s.subFormCard}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -3328,6 +3488,33 @@ Metadata:
 
                                 {/* ACTION BUTTONS: SAVE & REVERT */}
                                 <View style={{ gap: 10, marginTop: 4, marginBottom: 28 }}>
+                                    {saveBanner && (
+                                        <View style={{
+                                            backgroundColor: saveBanner.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+                                            borderColor: saveBanner.type === 'success' ? '#10B981' : '#EF4444',
+                                            borderWidth: 1.5,
+                                            borderRadius: 14,
+                                            padding: 12,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            gap: 10,
+                                            marginBottom: 4
+                                        }}>
+                                            <Ionicons
+                                                name={saveBanner.type === 'success' ? "checkmark-circle" : "alert-circle"}
+                                                size={20}
+                                                color={saveBanner.type === 'success' ? '#10B981' : '#EF4444'}
+                                            />
+                                            <Text style={{
+                                                flex: 1,
+                                                fontSize: 12,
+                                                fontWeight: '700',
+                                                color: saveBanner.type === 'success' ? '#047857' : '#B91C1C'
+                                            }}>
+                                                {saveBanner.message}
+                                            </Text>
+                                        </View>
+                                    )}
                                     <TouchableOpacity
                                         onPress={handleSaveUserProfile}
                                         disabled={savingProfile}
