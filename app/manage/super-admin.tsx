@@ -177,11 +177,13 @@ export default function SuperAdminMasterHubScreen() {
     lockKYC: false,
   });
 
-  // Staff & Promotion Requests (Strictly Super Admin Exclusive)
+  // Staff & Promotion Requests (Super Admin & Staff Governance)
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [promotionRequests, setPromotionRequests] = useState<PromotionRequest[]>([]);
   const [approvingReqId, setApprovingReqId] = useState<string | null>(null);
   const [demotingId, setDemotingId] = useState<string | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [staffFilterTab, setStaffFilterTab] = useState<'all' | 'super_admin' | 'admin'>('all');
 
   // Modals
   const [showDrawer, setShowDrawer] = useState(false);
@@ -284,13 +286,13 @@ export default function SuperAdminMasterHubScreen() {
         console.warn('Kill switches load notice:', err);
       }
 
-      // 5. Super Admin Council Only (Strict Deduplication - Zero Double Entries)
+      // 5. Staff & Super Admin Roster (Strict Deduplication - Zero Double Entries)
       try {
         const { data: staffData } = await supabase
           .from('profiles')
           .select('id, full_name, email, role, status, balance, avatar_url')
-          .eq('role', 'super_admin')
-          .order('full_name', { ascending: true });
+          .in('role', ['super_admin', 'admin'])
+          .order('role', { ascending: false });
 
         if (staffData) {
           const seenIds = new Set<string>();
@@ -302,10 +304,7 @@ export default function SuperAdminMasterHubScreen() {
             if (!seenIds.has(member.id) && (!emailKey || !seenEmails.has(emailKey))) {
               seenIds.add(member.id);
               if (emailKey) seenEmails.add(emailKey);
-              dedupedStaff.push({
-                ...member,
-                role: 'super_admin'
-              });
+              dedupedStaff.push(member);
             }
           }
           setStaffList(dedupedStaff);
@@ -408,54 +407,65 @@ export default function SuperAdminMasterHubScreen() {
     }
   };
 
-  const handleDemoteSuperAdmin = async (member: StaffMember) => {
-    const ownerEmails = [
-      'sale.abumafhal@gmail.com',
-      'abumafhal@gmail.com',
-      'admin@abumafhal.com',
-      'muhammadsaniisyaku3@gmail.com'
-    ];
-    if (ownerEmails.includes((member.email || '').toLowerCase().trim())) {
-      return showUniversalAlert('Action Blocked 🔒', 'Primary Root Owner account cannot be removed or demoted.');
+  const handleUpdateUserRole = async (targetUser: any, newRole: 'super_admin' | 'admin' | 'user') => {
+    // 🛡️ Anti-Hacker & Safety Shield: Prevent self-lockout
+    if (profile?.id === targetUser.id && newRole !== 'super_admin') {
+      return showUniversalAlert('Action Blocked 🔒', 'You cannot demote your own active logged-in Super Admin session.');
     }
 
-    const performDemote = async () => {
-      setDemotingId(member.id);
+    const userName = targetUser.full_name || targetUser.email || 'this user';
+    const roleLabels: Record<string, string> = {
+      super_admin: 'SUPER ADMIN 👑',
+      admin: 'STAFF ADMIN 🛡️',
+      user: 'REGULAR USER 👤'
+    };
+
+    const confirmPrompt = `Are you sure you want to change ${userName}'s clearance to ${roleLabels[newRole]}?`;
+
+    const executeRoleChange = async () => {
+      setUpdatingRoleId(targetUser.id);
       try {
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('demote_admin_to_user', {
-          p_user_id: member.id
+        // 1. Try secure Server RPC (bypasses profile lock and writes audit log)
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_set_user_role', {
+          p_target_user_id: targetUser.id,
+          p_new_role: newRole,
+          p_reason: 'Updated via Super Admin Vault Hub'
         });
 
         if (!rpcErr && rpcRes?.success) {
-          showUniversalAlert('Access Revoked 🛡️', rpcRes.message || 'User demoted successfully.');
+          showUniversalAlert('Role Updated 🎉', rpcRes.message || `${userName} is now set as ${roleLabels[newRole]}!`);
         } else {
-          await supabase.from('profiles').update({
-            role: 'user',
+          // Direct fallback update
+          const { error: directErr } = await supabase.from('profiles').update({
+            role: newRole,
             updated_at: new Date().toISOString()
-          }).eq('id', member.id);
+          }).eq('id', targetUser.id);
 
-          showUniversalAlert('Access Revoked 🛡️', `${member.full_name || member.email} has been demoted to regular user.`);
+          if (directErr) throw directErr;
+          showUniversalAlert('Role Updated 🎉', `${userName} role successfully updated to ${roleLabels[newRole]}!`);
         }
 
+        setNominateSearch('');
+        setNominateResults([]);
         await loadMasterDashboardData();
       } catch (err: any) {
-        showUniversalAlert('Revocation Error', err.message || 'Failed to demote user');
+        showUniversalAlert('Error Updating Role', err.message || 'Failed to update user role');
       } finally {
-        setDemotingId(null);
+        setUpdatingRoleId(null);
       }
     };
 
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.confirm(`Are you sure you want to revoke Super Admin clearance from ${member.full_name || member.email}? They will be converted to regular user.`)) {
-        performDemote();
+      if (typeof window !== 'undefined' && window.confirm(confirmPrompt)) {
+        executeRoleChange();
       }
     } else {
       Alert.alert(
-        'Revoke Super Admin Clearance',
-        `Are you sure you want to revoke Super Admin status from ${member.full_name || member.email}?`,
+        'Confirm Role Change 🛡️',
+        confirmPrompt,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Revoke Clearance', style: 'destructive', onPress: performDemote }
+          { text: `Set as ${newRole.toUpperCase().replace('_', ' ')}`, onPress: executeRoleChange }
         ]
       );
     }
@@ -471,43 +481,13 @@ export default function SuperAdminMasterHubScreen() {
       const q = query.toLowerCase().trim();
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, email, phone, role')
-        .neq('role', 'super_admin')
+        .select('id, full_name, email, phone, role, balance')
         .or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
         .limit(8);
 
       if (data) setNominateResults(data);
     } catch (err) {
       console.warn('Nomination search notice:', err);
-    }
-  };
-
-  const handleAppointSuperAdminDirect = async (userToPromote: any) => {
-    setNominatingUser(true);
-    try {
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('appoint_super_admin_direct', {
-        p_user_id: userToPromote.id,
-        p_notes: 'Direct Super Admin Appointment via Vault Hub'
-      });
-
-      if (!rpcErr && rpcRes?.success) {
-        showUniversalAlert('Appointed Successfully 👑', rpcRes.message || `${userToPromote.full_name || userToPromote.email} is now a Super Admin!`);
-      } else {
-        await supabase.from('profiles').update({
-          role: 'super_admin',
-          updated_at: new Date().toISOString()
-        }).eq('id', userToPromote.id);
-
-        showUniversalAlert('Appointed Successfully 👑', `${userToPromote.full_name || userToPromote.email} is now a Super Admin!`);
-      }
-
-      setNominateSearch('');
-      setNominateResults([]);
-      await loadMasterDashboardData();
-    } catch (err: any) {
-      showUniversalAlert('Appointment Error', err.message || 'Could not appoint Super Admin.');
-    } finally {
-      setNominatingUser(false);
     }
   };
 
@@ -1041,148 +1021,230 @@ export default function SuperAdminMasterHubScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-              {/* Security Metrics Strip */}
-              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
-                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>SUPER ADMINS</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '900', color: C.goldBright, marginTop: 2 }}>{staffList.length}</Text>
-                  <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Active Roster</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>REGULAR ADMINS</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#071435', marginTop: 2 }}>0</Text>
-                  <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Purged & Cleaned ✓</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>REDUNDANCY</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#10b981', marginTop: 2 }}>ZERO</Text>
-                  <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Deduplicated ✓</Text>
-                </View>
-              </View>
+              {/* Security Metrics & Filter Tabs */}
+              {(() => {
+                const superAdminCount = staffList.filter(s => s.role === 'super_admin').length;
+                const adminStaffCount = staffList.filter(s => s.role === 'admin').length;
+                const filteredStaff = staffList.filter(m => {
+                  if (staffFilterTab === 'super_admin') return m.role === 'super_admin';
+                  if (staffFilterTab === 'admin') return m.role === 'admin';
+                  return true;
+                });
 
-              {/* Active Super Admin Council Members */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <MaterialCommunityIcons name="shield-crown" size={16} color={C.goldBright} />
-                  <Text style={{ fontSize: 12, fontWeight: '900', color: '#071435', letterSpacing: 0.5 }}>
-                    VERIFIED SUPER ADMINS ({staffList.length})
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowAccessControlModal(false);
-                    router.push('/manage/staff');
-                  }}
-                >
-                  <Text style={{ color: C.goldBright, fontSize: 11, fontWeight: '800' }}>Staff Directory ➡️</Text>
-                </TouchableOpacity>
-              </View>
+                return (
+                  <>
+                    <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
+                      <TouchableOpacity 
+                        onPress={() => setStaffFilterTab('super_admin')}
+                        style={{ flex: 1, backgroundColor: staffFilterTab === 'super_admin' ? '#fffbeb' : '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: staffFilterTab === 'super_admin' ? C.goldBright : '#e2e8f0', alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>SUPER ADMINS</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '900', color: C.goldBright, marginTop: 2 }}>{superAdminCount}</Text>
+                        <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Master Key 👑</Text>
+                      </TouchableOpacity>
 
-              {staffList.length === 0 ? (
-                <View style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 11, color: '#94a3b8' }}>No Super Admin records found.</Text>
-                </View>
-              ) : (
-                staffList.map(member => {
-                  const emailLower = (member.email || '').toLowerCase().trim();
-                  const isRootOwner = [
-                    'sale.abumafhal@gmail.com',
-                    'abumafhal@gmail.com',
-                    'admin@abumafhal.com',
-                    'muhammadsaniisyaku3@gmail.com'
-                  ].includes(emailLower);
-                  const isDemoting = demotingId === member.id;
+                      <TouchableOpacity 
+                        onPress={() => setStaffFilterTab('admin')}
+                        style={{ flex: 1, backgroundColor: staffFilterTab === 'admin' ? '#eff6ff' : '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: staffFilterTab === 'admin' ? '#3b82f6' : '#e2e8f0', alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>STAFF ADMINS</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#2563eb', marginTop: 2 }}>{adminStaffCount}</Text>
+                        <Text style={{ fontSize: 9, color: '#2563eb', fontWeight: '800' }}>Support & Ops 🛡️</Text>
+                      </TouchableOpacity>
 
-                  return (
-                    <View
-                      key={member.id}
-                      style={{
-                        backgroundColor: '#ffffff',
-                        borderRadius: 14,
-                        padding: 12,
-                        marginBottom: 10,
-                        borderWidth: 1,
-                        borderColor: '#e8edf5',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 3,
-                        elevation: 1
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        {/* Member Avatar */}
-                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#fffbeb', borderWidth: 1.5, borderColor: C.goldBright, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                          {member.avatar_url ? (
-                            <Image source={{ uri: member.avatar_url }} style={{ width: '100%', height: '100%' }} />
-                          ) : (
-                            <Text style={{ fontSize: 14, fontWeight: '900', color: C.goldBright }}>
-                              {member.full_name ? member.full_name.substring(0, 2).toUpperCase() : 'SA'}
-                            </Text>
-                          )}
-                        </View>
+                      <TouchableOpacity 
+                        onPress={() => setStaffFilterTab('all')}
+                        style={{ flex: 1, backgroundColor: staffFilterTab === 'all' ? '#f1f5f9' : '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: staffFilterTab === 'all' ? '#0f172a' : '#e2e8f0', alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>TOTAL STAFF</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#071435', marginTop: 2 }}>{staffList.length}</Text>
+                        <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800' }}>View All ({staffList.length})</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                        {/* Name and Info */}
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#071435' }} numberOfLines={1}>
-                              {member.full_name || 'Super Admin Member'}
-                            </Text>
-                            <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#047857' }}>ONLINE</Text>
+                    {/* Active Staff List Header */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <MaterialCommunityIcons name="shield-account" size={17} color={C.goldBright} />
+                        <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#071435', letterSpacing: 0.3 }}>
+                          MANAGED ACCOUNTS ({filteredStaff.length})
+                        </Text>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setShowAccessControlModal(false);
+                          router.push('/manage/staff');
+                        }}
+                      >
+                        <Text style={{ color: C.goldBright, fontSize: 11, fontWeight: '800' }}>Staff Directory ➡️</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {filteredStaff.length === 0 ? (
+                      <View style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={{ fontSize: 11, color: '#94a3b8' }}>No accounts found in this filter.</Text>
+                      </View>
+                    ) : (
+                      filteredStaff.map(member => {
+                        const isCurrentSession = profile?.id === member.id;
+                        const isUpdating = updatingRoleId === member.id;
+                        const isSuper = member.role === 'super_admin';
+
+                        return (
+                          <View 
+                            key={member.id} 
+                            style={{ 
+                              backgroundColor: '#ffffff', 
+                              borderRadius: 14, 
+                              padding: 12, 
+                              marginBottom: 10, 
+                              borderWidth: 1.5, 
+                              borderColor: isSuper ? '#fde68a' : '#bfdbfe',
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.05,
+                              shadowRadius: 3,
+                              elevation: 1
+                            }}
+                          >
+                            {/* Member Row */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isSuper ? '#fffbeb' : '#eff6ff', borderWidth: 1.5, borderColor: isSuper ? C.goldBright : '#3b82f6', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                {member.avatar_url ? (
+                                  <Image source={{ uri: member.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                                ) : (
+                                  <Text style={{ fontSize: 14, fontWeight: '900', color: isSuper ? C.goldBright : '#2563eb' }}>
+                                    {member.full_name ? member.full_name.substring(0, 2).toUpperCase() : (isSuper ? 'SA' : 'AD')}
+                                  </Text>
+                                )}
+                              </View>
+
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#071435' }} numberOfLines={1}>
+                                    {member.full_name || 'Staff Member'}
+                                  </Text>
+                                  {isCurrentSession && (
+                                    <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                      <Text style={{ fontSize: 8.5, fontWeight: '900', color: '#b45309' }}>YOU (ACTIVE)</Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <Text style={{ fontSize: 11, color: '#64748b', marginTop: 1 }} numberOfLines={1}>{member.email}</Text>
+                              </View>
+
+                              {/* Role Badge */}
+                              <View style={{ backgroundColor: isSuper ? '#fffbeb' : '#eff6ff', borderWidth: 1, borderColor: isSuper ? '#fde68a' : '#bfdbfe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <MaterialCommunityIcons name={isSuper ? "crown" : "shield-account"} size={12} color={isSuper ? C.goldBright : '#2563eb'} />
+                                <Text style={{ fontSize: 10, fontWeight: '900', color: isSuper ? '#b45309' : '#1d4ed8' }}>
+                                  {isSuper ? 'SUPER ADMIN' : 'STAFF ADMIN'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Balance & Interactive Role Switcher Actions */}
+                            <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <Text style={{ fontSize: 10.5, color: '#94a3b8', fontWeight: '600' }}>
+                                  Balance: ₦{(Number(member.balance) || 0).toLocaleString()}
+                                </Text>
+                                {isUpdating && (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <ActivityIndicator size="small" color={C.goldBright} />
+                                    <Text style={{ fontSize: 10, color: C.goldBright, fontWeight: '700' }}>Applying Role...</Text>
+                                  </View>
+                                )}
+                              </View>
+
+                              {/* 3 Real Interactive Role Switch Buttons */}
+                              <View style={{ flexDirection: 'row', gap: 6 }}>
+                                {/* Button 1: Super Admin */}
+                                <TouchableOpacity
+                                  onPress={() => handleUpdateUserRole(member, 'super_admin')}
+                                  disabled={isUpdating || isSuper}
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: isSuper ? '#fef3c7' : '#f8fafc',
+                                    borderWidth: 1,
+                                    borderColor: isSuper ? '#f59e0b' : '#e2e8f0',
+                                    paddingVertical: 6,
+                                    borderRadius: 8,
+                                    alignItems: 'center',
+                                    flexDirection: 'row',
+                                    justifyContent: 'center',
+                                    gap: 3
+                                  }}
+                                >
+                                  <MaterialCommunityIcons name="crown" size={11} color={isSuper ? '#b45309' : '#64748b'} />
+                                  <Text style={{ fontSize: 10, fontWeight: '800', color: isSuper ? '#b45309' : '#475569' }}>
+                                    {isSuper ? 'Super Admin ✓' : 'Make Super'}
+                                  </Text>
+                                </TouchableOpacity>
+
+                                {/* Button 2: Staff Admin */}
+                                <TouchableOpacity
+                                  onPress={() => handleUpdateUserRole(member, 'admin')}
+                                  disabled={isUpdating || (!isSuper && member.role === 'admin')}
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: (!isSuper && member.role === 'admin') ? '#dbeafe' : '#f8fafc',
+                                    borderWidth: 1,
+                                    borderColor: (!isSuper && member.role === 'admin') ? '#3b82f6' : '#e2e8f0',
+                                    paddingVertical: 6,
+                                    borderRadius: 8,
+                                    alignItems: 'center',
+                                    flexDirection: 'row',
+                                    justifyContent: 'center',
+                                    gap: 3
+                                  }}
+                                >
+                                  <Ionicons name="shield-outline" size={11} color={(!isSuper && member.role === 'admin') ? '#1d4ed8' : '#64748b'} />
+                                  <Text style={{ fontSize: 10, fontWeight: '800', color: (!isSuper && member.role === 'admin') ? '#1d4ed8' : '#475569' }}>
+                                    {(!isSuper && member.role === 'admin') ? 'Staff Admin ✓' : 'Make Staff'}
+                                  </Text>
+                                </TouchableOpacity>
+
+                                {/* Button 3: Revert to User */}
+                                <TouchableOpacity
+                                  onPress={() => handleUpdateUserRole(member, 'user')}
+                                  disabled={isUpdating || isCurrentSession}
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: isCurrentSession ? '#f1f5f9' : '#fee2e2',
+                                    borderWidth: 1,
+                                    borderColor: isCurrentSession ? '#cbd5e1' : '#fca5a5',
+                                    paddingVertical: 6,
+                                    borderRadius: 8,
+                                    alignItems: 'center',
+                                    flexDirection: 'row',
+                                    justifyContent: 'center',
+                                    gap: 3,
+                                    opacity: isCurrentSession ? 0.6 : 1
+                                  }}
+                                >
+                                  <Ionicons name={isCurrentSession ? "lock-closed" : "person-outline"} size={11} color={isCurrentSession ? '#94a3b8' : '#dc2626'} />
+                                  <Text style={{ fontSize: 10, fontWeight: '800', color: isCurrentSession ? '#94a3b8' : '#dc2626' }}>
+                                    {isCurrentSession ? 'Locked 🔒' : 'Make User 👤'}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
                             </View>
                           </View>
-                          <Text style={{ fontSize: 11, color: '#64748b', marginTop: 1 }} numberOfLines={1}>{member.email}</Text>
-                        </View>
+                        );
+                      })
+                    )}
+                  </>
+                );
+              })()}
 
-                        {/* Role Badge */}
-                        <View style={{ backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <MaterialCommunityIcons name="crown" size={12} color={C.goldBright} />
-                          <Text style={{ fontSize: 10, fontWeight: '900', color: '#b45309' }}>SUPER ADMIN</Text>
-                        </View>
-                      </View>
-
-                      {/* Action Bar */}
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
-                        <Text style={{ fontSize: 10.5, color: '#94a3b8', fontWeight: '600' }}>
-                          Balance: ₦{(Number(member.balance) || 0).toLocaleString()}
-                        </Text>
-
-                        {isRootOwner ? (
-                          <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Ionicons name="key" size={11} color="#d97706" />
-                            <Text style={{ fontSize: 9.5, fontWeight: '900', color: '#92400e' }}>PRIMARY ROOT OWNER</Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            onPress={() => handleDemoteSuperAdmin(member)}
-                            disabled={isDemoting}
-                            style={{ backgroundColor: '#fee2e2', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                          >
-                            {isDemoting ? (
-                              <ActivityIndicator size="small" color="#ef4444" />
-                            ) : (
-                              <>
-                                <Ionicons name="arrow-down-circle" size={12} color="#dc2626" />
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#dc2626' }}>Demote to User</Text>
-                              </>
-                            )}
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-
-              {/* Appoint / Nominate Super Admin Section */}
+              {/* Appoint / Manage User Roles Section */}
               <View style={{ marginTop: 16, backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <Ionicons name="person-add" size={16} color={C.goldBright} />
-                  <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#071435' }}>Appoint New Super Admin</Text>
+                  <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#071435' }}>Manage Any Account Role</Text>
                 </View>
                 <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
-                  Search any registered user to appoint to the Super Admin Council with zero duplicate records.
+                  Search any registered user to instantly promote to Super Admin, Staff Admin, or revert to Regular User.
                 </Text>
 
                 {/* User Search Input */}
@@ -1204,27 +1266,47 @@ export default function SuperAdminMasterHubScreen() {
 
                 {/* Search Results */}
                 {nominateResults.length > 0 && (
-                  <View style={{ backgroundColor: '#ffffff', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', padding: 6, marginBottom: 8 }}>
+                  <View style={{ backgroundColor: '#ffffff', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', padding: 8, marginBottom: 8 }}>
                     {nominateResults.map(usr => (
-                      <View key={usr.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#071435' }}>{usr.full_name || 'Member'}</Text>
-                          <Text style={{ fontSize: 10.5, color: '#64748b' }}>{usr.email}</Text>
+                      <View key={usr.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#071435' }}>{usr.full_name || 'Member'}</Text>
+                            <Text style={{ fontSize: 11, color: '#64748b' }}>{usr.email}</Text>
+                          </View>
+                          <View style={{ backgroundColor: usr.role === 'super_admin' ? '#fffbeb' : usr.role === 'admin' ? '#eff6ff' : '#f1f5f9', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: usr.role === 'super_admin' ? '#b45309' : usr.role === 'admin' ? '#1d4ed8' : '#475569' }}>
+                              {(usr.role || 'user').toUpperCase()}
+                            </Text>
+                          </View>
                         </View>
-                        <TouchableOpacity
-                          onPress={() => handleAppointSuperAdminDirect(usr)}
-                          disabled={nominatingUser}
-                          style={{ backgroundColor: '#071435', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                        >
-                          {nominatingUser ? (
-                            <ActivityIndicator size="small" color="#f5a623" />
-                          ) : (
-                            <>
-                              <MaterialCommunityIcons name="crown" size={12} color="#f5a623" />
-                              <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900' }}>Appoint 👑</Text>
-                            </>
-                          )}
-                        </TouchableOpacity>
+
+                        {/* 3 Real Role Assignment Buttons */}
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <TouchableOpacity
+                            onPress={() => handleUpdateUserRole(usr, 'super_admin')}
+                            disabled={updatingRoleId === usr.id}
+                            style={{ flex: 1, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: '900', color: '#b45309' }}>👑 Super Admin</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={() => handleUpdateUserRole(usr, 'admin')}
+                            disabled={updatingRoleId === usr.id}
+                            style={{ flex: 1, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: '900', color: '#1d4ed8' }}>🛡️ Staff Admin</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={() => handleUpdateUserRole(usr, 'user')}
+                            disabled={updatingRoleId === usr.id || profile?.id === usr.id}
+                            style={{ flex: 1, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fca5a5', paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: '900', color: '#dc2626' }}>👤 Set User</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     ))}
                   </View>

@@ -265,6 +265,118 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
+-- ==============================================================================
+-- 5. UNIVERSAL ROLE DISPATCHER (SUPER ADMIN, STAFF ADMIN, OR USER)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.admin_set_user_role(
+    p_target_user_id UUID, 
+    p_new_role TEXT, 
+    p_reason TEXT DEFAULT 'Updated via Super Admin Vault'
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_caller_id UUID;
+    v_caller_email TEXT;
+    v_target_email TEXT;
+    v_target_name TEXT;
+    v_old_role TEXT;
+BEGIN
+    v_caller_id := auth.uid();
+
+    -- 🛡️ Anti-Hacker Shield: Require Admin clearance
+    IF NOT public.is_admin() THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Unauthorized: Super Admin credentials required.');
+    END IF;
+
+    -- Validate role
+    IF p_new_role NOT IN ('super_admin', 'admin', 'user') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid role: must be super_admin, admin, or user.');
+    END IF;
+
+    -- Prevent self-demotion from active session
+    IF v_caller_id = p_target_user_id AND p_new_role != 'super_admin' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Action rejected: You cannot demote your own active logged-in session.');
+    END IF;
+
+    SELECT email, full_name, role INTO v_target_email, v_target_name, v_old_role 
+    FROM public.profiles 
+    WHERE id = p_target_user_id;
+
+    IF v_target_email IS NULL THEN
+        SELECT email INTO v_target_email FROM auth.users WHERE id = p_target_user_id;
+    END IF;
+
+    IF v_target_email IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Target user profile not found.');
+    END IF;
+
+    SELECT email INTO v_caller_email FROM auth.users WHERE id = v_caller_id;
+
+    -- Enable session bypass to safely update profile
+    PERFORM set_config('app.bypass_profile_lock', 'true', true);
+
+    -- 1. Update public.profiles
+    UPDATE public.profiles
+    SET role = p_new_role,
+        updated_at = timezone('utc'::text, now())
+    WHERE id = p_target_user_id;
+
+    -- 2. Update auth.users metadata
+    UPDATE auth.users
+    SET raw_app_meta_data = jsonb_set(
+        COALESCE(raw_app_meta_data, '{}'::jsonb),
+        '{role}',
+        to_jsonb(p_new_role)
+    )
+    WHERE id = p_target_user_id;
+
+    -- 3. Update pending requests accordingly
+    IF p_new_role = 'user' THEN
+        UPDATE public.admin_promotion_requests
+        SET status = 'cancelled',
+            cancelled_by = v_caller_id,
+            cancelled_by_email = v_caller_email,
+            cancelled_at = timezone('utc'::text, now()),
+            notes = 'Demoted to user: ' || COALESCE(p_reason, 'None'),
+            updated_at = timezone('utc'::text, now())
+        WHERE target_user_id = p_target_user_id AND status = 'pending';
+    ELSIF p_new_role IN ('super_admin', 'admin') THEN
+        UPDATE public.admin_promotion_requests
+        SET status = 'approved',
+            approved_by = v_caller_id,
+            approved_by_email = v_caller_email,
+            approved_at = timezone('utc'::text, now()),
+            updated_at = timezone('utc'::text, now())
+        WHERE target_user_id = p_target_user_id AND status = 'pending';
+    END IF;
+
+    -- 4. Audit Log
+    INSERT INTO public.audit_logs (admin_id, action, target_resource, details)
+    VALUES (
+        v_caller_id,
+        'SUPER_ADMIN_CHANGED_USER_ROLE',
+        'profiles',
+        jsonb_build_object(
+            'target_user_id', p_target_user_id,
+            'target_email', v_target_email,
+            'old_role', v_old_role,
+            'new_role', p_new_role,
+            'changed_by', v_caller_email,
+            'reason', p_reason
+        )
+    );
+
+    RETURN jsonb_build_object(
+        'success', true, 
+        'message', 'User ' || COALESCE(v_target_name, v_target_email) || ' role successfully updated to ' || UPPER(p_new_role),
+        'role', p_new_role,
+        'target_id', p_target_user_id
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Grant permissions
 GRANT EXECUTE ON FUNCTION public.demote_admin_to_user(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.appoint_super_admin_direct(UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_set_user_role(UUID, TEXT, TEXT) TO authenticated, service_role;
